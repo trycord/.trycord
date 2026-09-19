@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { now, uuid } = require('../util');
 const roles = require('./roles');
+const { Codes } = require('../errors');
 const { effectivePermissions } = require('./permissions');
 
 const LIST_COLS = `
@@ -60,8 +61,11 @@ function create({ name, description, joinCode, isPublic, isDiscoverable }, owner
       isDiscoverable: isDiscoverable === undefined ? !!isPublic : !!isDiscoverable,
     }, owner);
   } catch (e) {
-    if (e.code) throw e;
-    if (String(e.message).includes('UNIQUE')) throw { code: 'CONFLICT', message: 'join code taken' };
+    // Service-shaped errors pass through; raw driver errors get translated.
+    // (better-sqlite3 sets e.code like 'SQLITE_CONSTRAINT_UNIQUE', which is
+    // NOT a service code — so check against the registry, not truthiness.)
+    if (e && e.code && Codes[e.code]) throw e;
+    if (String(e && e.message).includes('UNIQUE')) throw { code: 'CONFLICT', message: 'join code taken' };
     throw e;
   }
 }
