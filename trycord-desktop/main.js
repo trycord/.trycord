@@ -1,13 +1,13 @@
 // Trycord desktop window (Discord-style Electron wrapper).
 // Loads the bundled web client (client/, copied from trycord-client at build).
-// Needs trycord-server running at http://localhost:3000.
+// Needs trycord-server running at http://localhost:9971.
 // Dev:  npm start        Single-file exe:  npm run dist
 // Self-test (needs server): npm run smoke
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const API = 'http://localhost:3000';
+const API = 'http://localhost:9971';
 
 function clientEntry() {
   const bundled = path.join(__dirname, 'client', 'index.html');

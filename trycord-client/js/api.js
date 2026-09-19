@@ -13,7 +13,7 @@
       var q = new URLSearchParams(location.search).get('api');
       if (q) return q.replace(/\/$/, '');
     } catch (e) { /* ignore */ }
-    if (location.protocol === 'file:' || location.port === '5500') return 'http://localhost:3000';
+    if (location.protocol === 'file:' || location.port === '5500') return 'http://localhost:9971';
     return location.origin;
   }
 

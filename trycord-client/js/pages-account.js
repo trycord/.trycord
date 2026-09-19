@@ -60,7 +60,7 @@
 
       '<section class="settings-card" aria-labelledby="set-app"><h2 id="set-app">Application</h2>' +
       '<form id="api-form"><label class="field"><span>Server URL (blank = auto)</span>' +
-      '<input type="url" id="set-api" placeholder="http://localhost:3000" value="' + Ui.esc(s.apiBase || '') + '" /></label>' +
+      '<input type="url" id="set-api" placeholder="http://localhost:9971" value="' + Ui.esc(s.apiBase || '') + '" /></label>' +
       '<button class="btn btn-sm" type="submit">Save &amp; reload</button></form>' +
       '<hr class="divider" />' +
       '<div class="form-row"><button class="btn btn-ghost btn-sm" id="clear-local" type="button">Clear favorites &amp; recent</button>' +
