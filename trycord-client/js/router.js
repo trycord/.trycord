@@ -26,6 +26,9 @@
     if (segs[0] === 'server' && segs[1]) {
       return { name: 'workspace', id: segs[1], tab: segs[2] || 'overview', channel: segs[3] || null };
     }
+    if (segs[0] === 'discover' && segs[1]) {
+      return { name: 'preview', id: segs[1] };
+    }
     var simple = ['login', 'register', 'home', 'servers', 'discover', 'join', 'activity', 'favorites', 'profile', 'settings'];
     if (simple.indexOf(segs[0]) !== -1) return { name: segs[0] };
     return { name: 'unknown' };
@@ -74,6 +77,10 @@
         case 'home': await Home.home(view); break;
         case 'servers': Browse.servers(view); break;
         case 'discover': await Browse.discover(view); break;
+        case 'preview':
+          C.renderSidebar('#/discover');
+          await Browse.preview(view, r.id);
+          break;
         case 'join': Browse.join(view); break;
         case 'activity': await Browse.activity(view); break;
         case 'favorites': Browse.favorites(view); break;

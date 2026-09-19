@@ -1,0 +1,61 @@
+// /api/servers/:serverId/roles — role CRUD + assignment (MANAGE_ROLES, except list).
+const express = require('express');
+const auth = require('../middleware/auth');
+const { resolveServer, requireMember, requirePerm } = require('../middleware/serverAccess');
+const { fail, serviceError } = require('../errors');
+const roles = require('../services/roles');
+const memberships = require('../services/memberships');
+const { PERMISSIONS } = require('../services/permissions');
+
+const router = express.Router({ mergeParams: true });
+router.use(auth, resolveServer);
+
+router.get('/permissions', requireMember, (req, res) => {
+  res.json({ is_owner: req.access.isOwner, permissions: req.access.permissions, all: PERMISSIONS });
+});
+
+router.get('/', requireMember, (req, res) => {
+  res.json(roles.list(req.server.id));
+});
+
+router.post('/', requirePerm('MANAGE_ROLES'), (req, res) => {
+  try {
+    const { name, permissions } = req.body || {};
+    res.json(roles.create(req.server.id, { name, permissions }));
+  } catch (e) { serviceError(res, e); }
+});
+
+router.patch('/:roleId', requirePerm('MANAGE_ROLES'), (req, res) => {
+  const role = roles.get(req.params.roleId);
+  if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+  try {
+    const { name, permissions } = req.body || {};
+    res.json(roles.update(role, { name, permissions }));
+  } catch (e) { serviceError(res, e); }
+});
+
+router.delete('/:roleId', requirePerm('MANAGE_ROLES'), (req, res) => {
+  const role = roles.get(req.params.roleId);
+  if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+  try {
+    res.json(roles.remove(role));
+  } catch (e) { serviceError(res, e); }
+});
+
+router.post('/:roleId/assign', requirePerm('MANAGE_ROLES'), (req, res) => {
+  const role = roles.get(req.params.roleId);
+  if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+  const { userId } = req.body || {};
+  if (!userId || !memberships.get(req.server.id, userId)) {
+    return fail(res, 'NOT_A_MEMBER', 'user is not a member');
+  }
+  res.json(roles.assign(req.server.id, userId, role.id));
+});
+
+router.delete('/:roleId/assign/:userId', requirePerm('MANAGE_ROLES'), (req, res) => {
+  const role = roles.get(req.params.roleId);
+  if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+  res.json(roles.unassign(req.server.id, req.params.userId, role.id));
+});
+
+module.exports = router;

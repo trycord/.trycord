@@ -65,7 +65,7 @@
       '<hr class="divider" />' +
       '<div class="form-row"><button class="btn btn-ghost btn-sm" id="clear-local" type="button">Clear favorites &amp; recent</button>' +
       '<button class="btn btn-ghost btn-sm" id="logout-btn2" type="button">Log out</button></div>' +
-      '<p class="hint">Trycord web client v0.2.0 · API at <code>' + Ui.esc(location.origin) + '</code></p></section>' +
+      '<p class="hint">Trycord web client v0.3.0 · roles, invites & public discovery ready.</p></section>' +
       '</div>';
 
     document.getElementById('set-theme').value = s.theme || 'dark';

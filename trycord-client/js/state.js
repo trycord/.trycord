@@ -14,6 +14,7 @@
   var State = {
     user: null,
     servers: [],
+    perms: {}, // serverId -> { is_owner, permissions[] }
     favorites: load('trycord.favorites', []),
     recent: load('trycord.recent', []),
     settings: Object.assign(
@@ -38,6 +39,17 @@
       State.recent = State.recent.filter((r) => ids[r.id]);
       save('trycord.favorites', State.favorites);
       save('trycord.recent', State.recent);
+    },
+    // Effective access for the open server: { is_owner, permissions[] }.
+    // '*' means all permissions (owner). Always mirrored by the backend.
+    setPerms(serverId, access) {
+      State.perms[serverId] = access || { is_owner: false, permissions: [] };
+    },
+    can(serverId, perm) {
+      var a = State.perms[serverId];
+      if (!a) return false;
+      if (a.is_owner) return true;
+      return (a.permissions || []).indexOf(perm) !== -1;
     },
     serverById(id) {
       for (var i = 0; i < State.servers.length; i++) {

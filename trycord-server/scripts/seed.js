@@ -1,8 +1,10 @@
-// Seed a demo account + server so the app is usable on first run.
+// Seed a demo account + public server so the app is usable on first run.
 // Run:  npm run seed   (from trycord-server/)
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const db = require('../src/db');
+const servers = require('../src/services/servers');
+const invites = require('../src/services/invites');
 
 const now = () => new Date().toISOString();
 
@@ -14,19 +16,21 @@ if (!user) {
   user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
 }
 
-let srv = db.prepare('SELECT * FROM servers WHERE join_code = ?').get('lobby');
-if (!srv) {
-  const serverId = crypto.randomUUID();
-  db.prepare('INSERT INTO servers (id, name, description, owner_id, join_code, is_public, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(serverId, 'Lobby', 'Demo server — open to everyone', user.id, 'lobby', 1, now());
-  db.prepare('INSERT OR IGNORE INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)')
-    .run(crypto.randomUUID(), user.id, serverId, user.username, now());
-  db.prepare("INSERT INTO channels (id, server_id, name, topic, type, position) VALUES (?, ?, 'general', 'General chat', 'text', 0)")
-    .run(crypto.randomUUID(), serverId);
-  srv = db.prepare('SELECT * FROM servers WHERE id = ?').get(serverId);
+let serverId;
+try {
+  const r = servers.create(
+    { name: 'Lobby', description: 'Demo server — open to everyone', joinCode: 'lobby', isPublic: true, isDiscoverable: true },
+    { id: user.id, username: user.username }
+  );
+  serverId = r.serverId;
+} catch (e) {
+  if (e.code !== 'CONFLICT') throw e;
+  serverId = db.prepare('SELECT id FROM servers WHERE join_code = ?').get('lobby').id;
 }
 
+const invite = invites.create(serverId, user.id, {});
 console.log('Seed ready:');
-console.log('  login:     demo / demo1234');
-console.log('  join code: lobby');
-console.log('  url:       http://localhost:' + (process.env.PORT || 3000));
+console.log('  login:       demo / demo1234');
+console.log('  join code:   lobby');
+console.log('  invite code: ' + invite.code);
+console.log('  url:         http://localhost:' + (process.env.PORT || 3000));

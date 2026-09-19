@@ -1,7 +1,16 @@
-/* Browse pages: servers browser, discover, join flow, activity, favorites. */
+/* Browse pages: servers browser, public discover + preview, join flow, activity, favorites. */
 (function () {
   var Ui = window.TrycordUi;
   var C = window.TrycordComponents;
+
+  var INVITE_ERRORS = {
+    INVITE_EXPIRED: 'That invite has expired.',
+    INVITE_EXHAUSTED: 'That invite has no uses left.',
+    INVITE_REVOKED: 'That invite was revoked.',
+    INVITE_INVALID: 'Invite not found.',
+    ALREADY_MEMBER: 'You are already a member.',
+    SERVER_PRIVATE: 'This server is private — you need an invite.',
+  };
 
   function sortServers(list, mode) {
     var arr = list.slice();
@@ -77,97 +86,256 @@
     if (topBtn) topBtn.onclick = () => C.createServerModal(() => servers(root));
   }
 
-  // --- discover ----------------------------------------------------------
+  // --- discover (public index, paginated, no membership required) --------
+  function publicCard(s) {
+    var member = TrycordState.serverById(s.id);
+    return (
+      '<article class="server-card">' +
+      '<div class="head">' + Ui.avatarHtml(s.name) +
+      '<div class="titles"><h3>' + Ui.esc(s.name) + '</h3>' +
+      '<div class="meta"><span>' + s.member_count + ' member' + (s.member_count === 1 ? '' : 's') + '</span>' +
+      '<span aria-hidden="true">·</span><span>' + s.channel_count + ' channels</span></div>' +
+      '</div></div>' +
+      '<p class="desc">' + Ui.esc(s.description || 'No description.') + '</p>' +
+      '<div class="foot"><a class="btn btn-sm" href="#/discover/' + Ui.esc(s.id) + '">Preview</a>' +
+      '<span class="grow"></span>' +
+      (member
+        ? '<a class="btn btn-sm btn-ghost" href="#/server/' + Ui.esc(s.id) + '">Open →</a>'
+        : '<button type="button" class="btn btn-sm btn-primary" data-quick-join="' + Ui.esc(s.id) + '">Join</button>') +
+      '</div></article>'
+    );
+  }
+
   async function discover(root) {
-    C.setTopbar('Discover', 'Public servers open to everyone.');
-    root.innerHTML = '<section class="section">' + filterBar('dis') + '</section>';
+    C.setTopbar('Discover', 'Public servers — preview without joining.');
+    root.innerHTML =
+      '<section class="section"><div class="toolbar" role="search">' +
+      '<input type="text" id="dis-q" class="grow" placeholder="Search public servers…" aria-label="Search public servers" />' +
+      '</div><div id="dis-results"></div>' +
+      '<div class="row" style="justify-content:center;margin-top:1rem"><button type="button" class="btn btn-ghost" id="dis-more" hidden>Load more</button></div></section>';
+
     var out = root.querySelector('#dis-results');
-    out.innerHTML = Ui.skeletons(4);
+    var moreBtn = root.querySelector('#dis-more');
+    var q = root.querySelector('#dis-q');
+    var items = [];
+    var page = 1;
+    var pages = 1;
+    var loading = false;
+    var t = null;
+
+    function paint(append) {
+      if (!items.length) {
+        out.innerHTML = Ui.emptyState({
+          icon: '◌', title: 'No public servers found',
+          hint: q.value.trim()
+            ? 'Try a different search.'
+            : 'Server owners can list their server here from Server → Settings → Visibility.',
+        });
+      } else {
+        out.innerHTML = '<div class="grid-cards">' + items.map(publicCard).join('') + '</div>';
+        out.querySelectorAll('[data-quick-join]').forEach((b) => {
+          b.onclick = () => quickJoin(b.dataset.quickJoin, b);
+        });
+      }
+      moreBtn.hidden = page >= pages;
+    }
+
+    async function load(reset) {
+      if (loading) return;
+      loading = true;
+      if (reset) { page = 1; items = []; out.innerHTML = Ui.skeletons(4); }
+      try {
+        var r = await TrycordApi.discover(q.value.trim(), page, 12);
+        pages = r.pages;
+        items = reset ? r.items : items.concat(r.items);
+        paint();
+      } catch (e) {
+        if (reset) {
+          out.innerHTML = Ui.errorState(e.message);
+          var rb = out.querySelector('[data-retry]');
+          if (rb) rb.onclick = () => load(true);
+        } else Ui.toast(e.message, 'bad');
+      }
+      loading = false;
+    }
+
+    async function quickJoin(serverId, btn) {
+      Ui.setLoading(btn, true, 'Joining…');
+      try {
+        var r = await TrycordApi.joinPublic(serverId);
+        await Trycord.refreshServers();
+        Ui.setLoading(btn, false);
+        Ui.toast('Joined server.', 'good');
+        location.hash = '#/server/' + encodeURIComponent(r.serverId || serverId);
+      } catch (e) {
+        Ui.setLoading(btn, false);
+        Ui.toast(INVITE_ERRORS[e.code] || e.message, 'bad');
+      }
+    }
+
+    q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => load(true), 350); });
+    moreBtn.onclick = () => { page++; load(false); };
+    load(true);
+  }
+
+  // --- public preview (no membership required) ---------------------------
+  async function preview(root, serverId) {
+    C.setTopbar('Server Preview', 'Public information — no membership needed.');
+    root.innerHTML = '<div id="prev-body">' + Ui.skeletons(3) + '</div>';
+    var body = document.getElementById('prev-body');
     try {
-      var all = await TrycordApi.discover('');
-      var rerender = bindFilter(root, 'dis', () => all,
-        Ui.emptyState({
-          icon: '◌', title: 'No public servers yet',
-          hint: 'Server owners can list their server here from Server → Settings → Visibility.',
-          actions: '<a class="btn btn-ghost btn-sm" href="#/servers">Your servers</a>',
-        }));
-      // live server-side search on typing (debounced)
-      var q = root.querySelector('#dis-q');
-      var t = null;
-      q.addEventListener('input', () => {
-        clearTimeout(t);
-        t = setTimeout(async () => {
-          try { all = await TrycordApi.discover(q.value.trim()); rerender(); } catch (e) { /* keep old */ }
-        }, 350);
-      });
+      var p = await TrycordApi.discoverPreview(serverId);
     } catch (e) {
-      out.innerHTML = Ui.errorState(e.message);
-      var rb = out.querySelector('[data-retry]');
-      if (rb) rb.onclick = () => discover(root);
+      body.innerHTML = Ui.emptyState({
+        icon: '◌', title: 'Server unavailable',
+        hint: 'It may be private, unlisted, or deleted.',
+        actions: '<a class="btn btn-ghost btn-sm" href="#/discover">Back to Discover</a>',
+      });
+      return;
+    }
+    var member = TrycordState.serverById(p.id);
+    body.innerHTML =
+      '<section class="ws-head">' + Ui.avatarHtml(p.name, 'lg') +
+      '<div class="titles"><h2>' + Ui.esc(p.name) + '</h2>' +
+      '<p class="desc">' + Ui.esc(p.description || 'No description.') + '</p></div>' +
+      '<div class="side">' +
+      (member
+        ? '<a class="btn btn-primary" href="#/server/' + Ui.esc(p.id) + '">Open server →</a>'
+        : '<button type="button" class="btn btn-primary" id="prev-join">Join server</button>') +
+      '<a class="btn btn-ghost" href="#/discover">Discover</a></div></section>' +
+      '<div class="stats">' +
+      '<div class="stat"><div class="num">' + p.member_count + '</div><div class="lbl">Members</div></div>' +
+      '<div class="stat"><div class="num">' + p.channel_count + '</div><div class="lbl">Channels</div></div>' +
+      '<div class="stat"><div class="num">' + Ui.timeAgo(p.created_at) + '</div><div class="lbl">Created</div></div>' +
+      '</div>' +
+      '<section class="section"><h2>Channels</h2>' +
+      (p.channels.length
+        ? '<div class="activity-list">' + p.channels.map((c) =>
+          '<div class="activity-item"><span class="body"><span class="ctx"><b>#' + Ui.esc(c.name) + '</b></span>' +
+          '<span class="text muted">' + Ui.esc(c.topic || 'No topic.') + '</span></span></div>').join('') + '</div>'
+        : '<p class="muted">No channels listed.</p>') + '</section>';
+
+    var joinBtn = document.getElementById('prev-join');
+    if (joinBtn) {
+      joinBtn.onclick = async () => {
+        Ui.setLoading(joinBtn, true, 'Joining…');
+        try {
+          var r = await TrycordApi.joinPublic(p.id);
+          await Trycord.refreshServers();
+          Ui.toast('Joined ' + p.name + '.', 'good');
+          location.hash = '#/server/' + encodeURIComponent(r.serverId || p.id);
+        } catch (e) {
+          Ui.setLoading(joinBtn, false);
+          if (e.code === 'ALREADY_MEMBER') {
+            await Trycord.refreshServers();
+            location.hash = '#/server/' + encodeURIComponent(p.id);
+          } else Ui.toast(INVITE_ERRORS[e.code] || e.message, 'bad');
+        }
+      };
     }
   }
 
-  // --- join --------------------------------------------------------------
-  function join(root, presetCode) {
-    C.setTopbar('Join a Server', 'Enter an invite code to join.');
+  // --- join (invites first, legacy codes as fallback) ---------------------
+  function join(root) {
+    C.setTopbar('Join a Server', 'Enter an invite code.');
     root.innerHTML =
       '<div class="join-wrap stack"><section class="settings-card">' +
-      '<h2>Enter a Trycord invite code</h2>' +
-      '<form id="join-form" novalidate><label class="field"><span>Invite code</span>' +
-      '<input type="text" id="join-code" class="code-input" placeholder="e.g. lobby" autocomplete="off" spellcheck="false" /></label>' +
-      '<button class="btn btn-primary btn-block" type="submit" id="join-lookup">Look up server</button></form>' +
+      '<h2>Enter an invite code</h2>' +
+      '<form id="join-form" novalidate><label class="field"><span>Invite or join code</span>' +
+      '<input type="text" id="join-code" class="code-input" placeholder="e.g. AB12CD34 or lobby" autocomplete="off" spellcheck="false" /></label>' +
+      '<button class="btn btn-primary btn-block" type="submit" id="join-lookup">Look up</button></form>' +
       '<div id="join-result" style="margin-top:1rem"></div>' +
-      '<hr class="divider" /><p class="muted small">Don’t have a code? <a href="#/discover">Browse Discover</a> for public servers.</p>' +
+      '<hr class="divider" /><p class="muted small">No code? <a href="#/discover">Browse Discover</a> for public servers.</p>' +
       '</section></div>';
 
     var codeInput = document.getElementById('join-code');
-    if (presetCode) codeInput.value = presetCode;
 
     document.getElementById('join-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      var code = codeInput.value.trim().toLowerCase();
+      var code = codeInput.value.trim();
       if (!Ui.fieldError(codeInput, code ? '' : 'Enter an invite code.')) return;
       var btn = document.getElementById('join-lookup');
       var box = document.getElementById('join-result');
       Ui.setLoading(btn, true, 'Looking up…');
       box.innerHTML = '';
+
+      // Path 1: invite code -> invite preview (state included).
+      var found = null; // { kind: 'invite'|'legacy', server, invite? }
       try {
-        var srv = await TrycordApi.previewByCode(code);
-        Ui.setLoading(btn, false);
-        var already = TrycordState.serverById(srv.id);
-        box.innerHTML =
-          '<div class="server-card"><div class="head">' + Ui.avatarHtml(srv.name) +
-          '<div class="titles"><h3>' + Ui.esc(srv.name) + '</h3>' +
-          '<div class="meta"><span>' + srv.member_count + ' member' + (srv.member_count === 1 ? '' : 's') + '</span></div>' +
-          '</div></div>' +
-          '<p class="desc">' + Ui.esc(srv.description || 'No description.') + '</p>' +
-          '<div class="foot"><button type="button" class="btn btn-primary" id="do-join">' +
-          (already ? 'Open server' : 'Join server') + '</button></div></div>';
-        document.getElementById('do-join').onclick = async (ev) => {
-          var jb = ev.currentTarget;
-          if (already) {
-            location.hash = '#/server/' + encodeURIComponent(srv.id);
-            return;
-          }
-          Ui.setLoading(jb, true, 'Joining…');
-          try {
-            var r = await TrycordApi.joinByCode(code);
-            await Trycord.refreshServers();
-            Ui.setLoading(jb, false);
-            Ui.toast('Joined ' + (r.name || srv.name) + '.', 'good');
-            location.hash = '#/server/' + encodeURIComponent(r.serverId);
-          } catch (err) {
-            Ui.setLoading(jb, false);
-            Ui.toast(err.message, 'bad');
-          }
-        };
+        var inv = await TrycordApi.invitePreview(code);
+        found = { kind: 'invite', server: inv.server, invite: inv.invite };
       } catch (err) {
-        Ui.setLoading(btn, false);
-        box.innerHTML = '<div class="state" role="alert"><div class="glyph" aria-hidden="true">⌕</div>' +
-          '<h3>Code not found</h3><p>' + Ui.esc(err.message) +
-          ' Check the code and try again, or browse Discover.</p></div>';
+        if (err.code !== 'INVITE_INVALID') {
+          Ui.setLoading(btn, false);
+          box.innerHTML = infoCard('⌕', 'Lookup failed', err.message);
+          return;
+        }
+        // Path 2: legacy join code.
+        try {
+          var srv = await TrycordApi.previewByCode(code);
+          found = { kind: 'legacy', server: { id: srv.id, name: srv.name, description: srv.description, member_count: srv.member_count } };
+        } catch (err2) {
+          Ui.setLoading(btn, false);
+          box.innerHTML = infoCard('⌕', 'Code not found',
+            'Check the code and try again, or browse Discover for public servers.');
+          return;
+        }
       }
+      Ui.setLoading(btn, false);
+      renderFound(box, found, code);
     });
+
+    function infoCard(icon, title, hint) {
+      return '<div class="state" role="status"><div class="glyph" aria-hidden="true">' + icon + '</div>' +
+        '<h3>' + Ui.esc(title) + '</h3><p>' + Ui.esc(hint) + '</p></div>';
+    }
+
+    function renderFound(box, found, code) {
+      var s = found.server;
+      var already = TrycordState.serverById(s.id);
+      var stateNote = '';
+      var canJoin = true;
+      if (found.kind === 'invite' && found.invite.state !== 'valid') {
+        canJoin = false;
+        stateNote = '<p class="field-err" role="alert">' +
+          Ui.esc(INVITE_ERRORS['INVITE_' + found.invite.state.toUpperCase()] || 'This invite is not usable.') + '</p>';
+      }
+      box.innerHTML =
+        '<div class="server-card"><div class="head">' + Ui.avatarHtml(s.name) +
+        '<div class="titles"><h3>' + Ui.esc(s.name) + '</h3>' +
+        '<div class="meta"><span>' + s.member_count + ' member' + (s.member_count === 1 ? '' : 's') + '</span></div>' +
+        '</div></div>' +
+        '<p class="desc">' + Ui.esc(s.description || 'No description.') + '</p>' + stateNote +
+        '<div class="foot"><button type="button" class="btn btn-primary" id="do-join" ' + (canJoin ? '' : 'disabled') + '>' +
+        (already ? 'Open server' : 'Join server') + '</button></div></div>';
+
+      var jb = document.getElementById('do-join');
+      if (!jb || !canJoin) return;
+      jb.onclick = async () => {
+        if (already) {
+          location.hash = '#/server/' + encodeURIComponent(s.id);
+          return;
+        }
+        Ui.setLoading(jb, true, 'Joining…');
+        try {
+          var r = found.kind === 'invite'
+            ? await TrycordApi.joinWithInvite(code)
+            : await TrycordApi.joinByCode(code);
+          await Trycord.refreshServers();
+          Ui.setLoading(jb, false);
+          Ui.toast('Joined ' + s.name + '.', 'good');
+          location.hash = '#/server/' + encodeURIComponent(r.serverId);
+        } catch (err) {
+          Ui.setLoading(jb, false);
+          if (err.code === 'ALREADY_MEMBER') {
+            await Trycord.refreshServers();
+            location.hash = '#/server/' + encodeURIComponent(s.id);
+          } else {
+            Ui.toast(INVITE_ERRORS[err.code] || err.message, 'bad');
+          }
+        }
+      };
+    }
   }
 
   // --- activity ----------------------------------------------------------
@@ -217,5 +385,5 @@
     C.wireCards(box, () => favorites(root));
   }
 
-  window.TrycordPagesBrowse = { servers, discover, join, activity, favorites };
+  window.TrycordPagesBrowse = { servers, discover, preview, join, activity, favorites };
 })();
