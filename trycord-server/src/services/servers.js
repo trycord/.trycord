@@ -15,37 +15,21 @@ const LIST_COLS = `
   (SELECT MAX(m2.created_at) FROM messages m2
      JOIN channels c2 ON c2.id = m2.channel_id WHERE c2.server_id = s.id) AS last_activity_at`;
 
-function withAccess(row, userId) {
+async function withAccess(row, userId) {
   if (!row) return null;
   row.is_public = !!row.is_public;
   row.is_discoverable = !!row.is_discoverable;
   row.is_owner = row.owner_id === userId;
-  row.permissions = [...effectivePermissions(userId, row.id)];
+  row.permissions = [...(await effectivePermissions(userId, row.id))];
   return row;
 }
 
-const createTx = db.transaction((fields, owner) => {
-  const serverId = uuid();
-  db.prepare(`INSERT INTO servers
-    (id, name, description, owner_id, join_code, is_public, is_discoverable, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(serverId, fields.name, fields.description, owner.id, fields.code,
-      fields.isPublic ? 1 : 0, fields.isDiscoverable ? 1 : 0, now());
-  db.prepare('INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)')
-    .run(uuid(), owner.id, serverId, owner.username, now());
-  roles.createDefaults(serverId);
-  const admin = roles.byName(serverId, 'Admin');
-  if (admin) roles.assign(serverId, owner.id, admin.id);
-  const catId = uuid();
-  db.prepare('INSERT INTO categories (id, server_id, name, position) VALUES (?, ?, ?, ?)')
-    .run(catId, serverId, 'Text Channels', 0);
-  const channelId = uuid();
-  db.prepare('INSERT INTO channels (id, server_id, category_id, name, topic, type, position) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(channelId, serverId, catId, 'general', 'General chat', 'text', 0);
-  return { serverId, joinCode: fields.code, channelId };
-});
+function isUniqueViolation(e) {
+  const msg = String((e && e.message) || '');
+  return /UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) || e.code === 'ER_DUP_ENTRY' || e.code === 'SQLITE_CONSTRAINT_UNIQUE';
+}
 
-function create({ name, description, joinCode, isPublic, isDiscoverable }, owner) {
+async function create({ name, description, joinCode, isPublic, isDiscoverable }, owner) {
   const cleanName = String(name || '').trim().slice(0, 64);
   if (!cleanName) throw { code: 'VALIDATION_ERROR', message: 'name required' };
   const code = String(joinCode || crypto.randomBytes(4).toString('hex')).toLowerCase();
@@ -53,43 +37,62 @@ function create({ name, description, joinCode, isPublic, isDiscoverable }, owner
     throw { code: 'VALIDATION_ERROR', message: 'join code must be 3-32 chars: a-z, 0-9, -' };
   }
   try {
-    return createTx({
-      name: cleanName,
-      description: String(description || '').slice(0, 500),
-      code,
-      isPublic: !!isPublic,
-      isDiscoverable: isDiscoverable === undefined ? !!isPublic : !!isDiscoverable,
-    }, owner);
+    return await db.transaction(async (t) => {
+      const serverId = uuid();
+      await t.run(
+        `INSERT INTO servers
+         (id, name, description, owner_id, join_code, is_public, is_discoverable, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [serverId, cleanName, String(description || '').slice(0, 500), owner.id, code,
+          isPublic ? 1 : 0, isDiscoverable === undefined ? (isPublic ? 1 : 0) : (isDiscoverable ? 1 : 0), now()]
+      );
+      await t.run(
+        'INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)',
+        [uuid(), owner.id, serverId, owner.username, now()]
+      );
+      await roles.createDefaults(serverId, t);
+      const admin = await roles.byName(serverId, 'Admin');
+      if (admin) await roles.assign(serverId, owner.id, admin.id, t);
+      const catId = uuid();
+      await t.run('INSERT INTO categories (id, server_id, name, position) VALUES (?, ?, ?, ?)', [catId, serverId, 'Text Channels', 0]);
+      const channelId = uuid();
+      await t.run(
+        'INSERT INTO channels (id, server_id, category_id, name, topic, type, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [channelId, serverId, catId, 'general', 'General chat', 'text', 0]
+      );
+      return { serverId, joinCode: code, channelId };
+    });
   } catch (e) {
     // Service-shaped errors pass through; raw driver errors get translated.
-    // (better-sqlite3 sets e.code like 'SQLITE_CONSTRAINT_UNIQUE', which is
-    // NOT a service code — so check against the registry, not truthiness.)
     if (e && e.code && Codes[e.code]) throw e;
-    if (String(e && e.message).includes('UNIQUE')) throw { code: 'CONFLICT', message: 'join code taken' };
+    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'join code taken' };
     throw e;
   }
 }
 
-function detail(serverId, userId) {
-  const row = db.prepare(`
-    SELECT ${LIST_COLS},
+async function detail(serverId, userId) {
+  const row = await db.get(
+    `SELECT ${LIST_COLS},
       (SELECT COUNT(*) FROM messages m2
          JOIN channels c2 ON c2.id = m2.channel_id WHERE c2.server_id = s.id) AS message_count,
       u.username AS owner_name, u.display_name AS owner_display
-    FROM servers s JOIN users u ON u.id = s.owner_id WHERE s.id = ?
-  `).get(serverId);
+    FROM servers s JOIN users u ON u.id = s.owner_id WHERE s.id = ?`,
+    [serverId]
+  );
   return withAccess(row, userId);
 }
 
-function mine(userId) {
-  return db.prepare(`
-    SELECT ${LIST_COLS} FROM servers s
-    JOIN server_members m ON m.server_id = s.id
-    WHERE m.user_id = ? ORDER BY s.created_at DESC
-  `).all(userId).map((r) => withAccess(r, userId));
+async function mine(userId) {
+  const rows = await db.all(
+    `SELECT ${LIST_COLS} FROM servers s
+     JOIN server_members m ON m.server_id = s.id
+     WHERE m.user_id = ? ORDER BY s.created_at DESC`,
+    [userId]
+  );
+  return Promise.all(rows.map((r) => withAccess(r, userId)));
 }
 
-function update(serverId, patch) {
+async function update(serverId, patch) {
   const sets = [];
   const vals = [];
   if (patch.name !== undefined) {
@@ -111,17 +114,14 @@ function update(serverId, patch) {
   }
   if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'nothing to update' };
   vals.push(serverId);
-  db.prepare(`UPDATE servers SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
-  return db.prepare('SELECT * FROM servers WHERE id = ?').get(serverId);
+  await db.run(`UPDATE servers SET ${sets.join(', ')} WHERE id = ?`, vals);
+  return db.get('SELECT * FROM servers WHERE id = ?', [serverId]);
 }
 
-const removeTx = db.transaction((serverId) => {
-  db.prepare('DELETE FROM servers WHERE id = ?').run(serverId);
+async function remove(serverId) {
+  // Dependent rows cascade via foreign keys; one statement, atomic by itself.
+  await db.run('DELETE FROM servers WHERE id = ?', [serverId]);
   return { ok: true };
-});
-
-function remove(serverId) {
-  return removeTx(serverId);
 }
 
 module.exports = { create, detail, mine, update, remove };

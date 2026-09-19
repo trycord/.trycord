@@ -20,8 +20,8 @@ function parseRow(r) {
   return r;
 }
 
-function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
-  if (maxUses !== undefined && maxUses !== null) {
+async function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
+  if (maxUses !== undefined && maxUses !== null && maxUses !== '') {
     maxUses = Number(maxUses);
     if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100) {
       throw { code: 'VALIDATION_ERROR', message: 'maxUses must be 1-100' };
@@ -41,33 +41,37 @@ function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
     const code = newCode();
     try {
       const id = uuid();
-      db.prepare(`INSERT INTO invites
-        (id, code, server_id, creator_id, created_at, expires_at, max_uses, uses, revoked)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)`)
-        .run(id, code, serverId, creatorId, now(), expiresAt, maxUses);
-      return parseRow(db.prepare('SELECT * FROM invites WHERE id = ?').get(id));
+      await db.run(
+        `INSERT INTO invites
+         (id, code, server_id, creator_id, created_at, expires_at, max_uses, uses, revoked)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+        [id, code, serverId, creatorId, now(), expiresAt, maxUses]
+      );
+      return parseRow(await db.get('SELECT * FROM invites WHERE id = ?', [id]));
     } catch (e) {
-      if (!String(e.message).includes('UNIQUE')) throw e;
+      const msg = String((e && e.message) || '');
+      if (!/UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) && e.code !== 'ER_DUP_ENTRY' && e.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw e;
     }
   }
   throw { code: 'CONFLICT', message: 'could not generate an invite code' };
 }
 
-function list(serverId) {
-  return db.prepare(`
-    SELECT i.*, u.username AS creator_name
-    FROM invites i JOIN users u ON u.id = i.creator_id
-    WHERE i.server_id = ? ORDER BY i.created_at DESC
-  `).all(serverId).map(parseRow);
+async function list(serverId) {
+  const rows = await db.all(
+    `SELECT i.*, u.username AS creator_name
+     FROM invites i JOIN users u ON u.id = i.creator_id
+     WHERE i.server_id = ? ORDER BY i.created_at DESC`,
+    [serverId]
+  );
+  return rows.map(parseRow);
 }
 
-function getById(inviteId) {
-  return parseRow(db.prepare('SELECT * FROM invites WHERE id = ?').get(inviteId));
+async function getById(inviteId) {
+  return parseRow(await db.get('SELECT * FROM invites WHERE id = ?', [inviteId]));
 }
 
-function getByCode(code) {
-  return parseRow(db.prepare('SELECT * FROM invites WHERE code = ?')
-    .get(String(code).toUpperCase().trim()));
+async function getByCode(code) {
+  return parseRow(await db.get('SELECT * FROM invites WHERE code = ?', [String(code).toUpperCase().trim()]));
 }
 
 function stateOf(invite) {
@@ -78,29 +82,21 @@ function stateOf(invite) {
 }
 
 // Minimal safe info for pre-join display (never leaks settings, members, or messages).
-function preview(code) {
-  const invite = getByCode(code);
+async function preview(code) {
+  const invite = await getByCode(code);
   if (!invite) return null;
-  const srv = db.prepare(`
-    SELECT s.id, s.name, s.description, s.is_public, s.created_at,
+  const srv = await db.get(
+    `SELECT s.id, s.name, s.description, s.is_public, s.created_at,
       (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count
-    FROM servers s WHERE s.id = ?
-  `).get(invite.server_id);
+    FROM servers s WHERE s.id = ?`,
+    [invite.server_id]
+  );
   if (!srv) return null;
   return { invite: { code: invite.code, state: stateOf(invite) }, server: srv };
 }
 
-const consumeTx = db.transaction((invite, user) => {
-  const fresh = getByCode(invite.code);
-  const state = stateOf(fresh);
-  if (state !== 'valid') throw { code: 'INVITE_' + state.toUpperCase(), message: 'invite ' + state };
-  memberships.join(fresh.server_id, user);
-  db.prepare('UPDATE invites SET uses = uses + 1 WHERE id = ?').run(fresh.id);
-  return { serverId: fresh.server_id };
-});
-
-function joinWithCode(code, user) {
-  const invite = getByCode(code);
+async function joinWithCode(code, user) {
+  const invite = await getByCode(code);
   if (!invite) throw { code: 'INVITE_INVALID', message: 'invite not found' };
   if (invite.revoked) throw { code: 'INVITE_REVOKED', message: 'invite revoked' };
   if (invite.expires_at && new Date(invite.expires_at).getTime() <= Date.now()) {
@@ -109,11 +105,23 @@ function joinWithCode(code, user) {
   if (invite.max_uses !== null && invite.uses >= invite.max_uses) {
     throw { code: 'INVITE_EXHAUSTED', message: 'invite has no uses left' };
   }
-  return consumeTx(invite, user);
+  return db.transaction(async (t) => {
+    const fresh = await t.get('SELECT * FROM invites WHERE id = ?', [invite.id]);
+    if (!fresh || fresh.revoked) throw { code: 'INVITE_REVOKED', message: 'invite revoked' };
+    if (fresh.expires_at && new Date(fresh.expires_at).getTime() <= Date.now()) {
+      throw { code: 'INVITE_EXPIRED', message: 'invite expired' };
+    }
+    if (fresh.max_uses !== null && fresh.uses >= fresh.max_uses) {
+      throw { code: 'INVITE_EXHAUSTED', message: 'invite has no uses left' };
+    }
+    await memberships.joinIn(fresh.server_id, user, t);
+    await t.run('UPDATE invites SET uses = uses + 1 WHERE id = ?', [fresh.id]);
+    return { serverId: fresh.server_id };
+  });
 }
 
-function revoke(invite) {
-  db.prepare('UPDATE invites SET revoked = 1 WHERE id = ?').run(invite.id);
+async function revoke(invite) {
+  await db.run('UPDATE invites SET revoked = 1 WHERE id = ?', [invite.id]);
   return { ok: true };
 }
 

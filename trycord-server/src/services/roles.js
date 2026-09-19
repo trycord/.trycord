@@ -18,48 +18,57 @@ function parseRow(r) {
   return { ...r, permissions, is_default: !!r.is_default };
 }
 
-function createDefaults(serverId) {
+async function createDefaults(serverId, conn = db) {
   for (const d of DEFAULT_ROLES) {
-    db.prepare('INSERT INTO roles (id, server_id, name, position, permissions, is_default) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(uuid(), serverId, d.name, d.position, JSON.stringify(d.permissions), d.is_default);
+    await conn.run(
+      'INSERT INTO roles (id, server_id, name, position, permissions, is_default) VALUES (?, ?, ?, ?, ?, ?)',
+      [uuid(), serverId, d.name, d.position, JSON.stringify(d.permissions), d.is_default]
+    );
   }
 }
 
-function list(serverId) {
-  return db.prepare('SELECT * FROM roles WHERE server_id = ? ORDER BY position DESC, name ASC')
-    .all(serverId).map(parseRow);
+async function list(serverId) {
+  const rows = await db.all('SELECT * FROM roles WHERE server_id = ? ORDER BY position DESC, name ASC', [serverId]);
+  return rows.map(parseRow);
 }
 
-function get(roleId) {
-  return parseRow(db.prepare('SELECT * FROM roles WHERE id = ?').get(roleId));
+async function get(roleId) {
+  return parseRow(await db.get('SELECT * FROM roles WHERE id = ?', [roleId]));
 }
 
-function defaultRole(serverId) {
-  return parseRow(db.prepare('SELECT * FROM roles WHERE server_id = ? AND is_default = 1').get(serverId));
+async function defaultRole(serverId) {
+  return parseRow(await db.get('SELECT * FROM roles WHERE server_id = ? AND is_default = 1', [serverId]));
 }
 
-function byName(serverId, name) {
-  return parseRow(db.prepare('SELECT * FROM roles WHERE server_id = ? AND name = ?').get(serverId, name));
+async function byName(serverId, name) {
+  return parseRow(await db.get('SELECT * FROM roles WHERE server_id = ? AND name = ?', [serverId, name]));
 }
 
-function create(serverId, { name, permissions }) {
+function isUniqueViolation(e) {
+  const msg = String((e && e.message) || '');
+  return /UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) || e.code === 'ER_DUP_ENTRY' || e.code === 'SQLITE_CONSTRAINT_UNIQUE';
+}
+
+async function create(serverId, { name, permissions }) {
   const clean = String(name || '').trim().slice(0, 32);
   if (!clean) throw { code: 'VALIDATION_ERROR', message: 'role name required' };
   const perms = Array.isArray(permissions) ? permissions.filter(isKnown) : [];
   // New custom roles start at the bottom of the hierarchy.
-  const pos = db.prepare('SELECT COALESCE(MIN(position), 1) - 1 AS p FROM roles WHERE server_id = ?').get(serverId).p;
+  const posRow = await db.get('SELECT COALESCE(MIN(position), 1) - 1 AS p FROM roles WHERE server_id = ?', [serverId]);
   try {
     const id = uuid();
-    db.prepare('INSERT INTO roles (id, server_id, name, position, permissions, is_default) VALUES (?, ?, ?, ?, ?, 0)')
-      .run(id, serverId, clean, pos, JSON.stringify(perms));
+    await db.run(
+      'INSERT INTO roles (id, server_id, name, position, permissions, is_default) VALUES (?, ?, ?, ?, ?, 0)',
+      [id, serverId, clean, posRow.p, JSON.stringify(perms)]
+    );
     return get(id);
   } catch (e) {
-    if (String(e.message).includes('UNIQUE')) throw { code: 'CONFLICT', message: 'a role with that name exists' };
+    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'a role with that name exists' };
     throw e;
   }
 }
 
-function update(role, { name, permissions }) {
+async function update(role, { name, permissions }) {
   const sets = [];
   const vals = [];
   if (name !== undefined) {
@@ -76,47 +85,50 @@ function update(role, { name, permissions }) {
   if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'nothing to update' };
   vals.push(role.id);
   try {
-    db.prepare(`UPDATE roles SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    await db.run(`UPDATE roles SET ${sets.join(', ')} WHERE id = ?`, vals);
   } catch (e) {
-    if (String(e.message).includes('UNIQUE')) throw { code: 'CONFLICT', message: 'a role with that name exists' };
+    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'a role with that name exists' };
     throw e;
   }
   return get(role.id);
 }
 
-function remove(role) {
+async function remove(role) {
   if (role.is_default) throw { code: 'VALIDATION_ERROR', message: 'the default role cannot be deleted' };
-  const n = db.prepare('SELECT COUNT(*) AS n FROM member_roles WHERE role_id = ?').get(role.id).n;
-  if (n > 0) throw { code: 'ROLE_IN_USE', message: `role is assigned to ${n} member(s)` };
-  db.prepare('DELETE FROM roles WHERE id = ?').run(role.id);
+  const n = await db.get('SELECT COUNT(*) AS n FROM member_roles WHERE role_id = ?', [role.id]);
+  if (n.n > 0) throw { code: 'ROLE_IN_USE', message: `role is assigned to ${n.n} member(s)` };
+  await db.run('DELETE FROM roles WHERE id = ?', [role.id]);
   return { ok: true };
 }
 
-function userRoles(userId, serverId) {
-  return db.prepare(`
-    SELECT r.* FROM member_roles mr JOIN roles r ON r.id = mr.role_id
-    WHERE mr.server_id = ? AND mr.user_id = ? ORDER BY r.position DESC
-  `).all(serverId, userId).map(parseRow);
+async function userRoles(userId, serverId, conn = db) {
+  const rows = await conn.all(
+    `SELECT r.* FROM member_roles mr JOIN roles r ON r.id = mr.role_id
+     WHERE mr.server_id = ? AND mr.user_id = ? ORDER BY r.position DESC`,
+    [serverId, userId]
+  );
+  return rows.map(parseRow);
 }
 
-function assign(serverId, userId, roleId) {
-  db.prepare('INSERT OR IGNORE INTO member_roles (server_id, user_id, role_id) VALUES (?, ?, ?)')
-    .run(serverId, userId, roleId);
+async function assign(serverId, userId, roleId, conn = db) {
+  const ignore = (conn.dialect || db.dialect) === 'mysql' ? 'IGNORE' : 'OR IGNORE';
+  await conn.run(
+    `INSERT ${ignore} INTO member_roles (server_id, user_id, role_id) VALUES (?, ?, ?)`,
+    [serverId, userId, roleId]
+  );
   return { ok: true };
 }
 
-function unassign(serverId, userId, roleId) {
-  db.prepare('DELETE FROM member_roles WHERE server_id = ? AND user_id = ? AND role_id = ?')
-    .run(serverId, userId, roleId);
+async function unassign(serverId, userId, roleId, conn = db) {
+  await conn.run('DELETE FROM member_roles WHERE server_id = ? AND user_id = ? AND role_id = ?', [serverId, userId, roleId]);
   return { ok: true };
 }
 
-function ensureDefault(serverId, userId) {
-  const existing = db.prepare('SELECT 1 FROM member_roles WHERE server_id = ? AND user_id = ?')
-    .get(serverId, userId);
+async function ensureDefault(serverId, userId, conn = db) {
+  const existing = await conn.get('SELECT 1 FROM member_roles WHERE server_id = ? AND user_id = ?', [serverId, userId]);
   if (existing) return;
-  const d = defaultRole(serverId);
-  if (d) assign(serverId, userId, d.id);
+  const d = await defaultRole(serverId);
+  if (d) await assign(serverId, userId, d.id, conn);
 }
 
 module.exports = {

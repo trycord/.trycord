@@ -60,14 +60,19 @@
 
       '<section class="settings-card" aria-labelledby="set-app"><h2 id="set-app">Application</h2>' +
       '<form id="api-form"><label class="field"><span>Server URL (blank = auto)</span>' +
-      '<input type="url" id="set-api" placeholder="http://localhost:9971" value="' + Ui.esc(s.apiBase || '') + '" /></label>' +
+      '<input type="url" id="set-api" placeholder="http://localhost:9971" value="' + Ui.esc((TrycordState.access && TrycordState.access.apiBase) || '') + '" /></label>' +
       '<div class="form-row"><button class="btn btn-sm" type="submit">Save &amp; reload</button>' +
       '<button class="btn btn-ghost btn-sm" type="button" id="api-test">Test connection</button>' +
       '<span id="api-status" class="small muted" role="status"></span></div></form>' +
       '<hr class="divider" />' +
+      '<div class="form-row"><span class="small muted">Global sync: <b id="global-status">checking…</b></span>' +
+      '<button class="btn btn-ghost btn-sm" type="button" id="global-retry">Recheck</button></div>' +
+      '<p class="hint">Global sync is optional and never required for chat. ' +
+      'Appearance stays on this device; only an explicitly configured global service is contacted.</p>' +
+      '<hr class="divider" />' +
       '<div class="form-row"><button class="btn btn-ghost btn-sm" id="clear-local" type="button">Clear favorites &amp; recent</button>' +
       '<button class="btn btn-ghost btn-sm" id="logout-btn2" type="button">Log out</button></div>' +
-      '<p class="hint">Trycord web client v0.3.0 · roles, invites & public discovery ready.</p></section>' +
+      '<p class="hint">Trycord web client v0.4.0 · instance-aware access points.</p></section>' +
       '</div>';
 
     document.getElementById('set-theme').value = s.theme || 'dark';
@@ -118,8 +123,8 @@
         Ui.fieldError(document.getElementById('set-api'), 'Use an http(s) URL like http://51.79.44.111:9971');
         return;
       }
-      TrycordState.settings.apiBase = raw;
-      TrycordState.saveSettings();
+      TrycordState.access.apiBase = raw;
+      TrycordState.saveAccess();
       location.reload();
     });
 
@@ -148,6 +153,17 @@
       }
     };
     document.getElementById('logout-btn2').onclick = () => Trycord.logout();
+
+    var refreshGlobal = async () => {
+      var el = document.getElementById('global-status');
+      if (!el) return;
+      el.textContent = 'checking…';
+      var r = await TrycordGlobal.check();
+      var g = TrycordGlobal.globalUrl();
+      el.textContent = TrycordGlobal.describe(r.status) + (g ? ' (' + g + ')' : '');
+    };
+    document.getElementById('global-retry').onclick = refreshGlobal;
+    refreshGlobal();
   }
 
   window.TrycordPagesAccount = { profile, settings };

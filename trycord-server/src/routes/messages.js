@@ -15,51 +15,58 @@ function setBroadcaster(fn) {
 const router = express.Router({ mergeParams: true });
 router.use(auth);
 
-router.get('/', (req, res) => {
-  const ch = visibleChannel(req.params.channelId, req.user.id);
-  if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
-  const limit = Math.min(parseInt(req.query.limit || '50', 10) || 50, 200);
-  const rows = db.prepare(`
-    SELECT m.*, u.username AS author_name, u.display_name AS author_display
-    FROM messages m JOIN users u ON u.id = m.author_id
-    WHERE m.channel_id = ? ORDER BY m.created_at DESC LIMIT ?
-  `).all(ch.id, limit);
-  res.json(rows.reverse());
-});
-
-router.post('/', (req, res) => {
-  const ch = visibleChannel(req.params.channelId, req.user.id);
-  if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
-  if (!hasPermission(req.user.id, ch.server_id, 'SEND_MESSAGES')) {
-    return fail(res, 'PERMISSION_DENIED', 'you cannot post in this server');
-  }
-  const content = String((req.body || {}).content || '').trim().slice(0, 2000);
-  if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
-  const msg = {
-    id: uuid(), channel_id: ch.id, server_id: ch.server_id,
-    author_id: req.user.id, user: req.user.username, content, created_at: now(),
-  };
+router.get('/', async (req, res, next) => {
   try {
-    db.prepare('INSERT INTO messages (id, channel_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)')
-      .run(msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at);
-  } catch (e) { return serviceError(res, e); }
-  broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
-  res.json(msg);
+    const ch = await visibleChannel(req.params.channelId, req.user.id);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    // Integer embedded after validation (keeps LIMIT working on every database).
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 200);
+    const rows = await db.all(
+      `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+       FROM messages m JOIN users u ON u.id = m.author_id
+       WHERE m.channel_id = ? ORDER BY m.created_at DESC LIMIT ${limit}`,
+      [req.params.channelId]
+    );
+    res.json(rows.reverse());
+  } catch (e) { next(e); }
 });
 
-router.delete('/:messageId', (req, res) => {
-  const ch = visibleChannel(req.params.channelId, req.user.id);
-  if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
-  const msg = db.prepare('SELECT * FROM messages WHERE id = ? AND channel_id = ?')
-    .get(req.params.messageId, ch.id);
-  if (!msg) return fail(res, 'NOT_FOUND', 'message not found');
-  const isAuthor = msg.author_id === req.user.id;
-  if (!isAuthor && !hasPermission(req.user.id, ch.server_id, 'MANAGE_MESSAGES')) {
-    return fail(res, 'PERMISSION_DENIED', 'cannot delete this message');
-  }
-  db.prepare('DELETE FROM messages WHERE id = ?').run(msg.id);
-  broadcast(ch.server_id, ch.id, { type: 'message_deleted', id: msg.id, channel_id: ch.id });
-  res.json({ ok: true });
+router.post('/', async (req, res, next) => {
+  try {
+    const ch = await visibleChannel(req.params.channelId, req.user.id);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    if (!(await hasPermission(req.user.id, ch.server_id, 'SEND_MESSAGES'))) {
+      return fail(res, 'PERMISSION_DENIED', 'you cannot post in this server');
+    }
+    const content = String((req.body || {}).content || '').trim().slice(0, 2000);
+    if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
+    const msg = {
+      id: uuid(), channel_id: ch.id, server_id: ch.server_id,
+      author_id: req.user.id, user: req.user.username, content, created_at: now(),
+    };
+    await db.run(
+      'INSERT INTO messages (id, channel_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)',
+      [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at]
+    );
+    broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
+    res.json(msg);
+  } catch (e) { next(e); }
+});
+
+router.delete('/:messageId', async (req, res, next) => {
+  try {
+    const ch = await visibleChannel(req.params.channelId, req.user.id);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    const msg = await db.get('SELECT * FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
+    if (!msg) return fail(res, 'NOT_FOUND', 'message not found');
+    const isAuthor = msg.author_id === req.user.id;
+    if (!isAuthor && !(await hasPermission(req.user.id, ch.server_id, 'MANAGE_MESSAGES'))) {
+      return fail(res, 'PERMISSION_DENIED', 'cannot delete this message');
+    }
+    await db.run('DELETE FROM messages WHERE id = ?', [msg.id]);
+    broadcast(ch.server_id, ch.id, { type: 'message_deleted', id: msg.id, channel_id: ch.id });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
 });
 
 module.exports = router;

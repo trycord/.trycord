@@ -8,20 +8,22 @@ const channels = require('../services/channels');
 const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
 
-router.get('/', requireMember, (req, res) => {
-  res.json(channels.categories(req.server.id));
+router.get('/', requireMember, async (req, res, next) => {
+  try {
+    res.json(await channels.categories(req.server.id));
+  } catch (e) { next(e); }
 });
 
-router.post('/', requirePerm('MANAGE_CHANNELS'), (req, res) => {
+router.post('/', requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
     const { name } = req.body || {};
-    res.json(channels.createCategory(req.server.id, name));
+    res.json(await channels.createCategory(req.server.id, name));
   } catch (e) { serviceError(res, e); }
 });
 
-router.delete('/:categoryId', requirePerm('MANAGE_CHANNELS'), (req, res) => {
+router.delete('/:categoryId', requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
-    res.json(channels.deleteCategory(req.server.id, req.params.categoryId));
+    res.json(await channels.deleteCategory(req.server.id, req.params.categoryId));
   } catch (e) { serviceError(res, e); }
 });
 

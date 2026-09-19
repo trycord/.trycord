@@ -1,0 +1,10 @@
+{
+  "name": "trycord-client",
+  "version": "0.3.0",
+  "description": "Trycord web access point: static client + tiny static file server (no database, no API)",
+  "scripts": {
+    "serve": "node serve.js",
+    "start": "node serve.js"
+  },
+  "license": "MIT"
+}
