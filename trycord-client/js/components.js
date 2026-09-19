@@ -253,8 +253,8 @@
               input.focus();
               return;
             }
-            TrycordState.settings.apiBase = url;
-            TrycordState.saveSettings();
+            TrycordState.access.apiBase = url;
+            TrycordState.saveAccess();
             close();
             Ui.toast('Backend saved. Reloading…', 'good');
             setTimeout(() => location.reload(), 400);

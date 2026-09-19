@@ -16,19 +16,20 @@ function isKnown(perm) {
   return Object.prototype.hasOwnProperty.call(PERMISSIONS, perm);
 }
 
-function getOwnerId(serverId) {
-  const row = db.prepare('SELECT owner_id FROM servers WHERE id = ?').get(serverId);
+async function getOwnerId(serverId, conn = db) {
+  const row = await conn.get('SELECT owner_id FROM servers WHERE id = ?', [serverId]);
   return row ? row.owner_id : null;
 }
 
 // Union of all permission strings granted to the user via roles.
-function effectivePermissions(userId, serverId) {
-  if (getOwnerId(serverId) === userId) return new Set(['*']);
-  const rows = db.prepare(`
-    SELECT r.permissions FROM member_roles mr
-    JOIN roles r ON r.id = mr.role_id
-    WHERE mr.server_id = ? AND mr.user_id = ?
-  `).all(serverId, userId);
+async function effectivePermissions(userId, serverId, conn = db) {
+  if ((await getOwnerId(serverId, conn)) === userId) return new Set(['*']);
+  const rows = await conn.all(
+    `SELECT r.permissions FROM member_roles mr
+     JOIN roles r ON r.id = mr.role_id
+     WHERE mr.server_id = ? AND mr.user_id = ?`,
+    [serverId, userId]
+  );
   const out = new Set();
   for (const r of rows) {
     try {
@@ -38,8 +39,8 @@ function effectivePermissions(userId, serverId) {
   return out;
 }
 
-function hasPermission(userId, serverId, perm) {
-  const perms = effectivePermissions(userId, serverId);
+async function hasPermission(userId, serverId, perm, conn = db) {
+  const perms = await effectivePermissions(userId, serverId, conn);
   return perms.has('*') || perms.has(perm);
 }
 

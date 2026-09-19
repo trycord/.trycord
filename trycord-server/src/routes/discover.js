@@ -9,25 +9,27 @@ const db = require('../db');
 
 const router = express.Router();
 
-router.get('/servers', (req, res) => {
+router.get('/servers', async (req, res, next) => {
   try {
-    res.json(discovery.search({ q: req.query.q, page: req.query.page, limit: req.query.limit }));
-  } catch (e) { serviceError(res, e); }
+    res.json(await discovery.search({ q: req.query.q, page: req.query.page, limit: req.query.limit }));
+  } catch (e) { next(e); }
 });
 
-router.get('/servers/:id', (req, res) => {
-  const srv = discovery.preview(req.params.id);
-  if (!srv) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
-  res.json(srv);
+router.get('/servers/:id', async (req, res, next) => {
+  try {
+    const srv = await discovery.preview(req.params.id);
+    if (!srv) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
+    res.json(srv);
+  } catch (e) { next(e); }
 });
 
 // Join straight from a public preview. Private servers reject with SERVER_PRIVATE.
-router.post('/servers/:id/join', auth, (req, res) => {
-  const srv = db.prepare('SELECT id, is_public FROM servers WHERE id = ?').get(req.params.id);
-  if (!srv) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
-  if (!srv.is_public) return fail(res, 'SERVER_PRIVATE', 'this server is private — ask for an invite');
+router.post('/servers/:id/join', auth, async (req, res, next) => {
   try {
-    res.json(memberships.join(srv.id, req.user));
+    const srv = await db.get('SELECT id, is_public FROM servers WHERE id = ?', [req.params.id]);
+    if (!srv) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
+    if (!srv.is_public) return fail(res, 'SERVER_PRIVATE', 'this server is private — ask for an invite');
+    res.json(await memberships.join(srv.id, req.user));
   } catch (e) { serviceError(res, e); }
 });
 

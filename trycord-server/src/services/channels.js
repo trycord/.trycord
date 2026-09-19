@@ -7,49 +7,48 @@ function cleanName(name) {
   return String(name || '').trim().toLowerCase().replace(/[^a-z0-9-_ ]/g, '').slice(0, 32) || 'channel';
 }
 
-function categories(serverId) {
-  return db.prepare('SELECT * FROM categories WHERE server_id = ? ORDER BY position, name').all(serverId);
+async function categories(serverId) {
+  return db.all('SELECT * FROM categories WHERE server_id = ? ORDER BY position, name', [serverId]);
 }
 
-function createCategory(serverId, name) {
+async function createCategory(serverId, name) {
   const clean = String(name || '').trim().slice(0, 32);
   if (!clean) throw { code: 'VALIDATION_ERROR', message: 'category name required' };
-  const pos = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM categories WHERE server_id = ?')
-    .get(serverId).p;
+  const pos = await db.get('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM categories WHERE server_id = ?', [serverId]);
   const id = uuid();
-  db.prepare('INSERT INTO categories (id, server_id, name, position) VALUES (?, ?, ?, ?)')
-    .run(id, serverId, clean, pos);
-  return db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+  await db.run('INSERT INTO categories (id, server_id, name, position) VALUES (?, ?, ?, ?)', [id, serverId, clean, pos.p]);
+  return db.get('SELECT * FROM categories WHERE id = ?', [id]);
 }
 
-function deleteCategory(serverId, categoryId) {
-  const cat = db.prepare('SELECT * FROM categories WHERE id = ? AND server_id = ?').get(categoryId, serverId);
+async function deleteCategory(serverId, categoryId) {
+  const cat = await db.get('SELECT * FROM categories WHERE id = ? AND server_id = ?', [categoryId, serverId]);
   if (!cat) throw { code: 'NOT_FOUND', message: 'category not found' };
-  db.prepare('DELETE FROM categories WHERE id = ?').run(cat.id); // channels SET NULL
+  await db.run('DELETE FROM categories WHERE id = ?', [cat.id]); // channels SET NULL
   return { ok: true };
 }
 
-function list(serverId) {
-  const cats = categories(serverId);
-  const channels = db.prepare('SELECT * FROM channels WHERE server_id = ? ORDER BY position, name').all(serverId);
+async function list(serverId) {
+  const cats = await categories(serverId);
+  const channels = await db.all('SELECT * FROM channels WHERE server_id = ? ORDER BY position, name', [serverId]);
   return { categories: cats, channels };
 }
 
-function create(serverId, { name, topic, categoryId }) {
+async function create(serverId, { name, topic, categoryId }) {
   let cat = null;
   if (categoryId) {
-    cat = db.prepare('SELECT * FROM categories WHERE id = ? AND server_id = ?').get(categoryId, serverId);
+    cat = await db.get('SELECT * FROM categories WHERE id = ? AND server_id = ?', [categoryId, serverId]);
     if (!cat) throw { code: 'VALIDATION_ERROR', message: 'category not found in this server' };
   }
-  const pos = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM channels WHERE server_id = ?')
-    .get(serverId).p;
+  const pos = await db.get('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM channels WHERE server_id = ?', [serverId]);
   const id = uuid();
-  db.prepare('INSERT INTO channels (id, server_id, category_id, name, topic, type, position) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(id, serverId, cat ? cat.id : null, cleanName(name), String(topic || '').slice(0, 200), 'text', pos);
-  return db.prepare('SELECT * FROM channels WHERE id = ?').get(id);
+  await db.run(
+    'INSERT INTO channels (id, server_id, category_id, name, topic, type, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [id, serverId, cat ? cat.id : null, cleanName(name), String(topic || '').slice(0, 200), 'text', pos.p]
+  );
+  return db.get('SELECT * FROM channels WHERE id = ?', [id]);
 }
 
-function update(channel, { name, topic, categoryId }) {
+async function update(channel, { name, topic, categoryId }) {
   const sets = [];
   const vals = [];
   if (name !== undefined) {
@@ -62,8 +61,7 @@ function update(channel, { name, topic, categoryId }) {
   }
   if (categoryId !== undefined) {
     if (categoryId) {
-      const cat = db.prepare('SELECT * FROM categories WHERE id = ? AND server_id = ?')
-        .get(categoryId, channel.server_id);
+      const cat = await db.get('SELECT * FROM categories WHERE id = ? AND server_id = ?', [categoryId, channel.server_id]);
       if (!cat) throw { code: 'VALIDATION_ERROR', message: 'category not found in this server' };
       sets.push('category_id = ?');
       vals.push(cat.id);
@@ -74,17 +72,19 @@ function update(channel, { name, topic, categoryId }) {
   }
   if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'nothing to update' };
   vals.push(channel.id);
-  db.prepare(`UPDATE channels SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
-  return db.prepare('SELECT * FROM channels WHERE id = ?').get(channel.id);
+  await db.run(`UPDATE channels SET ${sets.join(', ')} WHERE id = ?`, vals);
+  return db.get('SELECT * FROM channels WHERE id = ?', [channel.id]);
 }
 
-function remove(serverId, channelId) {
-  const ch = db.prepare('SELECT * FROM channels WHERE id = ? AND server_id = ?').get(channelId, serverId);
-  if (!ch) throw { code: 'NOT_FOUND', message: 'channel not found' };
-  const count = db.prepare('SELECT COUNT(*) AS n FROM channels WHERE server_id = ?').get(serverId).n;
-  if (count <= 1) throw { code: 'CANNOT_DELETE_LAST_CHANNEL', message: 'cannot delete the last channel' };
-  db.prepare('DELETE FROM channels WHERE id = ?').run(ch.id);
-  return { ok: true };
+async function remove(serverId, channelId) {
+  return db.transaction(async (t) => {
+    const ch = await t.get('SELECT * FROM channels WHERE id = ? AND server_id = ?', [channelId, serverId]);
+    if (!ch) throw { code: 'NOT_FOUND', message: 'channel not found' };
+    const count = await t.get('SELECT COUNT(*) AS n FROM channels WHERE server_id = ?', [serverId]);
+    if (count.n <= 1) throw { code: 'CANNOT_DELETE_LAST_CHANNEL', message: 'cannot delete the last channel' };
+    await t.run('DELETE FROM channels WHERE id = ?', [ch.id]);
+    return { ok: true };
+  });
 }
 
 module.exports = { categories, createCategory, deleteCategory, list, create, update, remove };

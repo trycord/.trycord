@@ -1,0 +1,79 @@
+// Import records from a SQLite file into the configured database.
+// Run:  node scripts/migrate.js --from ./old-server.db
+// Works sqlite -> mysql and sqlite -> sqlite. Never touches the source file.
+// Tables are copied in foreign-key order; duplicate ids are skipped and counted.
+const fs = require('fs');
+const path = require('path');
+const Database = require('better-sqlite3');
+const db = require('../src/db');
+
+const TABLES = [
+  'users',
+  'servers',
+  'categories',
+  'roles',
+  'server_members',
+  'member_roles',
+  'channels',
+  'messages',
+  'invites',
+  'revoked_tokens',
+];
+
+function isDuplicate(e) {
+  const msg = String((e && e.message) || '');
+  return /UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) || e.code === 'ER_DUP_ENTRY' || e.code === 'SQLITE_CONSTRAINT_UNIQUE';
+}
+
+async function main() {
+  const fromIdx = process.argv.indexOf('--from');
+  const from = fromIdx !== -1 ? process.argv[fromIdx + 1] : null;
+  if (!from || !fs.existsSync(from)) {
+    console.error('usage: node scripts/migrate.js --from <sqlite-file>');
+    process.exit(1);
+  }
+  await db.connect(); // applies schema to the TARGET first
+  const q = (name) => (db.dialect === 'mysql' ? '`' + name + '`' : '"' + name + '"');
+  const src = new Database(path.resolve(from), { readonly: true });
+  try {
+    for (const table of TABLES) {
+      let rows = [];
+      try {
+        rows = src.prepare(`SELECT * FROM "${table}"`).all();
+      } catch (e) {
+        console.log(`${table}: missing in source, skipped`);
+        continue;
+      }
+      if (!rows.length) {
+        console.log(`${table}: 0 rows`);
+        continue;
+      }
+      const cols = Object.keys(rows[0]);
+      const placeholders = cols.map(() => '?').join(', ');
+      let copied = 0;
+      let skipped = 0;
+      for (const row of rows) {
+        try {
+          await db.run(
+            `INSERT INTO ${q(table)} (${cols.map(q).join(', ')}) VALUES (${placeholders})`,
+            cols.map((c) => row[c] === undefined ? null : row[c])
+          );
+          copied++;
+        } catch (e) {
+          if (isDuplicate(e)) skipped++;
+          else throw e;
+        }
+      }
+      console.log(`${table}: ${copied} copied, ${skipped} skipped (already present)`);
+    }
+  } finally {
+    src.close();
+    await db.close();
+  }
+  console.log('migration complete');
+}
+
+main().catch((e) => {
+  console.error('migration failed: ' + (e.message || e));
+  process.exit(1);
+});

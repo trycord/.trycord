@@ -7,7 +7,15 @@
    Errors are { code, message }; thrown Error carries .code for specific UX.
    401 on an authenticated call => session dead => clear + go to login. */
 (function () {
-  var TOKEN_KEY = 'trycord.token';
+  // Token storage is instance-scoped (see state.js); fall back to the
+  // legacy flat key only before state loads.
+  function tokenKey() {
+    try {
+      var st = window.TrycordState;
+      if (st && st.tokenKey) return st.tokenKey();
+    } catch (e) { /* ignore */ }
+    return 'trycord.token';
+  }
   var DEFAULT_API_URL = 'http://localhost:9971';
 
   // Returns a normalized http(s) base URL, or null if invalid.
@@ -33,7 +41,12 @@
     q = normalizeApiUrl(q);
     if (q) return { url: q, source: 'startup argument' };
     var saved = null;
-    try { saved = window.TrycordState && window.TrycordState.settings.apiBase; } catch (e) { /* not loaded */ }
+    try {
+      var st = window.TrycordState;
+      // Access config (device pointer at an instance), then legacy location.
+      saved = (st && st.access && st.access.apiBase) ||
+        (st && st.settings && st.settings.apiBase) || null;
+    } catch (e) { /* not loaded */ }
     saved = normalizeApiUrl(saved);
     if (saved) return { url: saved, source: 'saved setting' };
     var cfg = null;
@@ -62,12 +75,12 @@
 
   var API = {
     get token() {
-      try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+      try { return localStorage.getItem(tokenKey()); } catch (e) { return null; }
     },
     set token(t) {
       try {
-        if (t) localStorage.setItem(TOKEN_KEY, t);
-        else localStorage.removeItem(TOKEN_KEY);
+        if (t) localStorage.setItem(tokenKey(), t);
+        else localStorage.removeItem(tokenKey());
       } catch (e) { /* ignore */ }
     },
 
@@ -116,6 +129,34 @@
     baseSource: () => resolveApiBase().source,
     normalizeUrl: normalizeApiUrl,
     DEFAULT_API_URL,
+
+    // Stable id for the current instance: explicit config first,
+    // otherwise derived from the backend URL. Scopes per-instance storage.
+    instanceId() {
+      try {
+        var cfg = window.TRYCORD_CONFIG && window.TRYCORD_CONFIG.instanceId;
+        if (cfg && String(cfg).trim()) {
+          return 'cfg-' + String(cfg).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        }
+      } catch (e) { /* ignore */ }
+      try {
+        return 'url-' + new URL(baseUrl()).host.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      } catch (e) {
+        return 'url-unknown';
+      }
+    },
+
+    // Optional global service URL (empty = independent instance).
+    // Only ever used for explicitly global resources — never for chat.
+    globalUrl() {
+      try {
+        var g = window.TRYCORD_CONFIG && window.TRYCORD_CONFIG.globalUrl;
+        var n = normalizeApiUrl(g);
+        return n || '';
+      } catch (e) {
+        return '';
+      }
+    },
 
     // Probe a backend URL (used by the connection UI). Never throws.
     async testConnection(raw) {

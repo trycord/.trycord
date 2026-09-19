@@ -14,48 +14,54 @@ router.get('/permissions', requireMember, (req, res) => {
   res.json({ is_owner: req.access.isOwner, permissions: req.access.permissions, all: PERMISSIONS });
 });
 
-router.get('/', requireMember, (req, res) => {
-  res.json(roles.list(req.server.id));
+router.get('/', requireMember, async (req, res, next) => {
+  try {
+    res.json(await roles.list(req.server.id));
+  } catch (e) { next(e); }
 });
 
-router.post('/', requirePerm('MANAGE_ROLES'), (req, res) => {
+router.post('/', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
     const { name, permissions } = req.body || {};
-    res.json(roles.create(req.server.id, { name, permissions }));
+    res.json(await roles.create(req.server.id, { name, permissions }));
   } catch (e) { serviceError(res, e); }
 });
 
-router.patch('/:roleId', requirePerm('MANAGE_ROLES'), (req, res) => {
-  const role = roles.get(req.params.roleId);
-  if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+router.patch('/:roleId', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
+    const role = await roles.get(req.params.roleId);
+    if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
     const { name, permissions } = req.body || {};
-    res.json(roles.update(role, { name, permissions }));
+    res.json(await roles.update(role, { name, permissions }));
   } catch (e) { serviceError(res, e); }
 });
 
-router.delete('/:roleId', requirePerm('MANAGE_ROLES'), (req, res) => {
-  const role = roles.get(req.params.roleId);
-  if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+router.delete('/:roleId', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
-    res.json(roles.remove(role));
+    const role = await roles.get(req.params.roleId);
+    if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+    res.json(await roles.remove(role));
   } catch (e) { serviceError(res, e); }
 });
 
-router.post('/:roleId/assign', requirePerm('MANAGE_ROLES'), (req, res) => {
-  const role = roles.get(req.params.roleId);
-  if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
-  const { userId } = req.body || {};
-  if (!userId || !memberships.get(req.server.id, userId)) {
-    return fail(res, 'NOT_A_MEMBER', 'user is not a member');
-  }
-  res.json(roles.assign(req.server.id, userId, role.id));
+router.post('/:roleId/assign', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
+  try {
+    const role = await roles.get(req.params.roleId);
+    if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+    const { userId } = req.body || {};
+    if (!userId || !(await memberships.get(req.server.id, userId))) {
+      return fail(res, 'NOT_A_MEMBER', 'user is not a member');
+    }
+    res.json(await roles.assign(req.server.id, userId, role.id));
+  } catch (e) { next(e); }
 });
 
-router.delete('/:roleId/assign/:userId', requirePerm('MANAGE_ROLES'), (req, res) => {
-  const role = roles.get(req.params.roleId);
-  if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
-  res.json(roles.unassign(req.server.id, req.params.userId, role.id));
+router.delete('/:roleId/assign/:userId', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
+  try {
+    const role = await roles.get(req.params.roleId);
+    if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+    res.json(await roles.unassign(req.server.id, req.params.userId, role.id));
+  } catch (e) { next(e); }
 });
 
 module.exports = router;
