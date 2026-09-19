@@ -39,10 +39,35 @@ function createWindow() {
   if (process.argv.includes('--smoke-test')) {
     win.webContents.once('did-finish-load', async () => {
       try {
-        const probe = await win.webContents.executeJavaScript(
-          `fetch('${API}/health').then(async r => r.status + ' ' + await r.text()).catch(e => 'FETCH-FAIL ' + e)`
-        );
-        console.log('[smoke] page loaded; API probe: ' + probe);
+        // Full UI proof, step 1: register in-page and persist the token.
+        const reg = await win.webContents.executeJavaScript(`(async () => {
+          try {
+            const api = location.protocol === 'file:' ? '${API}' : location.origin;
+            const u = 'smoke' + Date.now().toString(36);
+            const res = await fetch(api + '/api/auth/register', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username: u, password: 'secret123' }),
+            });
+            if (!res.ok) return 'REGISTER-FAIL ' + res.status;
+            const r = await res.json();
+            localStorage.setItem('trycord.token', r.token);
+            location.hash = '#/home';
+            return 'TOKEN-SET';
+          } catch (e) { return 'PAGE-FAIL ' + e; }
+        })()`);
+        console.log('[smoke] register: ' + reg);
+        // Step 2: reload so the app boots and restores the session itself.
+        win.reload();
+        await new Promise((res) => setTimeout(res, 6000));
+        const out = await win.webContents.executeJavaScript(`(() => {
+          const shell = !document.getElementById('shell-app').hidden;
+          const nav = document.querySelectorAll('#sidebar-nav .nav-item').length;
+          const title = document.getElementById('page-title').textContent;
+          const welcome = [...document.querySelectorAll('#view h2')].some((h) => h.textContent.includes('Welcome back')) ? 'yes' : 'no';
+          return 'shell-app-visible=' + shell + ' nav-items=' + nav + ' title=' + title + ' welcome=' + welcome;
+        })()`);
+        console.log('[smoke] home: ' + out);
+        if (!String(out).includes('nav-items=8')) process.exitCode = 1;
       } catch (e) {
         console.log('[smoke] FAIL ' + e);
         process.exitCode = 1;
