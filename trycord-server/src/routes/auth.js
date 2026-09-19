@@ -3,17 +3,18 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const db = require('../db');
 const auth = require('../middleware/auth');
+const { fail, serviceError } = require('../errors');
 const { now, uuid, sign } = require('../util');
 
 const router = express.Router();
 
 router.post('/register', async (req, res) => {
   const { username, password, displayName } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: 'username and password required' });
-  if (String(password).length < 6) return res.status(400).json({ error: 'password must be 6+ characters' });
+  if (!username || !password) return fail(res, 'VALIDATION_ERROR', 'username and password required');
+  if (String(password).length < 6) return fail(res, 'VALIDATION_ERROR', 'password must be 6+ characters');
   const name = String(username).trim();
   if (!/^[A-Za-z0-9_.]{2,32}$/.test(name)) {
-    return res.status(400).json({ error: 'username must be 2-32 chars: letters, numbers, _ or .' });
+    return fail(res, 'VALIDATION_ERROR', 'username must be 2-32 chars: letters, numbers, _ or .');
   }
   try {
     const id = uuid();
@@ -23,18 +24,18 @@ router.post('/register', async (req, res) => {
     const token = sign({ id, username: name });
     res.json({ token, user: { id, username: name, displayName: displayName || name } });
   } catch (e) {
-    if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'username taken' });
-    res.status(500).json({ error: e.message });
+    if (String(e.message).includes('UNIQUE')) return fail(res, 'CONFLICT', 'username taken');
+    return serviceError(res, e);
   }
 });
 
 router.post('/login', async (req, res) => {
   const { username, password } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: 'username and password required' });
+  if (!username || !password) return fail(res, 'VALIDATION_ERROR', 'username and password required');
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(String(username).trim());
-  if (!user) return res.status(401).json({ error: 'invalid credentials' });
+  if (!user) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
   const ok = await bcrypt.compare(String(password), user.password_hash);
-  if (!ok) return res.status(401).json({ error: 'invalid credentials' });
+  if (!ok) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
   res.json({
     token: sign(user),
     user: { id: user.id, username: user.username, displayName: user.display_name },
@@ -51,7 +52,7 @@ router.post('/logout', auth, (req, res) => {
     }
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return serviceError(res, e);
   }
 });
 

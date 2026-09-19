@@ -1,52 +1,40 @@
-// /api/servers/:serverId/channels — list/create (members), delete (owner).
+// /api/servers/:serverId/channels — list (members), create/patch/delete (MANAGE_CHANNELS).
 const express = require('express');
-const db = require('../db');
 const auth = require('../middleware/auth');
-const { uuid, isMember, isOwner } = require('../util');
+const { resolveServer, requireMember, requirePerm } = require('../middleware/serverAccess');
+const { fail, serviceError } = require('../errors');
+const channels = require('../services/channels');
 
 const router = express.Router({ mergeParams: true });
-router.use(auth);
+router.use(auth, resolveServer);
 
-function requireMember(req, res) {
-  if (!isMember(req.user.id, req.params.serverId)) {
-    res.status(403).json({ error: 'not a member' });
-    return false;
-  }
-  return true;
-}
-
-router.get('/', (req, res) => {
-  if (!requireMember(req, res)) return;
-  res.json(db.prepare('SELECT * FROM channels WHERE server_id = ? ORDER BY position, name')
-    .all(req.params.serverId));
+router.get('/', requireMember, (req, res) => {
+  res.json(channels.list(req.server.id));
 });
 
-router.post('/', (req, res) => {
-  if (!requireMember(req, res)) return;
-  const { name, topic } = req.body || {};
-  if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
-  const clean = String(name).trim().toLowerCase().replace(/[^a-z0-9-_ ]/g, '').slice(0, 32) || 'channel';
-  const pos = db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM channels WHERE server_id = ?')
-    .get(req.params.serverId).p;
-  const channelId = uuid();
-  db.prepare('INSERT INTO channels (id, server_id, name, topic, type, position) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(channelId, req.params.serverId, clean, String(topic || '').slice(0, 200), 'text', pos);
-  res.json({ channelId });
+router.post('/', requirePerm('MANAGE_CHANNELS'), (req, res) => {
+  try {
+    const { name, topic, categoryId } = req.body || {};
+    if (!name || !String(name).trim()) return fail(res, 'VALIDATION_ERROR', 'name required');
+    res.json(channels.create(req.server.id, { name, topic, categoryId }));
+  } catch (e) { serviceError(res, e); }
 });
 
-router.delete('/:channelId', (req, res) => {
-  if (!requireMember(req, res)) return;
-  if (!isOwner(req.user.id, req.params.serverId)) {
-    return res.status(403).json({ error: 'only the server owner can delete channels' });
-  }
+router.patch('/:channelId', requirePerm('MANAGE_CHANNELS'), (req, res) => {
+  const db = require('../db');
   const ch = db.prepare('SELECT * FROM channels WHERE id = ? AND server_id = ?')
-    .get(req.params.channelId, req.params.serverId);
-  if (!ch) return res.status(404).json({ error: 'channel not found' });
-  const count = db.prepare('SELECT COUNT(*) AS n FROM channels WHERE server_id = ?')
-    .get(req.params.serverId).n;
-  if (count <= 1) return res.status(400).json({ error: 'cannot delete the last channel' });
-  db.prepare('DELETE FROM channels WHERE id = ?').run(ch.id);
-  res.json({ ok: true });
+    .get(req.params.channelId, req.server.id);
+  if (!ch) return fail(res, 'NOT_FOUND', 'channel not found');
+  try {
+    const { name, topic, categoryId } = req.body || {};
+    res.json(channels.update(ch, { name, topic, categoryId }));
+  } catch (e) { serviceError(res, e); }
+});
+
+router.delete('/:channelId', requirePerm('MANAGE_CHANNELS'), (req, res) => {
+  try {
+    res.json(channels.remove(req.server.id, req.params.channelId));
+  } catch (e) { serviceError(res, e); }
 });
 
 module.exports = router;

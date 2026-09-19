@@ -33,7 +33,44 @@ db.exec(`
     owner_id    TEXT NOT NULL REFERENCES users(id),
     join_code   TEXT UNIQUE NOT NULL,
     is_public   INTEGER NOT NULL DEFAULT 0,
+    is_discoverable INTEGER NOT NULL DEFAULT 1,
     created_at  TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS categories (
+    id        TEXT PRIMARY KEY,
+    server_id TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    name      TEXT NOT NULL,
+    position  INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS roles (
+    id          TEXT PRIMARY KEY,
+    server_id   TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    position    INTEGER NOT NULL DEFAULT 0,
+    permissions TEXT NOT NULL DEFAULT '[]',
+    is_default  INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (server_id, name)
+  );
+
+  CREATE TABLE IF NOT EXISTS member_roles (
+    server_id TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    user_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role_id   TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    PRIMARY KEY (server_id, user_id, role_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS invites (
+    id         TEXT PRIMARY KEY,
+    code       TEXT UNIQUE NOT NULL,
+    server_id  TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    creator_id TEXT NOT NULL REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    expires_at TEXT,
+    max_uses   INTEGER,
+    uses       INTEGER NOT NULL DEFAULT 0,
+    revoked    INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS server_members (
@@ -46,12 +83,13 @@ db.exec(`
   );
 
   CREATE TABLE IF NOT EXISTS channels (
-    id        TEXT PRIMARY KEY,
-    server_id TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
-    name      TEXT NOT NULL,
-    topic     TEXT DEFAULT '',
-    type      TEXT NOT NULL DEFAULT 'text',
-    position  INTEGER NOT NULL DEFAULT 0
+    id          TEXT PRIMARY KEY,
+    server_id   TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
+    name        TEXT NOT NULL,
+    topic       TEXT DEFAULT '',
+    type        TEXT NOT NULL DEFAULT 'text',
+    position    INTEGER NOT NULL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -70,12 +108,26 @@ db.exec(`
 // Migrations for databases created before these columns existed.
 for (const sql of [
   'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1',
+  'ALTER TABLE channels ADD COLUMN category_id TEXT REFERENCES categories(id) ON DELETE SET NULL',
 ]) {
   try {
     db.exec(sql);
   } catch (e) {
     if (!/duplicate column/i.test(e.message)) throw e;
   }
+}
+
+// Indexes for membership/role/channel/message hot paths.
+for (const sql of [
+  'CREATE INDEX IF NOT EXISTS idx_members_server ON server_members(server_id)',
+  'CREATE INDEX IF NOT EXISTS idx_roles_server ON roles(server_id)',
+  'CREATE INDEX IF NOT EXISTS idx_member_roles_lookup ON member_roles(server_id, user_id)',
+  'CREATE INDEX IF NOT EXISTS idx_channels_server ON channels(server_id)',
+  'CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, created_at)',
+  'CREATE INDEX IF NOT EXISTS idx_invites_server ON invites(server_id)',
+]) {
+  db.exec(sql);
 }
 
 // Drop revocation entries whose tokens already expired.
