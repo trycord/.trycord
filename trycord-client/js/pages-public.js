@@ -32,7 +32,9 @@
       '<button class="btn btn-primary btn-block" type="submit" id="li-btn">Log in</button>' +
       '</form>' +
       '<p class="auth-alt muted">No account? <a href="#/register">Create one</a></p>' +
+      C.serverSwitcher() +
       '<p class="auth-alt small muted">Running your own server? <code>npm run seed</code> in trycord-server creates a demo login.</p></div>';
+    C.wireServerSwitcher(root);
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -65,7 +67,9 @@
       '<label class="field"><span>Password (6+ characters)</span><input type="password" id="rg-pass" autocomplete="new-password" /></label>' +
       '<button class="btn btn-primary btn-block" type="submit" id="rg-btn">Create account</button>' +
       '</form>' +
-      '<p class="auth-alt muted">Have an account? <a href="#/login">Log in</a></p></div>';
+      '<p class="auth-alt muted">Have an account? <a href="#/login">Log in</a></p>' +
+      C.serverSwitcher() + '</div>';
+    C.wireServerSwitcher(root);
 
     document.getElementById('reg-form').addEventListener('submit', async (e) => {
       e.preventDefault();

@@ -184,8 +184,90 @@
     setTimeout(() => { var i = document.getElementById('cs-name'); if (i) i.focus(); }, 0);
   }
 
+  // Small "Server: host · Change" switcher for pre-login pages.
+  function serverHost() {
+    try {
+      return new URL(TrycordApi.baseUrl()).host;
+    } catch (e) {
+      return TrycordApi.baseUrl();
+    }
+  }
+
+  function serverSwitcher() {
+    return '<p class="auth-alt small muted">Server: <b data-srv-host></b> ' +
+      '<button type="button" class="link" data-change-server>Change</button></p>';
+  }
+
+  function wireServerSwitcher(root) {
+    root.querySelectorAll('[data-srv-host]').forEach((el) => {
+      el.textContent = serverHost();
+    });
+    root.querySelectorAll('[data-change-server]').forEach((b) => {
+      b.onclick = () => openServerConfigModal();
+    });
+  }
+
+  // Backend configuration dialog: validate -> test /health -> save.
+  function openServerConfigModal() {
+    var current = TrycordApi.baseUrl();
+    var source = TrycordApi.baseSource();
+    var body = document.createElement('div');
+    body.innerHTML =
+      '<p class="muted small">Currently using <code data-cur></code> (from <span data-src></span>).</p>' +
+      '<label class="field"><span>Backend URL</span>' +
+      '<input type="url" id="cfg-url" spellcheck="false" autocomplete="off" /></label>' +
+      '<div class="form-row"><button type="button" class="btn btn-ghost btn-sm" id="cfg-test">Test connection</button>' +
+      '<span id="cfg-status" class="small muted" role="status"></span></div>';
+    body.querySelector('[data-cur]').textContent = current;
+    body.querySelector('[data-src]').textContent = source;
+    var input = body.querySelector('#cfg-url');
+    input.value = current;
+    var status = body.querySelector('#cfg-status');
+
+    body.querySelector('#cfg-test').onclick = async (e) => {
+      var btn = e.currentTarget;
+      Ui.setLoading(btn, true, 'Testing…');
+      status.textContent = '';
+      var r = await TrycordApi.testConnection(input.value);
+      Ui.setLoading(btn, false);
+      if (!r.url) {
+        status.innerHTML = '⚠ <span>' + Ui.esc(r.message) + '</span>';
+      } else if (r.ok) {
+        status.innerHTML = '✓ <span>Connected to Trycord (' + r.latencyMs + ' ms)</span>';
+      } else {
+        status.innerHTML = '✕ <span>' + Ui.esc(r.message) + '</span>';
+      }
+    };
+
+    Ui.openModal({
+      title: 'Trycord server',
+      body,
+      actions: [
+        { id: 'cancel', label: 'Cancel' },
+        {
+          id: 'save', label: 'Save', primary: true,
+          onClick: (close) => {
+            var url = TrycordApi.normalizeUrl(input.value);
+            if (!url) {
+              Ui.fieldError(input, 'Use an http(s) URL like http://51.79.44.111:9971');
+              input.focus();
+              return;
+            }
+            TrycordState.settings.apiBase = url;
+            TrycordState.saveSettings();
+            close();
+            Ui.toast('Backend saved. Reloading…', 'good');
+            setTimeout(() => location.reload(), 400);
+          },
+        },
+      ],
+    });
+    setTimeout(() => input.focus(), 0);
+  }
+
   window.TrycordComponents = {
     NAV, renderSidebar, setTopbar, renderUser, closeMenus, toggleMenu,
     serverCard, wireCards, favStar, createServerModal,
+    serverSwitcher, wireServerSwitcher, openServerConfigModal,
   };
 })();
