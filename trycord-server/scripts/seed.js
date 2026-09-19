@@ -17,8 +17,8 @@ if (!user) {
 let srv = db.prepare('SELECT * FROM servers WHERE join_code = ?').get('lobby');
 if (!srv) {
   const serverId = crypto.randomUUID();
-  db.prepare('INSERT INTO servers (id, name, description, owner_id, join_code, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(serverId, 'Lobby', 'Demo server', user.id, 'lobby', now());
+  db.prepare('INSERT INTO servers (id, name, description, owner_id, join_code, is_public, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(serverId, 'Lobby', 'Demo server — open to everyone', user.id, 'lobby', 1, now());
   db.prepare('INSERT OR IGNORE INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)')
     .run(crypto.randomUUID(), user.id, serverId, user.username, now());
   db.prepare("INSERT INTO channels (id, server_id, name, topic, type, position) VALUES (?, ?, 'general', 'General chat', 'text', 0)")

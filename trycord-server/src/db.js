@@ -32,6 +32,7 @@ db.exec(`
     description TEXT DEFAULT '',
     owner_id    TEXT NOT NULL REFERENCES users(id),
     join_code   TEXT UNIQUE NOT NULL,
+    is_public   INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL
   );
 
@@ -60,6 +61,29 @@ db.exec(`
     content    TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS revoked_tokens (
+    jti        TEXT PRIMARY KEY,
+    expires_at TEXT NOT NULL
+  );
 `);
+
+// Migrations for databases created before these columns existed.
+for (const sql of [
+  'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0',
+]) {
+  try {
+    db.exec(sql);
+  } catch (e) {
+    if (!/duplicate column/i.test(e.message)) throw e;
+  }
+}
+
+// Drop revocation entries whose tokens already expired.
+db.prepare("DELETE FROM revoked_tokens WHERE expires_at < datetime('now')").run();
+setInterval(() => {
+  try {
+    db.prepare("DELETE FROM revoked_tokens WHERE expires_at < datetime('now')").run();
+  } catch { /* db closed during shutdown */ }
+}, 60 * 60 * 1000).unref();
 
 module.exports = db;

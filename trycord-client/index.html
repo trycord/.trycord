@@ -1,73 +1,92 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-density="comfortable">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>.trycord</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="styles/main.css" />
+  <link rel="stylesheet" href="styles/layout.css" />
+  <link rel="stylesheet" href="styles/components.css" />
 </head>
 <body>
-  <div id="offline-banner" hidden>
-    Server offline — start it with <code>npm start</code> in <code>trycord-server</code>, then
-    <button id="retry-btn" type="button">retry</button>
+  <a class="skip-link" href="#view">Skip to content</a>
+
+  <div id="offline-banner" class="offline-banner" hidden role="status">
+    <span class="dot dot-warn" aria-hidden="true"></span>
+    Server unreachable — start it with <code>npm start</code> in <code>trycord-server</code>.
+    <button id="retry-link" type="button" class="btn btn-ghost btn-sm">Retry</button>
   </div>
 
-  <div id="app">
-    <!-- Auth -->
-    <section id="auth-screen" class="screen card">
-      <h1>.trycord</h1>
-      <div class="form">
-        <h2>Login</h2>
-        <input id="login-username" placeholder="username" autocomplete="username" />
-        <input id="login-password" type="password" placeholder="password" autocomplete="current-password" />
-        <button id="login-btn" type="button">Login</button>
-        <p>New here? <button id="show-register" type="button" class="link">Register</button></p>
-      </div>
-      <div id="register-form" class="form" hidden>
-        <h2>Register</h2>
-        <input id="reg-username" placeholder="username" autocomplete="username" />
-        <input id="reg-password" type="password" placeholder="password (6+ chars)" autocomplete="new-password" />
-        <button id="reg-btn" type="button">Register</button>
-        <p>Have an account? <button id="show-login" type="button" class="link">Login</button></p>
-      </div>
-    </section>
+  <!-- Public shell: landing + auth -->
+  <div id="shell-public" hidden>
+    <header class="public-top">
+      <a class="brand" href="#/" aria-label="Trycord home">
+        <span class="brand-mark" aria-hidden="true">t</span><span class="brand-name">trycord</span>
+      </a>
+      <nav class="public-nav" aria-label="Public">
+        <a href="#/login" class="btn btn-ghost" data-auth-link="login">Log in</a>
+        <a href="#/register" class="btn btn-primary" data-auth-link="register">Sign up</a>
+      </nav>
+    </header>
+    <main id="view-public" class="public-main" tabindex="-1"></main>
+    <footer class="public-foot">Trycord — self-hosted community chat.</footer>
+  </div>
 
-    <!-- Join -->
-    <section id="join-screen" class="screen card" hidden>
-      <h1>Join a server</h1>
-      <input id="join-code" placeholder="join code, e.g. lobby" />
-      <button id="join-btn" type="button">Look up</button>
-      <div id="join-preview" hidden>
-        <p><strong id="preview-name"></strong><br /><span id="preview-desc"></span></p>
-        <button id="confirm-join" type="button">Join server</button>
-      </div>
-      <h2>Your servers</h2>
-      <ul id="my-servers"></ul>
-    </section>
-
-    <!-- Chat -->
-    <section id="chat-screen" hidden>
-      <aside class="sidebar">
-        <div id="server-header">
-          <strong id="current-server">-</strong>
-          <span>
-            <button id="leave-btn" type="button" title="Back to servers">Servers</button>
-            <button id="logout-btn" type="button">Logout</button>
-          </span>
+  <!-- App shell -->
+  <div id="shell-app" hidden>
+    <div class="app-grid">
+      <aside id="sidebar" class="sidebar" aria-label="Primary">
+        <a class="brand" href="#/home">
+          <span class="brand-mark" aria-hidden="true">t</span><span class="brand-name">trycord</span>
+        </a>
+        <nav id="sidebar-nav" aria-label="Sections"></nav>
+        <div class="sidebar-foot">
+          <button id="new-server-btn" type="button" class="btn btn-primary btn-block">+ New server</button>
+          <div class="user-chip">
+            <button id="user-chip-btn" type="button" class="user-chip-btn" aria-haspopup="menu" aria-expanded="false">
+              <span id="user-chip-avatar"></span>
+              <span class="user-chip-text">
+                <strong id="user-chip-name">–</strong>
+                <small id="user-chip-sub">View profile</small>
+              </span>
+            </button>
+            <button id="logout-btn" type="button" class="icon-btn" title="Log out" aria-label="Log out">⏻</button>
+          </div>
+          <div id="user-menu" class="menu" role="menu" hidden></div>
         </div>
-        <div id="channel-list"></div>
       </aside>
-      <div class="main">
-        <div id="channel-header"># -</div>
-        <ul id="message-list"></ul>
-        <div id="composer">
-          <input id="message-input" placeholder="Type a message…" autocomplete="off" />
-          <button id="send-btn" type="button">Send</button>
-        </div>
+      <button id="sidebar-scrim" type="button" class="scrim" hidden aria-label="Close navigation"></button>
+
+      <div class="app-main">
+        <header class="topbar">
+          <button id="nav-toggle" type="button" class="icon-btn only-mobile" aria-label="Open navigation" aria-expanded="false">☰</button>
+          <div class="topbar-title">
+            <h1 id="page-title">Home</h1>
+            <p id="page-sub" class="muted"></p>
+          </div>
+          <div class="topbar-right">
+            <span id="conn-pill" class="pill" role="status"><span class="dot" aria-hidden="true"></span><span id="conn-text">Checking…</span></span>
+            <button id="avatar-btn" type="button" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu"></button>
+          </div>
+        </header>
+        <main id="view" class="view" tabindex="-1"></main>
       </div>
-    </section>
+    </div>
   </div>
 
-  <script src="app.js"></script>
+  <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+  <div id="modal-root"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/pages-public.js"></script>
+  <script src="js/pages-home.js"></script>
+  <script src="js/pages-browse.js"></script>
+  <script src="js/pages-workspace.js"></script>
+  <script src="js/pages-account.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

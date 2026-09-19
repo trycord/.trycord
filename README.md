@@ -44,10 +44,29 @@ Verify its SHA256 before sharing; upload it to VirusTotal for a scan report.
 
 ## Layout
 
-| Folder            | What it is                                              | Branch   |
-|-------------------|---------------------------------------------------------|----------|
-| `trycord-server/` | Node + Express + SQLite API, WebSocket gateway, serves web client | `server` |
-| `trycord-client/` | Static web client (login, join, channels, realtime chat) | `client` |
-| `trycord-desktop/`| Electron wrapper — real desktop window like Discord     | `client` |
+| Folder             | What it is                                              | Branch   |
+|--------------------|---------------------------------------------------------|----------|
+| `trycord-server/`  | Node + Express + SQLite API, WebSocket gateway, serves web client | `server` |
+| `trycord-client/`  | App shell: landing, auth, home, servers, discover, join, workspace, activity, favorites, profile, settings | `client` |
+| `trycord-desktop/` | Electron wrapper — real desktop window like Discord     | `client` |
 
 `main` has everything. `server` has only the server. `client` has client + desktop.
+
+```
+trycord-server/src/
+├── server.js        # wiring, static client, start
+├── db.js            # sqlite open + schema + migrations
+├── ws.js            # realtime gateway
+├── util.js          # tokens, membership helpers
+├── middleware/auth.js
+└── routes/          # auth, users, servers, channels, messages, discover, activity
+
+trycord-client/
+├── index.html       # app shell (public + authenticated regions)
+├── styles/          # main (tokens/base), layout, components
+└── js/
+    ├── api.js state.js ui.js components.js
+    ├── pages-public.js pages-home.js pages-browse.js
+    ├── pages-workspace.js pages-account.js
+    └── router.js app.js
+```
