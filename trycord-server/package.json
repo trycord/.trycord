@@ -1,15 +1,13 @@
 {
   "name": "trycord-server",
-  "version": "1.0.0",
-  "main": "src/index.js",
+  "version": "0.1.0",
+  "description": "Trycord chat server: REST API + realtime WebSocket gateway, serves the web client",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "seed": "node scripts/seed.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "license": "MIT",
   "dependencies": {
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^13.0.3",
@@ -17,10 +15,6 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "sqlite3": "^6.0.1",
     "ws": "^8.21.3"
-  },
-  "devDependencies": {
-    "concurrently": "^10.0.5"
   }
 }

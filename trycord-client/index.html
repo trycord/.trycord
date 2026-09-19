@@ -1,68 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>.trycord</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="offline-banner" hidden>
+    Server offline — start it with <code>npm start</code> in <code>trycord-server</code>, then
+    <button id="retry-btn" type="button">retry</button>
+  </div>
+
   <div id="app">
-    <!-- Login / Register screen -->
-    <section id="auth-screen" class="screen">
+    <!-- Auth -->
+    <section id="auth-screen" class="screen card">
       <h1>.trycord</h1>
-      <div class="form-section">
+      <div class="form">
         <h2>Login</h2>
         <input id="login-username" placeholder="username" autocomplete="username" />
         <input id="login-password" type="password" placeholder="password" autocomplete="current-password" />
-        <button id="login-btn">Login</button>
-        <p>New here? <button id="switch-to-reg">Register</button></p>
+        <button id="login-btn" type="button">Login</button>
+        <p>New here? <button id="show-register" type="button" class="link">Register</button></p>
       </div>
-      <div id="reg-section" class="form-section" style="display:none;">
+      <div id="register-form" class="form" hidden>
         <h2>Register</h2>
         <input id="reg-username" placeholder="username" autocomplete="username" />
-        <input id="reg-password" type="password" placeholder="password" autocomplete="new-password" />
-        <button id="reg-btn">Register</button>
-        <p>Already have an account? <button id="switch-to-login">Login</button></p>
+        <input id="reg-password" type="password" placeholder="password (6+ chars)" autocomplete="new-password" />
+        <button id="reg-btn" type="button">Register</button>
+        <p>Have an account? <button id="show-login" type="button" class="link">Login</button></p>
       </div>
     </section>
 
-    <!-- Join server screen -->
-    <section id="join-screen" class="screen" style="display:none;">
-      <h1>Join Server</h1>
-      <p>Enter server join code:</p>
-      <input id="join-code" placeholder="e.g. testcom" />
-      <button id="join-btn">Join</button>
-      <div id="server-info" style="margin-top:1rem; display:none;">
-        <strong>Server:</strong> <span id="server-name"></span><br>
-        <strong>Description:</strong> <span id="server-desc"></span>
-        <button id="confirm-join">Join Server</button>
+    <!-- Join -->
+    <section id="join-screen" class="screen card" hidden>
+      <h1>Join a server</h1>
+      <input id="join-code" placeholder="join code, e.g. lobby" />
+      <button id="join-btn" type="button">Look up</button>
+      <div id="join-preview" hidden>
+        <p><strong id="preview-name"></strong><br /><span id="preview-desc"></span></p>
+        <button id="confirm-join" type="button">Join server</button>
       </div>
+      <h2>Your servers</h2>
+      <ul id="my-servers"></ul>
     </section>
 
-    <!-- Chat screen -->
-    <section id="chat-screen" class="screen" style="display:none;">
-      <div class="sidebar">
+    <!-- Chat -->
+    <section id="chat-screen" hidden>
+      <aside class="sidebar">
         <div id="server-header">
-          <span id="current-server"></span>
-          <button id="logout-btn">Logout</button>
+          <strong id="current-server">-</strong>
+          <span>
+            <button id="leave-btn" type="button" title="Back to servers">Servers</button>
+            <button id="logout-btn" type="button">Logout</button>
+          </span>
         </div>
-        <div id="channel-list">
-          <!-- channels will be populated -->
-        </div>
-      </div>
+        <div id="channel-list"></div>
+      </aside>
       <div class="main">
-        <div id="channel-header">
-          <span id="current-channel"></span>
-        </div>
-        <ul id="message-list" class="message-list"></ul>
-        <div id="message-input-wrapper">
+        <div id="channel-header"># -</div>
+        <ul id="message-list"></ul>
+        <div id="composer">
           <input id="message-input" placeholder="Type a message…" autocomplete="off" />
-          <button id="send-btn">Send</button>
+          <button id="send-btn" type="button">Send</button>
         </div>
       </div>
     </section>
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>
