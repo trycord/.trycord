@@ -1,0 +1,15 @@
+# deps
+node_modules/
+
+# secrets / local state
+.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+uploads/
+
+# build outputs (never commit binaries)
+release/
+dist/
+trycord-desktop/client/

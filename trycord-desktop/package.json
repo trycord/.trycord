@@ -1,0 +1,40 @@
+{
+  "name": "trycord-desktop",
+  "version": "0.1.0",
+  "description": "Trycord desktop app: Discord-style Electron window around the web client",
+  "author": "Trycord",
+  "main": "main.js",
+  "scripts": {
+    "start": "node scripts/copy-client.js && electron .",
+    "smoke": "node scripts/copy-client.js && electron . --smoke-test",
+    "dist": "node scripts/copy-client.js && electron-builder --win portable"
+  },
+  "license": "MIT",
+  "build": {
+    "appId": "com.trycord.app",
+    "productName": "Trycord",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "client/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  }
+}
