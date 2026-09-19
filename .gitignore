@@ -13,3 +13,4 @@ uploads/
 release/
 dist/
 trycord-desktop/client/
+*.zip
