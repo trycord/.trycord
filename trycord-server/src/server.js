@@ -1,5 +1,6 @@
 // Trycord server: resource API + WebSocket gateway + static web client.
-// Run:  npm install && npm start   ->  http://localhost:3000
+// Run:  npm install && npm start   ->  http://0.0.0.0:9971 by default
+// Bind address via HOST, port via PORT (see .env.example).
 //
 //   HTTP -> route (validate + authorize) -> service -> database
 require('dotenv').config();
@@ -12,7 +13,8 @@ const db = require('./db');
 const createGateway = require('./ws');
 const inviteRoutes = require('./routes/invites');
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = parseInt(process.env.PORT || '9971', 10);
+const HOST = process.env.HOST || '0.0.0.0';
 if (!process.env.JWT_SECRET) {
   console.warn('[warn] JWT_SECRET not set — using insecure dev default. See .env.example');
 }
@@ -66,9 +68,11 @@ const { broadcast } = createGateway(server);
 require('./routes/messages').setBroadcaster(broadcast);
 
 if (require.main === module) {
-  server.listen(PORT, () => {
-    console.log(`.trycord server at http://localhost:${PORT}`);
-    console.log('Open that URL in a browser — the chat client is served from the server itself.');
+  // The WebSocket gateway shares this HTTP server, so it uses the same bind address.
+  server.listen(PORT, HOST, () => {
+    console.log(`.trycord server listening on http://${HOST}:${PORT}`);
+    const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
+    console.log(`Open http://${displayHost}:${PORT} in a browser — the chat client is served from the server itself.`);
   });
 }
 

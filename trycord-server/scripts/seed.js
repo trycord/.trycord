@@ -33,4 +33,4 @@ console.log('Seed ready:');
 console.log('  login:       demo / demo1234');
 console.log('  join code:   lobby');
 console.log('  invite code: ' + invite.code);
-console.log('  url:         http://localhost:' + (process.env.PORT || 3000));
+console.log('  url:         http://localhost:' + (process.env.PORT || 9971));
