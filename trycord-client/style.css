@@ -1,0 +1,55 @@
+/* .trycord – minimal dark chat theme */
+:root {
+  --bg: #1e1f22;
+  --panel: #2b2d31;
+  --panel-2: #313338;
+  --text: #dbdee1;
+  --muted: #949ba4;
+  --accent: #5865f2;
+  --accent-hover: #4752c4;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+#app { min-height: 100vh; }
+.screen { max-width: 480px; margin: 4rem auto; padding: 1.5rem; background: var(--panel); border-radius: 8px; }
+.screen h1 { margin-top: 0; }
+.form-section { margin-bottom: 1rem; }
+input {
+  display: block;
+  width: 100%;
+  margin: 0.4rem 0;
+  padding: 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #1a1b1e;
+  background: #1e1f22;
+  color: var(--text);
+}
+button {
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  border-radius: 4px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+button:hover { background: var(--accent-hover); }
+/* chat layout overrides */
+#chat-screen { max-width: none; margin: 0; padding: 0; border-radius: 0; display: flex; height: 100vh; background: var(--bg); }
+.sidebar { width: 260px; background: var(--panel); display: flex; flex-direction: column; }
+#server-header { padding: 1rem; border-bottom: 1px solid #1a1b1e; display: flex; justify-content: space-between; align-items: center; }
+#channel-list { padding: 0.5rem; overflow-y: auto; flex: 1; }
+.channel-item { padding: 0.5rem; border-radius: 4px; cursor: pointer; color: var(--muted); }
+.channel-item:hover, .channel-item.active { background: var(--panel-2); color: var(--text); }
+.main { flex: 1; display: flex; flex-direction: column; }
+#channel-header { padding: 1rem; border-bottom: 1px solid #1a1b1e; font-weight: bold; }
+.message-list { flex: 1; overflow-y: auto; list-style: none; margin: 0; padding: 1rem; }
+.message-list li { margin-bottom: 0.6rem; }
+.message-list .author { font-weight: bold; margin-right: 0.5rem; }
+.message-list .time { color: var(--muted); font-size: 0.8rem; }
+#message-input-wrapper { display: flex; gap: 0.5rem; padding: 1rem; }
+#message-input { flex: 1; }
