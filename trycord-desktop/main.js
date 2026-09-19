@@ -1,6 +1,8 @@
 // Trycord desktop window (Discord-style Electron wrapper).
 // Loads the bundled web client (client/, copied from trycord-client at build).
-// Needs trycord-server running at http://localhost:9971.
+// Backend: --api-url=<url> startup argument, else the client's own
+// configuration (config.js / saved setting), else http://localhost:9971.
+//   Trycord.exe --api-url=http://51.79.44.111:9971
 // Dev:  npm start        Single-file exe:  npm run dist
 // Self-test (needs server): npm run smoke
 const { app, BrowserWindow, shell } = require('electron');
@@ -8,6 +10,21 @@ const path = require('path');
 const fs = require('fs');
 
 const API = 'http://localhost:9971';
+
+// Backend override from the command line, e.g. --api-url=http://51.79.44.111:9971
+// (also accepts "--api-url <url>"). Only http(s) URLs are honored.
+function apiUrlFromArgs(argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = String(argv[i]);
+    let v = null;
+    if (a.startsWith('--api-url=')) v = a.slice('--api-url='.length);
+    else if (a === '--api-url' && argv[i + 1]) v = String(argv[++i]);
+    if (v && /^https?:\/\//i.test(v.trim())) return v.trim().replace(/\/+$/, '');
+  }
+  return null;
+}
+
+const launchApiUrl = apiUrlFromArgs(process.argv);
 
 function clientEntry() {
   const bundled = path.join(__dirname, 'client', 'index.html');
@@ -30,19 +47,24 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  win.loadFile(clientEntry());
+  // The ?api= parameter is the client's top-precedence backend source,
+  // so the exe never permanently hardcodes localhost.
+  win.loadFile(clientEntry(), launchApiUrl ? { query: { api: launchApiUrl } } : {});
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
   if (process.argv.includes('--smoke-test')) {
+    const smokeApi = launchApiUrl || API;
+    console.log('[smoke] backend: ' + smokeApi);
     win.webContents.once('did-finish-load', async () => {
       try {
         // Full UI proof, step 1: register in-page and persist the token.
         const reg = await win.webContents.executeJavaScript(`(async () => {
           try {
-            const api = location.protocol === 'file:' ? '${API}' : location.origin;
+            const api = new URLSearchParams(location.search).get('api') ||
+              (location.protocol === 'file:' ? '${API}' : location.origin);
             const u = 'smoke' + Date.now().toString(36);
             const res = await fetch(api + '/api/auth/register', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },

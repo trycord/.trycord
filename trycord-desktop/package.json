@@ -1,6 +1,6 @@
 {
   "name": "trycord-desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Trycord desktop app: Discord-style Electron window around the web client",
   "author": "Trycord",
   "main": "main.js",

@@ -61,7 +61,9 @@
       '<section class="settings-card" aria-labelledby="set-app"><h2 id="set-app">Application</h2>' +
       '<form id="api-form"><label class="field"><span>Server URL (blank = auto)</span>' +
       '<input type="url" id="set-api" placeholder="http://localhost:9971" value="' + Ui.esc(s.apiBase || '') + '" /></label>' +
-      '<button class="btn btn-sm" type="submit">Save &amp; reload</button></form>' +
+      '<div class="form-row"><button class="btn btn-sm" type="submit">Save &amp; reload</button>' +
+      '<button class="btn btn-ghost btn-sm" type="button" id="api-test">Test connection</button>' +
+      '<span id="api-status" class="small muted" role="status"></span></div></form>' +
       '<hr class="divider" />' +
       '<div class="form-row"><button class="btn btn-ghost btn-sm" id="clear-local" type="button">Clear favorites &amp; recent</button>' +
       '<button class="btn btn-ghost btn-sm" id="logout-btn2" type="button">Log out</button></div>' +
@@ -111,10 +113,28 @@
 
     document.getElementById('api-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      TrycordState.settings.apiBase = document.getElementById('set-api').value.trim();
+      var raw = document.getElementById('set-api').value.trim();
+      if (raw && !TrycordApi.normalizeUrl(raw)) {
+        Ui.fieldError(document.getElementById('set-api'), 'Use an http(s) URL like http://51.79.44.111:9971');
+        return;
+      }
+      TrycordState.settings.apiBase = raw;
       TrycordState.saveSettings();
       location.reload();
     });
+
+    document.getElementById('api-test').onclick = async (e) => {
+      var btn = e.currentTarget;
+      var status = document.getElementById('api-status');
+      Ui.setLoading(btn, true, 'Testing…');
+      status.textContent = '';
+      var raw = document.getElementById('set-api').value.trim();
+      var r = await TrycordApi.testConnection(raw || TrycordApi.baseUrl());
+      Ui.setLoading(btn, false);
+      if (!r.url) status.textContent = '⚠ ' + r.message;
+      else if (r.ok) status.textContent = '✓ Connected to Trycord (' + r.latencyMs + ' ms)';
+      else status.textContent = '✕ ' + r.message;
+    };
 
     document.getElementById('clear-local').onclick = async () => {
       var yes = await Ui.confirmDialog({

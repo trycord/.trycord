@@ -1,20 +1,53 @@
-/* API layer: base URL resolution, token storage, typed endpoint helpers.
+/* API layer: centralized backend URL, token storage, typed endpoint helpers.
+   Backend resolution (most explicit wins):
+     1. ?api= URL parameter (used by the desktop exe's --api-url flag)
+     2. saved Server setting on this device (Settings -> Application)
+     3. window.TRYCORD_CONFIG.API_URL from config.js (edit without rebuilding)
+     4. built-in default (http://localhost:9971, or same-origin when served)
    Errors are { code, message }; thrown Error carries .code for specific UX.
    401 on an authenticated call => session dead => clear + go to login. */
 (function () {
   var TOKEN_KEY = 'trycord.token';
+  var DEFAULT_API_URL = 'http://localhost:9971';
+
+  // Returns a normalized http(s) base URL, or null if invalid.
+  // 'http://host:9971/' and 'http://host:9971' both become 'http://host:9971'.
+  // Anything non-http(s) (javascript:, data:, ftp:, bare words) is rejected.
+  function normalizeApiUrl(raw) {
+    if (!raw) return null;
+    var s = String(raw).trim().replace(/\/+$/, '');
+    if (!s) return null;
+    var u;
+    try {
+      u = new URL(s);
+    } catch (e) { return null; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    if (!u.hostname) return null;
+    var path = u.pathname === '/' ? '' : u.pathname.replace(/\/+$/, '');
+    return u.origin + path;
+  }
+
+  function resolveApiBase() {
+    var q = null;
+    try { q = new URLSearchParams(location.search).get('api'); } catch (e) { /* ignore */ }
+    q = normalizeApiUrl(q);
+    if (q) return { url: q, source: 'startup argument' };
+    var saved = null;
+    try { saved = window.TrycordState && window.TrycordState.settings.apiBase; } catch (e) { /* not loaded */ }
+    saved = normalizeApiUrl(saved);
+    if (saved) return { url: saved, source: 'saved setting' };
+    var cfg = null;
+    try { cfg = window.TRYCORD_CONFIG && window.TRYCORD_CONFIG.API_URL; } catch (e) { /* no config.js */ }
+    cfg = normalizeApiUrl(cfg);
+    if (cfg) return { url: cfg, source: 'server config' };
+    if (location.protocol === 'file:' || location.port === '5500') {
+      return { url: DEFAULT_API_URL, source: 'default' };
+    }
+    return { url: location.origin.replace(/\/+$/, ''), source: 'default' };
+  }
 
   function baseUrl() {
-    try {
-      var override = window.TrycordState && TrycordState.settings.apiBase;
-      if (override) return String(override).replace(/\/$/, '');
-    } catch (e) { /* state not loaded yet */ }
-    try {
-      var q = new URLSearchParams(location.search).get('api');
-      if (q) return q.replace(/\/$/, '');
-    } catch (e) { /* ignore */ }
-    if (location.protocol === 'file:' || location.port === '5500') return 'http://localhost:9971';
-    return location.origin;
+    return resolveApiBase().url;
   }
 
   function apiError(data, status) {
@@ -72,7 +105,39 @@
     },
 
     wsUrl() {
-      return baseUrl().replace(/^http/, 'ws') + '/?token=' + API.token;
+      // Derive from the configured backend: http -> ws, https -> wss.
+      // No separate WebSocket host is ever hardcoded.
+      var wsBase = baseUrl().replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
+      return wsBase + '/?token=' + API.token;
+    },
+
+    // Centralized backend configuration (single source of truth).
+    baseUrl,
+    baseSource: () => resolveApiBase().source,
+    normalizeUrl: normalizeApiUrl,
+    DEFAULT_API_URL,
+
+    // Probe a backend URL (used by the connection UI). Never throws.
+    async testConnection(raw) {
+      var url = normalizeApiUrl(raw);
+      if (!url) {
+        return { ok: false, code: 'INVALID_URL', message: 'Use an http(s) URL like http://51.79.44.111:9971' };
+      }
+      var t0 = Date.now();
+      try {
+        var ctrl = new AbortController();
+        var timer = setTimeout(() => ctrl.abort(), 8000);
+        var res;
+        try {
+          res = await fetch(url + '/api/health', { signal: ctrl.signal });
+        } finally {
+          clearTimeout(timer);
+        }
+        if (!res.ok) return { ok: false, code: 'BAD_STATUS', message: 'Server answered HTTP ' + res.status };
+        return { ok: true, url, latencyMs: Date.now() - t0 };
+      } catch (e) {
+        return { ok: false, code: 'UNREACHABLE', message: 'Unable to connect to ' + url };
+      }
     },
 
     // auth
