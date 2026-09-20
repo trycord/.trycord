@@ -7,6 +7,7 @@ const { fail, serviceError } = require('../errors');
 const { now, uuid, sign } = require('../util');
 
 const router = express.Router();
+const { TERMS_VERSION, PRIVACY_VERSION } = require('../legal');
 
 function isUniqueViolation(e) {
   const msg = String((e && e.message) || '');
@@ -15,9 +16,14 @@ function isUniqueViolation(e) {
 
 router.post('/register', async (req, res, next) => {
   try {
-    const { username, password, displayName } = req.body || {};
+    const { username, password, displayName, termsVersion, privacyVersion } = req.body || {};
     if (!username || !password) return fail(res, 'VALIDATION_ERROR', 'username and password required');
     if (String(password).length < 6) return fail(res, 'VALIDATION_ERROR', 'password must be 6+ characters');
+    // Terms acceptance is recorded with the exact versions shown at signup.
+    // Existing (pre-policy) accounts have NULL columns and are unaffected.
+    if (termsVersion !== TERMS_VERSION || privacyVersion !== PRIVACY_VERSION) {
+      return fail(res, 'VALIDATION_ERROR', 'please accept the current Terms of Service and Privacy Policy');
+    }
     const name = String(username).trim();
     if (!/^[A-Za-z0-9_.]{2,32}$/.test(name)) {
       return fail(res, 'VALIDATION_ERROR', 'username must be 2-32 chars: letters, numbers, _ or .');
@@ -26,8 +32,8 @@ router.post('/register', async (req, res, next) => {
     const hash = await bcrypt.hash(String(password), 10);
     try {
       await db.run(
-        'INSERT INTO users (id, username, display_name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)',
-        [id, name, String(displayName || name).slice(0, 32), hash, now()]
+        'INSERT INTO users (id, username, display_name, password_hash, created_at, terms_version, privacy_version, terms_accepted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, String(displayName || name).slice(0, 32), hash, now(), TERMS_VERSION, PRIVACY_VERSION, now()]
       );
     } catch (e) {
       if (isUniqueViolation(e)) return fail(res, 'CONFLICT', 'username taken');

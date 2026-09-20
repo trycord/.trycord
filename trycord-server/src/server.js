@@ -111,6 +111,17 @@ async function boot() {
     );
   });
 
+  // Public legal document versions (no auth): the client shows these exact
+  // versions at registration and records acceptance against them.
+  app.get('/api/legal', (req, res) => {
+    const legal = require('./legal');
+    res.json({
+      termsVersion: legal.TERMS_VERSION,
+      privacyVersion: legal.PRIVACY_VERSION,
+      updated: legal.LEGAL_UPDATED,
+    });
+  });
+
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/users', require('./routes/users'));
   app.use('/api/servers/:serverId/channels', require('./routes/channels'));
