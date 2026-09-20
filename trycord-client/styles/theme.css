@@ -1,0 +1,323 @@
+/* Trycord Theme System — Theme Management & Variants */
+
+/* ==========================================================================
+   THEME VARIANTS
+   Each theme defines its own color palette.
+   Switch themes by setting data-theme on <html>.
+   Base layer values live in tokens.css :root; themes override them here.
+   ========================================================================== */
+
+/* ===== DARK (Default) — layered, not flat ===== */
+[data-theme="dark"] {
+  --tc-bg-base: #141519;
+  --tc-bg-nav: #17181d;
+  --tc-bg-surface: #1c1e24;
+  --tc-bg-elevated: #23262e;
+  --tc-bg-hover: #282c36;
+  --tc-bg-active: #303642;
+  --tc-bg-overlay: rgba(8, 9, 12, 0.66);
+  --tc-bg: #141519;
+  --tc-bg-raised: #1c1e24;
+  --tc-surface: #1c1e24;
+  --tc-surface-raised: #23262e;
+  --tc-surface-hover: #282c36;
+  --tc-surface-active: #303642;
+  --tc-surface-subtle: #20232b;
+  --tc-border-subtle: rgba(255, 255, 255, 0.07);
+  --tc-border: rgba(255, 255, 255, 0.09);
+  --tc-border-soft: #262a33;
+  --tc-border-strong: rgba(255, 255, 255, 0.14);
+  --tc-border-focus: #6e6bf2;
+  --tc-text-primary: #edeff4;
+  --tc-text-secondary: #b9bec9;
+  --tc-text-muted: #8a90a0;
+  --tc-text-subtle: #6b7183;
+  --tc-text-disabled: #4a4f5e;
+  --tc-text-inverse: #141519;
+  --tc-text: #edeff4;
+  --tc-text-secondary: #b9bec9;
+  --tc-text-muted: #8a90a0;
+  --tc-text-subtle: #6b7183;
+  --tc-text-disabled: #4a4f5e;
+  --tc-text-inverse: #141519;
+  --tc-accent: #6e6bf2;
+  --tc-accent-hover: #8583f7;
+  --tc-accent-active: #5754d8;
+  --tc-accent-soft: rgba(110, 107, 242, 0.14);
+  --tc-accent-strong: #5754d8;
+  --tc-accent-muted: #8f8df0;
+  --tc-success: #3ecf8e;
+  --tc-success-soft: rgba(62, 207, 142, 0.13);
+  --tc-success-muted: #1f8a5c;
+  --tc-warning: #e5a54c;
+  --tc-warning-soft: rgba(229, 165, 76, 0.14);
+  --tc-warning-muted: #a86f24;
+  --tc-danger: #e5534b;
+  --tc-danger-soft: rgba(229, 83, 75, 0.13);
+  --tc-danger-muted: #a83a34;
+  --tc-info: #6e6bf2;
+  --tc-info-soft: rgba(110, 107, 242, 0.14);
+
+  /* Legacy aliases for backward compatibility */
+  --bg: #141519;
+  --bg-raise: #1c1e24;
+  --panel: #1c1e24;
+  --panel-2: #141519;
+  --panel-3: #23262e;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-soft: #262a33;
+  --text: #edeff4;
+  --muted: #8a90a0;
+  --faint: #6b7183;
+  --accent: #6e6bf2;
+  --accent-hover: #8583f7;
+  --accent-soft: rgba(110, 107, 242, 0.14);
+  --good: #3ecf8e;
+  --warn: #e5a54c;
+  --bad: #e5534b;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --radius: 10px;
+  --radius-sm: 7px;
+  --pad: 1rem;
+}
+
+/* ===== LIGHT ===== */
+[data-theme="light"] {
+  --tc-bg-base: #eef0f4;
+  --tc-bg-nav: #e6e8ee;
+  --tc-bg-surface: #ffffff;
+  --tc-bg-elevated: #ffffff;
+  --tc-bg-hover: #f1f2f6;
+  --tc-bg-active: #e4e6ec;
+  --tc-bg-overlay: rgba(20, 21, 25, 0.45);
+  --tc-bg: #eef0f4;
+  --tc-bg-raised: #ffffff;
+  --tc-surface: #ffffff;
+  --tc-surface-raised: #f4f5f8;
+  --tc-surface-hover: #eceef3;
+  --tc-surface-active: #dfe2e9;
+  --tc-surface-subtle: #f4f5f8;
+  --tc-border-subtle: rgba(20, 21, 25, 0.07);
+  --tc-border: rgba(20, 21, 25, 0.1);
+  --tc-border-soft: #e6e8ee;
+  --tc-border-strong: rgba(20, 21, 25, 0.18);
+  --tc-border-focus: #6e6bf2;
+  --tc-text-primary: #191a1f;
+  --tc-text-secondary: #4d515c;
+  --tc-text-muted: #6f7482;
+  --tc-text-subtle: #9aa0ae;
+  --tc-text-disabled: #c3c7d1;
+  --tc-text-inverse: #f4f5f7;
+  --tc-text: #191a1f;
+  --tc-text-secondary: #4d515c;
+  --tc-text-muted: #6f7482;
+  --tc-text-subtle: #9aa0ae;
+  --tc-text-disabled: #c3c7d1;
+  --tc-text-inverse: #f4f5f7;
+  --tc-accent: #5a57e8;
+  --tc-accent-hover: #6e6bf2;
+  --tc-accent-active: #4a47c4;
+  --tc-accent-soft: rgba(110, 107, 242, 0.12);
+  --tc-accent-strong: #4a47c4;
+  --tc-accent-muted: #8f8df0;
+  --tc-success: #1f9d63;
+  --tc-success-soft: rgba(31, 157, 99, 0.12);
+  --tc-success-muted: #177245;
+  --tc-warning: #b3762a;
+  --tc-warning-soft: rgba(179, 118, 42, 0.13);
+  --tc-warning-muted: #8a5a1e;
+  --tc-danger: #cf3f38;
+  --tc-danger-soft: rgba(207, 63, 56, 0.11);
+  --tc-danger-muted: #9c2f29;
+  --tc-info: #5a57e8;
+  --tc-info-soft: rgba(110, 107, 242, 0.12);
+
+  /* Legacy aliases */
+  --bg: #eef0f4;
+  --bg-raise: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #eef0f4;
+  --panel-3: #e6e8ee;
+  --line: rgba(20, 21, 25, 0.1);
+  --line-soft: #e6e8ee;
+  --text: #191a1f;
+  --muted: #6f7482;
+  --faint: #9aa0ae;
+  --accent: #5a57e8;
+  --accent-hover: #6e6bf2;
+  --accent-soft: rgba(110, 107, 242, 0.12);
+  --good: #1f9d63;
+  --warn: #b3762a;
+  --bad: #cf3f38;
+  --shadow: 0 12px 32px rgba(25, 26, 31, 0.14);
+  --radius: 10px;
+  --radius-sm: 7px;
+  --pad: 1rem;
+}
+
+/* ===== HIGH CONTRAST ===== */
+[data-theme="high-contrast"] {
+  --tc-bg-base: #000000;
+  --tc-bg-nav: #0a0b0e;
+  --tc-bg-surface: #101216;
+  --tc-bg-elevated: #171a20;
+  --tc-bg-hover: #20242c;
+  --tc-bg-active: #2a2f39;
+  --tc-bg-overlay: rgba(0, 0, 0, 0.8);
+  --tc-bg: #000000;
+  --tc-bg-raised: #101216;
+  --tc-surface: #101216;
+  --tc-surface-raised: #171a20;
+  --tc-surface-hover: #20242c;
+  --tc-surface-active: #2a2f39;
+  --tc-surface-subtle: #14161b;
+  --tc-border-subtle: #3a3f4b;
+  --tc-border: #e8eaf0;
+  --tc-border-soft: #3a3f4b;
+  --tc-border-strong: #ffffff;
+  --tc-border-focus: #8f8df0;
+  --tc-text-primary: #ffffff;
+  --tc-text-secondary: #d5d9e2;
+  --tc-text-muted: #c2c7d3;
+  --tc-text-subtle: #a8adb9;
+  --tc-text-disabled: #6b7183;
+  --tc-text-inverse: #000000;
+  --tc-text: #ffffff;
+  --tc-text-secondary: #d5d9e2;
+  --tc-text-muted: #c2c7d3;
+  --tc-text-subtle: #a8adb9;
+  --tc-text-disabled: #6b7183;
+  --tc-text-inverse: #000000;
+  --tc-accent: #8f8df0;
+  --tc-accent-hover: #a5a3f5;
+  --tc-accent-active: #8f8df0;
+  --tc-accent-soft: rgba(143, 141, 240, 0.2);
+  --tc-accent-strong: #8f8df0;
+  --tc-accent-muted: #8f8df0;
+  --tc-success: #3ecf8e;
+  --tc-success-soft: rgba(62, 207, 142, 0.2);
+  --tc-success-muted: #3ecf8e;
+  --tc-warning: #e5a54c;
+  --tc-warning-soft: rgba(229, 165, 76, 0.22);
+  --tc-warning-muted: #e5a54c;
+  --tc-danger: #ff6b63;
+  --tc-danger-soft: rgba(255, 107, 99, 0.2);
+  --tc-danger-muted: #ff6b63;
+  --tc-info: #8f8df0;
+  --tc-info-soft: rgba(143, 141, 240, 0.2);
+
+  /* Legacy aliases */
+  --bg: #000000;
+  --bg-raise: #0a0b0e;
+  --panel: #101216;
+  --panel-2: #000000;
+  --panel-3: #171a20;
+  --line: #e8eaf0;
+  --line-soft: #3a3f4b;
+  --text: #ffffff;
+  --muted: #c2c7d3;
+  --faint: #a8adb9;
+  --accent: #8f8df0;
+  --accent-hover: #a5a3f5;
+  --accent-soft: rgba(143, 141, 240, 0.2);
+  --good: #3ecf8e;
+  --warn: #e5a54c;
+  --bad: #ff6b63;
+  --shadow: 0 0 0 1px #ffffff, 0 12px 32px rgba(0, 0, 0, 0.5);
+  --radius: 10px;
+  --radius-sm: 7px;
+  --pad: 1rem;
+}
+
+/* ===== SYSTEM PREFERENCE (no explicit theme) ===== */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --tc-bg-base: #eef0f4;
+    --tc-bg-nav: #e6e8ee;
+    --tc-bg-surface: #ffffff;
+    --tc-bg-elevated: #ffffff;
+    --tc-bg-hover: #f1f2f6;
+    --tc-bg-active: #e4e6ec;
+    --tc-surface: #ffffff;
+    --tc-surface-raised: #f4f5f8;
+    --tc-surface-hover: #eceef3;
+    --tc-surface-active: #dfe2e9;
+    --tc-surface-subtle: #f4f5f8;
+    --tc-border: rgba(20, 21, 25, 0.1);
+    --tc-border-subtle: rgba(20, 21, 25, 0.07);
+    --tc-border-soft: #e6e8ee;
+    --tc-border-strong: rgba(20, 21, 25, 0.18);
+    --tc-border-focus: #6e6bf2;
+    --tc-text-primary: #191a1f;
+    --tc-text-secondary: #4d515c;
+    --tc-text-muted: #6f7482;
+    --tc-text-subtle: #9aa0ae;
+    --tc-text-disabled: #c3c7d1;
+    --tc-text-inverse: #f4f5f7;
+    --tc-text: #191a1f;
+    --tc-text-secondary: #4d515c;
+    --tc-text-muted: #6f7482;
+    --tc-text-subtle: #9aa0ae;
+    --tc-text-disabled: #c3c7d1;
+    --tc-text-inverse: #f4f5f7;
+    --tc-accent: #5a57e8;
+    --tc-accent-hover: #6e6bf2;
+    --tc-accent-active: #4a47c4;
+    --tc-accent-soft: rgba(110, 107, 242, 0.12);
+    --tc-accent-strong: #4a47c4;
+    --tc-accent-muted: #8f8df0;
+    --tc-success: #1f9d63;
+    --tc-success-soft: rgba(31, 157, 99, 0.12);
+    --tc-success-muted: #177245;
+    --tc-warning: #b3762a;
+    --tc-warning-soft: rgba(179, 118, 42, 0.13);
+    --tc-warning-muted: #8a5a1e;
+    --tc-danger: #cf3f38;
+    --tc-danger-soft: rgba(207, 63, 56, 0.11);
+    --tc-danger-muted: #9c2f29;
+    --tc-info: #5a57e8;
+    --tc-info-soft: rgba(110, 107, 242, 0.12);
+    --bg: #eef0f4;
+    --bg-raise: #ffffff;
+    --panel: #ffffff;
+    --panel-2: #eef0f4;
+    --panel-3: #e6e8ee;
+    --line: rgba(20, 21, 25, 0.1);
+    --line-soft: #e6e8ee;
+    --text: #191a1f;
+    --muted: #6f7482;
+    --faint: #9aa0ae;
+    --accent: #5a57e8;
+    --accent-hover: #6e6bf2;
+    --accent-soft: rgba(110, 107, 242, 0.12);
+    --good: #1f9d63;
+    --warn: #b3762a;
+    --bad: #cf3f38;
+    --shadow: 0 12px 32px rgba(25, 26, 31, 0.14);
+    --radius: 10px;
+    --radius-sm: 7px;
+    --pad: 1rem;
+  }
+}
+
+/* Theme transition — scoped, not global. Only themed surfaces transition. */
+.app-grid,
+.rail,
+.server-nav,
+.app-main,
+.member-panel,
+.topbar,
+.card,
+.btn,
+.chan-btn,
+.nav-item,
+.msg {
+  transition: background-color var(--tc-duration-normal) var(--tc-ease-out),
+    color var(--tc-duration-normal) var(--tc-ease-out),
+    border-color var(--tc-duration-normal) var(--tc-ease-out);
+}
+
+/* Disable theme transitions during theme switch to prevent flash */
+[data-theme-transition="false"] * {
+  transition: none !important;
+}

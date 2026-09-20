@@ -1,0 +1,330 @@
+/* Trycord Design Tokens — Source of Truth for Visual Language */
+/* All components must use these tokens. No arbitrary values. */
+
+:root {
+  /* ==========================================================================
+     COLOR SYSTEM — Trycord layered dark foundation.
+     Layers (darkest → lightest): base → navigation → surface → elevated →
+     interactive → focused. Each layer is tonally distinct so depth reads
+     without relying on borders alone.
+     ========================================================================== */
+
+  /* Layered backgrounds (dark default) */
+  --tc-bg-base: #141519;
+  --tc-bg-nav: #17181d;
+  --tc-bg-surface: #1c1e24;
+  --tc-bg-elevated: #23262e;
+  --tc-bg-hover: #282c36;
+  --tc-bg-active: #303642;
+  --tc-bg-overlay: rgba(8, 9, 12, 0.66);
+
+  /* Compat aliases (existing code references these) */
+  --tc-bg: #141519;
+  --tc-bg-raised: #1c1e24;
+  --tc-surface: #1c1e24;
+  --tc-surface-raised: #23262e;
+  --tc-surface-hover: #282c36;
+  --tc-surface-active: #303642;
+  --tc-surface-subtle: #20232b;
+
+  /* Borders */
+  --tc-border-subtle: rgba(255, 255, 255, 0.07);
+  --tc-border: rgba(255, 255, 255, 0.09);
+  --tc-border-soft: #262a33;
+  --tc-border-strong: rgba(255, 255, 255, 0.14);
+  --tc-border-focus: #6e6bf2;
+
+  /* Text hierarchy */
+  --tc-text-primary: #edeff4;
+  --tc-text-secondary: #b9bec9;
+  --tc-text-muted: #8a90a0;
+  --tc-text-subtle: #6b7183;
+  --tc-text-disabled: #4a4f5e;
+  --tc-text-inverse: #141519;
+  --tc-text: #edeff4;
+  --tc-text-secondary: #b9bec9;
+  --tc-text-muted: #8a90a0;
+  --tc-text-subtle: #6b7183;
+  --tc-text-disabled: #4a4f5e;
+  --tc-text-inverse: #141519;
+
+  /* Accent system — Trycord iris. Selective, never decorative. */
+  --tc-accent: #6e6bf2;
+  --tc-accent-hover: #8583f7;
+  --tc-accent-active: #5754d8;
+  --tc-accent-soft: rgba(110, 107, 242, 0.14);
+  --tc-accent-strong: #5754d8;
+  --tc-accent-muted: #8f8df0;
+  --tc-accent-ink: #ffffff;
+
+  /* Semantic status colors */
+  --tc-success: #3ecf8e;
+  --tc-success-soft: rgba(62, 207, 142, 0.13);
+  --tc-success-muted: #1f8a5c;
+  --tc-warning: #e5a54c;
+  --tc-warning-soft: rgba(229, 165, 76, 0.14);
+  --tc-warning-muted: #a86f24;
+  --tc-danger: #e5534b;
+  --tc-danger-soft: rgba(229, 83, 75, 0.13);
+  --tc-danger-muted: #a83a34;
+  --tc-info: #6e6bf2;
+  --tc-info-soft: rgba(110, 107, 242, 0.14);
+
+  /* Legacy aliases for backward compatibility */
+  --tc-panel: #1c1e24;
+  --tc-panel-2: #141519;
+  --tc-panel-3: #23262e;
+  --tc-line: rgba(255, 255, 255, 0.09);
+  --tc-line-soft: #262a33;
+  --tc-muted: #8a90a0;
+  --tc-faint: #6b7183;
+  --tc-good: #3ecf8e;
+  --tc-warn: #e5a54c;
+  --tc-bad: #e5534b;
+  --tc-radius: 10px;
+  --tc-radius-sm: 7px;
+  --tc-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --tc-pad: 1rem;
+
+  /* Presence */
+  --tc-online: #3ecf8e;
+  --tc-idle: #e5a54c;
+  --tc-dnd: #e5534b;
+  --tc-offline: #6b7183;
+
+  /* ==========================================================================
+     TYPOGRAPHY SYSTEM
+     ========================================================================== */
+  --tc-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --tc-font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --tc-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type scale */
+  --tc-display: 2rem;        /* 32px hero */
+  --tc-h1: 1.5rem;           /* 24px page heading */
+  --tc-h2: 1.25rem;          /* 20px section heading */
+  --tc-h3: 1.0625rem;        /* 17px card heading */
+  --tc-text-xs: 0.6875rem;   /* 11px metadata */
+  --tc-text-sm: 0.8125rem;   /* 13px secondary */
+  --tc-text-base: 0.9375rem; /* 15px body */
+  --tc-text-md: 0.875rem;    /* 14px */
+  --tc-text-lg: 1rem;        /* 16px */
+  --tc-text-xl: 1.125rem;    /* 18px */
+  --tc-text-2xl: 1.25rem;    /* 20px */
+  --tc-text-3xl: 1.5rem;     /* 24px */
+  --tc-text-4xl: 2rem;       /* 32px */
+  --tc-text-5xl: 3rem;       /* 48px */
+
+  /* Font weights */
+  --tc-font-light: 300;
+  --tc-font-normal: 400;
+  --tc-font-medium: 500;
+  --tc-font-semibold: 600;
+  --tc-font-bold: 700;
+  --tc-font-extrabold: 800;
+
+  /* Line heights */
+  --tc-leading-tight: 1.25;
+  --tc-leading-snug: 1.375;
+  --tc-leading-normal: 1.55;
+  --tc-leading-relaxed: 1.65;
+
+  /* Letter spacing */
+  --tc-tracking-tight: -0.02em;
+  --tc-tracking-normal: 0;
+  --tc-tracking-wide: 0.04em;
+  --tc-tracking-label: 0.08em;
+
+  /* ==========================================================================
+     SPACING SYSTEM — 4px base unit
+     ========================================================================== */
+  --tc-space-0: 0;
+  --tc-space-1: 0.25rem;
+  --tc-space-2: 0.5rem;
+  --tc-space-3: 0.75rem;
+  --tc-space-4: 1rem;
+  --tc-space-5: 1.25rem;
+  --tc-space-6: 1.5rem;
+  --tc-space-8: 2rem;
+  --tc-space-10: 2.5rem;
+  --tc-space-12: 3rem;
+  --tc-space-16: 4rem;
+  --tc-space-20: 5rem;
+  --tc-space-24: 6rem;
+
+  /* ==========================================================================
+     RADIUS SYSTEM
+     ========================================================================== */
+  --tc-radius-none: 0;
+  --tc-radius-sm: 6px;
+  --tc-radius-md: 8px;
+  --tc-radius-lg: 12px;
+  --tc-radius-xl: 16px;
+  --tc-radius-2xl: 20px;
+  --tc-radius-full: 9999px;
+
+  /* ==========================================================================
+     ELEVATION / SHADOWS — felt, not noticed
+     ========================================================================== */
+  --tc-shadow-none: none;
+  --tc-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --tc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.22);
+  --tc-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.28);
+  --tc-shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.36);
+  --tc-shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.36), 0 28px 64px rgba(0, 0, 0, 0.42);
+  --tc-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  --tc-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* Focus ring */
+  --tc-focus-ring: 0 0 0 3px rgba(110, 107, 242, 0.38);
+  --tc-focus-ring-inset: inset 0 0 0 2px #6e6bf2;
+
+  /* ==========================================================================
+     Z-INDEX SCALE
+     ========================================================================== */
+  --tc-z-base: 0;
+  --tc-z-dropdown: 100;
+  --tc-z-sticky: 200;
+  --tc-z-modal-backdrop: 400;
+  --tc-z-modal: 500;
+  --tc-z-popover: 600;
+  --tc-z-tooltip: 700;
+  --tc-z-toast: 800;
+  --tc-z-dialog: 900;
+
+  /* ==========================================================================
+     TRANSITIONS / MOTION — fast, subtle, purposeful
+     ========================================================================== */
+  --tc-duration-instant: 0ms;
+  --tc-duration-fast: 90ms;
+  --tc-duration-normal: 170ms;
+  --tc-duration-slow: 260ms;
+  --tc-duration-slower: 360ms;
+  --tc-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --tc-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --tc-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --tc-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ==========================================================================
+     BREAKPOINTS
+     ========================================================================== */
+  --tc-breakpoint-sm: 640px;
+  --tc-breakpoint-md: 768px;
+  --tc-breakpoint-lg: 1024px;
+  --tc-breakpoint-xl: 1280px;
+  --tc-breakpoint-2xl: 1536px;
+
+  /* ==========================================================================
+     DENSITY
+     ========================================================================== */
+  --tc-density-compact: 0.75;
+  --tc-density-comfortable: 1;
+  --tc-density-spacious: 1.25;
+}
+
+/* ==========================================================================
+   LIGHT THEME — warm paper layers
+   ========================================================================== */
+[data-theme="light"] {
+  --tc-bg-base: #eef0f4;
+  --tc-bg-nav: #e6e8ee;
+  --tc-bg-surface: #ffffff;
+  --tc-bg-elevated: #ffffff;
+  --tc-bg-hover: #f1f2f6;
+  --tc-bg-active: #e4e6ec;
+  --tc-bg-overlay: rgba(20, 21, 25, 0.45);
+  --tc-bg: #eef0f4;
+  --tc-bg-raised: #ffffff;
+  --tc-surface: #ffffff;
+  --tc-surface-raised: #f4f5f8;
+  --tc-surface-hover: #eceef3;
+  --tc-surface-active: #dfe2e9;
+  --tc-surface-subtle: #f4f5f8;
+  --tc-border-subtle: rgba(20, 21, 25, 0.07);
+  --tc-border: rgba(20, 21, 25, 0.1);
+  --tc-border-soft: #e6e8ee;
+  --tc-border-strong: rgba(20, 21, 25, 0.18);
+  --tc-border-focus: #6e6bf2;
+  --tc-text-primary: #191a1f;
+  --tc-text-secondary: #4d515c;
+  --tc-text-muted: #6f7482;
+  --tc-text-subtle: #9aa0ae;
+  --tc-text-disabled: #c3c7d1;
+  --tc-text-inverse: #f4f5f7;
+  --tc-text: #191a1f;
+  --tc-text-secondary: #4d515c;
+  --tc-text-muted: #6f7482;
+  --tc-text-subtle: #9aa0ae;
+  --tc-text-disabled: #c3c7d1;
+  --tc-text-inverse: #f4f5f7;
+  --tc-accent: #5a57e8;
+  --tc-accent-hover: #6e6bf2;
+  --tc-accent-active: #4a47c4;
+  --tc-accent-soft: rgba(110, 107, 242, 0.12);
+  --tc-accent-strong: #4a47c4;
+  --tc-accent-muted: #8f8df0;
+  --tc-success: #1f9d63;
+  --tc-success-soft: rgba(31, 157, 99, 0.12);
+  --tc-success-muted: #177245;
+  --tc-warning: #b3762a;
+  --tc-warning-soft: rgba(179, 118, 42, 0.13);
+  --tc-warning-muted: #8a5a1e;
+  --tc-danger: #cf3f38;
+  --tc-danger-soft: rgba(207, 63, 56, 0.11);
+  --tc-danger-muted: #9c2f29;
+  --tc-info: #5a57e8;
+  --tc-info-soft: rgba(110, 107, 242, 0.12);
+  --tc-panel: #ffffff;
+  --tc-panel-2: #eef0f4;
+  --tc-panel-3: #e6e8ee;
+  --tc-line: rgba(20, 21, 25, 0.1);
+  --tc-line-soft: #e6e8ee;
+  --tc-muted: #6f7482;
+  --tc-faint: #9aa0ae;
+  --tc-good: #1f9d63;
+  --tc-warn: #b3762a;
+  --tc-bad: #cf3f38;
+  --tc-radius: 10px;
+  --tc-radius-sm: 7px;
+  --tc-shadow: 0 12px 32px rgba(25, 26, 31, 0.14);
+  --tc-online: #1f9d63;
+  --tc-idle: #b3762a;
+  --tc-dnd: #cf3f38;
+  --tc-offline: #9aa0ae;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  :root {
+    --tc-border: rgba(255, 255, 255, 0.28);
+    --tc-border-strong: rgba(255, 255, 255, 0.45);
+    --tc-text-secondary: #d5d9e2;
+    --tc-text-muted: #c2c7d3;
+  }
+  [data-theme="light"] {
+    --tc-border: #8a8f9c;
+    --tc-border-strong: #555a66;
+    --tc-text-secondary: #33363e;
+    --tc-text-muted: #4d515c;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}

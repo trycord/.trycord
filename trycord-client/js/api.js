@@ -66,7 +66,11 @@
   function apiError(data, status) {
     var err = data && data.error;
     var code = (err && err.code) || 'ERROR';
-    var message = (err && err.message) || (typeof err === 'string' ? err : 'Request failed (HTTP ' + status + ')');
+    // Prefer the server's message (already human-readable). Fall back to
+    // something a person can act on instead of a bare HTTP status.
+    var message = (err && err.message) || (typeof err === 'string' ? err :
+      (!status ? "Couldn't reach the server. Check your connection and try again."
+               : 'The server returned an error (HTTP ' + status + ').'));
     var e = new Error(message);
     e.code = code;
     e.status = status;

@@ -3,17 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>.trycord</title>
-  <link rel="stylesheet" href="styles/main.css" />
+  <title>Trycord</title>
   <link rel="stylesheet" href="styles/layout.css" />
-  <link rel="stylesheet" href="styles/components.css" />
 </head>
 <body>
   <a class="skip-link" href="#view">Skip to content</a>
 
+  <!-- Trycord icon system: 24px grid, 1.8px stroke, round caps, currentColor -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/></symbol>
+      <symbol id="i-activity" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 4 12L16 12h5"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M15.8 15.8L20.5 20.5"/></symbol>
+      <symbol id="i-cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.7a7 7 0 0 0-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 2 1.2l.4 2.7h4l.4-2.7a7 7 0 0 0 2-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></symbol>
+      <symbol id="i-theme" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none" opacity="0.35"/></symbol>
+      <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h5v16h-5M10 8l4 4-4 4M14 12H3"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4L10 14M20 4l-7 17-3-7-7-3z"/></symbol>
+      <symbol id="i-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 4L7 20M17 4l-2 16M4.5 9h16M3.5 15h16"/></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><circle cx="16.5" cy="9" r="2.4"/><path d="M15.5 14.6c2.9.1 4.5 1.6 5 4.4"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5h-15S6 14 6 10"/><path d="M10 19a2.2 2.2 0 0 0 4 0"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></symbol>
+      <symbol id="i-dots" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v6c0 4.5-3.2 7.6-7.5 9-4.3-1.4-7.5-4.5-7.5-9V6z"/><path d="M9.5 12l2 2 3.5-4"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l2.3 4.9 5.2.6-3.9 3.6 1 5.2-4.6-2.6-4.6 2.6 1-5.2-3.9-3.6 5.2-.6z"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    </defs>
+  </svg>
+
   <div id="offline-banner" class="offline-banner" hidden role="status">
     <span class="dot dot-warn" aria-hidden="true"></span>
-    Server unreachable — start it with <code>npm start</code> in <code>trycord-server</code>.
+    Couldn't reach the Trycord server. Check your connection, then retry.
     <button id="retry-link" type="button" class="btn btn-ghost btn-sm">Retry</button>
   </div>
 
@@ -32,31 +57,37 @@
     <footer class="public-foot">Trycord — self-hosted community chat.</footer>
   </div>
 
-  <!-- App shell -->
+  <!-- App shell: Discord-style rail layout -->
   <div id="shell-app" hidden>
     <div class="app-grid">
-      <aside id="sidebar" class="sidebar" aria-label="Primary">
-        <a class="brand" href="#/home">
-          <span class="brand-mark" aria-hidden="true">t</span><span class="brand-name">trycord</span>
-        </a>
-        <nav id="sidebar-nav" aria-label="Sections"></nav>
-        <div class="sidebar-foot">
-          <button id="new-server-btn" type="button" class="btn btn-primary btn-block">+ New server</button>
-          <div class="user-chip">
-            <button id="user-chip-btn" type="button" class="user-chip-btn" aria-haspopup="menu" aria-expanded="false">
-              <span id="user-chip-avatar"></span>
-              <span class="user-chip-text">
-                <strong id="user-chip-name">–</strong>
-                <small id="user-chip-sub">View profile</small>
-              </span>
-            </button>
-            <button id="logout-btn" type="button" class="icon-btn" title="Log out" aria-label="Log out">⏻</button>
-          </div>
-          <div id="user-menu" class="menu" role="menu" hidden></div>
+      <!-- Left rail -->
+      <nav id="rail" class="rail" aria-label="Navigation">
+        <div class="rail-group">
+          <button type="button" class="rail-btn rail-logo" data-nav="#/home" title="Home" aria-label="Home">
+            <span class="brand-mark" aria-hidden="true">t</span>
+          </button>
+          <div class="rail-sep" aria-hidden="true"></div>
+          <button type="button" class="rail-btn" data-nav="#/home" data-tip="Home" title="Home" aria-label="Home"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg></button>
+          <button type="button" class="rail-btn" data-nav="#/servers" data-tip="Servers" title="Servers" aria-label="Servers"><svg class="icon" aria-hidden="true"><use href="#i-grid"/></svg></button>
+          <button type="button" class="rail-btn" data-nav="#/dm" data-tip="Direct Messages" title="Direct Messages" aria-label="Direct Messages"><svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg></button>
+          <button type="button" class="rail-btn" data-nav="#/activity" data-tip="Activity" title="Activity" aria-label="Activity"><svg class="icon" aria-hidden="true"><use href="#i-activity"/></svg></button>
         </div>
-      </aside>
-      <button id="sidebar-scrim" type="button" class="scrim" hidden aria-label="Close navigation"></button>
+        <div class="rail-servers" id="rail-servers" aria-label="Your servers"></div>
+        <div class="rail-foot">
+          <button type="button" class="rail-btn" id="rail-add" data-tip="Create or join a server" title="Create or join a server" aria-label="Create or join a server"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
+          <button type="button" class="rail-avatar" id="rail-account" aria-haspopup="menu" aria-expanded="false" aria-label="Account">
+            <span id="rail-avatar-img"></span>
+            <span id="rail-status" class="status-dot" aria-hidden="true"></span>
+          </button>
+        </div>
+      </nav>
 
+      <!-- Server navigation -->
+      <aside id="server-nav" class="server-nav" aria-label="Server navigation" hidden>
+        <div id="server-nav-body"></div>
+      </aside>
+
+      <!-- Main content -->
       <div class="app-main">
         <header class="topbar">
           <button id="nav-toggle" type="button" class="icon-btn only-mobile" aria-label="Open navigation" aria-expanded="false">☰</button>
@@ -65,16 +96,36 @@
             <p id="page-sub" class="muted"></p>
           </div>
           <div class="topbar-right">
+            <input type="search" class="search-input" id="search-input" placeholder="Search or jump to..." aria-label="Search" />
             <span id="conn-pill" class="pill" role="status"><span class="dot" aria-hidden="true"></span><span id="conn-text">Checking…</span></span>
             <button id="avatar-btn" type="button" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu"></button>
           </div>
         </header>
         <main id="view" class="view" tabindex="-1"></main>
+        <div id="account-bar" class="account-bar" hidden>
+          <span id="account-avatar"></span>
+          <span class="account-id">
+            <strong id="account-name">–</strong>
+            <small id="account-sub" class="muted">–</small>
+          </span>
+          <button id="account-theme" type="button" class="icon-btn" title="Toggle theme" aria-label="Toggle theme"></button>
+          <button id="account-settings" type="button" class="icon-btn" title="Settings" aria-label="Settings"></button>
+        </div>
       </div>
+
+      <!-- Member panel -->
+      <aside id="member-panel" class="member-panel" aria-label="Members and info" hidden>
+        <div id="member-panel-body"></div>
+      </aside>
     </div>
+
+    <nav id="mobilebar" class="mobilebar" aria-label="Global"></nav>
   </div>
 
-  <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+  <!-- Overlay roots -->
+  <div id="palette-root"></div>
+  <div id="menu-root"></div>
+  <div id="toasts" class="toast-container" aria-live="polite" aria-atomic="false"></div>
   <div id="modal-root"></div>
 
   <script src="config.js"></script>

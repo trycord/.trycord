@@ -23,7 +23,7 @@
   async function copyText(text, okMsg) {
     try {
       await navigator.clipboard.writeText(text);
-      Ui.toast(okMsg || 'Copied.', 'good');
+      Ui.toast(okMsg || 'Copied.', 'success');
     } catch (e) {
       Ui.toast(text, 'info');
     }
@@ -39,7 +39,7 @@
         renderNotMember(root, serverId);
         return;
       }
-      Ui.toast(e.message, 'bad');
+      Ui.toast(e.message, 'error');
       location.hash = '#/servers';
       return;
     }
@@ -130,12 +130,12 @@
       try {
         await TrycordApi.joinPublic(preview.id);
         await Trycord.refreshServers();
-        Ui.toast('Joined ' + preview.name + '.', 'good');
+        Ui.toast('Joined ' + preview.name + '.', 'success');
         location.hash = '#/server/' + encodeURIComponent(preview.id) + '/overview';
         workspace(root, preview.id, 'overview');
       } catch (err) {
         Ui.setLoading(btn, false);
-        Ui.toast(err.message, 'bad');
+        Ui.toast(err.message, 'error');
       }
     };
   }
@@ -165,7 +165,7 @@
         try {
           var inv = await TrycordApi.createInvite(detail.id, { expiresInHours: 24 });
           copyText(inv.code, 'Invite copied (expires in 24h).');
-        } catch (e) { Ui.toast(e.message, 'bad'); }
+        } catch (e) { Ui.toast(e.message, 'error'); }
       };
     }
 
@@ -279,8 +279,8 @@
             paintChannels();
             if (channels[0]) selectChannel(channels[0].id);
             else document.getElementById('msg-list').innerHTML = '';
-            Ui.toast('Channel deleted.', 'good');
-          } catch (err) { Ui.toast(err.message, 'bad'); }
+            Ui.toast('Channel deleted.', 'success');
+          } catch (err) { Ui.toast(err.message, 'error'); }
         };
         row.appendChild(del);
       }
@@ -338,7 +338,7 @@
             await TrycordApi.deleteMessage(current.channelId, m.id);
             delete renderedIds[m.id];
             li.remove();
-          } catch (err) { Ui.toast(err.message, 'bad'); }
+          } catch (err) { Ui.toast(err.message, 'error'); }
         };
         meta.appendChild(del);
       }
@@ -368,8 +368,8 @@
           input.value = '';
           paintChannels();
           selectChannel(r.id || r.channelId);
-          Ui.toast('Channel created.', 'good');
-        } catch (err) { Ui.toast(err.message, 'bad'); }
+          Ui.toast('Channel created.', 'success');
+        } catch (err) { Ui.toast(err.message, 'error'); }
       });
     }
 
@@ -382,7 +382,7 @@
       try {
         var m = await TrycordApi.postMessage(current.channelId, content);
         addMsg(m);
-      } catch (err) { Ui.toast(err.message, 'bad'); }
+      } catch (err) { Ui.toast(err.message, 'error'); }
     });
 
     paintChannels();
@@ -451,9 +451,9 @@
         if (!yes) return;
         try {
           await TrycordApi.kickMember(detail.id, b.dataset.kick);
-          Ui.toast('Member kicked.', 'good');
+          Ui.toast('Member kicked.', 'success');
           renderMembers(body, detail);
-        } catch (err) { Ui.toast(err.message, 'bad'); }
+        } catch (err) { Ui.toast(err.message, 'error'); }
       };
     });
 
@@ -490,9 +490,9 @@
                 if (!checks[i].checked && had) await TrycordApi.unassignRole(detail.id, rid, member.id);
               }
               close();
-              Ui.toast('Roles updated.', 'good');
+              Ui.toast('Roles updated.', 'success');
               onDone();
-            } catch (e) { Ui.toast(e.message, 'bad'); }
+            } catch (e) { Ui.toast(e.message, 'error'); }
           },
         },
       ],
@@ -541,9 +541,9 @@
       if (!input.value.trim()) return;
       try {
         await TrycordApi.createRole(detail.id, { name: input.value.trim(), permissions: [] });
-        Ui.toast('Role created.', 'good');
+        Ui.toast('Role created.', 'success');
         renderRoles(body, detail);
-      } catch (err) { Ui.toast(err.message, 'bad'); }
+      } catch (err) { Ui.toast(err.message, 'error'); }
     });
 
     box.querySelectorAll('[data-role-save]').forEach((b) => {
@@ -556,8 +556,8 @@
         });
         try {
           await TrycordApi.patchRole(detail.id, rid, { permissions: checked });
-          Ui.toast('Permissions saved.', 'good');
-        } catch (err) { Ui.toast(err.message, 'bad'); }
+          Ui.toast('Permissions saved.', 'success');
+        } catch (err) { Ui.toast(err.message, 'error'); }
       };
     });
 
@@ -570,9 +570,9 @@
         if (!yes) return;
         try {
           await TrycordApi.deleteRole(detail.id, b.dataset.roleDel);
-          Ui.toast('Role deleted.', 'good');
+          Ui.toast('Role deleted.', 'success');
           renderRoles(body, detail);
-        } catch (err) { Ui.toast(err.message, 'bad'); }
+        } catch (err) { Ui.toast(err.message, 'error'); }
       };
     });
   }
@@ -614,9 +614,9 @@
         b.onclick = async () => {
           try {
             await TrycordApi.revokeInvite(detail.id, b.dataset.invRevoke);
-            Ui.toast('Invite revoked.', 'good');
+            Ui.toast('Invite revoked.', 'success');
             reload();
-          } catch (err) { Ui.toast(err.message, 'bad'); }
+          } catch (err) { Ui.toast(err.message, 'error'); }
         };
       });
     }
@@ -629,10 +629,10 @@
           maxUses: maxRaw ? Number(maxRaw) : undefined,
           expiresInHours: document.getElementById('inv-exp').value || undefined,
         });
-        Ui.toast('Invite created: ' + inv.code, 'good');
+        Ui.toast('Invite created: ' + inv.code, 'success');
         copyText(inv.code, 'Invite copied: ' + inv.code);
         reload();
-      } catch (err) { Ui.toast(err.message, 'bad'); }
+      } catch (err) { Ui.toast(err.message, 'error'); }
     });
     reload();
   }
@@ -685,11 +685,11 @@
         });
         await Trycord.refreshServers();
         Ui.setLoading(btn, false);
-        Ui.toast('Server updated.', 'good');
+        Ui.toast('Server updated.', 'success');
         workspace(document.getElementById('view'), detail.id, 'settings');
       } catch (err) {
         Ui.setLoading(btn, false);
-        Ui.toast(err.message, 'bad');
+        Ui.toast(err.message, 'error');
       }
     });
 
@@ -709,7 +709,7 @@
           await Trycord.refreshServers();
           Ui.toast('Left server.', 'info');
           location.hash = '#/servers';
-        } catch (err) { Ui.toast(err.message, 'bad'); }
+        } catch (err) { Ui.toast(err.message, 'error'); }
       };
     }
     var delBtn = document.getElementById('del-server');
@@ -726,7 +726,7 @@
           await Trycord.refreshServers();
           Ui.toast('Server deleted.', 'info');
           location.hash = '#/servers';
-        } catch (err) { Ui.toast(err.message, 'bad'); }
+        } catch (err) { Ui.toast(err.message, 'error'); }
       };
     }
   }
@@ -750,9 +750,9 @@
       b.onclick = async () => {
         try {
           await TrycordApi.deleteCategory(detail.id, b.dataset.catDel);
-          Ui.toast('Category deleted (channels kept).', 'good');
+          Ui.toast('Category deleted (channels kept).', 'success');
           loadCategories(body, detail);
-        } catch (err) { Ui.toast(err.message, 'bad'); }
+        } catch (err) { Ui.toast(err.message, 'error'); }
       };
     });
     document.getElementById('cat-new').addEventListener('submit', async (e) => {
@@ -761,9 +761,9 @@
       if (!input.value.trim()) return;
       try {
         await TrycordApi.createCategory(detail.id, { name: input.value.trim() });
-        Ui.toast('Category created.', 'good');
+        Ui.toast('Category created.', 'success');
         loadCategories(body, detail);
-      } catch (err) { Ui.toast(err.message, 'bad'); }
+      } catch (err) { Ui.toast(err.message, 'error'); }
     }, { once: true });
   }
 

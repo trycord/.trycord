@@ -9,17 +9,24 @@
   function toast(message, type) {
     var root = document.getElementById('toasts');
     var el = document.createElement('div');
-    el.className = 'toast ' + (type || 'info');
+    el.className = 'toast toast-' + (type || 'info');
     el.setAttribute('role', 'status');
-    var span = document.createElement('span');
+    var content = document.createElement('div');
+    content.className = 'toast-content';
+    var title = document.createElement('div');
+    title.className = 'toast-title';
+    title.textContent = type === 'success' ? 'Success' : type === 'error' ? 'Error' : type === 'warning' ? 'Warning' : 'Info';
+    var span = document.createElement('div');
+    span.className = 'toast-message';
     span.textContent = message;
+    content.append(title, span);
     var btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'icon-btn';
+    btn.className = 'toast-close';
     btn.setAttribute('aria-label', 'Dismiss');
-    btn.textContent = '✕';
+    btn.innerHTML = '&times;';
     btn.onclick = () => el.remove();
-    el.append(span, btn);
+    el.append(content, btn);
     root.appendChild(el);
     setTimeout(() => { if (el.isConnected) el.remove(); }, 5000);
   }
@@ -28,28 +35,36 @@
     var root = document.getElementById('modal-root');
     root.innerHTML = '';
     var scrim = document.createElement('div');
-    scrim.className = 'modal-scrim';
+    scrim.className = 'modal-overlay';
     var box = document.createElement('div');
     box.className = 'modal';
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
     box.setAttribute('aria-label', opts.title || 'Dialog');
     var head = document.createElement('div');
-    head.className = 'modal-head';
+    head.className = 'modal-header';
     var h2 = document.createElement('h2');
+    h2.className = 'modal-title';
     h2.textContent = opts.title || '';
     head.appendChild(h2);
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'modal-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.setAttribute('aria-label', 'Close');
+    head.appendChild(closeBtn);
     var body = document.createElement('div');
     body.className = 'modal-body';
     if (typeof opts.body === 'string') body.innerHTML = opts.body;
     else if (opts.body) body.appendChild(opts.body);
     var foot = document.createElement('div');
-    foot.className = 'modal-foot';
+    foot.className = 'modal-footer';
     function close() {
       root.innerHTML = '';
       document.removeEventListener('keydown', onKey);
       if (opts.onClose) opts.onClose();
     }
+    closeBtn.onclick = close;
     function onKey(e) { if (e.key === 'Escape') close(); }
     (opts.actions || [{ id: 'ok', label: 'OK', primary: true }]).forEach((a) => {
       var b = document.createElement('button');
@@ -92,25 +107,26 @@
 
   function skeletons(n, cls) {
     var html = '';
-    for (var i = 0; i < (n || 3); i++) html += '<div class="skeleton"></div>';
+    for (var i = 0; i < (n || 3); i++) html += '<div class="skeleton skeleton-text"></div>';
     return '<div class="' + (cls || 'stack') + '" aria-busy="true" aria-label="Loading">' + html + '</div>';
   }
 
   function emptyState(o) {
     return (
-      '<div class="state" role="status">' +
-      '<div class="glyph" aria-hidden="true">' + (o.icon || '○') + '</div>' +
-      '<h3>' + esc(o.title || 'Nothing here yet') + '</h3>' +
-      '<p>' + esc(o.hint || '') + '</p>' +
+      '<div class="empty-state" role="status">' +
+      '<div class="empty-state-icon" aria-hidden="true">' + (o.icon || '○') + '</div>' +
+      '<h3 class="empty-state-title">' + esc(o.title || 'Nothing here yet') + '</h3>' +
+      '<p class="empty-state-text">' + esc(o.hint || '') + '</p>' +
       '<div class="actions">' + (o.actions || '') + '</div></div>'
     );
   }
 
   function errorState(message, retryLabel) {
     return (
-      '<div class="state" role="alert">' +
-      '<div class="glyph" aria-hidden="true">⚠</div><h3>Something went wrong</h3>' +
-      '<p>' + esc(message || 'Request failed.') + '</p>' +
+      '<div class="empty-state" role="alert">' +
+      '<div class="empty-state-icon" aria-hidden="true">⚠</div>' +
+      '<h3 class="empty-state-title">Something went wrong</h3>' +
+      '<p class="empty-state-text">' + esc(message || 'Request failed.') + '</p>' +
       '<div class="actions"><button type="button" class="btn btn-primary" data-retry>' +
       esc(retryLabel || 'Retry') + '</button></div></div>'
     );
@@ -125,7 +141,11 @@
   }
 
   function badge(text, kind) {
-    return '<span class="badge ' + (kind || '') + '">' + esc(text) + '</span>';
+    var cls = 'badge';
+    if (kind === 'owner') cls += ' badge-primary';
+    else if (kind === 'pub') cls += ' badge-success';
+    else if (kind === 'priv') cls += ' badge-secondary';
+    return '<span class="' + cls + '">' + esc(text) + '</span>';
   }
 
   function timeAgo(iso) {
