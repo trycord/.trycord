@@ -96,6 +96,21 @@ async function boot() {
     });
   });
 
+  // Runtime client configuration for browsers served by this server.
+  // Only safe public keys; TRYCORD_API_URL wins, else the public URL (if set).
+  // Lets a deployment pin the API origin without editing client files.
+  app.get('/runtime-config.js', (req, res) => {
+    const cfg = {};
+    const apiUrl = (process.env.TRYCORD_API_URL || '').trim() || inst.publicUrl;
+    if (apiUrl) cfg.API_URL = apiUrl;
+    if (inst.instanceId) cfg.instanceId = inst.instanceId;
+    if (inst.globalUrl) cfg.globalUrl = inst.globalUrl;
+    res.type('application/javascript').set('Cache-Control', 'no-store').send(
+      'window.TRYCORD_CONFIG = Object.assign(window.TRYCORD_CONFIG || {}, ' +
+      JSON.stringify(cfg) + ');'
+    );
+  });
+
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/users', require('./routes/users'));
   app.use('/api/servers/:serverId/channels', require('./routes/channels'));
@@ -157,9 +172,13 @@ async function boot() {
   await new Promise((resolve, reject) => {
     server.on('error', reject);
     server.listen(PORT, HOST, () => {
-      const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
       console.log(`.trycord server "${inst.instanceId}" listening on http://${HOST}:${PORT}`);
-      console.log(`Open http://${displayHost}:${PORT} in a browser — the chat client is served from the server itself.`);
+      if (inst.publicUrl) {
+        console.log(`Web client available at ${inst.publicUrl}`);
+      } else {
+        const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
+        console.log(`Web client available at http://${displayHost}:${PORT}`);
+      }
       resolve();
     });
   });
