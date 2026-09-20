@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('trycordDesktop', {
   platform: process.platform,
   version,
   updater: {
+    provider: () => ipcRenderer.invoke('trycord:updater-provider'),
     getPrefs: () => ipcRenderer.invoke('trycord:updater-prefs'),
     setPrefs: (patch) => ipcRenderer.invoke('trycord:updater-prefs-set', patch),
     check: () => ipcRenderer.invoke('trycord:updater-check'),
