@@ -1,15 +1,28 @@
-// Trycord desktop window (Discord-style Electron wrapper).
+// Trycord desktop window (Electron access point).
 // Loads the bundled web client (client/, copied from trycord-client at build).
 // Backend: --api-url=<url> startup argument, else the client's own
 // configuration (config.js / saved setting), else http://localhost:9971.
 //   Trycord.exe --api-url=http://51.79.44.111:9971
-// Dev:  npm start        Single-file exe:  npm run dist
+// Dev:      npm run dev        (no update server contact)
+// Build:    npm run build      (local package, never publishes)
+// Windows:  npm run build:win  (NSIS installer, never publishes)
+// Release:  npm run release    (CI publishes; needs GH_TOKEN)
 // Self-test (needs server): npm run smoke
-const { app, BrowserWindow, shell } = require('electron');
+//
+// The desktop app is an access point only: no database, no server state,
+// no backend authority. Auto-updates touch only the desktop application
+// itself and never server configuration or user data.
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { initUpdater } = require('./updater');
 
 const API = 'http://localhost:9971';
+
+function log() {
+  // eslint-disable-next-line no-console
+  console.log.apply(console, arguments);
+}
 
 // Backend override from the command line, e.g. --api-url=http://51.79.44.111:9971
 // (also accepts "--api-url <url>"). Only http(s) URLs are honored.
@@ -32,27 +45,34 @@ function clientEntry() {
   return path.join(__dirname, '..', 'trycord-client', 'index.html');
 }
 
+let mainWin = null;
+let updaterApi = null;
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: '.trycord',
+    title: 'Trycord',
     autoHideMenuBar: true,
-    backgroundColor: '#1e1f22',
+    backgroundColor: '#141519',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+  mainWin = win;
   // The ?api= parameter is the client's top-precedence backend source,
   // so the exe never permanently hardcodes localhost.
   win.loadFile(clientEntry(), launchApiUrl ? { query: { api: launchApiUrl } } : {});
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+  win.on('closed', () => {
+    if (mainWin === win) mainWin = null;
   });
 
   if (process.argv.includes('--smoke-test')) {
@@ -83,13 +103,13 @@ function createWindow() {
         await new Promise((res) => setTimeout(res, 6000));
         const out = await win.webContents.executeJavaScript(`(() => {
           const shell = !document.getElementById('shell-app').hidden;
-          const nav = document.querySelectorAll('#sidebar-nav .nav-item').length;
+          const rail = document.querySelectorAll('#rail .rail-btn[data-nav]').length;
           const title = document.getElementById('page-title').textContent;
           const welcome = [...document.querySelectorAll('#view h2')].some((h) => h.textContent.includes('Welcome back')) ? 'yes' : 'no';
-          return 'shell-app-visible=' + shell + ' nav-items=' + nav + ' title=' + title + ' welcome=' + welcome;
+          return 'shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' welcome=' + welcome;
         })()`);
         console.log('[smoke] home: ' + out);
-        if (!String(out).includes('nav-items=8')) process.exitCode = 1;
+        if (!String(out).includes('rail-tabs=4')) process.exitCode = 1;
       } catch (e) {
         console.log('[smoke] FAIL ' + e);
         process.exitCode = 1;
@@ -102,6 +122,13 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  // Auto-updater: packaged builds only; dev never contacts an update server.
+  // All failures are logged and swallowed — the app always launches.
+  try {
+    updaterApi = initUpdater({ app, ipcMain, getWindow: () => mainWin, log });
+  } catch (e) {
+    log('[updater] init failed (continuing without updates): ' + (e && e.message ? e.message : e));
+  }
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
