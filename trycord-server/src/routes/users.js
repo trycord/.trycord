@@ -67,17 +67,27 @@ router.post('/me/password', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// LIKE metacharacters (%, _) plus the escape character itself must match
+// literally, never as wildcards. The escape character is '!' deliberately:
+// unlike backslash it needs no escaping of its own in JS string syntax NOR
+// in SQL string syntax, so the statement text sent to MariaDB/MySQL contains
+// a plain, valid ESCAPE '!' clause (a JS '\\' became SQL '\', which MariaDB
+// parses as an unterminated string — the production 500). User input stays
+// in bound parameters; only the static clause changed.
+function escapeLike(s) {
+  return String(s).replace(/[%_!]/g, (c) => '!' + c);
+}
+
 // GET /api/users/search?q=alice — prefix-first directory, public fields only.
 router.get('/search', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim().slice(0, 32);
     if (q.length < 2) return fail(res, 'VALIDATION_ERROR', 'type at least 2 characters to search');
-    // Escape LIKE wildcards so the query stays a literal match.
-    const lit = q.replace(/[%_\\]/g, (c) => '\\' + c);
+    const lit = escapeLike(q);
     const rows = await db.all(
       `SELECT id, username, display_name, created_at FROM users
-       WHERE username LIKE ? ESCAPE '\\' OR username LIKE ? ESCAPE '\\'
-       ORDER BY CASE WHEN username LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END, username
+       WHERE username LIKE ? ESCAPE '!' OR username LIKE ? ESCAPE '!'
+       ORDER BY CASE WHEN username LIKE ? ESCAPE '!' THEN 0 ELSE 1 END, username
        LIMIT 20`,
       [`${lit}%`, `%${lit}%`, `${lit}%`]
     );
