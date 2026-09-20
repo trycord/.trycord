@@ -175,6 +175,8 @@
     document.getElementById('logout-btn2').onclick = () => Trycord.logout();
 
     // About & Updates (desktop bridge; no-ops safely in the browser).
+    // One failure => one notice. Identical repeat failures are deduplicated
+    // so a broken release or flaky network can never toast-loop the user.
     (function wireUpdater() {
       var bridge = (window.trycordDesktop && window.trycordDesktop.updater) || null;
       var ver = (window.trycordDesktop && window.trycordDesktop.version) || 'web client';
@@ -189,15 +191,26 @@
       var autoBox = document.getElementById('upd-auto');
       var chanSel = document.getElementById('upd-channel');
       if (!bridge) {
-        if (status) status.textContent = 'Updater bridge not present (browser mode).';
+        if (status) status.textContent = 'Desktop updater not present (browser mode).';
         if (checkBtn) checkBtn.disabled = true;
         return;
       }
-      try {
-        var prefs = bridge.getPrefs ? bridge.getPrefs() : {};
+      var lastErrorSig = '';
+      var lastErrorAt = 0;
+      var updateModalOpen = false;
+      function applyPrefs(prefs) {
+        if (!prefs) return;
         if (autoBox && typeof prefs.autoInstall === 'boolean') autoBox.checked = prefs.autoInstall;
         if (chanSel && prefs.channel) chanSel.value = prefs.channel;
         if (status && prefs.lastChecked) status.textContent = 'Last checked: ' + prefs.lastChecked;
+      }
+      try {
+        var maybePrefs = bridge.getPrefs ? bridge.getPrefs() : null;
+        if (maybePrefs && typeof maybePrefs.then === 'function') {
+          maybePrefs.then(applyPrefs, function () {});
+        } else {
+          applyPrefs(maybePrefs);
+        }
       } catch (e) { /* prefs are best-effort */ }
       if (autoBox) autoBox.onchange = function () { try { bridge.setPrefs({ autoInstall: autoBox.checked }); } catch (e) {} };
       if (chanSel) chanSel.onchange = function () { try { bridge.setPrefs({ channel: chanSel.value }); } catch (e) {} };
@@ -206,17 +219,41 @@
         if (status) status.textContent = 'Checking for updates…';
         try { bridge.check(); } catch (e) { Ui.setLoading(checkBtn, false); }
       };
+      function showDetails(ev) {
+        var rows = [
+          ['App version', ev.version || ver],
+          ['Channel', ev.channel || 'latest'],
+          ['Provider', (ev.provider || 'github')],
+          ['Repository', (ev.owner || '') + '/' + (ev.repo || '')],
+          ['Failure', ev.kind || 'unknown'],
+        ];
+        var body = document.createElement('div');
+        body.innerHTML =
+          '<dl style="display:grid;grid-template-columns:auto 1fr;gap:.35rem .9rem;font-size:var(--tc-text-sm);margin:0 0 var(--tc-space-3);">' +
+          rows.map(function (r) {
+            return '<dt class="text-muted">' + Ui.esc(r[0]) + '</dt><dd style="margin:0;">' + Ui.esc(String(r[1])) + '</dd>';
+          }).join('') + '</dl>' +
+          '<p class="text-muted text-sm" style="margin:0;">Technical detail (from the update log, safe to share when reporting a bug):</p>' +
+          '<pre class="code-chip" style="display:block;white-space:pre-wrap;margin-top:var(--tc-space-2);">' +
+          Ui.esc(ev.message || 'unknown error') + '</pre>';
+        Ui.openModal({
+          title: 'Update details',
+          body: body,
+          actions: [{ id: 'close', label: 'Close', primary: true }],
+          onClose: function () { updateModalOpen = false; },
+        });
+      }
       bridge.onEvent(function (ev) {
         if (!ev || !ev.type) return;
         if (ev.type === 'checking') {
           if (status) status.textContent = 'Checking for updates…';
         } else if (ev.type === 'available') {
           Ui.setLoading(checkBtn, false);
-          if (status) status.textContent = 'Update available: v' + (ev.version || '?') + ' — downloading…';
+          if (status) status.textContent = 'Trycord ' + (ev.version || '') + ' is available. Downloading update…';
           if (prog) prog.hidden = false;
         } else if (ev.type === 'not-available') {
           Ui.setLoading(checkBtn, false);
-          if (status) status.textContent = 'You are on the latest version.' + (ev.lastChecked ? ' (checked ' + ev.lastChecked + ')' : '');
+          if (status) status.textContent = "You're up to date." + (ev.lastChecked ? ' Last checked: ' + ev.lastChecked : '');
           if (prog) prog.hidden = true;
         } else if (ev.type === 'progress') {
           if (bar && typeof ev.percent === 'number') bar.style.width = Math.max(0, Math.min(100, ev.percent)) + '%';
@@ -225,20 +262,46 @@
         } else if (ev.type === 'downloaded') {
           Ui.setLoading(checkBtn, false);
           if (prog) prog.hidden = true;
-          if (status) status.textContent = 'Update v' + (ev.version || '') + ' ready.';
+          if (status) status.textContent = 'Update ready. Restart Trycord to install v' + (ev.version || '') + '.';
+          var modalRoot = document.getElementById('modal-root');
+          if (modalRoot && !modalRoot.firstChild) updateModalOpen = false;
+          if (updateModalOpen) return;
+          updateModalOpen = true;
           Ui.openModal({
-            title: 'Trycord has been updated',
-            body: '<p class="body-text">Version ' + Ui.esc(ev.version || '') + ' is downloaded and verified. Restart now to install, or later from Settings.</p>',
+            title: 'Trycord ' + (ev.version || '') + ' is ready to install',
+            body: '<p class="body-text">The update is downloaded and verified. Restart now to install it, or install later from Settings.</p>',
             actions: [
               { id: 'later', label: 'Later' },
-              { id: 'restart', label: 'Restart now', primary: true, onClick: function (close) { try { bridge.install(); } catch (e) {} close(); } },
+              { id: 'restart', label: 'Restart Trycord', primary: true, onClick: function (close) { try { bridge.install(); } catch (e) {} close(); } },
             ],
+            onClose: function () { updateModalOpen = false; },
           });
         } else if (ev.type === 'error') {
           Ui.setLoading(checkBtn, false);
           if (prog) prog.hidden = true;
-          if (status) status.textContent = 'Update check failed.';
-          Ui.toast('Unable to update Trycord. You can continue using the current version. (' + (ev.message || 'unknown error') + ')', 'warning');
+          if (status) status.textContent = "Couldn't check for updates. Try again later.";
+          // Dedupe: same failure signature within 10 minutes stays silent
+          // in the UI (it is still logged in the main process).
+          var sig = String(ev.kind || 'unknown') + '|' + String(ev.message || '').slice(0, 120);
+          var nowTs = Date.now();
+          if (sig === lastErrorSig && nowTs - lastErrorAt < 10 * 60 * 1000) return;
+          lastErrorSig = sig;
+          lastErrorAt = nowTs;
+          var body = document.createElement('div');
+          body.innerHTML =
+            '<p class="body-text" style="margin-top:0;">Couldn\'t update Trycord.</p>' +
+            '<p class="text-muted text-sm">You can continue using the current version. Try again later.</p>';
+          var detailsBtn = document.createElement('button');
+          detailsBtn.type = 'button';
+          detailsBtn.className = 'btn btn-ghost btn-sm';
+          detailsBtn.textContent = 'Details';
+          detailsBtn.onclick = function () { showDetails(ev); };
+          body.appendChild(detailsBtn);
+          Ui.openModal({
+            title: 'Update failed',
+            body: body,
+            actions: [{ id: 'close', label: 'Close', primary: true }],
+          });
         }
       });
     })();
