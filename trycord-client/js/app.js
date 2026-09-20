@@ -94,6 +94,14 @@
       };
     }
 
+    var backBtn = document.getElementById('nav-back');
+    if (backBtn) {
+      backBtn.onclick = () => {
+        if (window.history.length > 1) window.history.back();
+        else location.hash = '#/home';
+      };
+    }
+
     document.querySelectorAll('#rail .rail-item[data-nav]').forEach((b) => {
       b.onclick = () => { location.hash = b.getAttribute('data-nav'); };
     });
@@ -202,6 +210,14 @@
       }
     }
     window.addEventListener('hashchange', () => window.TrycordRouter.route());
+    if (window.matchMedia) {
+      // Breakpoint crossings only refresh chrome affordances (back button).
+      // Never re-render the view: that would wipe composer drafts.
+      var mq = window.matchMedia('(max-width: 900px)');
+      var onMode = () => { if (window.TrycordRouter.refreshChrome) window.TrycordRouter.refreshChrome(); };
+      if (mq.addEventListener) mq.addEventListener('change', onMode);
+      else if (mq.addListener) mq.addListener(onMode);
+    }
     if (!location.hash) location.hash = '#/';
     await window.TrycordRouter.route();
     window.__trycordBooted = true;

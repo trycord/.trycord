@@ -29,7 +29,7 @@
         (TrycordState.servers.length > 6
           ? '<p style="margin-top:var(--tc-space-3);"><a href="#/servers" class="tc-muted-link">View all ' + TrycordState.servers.length + ' servers →</a></p>' : '')
       : Ui.emptyState({
-          icon: '▦', title: 'No servers yet',
+          icon: Ui.icons.grid, title: 'No servers yet',
           hint: 'Create your first server or join one with an invite code.',
           actions: '<button type="button" class="btn btn-primary btn-sm" data-act="create">Create server</button>' +
             '<a class="btn btn-ghost btn-sm" href="#/join">Join server</a>',
@@ -69,7 +69,7 @@
       var box = document.getElementById('home-activity');
       if (!box) return;
       if (!acts.length) {
-        box.innerHTML = Ui.emptyState({ icon: '◷', title: 'No activity yet', hint: 'Messages in your servers will show up here.' });
+        box.innerHTML = Ui.emptyState({ icon: Ui.icons.clock, title: 'No activity yet', hint: 'Messages in your servers will show up here.' });
         return;
       }
       box.innerHTML = acts.map(activityItem).join('');

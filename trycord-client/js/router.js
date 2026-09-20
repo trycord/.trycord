@@ -23,6 +23,16 @@
     if (t) t.setAttribute('aria-expanded', 'false');
   }
 
+  // Mobile back button: visible on detail screens in mobile layout only.
+  // (CSS keeps it hidden on desktop regardless.)
+  function updateBackButton(r) {
+    var back = document.getElementById('nav-back');
+    if (!back) return;
+    var detail = r.name === 'workspace' || r.name === 'dm-detail' ||
+      r.name === 'preview' || r.name === 'settings';
+    back.hidden = !(detail && window.TrycordUi.isMobileLayout());
+  }
+
   function parse() {
     var h = location.hash || '#/';
     var segs = h.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
@@ -83,6 +93,7 @@
       if (r.name === 'workspace') activeHash = '#/servers';
       if (r.name === 'preview') activeHash = '#/discover';
       if (r.name === 'dm-detail') activeHash = '#/dm';
+      updateBackButton(r);
       C.renderRail(activeHash);
       C.renderUser();
       C.hideServerNav();
@@ -115,5 +126,5 @@
     }
   }
 
-  window.TrycordRouter = { route, parse };
+  window.TrycordRouter = { route, parse, refreshChrome: () => updateBackButton(parse()) };
 })();
