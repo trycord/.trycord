@@ -45,7 +45,7 @@
       var sorted = sortServers(list, sort.value);
       if (!sorted.length) {
         out.innerHTML = term
-          ? Ui.emptyState({ icon: '○', title: 'Nothing matched that search.', hint: 'Try a different search.' })
+          ? Ui.emptyState({ icon: Ui.icons.empty, title: 'Nothing matched that search.', hint: 'Try a different search.' })
           : emptyHtml;
         return;
       }
@@ -65,7 +65,7 @@
     root.innerHTML = filterBar('srv');
     bindFilter(root, 'srv', () => TrycordState.servers,
       Ui.emptyState({
-        icon: '▦', title: 'You haven’t joined any servers',
+        icon: Ui.icons.grid, title: 'You haven’t joined any servers',
         hint: 'Create one or join with an invite code.',
         actions: '<button type="button" class="btn btn-primary btn-sm" data-act="create">Create server</button>' +
           '<a class="btn btn-ghost btn-sm" href="#/join">Join server</a>',
@@ -115,7 +115,7 @@
     function paint(append) {
       if (!items.length) {
         out.innerHTML = Ui.emptyState({
-          icon: '○', title: 'No public servers found',
+          icon: Ui.icons.empty, title: 'No public servers found',
           hint: q.value.trim()
             ? 'Try a different search.'
             : 'Server owners can list their server from Server → Settings → Visibility.',
@@ -187,7 +187,7 @@
       var p = await TrycordApi.discoverPreview(serverId);
     } catch (e) {
       body.innerHTML = Ui.emptyState({
-        icon: '○', title: 'Server unavailable',
+        icon: Ui.icons.empty, title: 'Server unavailable',
         hint: 'It may be private, unlisted, or deleted.',
         actions: '<a class="btn btn-ghost btn-sm" href="#/discover">Back to Discover</a>',
       });
@@ -278,7 +278,7 @@
         } catch (err2) {
           Ui.setLoading(btn, false);
           box.innerHTML = Ui.emptyState({
-            icon: '○', title: 'Code not found',
+            icon: Ui.icons.empty, title: 'Code not found',
             hint: 'Check the code and try again, or browse Discover for public servers.',
           });
           return;
@@ -345,7 +345,7 @@
       var acts = await TrycordApi.activity(30);
       if (!acts.length) {
         box.innerHTML = Ui.emptyState({
-          icon: '◷', title: 'Nothing yet',
+          icon: Ui.icons.clock, title: 'Nothing yet',
           hint: 'When people post in your servers, the latest messages land here.',
         });
         return;
@@ -370,7 +370,7 @@
     var favs = TrycordState.servers.filter((s) => TrycordState.isFav(s.id));
     if (!favs.length) {
       root.innerHTML = Ui.emptyState({
-        icon: '☆', title: 'No favorites yet',
+        icon: Ui.icons.star, title: 'No favorites yet',
         hint: 'Star any server to pin it here.',
         actions: '<a class="btn btn-ghost btn-sm" href="#/servers">Browse your servers</a>',
       });

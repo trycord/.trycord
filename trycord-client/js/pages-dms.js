@@ -24,7 +24,7 @@
       return '<div class="nav-label">Direct messages</div>' +
         '<div style="padding:var(--tc-space-2);">' +
         Ui.emptyState({
-          icon: '✉', title: 'No conversations yet.',
+          icon: Ui.icons.empty, title: 'No conversations yet.',
           hint: 'Find someone to talk to.',
           actions: '<button type="button" class="btn btn-primary btn-sm" data-new-dm>Start a conversation</button>',
         }) + '</div>';
@@ -44,21 +44,28 @@
     return html;
   }
 
+  function dmRowMenu(c, x, y) {
+    Ui.contextMenu(x, y, [
+      { label: 'Open conversation', icon: 'i-mail', onClick: () => { location.hash = '#/dm/' + encodeURIComponent(c.id); } },
+      { label: 'View profile', icon: 'i-users', onClick: () => C.openProfileModal(c.peer && c.peer.id) },
+      { label: 'Mark as read', icon: 'i-checks', hidden: !c.unreadCount, onClick: () => {
+        TrycordApi.dmRead(c.id).then(() => Trycord.refreshSocial().then(() => window.TrycordRouter.route())).catch((err) => Ui.toast(err.message, 'error'));
+      } },
+    ]);
+  }
+
   function wireNavList(root, onNew) {
     root.querySelectorAll('[data-dm]').forEach((b) => {
       b.onclick = () => { location.hash = '#/dm/' + encodeURIComponent(b.dataset.dm); };
       b.oncontextmenu = (e) => {
         e.preventDefault();
         var c = TrycordState.dmById(b.dataset.dm);
-        if (!c) return;
-        Ui.contextMenu(e.clientX, e.clientY, [
-          { label: 'Open conversation', icon: 'i-mail', onClick: () => { location.hash = '#/dm/' + encodeURIComponent(c.id); } },
-          { label: 'View profile', icon: 'i-users', onClick: () => C.openProfileModal(c.peer && c.peer.id) },
-          { label: 'Mark as read', icon: 'i-checks', hidden: !c.unreadCount, onClick: () => {
-            TrycordApi.dmRead(c.id).then(() => Trycord.refreshSocial().then(() => window.TrycordRouter.route())).catch((err) => Ui.toast(err.message, 'error'));
-          } },
-        ]);
+        if (c) dmRowMenu(c, e.clientX, e.clientY);
       };
+    });
+    Ui.bindLongPress(root, '[data-dm]', (el, x, y) => {
+      var c = TrycordState.dmById(el.dataset.dm);
+      if (c) dmRowMenu(c, x, y);
     });
     var nw = root.querySelector('[data-new-dm]');
     if (nw) nw.onclick = onNew;
@@ -124,7 +131,7 @@
     var convs = TrycordState.dms;
     if (!convs.length) {
       body.innerHTML = Ui.emptyState({
-        icon: '✉', title: 'No conversations yet.',
+        icon: Ui.icons.empty, title: 'No conversations yet.',
         hint: 'Find someone to talk to.',
         actions: '<button type="button" class="btn btn-primary" data-new-dm2>Start a conversation</button>',
       });
@@ -150,7 +157,7 @@
     var html = '<div style="display:flex;gap:var(--tc-space-2);margin-bottom:var(--tc-space-4);">' +
       '<button type="button" class="btn btn-primary btn-sm" data-add-friend>Add friend</button></div>';
     if (!friends.length) {
-      html += Ui.emptyState({ icon: '☺', title: 'No friends yet.', hint: 'Find someone on Trycord to get started.' });
+      html += Ui.emptyState({ icon: Ui.icons.empty, title: 'No friends yet.', hint: 'Find someone on Trycord to get started.' });
     } else {
       html += friends.map((f) =>
         '<div class="member-row" data-user="' + Ui.esc(f.id) + '">' +
@@ -241,7 +248,7 @@
       ? '<div style="display:flex;justify-content:flex-end;margin-bottom:var(--tc-space-3);">' +
         '<button type="button" class="btn btn-ghost btn-sm" data-read-all>Mark all read</button></div>' : '';
     if (!items.length) {
-      html += Ui.emptyState({ icon: '🔔', title: "You're all caught up.", hint: '' });
+      html += Ui.emptyState({ icon: Ui.icons.empty, title: "You're all caught up.", hint: '' });
     } else {
       html += items.map((n) => {
         var who = (n.actor && (n.actor.displayName || n.actor.username)) || 'Trycord';

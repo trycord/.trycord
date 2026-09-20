@@ -25,7 +25,7 @@
     var box = document.getElementById('prof-servers');
     if (!mine.length) {
       box.innerHTML = Ui.emptyState({
-        icon: '▦', title: 'No servers yet',
+        icon: Ui.icons.grid, title: 'No servers yet',
         hint: 'Join or create a server to get started.',
         actions: '<a class="btn btn-ghost btn-sm" href="#/join">Join server</a>',
       });

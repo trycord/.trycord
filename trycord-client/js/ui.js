@@ -1,5 +1,47 @@
 /* UI primitives: escaping, toasts, modal/dialog, states, avatar, time. */
 (function () {
+  // Trycord icon vocabulary — ONE source of truth for typographic icons.
+  // These are text glyphs (arrows, math, geometric shapes) chosen for
+  // broad cross-platform rendering: every entry defaults to monochrome
+  // text presentation, never color emoji. Anything complex, brand-critical,
+  // or at risk of emoji substitution (bell, lock, logo) stays an inline
+  // SVG symbol in index.html instead. Use Ui.icon(name) so the language
+  // can evolve without hunting the codebase.
+  var icons = {
+    back: '←',
+    forward: '→',
+    close: '×',
+    add: '+',
+    more: '⋮',
+    overflow: '⋯',
+    search: '⌕',
+    command: '⌘',
+    settings: '⚙',
+    edit: '✎',
+    refresh: '↻',
+    external: '↗',
+    upload: '↑',
+    download: '↓',
+    check: '✓',
+    checks: '✓✓',
+    channel: '#',
+    mention: '@',
+    star: '☆',
+    starFilled: '★',
+    dot: '•',
+    chevron: '›',
+    empty: '○',
+    clock: '◷',
+    grid: '▦',
+  };
+
+  // <span class="ico" aria-hidden="true">X</span> — decorative by default.
+  // Icon-only controls MUST carry their own aria-label (never rely on this).
+  function icon(name, cls) {
+    var glyph = icons[name] || icons.empty;
+    return '<span class="ico' + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + glyph + '</span>';
+  }
+
   function esc(s) {
     return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -252,9 +294,74 @@
     if (first) first.focus({ preventScroll: true });
   }
 
+  // Long-press for touch screens: fires fn(x, y) after 550ms of steady
+  // touch. Movement cancels. Never the only path — every long-press target
+  // also has a visible affordance (buttons, ⋮) or contextmenu handler.
+  function longPress(el, fn) {
+    var timer = null;
+    var sx = 0;
+    var sy = 0;
+    el.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        fn(sx, sy);
+      }, 550);
+    }, { passive: true });
+    el.addEventListener('touchmove', (e) => {
+      if (!timer) return;
+      var t = e.touches[0];
+      if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }, { passive: true });
+    el.addEventListener('touchend', () => {
+      clearTimeout(timer);
+      timer = null;
+    });
+    el.addEventListener('touchcancel', () => {
+      clearTimeout(timer);
+      timer = null;
+    });
+  }
+
+  // Bind long-press to every element matching selector under root that
+  // doesn't already have one. Call after each list render.
+  function bindLongPress(root, selector, fn) {
+    root.querySelectorAll(selector).forEach((el) => {
+      if (el.dataset.lpBound) return;
+      el.dataset.lpBound = '1';
+      longPress(el, (x, y) => fn(el, x, y));
+    });
+  }
+
+  // Re-dispatch as contextmenu so touch/long-press flows through the exact
+  // same permission-aware menu code as right-click. One code path.
+  function fireContextMenu(el, x, y) {
+    el.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true, clientX: x, clientY: y,
+    }));
+  }
+
+  // Layout mode for the rare cases JS must differ by viewport (e.g. which
+  // drawer to open). Visual layout stays in CSS; this is a media query,
+  // not a pixel sniff, and updates live on resize/rotation.
+  var mobileQuery = null;
+  try {
+    mobileQuery = window.matchMedia('(max-width: 900px)');
+  } catch (e) { /* very old browsers: assume desktop */ }
+  function isMobileLayout() {
+    return !!(mobileQuery && mobileQuery.matches);
+  }
+
   window.TrycordUi = {
     esc, toast, openModal, confirmDialog, skeletons,
     emptyState, errorState, avatarHtml, badge, timeAgo, fullDate, dayLabel,
-    fieldError, setLoading, contextMenu, closeCtx,
+    fieldError, setLoading, contextMenu, closeCtx, longPress, bindLongPress,
+    fireContextMenu, isMobileLayout, icons, icon,
   };
 })();

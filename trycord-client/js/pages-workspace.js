@@ -151,13 +151,10 @@
       b.onclick = () => { location.hash = '#/server/' + encodeURIComponent(detail.id) + '/chat/' + encodeURIComponent(b.dataset.openChan); };
       b.oncontextmenu = (e) => {
         e.preventDefault();
-        Ui.contextMenu(e.clientX, e.clientY, [
-          { label: 'Open channel', icon: 'i-hash', onClick: () => { location.hash = '#/server/' + encodeURIComponent(detail.id) + '/chat/' + encodeURIComponent(b.dataset.openChan); } },
-          { label: 'Copy channel name', icon: 'i-copy', onClick: () => C.copyText(b.querySelector('.lbl').textContent, 'Channel name copied.') },
-          { label: 'Delete channel', icon: 'i-trash', danger: true, hidden: !can(detail.id, 'MANAGE_CHANNELS'), onClick: () => deleteChannel(detail, b.dataset.openChan) },
-        ]);
+        chanMenu(b, e.clientX, e.clientY, detail);
       };
     });
+    Ui.bindLongPress(body, '[data-open-chan]', (el, x, y) => chanMenu(el, x, y, detail));
     body.querySelectorAll('[data-del-chan]').forEach((b) => {
       b.onclick = (e) => { e.stopPropagation(); deleteChannel(detail, b.dataset.delChan); };
     });
@@ -178,6 +175,14 @@
     if (nc) nc.onclick = () => channelModal(detail, null);
     var ncat = body.querySelector('[data-new-cat]');
     if (ncat) ncat.onclick = () => categoryModal(detail);
+  }
+
+  function chanMenu(b, x, y, detail) {
+    Ui.contextMenu(x, y, [
+      { label: 'Open channel', icon: 'i-hash', onClick: () => { location.hash = '#/server/' + encodeURIComponent(detail.id) + '/chat/' + encodeURIComponent(b.dataset.openChan); } },
+      { label: 'Copy channel name', icon: 'i-copy', onClick: () => C.copyText(b.querySelector('.lbl').textContent, 'Channel name copied.') },
+      { label: 'Delete channel', icon: 'i-trash', danger: true, hidden: !can(detail.id, 'MANAGE_CHANNELS'), onClick: () => deleteChannel(detail, b.dataset.openChan) },
+    ]);
   }
 
   async function deleteChannel(detail, channelId) {
@@ -288,7 +293,7 @@
           '<div class="body"><div class="head"><span class="author">' + Ui.esc(a.author_display || a.author_name) + '</span>' +
           '<span class="time">in #' + Ui.esc(a.channel_name) + ' · ' + Ui.esc(Ui.timeAgo(a.created_at)) + '</span></div>' +
           '<div class="text">' + Ui.esc(a.content) + '</div></div></li>').join('') + '</ul>'
-        : Ui.emptyState({ icon: '◷', title: 'Nothing here yet.', hint: 'Activity in this server will show up here.' }));
+        : Ui.emptyState({ icon: Ui.icons.clock, title: 'Nothing here yet.', hint: 'Activity in this server will show up here.' }));
     function stat(num, lbl) {
       return '<div class="stat" style="flex:1;min-width:9rem;"><div class="num">' + Ui.esc(String(num === undefined || num === null ? '–' : num)) + '</div><div class="lbl">' + Ui.esc(lbl) + '</div></div>';
     }
@@ -312,7 +317,7 @@
       C.setTopbar(detail.name, 'No channels yet.', '', 'i-hash');
       root.innerHTML = tabBar(detail, 'chat') +
         Ui.emptyState({
-          icon: '#', title: 'No channels yet.',
+          icon: Ui.icons.channel, title: 'No channels yet.',
           hint: can(detail.id, 'MANAGE_CHANNELS') ? 'Create the first channel to start talking.' : 'Ask a moderator to create a channel.',
           actions: can(detail.id, 'MANAGE_CHANNELS') ? '<button type="button" class="btn btn-primary" data-new-chan2>New channel</button>' : '',
         });

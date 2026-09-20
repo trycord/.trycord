@@ -62,6 +62,10 @@
         if (s) serverMenu(e.clientX, e.clientY, s);
       };
     });
+    Ui.bindLongPress(box, '[data-open]', function (el, x, y) {
+      var s = TrycordState.serverById(el.dataset.open);
+      if (s) serverMenu(x, y, s);
+    });
   }
 
   function renderRailBadges() {
@@ -424,7 +428,7 @@
       out.innerHTML = Ui.skeletons(2);
       TrycordApi.userSearch(q).then(function (users) {
         if (!users.length) {
-          out.innerHTML = Ui.emptyState({ icon: '○', title: 'Nothing matched that search.', hint: '' });
+          out.innerHTML = Ui.emptyState({ icon: Ui.icons.empty, title: 'Nothing matched that search.', hint: '' });
           return;
         }
         out.innerHTML = users.map(function (u) {
@@ -750,7 +754,8 @@
       '<div class="msg-actions" role="toolbar" aria-label="Message actions">' +
       '<button type="button" class="icon-btn" data-copy title="Copy text" aria-label="Copy text"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>' +
       (opts.canDelete ? '<button type="button" class="icon-btn" data-del title="Delete message" aria-label="Delete message"><svg aria-hidden="true"><use href="#i-trash"/></svg></button>' : '') +
-      '</div></li>'
+      '</div>' +
+      '<button type="button" class="msg-touchbtn" data-touch-menu title="Message actions" aria-label="Message actions" aria-haspopup="menu"><svg aria-hidden="true"><use href="#i-dots"/></svg></button></li>'
     );
   }
 
@@ -768,12 +773,26 @@
   }
 
   function wireMessageList(root, onDelete) {
+    Ui.bindLongPress(root, '[data-mid]', function (el, x, y) {
+      Ui.fireContextMenu(el, x, y);
+    });
     root.querySelectorAll('[data-copy]').forEach((b) => {
       b.onclick = (e) => {
         e.stopPropagation();
         var li = b.closest('[data-mid]');
         var text = li ? li.querySelector('.text').textContent : '';
         copyText(text, 'Message copied.');
+      };
+    });
+    // Touch path: re-dispatch as contextmenu so touch uses the exact same
+    // permission-aware menu as right-click/long-press. One code path.
+    root.querySelectorAll('[data-touch-menu]').forEach((b) => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        var li = b.closest('[data-mid]');
+        if (!li) return;
+        var r = b.getBoundingClientRect();
+        Ui.fireContextMenu(li, r.left, r.bottom + 4);
       };
     });
     if (onDelete) {
