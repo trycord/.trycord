@@ -16,7 +16,10 @@ function tables(engine) {
       username      VARCHAR(64) UNIQUE NOT NULL,
       display_name  TEXT,
       password_hash TEXT NOT NULL,
-      created_at    VARCHAR(64) NOT NULL
+      created_at    VARCHAR(64) NOT NULL,
+      terms_version VARCHAR(16),
+      privacy_version VARCHAR(16),
+      terms_accepted_at VARCHAR(64)
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS servers (
@@ -201,6 +204,9 @@ const LEGACY_ALTERS = [
   'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1',
   'ALTER TABLE channels ADD COLUMN category_id VARCHAR(64) REFERENCES categories(id) ON DELETE SET NULL',
+  'ALTER TABLE users ADD COLUMN terms_version VARCHAR(16)',
+  'ALTER TABLE users ADD COLUMN privacy_version VARCHAR(16)',
+  'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64)',
 ];
 
 // Existing MySQL databases may already have created_at stored as TEXT.
@@ -213,6 +219,9 @@ const MYSQL_ALTERS = [
   'ALTER TABLE invites MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
   'ALTER TABLE invites MODIFY COLUMN expires_at VARCHAR(64) NULL',
   'ALTER TABLE revoked_tokens MODIFY COLUMN expires_at VARCHAR(64) NOT NULL',
+  'ALTER TABLE users ADD COLUMN terms_version VARCHAR(64) NULL',
+  'ALTER TABLE users ADD COLUMN privacy_version VARCHAR(64) NULL',
+  'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64) NULL',
 ];
 
 const INDEXES = [
