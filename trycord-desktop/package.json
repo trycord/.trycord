@@ -1,13 +1,29 @@
 {
   "name": "trycord-desktop",
-  "version": "0.5.0",
-  "description": "Trycord desktop app: Discord-style Electron window around the web client",
+  "version": "1.0.1",
+  "description": "Trycord desktop app: the web client in a native desktop window",
   "author": "Trycord",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LanxTheShowmaker/.trycord.git",
+    "directory": "trycord-desktop"
+  },
+  "bugs": {
+    "url": "https://github.com/LanxTheShowmaker/.trycord/issues"
+  },
+  "homepage": "https://github.com/LanxTheShowmaker/.trycord#readme",
+  "keywords": ["chat", "self-hosted", "desktop", "electron"],
   "main": "main.js",
   "scripts": {
+    "dev": "node scripts/copy-client.js && electron .",
     "start": "node scripts/copy-client.js && electron .",
     "smoke": "node scripts/copy-client.js && electron . --smoke-test",
-    "dist": "node scripts/copy-client.js && electron-builder --win portable"
+    "dist": "node scripts/copy-client.js && electron-builder --win portable --publish never",
+    "build": "node scripts/copy-client.js && electron-builder --publish never",
+    "build:win": "node scripts/copy-client.js && electron-builder --win --publish never",
+    "build:linux": "node scripts/copy-client.js && electron-builder --linux --publish never",
+    "build:mac": "node scripts/copy-client.js && electron-builder --mac --publish never",
+    "release": "node scripts/copy-client.js && electron-builder --publish always"
   },
   "license": "MIT",
   "build": {
@@ -18,20 +34,62 @@
     },
     "files": [
       "main.js",
+      "updater.js",
       "preload.js",
       "package.json",
       "client/**/*"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "LanxTheShowmaker",
+        "repo": ".trycord"
+      }
+    ],
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
         }
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Trycord",
+      "artifactName": "Trycord Setup ${version}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Network;Chat"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.social-networking"
     }
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
   },
   "devDependencies": {
     "electron": "^44.4.3",
