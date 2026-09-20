@@ -1,0 +1,82 @@
+# Trycord desktop release pipeline.
+#
+# Trigger: ONLY explicit version tags (v1.0.1, v1.2.0-beta.1, ...).
+# Ordinary pushes, PRs, and merges NEVER publish a release.
+#
+# Flow: tag → install → build → package → metadata → publish →
+#       installed clients detect the update via electron-updater.
+#
+# Required repository secret: GH_TOKEN (a token with `contents:write` /
+# `repo` scope; the default GITHUB_TOKEN works for same-repo releases).
+#
+# Code signing (optional, recommended for production):
+#   CSC_LINK         — base64-encoded certificate or path to .pfx
+#   CSC_KEY_PASSWORD — certificate password
+# macOS auto-updates REQUIRE a signed app; Windows signing is optional
+# but recommended. When unset, builds are unsigned and still work for
+# local install/testing.
+name: Release desktop
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-win:
+    name: Build + publish (Windows NSIS)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: trycord-desktop
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: trycord-desktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build + publish Windows installer
+        run: npm run release -- --win
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      - name: List artifacts
+        run: ls release/
+
+  release-linux:
+    name: Build + publish (Linux AppImage)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trycord-desktop
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: trycord-desktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build + publish Linux AppImage
+        run: npm run release -- --linux
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}

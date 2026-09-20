@@ -1,0 +1,54 @@
+# Trycord check pipeline: install, syntax-check, schema smoke test.
+#
+# Runs on pushes and pull requests to main. Never publishes anything —
+# releases are produced only by the release-desktop workflow on v* tags.
+name: Check
+
+on:
+  push:
+    branches: [main]
+    tags-ignore: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  server:
+    name: Server checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: trycord-server
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: trycord-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax-check server sources
+        run: node --check src/server.js && for f in $(find src scripts -name '*.js'); do node --check "$f" || exit 1; done
+
+      - name: Schema smoke test (throwaway SQLite)
+        run: npm run check
+
+  client:
+    name: Client checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Syntax-check client sources
+        run: for f in trycord-client/js/*.js trycord-client/serve.js trycord-client/config.js; do node --check "$f" || exit 1; done
