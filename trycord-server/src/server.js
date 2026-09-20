@@ -146,7 +146,14 @@ async function boot() {
   ]) {
     if (fs.existsSync(path.join(candidate, 'index.html'))) {
       clientDir = candidate;
-      app.use(express.static(candidate));
+      // Never serve a stale client bundle: a cached index.html paired with
+      // mismatched JS/CSS renders a blank page with no way to recover except
+      // a hard refresh. Always fetch fresh from the server.
+      app.use(express.static(candidate, {
+        setHeaders(res) {
+          res.setHeader('Cache-Control', 'no-store');
+        },
+      }));
       console.log('[info] serving web client from ' + candidate);
       break;
     }
