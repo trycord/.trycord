@@ -23,6 +23,7 @@
     "build:win": "node scripts/copy-client.js && electron-builder --win --publish never",
     "build:linux": "node scripts/copy-client.js && electron-builder --linux --publish never",
     "build:mac": "node scripts/copy-client.js && electron-builder --mac --publish never",
+    "validate:release": "node scripts/validate-release.js",
     "release": "node scripts/copy-client.js && electron-builder --publish always"
   },
   "license": "MIT",
