@@ -86,9 +86,11 @@ function createWindow() {
             const api = new URLSearchParams(location.search).get('api') ||
               (location.protocol === 'file:' ? '${API}' : location.origin);
             const u = 'smoke' + Date.now().toString(36);
+            const legalRes = await fetch(api + '/api/legal');
+            const legal = await legalRes.json();
             const res = await fetch(api + '/api/auth/register', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ username: u, password: 'secret123' }),
+              body: JSON.stringify({ username: u, password: 'secret123', termsVersion: legal.termsVersion, privacyVersion: legal.privacyVersion }),
             });
             if (!res.ok) return 'REGISTER-FAIL ' + res.status;
             const r = await res.json();

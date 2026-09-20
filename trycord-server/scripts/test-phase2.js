@@ -69,8 +69,21 @@ async function main() {
   const su = (n) => n + '_' + stamp;
 
   // --- accounts ---
+  // Legal versions the server currently requires at registration.
+  const legal = await (await fetch(BASE + '/api/legal')).json();
+  if (!legal.termsVersion || !legal.privacyVersion) {
+    console.error('FAIL: /api/legal missing versions');
+    process.exit(1);
+  }
+  console.log('ok: legal versions ' + legal.termsVersion + '/' + legal.privacyVersion);
+  const r0 = await api('POST', '/api/auth/register', null, { username: su('nolegal'), password: 'secret123' });
+  ok(r0.status === 400, 'registration without terms acceptance rejected (400)');
+
   async function register(name) {
-    const r = await api('POST', '/api/auth/register', null, { username: su(name), password: 'secret123' });
+    const r = await api('POST', '/api/auth/register', null, {
+      username: su(name), password: 'secret123',
+      termsVersion: legal.termsVersion, privacyVersion: legal.privacyVersion,
+    });
     ok(r.status === 200 && r.data.token && r.data.user, 'register ' + name);
     return r.data;
   }
