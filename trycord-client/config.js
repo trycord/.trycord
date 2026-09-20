@@ -1,15 +1,14 @@
 /* Trycord runtime backend configuration.
-   Edit this file to point the client at a different Trycord server —
-   no rebuild needed. Examples:
-     http://localhost:9971      (local development, the default)
-     http://51.79.44.111:9971   (remote server)
+   Leave API_URL empty to auto-detect: same-origin when the client is served
+   by a Trycord server, http://localhost:9971 for local file/desktop use.
+   Set it to pin a specific instance without rebuilding, e.g.:
+     http://51.79.44.111:9971
      https://trycord.wispbyte.app (official instance)
-   When served by the access-point server, /runtime-config.js may override
-   these values from the deployment environment (only safe public keys).
+   When served with /runtime-config.js present, deployment values merge in.
    Precedence (most explicit wins): ?api= URL parameter, in-app Server
    setting (saved on this device), this file + runtime config, then default. */
 window.TRYCORD_CONFIG = {
-  API_URL: 'http://localhost:9971',
+  API_URL: '',
   // instanceId: 'official',   // namespaced browser storage for this instance
   // globalUrl: '',            // optional global service (empty = independent)
 };
