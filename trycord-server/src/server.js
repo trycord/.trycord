@@ -80,9 +80,9 @@ async function boot() {
   app.get('/api/health', async (req, res) => {
     try {
       await db.get('SELECT 1');
-      res.json({ ok: true, db: 'ok', instanceId: inst.instanceId });
+      res.json({ ok: true, db: 'ok', instanceId: inst.instanceId, client: !!clientDir });
     } catch {
-      res.status(503).json({ ok: false, db: 'unreachable', instanceId: inst.instanceId });
+      res.status(503).json({ ok: false, db: 'unreachable', instanceId: inst.instanceId, client: !!clientDir });
     }
   });
 
@@ -136,16 +136,24 @@ async function boot() {
   });
 
   // Serve the web client (repo layout, packaged layout, desktop copy).
+  // Silent skipping here is what produces a bare "Cannot GET /" in production,
+  // so log explicitly either way.
+  let clientDir = null;
   for (const candidate of [
     path.join(__dirname, '..', '..', 'trycord-client'),
     path.join(__dirname, '..', 'client'),
     path.join(__dirname, '..', '..', 'trycord-desktop', 'client'),
   ]) {
     if (fs.existsSync(path.join(candidate, 'index.html'))) {
+      clientDir = candidate;
       app.use(express.static(candidate));
       console.log('[info] serving web client from ' + candidate);
       break;
     }
+  }
+  if (!clientDir) {
+    console.warn('[warn] web client NOT served: no index.html found next to the server. ' +
+      'Deploy the full repository (with trycord-client/) or ignore this if API-only.');
   }
 
   const { broadcast } = createGateway(server);
