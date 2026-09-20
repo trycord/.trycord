@@ -9,14 +9,15 @@
     var owned = mine.filter((s) => s.is_owner).length;
     C.setTopbar('Profile', '@' + u.username);
     root.innerHTML =
-      '<section class="settings-card"><div class="row wrap">' + Ui.avatarHtml(u.displayName || u.username, 'lg') +
+      '<section class="card"><div class="card-body" style="display: flex; gap: var(--tc-space-4); align-items: center; flex-wrap: wrap;">' +
+      Ui.avatarHtml(u.displayName || u.username, 'avatar-xl') +
       '<div><h2 style="margin:0">' + Ui.esc(u.displayName || u.username) + '</h2>' +
-      '<p class="muted" style="margin:0">@' + Ui.esc(u.username) + ' · member since ' + Ui.fullDate(u.createdAt) + '</p></div>' +
+      '<p class="text-muted" style="margin:0">@' + Ui.esc(u.username) + ' · member since ' + Ui.fullDate(u.createdAt) + '</p></div>' +
       '</div></section>' +
-      '<div class="stats" style="margin-top:1rem">' +
-      '<div class="stat"><div class="num">' + mine.length + '</div><div class="lbl">Servers joined</div></div>' +
-      '<div class="stat"><div class="num">' + owned + '</div><div class="lbl">Servers owned</div></div>' +
-      '<div class="stat"><div class="num">' + TrycordState.favorites.length + '</div><div class="lbl">Favorites</div></div>' +
+      '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--tc-space-4); margin-top: var(--tc-space-4);">' +
+      '<div class="card"><div class="card-body" style="text-align: center;"><div style="font-size: var(--tc-text-3xl); font-weight: var(--tc-font-bold);">' + mine.length + '</div><div class="text-muted text-sm">Servers joined</div></div></div>' +
+      '<div class="card"><div class="card-body" style="text-align: center;"><div style="font-size: var(--tc-text-3xl); font-weight: var(--tc-font-bold);">' + owned + '</div><div class="text-muted text-sm">Servers owned</div></div></div>' +
+      '<div class="card"><div class="card-body" style="text-align: center;"><div style="font-size: var(--tc-text-3xl); font-weight: var(--tc-font-bold);">' + TrycordState.favorites.length + '</div><div class="text-muted text-sm">Favorites</div></div></div>' +
       '</div>' +
       '<section class="section"><h2>Your servers</h2><div id="prof-servers"></div></section>';
 
@@ -28,7 +29,7 @@
         actions: '<a class="btn btn-ghost btn-sm" href="#/join">Join server</a>',
       });
     } else {
-      box.innerHTML = '<div class="grid-cards">' + mine.map((s) => C.serverCard(s)).join('') + '</div>';
+      box.innerHTML = '<div class="showcase-grid">' + mine.map((s) => C.serverCard(s)).join('') + '</div>';
       C.wireCards(box);
     }
   }
@@ -38,41 +39,60 @@
     var s = TrycordState.settings;
     C.setTopbar('Settings', 'Account, appearance, and application.');
     root.innerHTML =
-      '<div class="settings-grid">' +
-      '<section class="settings-card" aria-labelledby="set-account"><h2 id="set-account">Account</h2>' +
-      '<p class="hint">Signed in as <b>@' + Ui.esc(u.username) + '</b>.</p>' +
-      '<form id="name-form"><label class="field"><span>Display name</span>' +
-      '<input type="text" id="set-display" maxlength="32" value="' + Ui.esc(u.displayName || '') + '" /></label>' +
+      '<div style="display: grid; gap: var(--tc-space-4); max-width: 48rem;">' +
+      '<section class="card" aria-labelledby="set-account"><div class="card-header"><h2 id="set-account">Account</h2></div>' +
+      '<div class="card-body"><p class="text-muted">Signed in as <b>@' + Ui.esc(u.username) + '</b>.</p>' +
+      '<form id="name-form"><div class="form-group"><label class="form-label" for="set-display">Display name</label>' +
+      '<input type="text" id="set-display" class="form-input" maxlength="32" value="' + Ui.esc(u.displayName || '') + '" /></div>' +
       '<button class="btn btn-primary btn-sm" type="submit">Save display name</button></form>' +
       '<hr class="divider" />' +
-      '<form id="pw-form"><label class="field"><span>Current password</span>' +
-      '<input type="password" id="pw-cur" autocomplete="current-password" /></label>' +
-      '<label class="field"><span>New password (6+ characters)</span>' +
-      '<input type="password" id="pw-new" autocomplete="new-password" /></label>' +
-      '<button class="btn btn-sm" type="submit">Change password</button></form></section>' +
+      '<form id="pw-form"><div class="form-group"><label class="form-label" for="pw-cur">Current password</label>' +
+      '<input type="password" id="pw-cur" class="form-input" autocomplete="current-password" /></div>' +
+      '<div class="form-group"><label class="form-label" for="pw-new">New password (6+ characters)</label>' +
+      '<input type="password" id="pw-new" class="form-input" autocomplete="new-password" /></div>' +
+      '<button class="btn btn-secondary btn-sm" type="submit">Change password</button></form></div></section>' +
 
-      '<section class="settings-card" aria-labelledby="set-appear"><h2 id="set-appear">Appearance</h2>' +
-      '<div class="form-row"><label class="small muted" for="set-theme">Theme</label>' +
-      '<select id="set-theme"><option value="dark">Dark</option><option value="light">Light</option></select></div>' +
-      '<div class="form-row" style="margin-top:0.6rem"><label class="small muted" for="set-density">Density</label>' +
-      '<select id="set-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>' +
-      '<p class="hint">Saved instantly on this device.</p></section>' +
+      '<section class="card" aria-labelledby="set-appear"><div class="card-header"><h2 id="set-appear">Appearance</h2></div>' +
+      '<div class="card-body"><div class="form-group"><label class="form-label" for="set-theme">Theme</label>' +
+      '<select id="set-theme" class="form-input"><option value="dark">Dark</option><option value="light">Light</option></select></div>' +
+      '<div class="form-group"><label class="form-label" for="set-density">Density</label>' +
+      '<select id="set-density" class="form-input"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>' +
+      '<p class="text-muted text-sm">Saved instantly on this device.</p></div></section>' +
 
-      '<section class="settings-card" aria-labelledby="set-app"><h2 id="set-app">Application</h2>' +
-      '<form id="api-form"><label class="field"><span>Server URL (blank = auto)</span>' +
-      '<input type="url" id="set-api" placeholder="http://localhost:9971" value="' + Ui.esc((TrycordState.access && TrycordState.access.apiBase) || '') + '" /></label>' +
-      '<div class="form-row"><button class="btn btn-sm" type="submit">Save &amp; reload</button>' +
+      '<section class="card" aria-labelledby="set-app"><div class="card-header"><h2 id="set-app">Application</h2></div>' +
+      '<div class="card-body"><form id="api-form"><div class="form-group"><label class="form-label" for="set-api">Server URL (blank = auto)</label>' +
+      '<input type="url" id="set-api" class="form-input" placeholder="http://localhost:9971" value="' + Ui.esc((TrycordState.access && TrycordState.access.apiBase) || '') + '" /></div>' +
+      '<div style="display: flex; gap: var(--tc-space-3); align-items: center;"><button class="btn btn-secondary btn-sm" type="submit">Save &amp; reload</button>' +
       '<button class="btn btn-ghost btn-sm" type="button" id="api-test">Test connection</button>' +
-      '<span id="api-status" class="small muted" role="status"></span></div></form>' +
+      '<span id="api-status" class="text-sm text-muted" role="status"></span></div></form>' +
       '<hr class="divider" />' +
-      '<div class="form-row"><span class="small muted">Global sync: <b id="global-status">checking…</b></span>' +
+      '<div style="display: flex; gap: var(--tc-space-3); align-items: center;"><span class="text-sm text-muted">Global sync: <b id="global-status">checking…</b></span>' +
       '<button class="btn btn-ghost btn-sm" type="button" id="global-retry">Recheck</button></div>' +
-      '<p class="hint">Global sync is optional and never required for chat. ' +
+      '<p class="text-muted text-sm">Global sync is optional and never required for chat. ' +
       'Appearance stays on this device; only an explicitly configured global service is contacted.</p>' +
       '<hr class="divider" />' +
-      '<div class="form-row"><button class="btn btn-ghost btn-sm" id="clear-local" type="button">Clear favorites &amp; recent</button>' +
-      '<button class="btn btn-ghost btn-sm" id="logout-btn2" type="button">Log out</button></div>' +
-      '<p class="hint">Trycord web client v0.4.0 · instance-aware access points.</p></section>' +
+      '<div style="display: flex; gap: var(--tc-space-3);"><button class="btn btn-ghost btn-sm" id="clear-local" type="button">Clear favorites &amp; recent</button>' +
+      '<button class="btn btn-danger btn-sm" id="logout-btn2" type="button">Log out</button></div>' +
+      '<p class="text-muted text-sm" style="margin-top: var(--tc-space-4);" id="client-version-line">Trycord client</p></div></section>' +
+
+      '<section class="card" aria-labelledby="set-about"><div class="card-header"><h2 id="set-about">About &amp; Updates</h2></div>' +
+      '<div class="card-body"><p class="text-muted" style="margin:0 0 var(--tc-space-3);"><b id="about-version">Trycord</b> — a self-hostable community chat platform.</p>' +
+      '<p style="display:flex;gap:var(--tc-space-3);flex-wrap:wrap;margin:0 0 var(--tc-space-4);">' +
+      '<a class="btn btn-ghost btn-sm" href="https://github.com/LanxTheShowmaker/.trycord" target="_blank" rel="noopener">Source code</a>' +
+      '<a class="btn btn-ghost btn-sm" href="https://github.com/LanxTheShowmaker/.trycord#readme" target="_blank" rel="noopener">Documentation</a>' +
+      '<a class="btn btn-ghost btn-sm" href="https://github.com/LanxTheShowmaker/.trycord/issues" target="_blank" rel="noopener">Report a problem</a></p>' +
+      '<div id="updater-block">' +
+      '<div class="form-group"><label class="form-label" for="upd-channel">Release channel</label>' +
+      '<select id="upd-channel" class="form-input"><option value="latest">Stable</option><option value="beta">Beta</option></select></div>' +
+      '<div class="form-check" style="margin-bottom: var(--tc-space-3);"><input type="checkbox" id="upd-auto" class="form-check-input" checked />' +
+      '<label class="form-check-label" for="upd-auto">Automatically install updates</label></div>' +
+      '<div style="display: flex; gap: var(--tc-space-3); align-items: center; flex-wrap: wrap;">' +
+      '<button class="btn btn-secondary btn-sm" type="button" id="upd-check">Check for updates</button>' +
+      '<span id="upd-status" class="text-sm text-muted" role="status">Last checked: never</span></div>' +
+      '<div class="progress" id="upd-progress" hidden style="margin-top: var(--tc-space-3);"><div class="progress-bar" id="upd-bar" style="width: 0%;"></div></div>' +
+      '</div>' +
+      '<p class="text-muted text-sm" id="upd-note" style="margin-top: var(--tc-space-3);">Desktop updates are delivered by the installed Trycord app. This web view checks through the desktop bridge when available.</p>' +
+      '</div></section>' +
       '</div>';
 
     document.getElementById('set-theme').value = s.theme || 'dark';
@@ -86,8 +106,8 @@
         var updated = await TrycordApi.patchMe({ displayName: input.value.trim() });
         TrycordState.user = updated;
         C.renderUser();
-        Ui.toast('Display name saved.', 'good');
-      } catch (err) { Ui.toast(err.message, 'bad'); }
+        Ui.toast('Display name saved.', 'success');
+      } catch (err) { Ui.toast(err.message, 'error'); }
     });
 
     document.getElementById('pw-form').addEventListener('submit', async (e) => {
@@ -101,7 +121,7 @@
         await TrycordApi.changePassword({ currentPassword: cur.value, newPassword: neu.value });
         cur.value = '';
         neu.value = '';
-        Ui.toast('Password changed.', 'good');
+        Ui.toast('Password changed.', 'success');
       } catch (err) {
         Ui.fieldError(cur, err.message);
       }
@@ -149,10 +169,79 @@
       });
       if (yes) {
         TrycordState.clearLocal();
-        Ui.toast('Local data cleared.', 'good');
+        Ui.toast('Local data cleared.', 'success');
       }
     };
     document.getElementById('logout-btn2').onclick = () => Trycord.logout();
+
+    // About & Updates (desktop bridge; no-ops safely in the browser).
+    (function wireUpdater() {
+      var bridge = (window.trycordDesktop && window.trycordDesktop.updater) || null;
+      var ver = (window.trycordDesktop && window.trycordDesktop.version) || 'web client';
+      var line = document.getElementById('client-version-line');
+      if (line) line.textContent = 'Trycord ' + ver + ' · instance-aware access points.';
+      var about = document.getElementById('about-version');
+      if (about) about.textContent = 'Trycord ' + ver;
+      var status = document.getElementById('upd-status');
+      var bar = document.getElementById('upd-bar');
+      var prog = document.getElementById('upd-progress');
+      var checkBtn = document.getElementById('upd-check');
+      var autoBox = document.getElementById('upd-auto');
+      var chanSel = document.getElementById('upd-channel');
+      if (!bridge) {
+        if (status) status.textContent = 'Updater bridge not present (browser mode).';
+        if (checkBtn) checkBtn.disabled = true;
+        return;
+      }
+      try {
+        var prefs = bridge.getPrefs ? bridge.getPrefs() : {};
+        if (autoBox && typeof prefs.autoInstall === 'boolean') autoBox.checked = prefs.autoInstall;
+        if (chanSel && prefs.channel) chanSel.value = prefs.channel;
+        if (status && prefs.lastChecked) status.textContent = 'Last checked: ' + prefs.lastChecked;
+      } catch (e) { /* prefs are best-effort */ }
+      if (autoBox) autoBox.onchange = function () { try { bridge.setPrefs({ autoInstall: autoBox.checked }); } catch (e) {} };
+      if (chanSel) chanSel.onchange = function () { try { bridge.setPrefs({ channel: chanSel.value }); } catch (e) {} };
+      if (checkBtn) checkBtn.onclick = function () {
+        Ui.setLoading(checkBtn, true, 'Checking…');
+        if (status) status.textContent = 'Checking for updates…';
+        try { bridge.check(); } catch (e) { Ui.setLoading(checkBtn, false); }
+      };
+      bridge.onEvent(function (ev) {
+        if (!ev || !ev.type) return;
+        if (ev.type === 'checking') {
+          if (status) status.textContent = 'Checking for updates…';
+        } else if (ev.type === 'available') {
+          Ui.setLoading(checkBtn, false);
+          if (status) status.textContent = 'Update available: v' + (ev.version || '?') + ' — downloading…';
+          if (prog) prog.hidden = false;
+        } else if (ev.type === 'not-available') {
+          Ui.setLoading(checkBtn, false);
+          if (status) status.textContent = 'You are on the latest version.' + (ev.lastChecked ? ' (checked ' + ev.lastChecked + ')' : '');
+          if (prog) prog.hidden = true;
+        } else if (ev.type === 'progress') {
+          if (bar && typeof ev.percent === 'number') bar.style.width = Math.max(0, Math.min(100, ev.percent)) + '%';
+          if (prog) prog.hidden = false;
+          if (status) status.textContent = 'Downloading update… ' + Math.round(ev.percent || 0) + '%';
+        } else if (ev.type === 'downloaded') {
+          Ui.setLoading(checkBtn, false);
+          if (prog) prog.hidden = true;
+          if (status) status.textContent = 'Update v' + (ev.version || '') + ' ready.';
+          Ui.openModal({
+            title: 'Trycord has been updated',
+            body: '<p class="body-text">Version ' + Ui.esc(ev.version || '') + ' is downloaded and verified. Restart now to install, or later from Settings.</p>',
+            actions: [
+              { id: 'later', label: 'Later' },
+              { id: 'restart', label: 'Restart now', primary: true, onClick: function (close) { try { bridge.install(); } catch (e) {} close(); } },
+            ],
+          });
+        } else if (ev.type === 'error') {
+          Ui.setLoading(checkBtn, false);
+          if (prog) prog.hidden = true;
+          if (status) status.textContent = 'Update check failed.';
+          Ui.toast('Unable to update Trycord. You can continue using the current version. (' + (ev.message || 'unknown error') + ')', 'warning');
+        }
+      });
+    })();
 
     var refreshGlobal = async () => {
       var el = document.getElementById('global-status');

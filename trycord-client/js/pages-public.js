@@ -86,7 +86,7 @@
         TrycordApi.token = r.token;
         TrycordState.user = r.user;
         await Trycord.refreshServers();
-        Ui.toast('Account created — welcome to Trycord.', 'good');
+        Ui.toast('Account created — welcome to Trycord.', 'success');
         location.hash = '#/home';
       } catch (err) {
         Ui.setLoading(btn, false);

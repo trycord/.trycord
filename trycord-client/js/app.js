@@ -10,7 +10,7 @@
       } catch (e) {
         TrycordState.setServers([]);
       }
-      C.renderSidebar(location.hash);
+      C.renderRail(location.hash);
     },
 
     async logout() {
@@ -24,56 +24,90 @@
 
     setOnline(online) {
       var pill = document.getElementById('conn-pill');
+      if (!pill) return;
       var text = document.getElementById('conn-text');
       var dot = pill.querySelector('.dot');
-      dot.className = 'dot' + (online ? '' : ' dot-bad');
-      text.textContent = online ? 'Online' : 'Offline';
-      document.getElementById('offline-banner').hidden = online;
+      if (dot) dot.className = 'dot' + (online ? '' : ' dot-bad');
+      if (text) text.textContent = online ? 'Online' : 'Offline';
+      var banner = document.getElementById('offline-banner');
+      if (banner) banner.hidden = online;
     },
   };
   window.Trycord = Trycord;
 
   function wireChrome() {
-    document.getElementById('retry-link').onclick = () => location.reload();
+    var retry = document.getElementById('retry-link');
+    if (retry) retry.onclick = function () { location.reload(); };
 
     var toggle = document.getElementById('nav-toggle');
-    var scrim = document.getElementById('sidebar-scrim');
-    toggle.onclick = () => {
-      var open = !document.body.classList.contains('nav-open');
-      document.body.classList.toggle('nav-open', open);
-      scrim.hidden = !open;
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    };
-    scrim.onclick = () => {
-      document.body.classList.remove('nav-open');
-      scrim.hidden = true;
-      toggle.setAttribute('aria-expanded', 'false');
-    };
+    if (toggle) {
+      toggle.onclick = function () {
+        var open = !document.body.classList.contains('nav-open');
+        document.body.classList.toggle('nav-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+    }
 
-    document.getElementById('user-chip-btn').onclick = (e) => {
-      C.toggleMenu(e.currentTarget);
-    };
-    document.getElementById('avatar-btn').onclick = (e) => {
-      C.toggleMenu(e.currentTarget);
-    };
-    document.getElementById('logout-btn').onclick = () => Trycord.logout();
-    document.getElementById('new-server-btn').onclick = () => {
-      document.body.classList.remove('nav-open');
-      scrim.hidden = true;
-      C.createServerModal();
-    };
-    document.addEventListener('click', (e) => {
-      var menu = document.getElementById('user-menu');
-      if (!menu.hidden &&
-          !menu.contains(e.target) &&
-          !e.target.closest('#user-chip-btn') &&
+    // Rail navigation tabs
+    document.querySelectorAll('#rail .rail-btn[data-nav]').forEach(function (b) {
+      b.onclick = function () { location.hash = b.getAttribute('data-nav'); };
+    });
+
+    var railAdd = document.getElementById('rail-add');
+    if (railAdd) railAdd.onclick = function () { C.createServerModal(); };
+
+    var railAccount = document.getElementById('rail-account');
+    if (railAccount) railAccount.onclick = function (e) { C.toggleMenu(e.currentTarget); };
+
+    var avatarBtn = document.getElementById('avatar-btn');
+    if (avatarBtn) avatarBtn.onclick = function (e) { C.toggleMenu(e.currentTarget); };
+
+    var accTheme = document.getElementById('account-theme');
+    if (accTheme) {
+      accTheme.innerHTML = '<svg class="icon" aria-hidden="true" style="width:1.2rem;height:1.2rem;"><use href="#i-theme"/></svg>';
+      accTheme.onclick = function () {
+        var cur = document.documentElement.getAttribute('data-theme') || 'dark';
+        var next = cur === 'dark' ? 'light' : cur === 'light' ? 'high-contrast' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem('trycord-theme', next); } catch (e) {}
+        Ui.toast('Theme: ' + next, 'info');
+      };
+    }
+    var accSettings = document.getElementById('account-settings');
+    if (accSettings) {
+      accSettings.innerHTML = '<svg class="icon" aria-hidden="true" style="width:1.2rem;height:1.2rem;"><use href="#i-cog"/></svg>';
+      accSettings.onclick = function () { C.openSettingsModal(); };
+    }
+
+    // Topbar search -> palette
+    var search = document.getElementById('search-input');
+    if (search) {
+      search.addEventListener('focus', function () { C.openPalette(); search.blur(); });
+      search.addEventListener('click', function () { C.openPalette(); search.blur(); });
+    }
+
+    document.addEventListener('click', function (e) {
+      var root = document.getElementById('menu-root');
+      if (root && root.firstChild &&
+          !root.contains(e.target) &&
+          !e.target.closest('#rail-account') &&
           !e.target.closest('#avatar-btn')) {
         C.closeMenus();
       }
     });
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') C.closeMenus();
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        C.openPalette();
+      }
     });
+
+    // Restore saved theme
+    try {
+      var saved = localStorage.getItem('trycord-theme');
+      if (saved) document.documentElement.setAttribute('data-theme', saved);
+    } catch (e) {}
   }
 
   async function probe() {
@@ -98,7 +132,7 @@
         TrycordState.user = null;
       }
     }
-    window.addEventListener('hashchange', () => window.TrycordRouter.route());
+    window.addEventListener('hashchange', function () { window.TrycordRouter.route(); });
     if (!location.hash) location.hash = '#/';
     await window.TrycordRouter.route();
   }

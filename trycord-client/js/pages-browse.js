@@ -23,9 +23,9 @@
 
   function filterBar(idPrefix) {
     return (
-      '<div class="toolbar" role="search">' +
-      '<input type="text" id="' + idPrefix + '-q" class="grow" placeholder="Search servers…" aria-label="Search servers" />' +
-      '<label class="small muted">Sort <select id="' + idPrefix + '-sort" aria-label="Sort servers">' +
+      '<div style="display: flex; gap: var(--tc-space-3); align-items: center; margin-bottom: var(--tc-space-4);" role="search">' +
+      '<input type="text" id="' + idPrefix + '-q" class="form-input" style="flex: 1;" placeholder="Search servers…" aria-label="Search servers" />' +
+      '<label class="text-sm text-muted">Sort <select id="' + idPrefix + '-sort" class="form-input" style="width: auto;" aria-label="Sort servers">' +
       '<option value="name">Name A–Z</option><option value="members">Most members</option>' +
       '<option value="active">Recently active</option></select></label>' +
       '<button type="button" class="btn btn-ghost btn-sm" id="' + idPrefix + '-view" aria-pressed="false" title="Toggle grid/list">☰ List</button>' +
@@ -51,7 +51,7 @@
           : emptyHtml;
         return;
       }
-      out.innerHTML = '<div class="grid-cards' + (asList ? ' list' : '') + '">' +
+      out.innerHTML = '<div class="showcase-grid' + (asList ? ' list' : '') + '">' +
         sorted.map((s) => C.serverCard(s)).join('') + '</div>';
       C.wireCards(out);
     }
@@ -91,17 +91,17 @@
     var member = TrycordState.serverById(s.id);
     return (
       '<article class="server-card">' +
-      '<div class="head">' + Ui.avatarHtml(s.name) +
-      '<div class="titles"><h3>' + Ui.esc(s.name) + '</h3>' +
-      '<div class="meta"><span>' + s.member_count + ' member' + (s.member_count === 1 ? '' : 's') + '</span>' +
-      '<span aria-hidden="true">·</span><span>' + s.channel_count + ' channels</span></div>' +
+      '<div class="header">' + Ui.avatarHtml(s.name, 'avatar-lg') +
+      '<div class="info"><div class="name">' + Ui.esc(s.name) + '</div>' +
+      '<div class="meta"><span class="badge badge-dot badge-dot-success">' + s.member_count + ' member' + (s.member_count === 1 ? '' : 's') + '</span>' +
+      '<span class="badge badge-secondary">' + s.channel_count + ' channels</span></div>' +
       '</div></div>' +
       '<p class="desc">' + Ui.esc(s.description || 'No description.') + '</p>' +
-      '<div class="foot"><a class="btn btn-sm" href="#/discover/' + Ui.esc(s.id) + '">Preview</a>' +
+      '<div class="footer"><a class="btn btn-secondary btn-sm" href="#/discover/' + Ui.esc(s.id) + '">Preview</a>' +
       '<span class="grow"></span>' +
       (member
-        ? '<a class="btn btn-sm btn-ghost" href="#/server/' + Ui.esc(s.id) + '">Open →</a>'
-        : '<button type="button" class="btn btn-sm btn-primary" data-quick-join="' + Ui.esc(s.id) + '">Join</button>') +
+        ? '<a class="btn btn-ghost btn-sm" href="#/server/' + Ui.esc(s.id) + '">Open →</a>'
+        : '<button type="button" class="btn btn-primary btn-sm" data-quick-join="' + Ui.esc(s.id) + '">Join</button>') +
       '</div></article>'
     );
   }
@@ -132,7 +132,7 @@
             : 'Server owners can list their server here from Server → Settings → Visibility.',
         });
       } else {
-        out.innerHTML = '<div class="grid-cards">' + items.map(publicCard).join('') + '</div>';
+        out.innerHTML = '<div class="showcase-grid">' + items.map(publicCard).join('') + '</div>';
         out.querySelectorAll('[data-quick-join]').forEach((b) => {
           b.onclick = () => quickJoin(b.dataset.quickJoin, b);
         });
@@ -154,7 +154,7 @@
           out.innerHTML = Ui.errorState(e.message);
           var rb = out.querySelector('[data-retry]');
           if (rb) rb.onclick = () => load(true);
-        } else Ui.toast(e.message, 'bad');
+        } else Ui.toast(e.message, 'error');
       }
       loading = false;
     }
@@ -165,11 +165,11 @@
         var r = await TrycordApi.joinPublic(serverId);
         await Trycord.refreshServers();
         Ui.setLoading(btn, false);
-        Ui.toast('Joined server.', 'good');
+        Ui.toast('Joined server.', 'success');
         location.hash = '#/server/' + encodeURIComponent(r.serverId || serverId);
       } catch (e) {
         Ui.setLoading(btn, false);
-        Ui.toast(INVITE_ERRORS[e.code] || e.message, 'bad');
+        Ui.toast(INVITE_ERRORS[e.code] || e.message, 'error');
       }
     }
 
@@ -222,14 +222,14 @@
         try {
           var r = await TrycordApi.joinPublic(p.id);
           await Trycord.refreshServers();
-          Ui.toast('Joined ' + p.name + '.', 'good');
+          Ui.toast('Joined ' + p.name + '.', 'success');
           location.hash = '#/server/' + encodeURIComponent(r.serverId || p.id);
         } catch (e) {
           Ui.setLoading(joinBtn, false);
           if (e.code === 'ALREADY_MEMBER') {
             await Trycord.refreshServers();
             location.hash = '#/server/' + encodeURIComponent(p.id);
-          } else Ui.toast(INVITE_ERRORS[e.code] || e.message, 'bad');
+          } else Ui.toast(INVITE_ERRORS[e.code] || e.message, 'error');
         }
       };
     }
@@ -239,14 +239,14 @@
   function join(root) {
     C.setTopbar('Join a Server', 'Enter an invite code.');
     root.innerHTML =
-      '<div class="join-wrap stack"><section class="settings-card">' +
-      '<h2>Enter an invite code</h2>' +
-      '<form id="join-form" novalidate><label class="field"><span>Invite or join code</span>' +
-      '<input type="text" id="join-code" class="code-input" placeholder="e.g. AB12CD34 or lobby" autocomplete="off" spellcheck="false" /></label>' +
-      '<button class="btn btn-primary btn-block" type="submit" id="join-lookup">Look up</button></form>' +
-      '<div id="join-result" style="margin-top:1rem"></div>' +
-      '<hr class="divider" /><p class="muted small">No code? <a href="#/discover">Browse Discover</a> for public servers.</p>' +
-      '</section></div>';
+      '<div style="max-width: 32rem; margin: 0 auto;"><section class="card">' +
+      '<div class="card-header"><h2>Enter an invite code</h2></div>' +
+      '<div class="card-body"><form id="join-form" novalidate><div class="form-group"><label class="form-label" for="join-code">Invite or join code</label>' +
+      '<input type="text" id="join-code" class="form-input" placeholder="e.g. AB12CD34 or lobby" autocomplete="off" spellcheck="false" /></div>' +
+      '<button class="btn btn-primary" style="width: 100%;" type="submit" id="join-lookup">Look up</button></form>' +
+      '<div id="join-result" style="margin-top: var(--tc-space-4);"></div>' +
+      '<hr class="divider" /><p class="text-muted text-sm">No code? <a href="#/discover">Browse Discover</a> for public servers.</p>' +
+      '</div></section></div>';
 
     var codeInput = document.getElementById('join-code');
 
@@ -286,8 +286,8 @@
     });
 
     function infoCard(icon, title, hint) {
-      return '<div class="state" role="status"><div class="glyph" aria-hidden="true">' + icon + '</div>' +
-        '<h3>' + Ui.esc(title) + '</h3><p>' + Ui.esc(hint) + '</p></div>';
+      return '<div class="empty-state" role="status"><div class="empty-state-icon" aria-hidden="true">' + icon + '</div>' +
+        '<h3 class="empty-state-title">' + Ui.esc(title) + '</h3><p class="empty-state-text">' + Ui.esc(hint) + '</p></div>';
     }
 
     function renderFound(box, found, code) {
@@ -297,16 +297,16 @@
       var canJoin = true;
       if (found.kind === 'invite' && found.invite.state !== 'valid') {
         canJoin = false;
-        stateNote = '<p class="field-err" role="alert">' +
+        stateNote = '<p class="text-danger" role="alert">' +
           Ui.esc(INVITE_ERRORS['INVITE_' + found.invite.state.toUpperCase()] || 'This invite is not usable.') + '</p>';
       }
       box.innerHTML =
-        '<div class="server-card"><div class="head">' + Ui.avatarHtml(s.name) +
-        '<div class="titles"><h3>' + Ui.esc(s.name) + '</h3>' +
-        '<div class="meta"><span>' + s.member_count + ' member' + (s.member_count === 1 ? '' : 's') + '</span></div>' +
+        '<div class="server-card"><div class="header">' + Ui.avatarHtml(s.name, 'avatar-lg') +
+        '<div class="info"><div class="name">' + Ui.esc(s.name) + '</div>' +
+        '<div class="meta"><span class="badge badge-dot badge-dot-success">' + s.member_count + ' member' + (s.member_count === 1 ? '' : 's') + '</span></div>' +
         '</div></div>' +
         '<p class="desc">' + Ui.esc(s.description || 'No description.') + '</p>' + stateNote +
-        '<div class="foot"><button type="button" class="btn btn-primary" id="do-join" ' + (canJoin ? '' : 'disabled') + '>' +
+        '<div class="footer"><button type="button" class="btn btn-primary" id="do-join" ' + (canJoin ? '' : 'disabled') + '>' +
         (already ? 'Open server' : 'Join server') + '</button></div></div>';
 
       var jb = document.getElementById('do-join');
@@ -323,7 +323,7 @@
             : await TrycordApi.joinByCode(code);
           await Trycord.refreshServers();
           Ui.setLoading(jb, false);
-          Ui.toast('Joined ' + s.name + '.', 'good');
+          Ui.toast('Joined ' + s.name + '.', 'success');
           location.hash = '#/server/' + encodeURIComponent(r.serverId);
         } catch (err) {
           Ui.setLoading(jb, false);
@@ -331,7 +331,7 @@
             await Trycord.refreshServers();
             location.hash = '#/server/' + encodeURIComponent(s.id);
           } else {
-            Ui.toast(INVITE_ERRORS[err.code] || err.message, 'bad');
+            Ui.toast(INVITE_ERRORS[err.code] || err.message, 'error');
           }
         }
       };
@@ -381,7 +381,7 @@
       });
       return;
     }
-    box.innerHTML = '<div class="grid-cards">' + favs.map((s) => C.serverCard(s)).join('') + '</div>';
+    box.innerHTML = '<div class="showcase-grid">' + favs.map((s) => C.serverCard(s)).join('') + '</div>';
     C.wireCards(box, () => favorites(root));
   }
 

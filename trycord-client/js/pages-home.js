@@ -7,7 +7,7 @@
     return (
       '<button type="button" class="activity-item" data-goto-server="' + Ui.esc(a.server_id) +
       '" data-goto-channel="' + Ui.esc(a.channel_id) + '">' +
-      Ui.avatarHtml(a.author_display || a.author_name, 'sm') +
+      Ui.avatarHtml(a.author_display || a.author_name, 'avatar-sm') +
       '<span class="body"><span class="ctx"><b>' + Ui.esc(a.author_display || a.author_name) + '</b> in ' +
       Ui.esc(a.server_name) + ' <b>#' + Ui.esc(a.channel_name) + '</b> · ' + Ui.timeAgo(a.created_at) + '</span>' +
       '<span class="text">' + Ui.esc(a.content) + '</span></span></button>'
@@ -23,7 +23,7 @@
 
     var servers = TrycordState.servers.slice(0, 6);
     var cards = servers.length
-      ? '<div class="grid-cards">' + servers.map((s) => C.serverCard(s)).join('') + '</div>' +
+      ? '<div class="showcase-grid">' + servers.map((s) => C.serverCard(s)).join('') + '</div>' +
         (TrycordState.servers.length > 6
           ? '<p><a href="#/servers">View all ' + TrycordState.servers.length + ' servers →</a></p>' : '')
       : Ui.emptyState({
@@ -33,18 +33,18 @@
             '<a class="btn btn-ghost btn-sm" href="#/join">Join server</a>',
         });
 
-    root.innerHTML =
+root.innerHTML =
       '<section class="section"><h2>Welcome back, ' + Ui.esc(first) + '</h2>' +
-      '<p class="muted">Here’s what’s happening across your Trycord servers.</p>' +
+      '<p class="text-muted">Here\'s what\'s happening across your Trycord servers.</p>' +
       '<div class="toolbar">' +
-      '<button type="button" class="btn" data-act="create">＋ Create server</button>' +
-      '<a class="btn" href="#/join">Join server</a>' +
-      '<a class="btn" href="#/discover">Browse servers</a>' +
-      '<button type="button" class="btn" data-act="recent">Open recent server</button>' +
+      '<button type="button" class="btn btn-primary" data-act="create">＋ Create server</button>' +
+      '<a class="btn btn-secondary" href="#/join">Join server</a>' +
+      '<a class="btn btn-secondary" href="#/discover">Browse servers</a>' +
+      '<button type="button" class="btn btn-ghost" data-act="recent">Open recent server</button>' +
       '</div></section>' +
-      '<section class="section"><div class="row space"><h2>Your servers</h2><a href="#/servers">View all →</a></div>' +
+      '<section class="section"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--tc-space-4);"><h2>Your servers</h2><a href="#/servers" class="text-accent">View all →</a></div>' +
       '<div id="home-servers">' + cards + '</div></section>' +
-      '<section class="section"><div class="row space"><h2>Recent activity</h2><a href="#/activity">View all →</a></div>' +
+      '<section class="section"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--tc-space-4);"><h2>Recent activity</h2><a href="#/activity" class="text-accent">View all →</a></div>' +
       '<div id="home-activity">' + Ui.skeletons(3) + '</div></section>';
 
     C.wireCards(root);
