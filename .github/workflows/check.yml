@@ -52,3 +52,21 @@ jobs:
 
       - name: Syntax-check client sources
         run: for f in trycord-client/js/*.js trycord-client/serve.js trycord-client/config.js; do node --check "$f" || exit 1; done
+
+  desktop:
+    name: Desktop checks (no install needed)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Syntax-check desktop sources
+        run: for f in trycord-desktop/main.js trycord-desktop/updater.js trycord-desktop/preload.js trycord-desktop/scripts/*.js; do node --check "$f" || exit 1; done
+
+      - name: Updater safety harness (dev/offline path, no Electron)
+        run: node trycord-desktop/scripts/test-updater-safety.js

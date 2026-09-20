@@ -3,8 +3,12 @@
 # Trigger: ONLY explicit version tags (v1.0.1, v1.2.0-beta.1, ...).
 # Ordinary pushes, PRs, and merges NEVER publish a release.
 #
-# Flow: tag → install → build → package → metadata → publish →
-#       installed clients detect the update via electron-updater.
+# Flow per platform:
+#   tag → install → build (never publishes) → validate artifacts
+#       → publish → validate published update metadata.
+# If validation fails at any point, the job FAILS and nothing (more)
+# is published. A release is successful only when the published
+# latest.yml is reachable and references the published installer.
 #
 # Required repository secret: GH_TOKEN (a token with `contents:write` /
 # `repo` scope; the default GITHUB_TOKEN works for same-repo releases).
@@ -46,15 +50,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build + publish Windows installer
+      - name: Build Windows installer (no publish)
+        run: npm run build:win
+
+      - name: Validate release artifacts (fail before publish if broken)
+        run: npm run validate:release
+
+      - name: Publish Windows installer
         run: npm run release -- --win
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
-      - name: List artifacts
-        run: ls release/
+      - name: Validate published update metadata
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ASSETS="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          echo "$ASSETS"
+          echo "$ASSETS" | grep -q '\.exe$' || (echo 'missing installer asset' && exit 1)
+          echo "$ASSETS" | grep -q '^latest\.yml$' || (echo 'missing latest.yml asset' && exit 1)
+          echo "$ASSETS" | grep -q '\.blockmap$' || (echo 'missing blockmap asset' && exit 1)
+          echo "published release $TAG carries installer + latest.yml + blockmap"
 
   release-linux:
     name: Build + publish (Linux AppImage)
@@ -76,7 +95,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build + publish Linux AppImage
+      - name: Build Linux AppImage (no publish)
+        run: npm run build:linux
+
+      - name: Validate release artifacts (fail before publish if broken)
+        run: npm run validate:release
+
+      - name: Publish Linux AppImage
         run: npm run release -- --linux
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Validate published update metadata
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ASSETS="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          echo "$ASSETS"
+          echo "$ASSETS" | grep -q '\.AppImage$' || (echo 'missing AppImage asset' && exit 1)
+          echo "$ASSETS" | grep -q '^latest-linux\.yml$' || (echo 'missing latest-linux.yml asset' && exit 1)
+          echo "published release $TAG carries AppImage + latest-linux.yml"
