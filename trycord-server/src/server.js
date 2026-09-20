@@ -122,6 +122,9 @@ async function boot() {
   app.use('/api/invites', inviteRoutes.byCode);
   app.use('/api/discover', require('./routes/discover'));
   app.use('/api/activity', require('./routes/activity'));
+  app.use('/api/dms', require('./routes/dms'));
+  app.use('/api/friends', require('./routes/friends'));
+  app.use('/api/notifications', require('./routes/notifications'));
 
   // Back-compat alias for older clients.
   app.get('/api/me', require('./middleware/auth'), async (req, res, next) => {
@@ -146,12 +149,18 @@ async function boot() {
   ]) {
     if (fs.existsSync(path.join(candidate, 'index.html'))) {
       clientDir = candidate;
-      // Never serve a stale client bundle: a cached index.html paired with
-      // mismatched JS/CSS renders a blank page with no way to recover except
-      // a hard refresh. Always fetch fresh from the server.
+      // Entry points are never cached (a stale index.html paired with fresh
+      // or stale JS/CSS is what renders a blank page). Versioned assets use
+      // conditional revalidation instead: browsers revalidate on every load
+      // (ETag), so new deploys are picked up immediately without giving up
+      // caching entirely.
       app.use(express.static(candidate, {
-        setHeaders(res) {
-          res.setHeader('Cache-Control', 'no-store');
+        setHeaders(res, filePath) {
+          if (/(^|[\\/])(index\.html|config\.js)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'no-store');
+          } else {
+            res.setHeader('Cache-Control', 'no-cache');
+          }
         },
       }));
       console.log('[info] serving web client from ' + candidate);
@@ -163,8 +172,11 @@ async function boot() {
       'Deploy the full repository (with trycord-client/) or ignore this if API-only.');
   }
 
-  const { broadcast } = createGateway(server);
+  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence } = createGateway(server);
   require('./routes/messages').setBroadcaster(broadcast);
+  require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });
+  require('./routes/friends').setGateway({ sendToUser });
+  require('./routes/users').setGateway({ getPresence });
 
   // Consistent error envelope for anything that escapes routes.
   // eslint-disable-next-line no-unused-vars

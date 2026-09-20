@@ -21,12 +21,29 @@ router.get('/', async (req, res, next) => {
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     // Integer embedded after validation (keeps LIMIT working on every database).
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 200);
-    const rows = await db.all(
-      `SELECT m.*, u.username AS author_name, u.display_name AS author_display
-       FROM messages m JOIN users u ON u.id = m.author_id
-       WHERE m.channel_id = ? ORDER BY m.created_at DESC LIMIT ${limit}`,
-      [req.params.channelId]
-    );
+    let rows;
+    if (req.query.before) {
+      // Cursor page: messages strictly older than the anchor, newest first.
+      const anchor = await db.get(
+        'SELECT created_at FROM messages WHERE id = ? AND channel_id = ?',
+        [req.query.before, ch.id]
+      );
+      if (!anchor) return fail(res, 'NOT_FOUND', 'message not found');
+      rows = await db.all(
+        `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+         FROM messages m JOIN users u ON u.id = m.author_id
+         WHERE m.channel_id = ? AND (m.created_at < ? OR (m.created_at = ? AND m.id < ?))
+         ORDER BY m.created_at DESC, m.id DESC LIMIT ${limit}`,
+        [ch.id, anchor.created_at, anchor.created_at, req.query.before]
+      );
+    } else {
+      rows = await db.all(
+        `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+         FROM messages m JOIN users u ON u.id = m.author_id
+         WHERE m.channel_id = ? ORDER BY m.created_at DESC, m.id DESC LIMIT ${limit}`,
+        [req.params.channelId]
+      );
+    }
     res.json(rows.reverse());
   } catch (e) { next(e); }
 });

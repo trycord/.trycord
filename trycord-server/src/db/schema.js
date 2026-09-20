@@ -126,6 +126,73 @@ function tables(engine) {
       FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
       FOREIGN KEY (uploader_id) REFERENCES users(id)
     )${engine}`,
+
+    // --- Direct messaging (Phase 2) ---
+    // pair_key is the canonical "smaller-id:larger-id" for one-to-one chats
+    // and UNIQUE, so Alice↔Bob always resolves to one conversation no matter
+    // who opens it first. Group DMs stay possible later: they simply use a
+    // NULL pair_key with 3+ dm_members rows.
+    `CREATE TABLE IF NOT EXISTS dm_conversations (
+      id         VARCHAR(64) PRIMARY KEY,
+      pair_key   VARCHAR(129) UNIQUE,
+      created_at VARCHAR(64) NOT NULL,
+      updated_at VARCHAR(64) NOT NULL
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS dm_members (
+      conversation_id VARCHAR(64) NOT NULL,
+      user_id         VARCHAR(64) NOT NULL,
+      joined_at       VARCHAR(64) NOT NULL,
+      last_read_at    VARCHAR(64),
+      PRIMARY KEY (conversation_id, user_id),
+      FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS dm_messages (
+      id              VARCHAR(64) PRIMARY KEY,
+      conversation_id VARCHAR(64) NOT NULL,
+      author_id       VARCHAR(64) NOT NULL,
+      content         TEXT NOT NULL,
+      created_at      VARCHAR(64) NOT NULL,
+      FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (author_id) REFERENCES users(id)
+    )${engine}`,
+
+    // --- Friendships (Phase 2) ---
+    `CREATE TABLE IF NOT EXISTS friend_requests (
+      id           VARCHAR(64) PRIMARY KEY,
+      from_user_id VARCHAR(64) NOT NULL,
+      to_user_id   VARCHAR(64) NOT NULL,
+      status       VARCHAR(16) NOT NULL DEFAULT 'pending',
+      created_at   VARCHAR(64) NOT NULL,
+      updated_at   VARCHAR(64) NOT NULL,
+      UNIQUE (from_user_id, to_user_id),
+      FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
+    // Stored both directions (a,b) + (b,a) so "my friends" is one lookup.
+    `CREATE TABLE IF NOT EXISTS friendships (
+      user_id    VARCHAR(64) NOT NULL,
+      friend_id  VARCHAR(64) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      PRIMARY KEY (user_id, friend_id),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
+    // --- Notifications (Phase 2) ---
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id           VARCHAR(64) PRIMARY KEY,
+      user_id      VARCHAR(64) NOT NULL,
+      type         VARCHAR(32) NOT NULL,
+      actor_id     VARCHAR(64),
+      reference_id VARCHAR(64),
+      created_at   VARCHAR(64) NOT NULL,
+      read_at      VARCHAR(64),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
   ];
 }
 
@@ -157,6 +224,13 @@ const INDEXES = [
   'CREATE INDEX idx_invites_server ON invites(server_id)',
   'CREATE INDEX idx_attachments_message ON attachments(message_id)',
   'CREATE INDEX idx_attachments_channel ON attachments(channel_id)',
+  'CREATE INDEX idx_users_username ON users(username)',
+  'CREATE INDEX idx_dm_members_user ON dm_members(user_id)',
+  'CREATE INDEX idx_dm_messages_conv ON dm_messages(conversation_id, created_at)',
+  'CREATE INDEX idx_friend_requests_to ON friend_requests(to_user_id, status)',
+  'CREATE INDEX idx_friend_requests_from ON friend_requests(from_user_id, status)',
+  'CREATE INDEX idx_friendships_user ON friendships(user_id)',
+  'CREATE INDEX idx_notifications_user ON notifications(user_id, created_at)',
 ];
 
 function isDuplicateObjectError(e) {

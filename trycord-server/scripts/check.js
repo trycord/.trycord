@@ -17,7 +17,8 @@ async function main() {
   const required = [
     'users', 'servers', 'categories', 'roles', 'server_members',
     'member_roles', 'channels', 'messages', 'invites', 'revoked_tokens',
-    'attachments',
+    'attachments', 'dm_conversations', 'dm_members', 'dm_messages',
+    'friend_requests', 'friendships', 'notifications',
   ];
   const missing = required.filter((t) => !names.includes(t));
   if (missing.length) throw new Error('missing tables: ' + missing.join(', '));
