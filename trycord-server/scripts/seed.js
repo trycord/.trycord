@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const db = require('../src/db');
 const servers = require('../src/services/servers');
 const invites = require('../src/services/invites');
-
+require('dotenv').config();
 async function main() {
   await db.connect();
 

@@ -1,45 +1,47 @@
-// Portable schema: one definition, valid for SQLite and MySQL (InnoDB/utf8mb4).
-// Rules followed throughout (MySQL compatibility):
-//   - VARCHAR (not TEXT) for primary keys, unique keys, and indexed columns
-//   - id columns are VARCHAR(36): UUIDs are exactly 36 chars, so even the
-//     3-column member_roles key stays under old 767-byte index limits
-//   - timestamps are VARCHAR(32) (ISO-8601 is 24 chars), never TEXT in an index
+// Portable schema: valid for SQLite and MySQL/InnoDB with utf8mb4.
+//
+// MySQL compatibility rules:
+//   - VARCHAR for primary keys, unique keys, and indexed columns
 //   - no DEFAULT on TEXT columns
-//   - explicit FOREIGN KEY table constraints (inline REFERENCES are ignored by MySQL)
-//   - timestamps stored as ISO-8601 text, generated in JS (no datetime()/NOW() in SQL)
+//   - timestamps are stored as VARCHAR because they are indexed
+//   - explicit FOREIGN KEY constraints
+//
+// IMPORTANT:
+// messages.created_at MUST be VARCHAR rather than TEXT because
+// idx_messages_channel indexes (channel_id, created_at).
 function tables(engine) {
   return [
     `CREATE TABLE IF NOT EXISTS users (
-      id            VARCHAR(36) PRIMARY KEY,
+      id            VARCHAR(64) PRIMARY KEY,
       username      VARCHAR(64) UNIQUE NOT NULL,
       display_name  TEXT,
       password_hash TEXT NOT NULL,
-      created_at    VARCHAR(32) NOT NULL
+      created_at    VARCHAR(64) NOT NULL
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS servers (
-      id              VARCHAR(36) PRIMARY KEY,
+      id              VARCHAR(64) PRIMARY KEY,
       name            TEXT NOT NULL,
       description     TEXT,
-      owner_id        VARCHAR(36) NOT NULL,
+      owner_id        VARCHAR(64) NOT NULL,
       join_code       VARCHAR(64) UNIQUE NOT NULL,
       is_public       INTEGER NOT NULL DEFAULT 0,
       is_discoverable INTEGER NOT NULL DEFAULT 1,
-      created_at      VARCHAR(32) NOT NULL,
+      created_at      VARCHAR(64) NOT NULL,
       FOREIGN KEY (owner_id) REFERENCES users(id)
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS categories (
-      id        VARCHAR(36) PRIMARY KEY,
-      server_id VARCHAR(36) NOT NULL,
+      id        VARCHAR(64) PRIMARY KEY,
+      server_id VARCHAR(64) NOT NULL,
       name      VARCHAR(64) NOT NULL,
       position  INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS roles (
-      id          VARCHAR(36) PRIMARY KEY,
-      server_id   VARCHAR(36) NOT NULL,
+      id          VARCHAR(64) PRIMARY KEY,
+      server_id   VARCHAR(64) NOT NULL,
       name        VARCHAR(64) NOT NULL,
       position    INTEGER NOT NULL DEFAULT 0,
       permissions TEXT NOT NULL,
@@ -49,20 +51,20 @@ function tables(engine) {
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS server_members (
-      id        VARCHAR(36) PRIMARY KEY,
-      user_id   VARCHAR(36) NOT NULL,
-      server_id VARCHAR(36) NOT NULL,
+      id        VARCHAR(64) PRIMARY KEY,
+      user_id   VARCHAR(64) NOT NULL,
+      server_id VARCHAR(64) NOT NULL,
       nickname  TEXT,
-      joined_at VARCHAR(32) NOT NULL,
+      joined_at VARCHAR(64) NOT NULL,
       UNIQUE (user_id, server_id),
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS member_roles (
-      server_id VARCHAR(36) NOT NULL,
-      user_id   VARCHAR(36) NOT NULL,
-      role_id   VARCHAR(36) NOT NULL,
+      server_id VARCHAR(64) NOT NULL,
+      user_id   VARCHAR(64) NOT NULL,
+      role_id   VARCHAR(64) NOT NULL,
       PRIMARY KEY (server_id, user_id, role_id),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -70,9 +72,9 @@ function tables(engine) {
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS channels (
-      id          VARCHAR(36) PRIMARY KEY,
-      server_id   VARCHAR(36) NOT NULL,
-      category_id VARCHAR(36),
+      id          VARCHAR(64) PRIMARY KEY,
+      server_id   VARCHAR(64) NOT NULL,
+      category_id VARCHAR(64),
       name        VARCHAR(64) NOT NULL,
       topic       TEXT,
       type        VARCHAR(16) NOT NULL DEFAULT 'text',
@@ -82,22 +84,22 @@ function tables(engine) {
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS messages (
-      id         VARCHAR(36) PRIMARY KEY,
-      channel_id VARCHAR(36) NOT NULL,
-      author_id  VARCHAR(36) NOT NULL,
+      id         VARCHAR(64) PRIMARY KEY,
+      channel_id VARCHAR(64) NOT NULL,
+      author_id  VARCHAR(64) NOT NULL,
       content    TEXT NOT NULL,
-      created_at VARCHAR(32) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
       FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
       FOREIGN KEY (author_id) REFERENCES users(id)
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS invites (
-      id         VARCHAR(36) PRIMARY KEY,
+      id         VARCHAR(64) PRIMARY KEY,
       code       VARCHAR(32) UNIQUE NOT NULL,
-      server_id  VARCHAR(36) NOT NULL,
-      creator_id VARCHAR(36) NOT NULL,
-      created_at VARCHAR(32) NOT NULL,
-      expires_at VARCHAR(32),
+      server_id  VARCHAR(64) NOT NULL,
+      creator_id VARCHAR(64) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      expires_at VARCHAR(64),
       max_uses   INTEGER,
       uses       INTEGER NOT NULL DEFAULT 0,
       revoked    INTEGER NOT NULL DEFAULT 0,
@@ -107,19 +109,19 @@ function tables(engine) {
 
     `CREATE TABLE IF NOT EXISTS revoked_tokens (
       jti        VARCHAR(128) PRIMARY KEY,
-      expires_at VARCHAR(32) NOT NULL
+      expires_at VARCHAR(64) NOT NULL
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS attachments (
-      id          VARCHAR(36) PRIMARY KEY,
-      message_id  VARCHAR(36),
-      channel_id  VARCHAR(36) NOT NULL,
-      uploader_id VARCHAR(36) NOT NULL,
+      id          VARCHAR(64) PRIMARY KEY,
+      message_id  VARCHAR(64),
+      channel_id  VARCHAR(64) NOT NULL,
+      uploader_id VARCHAR(64) NOT NULL,
       filename    VARCHAR(255) NOT NULL,
       mime        VARCHAR(64) NOT NULL,
       size        INTEGER NOT NULL DEFAULT 0,
       url         VARCHAR(512) NOT NULL,
-      created_at  VARCHAR(32) NOT NULL,
+      created_at  VARCHAR(64) NOT NULL,
       FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
       FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
       FOREIGN KEY (uploader_id) REFERENCES users(id)
@@ -127,12 +129,23 @@ function tables(engine) {
   ];
 }
 
-// ALTERs for SQLite databases created before these columns existed.
-// (MySQL deployments always get the full schema above.)
+// Legacy SQLite migrations.
 const LEGACY_ALTERS = [
   'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1',
-  'ALTER TABLE channels ADD COLUMN category_id VARCHAR(36) REFERENCES categories(id) ON DELETE SET NULL',
+  'ALTER TABLE channels ADD COLUMN category_id VARCHAR(64) REFERENCES categories(id) ON DELETE SET NULL',
+];
+
+// Existing MySQL databases may already have created_at stored as TEXT.
+// Convert those columns before creating the indexes.
+const MYSQL_ALTERS = [
+  'ALTER TABLE users MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
+  'ALTER TABLE servers MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
+  'ALTER TABLE server_members MODIFY COLUMN joined_at VARCHAR(64) NOT NULL',
+  'ALTER TABLE messages MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
+  'ALTER TABLE invites MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
+  'ALTER TABLE invites MODIFY COLUMN expires_at VARCHAR(64) NULL',
+  'ALTER TABLE revoked_tokens MODIFY COLUMN expires_at VARCHAR(64) NOT NULL',
 ];
 
 const INDEXES = [
@@ -148,32 +161,81 @@ const INDEXES = [
 
 function isDuplicateObjectError(e) {
   const msg = String((e && e.message) || '');
-  return /duplicate column/i.test(msg) || /duplicate key name/i.test(msg) || e.code === 'ER_DUP_FIELDNAME' || e.code === 'ER_DUP_KEYNAME';
+
+  return (
+    /duplicate column/i.test(msg) ||
+    /duplicate key name/i.test(msg) ||
+    e.code === 'ER_DUP_FIELDNAME' ||
+    e.code === 'ER_DUP_KEYNAME'
+  );
 }
 
 async function applySchema(conn) {
   const dialect = conn.dialect;
-  const engine = dialect === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+
+  const engine =
+    dialect === 'mysql'
+      ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+      : '';
+
+  // Create the base tables.
   for (const ddl of tables(engine)) {
     await conn.exec(ddl);
   }
+
+  // SQLite-only legacy migrations.
   if (dialect === 'sqlite') {
     for (const sql of LEGACY_ALTERS) {
       try {
         await conn.exec(sql);
       } catch (e) {
-        if (!isDuplicateObjectError(e)) throw e;
+        if (!isDuplicateObjectError(e)) {
+          throw e;
+        }
       }
     }
   }
+
+  // MySQL compatibility migrations.
+  //
+  // These MUST run before idx_messages_channel is created because
+  // messages.created_at was historically TEXT.
+  if (dialect === 'mysql') {
+    for (const sql of MYSQL_ALTERS) {
+      try {
+        await conn.exec(sql);
+      } catch (e) {
+        // Ignore harmless "already correct" cases where supported.
+        // Do NOT suppress actual schema errors.
+        if (
+          !/no change|already exists|duplicate column/i.test(
+            String((e && e.message) || '')
+          )
+        ) {
+          throw e;
+        }
+      }
+    }
+  }
+
+  // Create indexes after all column types have been normalized.
   for (const idx of INDEXES) {
-    const sql = dialect === 'sqlite' ? idx.replace('CREATE INDEX', 'CREATE INDEX IF NOT EXISTS') : idx;
+    const sql =
+      dialect === 'sqlite'
+        ? idx.replace('CREATE INDEX', 'CREATE INDEX IF NOT EXISTS')
+        : idx;
+
     try {
       await conn.exec(sql);
     } catch (e) {
-      if (!isDuplicateObjectError(e)) throw e;
+      if (!isDuplicateObjectError(e)) {
+        throw e;
+      }
     }
   }
 }
 
-module.exports = { tables, applySchema };
+module.exports = {
+  tables,
+  applySchema,
+};

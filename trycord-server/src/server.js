@@ -180,7 +180,7 @@ async function boot() {
   await new Promise((resolve, reject) => {
     server.on('error', reject);
     server.listen(PORT, HOST, () => {
-      console.log(`.trycord server "${inst.instanceId}" listening on http://${HOST}:${PORT}`);
+      console.log(`Trycord server "${inst.instanceId}" listening on http://${HOST}:${PORT}`);
       if (inst.publicUrl) {
         console.log(`Web client available at ${inst.publicUrl}`);
       } else {
