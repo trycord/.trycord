@@ -35,6 +35,35 @@
   };
   window.Trycord = Trycord;
 
+  function showStaleClientNotice() {
+    if (document.getElementById('stale-client-notice')) return;
+    var div = document.createElement('div');
+    div.id = 'stale-client-notice';
+    div.setAttribute('role', 'alert');
+    div.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#141519;color:#edeff4;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:2rem;';
+    div.innerHTML =
+      '<div style="max-width:26rem;text-align:center;">' +
+      '<h1 style="font-size:1.25rem;margin:0 0 .5rem;">Trycord needs a refresh</h1>' +
+      '<p style="margin:0 0 1rem;color:#b9bec1;font-size:.9rem;">The app failed to start, usually because the browser kept an old copy of the client files. Reloading fetches the current version.</p>' +
+      '<button type="button" style="padding:.6rem 1.2rem;border:none;border-radius:8px;background:#6e6bf2;color:#fff;font:inherit;font-weight:600;cursor:pointer;">Reload Trycord</button></div>';
+    document.body.prepend(div);
+    var btn = div.querySelector('button');
+    if (btn) btn.onclick = () => location.reload();
+  }
+
+  // Fail visibly instead of leaving a blank page: if the HTML shell and the
+  // loaded scripts disagree (stale cached bundle) or boot throws, say so.
+  window.addEventListener('error', () => {
+    if (window.__trycordBooted) return;
+    try { showStaleClientNotice(); } catch (e) { /* last resort: stay silent */ }
+  });
+
+  function shellMismatch() {
+    return !(document.getElementById('shell-app') &&
+      document.getElementById('view') &&
+      document.getElementById('rail'));
+  }
+
   function wireChrome() {
     var retry = document.getElementById('retry-link');
     if (retry) retry.onclick = function () { location.reload(); };
@@ -120,6 +149,10 @@
   }
 
   async function boot() {
+    if (shellMismatch()) {
+      showStaleClientNotice();
+      return;
+    }
     wireChrome();
     await probe();
     setInterval(probe, 30000);
@@ -135,6 +168,7 @@
     window.addEventListener('hashchange', function () { window.TrycordRouter.route(); });
     if (!location.hash) location.hash = '#/';
     await window.TrycordRouter.route();
+    window.__trycordBooted = true;
   }
 
   document.addEventListener('DOMContentLoaded', boot);
