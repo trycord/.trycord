@@ -225,7 +225,7 @@
     channels: (sid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels'),
     createChannel: (sid, body) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels', { method: 'POST', body }),
     deleteChannel: (sid, cid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels/' + encodeURIComponent(cid), { method: 'DELETE' }),
-    messages: (cid, limit) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages?limit=' + (limit || 50)),
+    messages: (cid, limit, before) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages?limit=' + (limit || 50) + (before ? '&before=' + encodeURIComponent(before) : '')),
     postMessage: (cid, content) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages', { method: 'POST', body: { content } }),
     deleteMessage: (cid, mid) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages/' + encodeURIComponent(mid), { method: 'DELETE' }),
     // browse + activity (discover is public: no membership required)
@@ -237,6 +237,30 @@
     joinPublic: (id) => API.call('/api/discover/servers/' + encodeURIComponent(id) + '/join', { method: 'POST' }),
     activity: (limit) => API.call('/api/activity?limit=' + (limit || 20)),
     health: () => API.call('/health'),
+    // direct messages
+    dms: () => API.call('/api/dms'),
+    openDM: (userId) => API.call('/api/dms', { method: 'POST', body: { userId } }),
+    dmDetail: (id) => API.call('/api/dms/' + encodeURIComponent(id)),
+    dmHistory: (id, before, limit) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages?limit=' + (limit || 50) + (before ? '&before=' + encodeURIComponent(before) : '')),
+    dmSend: (id, content) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages', { method: 'POST', body: { content } }),
+    dmDelete: (id, mid) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(mid), { method: 'DELETE' }),
+    dmRead: (id) => API.call('/api/dms/' + encodeURIComponent(id) + '/read', { method: 'POST' }),
+    // friends
+    friends: () => API.call('/api/friends'),
+    friendRequests: () => API.call('/api/friends/requests'),
+    friendRequest: (userId) => API.call('/api/friends/requests', { method: 'POST', body: { userId } }),
+    friendAccept: (id) => API.call('/api/friends/requests/' + encodeURIComponent(id) + '/accept', { method: 'POST' }),
+    friendDecline: (id) => API.call('/api/friends/requests/' + encodeURIComponent(id) + '/decline', { method: 'POST' }),
+    friendCancel: (id) => API.call('/api/friends/requests/' + encodeURIComponent(id), { method: 'DELETE' }),
+    friendRemove: (userId) => API.call('/api/friends/' + encodeURIComponent(userId), { method: 'DELETE' }),
+    // directory + presence
+    userSearch: (q) => API.call('/api/users/search?q=' + encodeURIComponent(q)),
+    userProfile: (id) => API.call('/api/users/' + encodeURIComponent(id)),
+    presence: (ids) => API.call('/api/users/presence?ids=' + ids.map(encodeURIComponent).join(',')),
+    // notifications
+    notifications: (limit) => API.call('/api/notifications?limit=' + (limit || 30)),
+    notifRead: (id) => API.call('/api/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST' }),
+    notifReadAll: () => API.call('/api/notifications/read-all', { method: 'POST' }),
   };
 
   window.TrycordApi = API;

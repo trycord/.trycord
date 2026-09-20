@@ -190,9 +190,71 @@
     }
   }
 
+  function dayLabel(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    var nowD = new Date();
+    var day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var today = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate());
+    var diff = Math.round((today - day) / 86400000);
+    if (diff <= 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() === nowD.getFullYear() ? undefined : 'numeric' });
+  }
+
+  function closeCtx() {
+    var root = document.getElementById('ctx-root');
+    if (root) root.innerHTML = '';
+    document.removeEventListener('keydown', ctxKey);
+  }
+
+  function ctxKey(e) {
+    if (e.key === 'Escape') closeCtx();
+  }
+
+  // Minimal permission-aware context menu. items: [{ label, icon, danger,
+  // onClick, hidden }]. Anchored at x/y, clamped to the viewport, keyboard
+  // dismissible, single-flight.
+  function contextMenu(x, y, items) {
+    closeCtx();
+    var list = (items || []).filter((it) => it && !it.hidden);
+    if (!list.length) return;
+    var root = document.getElementById('ctx-root');
+    if (!root) return;
+    var menu = document.createElement('div');
+    menu.className = 'ctx-menu';
+    menu.setAttribute('role', 'menu');
+    menu.style.position = 'fixed';
+    list.forEach((it) => {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'menuitem');
+      if (it.danger) b.className = 'danger';
+      b.innerHTML = (it.icon ? '<svg aria-hidden="true"><use href="#' + it.icon + '"/></svg>' : '') +
+        '<span>' + esc(it.label) + '</span>';
+      b.onclick = () => { closeCtx(); it.onClick && it.onClick(); };
+      menu.appendChild(b);
+    });
+    root.appendChild(menu);
+    var r = menu.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
+    document.addEventListener('keydown', ctxKey);
+    setTimeout(() => {
+      document.addEventListener('mousedown', function outside(e) {
+        if (!menu.contains(e.target)) {
+          closeCtx();
+          document.removeEventListener('mousedown', outside);
+        }
+      });
+    }, 0);
+    var first = menu.querySelector('button');
+    if (first) first.focus({ preventScroll: true });
+  }
+
   window.TrycordUi = {
     esc, toast, openModal, confirmDialog, skeletons,
-    emptyState, errorState, avatarHtml, badge, timeAgo, fullDate,
-    fieldError, setLoading,
+    emptyState, errorState, avatarHtml, badge, timeAgo, fullDate, dayLabel,
+    fieldError, setLoading, contextMenu, closeCtx,
   };
 })();

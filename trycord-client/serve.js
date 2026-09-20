@@ -43,8 +43,8 @@ function runtimeConfigJs() {
     JSON.stringify(cfg) + ');';
 }
 
-function send(res, status, type, body) {
-  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store' });
+function send(res, status, type, body, cache) {
+  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': cache || 'no-cache' });
   res.end(body);
 }
 
@@ -72,7 +72,10 @@ const server = http.createServer((req, res) => {
   }
   fs.readFile(file, (err, data) => {
     if (err) return send(res, 404, 'text/plain', 'not found');
-    send(res, 200, MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', data);
+    // Entry points are never cached; hashed-agnostic assets revalidate.
+    // A stale index.html paired with mismatched JS/CSS renders a blank page.
+    const entry = /(^|[\\/])(index\.html|config\.js)$/i.test(file);
+    send(res, 200, MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', data, entry ? 'no-store' : 'no-cache');
   });
 });
 

@@ -1,4 +1,4 @@
-/* Public pages: landing, login, register. */
+/* Public pages: landing, login, register. Plain language, no hype. */
 (function () {
   var Ui = window.TrycordUi;
   var C = window.TrycordComponents;
@@ -11,14 +11,16 @@
       '<p class="lead">Trycord is a real-time chat platform you run yourself: ' +
       'create servers, organize channels, and talk — no cloud account required.</p>' +
       '<div class="hero-cta">' +
-      '<a class="btn btn-primary" href="#/register">Get started</a>' +
-      '<a class="btn btn-ghost" href="#/login">Log in</a>' +
+      '<a class="btn btn-primary btn-lg" href="#/register">Get started</a>' +
+      '<a class="btn btn-secondary btn-lg" href="#/login">Log in</a>' +
       '</div></section>' +
       '<section class="feature-grid" aria-label="Features">' +
-      '<div class="feature"><h3>🛡 Your server, your rules</h3><p>Create servers with invite codes, manage members, and control visibility.</p></div>' +
-      '<div class="feature"><h3>⚡ Real-time chat</h3><p>Channel-based messaging delivered instantly over WebSockets.</p></div>' +
-      '<div class="feature"><h3>◌ Discover</h3><p>List public servers so new members can find and join them.</p></div>' +
-      '<div class="feature"><h3>🖥 Desktop app</h3><p>Run the same client as a native-style desktop window via Electron.</p></div>' +
+      '<div class="feature"><h3>Your server, your rules</h3><p>Create servers with invite codes, manage members, and control visibility.</p></div>' +
+      '<div class="feature"><h3>Real-time chat</h3><p>Channel-based messaging delivered instantly over WebSockets.</p></div>' +
+      '<div class="feature"><h3>Direct messages</h3><p>Private one-to-one conversations with friends, plus friend requests.</p></div>' +
+      '<div class="feature"><h3>Discover</h3><p>List public servers so new members can find and join them.</p></div>' +
+      '<div class="feature"><h3>Roles &amp; permissions</h3><p>Moderate with granular per-server permissions.</p></div>' +
+      '<div class="feature"><h3>Desktop app</h3><p>Run the same client as a desktop window with automatic updates.</p></div>' +
       '</section>';
   }
 
@@ -50,6 +52,7 @@
         TrycordApi.token = r.token;
         TrycordState.user = r.user;
         await Trycord.refreshServers();
+        await Trycord.refreshSocial();
         location.hash = '#/home';
       } catch (err) {
         Ui.setLoading(btn, false);
@@ -86,6 +89,7 @@
         TrycordApi.token = r.token;
         TrycordState.user = r.user;
         await Trycord.refreshServers();
+        await Trycord.refreshSocial();
         Ui.toast('Account created — welcome to Trycord.', 'success');
         location.hash = '#/home';
       } catch (err) {

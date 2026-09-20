@@ -72,6 +72,12 @@
     user: null,
     servers: [],
     perms: {}, // serverId -> { is_owner, permissions[] }
+    // Social state is in-memory only: the server is authoritative, and these
+    // are refetched on boot and updated incrementally from WebSocket events.
+    dms: [], // [{ id, peer, lastMessage, unreadCount, updatedAt }]
+    friends: [], // [{ id, username, displayName, presence }]
+    requests: { incoming: [], outgoing: [] },
+    notifications: { items: [], unreadCount: 0 },
     instanceSlug: slug,
     access,
     favorites: load(NS + 'favorites', []),
@@ -140,6 +146,39 @@
       State.recent = [];
       save(NS + 'favorites', []);
       save(NS + 'recent', []);
+    },
+    // --- social helpers (all in-memory; server is the source of truth) ---
+    setDMs(list) {
+      State.dms = Array.isArray(list) ? list : [];
+    },
+    dmUnreadTotal() {
+      return State.dms.reduce((n, c) => n + (c.unreadCount || 0), 0);
+    },
+    dmById(id) {
+      for (var i = 0; i < State.dms.length; i++) {
+        if (String(State.dms[i].id) === String(id)) return State.dms[i];
+      }
+      return null;
+    },
+    // Patch one conversation's preview/unread from a realtime event or send.
+    touchDM(id, patch) {
+      var c = State.dmById(id);
+      if (!c) return null;
+      Object.keys(patch || {}).forEach((k) => { c[k] = patch[k]; });
+      State.dms.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+      return c;
+    },
+    setFriends(list) {
+      State.friends = Array.isArray(list) ? list : [];
+    },
+    setRequests(incoming, outgoing) {
+      State.requests = { incoming: incoming || [], outgoing: outgoing || [] };
+    },
+    pendingRequestCount() {
+      return (State.requests.incoming || []).length;
+    },
+    setNotifications(items, unreadCount) {
+      State.notifications = { items: Array.isArray(items) ? items : [], unreadCount: unreadCount || 0 };
     },
   };
 
