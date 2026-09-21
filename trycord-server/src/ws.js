@@ -9,6 +9,7 @@ const { secret, now, uuid, visibleChannel } = require('./util');
 const { hasPermission } = require('./services/permissions');
 const { tokenStale } = require('./middleware/auth');
 const dms = require('./services/dms');
+const uploads = require('./services/uploads');
 
 function createGateway(server) {
   const wss = new WebSocket.Server({ noServer: true });
@@ -145,7 +146,8 @@ function createGateway(server) {
           } else if (data.type === 'msg') {
             if (!ws.channelId) return;
             const content = String(data.content || '').trim().slice(0, 2000);
-            if (!content) return;
+            const ids = uploads.sanitizeIds(data.attachments);
+            if (!content && !ids.length) return;
             const ch = await visibleChannel(ws.channelId, user.id);
             if (!ch) return;
             // Same gate as the HTTP post: membership alone is not enough.
@@ -161,6 +163,9 @@ function createGateway(server) {
                 [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at]
               );
             } catch { return; }
+            msg.attachments = ids.length
+              ? await uploads.attachToMessage(ids, msg.id, user.id, ch.id)
+              : [];
             broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
           } else if (data.type === 'dm:join') {
             // Join a DM room to receive its events. Membership verified.

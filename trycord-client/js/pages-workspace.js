@@ -335,8 +335,12 @@
       '<ul class="msg-list" id="msg-list" aria-label="Messages"></ul>' +
       '<div class="typing-row" id="chat-typing" aria-live="polite"></div>' +
       '<form class="composer" id="composer">' +
-      '<div class="composer-box"><textarea id="msg-input" rows="1" placeholder="Message #' + Ui.esc(ch.name) + '" aria-label="Message text"></textarea>' +
-      '<button type="submit" class="composer-send" id="msg-send" aria-label="Send message"><svg aria-hidden="true"><use href="#i-send"/></svg></button></div>' +
+      '<div class="attachment-row" id="attachment-row" hidden></div>' +
+      '<div class="composer-box">' +
+      '<button type="button" class="icon-btn composer-attach" id="attach-btn" aria-label="Attach a file" title="Attach a file (max 8 MB)"><svg aria-hidden="true"><use href="#i-paperclip"/></svg></button>' +
+      '<textarea id="msg-input" rows="1" placeholder="Message #' + Ui.esc(ch.name) + '" aria-label="Message text"></textarea>' +
+      '<button type="submit" class="composer-send" id="msg-send" aria-label="Send message"><svg aria-hidden="true"><use href="#i-send"/></svg></button>' +
+      '</div>' +
       '<div class="composer-hint">Enter to send · Shift+Enter for a new line</div>' +
       '</form>';
 
@@ -362,6 +366,7 @@
         id: m.id, content: m.content, createdAt: m.created_at,
         editedAt: m.edited_at || null,
         authorId: m.author_id, authorName: m.author_display || m.author_name,
+        attachments: m.attachments || [],
       }, {
         grouped: i > 0 && groupable(rendered[i - 1], m),
         canDelete: String(m.author_id) === String(me.id) || manager,
@@ -459,16 +464,92 @@
       }
     });
     var sendBtn = root.querySelector('#msg-send');
+    var attachBtn = root.querySelector('#attach-btn');
+    var attachRow = root.querySelector('#attachment-row');
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.accept = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,.txt,.md,.csv,.json';
+    fileInput.hidden = true;
+    root.querySelector('#composer').appendChild(fileInput);
+
+    // Files staged for the next message. Upload happens on send (never on
+    // select) so removing a chip can't strand orphaned uploads on the server.
+    var pending = [];
+    function fmtBytes(n) {
+      n = parseInt(n, 10) || 0;
+      if (n < 1024) return n + ' B';
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+      return (n / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    function renderChips() {
+      if (!pending.length) { attachRow.hidden = true; attachRow.innerHTML = ''; return; }
+      attachRow.hidden = false;
+      attachRow.innerHTML = pending.map((f, i) =>
+        '<span class="attach-chip' + (f.status === 'failed' ? ' is-error' : '') + '">' +
+        '<svg class="attach-chip-ic" aria-hidden="true"><use href="#i-paperclip"/></svg>' +
+        '<span class="attach-chip-name" title="' + Ui.esc(f.file.name) + '">' + Ui.esc(f.file.name) + '</span>' +
+        '<span class="attach-chip-meta">' + (f.status === 'uploading' ? 'Uploading…'
+          : f.status === 'failed' ? 'Upload failed'
+            : fmtBytes(f.file.size)) + '</span>' +
+        (f.status === 'uploading' ? ''
+          : '<button type="button" class="icon-btn" data-remove="' + i + '" aria-label="Remove ' + Ui.esc(f.file.name) + '"><svg aria-hidden="true"><use href="#i-x"/></svg></button>') +
+        '</span>'
+      ).join('');
+      attachRow.querySelectorAll('[data-remove]').forEach((b) => {
+        b.onclick = () => {
+          var idx = parseInt(b.dataset.remove, 10);
+          if (pending[idx] && pending[idx].status !== 'uploading') {
+            pending.splice(idx, 1);
+            renderChips();
+          }
+        };
+      });
+    }
+    attachBtn.onclick = () => fileInput.click();
+    fileInput.onchange = () => {
+      var files = Array.prototype.slice.call(fileInput.files || []);
+      files.forEach((f) => {
+        if (f.size > 8 * 1024 * 1024) {
+          Ui.toast('"' + f.name + '" is larger than 8 MB.', 'error');
+          return;
+        }
+        pending.push({ file: f, status: 'ready' });
+      });
+      fileInput.value = '';
+      renderChips();
+    };
+
     root.querySelector('#composer').addEventListener('submit', (e) => {
       e.preventDefault();
       var text = input.value.trim();
-      if (!text) return;
+      var files = pending.slice();
+      if (!text && !files.length) return;
       Ui.setLoading(sendBtn, true, '…');
-      TrycordApi.postMessage(ch.id, text).then((m) => {
-        input.value = '';
-        input.style.height = 'auto';
-        addMessages([Object.assign(m, { author_display: m.author_display || (me.displayName || me.username), author_name: me.username })], true);
-      }).catch((err) => Ui.toast(err.message, 'error'))
+      files.forEach((f) => { f.status = 'uploading'; });
+      renderChips();
+      // Upload every staged file, then send one message carrying all ids.
+      var uploadsReady = files.map((f) =>
+        TrycordApi.uploadAttachment(ch.id, f.file)
+          .then((a) => { f.status = 'ready'; f.id = a && a.id; })
+          .catch((err) => { f.status = 'failed'; throw err; })
+      );
+      Promise.all(uploadsReady)
+        .then(() => {
+          var ids = files.filter((f) => f.id).map((f) => f.id);
+          return TrycordApi.postMessage(ch.id, text, ids);
+        })
+        .then((m) => {
+          input.value = '';
+          input.style.height = 'auto';
+          pending = [];
+          renderChips();
+          addMessages([Object.assign(m, { author_display: m.author_display || (me.displayName || me.username), author_name: me.username })], true);
+        })
+        .catch((err) => {
+          renderChips();
+          Ui.toast(err.message, 'error');
+        })
         .finally(() => Ui.setLoading(sendBtn, false));
     });
 
@@ -500,6 +581,7 @@
           addMessages([{
             id: ev.id, content: ev.content, created_at: ev.created_at,
             author_id: ev.author_id, author_display: ev.user, author_name: ev.user,
+            attachments: ev.attachments || [],
           }], false);
         } else if (ev.type === 'message_deleted' && String(ev.channel_id) === String(ch.id)) {
           delete renderedIds[ev.id];
