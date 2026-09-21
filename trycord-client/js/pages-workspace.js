@@ -538,7 +538,7 @@
     var offline = members.filter((m) => m.presence !== 'online');
     function row(m) {
       var self = TrycordState.user && String(m.id) === String(TrycordState.user.id);
-      var canMod = can(detail.id, 'MANAGE_MEMBERS') && !self && !m.is_owner;
+      var canMod = can(detail.id, 'KICK_MEMBERS') && !self && !m.is_owner;
       return '<div class="member-row" data-user="' + Ui.esc(m.id) + '">' +
         C.presenceAvatar(m.display_name || m.username, '', m.presence) +
         '<span class="who"><span class="name">' + Ui.esc(m.display_name || m.username) +
@@ -622,7 +622,7 @@
     var allPerms = [];
     try {
       roles = await TrycordApi.roles(detail.id);
-      allPerms = await TrycordApi.serverPerms(detail.id);
+      allPerms = ((await TrycordApi.serverPerms(detail.id)) || {}).all || [];
     } catch (e) {
       root.innerHTML = tabBar(detail, 'roles') + Ui.errorState(e.message, 'Retry');
       var rb = root.querySelector('[data-retry]');
@@ -675,7 +675,11 @@
     });
     root.querySelectorAll('[data-perm]').forEach((box) => {
       box.onchange = () => {
-        TrycordApi.patchRole(detail.id, box.dataset.role, { togglePermission: box.dataset.perm })
+        var roleId = box.dataset.role;
+        var checked = Array.prototype.slice.call(root.querySelectorAll('[data-role="' + roleId + '"][data-perm]'))
+          .filter((b) => b.checked)
+          .map((b) => b.dataset.perm);
+        TrycordApi.patchRole(detail.id, roleId, { permissions: checked })
           .then(() => Ui.toast('Role saved.', 'success'))
           .catch((e) => { box.checked = !box.checked; Ui.toast(e.message, 'error'); });
       };

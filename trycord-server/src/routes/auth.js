@@ -43,7 +43,7 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
       throw e;
     }
     const token = sign({ id, username: name });
-    res.json({ token, user: { id, username: name, displayName: displayName || name } });
+    res.json({ token, user: { id, username: name, displayName: displayName || name, createdAt: now() } });
   } catch (e) { next(e); }
 });
 
@@ -57,7 +57,7 @@ router.post('/login', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, 
     if (!ok) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
     res.json({
       token: sign(user),
-      user: { id: user.id, username: user.username, displayName: user.display_name },
+      user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },
     });
   } catch (e) { next(e); }
 });
@@ -100,7 +100,7 @@ router.post('/change-password', auth, rateLimit({ windowMs: 60000, max: 20 }), a
     const token = sign({ id: row.id, username: row.username });
     res.json({
       token,
-      user: { id: row.id, username: row.username, displayName: row.display_name },
+      user: { id: row.id, username: row.username, displayName: row.display_name, createdAt: row.created_at },
     });
   } catch (e) { next(e); }
 });
@@ -121,11 +121,11 @@ router.post('/sessions/revoke-others', auth, async (req, res, next) => {
   try {
     const ts = now();
     await db.run('UPDATE users SET sessions_invalidated_at = ? WHERE id = ?', [ts, req.user.id]);
-    const row = await db.get('SELECT id, username, display_name FROM users WHERE id = ?', [req.user.id]);
+    const row = await db.get('SELECT id, username, display_name, created_at FROM users WHERE id = ?', [req.user.id]);
     console.log(`[security] other_sessions_revoked user=${req.user.id}`);
     res.json({
       token: sign({ id: row.id, username: row.username }),
-      user: { id: row.id, username: row.username, displayName: row.display_name },
+      user: { id: row.id, username: row.username, displayName: row.display_name, createdAt: row.created_at },
     });
   } catch (e) { next(e); }
 });

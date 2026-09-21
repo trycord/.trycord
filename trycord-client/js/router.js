@@ -46,6 +46,9 @@
     if (segs[0] === 'discover' && segs[1]) {
       return { name: 'preview', id: segs[1] };
     }
+    if (segs[0] === 'reset-password') return { name: 'reset-password', token: segs[1] || null };
+    if (segs[0] === 'verify-email') return { name: 'verify-email', token: segs[1] || null };
+    if (segs[0] === 'forgot-password') return { name: 'forgot-password' };
     var simple = ['login', 'register', 'home', 'servers', 'discover', 'join', 'activity', 'favorites', 'dm', 'settings'];
     if (simple.indexOf(segs[0]) !== -1) return { name: segs[0] };
     return { name: 'unknown' };
@@ -80,6 +83,26 @@
         showShell('public');
         (r.name === 'login' ? Pub.login : Pub.register)(document.getElementById('view-public'));
         document.title = (r.name === 'login' ? 'Log in' : 'Sign up') + ' · Trycord';
+        return;
+      }
+      // Recovery routes are public (the token IS the credential) and work
+      // even when a stale session exists in this tab.
+      if (r.name === 'forgot-password') {
+        showShell('public');
+        Pub.forgotPassword(document.getElementById('view-public'));
+        document.title = 'Reset password · Trycord';
+        return;
+      }
+      if (r.name === 'reset-password') {
+        showShell('public');
+        Pub.resetPassword(document.getElementById('view-public'), r.token);
+        document.title = 'Set a new password · Trycord';
+        return;
+      }
+      if (r.name === 'verify-email') {
+        showShell('public');
+        Pub.verifyEmail(document.getElementById('view-public'), r.token);
+        document.title = 'Verify email · Trycord';
         return;
       }
 

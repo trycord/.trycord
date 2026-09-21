@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const WebSocket = require('ws');
 const db = require('./db');
 const { secret, now, uuid, visibleChannel } = require('./util');
+const { hasPermission } = require('./services/permissions');
+const { tokenStale } = require('./middleware/auth');
 const dms = require('./services/dms');
 
 function createGateway(server) {
@@ -122,6 +124,11 @@ function createGateway(server) {
         const revoked = await db.get('SELECT 1 FROM revoked_tokens WHERE jti = ?', [user.jti]);
         if (revoked) { ws.close(); return; }
       }
+      // Mirror the HTTP layer: tokens issued before a password change or
+      // "sign out everywhere" are dead. Socket sessions must never outlive them.
+      const row = await db.get('SELECT password_changed_at, sessions_invalidated_at FROM users WHERE id = ?', [user.id]);
+      if (!row) { ws.close(); return; }
+      if (tokenStale(user, row)) { ws.close(); return; }
       ws.user = user;
       ws.dmIds = new Set();
       trackOpen(ws, user.id);
@@ -141,6 +148,8 @@ function createGateway(server) {
             if (!content) return;
             const ch = await visibleChannel(ws.channelId, user.id);
             if (!ch) return;
+            // Same gate as the HTTP post: membership alone is not enough.
+            if (!(await hasPermission(user.id, ch.server_id, 'SEND_MESSAGES'))) return;
             const msg = {
               id: uuid(), channel_id: ch.id, server_id: ch.server_id,
               author_id: user.id, user: user.username, content, created_at: now(),
