@@ -360,14 +360,18 @@
         html += C.renderMessage(m, {
           grouped,
           canDelete: mine2,
+          canEdit: mine2,
           showRead: true,
           isMine: mine2,
           peerReadAt: peerReadAt,
         });
         return html;
       }).join('');
-      C.wireMessageList(listEl, (mid) => {
-        TrycordApi.dmDelete(id, mid).catch((e) => Ui.toast(e.message, 'error'));
+      C.wireMessageList(listEl, {
+        onDelete: (mid) => {
+          TrycordApi.dmDelete(id, mid).catch((e) => Ui.toast(e.message, 'error'));
+        },
+        onEdit: (mid) => editMessage(mid),
       });
       if (focusBottom) listEl.scrollTop = listEl.scrollHeight;
       else if (keepPos) listEl.scrollTop = listEl.scrollHeight - prevHeight + prevTop;
@@ -385,6 +389,25 @@
       rendered.sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)) || String(a.id).localeCompare(String(b.id)));
       var nearBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 120;
       paint(toBottom || nearBottom, added && !toBottom && !nearBottom);
+    }
+
+    function applyUpdatedMessage(ev) {
+      var idx = -1;
+      rendered.forEach((m, i) => { if (String(m.id) === String(ev.id)) idx = i; });
+      if (idx === -1) return false;
+      rendered[idx] = Object.assign({}, rendered[idx], { content: ev.content, editedAt: ev.editedAt || null });
+      paint(false, false);
+      return true;
+    }
+
+    function editMessage(mid) {
+      var m = rendered.find((x) => String(x.id) === String(mid));
+      if (!m || String(m.authorId) !== String(myId)) return;
+      C.openEditModal(m.content, (text) =>
+        TrycordApi.dmEdit(id, mid, text).then((out) => {
+          applyUpdatedMessage({ id: mid, content: out.content, editedAt: out.editedAt || null });
+        })
+      );
     }
 
     rendered = [];
@@ -472,6 +495,21 @@
         .finally(() => Ui.setLoading(sendBtn, false));
     });
 
+    listEl.oncontextmenu = (e) => {
+      var li = e.target.closest('[data-mid]');
+      if (!li) return;
+      e.preventDefault();
+      var m = rendered.find((x) => String(x.id) === String(li.dataset.mid));
+      if (!m) return;
+      var mine = String(m.authorId) === String(myId);
+      Ui.contextMenu(e.clientX, e.clientY, [
+        { label: 'Copy text', icon: 'i-copy', onClick: () => C.copyText(li.querySelector('.text').textContent, 'Message copied.') },
+        { label: 'Edit message', icon: 'i-pen', hidden: !mine, onClick: () => editMessage(m.id) },
+        { label: 'Delete message', icon: 'i-trash', danger: true, hidden: !mine, onClick: () => TrycordApi.dmDelete(id, m.id).catch((err) => Ui.toast(err.message, 'error')) },
+      ]);
+    };
+    // Long-press / touch menu already routes through wireMessageList into
+    // the contextmenu handler above: one menu, every input method.
     cleanupFn = C.connectSocket({
       onOpen: (sock) => {
         wsRef.sock = sock;
@@ -498,6 +536,8 @@
           delete renderedIds[ev.id];
           rendered = rendered.filter((m) => String(m.id) !== String(ev.id));
           paint(false);
+        } else if (ev.type === 'dm:message_updated') {
+          applyUpdatedMessage(ev);
         } else if (ev.type === 'dm:read') {
           if (String(ev.userId) !== String(myId)) {
             peerReadAt = ev.lastReadAt;
