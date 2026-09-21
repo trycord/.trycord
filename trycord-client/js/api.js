@@ -227,6 +227,7 @@
     deleteChannel: (sid, cid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels/' + encodeURIComponent(cid), { method: 'DELETE' }),
     messages: (cid, limit, before) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages?limit=' + (limit || 50) + (before ? '&before=' + encodeURIComponent(before) : '')),
     postMessage: (cid, content) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages', { method: 'POST', body: { content } }),
+    patchMessage: (cid, mid, content) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages/' + encodeURIComponent(mid), { method: 'PATCH', body: { content } }),
     deleteMessage: (cid, mid) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages/' + encodeURIComponent(mid), { method: 'DELETE' }),
     // browse + activity (discover is public: no membership required)
     discover: (q, page, limit) => {
@@ -243,6 +244,7 @@
     dmDetail: (id) => API.call('/api/dms/' + encodeURIComponent(id)),
     dmHistory: (id, before, limit) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages?limit=' + (limit || 50) + (before ? '&before=' + encodeURIComponent(before) : '')),
     dmSend: (id, content) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages', { method: 'POST', body: { content } }),
+    dmEdit: (id, mid, content) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(mid), { method: 'PATCH', body: { content } }),
     dmDelete: (id, mid) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(mid), { method: 'DELETE' }),
     dmRead: (id) => API.call('/api/dms/' + encodeURIComponent(id) + '/read', { method: 'POST' }),
     // friends

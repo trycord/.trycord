@@ -738,6 +738,9 @@
     var seen = opts.showRead && opts.isMine && opts.peerReadAt && String(opts.peerReadAt) >= String(m.createdAt)
       ? '<div class="seen"><svg aria-hidden="true" style="width:.8rem;height:.8rem;vertical-align:-1px;"><use href="#i-checks"/></svg> Seen</div>'
       : '';
+    var edited = m.editedAt
+      ? ' <span class="edited" title="' + Ui.esc(editedFull(m.editedAt)) + '">(edited)</span>'
+      : '';
     return (
       '<li class="msg' + (grouped ? ' cont' : '') + '" data-mid="' + Ui.esc(m.id) + '">' +
       '<span class="gutter">' +
@@ -748,11 +751,12 @@
       '<div class="body">' +
       (grouped ? '' :
         '<div class="head"><span class="author">' + Ui.esc(m.authorName || '?') + '</span>' +
-        '<time class="time" title="' + Ui.esc(full) + '">' + Ui.esc(time) + '</time></div>') +
-      '<div class="text">' + linkify(Ui.esc(m.content)) + '</div>' + seen +
+        '<time class="time" title="' + Ui.esc(full) + '">' + Ui.esc(time) + '</time>' + edited + '</div>') +
+      '<div class="text">' + linkify(Ui.esc(m.content)) + (grouped ? edited : '') + '</div>' + seen +
       '</div>' +
       '<div class="msg-actions" role="toolbar" aria-label="Message actions">' +
       '<button type="button" class="icon-btn" data-copy title="Copy text" aria-label="Copy text"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>' +
+      (opts.canEdit ? '<button type="button" class="icon-btn" data-edit title="Edit message" aria-label="Edit message"><svg aria-hidden="true"><use href="#i-pen"/></svg></button>' : '') +
       (opts.canDelete ? '<button type="button" class="icon-btn" data-del title="Delete message" aria-label="Delete message"><svg aria-hidden="true"><use href="#i-trash"/></svg></button>' : '') +
       '</div>' +
       '<button type="button" class="msg-touchbtn" data-touch-menu title="Message actions" aria-label="Message actions" aria-haspopup="menu"><svg aria-hidden="true"><use href="#i-dots"/></svg></button></li>'
@@ -765,6 +769,14 @@
     return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
 
+  function editedFull(iso) {
+    try {
+      return 'Edited ' + new Date(iso).toLocaleString();
+    } catch (e) {
+      return 'Edited';
+    }
+  }
+
   function linkify(escaped) {
     // escaped is already HTML-escaped; link http(s) spans + @mentions.
     return escaped
@@ -772,7 +784,10 @@
       .replace(/(^|\s)@([A-Za-z0-9_.]{2,32})/g, '$1<span class="text-accent">@$2</span>');
   }
 
-  function wireMessageList(root, onDelete) {
+  // handlers: legacy onDelete(mid) function, or { onDelete(mid), onEdit(mid) }.
+  function wireMessageList(root, handlers) {
+    var onDelete = typeof handlers === 'function' ? handlers : handlers && handlers.onDelete;
+    var onEdit = handlers && handlers.onEdit;
     Ui.bindLongPress(root, '[data-mid]', function (el, x, y) {
       Ui.fireContextMenu(el, x, y);
     });
@@ -801,6 +816,15 @@
           e.stopPropagation();
           var li = b.closest('[data-mid]');
           if (li) onDelete(li.dataset.mid);
+        };
+      });
+    }
+    if (onEdit) {
+      root.querySelectorAll('[data-edit]').forEach((b) => {
+        b.onclick = (e) => {
+          e.stopPropagation();
+          var li = b.closest('[data-mid]');
+          if (li) onEdit(li.dataset.mid);
         };
       });
     }
