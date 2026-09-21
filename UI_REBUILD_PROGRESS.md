@@ -46,7 +46,7 @@ resume at the phase marked `IN PROGRESS` below — never restart the design.
 | 1 | Audit current UI architecture + class/DOM contract inventory | DONE (inventory below) |
 | 2 | Design tokens + globals/reset/theme | DONE (commit pending record) |
 | 3 | Foundational surfaces & primitives (btn/input/menu/modal/toast/…) | DONE (golden cross-phase) |
-| 4 | App shell architecture: global rail → workspace nav → content | pending |
+| 4 | App shell architecture: global rail → workspace nav → content | DONE |
 | 5 | Global navigation (rail/palette/search/user menu) | pending |
 | 6 | Workspace navigation (server nav, channels, categories) | pending |
 | 7 | Chat: message rows, grouped threads, composer | pending |
@@ -120,3 +120,21 @@ resume at the phase marked `IN PROGRESS` below — never restart the design.
   media mobile/coarse/print blocks preserved. Brace balance OK; static
   serve of layout.css 200.
 - Commit for Phase 2 checkpoint: e3e9509 (+ Phase 3 pending commit)
+
+- **Phase 4 (app shell + index.html)**: rewrote `layout.css` (85/85 selector
+  count parity; 8 functionally-covered drops verified one-by-one, e.g.
+  `.rail-item.rail-pill` labels → now the left-edge accent bars; drawer
+  `nav-open` gated on `:not([hidden])` so no empty drawers). New composition:
+  `.app-rail` global sidebar (glass, `--tc-glass-strong` + blur, safe-area
+  padded) → `.app-context` workspace nav (glass) → `.app-main` whose chrome
+  (`.app-bar`) now lives INSIDE the main column + `.app-main-inner` wrapping
+  `#view` and `#member-panel`. `index.html` restructured accordingly
+  (bar moved under `#shell-app > .app-shell > .app-layout > .app-main`).
+  Fixed defects: `#member-panel`/`.app-side` now has real container layout
+  (right detail column, drawer on mobile); mobilebar padding no longer
+  overwritten by safe-area (explicit padding-* rules); scrims use
+  `--tc-bg-scrim` + blur(2px). Verification: static serve 200; index.html
+  tree check (shell-app / main-inner / bar-after-main / 30 sprite symbols);
+  braces 100/100; no JS dependency on old nesting.
+
+- Commit log: phase 2 e3e9509 · phase 3 ed81b6b

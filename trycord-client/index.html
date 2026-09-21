@@ -73,38 +73,9 @@
     </footer>
   </div>
 
-  <!-- App shell: spatial composition, intentional hierarchy -->
+  <!-- App shell: Global Sidebar → Workspace Navigation → Main -->
   <div id="shell-app" hidden>
     <div class="app-shell">
-      <!-- Top navigation bar: slim, intentional -->
-      <header class="app-bar">
-        <button id="nav-toggle" type="button" class="bar-btn bar-nav" aria-label="Open navigation" aria-expanded="false">
-          <svg class="bar-icon" aria-hidden="true"><use href="#i-menu"/></svg>
-        </button>
-        <button id="nav-back" type="button" class="bar-btn bar-back" aria-label="Go back" hidden>
-          <svg class="bar-icon" aria-hidden="true"><use href="#i-back"/></svg>
-        </button>
-        <a class="brand" href="#/home" aria-label="Trycord home" rel="noopener">
-          <span class="brand-mark" aria-hidden="true">t</span>
-        </a>
-        <div class="bar-context">
-          <span class="ctx-icon" id="ctx-icon" aria-hidden="true"></span>
-          <h1 class="ctx-title" id="page-title">Home</h1>
-          <span class="ctx-sub" id="page-sub"></span>
-        </div>
-        <div class="bar-actions topbar-actions">
-          <button id="palette-btn" type="button" class="bar-search" aria-label="Search or jump to (Ctrl+K)">
-            <svg aria-hidden="true"><use href="#i-search"/></svg><span>Search</span><kbd>Ctrl K</kbd>
-          </button>
-          <button id="bell-btn" type="button" class="bar-notif" aria-label="Notifications" aria-haspopup="menu" aria-expanded="false">
-            <svg class="bar-icon" aria-hidden="true"><use href="#i-bell"/></svg>
-            <span class="dot" id="bell-dot" hidden></span>
-          </button>
-          <span id="conn-pill" class="pill" role="status"><span class="dot" aria-hidden="true"></span><span id="conn-text">Checking…</span></span>
-          <button id="avatar-btn" type="button" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu"></button>
-        </div>
-      </header>
-
       <!-- Spatial layout: compact regions, deliberate grouping -->
       <div class="app-layout">
         <!-- Primary navigation rail: compact, icon-only -->
@@ -153,12 +124,42 @@
           </div>
         </aside>
 
-        <!-- Main content area with intentional hierarchy -->
+        <!-- Main content column: chrome + conversation + optional detail -->
         <div class="app-main">
-          <main id="view" class="app-view" tabindex="-1" aria-label="Conversation view"></main>
-          <aside id="member-panel" class="app-side" aria-label="Members and info" hidden>
-            <div id="member-panel-body"></div>
-          </aside>
+          <!-- Main chrome: slim, typographic, scoped to content -->
+          <header class="app-bar">
+            <button id="nav-toggle" type="button" class="bar-btn bar-nav" aria-label="Open navigation" aria-expanded="false">
+              <svg class="bar-icon" aria-hidden="true"><use href="#i-menu"/></svg>
+            </button>
+            <button id="nav-back" type="button" class="bar-btn bar-back" aria-label="Go back" hidden>
+              <svg class="bar-icon" aria-hidden="true"><use href="#i-back"/></svg>
+            </button>
+            <a class="brand" href="#/home" aria-label="Trycord home" rel="noopener">
+              <span class="brand-mark" aria-hidden="true">t</span>
+            </a>
+            <div class="bar-context">
+              <span class="ctx-icon" id="ctx-icon" aria-hidden="true"></span>
+              <h1 class="ctx-title" id="page-title">Home</h1>
+              <span class="ctx-sub" id="page-sub"></span>
+            </div>
+            <div class="bar-actions topbar-actions">
+              <button id="palette-btn" type="button" class="bar-search" aria-label="Search or jump to (Ctrl+K)">
+                <svg aria-hidden="true"><use href="#i-search"/></svg><span>Search</span><kbd>Ctrl K</kbd>
+              </button>
+              <button id="bell-btn" type="button" class="bar-notif" aria-label="Notifications" aria-haspopup="menu" aria-expanded="false">
+                <svg class="bar-icon" aria-hidden="true"><use href="#i-bell"/></svg>
+                <span class="dot" id="bell-dot" hidden></span>
+              </button>
+              <span id="conn-pill" class="pill" role="status"><span class="dot" aria-hidden="true"></span><span id="conn-text">Checking…</span></span>
+              <button id="avatar-btn" type="button" class="avatar-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu"></button>
+            </div>
+          </header>
+          <div class="app-main-inner">
+            <main id="view" class="app-view" tabindex="-1" aria-label="Conversation view"></main>
+            <aside id="member-panel" class="app-side" aria-label="Members and info" hidden>
+              <div id="member-panel-body"></div>
+            </aside>
+          </div>
         </div>
       </div>
 
