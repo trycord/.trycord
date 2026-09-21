@@ -1,330 +1,240 @@
-/* Trycord Design Tokens — Source of Truth for Visual Language */
-/* All components must use these tokens. No arbitrary values. */
+/* Trycord design tokens — rebuilt visual language.
+   Clean, sleek, minimal, modern, distinctive.
+   Color: restrained palette, intentional accent.
+   Typography: deliberate hierarchy.
+   Spacing: purposeful rhythm.
+   Geometry: subtle but coherent.
+*/
 
+/* ============ Color Semantics ============ */
+
+/* Base background — deeper, warmer dark */
 :root {
-  /* ==========================================================================
-     COLOR SYSTEM — Trycord layered dark foundation.
-     Layers (darkest → lightest): base → navigation → surface → elevated →
-     interactive → focused. Each layer is tonally distinct so depth reads
-     without relying on borders alone.
-     ========================================================================== */
+  --tc-bg-base: #0d0e12;
+  /* Nav surface — slightly distinct from base */
+  --tc-bg-nav: #1a1c24;
 
-  /* Layered backgrounds (dark default) */
-  --tc-bg-base: #141519;
-  --tc-bg-nav: #17181d;
-  --tc-bg-surface: #1c1e24;
-  --tc-bg-elevated: #23262e;
-  --tc-bg-hover: #282c36;
-  --tc-bg-active: #303642;
-  --tc-bg-overlay: rgba(8, 9, 12, 0.66);
+/* Elevated surfaces — minimal contrast */
+--tc-bg-elevated: #21242e;
 
-  /* Compat aliases (existing code references these) */
-  --tc-bg: #141519;
-  --tc-bg-raised: #1c1e24;
-  --tc-surface: #1c1e24;
-  --tc-surface-raised: #23262e;
-  --tc-surface-hover: #282c36;
-  --tc-surface-active: #303642;
-  --tc-surface-subtle: #20232b;
+/* Subtle surface for inputs/overlays */
+--tc-bg-subtle: #2a2d37;
 
-  /* Borders */
-  --tc-border-subtle: rgba(255, 255, 255, 0.07);
-  --tc-border: rgba(255, 255, 255, 0.09);
-  --tc-border-soft: #262a33;
-  --tc-border-strong: rgba(255, 255, 255, 0.14);
-  --tc-border-focus: #6e6bf2;
+/* Primary text — crisp, legible */
+--tc-text-primary: #ececf1;
 
-  /* Text hierarchy */
-  --tc-text-primary: #edeff4;
-  --tc-text-secondary: #b9bec9;
-  --tc-text-muted: #8a90a0;
-  --tc-text-subtle: #6b7183;
-  --tc-text-disabled: #4a4f5e;
-  --tc-text-inverse: #141519;
-  --tc-text: #edeff4;
-  --tc-text-secondary: #b9bec9;
-  --tc-text-muted: #8a90a0;
-  --tc-text-subtle: #6b7183;
-  --tc-text-disabled: #4a4f5e;
-  --tc-text-inverse: #141519;
+/* Secondary text — readable but receded */
+--tc-text-secondary: #b9bec9;
 
-  /* Accent system — Trycord iris. Selective, never decorative. */
-  --tc-accent: #6e6bf2;
-  --tc-accent-hover: #8583f7;
-  --tc-accent-active: #5754d8;
-  --tc-accent-soft: rgba(110, 107, 242, 0.14);
-  --tc-accent-strong: #5754d8;
-  --tc-accent-muted: #8f8df0;
-  --tc-accent-ink: #ffffff;
+/* Muted / helper text */
+--tc-text-muted: #8a90a0;
 
-  /* Semantic status colors */
-  --tc-success: #3ecf8e;
-  --tc-success-soft: rgba(62, 207, 142, 0.13);
-  --tc-success-muted: #1f8a5c;
-  --tc-warning: #e5a54c;
-  --tc-warning-soft: rgba(229, 165, 76, 0.14);
-  --tc-warning-muted: #a86f24;
-  --tc-danger: #e5534b;
-  --tc-danger-soft: rgba(229, 83, 75, 0.13);
-  --tc-danger-muted: #a83a34;
-  --tc-info: #6e6bf2;
-  --tc-info-soft: rgba(110, 107, 242, 0.14);
+/* Subtle / faint */
+--tc-text-subtle: #6b7183;
 
-  /* Legacy aliases for backward compatibility */
-  --tc-panel: #1c1e24;
-  --tc-panel-2: #141519;
-  --tc-panel-3: #23262e;
-  --tc-line: rgba(255, 255, 255, 0.09);
-  --tc-line-soft: #262a33;
-  --tc-muted: #8a90a0;
-  --tc-faint: #6b7183;
-  --tc-good: #3ecf8e;
-  --tc-warn: #e5a54c;
-  --tc-bad: #e5534b;
-  --tc-radius: 10px;
-  --tc-radius-sm: 7px;
-  --tc-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  --tc-pad: 1rem;
+/* Inverse text (on dark surfaces) */
+--tc-text-inverse: #1a1c24;
 
-  /* Presence */
-  --tc-online: #3ecf8e;
-  --tc-idle: #e5a54c;
-  --tc-dnd: #e5534b;
+/* Accent — the Trycord identity, but refined */
+--tc-accent: #7e8cf5;
+/* Accent variations */
+--tc-accent-soft: #e8e9f0;
+--tc-accent-muted: #a5b1d1;
+/* Accent inverse (on accent) */
+--tc-accent-fg: #1a1c24;
+
+/* Semantic colors — refined, not signal-flag bright */
+--tc-success: #48bb78;
+--tc-success-soft: #e8f6f0;
+--tc-warning: #d2a645;
+--tc-warning-soft: #fdf6ec;
+--tc-danger: #e5534b;
+--tc-danger-soft: #fed7d5;
+--tc-info: #7e8cf5;
+
+/* Nav border — subtle, not harsh */
+--tc-border-subtle: #303544;
+
+/* Border strength variations */
+--tc-border-soft: #3a3f4f;
+--tc-border-medium: #404558;
+
+/* Shadow system — light, purposeful */
+--tc-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+--tc-shadow-md: 0 4px 12px 0 rgba(0, 0, 0, 0.3);
+--tc-shadow-lg: 0 12px 24px 0 rgba(0, 0, 0, 0.4);
+--tc-shadow-inset: inset 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+
+/* Focus ring — distinctive but accessible */
+--tc-focus-ring: 2px solid var(--tc-accent);
+--tc-focus-ring-offset: 2px;
+
+/* Radius — restrained geometry */
+--tc-radius-none: 0;
+--tc-radius-xs: 2px;
+--tc-radius-sm: 4px;
+--tc-radius-md: 6px;
+--tc-radius: 8px;
+--tc-radius-lg: 10px;
+--tc-radius-full: 9999px;
+
+/* Elevation levels — meaningful, not excessive */
+--tc-elev-level-0: 0 1px 1px 0 rgba(0, 0, 0, 0.05);
+--tc-elev-level-1: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+--tc-elev-level-2: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+--tc-elev-level-3: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+/* ============ Typography Scale ============ */
+/* Inter font, deliberate hierarchy */
+
+--tc-font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+/* Font weights */
+--tc-font-light: 300;
+--tc-font-normal: 400;
+--tc-font-medium: 500;
+--tc-font-semibold: 600;
+--tc-font-bold: 700;
+--tc-font-extrabold: 800;
+
+/* Text sizes — scaled rhythmically, not arbitrary */
+--tc-text-xxxs: 0.55rem; /* 8px — captions, subtle */
+--tc-text-xxs: 0.65rem; /* 10px — meta, small labels */
+--tc-text-xs: 0.75rem; /* 12px — inline, small */
+--tc-text-sm: 0.875rem; /* 14px — body default */
+--tc-text-base: 1rem; /* 16px — paragraph default */
+--tc-text-lg: 1.125rem; /* 18px — large body */
+--tc-text-xl: 1.25rem; /* 20px — headings */
+--tc-text-2xl: 1.5rem; /* 24px — subheadings */
+--tc-text-3xl: 1.875rem; /* 30px — major headings */
+--tc-text-4xl: 2.25rem; /* 36px — page headings */
+--tc-text-5xl: 3rem; /* 48px — display */
+
+--tc-line-height-tight: 1.1;
+--tc-line-height-normal: 1.5;
+--tc-line-height-relaxed: 1.625;
+
+/* Letter spacing — optical adjustments */
+--tc-letter-tighter: -0.02em;
+--tc-letter-tight: -0.01em;
+--tc-letter-normal: 0em;
+--tc-letter-wide: 0.02em;
+
+/* ============ Spacing System ============ */
+/* 4px base unit, purposeful rhythm */
+
+--tc-space-0: 0;
+--tc-space-1: 0.25rem; /* 4px */
+--tc-space-2: 0.5rem; /* 8px */
+--tc-space-3: 0.75rem; /* 12px */
+--tc-space-4: 1rem; /* 16px */
+--tc-space-5: 1.25rem; /* 20px */
+--tc-space-6: 1.5rem; /* 24px */
+--tc-space-7: 1.875rem; /* 30px */
+--tc-space-8: 2rem; /* 32px */
+--tc-space-9: 2.25rem; /* 36px */
+--tc-space-10: 2.5rem; /* 40px */
+--tc-space-11: 2.75rem; /* 44px */
+--tc-space-12: 3rem; /* 48px */
+--tc-space-14: 3.5rem; /* 56px */
+--tc-space-16: 4rem; /* 64px */
+--tc-space-20: 5rem; /* 80px */
+--tc-space-24: 6rem; /* 96px */
+
+/* ============ Transitions & Easing ============ */
+/* Purposeful, not excessive */
+
+--tc-duration-instant: 0ms;
+--tc-duration-fast: 150ms;
+--tc-duration-normal: 250ms;
+--tc-duration-slow: 360ms;
+
+--tc-ease-out: cubic-bezier(0, 0, 0.2, 1);
+--tc-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+--tc-ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+/* ============ Z-Index ============ */
+/* Logical layering, not excessive */
+
+  --tc-z-toast: 90;
+  --tc-z-dropdown: 80;
+  --tc-z-sticky: 70;
+  --tc-z-nav: 60;
+  --tc-z-modal: 50;
+  --tc-z-popover: 40;
+  --tc-z-tooltip: 30;
+  --tc-z-card: 20;
+  --tc-z-img: 10;
+
+  /* ---- Compat aliases: keep old components functional mid-rebuild ---- */
+  --tc-bg-hover: #262a35;
+  --tc-bg-active: #2e3340;
+  --tc-border: #303544;
+  --tc-border-strong: #3a3f4f;
+  --tc-border-focus: #7e8cf5;
+  --tc-accent-hover: #8d9bf7;
+  --tc-accent-active: #6d7df0;
+  --tc-online: #48bb78;
   --tc-offline: #6b7183;
-
-  /* ==========================================================================
-     TYPOGRAPHY SYSTEM
-     ========================================================================== */
-  --tc-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --tc-font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --tc-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  /* Type scale */
-  --tc-display: 2rem;        /* 32px hero */
-  --tc-h1: 1.5rem;           /* 24px page heading */
-  --tc-h2: 1.25rem;          /* 20px section heading */
-  --tc-h3: 1.0625rem;        /* 17px card heading */
-  --tc-text-xs: 0.6875rem;   /* 11px metadata */
-  --tc-text-sm: 0.8125rem;   /* 13px secondary */
-  --tc-text-base: 0.9375rem; /* 15px body */
-  --tc-text-md: 0.875rem;    /* 14px */
-  --tc-text-lg: 1rem;        /* 16px */
-  --tc-text-xl: 1.125rem;    /* 18px */
-  --tc-text-2xl: 1.25rem;    /* 20px */
-  --tc-text-3xl: 1.5rem;     /* 24px */
-  --tc-text-4xl: 2rem;       /* 32px */
-  --tc-text-5xl: 3rem;       /* 48px */
-
-  /* Font weights */
-  --tc-font-light: 300;
-  --tc-font-normal: 400;
-  --tc-font-medium: 500;
-  --tc-font-semibold: 600;
-  --tc-font-bold: 700;
-  --tc-font-extrabold: 800;
-
-  /* Line heights */
-  --tc-leading-tight: 1.25;
+  --tc-text-disabled: #6b7183;
+  --tc-h2: 1.5rem;
+  --tc-h3: 1.25rem;
+  --tc-display: 2.5rem;
+  --tc-tracking-tight: -0.01em;
+  --tc-tracking-label: 0.06em;
+  --tc-leading-tight: 1.1;
+  --tc-leading-normal: 1.5;
   --tc-leading-snug: 1.375;
-  --tc-leading-normal: 1.55;
-  --tc-leading-relaxed: 1.65;
-
-  /* Letter spacing */
-  --tc-tracking-tight: -0.02em;
-  --tc-tracking-normal: 0;
-  --tc-tracking-wide: 0.04em;
-  --tc-tracking-label: 0.08em;
-
-  /* ==========================================================================
-     SPACING SYSTEM — 4px base unit
-     ========================================================================== */
-  --tc-space-0: 0;
-  --tc-space-1: 0.25rem;
-  --tc-space-2: 0.5rem;
-  --tc-space-3: 0.75rem;
-  --tc-space-4: 1rem;
-  --tc-space-5: 1.25rem;
-  --tc-space-6: 1.5rem;
-  --tc-space-8: 2rem;
-  --tc-space-10: 2.5rem;
-  --tc-space-12: 3rem;
-  --tc-space-16: 4rem;
-  --tc-space-20: 5rem;
-  --tc-space-24: 6rem;
-
-  /* ==========================================================================
-     RADIUS SYSTEM
-     ========================================================================== */
-  --tc-radius-none: 0;
-  --tc-radius-sm: 6px;
-  --tc-radius-md: 8px;
-  --tc-radius-lg: 12px;
-  --tc-radius-xl: 16px;
-  --tc-radius-2xl: 20px;
-  --tc-radius-full: 9999px;
-
-  /* ==========================================================================
-     ELEVATION / SHADOWS — felt, not noticed
-     ========================================================================== */
-  --tc-shadow-none: none;
-  --tc-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --tc-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.22);
-  --tc-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.28);
-  --tc-shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.36);
-  --tc-shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.36), 0 28px 64px rgba(0, 0, 0, 0.42);
-  --tc-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  --tc-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-
-  /* Focus ring */
-  --tc-focus-ring: 0 0 0 3px rgba(110, 107, 242, 0.38);
-  --tc-focus-ring-inset: inset 0 0 0 2px #6e6bf2;
-
-  /* ==========================================================================
-     Z-INDEX SCALE
-     ========================================================================== */
-  --tc-z-base: 0;
-  --tc-z-dropdown: 100;
-  --tc-z-sticky: 200;
-  --tc-z-modal-backdrop: 400;
-  --tc-z-modal: 500;
-  --tc-z-popover: 600;
-  --tc-z-tooltip: 700;
-  --tc-z-toast: 800;
-  --tc-z-dialog: 900;
-
-  /* ==========================================================================
-     TRANSITIONS / MOTION — fast, subtle, purposeful
-     ========================================================================== */
-  --tc-duration-instant: 0ms;
-  --tc-duration-fast: 90ms;
-  --tc-duration-normal: 170ms;
-  --tc-duration-slow: 260ms;
-  --tc-duration-slower: 360ms;
-  --tc-ease-in: cubic-bezier(0.4, 0, 1, 1);
-  --tc-ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --tc-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-  --tc-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  /* ==========================================================================
-     BREAKPOINTS
-     ========================================================================== */
-  --tc-breakpoint-sm: 640px;
-  --tc-breakpoint-md: 768px;
-  --tc-breakpoint-lg: 1024px;
-  --tc-breakpoint-xl: 1280px;
-  --tc-breakpoint-2xl: 1536px;
-
-  /* ==========================================================================
-     DENSITY
-     ========================================================================== */
-  --tc-density-compact: 0.75;
-  --tc-density-comfortable: 1;
-  --tc-density-spacious: 1.25;
+  --tc-font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+  --tc-info-soft: #e8e9f0;
+  --tc-shadow-xl: 0 24px 48px 0 rgba(0, 0, 0, 0.5);
+  --tc-z-modal-backdrop: 45;
+  --tc-radius-xl: 12px;
+  --tc-radius-xxs: 2px;
+  --tc-space-xxs: 0.125rem;
+  /* Neutral scale (status strip + misc) */
+  --tc-neutral: #8a90a0;
+  --tc-neutral-soft: rgba(138, 144, 160, 0.14);
+  --tc-neutral-muted: #3a3f4f;
+  /* Legacy surface/text/type names used by utilities, globals, showcase */
+  --tc-bg-surface: #21242e;
+  --tc-bg-raised: #2a2d37;
+  --tc-surface: #21242e;
+  --tc-surface-hover: #262a35;
+  --tc-text: #ececf1;
+  --tc-h1: 2rem;
+  --tc-font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --tc-tracking-wide: 0.02em;
 }
 
-/* ==========================================================================
-   LIGHT THEME — warm paper layers
-   ========================================================================== */
-[data-theme="light"] {
-  --tc-bg-base: #eef0f4;
-  --tc-bg-nav: #e6e8ee;
-  --tc-bg-surface: #ffffff;
-  --tc-bg-elevated: #ffffff;
-  --tc-bg-hover: #f1f2f6;
-  --tc-bg-active: #e4e6ec;
-  --tc-bg-overlay: rgba(20, 21, 25, 0.45);
-  --tc-bg: #eef0f4;
-  --tc-bg-raised: #ffffff;
-  --tc-surface: #ffffff;
-  --tc-surface-raised: #f4f5f8;
-  --tc-surface-hover: #eceef3;
-  --tc-surface-active: #dfe2e9;
-  --tc-surface-subtle: #f4f5f8;
-  --tc-border-subtle: rgba(20, 21, 25, 0.07);
-  --tc-border: rgba(20, 21, 25, 0.1);
-  --tc-border-soft: #e6e8ee;
-  --tc-border-strong: rgba(20, 21, 25, 0.18);
-  --tc-border-focus: #6e6bf2;
-  --tc-text-primary: #191a1f;
-  --tc-text-secondary: #4d515c;
-  --tc-text-muted: #6f7482;
-  --tc-text-subtle: #9aa0ae;
-  --tc-text-disabled: #c3c7d1;
-  --tc-text-inverse: #f4f5f7;
-  --tc-text: #191a1f;
-  --tc-text-secondary: #4d515c;
-  --tc-text-muted: #6f7482;
-  --tc-text-subtle: #9aa0ae;
-  --tc-text-disabled: #c3c7d1;
-  --tc-text-inverse: #f4f5f7;
-  --tc-accent: #5a57e8;
-  --tc-accent-hover: #6e6bf2;
-  --tc-accent-active: #4a47c4;
-  --tc-accent-soft: rgba(110, 107, 242, 0.12);
-  --tc-accent-strong: #4a47c4;
-  --tc-accent-muted: #8f8df0;
-  --tc-success: #1f9d63;
-  --tc-success-soft: rgba(31, 157, 99, 0.12);
-  --tc-success-muted: #177245;
-  --tc-warning: #b3762a;
-  --tc-warning-soft: rgba(179, 118, 42, 0.13);
-  --tc-warning-muted: #8a5a1e;
-  --tc-danger: #cf3f38;
-  --tc-danger-soft: rgba(207, 63, 56, 0.11);
-  --tc-danger-muted: #9c2f29;
-  --tc-info: #5a57e8;
-  --tc-info-soft: rgba(110, 107, 242, 0.12);
-  --tc-panel: #ffffff;
-  --tc-panel-2: #eef0f4;
-  --tc-panel-3: #e6e8ee;
-  --tc-line: rgba(20, 21, 25, 0.1);
-  --tc-line-soft: #e6e8ee;
-  --tc-muted: #6f7482;
-  --tc-faint: #9aa0ae;
-  --tc-good: #1f9d63;
-  --tc-warn: #b3762a;
-  --tc-bad: #cf3f38;
-  --tc-radius: 10px;
-  --tc-radius-sm: 7px;
-  --tc-shadow: 0 12px 32px rgba(25, 26, 31, 0.14);
-  --tc-online: #1f9d63;
-  --tc-idle: #b3762a;
-  --tc-dnd: #cf3f38;
-  --tc-offline: #9aa0ae;
-}
-
-/* High contrast mode */
-@media (prefers-contrast: more) {
+/* ============ High-contrast mode ============ */
+@media (forced-colors: active) {
   :root {
-    --tc-border: rgba(255, 255, 255, 0.28);
-    --tc-border-strong: rgba(255, 255, 255, 0.45);
-    --tc-text-secondary: #d5d9e2;
-    --tc-text-muted: #c2c7d3;
-  }
-  [data-theme="light"] {
-    --tc-border: #8a8f9c;
-    --tc-border-strong: #555a66;
-    --tc-text-secondary: #33363e;
-    --tc-text-muted: #4d515c;
+    --tc-bg-base: Canvas;
+    --tc-bg-nav: CanvasText;
+    --tc-bg-elevated: Canvas;
+    --tc-text-primary: CanvasText;
+    --tc-text-secondary: GrayText;
+    --tc-text-muted: GrayText;
+    --tc-accent: ButtonText;
+    --tc-border-subtle: ButtonBorder;
+    --tc-success: CanvasText;
+    --tc-warning: CanvasText;
+    --tc-danger: CanvasText;
+    --tc-info: ButtonText;
   }
 }
 
-/* Reduced motion */
+/* ============ Reduced motion ============ */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  :root {
+    --tc-duration-instant: 0ms;
+    --tc-duration-fast: 0ms;
+    --tc-duration-normal: 0ms;
+    --tc-duration-slow: 0ms;
   }
-}
-
-html[data-motion="off"] *,
-html[data-motion="off"] *::before,
-html[data-motion="off"] *::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
+  }
 }
