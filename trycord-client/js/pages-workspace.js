@@ -360,13 +360,18 @@
       var prevTop = keepPos ? listEl.scrollTop : 0;
       listEl.innerHTML = rendered.map((m, i) => C.renderMessage({
         id: m.id, content: m.content, createdAt: m.created_at,
+        editedAt: m.edited_at || null,
         authorId: m.author_id, authorName: m.author_display || m.author_name,
       }, {
         grouped: i > 0 && groupable(rendered[i - 1], m),
         canDelete: String(m.author_id) === String(me.id) || manager,
+        canEdit: String(m.author_id) === String(me.id),
       })).join('');
-      C.wireMessageList(listEl, (mid) => {
-        TrycordApi.deleteMessage(ch.id, mid).catch((e) => Ui.toast(e.message, 'error'));
+      C.wireMessageList(listEl, {
+        onDelete: (mid) => {
+          TrycordApi.deleteMessage(ch.id, mid).catch((e) => Ui.toast(e.message, 'error'));
+        },
+        onEdit: (mid) => editMessage(mid),
       });
       if (forceBottom) listEl.scrollTop = listEl.scrollHeight;
       else if (keepPos) listEl.scrollTop = listEl.scrollHeight - prevHeight + prevTop;
@@ -385,6 +390,32 @@
       var nearBottom = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 160;
       paint(toBottom || nearBottom, added && !toBottom && !nearBottom);
     }
+
+    // Realtime or PATCH-response driven content replacement. Never
+    // reorders, never refetches: the entry keeps its position.
+    function applyUpdatedMessage(ev) {
+      var idx = -1;
+      rendered.forEach((m, i) => { if (String(m.id) === String(ev.id)) idx = i; });
+      if (idx === -1) return false;
+      rendered[idx] = Object.assign({}, rendered[idx], { content: ev.content, edited_at: ev.edited_at || null });
+      paint(false, false);
+      return true;
+    }
+
+    function editMessage(mid) {
+      var m = rendered.find((x) => String(x.id) === String(mid));
+      if (!m || String(m.author_id) !== String(me.id)) return;
+      C.openEditModal(m.content, (text) =>
+        TrycordApi.patchMessage(ch.id, mid, text).then((out) => {
+          applyUpdatedMessage({ id: mid, content: out.content, edited_at: out.edited_at || null });
+        })
+      );
+    }
+
+    // Channel-specific loading state: never show the previous channel's
+    // messages under this channel's header. Replaced by content, empty,
+    // or error below.
+    listEl.innerHTML = '<li style="list-style:none;" aria-hidden="true">' + Ui.skeletons(6) + '</li>';
 
     try {
       var first = await TrycordApi.messages(ch.id, 50);
@@ -450,6 +481,7 @@
       var mine = String(m.author_id) === String(me.id);
       Ui.contextMenu(e.clientX, e.clientY, [
         { label: 'Copy text', icon: 'i-copy', onClick: () => C.copyText(li.querySelector('.text').textContent, 'Message copied.') },
+        { label: 'Edit message', icon: 'i-pen', hidden: !mine, onClick: () => editMessage(m.id) },
         { label: 'Delete message', icon: 'i-trash', danger: true, hidden: !(mine || manager), onClick: () => TrycordApi.deleteMessage(ch.id, m.id).catch((err) => Ui.toast(err.message, 'error')) },
       ]);
     };
@@ -473,6 +505,8 @@
           delete renderedIds[ev.id];
           rendered = rendered.filter((m) => String(m.id) !== String(ev.id));
           paint(false, false);
+        } else if (ev.type === 'message_updated' && String(ev.channel_id) === String(ch.id)) {
+          applyUpdatedMessage(ev);
         } else {
           C.handleSignal(ev, {});
         }

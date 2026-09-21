@@ -880,6 +880,45 @@
     };
   }
 
+  // Shared message-edit dialog. onSave(text) returns a promise for the
+  // PATCH call; the dialog closes on success and toasts on failure.
+  function openEditModal(initialText, onSave) {
+    var body = document.createElement('div');
+    body.innerHTML =
+      '<div class="form-group" style="margin-bottom:0;"><label class="form-label" for="msg-edit-input">Edit message</label>' +
+      '<textarea id="msg-edit-input" class="form-textarea" rows="3" maxlength="2000"></textarea></div>' +
+      '<p class="form-hint">Enter to save · Shift+Enter for a new line · Escape to cancel</p>';
+    var input = body.querySelector('#msg-edit-input');
+    input.value = initialText || '';
+    Ui.openModal({
+      title: 'Edit message', body,
+      actions: [{ id: 'cancel', label: 'Cancel' }, {
+        id: 'save', label: 'Save', primary: true,
+        onClick: (close) => {
+          var text = input.value.trim();
+          if (!text) { Ui.fieldError(input, 'Message cannot be empty.'); return; }
+          if (text === (initialText || '').trim()) { close(); return; }
+          Promise.resolve().then(() => onSave(text)).then(close, (e) => {
+            Ui.toast((e && e.message) || 'Could not save your edit.', 'error');
+          });
+        },
+      }],
+    });
+    setTimeout(() => {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }, 0);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        var saveBtn = Array.prototype.slice.call(
+          document.querySelectorAll('#modal-root .modal-footer .btn-primary')
+        ).pop();
+        if (saveBtn) saveBtn.click();
+      }
+    });
+  }
+
   window.TrycordComponents = {
     NAV,
     renderRail, renderSidebar, renderRailServers, renderRailBadges, renderMobileBar,
@@ -890,6 +929,6 @@
     openProfileModal, openUserSearch, presenceAvatar,
     serverRow, wireServerRows, favStar, serverMenu, copyText,
     createServerModal, serverSwitcher, wireServerSwitcher, openServerConfigModal,
-    openPalette, renderMessage, wireMessageList, connectSocket,
+    openPalette, renderMessage, wireMessageList, connectSocket, openEditModal,
   };
 })();
