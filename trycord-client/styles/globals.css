@@ -1,5 +1,5 @@
 /* Trycord globals — body, type roles, links, focus, scrollbars, selection.
-   Component-specific rules belong in components.css; shell rules in layout.css. */
+   Component rules live in components.css; shell layout in layout.css. */
 
 body {
   font-family: var(--tc-font-sans);
@@ -9,54 +9,123 @@ body {
   color: var(--tc-text-primary);
 }
 
-/* Type roles */
-.tc-display { font-size: var(--tc-display); font-weight: var(--tc-font-extrabold); letter-spacing: var(--tc-tracking-tight); line-height: var(--tc-leading-tight); }
-.tc-h1, h1.tc { font-size: var(--tc-h1); font-weight: var(--tc-font-extrabold); letter-spacing: var(--tc-tracking-tight); line-height: var(--tc-leading-tight); }
-.tc-h2, h2.tc { font-size: var(--tc-h2); font-weight: var(--tc-font-bold); letter-spacing: var(--tc-tracking-tight); line-height: var(--tc-leading-tight); }
-.tc-h3, h3.tc { font-size: var(--tc-h3); font-weight: var(--tc-font-semibold); letter-spacing: normal; line-height: var(--tc-leading-snug); }
-.tc-body { font-size: var(--tc-text-base); line-height: var(--tc-leading-normal); color: var(--tc-text-secondary); }
+/* ---------- Type roles (structure, not decoration) ---------- */
+.tc-display {
+  font-size: var(--tc-display);
+  font-weight: var(--tc-font-extrabold);
+  letter-spacing: var(--tc-tracking-tight);
+  line-height: var(--tc-leading-tight);
+}
+.tc-h1, h1.tc {
+  font-size: var(--tc-h1);
+  font-weight: var(--tc-font-semibold);
+  letter-spacing: var(--tc-tracking-tight);
+  line-height: var(--tc-leading-tight);
+}
+.tc-h2, h2.tc {
+  font-size: var(--tc-h2);
+  font-weight: var(--tc-font-bold);
+  letter-spacing: var(--tc-tracking-tight);
+  line-height: var(--tc-leading-tight);
+}
+.tc-h3, h3.tc {
+  font-size: var(--tc-h3);
+  font-weight: var(--tc-font-semibold);
+  line-height: var(--tc-leading-snug);
+}
+.tc-body {
+  font-size: var(--tc-text-base);
+  line-height: var(--tc-leading-normal);
+  color: var(--tc-text-secondary);
+}
 .tc-secondary { font-size: var(--tc-text-sm); color: var(--tc-text-secondary); }
 .tc-meta { font-size: var(--tc-text-xs); color: var(--tc-text-muted); }
-.tc-label { font-size: var(--tc-text-xs); font-weight: var(--tc-font-semibold); letter-spacing: var(--tc-tracking-label); text-transform: uppercase; color: var(--tc-text-muted); }
+.tc-label {
+  font-size: var(--tc-text-xxs);
+  font-weight: var(--tc-font-semibold);
+  letter-spacing: var(--tc-tracking-label);
+  text-transform: uppercase;
+  color: var(--tc-text-muted);
+}
+.text-sm { font-size: var(--tc-text-sm); color: var(--tc-text-secondary); }
+.muted, .text-muted { color: var(--tc-text-muted); }
+.tc-muted-link { color: var(--tc-text-muted); }
+.tc-muted-link:hover { color: var(--tc-accent-muted); }
 
-/* Links: accent, underline on hover only */
-a { color: var(--tc-accent-muted); text-decoration: none; }
-a:hover { color: var(--tc-accent-hover); text-decoration: underline; }
+/* Simple layout helpers used by page renderers. */
+.tc-stack { display: flex; flex-direction: column; gap: var(--tc-space-4); }
+.tc-cluster { display: flex; flex-wrap: wrap; gap: var(--tc-space-2); align-items: center; }
 
-/* Focus: always visible, never bare. Components may refine the ring. */
+/* ---------- Links ---------- */
+a {
+  color: var(--tc-accent-muted);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--tc-accent-hover);
+  text-decoration: underline;
+}
+
+/* ---------- Focus: always visible, never bare. ---------- */
 :focus { outline: none; }
-:focus-visible { box-shadow: var(--tc-focus-ring); border-radius: var(--tc-radius-sm); }
+:focus-visible {
+  box-shadow: var(--tc-focus-shadow);
+  outline: 2px solid var(--tc-focus-ring);
+  outline-offset: var(--tc-focus-ring-offset);
+}
 button:focus:not(:focus-visible),
 a:focus:not(:focus-visible),
 input:focus:not(:focus-visible),
 textarea:focus:not(:focus-visible),
-select:focus:not(:focus-visible) { box-shadow: none; }
+select:focus:not(:focus-visible) {
+  box-shadow: none;
+  outline: none;
+}
 
-/* Selection */
-::selection { background: var(--tc-accent-soft); color: var(--tc-text-primary); }
+/* ---------- Selection ---------- */
+::selection {
+  background: var(--tc-accent-soft);
+  color: var(--tc-text-primary);
+}
 
-/* Scrollbars: thin and quiet */
+/* ---------- Scrollbars: thin and quiet ---------- */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--tc-bg-active); border-radius: 8px; border: 3px solid transparent; background-clip: content-box; }
-::-webkit-scrollbar-thumb:hover { background: var(--tc-text-muted); background-clip: content-box; border: 3px solid transparent; }
-* { scrollbar-width: thin; scrollbar-color: var(--tc-bg-active) transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--tc-neutral-muted);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--tc-text-muted);
+  background-clip: content-box;
+  border: 3px solid transparent;
+}
+* { scrollbar-width: thin; scrollbar-color: var(--tc-neutral-muted) transparent; }
 
-/* Code */
+/* ---------- Code ---------- */
 code, kbd, pre { font-family: var(--tc-font-mono); }
 code {
-  font-size: 0.85em; background: var(--tc-bg-active);
+  font-size: 0.85em;
+  background: var(--tc-bg-active);
   border: 1px solid var(--tc-border-subtle);
-  padding: 0.1rem 0.4rem; border-radius: var(--tc-radius-sm);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--tc-radius-sm);
   color: var(--tc-text-secondary);
 }
 kbd {
-  font-size: var(--tc-text-xs); background: var(--tc-bg-active);
-  border: 1px solid var(--tc-border-strong); border-bottom-width: 2px;
-  padding: 0.1rem 0.35rem; border-radius: var(--tc-radius-sm);
-  color: var(--tc-text-secondary); white-space: nowrap;
+  font-size: var(--tc-text-xs);
+  background: var(--tc-bg-active);
+  border: 1px solid var(--tc-border-strong);
+  border-bottom-width: 2px;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--tc-radius-sm);
+  color: var(--tc-text-secondary);
+  white-space: nowrap;
 }
 
+/* ---------- Motion preference from settings ---------- */
 html[data-motion="off"] *,
 html[data-motion="off"] *::before,
 html[data-motion="off"] *::after {
