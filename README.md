@@ -16,6 +16,7 @@ configure, whether that's the official instance or one you host.
 
 - Servers with invite codes, member management, and visibility controls
 - Channel categories and channel-based real-time chat over WebSockets
+- File attachments in channels (images, PDF, and text files) with permission-checked downloads
 - Roles and granular permissions, server discovery for public instances
 - Web client, desktop client (Electron), and self-hostable Node.js server
 - SQLite for development, MySQL for production
@@ -174,9 +175,10 @@ trycord-server/src/
 ├── errors.js util.js
 ├── middleware/auth.js serverAccess.js
 ├── routes/          # auth, users, servers, channels, categories, roles,
-│                    # invites, messages, discover, activity
+│                    # invites, messages, attachments, discover,
+│                    # dms, friends, notifications, activity
 └── services/        # servers, memberships, roles, permissions, channels,
-                     # invites, discovery
+                     # invites, dms, friends, notifications, discovery, uploads
 
 trycord-client/
 ├── index.html       # app shell (public + authenticated regions)
@@ -184,16 +186,15 @@ trycord-client/
 ├── config.js        # runtime backend config (no rebuild to change)
 ├── styles/          # tokens, theme, components, utilities, layout
 └── js/
-    ├── api.js state.js global-sync.js ui.js components.js
+    ├── api.js state.js ui.js shell.js global-sync.js
+    ├── router.js app.js
     ├── pages-public.js pages-home.js pages-browse.js
-    ├── pages-workspace.js pages-account.js
-    └── router.js app.js
+    └── pages-account.js pages-dms.js pages-workspace.js
 ```
 
-## Official instances
+## Official instance
 
-- Web client: `https://trycord.wisp.uno`
-- Backend: `https://trycord.wispbyte.app`
+- Public instance: `https://trycord.wispbyte.app`
 
 Self-hosted servers use their own URL and database. The official instance is
 simply the default destination, never the only one.

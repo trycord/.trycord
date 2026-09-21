@@ -741,6 +741,9 @@
     var edited = m.editedAt
       ? ' <span class="edited" title="' + Ui.esc(editedFull(m.editedAt)) + '">(edited)</span>'
       : '';
+    var atts = (m.attachments || []).length
+      ? '<div class="attachments">' + m.attachments.map(attachmentHtml).join('') + '</div>'
+      : '';
     return (
       '<li class="msg' + (grouped ? ' cont' : '') + '" data-mid="' + Ui.esc(m.id) + '">' +
       '<span class="gutter">' +
@@ -752,7 +755,8 @@
       (grouped ? '' :
         '<div class="head"><span class="author">' + Ui.esc(m.authorName || '?') + '</span>' +
         '<time class="time" title="' + Ui.esc(full) + '">' + Ui.esc(time) + '</time>' + edited + '</div>') +
-      '<div class="text">' + linkify(Ui.esc(m.content)) + (grouped ? edited : '') + '</div>' + seen +
+      '<div class="text">' + linkify(Ui.esc(m.content)) + (grouped ? edited : '') + '</div>' +
+      atts + seen +
       '</div>' +
       '<div class="msg-actions" role="toolbar" aria-label="Message actions">' +
       '<button type="button" class="icon-btn" data-copy title="Copy text" aria-label="Copy text"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>' +
@@ -761,6 +765,118 @@
       '</div>' +
       '<button type="button" class="msg-touchbtn" data-touch-menu title="Message actions" aria-label="Message actions" aria-haspopup="menu"><svg aria-hidden="true"><use href="#i-dots"/></svg></button></li>'
     );
+  }
+
+  function attachmentHtml(a) {
+    return '<div class="attachment" data-attach="' + Ui.esc(a.id) + '" data-mime="' + Ui.esc(a.mime) + '" data-name="' + Ui.esc(a.filename) + '" tabindex="0" role="button" aria-label="Open ' + Ui.esc(a.filename) + '">' +
+      '<div class="attachment-thumb" data-thumb hidden></div>' +
+      '<div class="attachment-meta">' +
+      '<svg class="attachment-ic" aria-hidden="true"><use href="#i-paperclip"/></svg>' +
+      '<span class="attachment-name" title="' + Ui.esc(a.filename) + '">' + Ui.esc(a.filename) + '</span>' +
+      '<span class="attachment-size">' + formatBytes(a.size) + '</span>' +
+      '<button type="button" class="icon-btn attachment-dl" data-dl title="Download" aria-label="Download ' + Ui.esc(a.filename) + '"><svg aria-hidden="true"><use href="#i-download"/></svg></button>' +
+      '</div></div>';
+  }
+
+  // Tracked object URLs for attachment previews; revoked every time a message
+  // list is repainted so memory doesn't grow without bound while chatting.
+  var attachmentUrlPool = [];
+  function trackUrl(u) { if (u) attachmentUrlPool.push(u); }
+  function revokeAttachmentUrls() {
+    attachmentUrlPool.forEach((u) => { try { URL.revokeObjectURL(u); } catch (e) { /* ignore */ } });
+    attachmentUrlPool = [];
+  }
+
+  function formatBytes(n) {
+    n = parseInt(n, 10) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function downloadBlob(name, url) {
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = name || 'attachment';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function openAttachment(id, mime, name, download) {
+    var wantsDownload = download !== false && mime.indexOf('image/') !== 0;
+    TrycordApi.attachmentBlob(id).then((blob) => {
+      var url = URL.createObjectURL(blob);
+      if (download === true || wantsDownload) {
+        downloadBlob(name, url);
+        setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
+        return;
+      }
+      var body = document.createElement('div');
+      body.style.textAlign = 'center';
+      var img = document.createElement('img');
+      img.src = url;
+      img.alt = name || '';
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '70vh';
+      img.style.borderRadius = 'var(--tc-radius-md)';
+      img.onload = () => { try { URL.revokeObjectURL(url); } catch (e) {} };
+      body.appendChild(img);
+      Ui.openModal({
+        title: name || 'Attachment',
+        body,
+        actions: [
+          { id: 'download', label: 'Download', primary: true, onClick: (close) => { downloadBlob(name, url); close(); } },
+          { id: 'close', label: 'Close' },
+        ],
+        onClose: () => {},
+      });
+    }).catch(() => Ui.toast('Attachment failed to load.', 'error'));
+  }
+
+  function loadAttachmentThumb(el, th) {
+    if (el.dataset.loading) return;
+    el.dataset.loading = '1';
+    TrycordApi.attachmentBlob(el.dataset.attach).then((blob) => {
+      var url = URL.createObjectURL(blob);
+      trackUrl(url);
+      th.hidden = false;
+      var img = document.createElement('img');
+      img.alt = el.dataset.name || '';
+      img.loading = 'lazy';
+      img.src = url;
+      th.appendChild(img);
+    }).catch(() => {
+      th.hidden = false;
+      th.classList.add('attachment-thumb-error');
+    });
+  }
+
+  // Reachable by keyboard: Enter/Space on an attachment opens it (download
+  // for files, lightbox for images).
+  function wireAttachments(root) {
+    revokeAttachmentUrls();
+    root.querySelectorAll('[data-attach]').forEach((el) => {
+      var mime = (el.dataset.mime || '').toLowerCase();
+      if (mime.indexOf('image/') === 0) {
+        var th = el.querySelector('[data-thumb]');
+        if (th) loadAttachmentThumb(el, th);
+      }
+      el.onclick = (e) => {
+        e.stopPropagation();
+        if (e.target.closest('[data-dl]')) {
+          openAttachment(el.dataset.attach, mime, el.dataset.name || 'attachment', true);
+          return;
+        }
+        openAttachment(el.dataset.attach, mime, el.dataset.name || 'attachment', false);
+      };
+      el.onkeydown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          openAttachment(el.dataset.attach, mime, el.dataset.name || 'attachment', false);
+        }
+      };
+    });
   }
 
   function shortTime(iso) {
@@ -788,6 +904,7 @@
   function wireMessageList(root, handlers) {
     var onDelete = typeof handlers === 'function' ? handlers : handlers && handlers.onDelete;
     var onEdit = handlers && handlers.onEdit;
+    wireAttachments(root);
     Ui.bindLongPress(root, '[data-mid]', function (el, x, y) {
       Ui.fireContextMenu(el, x, y);
     });

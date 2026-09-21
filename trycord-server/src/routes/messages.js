@@ -7,6 +7,7 @@ const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const { now, uuid, visibleChannel } = require('../util');
 const { hasPermission } = require('../services/permissions');
+const uploads = require('../services/uploads');
 
 let broadcast = () => {};
 function setBroadcaster(fn) {
@@ -45,7 +46,9 @@ router.get('/', async (req, res, next) => {
         [req.params.channelId]
       );
     }
-    res.json(rows.reverse());
+    const byId = await uploads.getForMessages(rows.map((r) => r.id));
+    rows.reverse().forEach((r) => { r.attachments = byId[r.id] || []; });
+    res.json(rows);
   } catch (e) { next(e); }
 });
 
@@ -57,7 +60,10 @@ router.post('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next)
       return fail(res, 'PERMISSION_DENIED', 'you cannot post in this server');
     }
     const content = String((req.body || {}).content || '').trim().slice(0, 2000);
-    if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
+    // Attachments and text are independent: a message may carry files
+    // alone, text alone, or both — but must carry at least one.
+    const ids = uploads.sanitizeIds((req.body || {}).attachmentIds);
+    if (!content && !ids.length) return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
     const msg = {
       id: uuid(), channel_id: ch.id, server_id: ch.server_id,
       author_id: req.user.id, user: req.user.username, content, created_at: now(),
@@ -67,6 +73,9 @@ router.post('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next)
       'INSERT INTO messages (id, channel_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)',
       [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at]
     );
+    msg.attachments = ids.length
+      ? await uploads.attachToMessage(ids, msg.id, req.user.id, ch.id)
+      : [];
     broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
     res.json(msg);
   } catch (e) { next(e); }
@@ -82,7 +91,9 @@ router.delete('/:messageId', async (req, res, next) => {
     if (!isAuthor && !(await hasPermission(req.user.id, ch.server_id, 'MANAGE_MESSAGES'))) {
       return fail(res, 'PERMISSION_DENIED', 'cannot delete this message');
     }
+    const fileRows = await db.all('SELECT id FROM attachments WHERE message_id = ?', [msg.id]);
     await db.run('DELETE FROM messages WHERE id = ?', [msg.id]);
+    uploads.removeFiles(fileRows.map((r) => r.id));
     broadcast(ch.server_id, ch.id, { type: 'message_deleted', id: msg.id, channel_id: ch.id });
     res.json({ ok: true });
   } catch (e) { next(e); }

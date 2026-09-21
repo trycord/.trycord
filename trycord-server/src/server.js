@@ -79,9 +79,10 @@ async function boot() {
     next();
   });
 
-  const uploadsDir = path.join(__dirname, '..', 'uploads');
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  app.use('/uploads', express.static(uploadsDir));
+  // Attachment storage exists on disk but is NEVER mounted as a public
+  // static directory: every read goes through the authenticated
+  // /api/attachments/:id route (see routes/attachments.js).
+  require('./services/uploads');
 
   app.get('/health', (req, res) => res.json({ ok: true }));
   // Readiness: process alive AND database answering. Load balancers and
@@ -104,14 +105,12 @@ async function boot() {
   });
 
   // Safe public instance metadata. Never secrets, paths, or credentials.
-  // features.uploads stays false until a real upload API exists — the
-  // attachments table alone is not a feature.
   app.get('/api/instance', (req, res) => {
     res.json({
       instanceId: inst.instanceId,
       name: inst.name,
       globalSync: inst.globalUrl !== '',
-      features: { publicDiscovery: true, uploads: false },
+      features: { publicDiscovery: true, uploads: true },
     });
   });
 
@@ -148,6 +147,7 @@ async function boot() {
   app.use('/api/servers/:serverId/roles', require('./routes/roles'));
   app.use('/api/servers/:serverId/invites', inviteRoutes.managed);
   app.use('/api/channels/:channelId/messages', require('./routes/messages'));
+  app.use('/api', require('./routes/attachments'));
   app.use('/api/servers', require('./routes/servers'));
   app.use('/api/invites', inviteRoutes.byCode);
   app.use('/api/discover', require('./routes/discover'));
@@ -217,11 +217,13 @@ async function boot() {
   });
 
   // Drop expired token revocations (uses JS time — portable across databases).
+  const uploads = require('./services/uploads');
   const purge = async () => {
     try {
       await db.run('DELETE FROM revoked_tokens WHERE expires_at < ?', [new Date().toISOString()]);
       await db.run('DELETE FROM password_resets WHERE expires_at < ? OR used_at IS NOT NULL', [new Date().toISOString()]);
       await db.run('DELETE FROM email_verifications WHERE expires_at < ? OR used_at IS NOT NULL', [new Date().toISOString()]);
+      await uploads.purgePending();
     } catch { /* shutting down */ }
   };
   await purge();

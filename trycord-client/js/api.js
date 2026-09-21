@@ -77,7 +77,69 @@
     return e;
   }
 
+  async function finish(res, authed) {
+    var text = await res.text();
+    var data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (e) { data = { raw: text }; }
+    if (res.status === 401 && authed) {
+      API.token = null;
+      if (window.TrycordState) TrycordState.user = null;
+      Trycord.setOnline(true);
+      location.hash = '#/login';
+      throw apiError({ error: { code: 'SESSION_REVOKED', message: 'Session expired — please log in again.' } }, 401);
+    }
+    if (!res.ok) throw apiError(data, res.status);
+    Trycord.setOnline(true);
+    return data;
+  }
+
+  async function call(path, opts) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json' };
+    var authed = !!API.token;
+    if (authed) headers.Authorization = 'Bearer ' + API.token;
+    var res;
+    try {
+      res = await fetch(baseUrl() + path, {
+        method: opts.method || 'GET',
+        headers: headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+    } catch (e) {
+      Trycord.setOnline(false);
+      var net = new Error('Cannot reach the server at ' + baseUrl() + '. Is it running?');
+      net.code = 'OFFLINE';
+      throw net;
+    }
+    return finish(res, authed);
+  }
+
+  // Multipart upload: the browser sets the boundary itself (no Content-Type
+  // header here). Same auth, error, and 401 semantics as call().
+  async function multipart(path, file) {
+    var authed = !!API.token;
+    var fd = new FormData();
+    fd.append('file', file, (file && file.name) || 'upload');
+    var res;
+    try {
+      res = await fetch(baseUrl() + path, {
+        method: 'POST',
+        headers: authed ? { Authorization: 'Bearer ' + API.token } : {},
+        body: fd,
+      });
+    } catch (e) {
+      Trycord.setOnline(false);
+      var net = new Error('Cannot reach the server at ' + baseUrl() + '. Is it running?');
+      net.code = 'OFFLINE';
+      throw net;
+    }
+    return finish(res, authed);
+  }
+
   var API = {
+    call,
+    multipart,
+
     get token() {
       try { return localStorage.getItem(tokenKey()); } catch (e) { return null; }
     },
@@ -86,39 +148,6 @@
         if (t) localStorage.setItem(tokenKey(), t);
         else localStorage.removeItem(tokenKey());
       } catch (e) { /* ignore */ }
-    },
-
-    async call(path, opts) {
-      opts = opts || {};
-      var headers = { 'Content-Type': 'application/json' };
-      var authed = !!API.token;
-      if (authed) headers.Authorization = 'Bearer ' + API.token;
-      var res;
-      try {
-        res = await fetch(baseUrl() + path, {
-          method: opts.method || 'GET',
-          headers: headers,
-          body: opts.body ? JSON.stringify(opts.body) : undefined,
-        });
-      } catch (e) {
-        Trycord.setOnline(false);
-        var net = new Error('Cannot reach the server at ' + baseUrl() + '. Is it running?');
-        net.code = 'OFFLINE';
-        throw net;
-      }
-      var text = await res.text();
-      var data = null;
-      try { data = text ? JSON.parse(text) : null; } catch (e) { data = { raw: text }; }
-      if (res.status === 401 && authed) {
-        API.token = null;
-        if (window.TrycordState) TrycordState.user = null;
-        Trycord.setOnline(true);
-        location.hash = '#/login';
-        throw apiError({ error: { code: 'SESSION_REVOKED', message: 'Session expired — please log in again.' } }, 401);
-      }
-      if (!res.ok) throw apiError(data, res.status);
-      Trycord.setOnline(true);
-      return data;
     },
 
     wsUrl() {
@@ -235,9 +264,42 @@
     createChannel: (sid, body) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels', { method: 'POST', body }),
     deleteChannel: (sid, cid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels/' + encodeURIComponent(cid), { method: 'DELETE' }),
     messages: (cid, limit, before) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages?limit=' + (limit || 50) + (before ? '&before=' + encodeURIComponent(before) : '')),
-    postMessage: (cid, content) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages', { method: 'POST', body: { content } }),
+    postMessage: (cid, content, attachmentIds) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages', {
+      method: 'POST',
+      body: attachmentIds && attachmentIds.length ? { content, attachmentIds } : { content },
+    }),
     patchMessage: (cid, mid, content) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages/' + encodeURIComponent(mid), { method: 'PATCH', body: { content } }),
     deleteMessage: (cid, mid) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages/' + encodeURIComponent(mid), { method: 'DELETE' }),
+    // attachments (uploads feature)
+    uploadAttachment: (channelId, file) =>
+      API.multipart('/api/channels/' + encodeURIComponent(channelId) + '/attachments', file)
+        .then((d) => d && d.attachment),
+    attachmentUrl: (id) => baseUrl() + '/api/attachments/' + encodeURIComponent(id),
+    // Authored download: the Bearer token cannot ride on a plain <a href>,
+    // so callers fetch the blob and use an object URL.
+    async attachmentBlob(id) {
+      var res;
+      try {
+        res = await fetch(API.attachmentUrl(id), {
+          headers: API.token ? { Authorization: 'Bearer ' + API.token } : {},
+        });
+      } catch (e) {
+        Trycord.setOnline(false);
+        var net = new Error('Cannot reach the server at ' + baseUrl() + '. Is it running?');
+        net.code = 'OFFLINE';
+        throw net;
+      }
+      if (res.status === 401 && API.token) {
+        API.token = null;
+        if (window.TrycordState) TrycordState.user = null;
+        Trycord.setOnline(true);
+        location.hash = '#/login';
+        throw apiError({ error: { code: 'SESSION_REVOKED', message: 'Session expired — please log in again.' } }, 401);
+      }
+      if (!res.ok) throw apiError({ error: { code: 'NOT_FOUND', message: 'Attachment unavailable.' } }, res.status);
+      Trycord.setOnline(true);
+      return res.blob();
+    },
     // browse + activity (discover is public: no membership required)
     discover: (q, page, limit) => {
       var qs = '?limit=' + (limit || 12) + '&page=' + (page || 1) + (q ? '&q=' + encodeURIComponent(q) : '');
