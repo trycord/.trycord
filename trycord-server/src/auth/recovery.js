@@ -90,7 +90,7 @@ async function resetPassword(token, newPassword) {
   console.log(`[security] password_reset_completed user=${user.id}`);
   return {
     token: sign({ id: user.id, username: user.username }),
-    user: { id: user.id, username: user.username, displayName: user.display_name },
+    user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },
   };
 }
 

@@ -11,7 +11,7 @@ const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
 
 router.get('/permissions', requireMember, (req, res) => {
-  res.json({ is_owner: req.access.isOwner, permissions: req.access.permissions, all: PERMISSIONS });
+  res.json({ is_owner: req.access.isOwner, permissions: req.access.permissions, all: Object.keys(PERMISSIONS) });
 });
 
 router.get('/', requireMember, async (req, res, next) => {

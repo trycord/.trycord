@@ -189,10 +189,19 @@
     register: (body) => API.call('/api/auth/register', { method: 'POST', body }),
     login: (body) => API.call('/api/auth/login', { method: 'POST', body }),
     logout: () => API.call('/api/auth/logout', { method: 'POST' }),
+    changePassword: (body) => API.call('/api/auth/change-password', { method: 'POST', body }),
+    revokeAllSessions: () => API.call('/api/auth/sessions/revoke-all', { method: 'POST' }),
+    revokeOtherSessions: () => API.call('/api/auth/sessions/revoke-others', { method: 'POST' }),
+    forgotPassword: (body) => API.call('/api/auth/forgot-password', { method: 'POST', body }),
+    resetPassword: (body) => API.call('/api/auth/reset-password', { method: 'POST', body }),
+    verifyEmail: (body) => API.call('/api/auth/verify-email', { method: 'POST', body }),
+    resendVerification: (body) => API.call('/api/auth/verify-email/resend', { method: 'POST', body }),
+    changeEmail: (body) => API.call('/api/auth/change-email', { method: 'POST', body }),
     // users
     me: () => API.call('/api/users/me'),
     patchMe: (body) => API.call('/api/users/me', { method: 'PATCH', body }),
-    changePassword: (body) => API.call('/api/users/me/password', { method: 'POST', body }),
+    // public instance metadata (no auth)
+    legal: () => API.call('/api/legal'),
     // servers
     myServers: () => API.call('/api/servers'),
     createServer: (body) => API.call('/api/servers', { method: 'POST', body }),

@@ -171,7 +171,7 @@
     document.documentElement.setAttribute('data-theme', next);
     try { localStorage.setItem('trycord-theme', next); } catch (e) {}
     var sel = document.getElementById('set-theme');
-    if (sel) sel.value = next === 'high-contrast' ? 'dark' : next;
+    if (sel) sel.value = next;
     Ui.toast('Theme: ' + next, 'info');
   }
 

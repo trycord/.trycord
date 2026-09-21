@@ -9,12 +9,14 @@ const { secret } = require('../util');
 
 function tokenStale(user, row) {
   if (!row || !user.iat) return false;
-  const issuedMs = user.iat * 1000;
+  // JWT iat is whole seconds, so compare against the marker's whole
+  // second too. A marker written in the same second the token was
+  // issued must not flag a freshly-signed token as stale.
   for (const col of ['password_changed_at', 'sessions_invalidated_at']) {
     const t = row[col];
     if (!t) continue;
-    const markerMs = new Date(t).getTime();
-    if (!Number.isNaN(markerMs) && issuedMs <= markerMs) return true;
+    const markerSec = Math.floor(new Date(t).getTime() / 1000);
+    if (!Number.isNaN(markerSec) && user.iat < markerSec) return true;
   }
   return false;
 }
@@ -45,3 +47,4 @@ function auth(req, res, next) {
 }
 
 module.exports = auth;
+module.exports.tokenStale = tokenStale;

@@ -105,7 +105,7 @@ function createWindow() {
         await new Promise((res) => setTimeout(res, 6000));
         const out = await win.webContents.executeJavaScript(`(() => {
           const shell = !document.getElementById('shell-app').hidden;
-          const rail = document.querySelectorAll('#rail .rail-btn[data-nav]').length;
+          const rail = document.querySelectorAll('#rail .rail-item[data-nav]').length;
           const title = document.getElementById('page-title').textContent;
           const welcome = [...document.querySelectorAll('#view h2')].some((h) => h.textContent.includes('Welcome back')) ? 'yes' : 'no';
           return 'shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' welcome=' + welcome;

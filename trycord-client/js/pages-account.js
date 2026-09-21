@@ -4,37 +4,6 @@
   var Ui = window.TrycordUi;
   var C = window.TrycordComponents;
 
-  function profile(root) {
-    var u = TrycordState.user;
-    var mine = TrycordState.servers;
-    var owned = mine.filter((s) => s.is_owner).length;
-    C.setTopbar('Profile', '@' + u.username, '', 'i-users');
-    root.innerHTML =
-      '<div style="display:flex;gap:var(--tc-space-4);align-items:center;margin-bottom:var(--tc-space-6);flex-wrap:wrap;">' +
-      Ui.avatarHtml(u.displayName || u.username, 'avatar-xl') +
-      '<div><h2 class="tc-h1">' + Ui.esc(u.displayName || u.username) + '</h2>' +
-      '<p class="tc-body" style="margin:var(--tc-space-1) 0 0;">@' + Ui.esc(u.username) + ' · member since ' + Ui.esc(Ui.fullDate(u.createdAt)) + '</p></div></div>' +
-      '<div class="tc-cluster" style="margin-bottom:var(--tc-space-6);">' +
-      stat(mine.length, 'Servers joined') + stat(owned, 'Servers owned') + stat(TrycordState.favorites.length, 'Favorites') +
-      '</div>' +
-      '<h2 class="tc-h2" style="margin-bottom:var(--tc-space-3);">Your servers</h2><div id="prof-servers"></div>';
-    function stat(num, lbl) {
-      return '<div class="stat" style="flex:1;min-width:9rem;"><div class="num">' + num + '</div><div class="lbl">' + Ui.esc(lbl) + '</div></div>';
-    }
-
-    var box = document.getElementById('prof-servers');
-    if (!mine.length) {
-      box.innerHTML = Ui.emptyState({
-        icon: Ui.icons.grid, title: 'No servers yet',
-        hint: 'Join or create a server to get started.',
-        actions: '<a class="btn btn-ghost btn-sm" href="#/join">Join server</a>',
-      });
-    } else {
-      box.innerHTML = mine.map((s) => C.serverRow(s)).join('');
-      C.wireServerRows(box);
-    }
-  }
-
   var setTab = 'account';
 
   function settings(root) {
@@ -72,9 +41,21 @@
       '<hr class="divider" />' +
       '<form id="pw-form"><div class="form-group"><label class="form-label" for="pw-cur">Current password</label>' +
       '<input type="password" id="pw-cur" class="form-input" autocomplete="current-password" /></div>' +
-      '<div class="form-group"><label class="form-label" for="pw-new">New password (6+ characters)</label>' +
+      '<div class="form-group"><label class="form-label" for="pw-new">New password (8+ characters)</label>' +
       '<input type="password" id="pw-new" class="form-input" autocomplete="new-password" /></div>' +
+      '<span class="form-hint" style="margin:calc(var(--tc-space-2) * -1) 0 var(--tc-space-3);display:block;">Changing your password signs out every other session. This device keeps you logged in.</span>' +
       '<button class="btn btn-secondary btn-sm" type="submit">Change password</button></form>' +
+      '<hr class="divider" />' +
+      '<div class="set-row"><div class="grow"><strong>Recovery email</strong><small id="email-status">' +
+      (u.email ? Ui.esc(u.email) + (u.emailVerified ? ' · verified' : ' · not verified') : 'Not set') +
+      '</small></div>' +
+      '<button class="btn btn-ghost btn-sm" type="button" data-email-edit>' + (u.email ? 'Change email' : 'Add email') + '</button>' +
+      (u.email && !u.emailVerified ? '<button class="btn btn-ghost btn-sm" type="button" data-email-resend>Resend verification</button>' : '') +
+      '</div>' +
+      '<hr class="divider" />' +
+      '<div class="set-row"><div class="grow"><strong>Sessions</strong><small>End sessions you no longer trust.</small></div>' +
+      '<button class="btn btn-ghost btn-sm" type="button" data-revoke-other>Sign out other devices</button>' +
+      '<button class="btn btn-danger btn-sm" type="button" data-revoke-all>Sign out everywhere</button></div>' +
       '<hr class="divider" />' +
       '<div class="set-row"><div class="grow"><strong>Log out</strong><small>Ends this session on this device.</small></div>' +
       '<button class="btn btn-danger btn-sm" id="logout-btn2" type="button">Log out</button></div>';
@@ -96,19 +77,115 @@
       var cur = document.getElementById('pw-cur');
       var neu = document.getElementById('pw-new');
       var ok = Ui.fieldError(cur, cur.value ? '' : 'Enter your current password.');
-      ok = Ui.fieldError(neu, neu.value.length >= 6 ? '' : 'New password must be 6+ characters.') && ok;
+      ok = Ui.fieldError(neu, neu.value.length >= 8 ? '' : 'New password must be 8+ characters.') && ok;
       if (!ok) return;
+      var btn = document.querySelector('#pw-form button[type="submit"]');
+      Ui.setLoading(btn, true, 'Saving…');
       try {
-        await TrycordApi.changePassword({ currentPassword: cur.value, newPassword: neu.value });
+        // The secure endpoint invalidates old sessions and returns a fresh
+        // token; swap to it so THIS device stays logged in.
+        var r = await TrycordApi.changePassword({ currentPassword: cur.value, newPassword: neu.value });
+        TrycordApi.token = r.token;
+        TrycordState.user = r.user;
+        C.renderUser();
         cur.value = '';
         neu.value = '';
-        Ui.toast('Password changed.', 'success');
+        Ui.toast('Password changed. Other sessions were signed out.', 'success');
       } catch (err) {
         Ui.fieldError(cur, err.message);
+      } finally {
+        Ui.setLoading(btn, false);
       }
     });
 
+    // The account tab shows email recovery state, which lives on /me (private).
+    window.TrycordApi.me().then(function (me) {
+      if (!me) return;
+      TrycordState.user = Object.assign({}, TrycordState.user, me);
+      var st = document.getElementById('email-status');
+      if (st) st.textContent = me.email
+        ? me.email + (me.emailVerified ? ' · verified' : ' · not verified')
+        : 'Not set';
+      var edit = panel.querySelector('[data-email-edit]');
+      if (edit) edit.textContent = me.email ? 'Change email' : 'Add email';
+    }).catch(() => {});
+
+    var emailEdit = panel.querySelector('[data-email-edit]');
+    if (emailEdit) emailEdit.onclick = () => emailModal();
+    var emailResend = panel.querySelector('[data-email-resend]');
+    if (emailResend) emailResend.onclick = async () => {
+      try {
+        var curEmail = (TrycordState.user && TrycordState.user.email) || '';
+        await TrycordApi.resendVerification({ email: curEmail });
+        Ui.toast('Verification email sent.', 'success');
+      } catch (err) { Ui.toast(err.message, 'error'); }
+    };
+    panel.querySelector('[data-revoke-other]').onclick = async () => {
+      var yes = await Ui.confirmDialog({
+        title: 'Sign out other devices?',
+        message: 'Every session except this one will be ended immediately.',
+        confirmText: 'Sign out others',
+      });
+      if (!yes) return;
+      try {
+        var r = await TrycordApi.revokeOtherSessions();
+        TrycordApi.token = r.token;
+        TrycordState.user = r.user;
+        C.renderUser();
+        Ui.toast('Other sessions signed out.', 'success');
+      } catch (err) { Ui.toast(err.message, 'error'); }
+    };
+    panel.querySelector('[data-revoke-all]').onclick = async () => {
+      var yes = await Ui.confirmDialog({
+        title: 'Sign out everywhere?',
+        message: 'This device and every other session will be signed out.',
+        confirmText: 'Sign out everywhere',
+        danger: true,
+      });
+      if (!yes) return;
+      try {
+        await TrycordApi.revokeAllSessions();
+      } catch (err) { /* token may already be dead */ }
+      TrycordApi.token = null;
+      TrycordState.user = null;
+      location.hash = '#/login';
+      Ui.toast('Signed out everywhere.', 'success');
+    };
     document.getElementById('logout-btn2').onclick = () => Trycord.logout();
+
+    function emailModal() {
+      var body = document.createElement('div');
+      body.innerHTML =
+        '<p class="text-muted text-sm">Used only for password resets and security notices.</p>' +
+        '<div class="form-group"><label class="form-label" for="em-email">New recovery email</label>' +
+        '<input type="email" id="em-email" class="form-input" autocomplete="email" /></div>' +
+        '<div class="form-group"><label class="form-label" for="em-pass">Current password</label>' +
+        '<input type="password" id="em-pass" class="form-input" autocomplete="current-password" /></div>';
+      Ui.openModal({
+        title: (u.email ? 'Change recovery email' : 'Add recovery email'),
+        body,
+        actions: [{ id: 'cancel', label: 'Cancel' }, {
+          id: 'save', label: 'Send verification email', primary: true,
+          onClick: (close) => {
+            var emailEl = body.querySelector('#em-email');
+            var passEl = body.querySelector('#em-pass');
+            var email = emailEl.value.trim().toLowerCase();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+              Ui.fieldError(emailEl, 'Enter a valid email address.');
+              return;
+            }
+            if (!passEl.value) { Ui.fieldError(passEl, 'Enter your current password.'); return; }
+            TrycordApi.changeEmail({ currentPassword: passEl.value, newEmail: email })
+              .then(() => {
+                close();
+                Ui.toast('Verification email sent to ' + email + '.', 'success');
+              })
+              .catch((err) => Ui.toast(err.message, 'error'));
+          },
+        }],
+      });
+      setTimeout(() => body.querySelector('#em-email').focus(), 0);
+    }
   }
 
   function appearancePanel(panel, s) {
@@ -365,5 +442,5 @@
     });
   }
 
-  window.TrycordPagesAccount = { profile, settings };
+  window.TrycordPagesAccount = { settings };
 })();
