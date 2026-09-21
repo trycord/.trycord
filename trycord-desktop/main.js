@@ -105,13 +105,13 @@ function createWindow() {
         await new Promise((res) => setTimeout(res, 6000));
         const out = await win.webContents.executeJavaScript(`(() => {
           const shell = !document.getElementById('shell-app').hidden;
-          const rail = document.querySelectorAll('#rail .rail-item[data-nav]').length;
+          const rail = document.querySelectorAll('#rail .spine-place[data-nav]').length;
           const title = document.getElementById('page-title').textContent;
-          const welcome = [...document.querySelectorAll('#view h2')].some((h) => h.textContent.includes('Welcome back')) ? 'yes' : 'no';
-          return 'shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' welcome=' + welcome;
+          const atrium = !!document.querySelector('#view .atrium');
+          return 'shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' atrium=' + (atrium ? 'yes' : 'no');
         })()`);
         console.log('[smoke] home: ' + out);
-        if (!String(out).includes('rail-tabs=4')) process.exitCode = 1;
+        if (!String(out).includes('rail-tabs=4') || !String(out).includes('atrium=yes')) process.exitCode = 1;
       } catch (e) {
         console.log('[smoke] FAIL ' + e);
         process.exitCode = 1;

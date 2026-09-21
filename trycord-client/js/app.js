@@ -102,7 +102,7 @@
       };
     }
 
-    document.querySelectorAll('#rail .rail-item[data-nav]').forEach((b) => {
+    document.querySelectorAll('#rail .spine-place[data-nav]').forEach((b) => {
       b.onclick = () => { location.hash = b.getAttribute('data-nav'); };
     });
 

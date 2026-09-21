@@ -6,30 +6,25 @@
 
   var NAV = [
     { hash: '#/home', label: 'Home', icon: 'i-home' },
-    { hash: '#/servers', label: 'Servers', icon: 'i-grid' },
-    { hash: '#/dm', label: 'Direct messages', icon: 'i-mail' },
+    { hash: '#/dm', label: 'Messages', icon: 'i-mail' },
     { hash: '#/discover', label: 'Discover', icon: 'i-globe' },
     { hash: '#/activity', label: 'Activity', icon: 'i-activity' },
-    { hash: '#/favorites', label: 'Favorites', icon: 'i-star' },
-    { hash: '#/join', label: 'Join server', icon: 'i-plus' },
   ];
 
   function railActiveFor(hash) {
     if (!hash) return '#/home';
-    if (hash.indexOf('#/server/') === 0) return '#/servers';
+    // A community is its own place: the presence row highlights itself.
+    if (hash.indexOf('#/server/') === 0) return null;
     if (hash.indexOf('#/dm') === 0) return '#/dm';
     if (hash.indexOf('#/discover') === 0) return '#/discover';
     if (hash.indexOf('#/activity') === 0) return '#/activity';
-    if (hash.indexOf('#/favorites') === 0) return '#/favorites';
-    if (hash.indexOf('#/servers') === 0 || hash.indexOf('#/join') === 0) return '#/servers';
-    if (hash.indexOf('#/settings') === 0) return '#/home';
     return '#/home';
   }
 
   function renderRail(active) {
     var want = railActiveFor(active || location.hash);
-    document.querySelectorAll('#rail .rail-item[data-nav]').forEach(function (b) {
-      var on = b.getAttribute('data-nav') === want;
+    document.querySelectorAll('#rail .spine-place[data-nav]').forEach(function (b) {
+      var on = want && b.getAttribute('data-nav') === want;
       b.classList.toggle('active', on);
       if (on) b.setAttribute('aria-current', 'page');
       else b.removeAttribute('aria-current');
@@ -48,11 +43,13 @@
     var box = document.getElementById('rail-servers');
     if (!box) return;
     var servers = (window.TrycordState && TrycordState.servers) || [];
-    box.innerHTML = servers.slice(0, 30).map(function (s) {
+    box.innerHTML = servers.slice(0, 50).map(function (s) {
       var active = (location.hash || '').indexOf('#/server/' + encodeURIComponent(s.id)) === 0;
-      return '<button type="button" class="rail-item' + (active ? ' active' : '') + '" data-open="' + Ui.esc(s.id) + '"' +
-        ' data-tip="' + Ui.esc(s.name) + '" title="' + Ui.esc(s.name) + '" aria-label="' + Ui.esc(s.name) + '" role="listitem">' +
-        '<span class="rail-pill" aria-hidden="true"></span>' + Ui.avatarHtml(s.name, '') + '</button>';
+      return '<button type="button" class="spine-place' + (active ? ' active' : '') + '" data-open="' + Ui.esc(s.id) + '"' +
+        ' title="' + Ui.esc(s.name) + '" aria-label="' + Ui.esc(s.name) + '" role="listitem">' +
+        '<span class="place-avatar">' + Ui.avatarHtml(s.name, '') + '</span>' +
+        '<span class="spine-label">' + Ui.esc(s.name) + '</span>' +
+        '<span class="spine-badge" data-sb hidden></span></button>';
     }).join('');
     box.querySelectorAll('[data-open]').forEach(function (b) {
       b.onclick = function () { location.hash = '#/server/' + encodeURIComponent(b.dataset.open); };
@@ -75,7 +72,7 @@
       badge.hidden = !total;
       badge.textContent = total > 99 ? '99+' : String(total);
     }
-    var dmTab = document.querySelector('#rail .rail-item[data-nav="#/dm"]');
+    var dmTab = document.querySelector('#rail .spine-place[data-nav="#/dm"]');
     if (dmTab) dmTab.classList.toggle('has-unread', total > 0);
   }
 
@@ -145,6 +142,8 @@
     var sub = u ? ('@' + u.username) : '–';
     var railImg = document.getElementById('rail-avatar-img');
     if (railImg) railImg.innerHTML = Ui.avatarHtml(name, '');
+    var railName = document.getElementById('rail-name');
+    if (railName) railName.textContent = name;
     var accAv = document.getElementById('account-avatar');
     if (accAv) accAv.innerHTML = Ui.avatarHtml(name, '');
     var accName = document.getElementById('account-name');

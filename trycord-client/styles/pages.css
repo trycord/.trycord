@@ -1,0 +1,341 @@
+/* Trycord pages — screen-specific compositions. Home is The Atrium: one
+   flowing communication environment, anchored to the presence field —
+   never a centered-dashboard column, never stacked section headings,
+   never a card grid. */
+
+/* ============ The Atrium (Home) ============ */
+.atrium {
+  position: relative;
+  /* Anchored to the left field, not centered: an editorial, measurable flow
+     that breathes from the spine. Orange is atmosphere at the top edge. */
+  max-width: 56rem;
+  padding: clamp(2rem, 5vh, 4rem) var(--tc-space-2) var(--tc-space-8);
+  background-image: var(--tc-atmo-top);
+  background-repeat: no-repeat;
+  background-size: 100% 24rem;
+  background-position: center top;
+}
+
+/* Tone: one line of prose, typography not chrome. */
+.atrium-tone {
+  position: relative;
+  margin: 0 0 var(--tc-space-8);
+}
+.atrium-stroke {
+  display: flex;
+  align-items: baseline;
+  gap: var(--tc-space-2);
+  font-size: var(--tc-text-2xl);
+  font-weight: var(--tc-font-extrabold);
+  letter-spacing: var(--tc-tracking-tight);
+  line-height: var(--tc-leading-tight);
+  margin: 0;
+  flex-wrap: wrap;
+}
+.atrium-name {
+  color: var(--tc-accent-muted);
+}
+.atrium-frag {
+  color: var(--tc-text-muted);
+  font-weight: var(--tc-font-medium);
+  font-size: var(--tc-text-lg);
+  letter-spacing: var(--tc-tracking-wide);
+}
+.ember {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--tc-accent-gradient);
+  box-shadow: 0 0 8px var(--tc-accent-glow), 0 0 2px var(--tc-accent-glow);
+  align-self: center;
+}
+
+/* The flow: places, then people, then weather — one continuous strand. */
+.atrium-flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tc-space-8);
+}
+
+/* --- Places: glowing presence threads, not rooms-in-cards --- */
+.place {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tc-space-2);
+  padding: var(--tc-space-3);
+  border-radius: var(--tc-radius-lg);
+  transition: background var(--tc-duration-fast) var(--tc-ease-out);
+}
+.place:hover {
+  background: linear-gradient(90deg, var(--tc-bg-hover), transparent 85%);
+}
+.place-head {
+  display: flex;
+  align-items: center;
+  gap: var(--tc-space-3);
+  min-width: 0;
+  color: var(--tc-text-primary);
+  text-decoration: none;
+}
+.place-head:hover { text-decoration: none; }
+.place-halo {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+}
+.place-halo .avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.1rem;
+  border-radius: var(--tc-radius-md);
+  box-shadow: 0 0 0 1px var(--tc-border-subtle), 0 2px 12px rgba(0, 0, 0, 0.3);
+  transition: box-shadow var(--tc-duration-fast) var(--tc-ease-out);
+}
+.place-head:hover .place-halo .avatar {
+  box-shadow: 0 0 0 1px var(--tc-accent-softer), var(--tc-glow-halo);
+}
+.place-ident {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.place-name {
+  font-weight: var(--tc-font-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.place-meta {
+  font-size: var(--tc-text-xs);
+  color: var(--tc-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Edge-light echo: the same ember emission as the spine, at the place's
+   content side. Silent until the place is approached. */
+.place-glow {
+  flex: none;
+  width: 2px;
+  height: 2rem;
+  border-radius: 2px;
+  background: var(--tc-accent-gradient);
+  box-shadow: var(--tc-shadow-glow);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition: opacity var(--tc-duration-fast) var(--tc-ease-out),
+    transform var(--tc-duration-fast) var(--tc-ease-out);
+}
+.place-head:hover .place-glow {
+  opacity: 0.9;
+  transform: none;
+}
+
+/* --- Rooms under a place: live rows, or a quiet line --- */
+.place-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tc-space-1);
+  margin-left: calc(2.75rem + var(--tc-space-3));
+}
+.place-quiet {
+  color: var(--tc-text-muted);
+  font-size: var(--tc-text-sm);
+  line-height: var(--tc-leading-snug);
+  margin: 0;
+  padding: var(--tc-space-1) 0;
+}
+
+/* --- One thread row: author, place+channel, new text. Cardless. --- */
+.thread-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tc-space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--tc-space-2) var(--tc-space-2);
+  background: none;
+  border: none;
+  border-radius: var(--tc-radius-sm);
+  color: var(--tc-text-primary);
+  font: inherit;
+  font-size: var(--tc-text-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--tc-duration-fast) var(--tc-ease-out);
+}
+.thread-row:hover { background: var(--tc-bg-hover); }
+.thread-author { flex: none; }
+.thread-author .avatar {
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 0.75rem;
+}
+.thread-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.thread-meta {
+  color: var(--tc-text-secondary);
+  font-weight: var(--tc-font-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.thread-where {
+  color: var(--tc-text-muted);
+  font-weight: var(--tc-font-normal);
+}
+.thread-when {
+  color: var(--tc-text-subtle);
+  font-weight: var(--tc-font-normal);
+  margin-left: var(--tc-space-2);
+}
+.thread-text {
+  color: var(--tc-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.atrium-strays {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tc-space-1);
+}
+
+/* --- People: presence beside places, no heading, no cards --- */
+.atrium-people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tc-space-1);
+}
+.person-row {
+  display: flex;
+  align-items: center;
+  gap: var(--tc-space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--tc-space-2);
+  background: none;
+  border: none;
+  border-radius: var(--tc-radius-sm);
+  color: var(--tc-text-primary);
+  font: inherit;
+  font-size: var(--tc-text-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--tc-duration-fast) var(--tc-ease-out);
+}
+.person-row:hover { background: var(--tc-bg-hover); }
+.person-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.person-name {
+  font-weight: var(--tc-font-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.person-preview {
+  color: var(--tc-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.person-when {
+  color: var(--tc-text-muted);
+  font-size: var(--tc-text-xs);
+  flex: none;
+}
+.person-unread {
+  flex: none;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  padding: 0 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tc-ember);
+  color: var(--tc-text-inverse);
+  font-size: 0.65rem;
+  font-weight: var(--tc-font-bold);
+  border-radius: var(--tc-radius-full);
+}
+.person-row.unread .person-name { color: var(--tc-text-primary); }
+.person-row.unread .person-preview { color: var(--tc-text-secondary); }
+.person-row.unread { box-shadow: inset 2px 0 0 var(--tc-ember); border-radius: var(--tc-radius-sm); }
+
+/* Ambient quieter lines: prose, not empty-states */
+.atrium-quiet {
+  color: var(--tc-text-muted);
+  font-size: var(--tc-text-sm);
+  line-height: var(--tc-leading-snug);
+  margin: 0;
+}
+
+/* --- Weather: the woven actions line, ambient at the foot --- */
+.atrium-weather {
+  display: flex;
+  align-items: center;
+  gap: var(--tc-space-3);
+  flex-wrap: wrap;
+  margin-top: var(--tc-space-4);
+  padding-top: var(--tc-space-5);
+}
+
+/* Woven text controls with a gradient hairline, not boxes */
+.linky {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--tc-text-sm);
+  font-weight: var(--tc-font-semibold);
+  color: var(--tc-accent-muted);
+  cursor: pointer;
+  text-decoration: none;
+  background-image: var(--tc-accent-gradient);
+  background-size: 0% 2px;
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  transition: background-size var(--tc-duration-normal) var(--tc-ease-out),
+    color var(--tc-duration-fast) var(--tc-ease-out);
+}
+.linky:hover {
+  background-size: 100% 2px;
+  color: var(--tc-text-primary);
+  text-decoration: none;
+}
+.atrium-dotsep {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 50%;
+  background: var(--tc-ember);
+  opacity: 0.5;
+  flex: none;
+}
+
+/* Atrium breathing room on narrow widths: single flow, no columns */
+@media (max-width: 760px) {
+  .atrium {
+    padding-top: var(--tc-space-6);
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .place-rooms {
+    margin-left: 0;
+  }
+  .atrium-stroke {
+    font-size: var(--tc-text-xl);
+  }
+}
