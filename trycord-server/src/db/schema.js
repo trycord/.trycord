@@ -227,41 +227,50 @@ function tables(engine) {
   ];
 }
 
-// Legacy SQLite migrations.
+// Introspection-driven migrations.
+//
+// The old approach detected "duplicate column" by parsing driver error
+// messages, which was fragile across SQLite/MySQL version pairings. These
+// migrations ask the database what actually exists and only run each ALTER
+// once the column is missing — idempotent by construction, and genuine
+// schema problems still throw instead of being swallowed.
 const LEGACY_ALTERS = [
-  'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0',
-  'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1',
-  'ALTER TABLE channels ADD COLUMN category_id VARCHAR(64) REFERENCES categories(id) ON DELETE SET NULL',
-  'ALTER TABLE users ADD COLUMN terms_version VARCHAR(16)',
-  'ALTER TABLE users ADD COLUMN privacy_version VARCHAR(16)',
-  'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64)',
-  'ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64)',
-  'ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64)',
-  'ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE',
-  'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)',
-  'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64)',
-  'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64)',
+  ['servers', 'is_public', 'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0'],
+  ['servers', 'is_discoverable', 'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1'],
+  ['channels', 'category_id', 'ALTER TABLE channels ADD COLUMN category_id VARCHAR(64) REFERENCES categories(id) ON DELETE SET NULL'],
+  ['users', 'terms_version', 'ALTER TABLE users ADD COLUMN terms_version VARCHAR(16)'],
+  ['users', 'privacy_version', 'ALTER TABLE users ADD COLUMN privacy_version VARCHAR(16)'],
+  ['users', 'terms_accepted_at', 'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64)'],
+  ['users', 'password_changed_at', 'ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64)'],
+  ['users', 'sessions_invalidated_at', 'ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64)'],
+  ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE'],
+  ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
+  ['messages', 'edited_at', 'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64)'],
+  ['dm_messages', 'edited_at', 'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64)'],
 ];
 
-// Existing MySQL databases may already have created_at stored as TEXT.
-// Convert those columns before creating the indexes.
-const MYSQL_ALTERS = [
-  'ALTER TABLE users MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
-  'ALTER TABLE servers MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
-  'ALTER TABLE server_members MODIFY COLUMN joined_at VARCHAR(64) NOT NULL',
-  'ALTER TABLE messages MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
-  'ALTER TABLE invites MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
-  'ALTER TABLE invites MODIFY COLUMN expires_at VARCHAR(64) NULL',
-  'ALTER TABLE revoked_tokens MODIFY COLUMN expires_at VARCHAR(64) NOT NULL',
-  'ALTER TABLE users MODIFY COLUMN terms_version VARCHAR(16) NULL',
-  'ALTER TABLE users MODIFY COLUMN privacy_version VARCHAR(16) NULL',
-  'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64) NULL',
-  'ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64) NULL',
-  'ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64) NULL',
-  'ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE',
-  'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64) NULL',
-  'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64) NULL',
-  'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64) NULL',
+// Existing MySQL databases may already have these stored as TEXT. Convert
+// before creating the indexes. MODIFY only runs while DATA_TYPE is still
+// 'text'; once VARCHAR it is skipped, so this is naturally idempotent.
+const MYSQL_MODIFY = [
+  ['users', 'created_at', 'ALTER TABLE users MODIFY COLUMN created_at VARCHAR(64) NOT NULL'],
+  ['servers', 'created_at', 'ALTER TABLE servers MODIFY COLUMN created_at VARCHAR(64) NOT NULL'],
+  ['server_members', 'joined_at', 'ALTER TABLE server_members MODIFY COLUMN joined_at VARCHAR(64) NOT NULL'],
+  ['messages', 'created_at', 'ALTER TABLE messages MODIFY COLUMN created_at VARCHAR(64) NOT NULL'],
+  ['invites', 'created_at', 'ALTER TABLE invites MODIFY COLUMN created_at VARCHAR(64) NOT NULL'],
+  ['invites', 'expires_at', 'ALTER TABLE invites MODIFY COLUMN expires_at VARCHAR(64) NULL'],
+  ['revoked_tokens', 'expires_at', 'ALTER TABLE revoked_tokens MODIFY COLUMN expires_at VARCHAR(64) NOT NULL'],
+  ['users', 'terms_version', 'ALTER TABLE users MODIFY COLUMN terms_version VARCHAR(16) NULL'],
+  ['users', 'privacy_version', 'ALTER TABLE users MODIFY COLUMN privacy_version VARCHAR(16) NULL'],
+  ['users', 'terms_accepted_at', 'ALTER TABLE users MODIFY COLUMN terms_accepted_at VARCHAR(64) NULL'],
+  ['users', 'password_changed_at', 'ALTER TABLE users MODIFY COLUMN password_changed_at VARCHAR(64) NULL'],
+  ['users', 'sessions_invalidated_at', 'ALTER TABLE users MODIFY COLUMN sessions_invalidated_at VARCHAR(64) NULL'],
+  ['messages', 'edited_at', 'ALTER TABLE messages MODIFY COLUMN edited_at VARCHAR(64) NULL'],
+  ['dm_messages', 'edited_at', 'ALTER TABLE dm_messages MODIFY COLUMN edited_at VARCHAR(64) NULL'],
+];
+
+const MYSQL_ADD = [
+  ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE'],
 ];
 
 const INDEXES = [
@@ -286,15 +295,25 @@ const INDEXES = [
   'CREATE INDEX idx_users_email ON users(email)',
 ];
 
-function isDuplicateObjectError(e) {
-  const msg = String((e && e.message) || '');
+const MYSQL_COLUMN_SQL =
+  'SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?';
 
-  return (
-    /duplicate column/i.test(msg) ||
-    /duplicate key name/i.test(msg) ||
-    e.code === 'ER_DUP_FIELDNAME' ||
-    e.code === 'ER_DUP_KEYNAME'
+async function sqliteColumn(conn, table, column) {
+  const rows = await conn.all(`PRAGMA table_info(${table})`);
+  return rows.find((r) => String(r.name) === column) || null;
+}
+
+async function mysqlColumn(conn, table, column) {
+  const rows = await conn.all(MYSQL_COLUMN_SQL, [table, column]);
+  return rows[0] ? { dataType: String(rows[0].DATA_TYPE || '').toLowerCase() } : null;
+}
+
+async function mysqlIndexExists(conn, table, index) {
+  const rows = await conn.all(
+    'SELECT COUNT(*) AS n FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?',
+    [table, index]
   );
+  return parseInt(rows[0] && rows[0].n, 10) > 0;
 }
 
 async function applySchema(conn) {
@@ -310,54 +329,41 @@ async function applySchema(conn) {
     await conn.exec(ddl);
   }
 
-  // SQLite-only legacy migrations.
+  // SQLite legacy migrations: run only when the column does not exist.
   if (dialect === 'sqlite') {
-    for (const sql of LEGACY_ALTERS) {
-      try {
-        await conn.exec(sql);
-      } catch (e) {
-        if (!isDuplicateObjectError(e)) {
-          throw e;
-        }
+    for (const [table, column, ddl] of LEGACY_ALTERS) {
+      if (!(await sqliteColumn(conn, table, column))) {
+        await conn.exec(ddl);
       }
     }
   }
 
-  // MySQL compatibility migrations.
-  //
-  // These MUST run before idx_messages_channel is created because
+  // MySQL migrations. These MUST run before idx_messages_channel because
   // messages.created_at was historically TEXT.
   if (dialect === 'mysql') {
-    for (const sql of MYSQL_ALTERS) {
-      try {
-        await conn.exec(sql);
-      } catch (e) {
-        // Ignore harmless "already correct" cases where supported.
-        // Do NOT suppress actual schema errors.
-        if (
-          !/no change|already exists|duplicate column/i.test(
-            String((e && e.message) || '')
-          )
-        ) {
-          throw e;
-        }
+    for (const [table, column, ddl] of MYSQL_MODIFY) {
+      const col = await mysqlColumn(conn, table, column);
+      if (!col) {
+        throw new Error(`schema: MySQL is missing ${table}.${column}; migration is unsafe`);
+      }
+      if (col.dataType === 'text') await conn.exec(ddl);
+    }
+    for (const [table, column, ddl] of MYSQL_ADD) {
+      if (!(await mysqlColumn(conn, table, column))) {
+        await conn.exec(ddl);
       }
     }
   }
 
   // Create indexes after all column types have been normalized.
   for (const idx of INDEXES) {
-    const sql =
-      dialect === 'sqlite'
-        ? idx.replace('CREATE INDEX', 'CREATE INDEX IF NOT EXISTS')
-        : idx;
-
-    try {
-      await conn.exec(sql);
-    } catch (e) {
-      if (!isDuplicateObjectError(e)) {
-        throw e;
-      }
+    if (dialect === 'sqlite') {
+      await conn.exec(idx.replace('CREATE INDEX', 'CREATE INDEX IF NOT EXISTS'));
+      continue;
+    }
+    const m = /INDEX (\w+) ON (\w+)/.exec(idx);
+    if (!m || !(await mysqlIndexExists(conn, m[2], m[1]))) {
+      await conn.exec(idx);
     }
   }
 }

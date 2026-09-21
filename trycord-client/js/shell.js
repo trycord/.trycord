@@ -955,32 +955,40 @@
     var retries = 0;
     var dead = false;
     var backoff = null;
+    var opening = false;
     function open() {
-      if (dead) return;
-      try {
-        ws = new WebSocket(TrycordApi.wsUrl());
-      } catch (e) {
-        schedule();
-        return;
-      }
-      ws.onopen = () => {
-        retries = 0;
-        if (opts.onStatus) opts.onStatus('connected');
-        if (opts.onOpen) opts.onOpen(ws);
-      };
-      ws.onmessage = (e) => {
-        var data = null;
-        try { data = JSON.parse(e.data); } catch (err) { return; }
-        if (opts.onEvent) opts.onEvent(data, ws);
-      };
-      ws.onclose = () => {
+      if (dead || opening) return;
+      opening = true;
+      // Fetch a short-lived ticket over the API, then handshake with it.
+      TrycordApi.wsTicket().then((ticket) => {
+        opening = false;
         if (dead) return;
-        if (opts.onStatus) opts.onStatus('reconnecting');
-        schedule();
-      };
-      ws.onerror = () => {
-        try { ws.close(); } catch (e) { /* handled by onclose */ }
-      };
+        if (!ticket) { schedule(); return; }
+        var s = null;
+        try { s = new WebSocket(TrycordApi.wsUrl(ticket)); } catch (e) { schedule(); return; }
+        ws = s;
+        s.onopen = () => {
+          retries = 0;
+          if (opts.onStatus) opts.onStatus('connected');
+          if (opts.onOpen) opts.onOpen(s);
+        };
+        s.onmessage = (e) => {
+          var data = null;
+          try { data = JSON.parse(e.data); } catch (err) { return; }
+          if (opts.onEvent) opts.onEvent(data, s);
+        };
+        s.onclose = () => {
+          if (dead) return;
+          if (opts.onStatus) opts.onStatus('reconnecting');
+          schedule();
+        };
+        s.onerror = () => {
+          try { s.close(); } catch (e) { /* handled by onclose */ }
+        };
+      }).catch(() => {
+        opening = false;
+        if (!dead) schedule();
+      });
     }
     function schedule() {
       if (dead) return;

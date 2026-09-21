@@ -176,4 +176,23 @@ router.post('/change-email', auth, rateLimit({ windowMs: 60000, max: 10 }), asyn
   } catch (e) { serviceError(res, e); }
 });
 
+// Request a short-lived, single-use ticket for the WebSocket handshake.
+// Bearer JWTs never belong in a URL (logs, proxies, referrers), so the
+// client exchanges its token for a ticket over HTTPS and connects with it.
+let ticketIssuer = null;
+function setTicketIssuer(fn) { ticketIssuer = fn; }
+
+router.post('/ws/ticket', auth, rateLimit({ windowMs: 60000, max: 60 }), (req, res) => {
+  if (!ticketIssuer) return fail(res, 'NOT_FOUND', 'websocket gateway unavailable');
+  res.json({
+    ticket: ticketIssuer({
+      id: req.user.id,
+      username: req.user.username,
+      jti: req.user.jti || null,
+      iat: req.user.iat,
+    }),
+  });
+});
+
 module.exports = router;
+module.exports.setTicketIssuer = setTicketIssuer;
