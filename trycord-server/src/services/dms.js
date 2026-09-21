@@ -127,6 +127,7 @@ async function listMine(userId) {
       publicPeer(peerRow),
       last ? {
         id: last.id, content: last.content, createdAt: last.created_at,
+        editedAt: last.edited_at || null,
         authorId: last.author_id, authorName: last.author_display || last.author_name,
       } : null,
       unread ? unread.n : 0
@@ -169,6 +170,7 @@ async function history(userId, conversationId, { before = null, limit = 50 } = {
     conversationId: m.conversation_id,
     content: m.content,
     createdAt: m.created_at,
+    editedAt: m.edited_at || null,
     authorId: m.author_id,
     authorName: m.author_display || m.author_name,
   }));
@@ -195,6 +197,36 @@ async function send(userId, username, conversationId, content) {
     conversationId: msg.conversation_id,
     content: msg.content,
     createdAt: msg.created_at,
+    editedAt: null,
+    authorId: userId,
+    authorName: username,
+  };
+}
+
+// Author-only edit. No revision history table: edited_at marks the latest
+// revision, matching the channel-message model.
+async function edit(userId, conversationId, messageId, content, username) {
+  const seen = await visibleConversation(conversationId, userId);
+  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
+  const msg = await db.get(
+    'SELECT * FROM dm_messages WHERE id = ? AND conversation_id = ?',
+    [messageId, conversationId]
+  );
+  if (!msg) throw { code: 'NOT_FOUND', message: 'message not found' };
+  if (msg.author_id !== userId) throw { code: 'PERMISSION_DENIED', message: 'only the author can edit' };
+  const text = String(content === null || content === undefined ? '' : content).trim();
+  if (!text) throw { code: 'VALIDATION_ERROR', message: 'message is empty' };
+  if (text.length > MAX_CONTENT) {
+    throw { code: 'VALIDATION_ERROR', message: `message too long (max ${MAX_CONTENT} characters)` };
+  }
+  const editedAt = now();
+  await db.run('UPDATE dm_messages SET content = ?, edited_at = ? WHERE id = ?', [text.slice(0, MAX_CONTENT), editedAt, msg.id]);
+  return {
+    id: msg.id,
+    conversationId,
+    content: text.slice(0, MAX_CONTENT),
+    createdAt: msg.created_at,
+    editedAt,
     authorId: userId,
     authorName: username,
   };
@@ -260,6 +292,7 @@ module.exports = {
   listMine,
   history,
   send,
+  edit,
   remove,
   markRead,
   detail,

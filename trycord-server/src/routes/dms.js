@@ -96,6 +96,16 @@ router.delete('/:id/messages/:messageId', async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
+// PATCH /api/dms/:id/messages/:messageId — author-only edit.
+router.patch('/:id/messages/:messageId', rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
+  try {
+    const out = await dms.edit(req.user.id, req.params.id, req.params.messageId, (req.body || {}).content, req.user.username);
+    const members = await dms.memberIds(req.params.id);
+    gateway.broadcastDm(members, { type: 'dm:message_updated', ...out, conversationId: out.conversationId });
+    res.json(out);
+  } catch (e) { serviceError(res, e); }
+});
+
 // POST /api/dms/:id/read — viewing drives read state, never list loads.
 router.post('/:id/read', async (req, res, next) => {
   try {

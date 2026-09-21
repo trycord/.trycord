@@ -144,6 +144,7 @@ function createGateway(server) {
             const msg = {
               id: uuid(), channel_id: ch.id, server_id: ch.server_id,
               author_id: user.id, user: user.username, content, created_at: now(),
+              edited_at: null,
             };
             try {
               await db.run(
