@@ -45,7 +45,7 @@ resume at the phase marked `IN PROGRESS` below — never restart the design.
 | 0 | Server security backlog (tickets, heartbeat, headers, migrations) | DONE (commit c53ed9b) |
 | 1 | Audit current UI architecture + class/DOM contract inventory | DONE (inventory below) |
 | 2 | Design tokens + globals/reset/theme | DONE (commit pending record) |
-| 3 | Foundational surfaces & primitives (btn/input/menu/modal/toast/…) | IN PROGRESS |
+| 3 | Foundational surfaces & primitives (btn/input/menu/modal/toast/…) | DONE (golden cross-phase) |
 | 4 | App shell architecture: global rail → workspace nav → content | pending |
 | 5 | Global navigation (rail/palette/search/user menu) | pending |
 | 6 | Workspace navigation (server nav, channels, categories) | pending |
@@ -108,4 +108,15 @@ resume at the phase marked `IN PROGRESS` below — never restart the design.
   tokens all defined ✔; CSS brace balance ✔; `layout.css` 6-file @import chain
   resolves ✔. Fork `--tc-focus-ring` into color (`outline`) + `--tc-focus-shadow`
   (`box-shadow`) because legacy consumers used both shorthands.
-- Commit for Phase 2 checkpoint: ________________
+- **Phase 3 (components)**: full rewrite, 427/427 old selectors preserved
+  (+3 additions: `.dm-row.unread`, `.dm-row.unread.active`,
+  `.palette-item.selected`), verified by selector diff vs committed file.
+  New presentation: glass chromium for menus/modals/palette/toasts/msg-actions
+  (`--tc-glass-bg` + `backdrop-filter: blur(...) saturate(1.35)`),
+  scrims (modal-overlay/palette-overlay) use `--tc-bg-scrim` + blur(3px),
+  primary actions on `--tc-accent-gradient` with `--tc-shadow-glow`,
+  active rails/channels/DM rows get accent indicator (`inset 2px`/gradient
+  pill), inputs/composer on `--tc-bg-subtle` wells with inset shadow,
+  media mobile/coarse/print blocks preserved. Brace balance OK; static
+  serve of layout.css 200.
+- Commit for Phase 2 checkpoint: e3e9509 (+ Phase 3 pending commit)
