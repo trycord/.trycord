@@ -138,3 +138,61 @@ resume at the phase marked `IN PROGRESS` below — never restart the design.
   braces 100/100; no JS dependency on old nesting.
 
 - Commit log: phase 2 e3e9509 · phase 3 ed81b6b
+
+## R2 — Nuclear composition correction (supersedes R1 output)
+
+Design review showed R1 was still a **reskin, not a redesign**: the old DNA
+(a left icon rail + a top bar + a centered dashboard Home + section stacks)
+was still present underneath the new paint. Directive: treat the UI as a
+failed prototype and **nuke the composition** — keep every product contract
+(backend, APIs, auth, data, WS, permissions, functionality) and rebuild the
+experience as if the old UI never existed.
+
+### What was removed / replaced (the architectural test)
+
+| Removed (old DNA) | Replaced with |
+| --- | --- |
+| Conventional left icon rail (`app-rail`, `.rail-item` boxes, `.rail-pill` marks, `.rail-sep`, `.rail-sep` dividers) | **Presence spine** (`.presence-spine`): ONE living column — your identity (avatar + name + presence dot) at the head, places (Home/Messages/Discover/Activity), then communities as presence marks. No boxes, no pills, no dividers. **Blooms** from glyph-led (3.75rem) to a readable index (13.5rem) on hover / keyboard focus. Active = ambient edge-light bleeding toward content (thin gradient emission + halo), never a box. |
+| Conventional top navigation bar (`app-bar`, `.brand` in chrome, `.bar-search` box) | **In-content context surface** (`.ctx-surface`): a soft glass sheet INSIDE the conversation column with typographic title/subline (`ctx-head`), plus an **ambient corner** (command, bell, connection ember, self-avatar) that fades to ~40% opacity and surfaces on approach/focus. Brand removed from app chrome entirely. |
+| Centered dashboard content column, stacked section headings, section→container→empty-state→CTA composition on Home | **The Atrium**: one flowing environment (`.atrium`) anchored to the spine, full-width `#view`, a single prose tone (time-aware; no "Welcome back"), places as glowing presence threads with live rooms woven beneath each, people woven in as presence rows, quieter lines instead of empty-state cards, and a woven actions line at the foot (`.atrium-weather`) instead of CTA rows. |
+| Bottom mobile tab bar (`#mobilebar`, `.mnav`, brand padding) | **Mobile from zero**: spine becomes a slide-over presence drawer; the workspace column slides out beside it as one fused field; the ctx-surface stays on-canvas with the corner fully reachable. No tab strip. |
+| Ribbon-bar navigation / rigid nav regions | Navigation is spatial: places live in the spine, rooms fuse through a **glass seam** (`.app-context::after` light-thread, no border box), the current place's context is typography inside the canvas. |
+| Divider/rule furniture (`.rail-sep`, border-top rails) | Whispered seams (one-pixel gradient threads) only where structure continues. |
+
+### What stayed identical (the preserve list)
+
+- All DOM id hooks the JS depends on: `#rail`, `#rail-servers`, `#rail-account`,
+  `#rail-avatar-img`, `#rail-status`, `#rail-add`, `#dm-badge`, `#server-nav`,
+  `#server-nav-body`, `#account-strip/#account-avatar/-name/-sub`,
+  `#page-title/#page-sub/#ctx-icon`, `#topbar-actions`, `#conn-pill/
+  #conn-text`, `#palette-btn`, `#bell-btn/#bell-dot`, `#avatar-btn`,
+  `#nav-toggle/#nav-back/#nav-scrim`, `#view`, `#member-panel/-body`,
+  `#shell-app/-public`. Routers, state, WS, auth, permission flows untouched.
+- Desktop smoke contract updated once (selector rename is an implementation
+  detail, not a contract change): `#rail .rail-item[data-nav]` →
+  `#rail .spine-place[data-nav]` (still `rail-tabs=4`); Home assertion now
+  checks `.atrium` presence instead of "Welcome back" text.
+- `activityItem()` export kept byte-compatible for the Activity page.
+
+### Verification record (R2)
+
+- `tokcheck.js` — 114 referenced / 163 defined, **none missing** (added
+  `--tc-glass-border-strong`, dark + light). ✔
+- `import-walk.js` — 7-file @import chain intact ✔
+- `node --check` on shell/app/pages-home/pages-workspace/pages-dms/
+  pages-browse + desktop main/updater/copy-client ✔
+- CSS brace balance on all 4 sheets ✔
+- **Electron smoke (real bundle, temp backend 9977)**:
+  `shell-app-visible=true rail-tabs=4 title=Home atrium=yes` ✔
+  (This also retired the earlier unresolved `title=Servers welcome=no`
+   mystery — that check asserted markup the redesign intentionally removed.)
+- Desktop bundle refreshed via `scripts/copy-client.js`.
+
+### Open notes (R2)
+
+- Per-community unread aggregates aren't exposed by the backend; the Atrium's
+  rooms show recent threads (activity) rather than unread counts. DMs carry
+  real unread emphasis. Revisit if the backend adds per-community unread.
+- Chat/DMs/Settings/Discover keep their functional layouts for now; the
+  shell, spine, and Atrium are the verified core. Remaining pages get the
+  same treatment in follow-up passes (per directive: shell first, then pages).
