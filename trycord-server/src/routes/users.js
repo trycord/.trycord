@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const db = require('../db');
 const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
+const { checkPassword } = require('../auth/passwords');
 const { fail, serviceError } = require('../errors');
 
 let gateway = { getPresence: null };
@@ -32,7 +33,11 @@ router.get('/me', async (req, res, next) => {
   try {
     const row = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
     if (!row) return fail(res, 'NOT_FOUND', 'user not found');
-    res.json(publicUser(row));
+    // Email recovery state is private to the owner — never on publicUser.
+    res.json(Object.assign(publicUser(row), {
+      email: row.email || null,
+      emailVerified: !!row.email_verified_at,
+    }));
   } catch (e) { next(e); }
 });
 
@@ -48,15 +53,14 @@ router.patch('/me', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/me/password', async (req, res, next) => {
+router.post('/me/password', rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body || {};
     if (!currentPassword || !newPassword) {
       return fail(res, 'VALIDATION_ERROR', 'current and new password required');
     }
-    if (String(newPassword).length < 6) {
-      return fail(res, 'VALIDATION_ERROR', 'new password must be 6+ characters');
-    }
+    const pwErr = checkPassword(newPassword);
+    if (pwErr) return fail(res, 'VALIDATION_ERROR', pwErr);
     const row = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
     if (!row) return fail(res, 'NOT_FOUND', 'user not found');
     const ok = await bcrypt.compare(String(currentPassword), row.password_hash);

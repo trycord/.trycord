@@ -3,6 +3,7 @@
 const express = require('express');
 const db = require('../db');
 const auth = require('../middleware/auth');
+const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const { now, uuid, visibleChannel } = require('../util');
 const { hasPermission } = require('../services/permissions');
@@ -48,7 +49,7 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
@@ -60,6 +61,7 @@ router.post('/', async (req, res, next) => {
     const msg = {
       id: uuid(), channel_id: ch.id, server_id: ch.server_id,
       author_id: req.user.id, user: req.user.username, content, created_at: now(),
+      edited_at: null,
     };
     await db.run(
       'INSERT INTO messages (id, channel_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)',
@@ -83,6 +85,32 @@ router.delete('/:messageId', async (req, res, next) => {
     await db.run('DELETE FROM messages WHERE id = ?', [msg.id]);
     broadcast(ch.server_id, ch.id, { type: 'message_deleted', id: msg.id, channel_id: ch.id });
     res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// PATCH /:messageId — author-only edit. Moderators can delete but never
+// rewrite someone else's words. Broadcasts message_updated.
+router.patch('/:messageId', rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
+  try {
+    const ch = await visibleChannel(req.params.channelId, req.user.id);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    const msg = await db.get('SELECT * FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
+    if (!msg) return fail(res, 'NOT_FOUND', 'message not found');
+    if (msg.author_id !== req.user.id) return fail(res, 'PERMISSION_DENIED', 'only the author can edit');
+    const content = String(((req.body || {}).content === null || (req.body || {}).content === undefined) ? '' : req.body.content).trim().slice(0, 2000);
+    if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
+    const editedAt = now();
+    await db.run('UPDATE messages SET content = ?, edited_at = ? WHERE id = ?', [content, editedAt, msg.id]);
+    const author = await db.get('SELECT username, display_name FROM users WHERE id = ?', [msg.author_id]);
+    const out = {
+      id: msg.id, channel_id: ch.id, server_id: ch.server_id,
+      author_id: msg.author_id, user: req.user.username, content,
+      created_at: msg.created_at, edited_at: editedAt,
+      author_name: (author && author.username) || req.user.username,
+      author_display: (author && author.display_name) || req.user.username,
+    };
+    broadcast(ch.server_id, ch.id, { type: 'message_updated', ...out });
+    res.json(out);
   } catch (e) { next(e); }
 });
 

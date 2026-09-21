@@ -72,11 +72,28 @@ async function boot() {
   }
   app.use(express.json({ limit: '1mb' }));
 
+  // Request IDs for correlating logs and error reports. Cheap, no PII.
+  app.use((req, res, next) => {
+    req.requestId = Math.random().toString(36).slice(2, 10);
+    res.set('X-Request-Id', req.requestId);
+    next();
+  });
+
   const uploadsDir = path.join(__dirname, '..', 'uploads');
   fs.mkdirSync(uploadsDir, { recursive: true });
   app.use('/uploads', express.static(uploadsDir));
 
   app.get('/health', (req, res) => res.json({ ok: true }));
+  // Readiness: process alive AND database answering. Load balancers and
+  // the desktop smoke test use this to know traffic is safe.
+  app.get('/ready', async (req, res) => {
+    try {
+      await db.get('SELECT 1');
+      res.json({ ok: true, instanceId: inst.instanceId });
+    } catch {
+      res.status(503).json({ ok: false });
+    }
+  });
   app.get('/api/health', async (req, res) => {
     try {
       await db.get('SELECT 1');
@@ -87,12 +104,14 @@ async function boot() {
   });
 
   // Safe public instance metadata. Never secrets, paths, or credentials.
+  // features.uploads stays false until a real upload API exists — the
+  // attachments table alone is not a feature.
   app.get('/api/instance', (req, res) => {
     res.json({
       instanceId: inst.instanceId,
       name: inst.name,
       globalSync: inst.globalUrl !== '',
-      features: { publicDiscovery: true, uploads: true },
+      features: { publicDiscovery: true, uploads: false },
     });
   });
 
@@ -201,6 +220,8 @@ async function boot() {
   const purge = async () => {
     try {
       await db.run('DELETE FROM revoked_tokens WHERE expires_at < ?', [new Date().toISOString()]);
+      await db.run('DELETE FROM password_resets WHERE expires_at < ? OR used_at IS NOT NULL', [new Date().toISOString()]);
+      await db.run('DELETE FROM email_verifications WHERE expires_at < ? OR used_at IS NOT NULL', [new Date().toISOString()]);
     } catch { /* shutting down */ }
   };
   await purge();
@@ -224,7 +245,28 @@ async function boot() {
 }
 
 if (require.main === module) {
-  boot().catch((e) => {
+  boot().then(({ server }) => {
+    // Graceful shutdown: stop accepting, let sockets drain, close the
+    // database, then exit. Never corrupt state on the way out.
+    let shuttingDown = false;
+    const shutdown = (signal) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      console.log(`[info] ${signal}: draining connections…`);
+      server.close(() => {
+        db.close()
+          .catch(() => {})
+          .finally(() => {
+            console.log('[info] shutdown complete');
+            process.exit(0);
+          });
+      });
+      // Don't hang forever on stubborn keep-alives.
+      setTimeout(() => process.exit(0), 10000).unref();
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+  }).catch((e) => {
     console.error('startup failed: ' + (e.message || e));
     process.exit(1);
   });

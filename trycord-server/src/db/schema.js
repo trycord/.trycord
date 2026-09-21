@@ -19,7 +19,11 @@ function tables(engine) {
       created_at    VARCHAR(64) NOT NULL,
       terms_version VARCHAR(16),
       privacy_version VARCHAR(16),
-      terms_accepted_at VARCHAR(64)
+      terms_accepted_at VARCHAR(64),
+      password_changed_at VARCHAR(64),
+      sessions_invalidated_at VARCHAR(64),
+      email VARCHAR(255) UNIQUE,
+      email_verified_at VARCHAR(64)
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS servers (
@@ -92,6 +96,7 @@ function tables(engine) {
       author_id  VARCHAR(64) NOT NULL,
       content    TEXT NOT NULL,
       created_at VARCHAR(64) NOT NULL,
+      edited_at  VARCHAR(64),
       FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
       FOREIGN KEY (author_id) REFERENCES users(id)
     )${engine}`,
@@ -158,6 +163,7 @@ function tables(engine) {
       author_id       VARCHAR(64) NOT NULL,
       content         TEXT NOT NULL,
       created_at      VARCHAR(64) NOT NULL,
+      edited_at       VARCHAR(64),
       FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
       FOREIGN KEY (author_id) REFERENCES users(id)
     )${engine}`,
@@ -196,6 +202,28 @@ function tables(engine) {
       read_at      VARCHAR(64),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
+
+    // --- Account recovery (single-use hashed tokens, expiring) ---
+    `CREATE TABLE IF NOT EXISTS password_resets (
+      id         VARCHAR(64) PRIMARY KEY,
+      user_id    VARCHAR(64) NOT NULL,
+      token_hash VARCHAR(128) UNIQUE NOT NULL,
+      expires_at VARCHAR(64) NOT NULL,
+      used_at    VARCHAR(64),
+      created_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS email_verifications (
+      id         VARCHAR(64) PRIMARY KEY,
+      user_id    VARCHAR(64) NOT NULL,
+      email      VARCHAR(255) NOT NULL,
+      token_hash VARCHAR(128) UNIQUE NOT NULL,
+      expires_at VARCHAR(64) NOT NULL,
+      used_at    VARCHAR(64),
+      created_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
   ];
 }
 
@@ -207,6 +235,12 @@ const LEGACY_ALTERS = [
   'ALTER TABLE users ADD COLUMN terms_version VARCHAR(16)',
   'ALTER TABLE users ADD COLUMN privacy_version VARCHAR(16)',
   'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64)',
+  'ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64)',
+  'ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64)',
+  'ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE',
+  'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)',
+  'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64)',
+  'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64)',
 ];
 
 // Existing MySQL databases may already have created_at stored as TEXT.
@@ -219,9 +253,15 @@ const MYSQL_ALTERS = [
   'ALTER TABLE invites MODIFY COLUMN created_at VARCHAR(64) NOT NULL',
   'ALTER TABLE invites MODIFY COLUMN expires_at VARCHAR(64) NULL',
   'ALTER TABLE revoked_tokens MODIFY COLUMN expires_at VARCHAR(64) NOT NULL',
-  'ALTER TABLE users ADD COLUMN terms_version VARCHAR(64) NULL',
-  'ALTER TABLE users ADD COLUMN privacy_version VARCHAR(64) NULL',
+  'ALTER TABLE users MODIFY COLUMN terms_version VARCHAR(16) NULL',
+  'ALTER TABLE users MODIFY COLUMN privacy_version VARCHAR(16) NULL',
   'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64) NULL',
+  'ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64) NULL',
+  'ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64) NULL',
+  'ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE',
+  'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64) NULL',
+  'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64) NULL',
+  'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64) NULL',
 ];
 
 const INDEXES = [
@@ -240,6 +280,10 @@ const INDEXES = [
   'CREATE INDEX idx_friend_requests_from ON friend_requests(from_user_id, status)',
   'CREATE INDEX idx_friendships_user ON friendships(user_id)',
   'CREATE INDEX idx_notifications_user ON notifications(user_id, created_at)',
+  'CREATE INDEX idx_password_resets_token ON password_resets(token_hash)',
+  'CREATE INDEX idx_password_resets_user ON password_resets(user_id)',
+  'CREATE INDEX idx_email_verifications_token ON email_verifications(token_hash)',
+  'CREATE INDEX idx_users_email ON users(email)',
 ];
 
 function isDuplicateObjectError(e) {
