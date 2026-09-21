@@ -27,9 +27,12 @@ function fail(res, code, message) {
 }
 
 // Services throw { code, message }; routes translate them here.
+// Unknown failures never leak their raw message (stack traces, SQL, paths)
+// to clients: log the real error server-side, send a fixed generic envelope.
 function serviceError(res, e) {
   if (e && e.code && Codes[e.code]) return fail(res, e.code, e.message);
-  return res.status(500).json({ error: { code: 'INTERNAL', message: String((e && e.message) || e) } });
+  console.error('[service]', (e && e.stack) || e);
+  return res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
 }
 
 module.exports = { Codes, fail, serviceError };

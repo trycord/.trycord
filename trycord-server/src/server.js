@@ -79,6 +79,47 @@ async function boot() {
     next();
   });
 
+  // Security headers. Hardens the app surface without breaking the
+  // documented cross-instance feature (the client can be pointed at another
+  // API origin at runtime), so CSP connect/src origins are derived from
+  // runtime config plus a per-instance allowlist knob (CSP_CONNECT_ORIGINS
+  // in .env, comma-separated). The real app page has no inline scripts, so
+  // script-src is strict; the static showcase gallery is dev-only and
+  // exempted from that one rule.
+  const cspConnect = ['self', 'ws:', 'wss:'];
+  const cspImg = ['self', 'data:', 'blob:'];
+  const apiOrigin = ((process.env.TRYCORD_API_URL || '').trim() || inst.publicUrl || '');
+  const addCspOrigin = (o) => {
+    try { const origin = new URL(o).origin; cspConnect.push(origin, origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')); cspImg.push(origin); } catch { /* ignore unparseable */ }
+  };
+  [apiOrigin, inst.publicUrl, inst.globalUrl].forEach((o) => o && addCspOrigin(o));
+  ['http://localhost:9971', 'http://127.0.0.1:9971', 'https://trycord.wispbyte.app'].forEach(addCspOrigin);
+  String(process.env.CSP_CONNECT_ORIGINS || '')
+    .split(',').map((s) => s.trim()).filter(Boolean).forEach(addCspOrigin);
+  const buildCsp = (allowInlineScripts) => [
+    "default-src 'self'",
+    `connect-src ${[...new Set(cspConnect)].join(' ')}`,
+    allowInlineScripts ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    `img-src ${[...new Set(cspImg)].join(' ')}`,
+    "font-src 'self' data:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+  const appCsp = buildCsp(false);
+  const showcaseCsp = buildCsp(true);
+  app.use((req, res, next) => {
+    res.setHeader('Content-Security-Policy', req.path.indexOf('showcase') !== -1 ? showcaseCsp : appCsp);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
+    res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+    next();
+  });
+
   // Attachment storage exists on disk but is NEVER mounted as a public
   // static directory: every read goes through the authenticated
   // /api/attachments/:id route (see routes/attachments.js).
@@ -202,7 +243,8 @@ async function boot() {
       'Deploy the full repository (with trycord-client/) or ignore this if API-only.');
   }
 
-  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence } = createGateway(server);
+  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket } = createGateway(server);
+  require('./routes/auth').setTicketIssuer(issueTicket);
   require('./routes/messages').setBroadcaster(broadcast);
   require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });
   require('./routes/friends').setGateway({ sendToUser });

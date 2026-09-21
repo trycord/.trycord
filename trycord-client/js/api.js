@@ -150,11 +150,18 @@
       } catch (e) { /* ignore */ }
     },
 
-    wsUrl() {
+    wsUrl(ticket) {
       // Derive from the configured backend: http -> ws, https -> wss.
       // No separate WebSocket host is ever hardcoded.
       var wsBase = baseUrl().replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
-      return wsBase + '/?token=' + API.token;
+      return wsBase + '/?ticket=' + (ticket ? encodeURIComponent(ticket) : '');
+    },
+
+    // Short-lived, single-use ticket for the WebSocket handshake. The JWT is
+    // never put in a URL (logs, proxies, referrers); the gateway refuses
+    // legacy ?token= sockets.
+    wsTicket() {
+      return call('/api/auth/ws/ticket').then((d) => (d && d.ticket) || null);
     },
 
     // Centralized backend configuration (single source of truth).
