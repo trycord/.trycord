@@ -11,7 +11,7 @@
       try { cleanupFn(); } catch (e) { /* closing */ }
       cleanupFn = null;
     }
-    var panel = document.getElementById('member-panel');
+    var panel = TrycordShell.el('member-panel');
     if (panel) panel.hidden = true;
   }
 
@@ -56,14 +56,14 @@
       '<button type="button" class="icon-btn" data-srv-menu title="Server actions" aria-label="Server actions" aria-haspopup="menu"><svg aria-hidden="true"><use href="#i-dots"/></svg></button>' +
       C.favStar(detail.id, TrycordState.isFav(detail.id)),
       'i-grid');
-    var menuBtn = document.querySelector('#topbar-actions [data-srv-menu]');
+    var menuBtn = TrycordShell.q('#topbar-actions [data-srv-menu]');
     if (menuBtn) {
       menuBtn.onclick = (e) => {
         var r = menuBtn.getBoundingClientRect();
         serverMenu(r.left, r.bottom + 4, detail);
       };
     }
-    var favBtn = document.querySelector('#topbar-actions [data-fav]');
+    var favBtn = TrycordShell.q('#topbar-actions [data-fav]');
     if (favBtn) {
       favBtn.onclick = (e) => {
         e.stopPropagation();
@@ -145,7 +145,7 @@
   }
 
   function wireNav(detail) {
-    var body = document.getElementById('server-nav-body');
+    var body = TrycordShell.el('server-nav-body');
     if (!body) return;
     body.querySelectorAll('[data-open-chan]').forEach((b) => {
       b.onclick = () => { location.hash = '#/server/' + encodeURIComponent(detail.id) + '/chat/' + encodeURIComponent(b.dataset.openChan); };
@@ -328,7 +328,7 @@
     var ch = channels.find((c) => String(c.id) === String(deepChannelId)) || channels[0];
     C.setTopbar(ch.name, ch.topic || ('Channel in ' + detail.name),
       '<button type="button" class="icon-btn" data-members title="Members" aria-label="Members"><svg aria-hidden="true"><use href="#i-users"/></svg></button>', 'i-hash');
-    var mb = document.querySelector('#topbar-actions [data-members]');
+    var mb = TrycordShell.q('#topbar-actions [data-members]');
     if (mb) mb.onclick = () => { location.hash = '#/server/' + encodeURIComponent(detail.id) + '/members'; };
 
     root.innerHTML = tabBar(detail, 'chat') +

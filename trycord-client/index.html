@@ -178,6 +178,81 @@
     </div>
   </div>
 
+  <!-- App shell (desktop): a separate presentation, distinct DOM (desk-* ids).
+       Built from zero: the presence spine sits in-flow at the left, the current
+       place's rooms fuse beside it, and the canvas IS the journey. There is no
+       top bar and no card grid. Shared logic/state; separate shell + CSS. -->
+  <div id="shell-desktop" hidden>
+    <div class="desk-shell">
+      <nav id="desk-rail" class="presence-spine" aria-label="Places and presence" role="navigation">
+        <button type="button" class="spine-identity" id="desk-rail-account" aria-haspopup="menu" aria-expanded="false" aria-label="Open your account">
+          <span id="desk-rail-avatar-img" class="spine-avatar"></span>
+          <span id="desk-rail-status" class="status-dot" aria-hidden="true"></span>
+          <span class="spine-label" id="desk-rail-name">You</span>
+        </button>
+
+        <button type="button" class="spine-place" data-nav="#/home" aria-label="Home" title="Home">
+          <svg class="spine-glyph" aria-hidden="true"><use href="#i-home"/></svg>
+          <span class="spine-label">Home</span>
+        </button>
+        <button type="button" class="spine-place" data-nav="#/dm" aria-label="Direct messages" title="Direct messages">
+          <svg class="spine-glyph" aria-hidden="true"><use href="#i-mail"/></svg>
+          <span class="spine-label">Messages</span>
+          <span class="spine-badge" id="desk-dm-badge" hidden></span>
+        </button>
+        <button type="button" class="spine-place" data-nav="#/discover" aria-label="Discover places" title="Discover places">
+          <svg class="spine-glyph" aria-hidden="true"><use href="#i-globe"/></svg>
+          <span class="spine-label">Discover</span>
+        </button>
+        <button type="button" class="spine-place" data-nav="#/activity" aria-label="Activity" title="Activity">
+          <svg class="spine-glyph" aria-hidden="true"><use href="#i-activity"/></svg>
+          <span class="spine-label">Activity</span>
+        </button>
+
+        <div class="spine-comm" id="desk-rail-servers" role="list" aria-label="Your communities"></div>
+
+        <div class="spine-base">
+          <button type="button" class="spine-place" id="desk-rail-add" aria-label="Create or join a place" title="Create or join a place">
+            <svg class="spine-glyph" aria-hidden="true"><use href="#i-plus"/></svg>
+            <span class="spine-label">New place</span>
+          </button>
+        </div>
+      </nav>
+
+      <aside id="desk-server-nav" class="app-context" aria-label="Context navigation" hidden>
+        <div class="app-context-scroll" id="desk-server-nav-body"></div>
+      </aside>
+
+      <div class="app-main">
+        <div class="ctx-surface">
+          <span class="ctx-icon" id="desk-ctx-icon" aria-hidden="true"></span>
+          <div class="ctx-head">
+            <h1 class="ctx-title" id="desk-page-title">Home</h1>
+            <span class="ctx-sub" id="desk-page-sub"></span>
+          </div>
+          <div class="bar-actions topbar-actions">
+            <button id="desk-palette-btn" type="button" class="ambient-btn" aria-label="Search, jump, do everything (Ctrl+K)" title="Search, jump, do everything (Ctrl+K)">
+              <svg class="bar-icon" aria-hidden="true"><use href="#i-search"/></svg>
+            </button>
+            <button id="desk-bell-btn" type="button" class="ambient-btn" aria-label="Notifications" aria-haspopup="menu" aria-expanded="false" title="Notifications">
+              <svg class="bar-icon" aria-hidden="true"><use href="#i-bell"/></svg>
+              <span class="dot" id="desk-bell-dot" hidden></span>
+            </button>
+            <span id="desk-conn-pill" class="pill" role="status"><span class="dot" aria-hidden="true"></span><span id="desk-conn-text">Checking…</span></span>
+            <button id="desk-avatar-btn" type="button" class="ambient-btn avatar-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu"></button>
+          </div>
+        </div>
+
+        <div class="app-main-inner">
+          <main id="desk-view" class="app-view" tabindex="-1" aria-label="Conversation view"></main>
+          <aside id="desk-member-panel" class="app-side" aria-label="Members and info" hidden>
+            <div id="desk-member-panel-body"></div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Overlay roots -->
   <div id="palette-root"></div>
   <div id="menu-root"></div>

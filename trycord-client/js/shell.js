@@ -23,7 +23,7 @@
 
   function renderRail(active) {
     var want = railActiveFor(active || location.hash);
-    document.querySelectorAll('#rail .spine-place[data-nav]').forEach(function (b) {
+    TrycordShell.qsa('.presence-spine .spine-place[data-nav]').forEach(function (b) {
       var on = want && b.getAttribute('data-nav') === want;
       b.classList.toggle('active', on);
       if (on) b.setAttribute('aria-current', 'page');
@@ -40,7 +40,7 @@
   }
 
   function renderRailServers() {
-    var box = document.getElementById('rail-servers');
+    var box = TrycordShell.el('rail-servers');
     if (!box) return;
     var servers = (window.TrycordState && TrycordState.servers) || [];
     box.innerHTML = servers.slice(0, 50).map(function (s) {
@@ -67,17 +67,17 @@
 
   function renderRailBadges() {
     var total = window.TrycordState ? TrycordState.dmUnreadTotal() : 0;
-    var badge = document.getElementById('dm-badge');
+    var badge = TrycordShell.el('dm-badge');
     if (badge) {
       badge.hidden = !total;
       badge.textContent = total > 99 ? '99+' : String(total);
     }
-    var dmTab = document.querySelector('#rail .spine-place[data-nav="#/dm"]');
+    var dmTab = TrycordShell.q('.presence-spine .spine-place[data-nav="#/dm"]');
     if (dmTab) dmTab.classList.toggle('has-unread', total > 0);
   }
 
   function renderMobileBar(active) {
-    var bar = document.getElementById('mobilebar');
+    var bar = TrycordShell.el('mobilebar');
     if (!bar) return;
     var items = [
       { hash: '#/home', label: 'Home', icon: 'i-home' },
@@ -97,28 +97,28 @@
   }
 
   function renderServerNav(html, show) {
-    var nav = document.getElementById('server-nav');
-    var body = document.getElementById('server-nav-body');
+    var nav = TrycordShell.el('server-nav');
+    var body = TrycordShell.el('server-nav-body');
     if (!nav || !body) return;
     if (typeof html === 'string') body.innerHTML = html;
     nav.hidden = !show;
   }
 
   function hideServerNav() {
-    var nav = document.getElementById('server-nav');
+    var nav = TrycordShell.el('server-nav');
     if (nav) nav.hidden = true;
   }
 
   function setTopbar(title, subtitle, actionsHtml, iconId) {
-    var t = document.getElementById('page-title');
-    var s = document.getElementById('page-sub');
-    var icon = document.getElementById('ctx-icon');
+    var t = TrycordShell.el('page-title');
+    var s = TrycordShell.el('page-sub');
+    var icon = TrycordShell.el('ctx-icon');
     if (t) t.textContent = title || '';
     if (s) s.textContent = subtitle || '';
     if (icon) icon.innerHTML = iconId ? '<svg aria-hidden="true" style="width:1.2rem;height:1.2rem;"><use href="#' + iconId + '"/></svg>' : '';
-    var bar = document.querySelector('.topbar-actions');
+    var bar = TrycordShell.q('.topbar-actions');
     if (!bar) return;
-    var old = document.getElementById('topbar-actions');
+    var old = TrycordShell.q('#topbar-actions');
     if (old) old.remove();
     if (actionsHtml) {
       var wrap = document.createElement('div');
@@ -126,7 +126,7 @@
       wrap.className = 'row';
       wrap.style.display = 'contents';
       wrap.innerHTML = actionsHtml;
-      var pill = document.getElementById('conn-pill');
+      var pill = TrycordShell.el('conn-pill');
       bar.insertBefore(wrap, pill || bar.firstChild);
     }
   }
@@ -140,28 +140,28 @@
     var u = (window.TrycordState && TrycordState.user) || null;
     var name = u ? (u.displayName || u.username) : '–';
     var sub = u ? ('@' + u.username) : '–';
-    var railImg = document.getElementById('rail-avatar-img');
+    var railImg = TrycordShell.el('rail-avatar-img');
     if (railImg) railImg.innerHTML = Ui.avatarHtml(name, '');
-    var railName = document.getElementById('rail-name');
+    var railName = TrycordShell.el('rail-name');
     if (railName) railName.textContent = name;
-    var accAv = document.getElementById('account-avatar');
+    var accAv = TrycordShell.el('account-avatar');
     if (accAv) accAv.innerHTML = Ui.avatarHtml(name, '');
-    var accName = document.getElementById('account-name');
+    var accName = TrycordShell.el('account-name');
     if (accName) accName.textContent = name;
-    var accSub = document.getElementById('account-sub');
+    var accSub = TrycordShell.el('account-sub');
     if (accSub) accSub.textContent = sub;
-    var ab = document.getElementById('avatar-btn');
+    var ab = TrycordShell.el('avatar-btn');
     if (ab) {
       ab.innerHTML = Ui.avatarHtml(name, '');
       ab.setAttribute('aria-label', 'Account menu for ' + name);
     }
-    var strip = document.getElementById('account-strip');
+    var strip = TrycordShell.el('account-strip');
     if (strip) strip.hidden = !u;
     renderBell();
   }
 
   function renderBell() {
-    var dot = document.getElementById('bell-dot');
+    var dot = TrycordShell.el('bell-dot');
     if (!dot) return;
     var n = window.TrycordState ? (window.TrycordState.notifications.unreadCount || 0) : 0;
     dot.hidden = !n;
@@ -171,8 +171,8 @@
   function closeMenus() {
     var root = document.getElementById('menu-root');
     if (root) root.innerHTML = '';
-    ['#rail-account', '#avatar-btn', '#bell-btn'].forEach(function (sel) {
-      var el = document.querySelector(sel);
+    ['rail-account', 'avatar-btn', 'bell-btn'].forEach(function (id) {
+      var el = TrycordShell.el(id);
       if (el) el.setAttribute('aria-expanded', 'false');
     });
   }

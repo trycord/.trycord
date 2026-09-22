@@ -11,7 +11,7 @@
       try { cleanupFn(); } catch (e) { /* closing */ }
       cleanupFn = null;
     }
-    var panel = document.getElementById('member-panel');
+    var panel = TrycordShell.el('member-panel');
     if (panel) panel.hidden = true;
   }
 
@@ -105,7 +105,7 @@
       return;
     }
     C.renderServerNav(conversationListHtml(null, TrycordState.dms), true);
-    wireNavList(document.getElementById('server-nav-body'), startConversation);
+    wireNavList(TrycordShell.el('server-nav-body'), startConversation);
 
     var tabs = [
       ['chats', 'Chats'],
@@ -173,7 +173,7 @@
       C.openUserSearch((picked) => {
         TrycordApi.friendRequest(picked.id)
           .then(() => { Ui.toast('Friend request sent.', 'success'); return Trycord.refreshSocial(); })
-          .then(() => list(document.getElementById('view')))
+          .then(() => list(TrycordShell.el('view')))
           .catch((e) => Ui.toast(e.message, 'error'));
       });
     };
@@ -194,7 +194,7 @@
         TrycordApi.friendRemove(id).then(() => {
           Ui.toast('Friend removed.', 'success');
           return Trycord.refreshSocial();
-        }).then(() => list(document.getElementById('view')))
+        }).then(() => list(TrycordShell.el('view')))
           .catch((err) => Ui.toast(err.message, 'error'));
       };
     });
@@ -226,12 +226,12 @@
     ).join('') : '<p class="text-muted text-sm" style="padding:0 var(--tc-space-2);">No outgoing requests.</p>';
     body.innerHTML = html;
     function refresh() {
-      Trycord.refreshSocial().then(() => list(document.getElementById('view')));
+      Trycord.refreshSocial().then(() => list(TrycordShell.el('view')));
     }
     body.querySelectorAll('[data-accept]').forEach((b) => {
       b.onclick = () => TrycordApi.friendAccept(b.dataset.accept)
         .then(() => { Ui.toast('Friend request accepted.', 'success'); return Trycord.refreshSocial(); })
-        .then(() => list(document.getElementById('view')))
+        .then(() => list(TrycordShell.el('view')))
         .catch((e) => Ui.toast(e.message, 'error'));
     });
     body.querySelectorAll('[data-decline]').forEach((b) => {
@@ -266,14 +266,14 @@
     if (all) {
       all.onclick = () => TrycordApi.notifReadAll()
         .then(() => Trycord.refreshSocial())
-        .then(() => list(document.getElementById('view')))
+        .then(() => list(TrycordShell.el('view')))
         .catch((e) => Ui.toast(e.message, 'error'));
     }
     body.querySelectorAll('[data-notif]').forEach((row) => {
       row.onclick = () => {
         TrycordApi.notifRead(row.dataset.notif).catch(() => {});
         if (row.dataset.kind === 'dm' && row.dataset.ref) location.hash = '#/dm/' + encodeURIComponent(row.dataset.ref);
-        else { tab = 'chats'; list(document.getElementById('view')); }
+        else { tab = 'chats'; list(TrycordShell.el('view')); }
         Trycord.refreshSocial();
       };
     });
@@ -288,7 +288,7 @@
     } catch (e) {
       C.setTopbar('Direct messages', '', '', 'i-mail');
       C.renderServerNav(conversationListHtml(null, TrycordState.dms), true);
-      wireNavList(document.getElementById('server-nav-body'), startConversation);
+      wireNavList(TrycordShell.el('server-nav-body'), startConversation);
       view.innerHTML = Ui.errorState(e.message, 'Back to messages');
       var rb = view.querySelector('[data-retry]');
       if (rb) rb.onclick = () => { location.hash = '#/dm'; };
@@ -303,8 +303,8 @@
       if (fresh.length) TrycordState.setDMs(fresh);
     } catch (e) { /* list is best-effort here */ }
     C.renderServerNav(conversationListHtml(id, TrycordState.dms), true);
-    wireNavList(document.getElementById('server-nav-body'), startConversation);
-    var profBtn = document.querySelector('#topbar-actions [data-profile]');
+    wireNavList(TrycordShell.el('server-nav-body'), startConversation);
+    var profBtn = TrycordShell.q('#topbar-actions [data-profile]');
     if (profBtn) profBtn.onclick = () => C.openProfileModal(peerId);
 
     var myLastRead = null;
@@ -518,8 +518,8 @@
       onStatus: (st) => {
         C.setTopbar(peerName({ peer }), st === 'connected'
           ? ((peer.presence || 'offline') + ' · Direct message')
-          : 'Reconnecting…', document.getElementById('topbar-actions') ? document.getElementById('topbar-actions').innerHTML : '', 'i-mail');
-        var pb = document.querySelector('#topbar-actions [data-profile]');
+          : 'Reconnecting…', TrycordShell.q('#topbar-actions') ? TrycordShell.q('#topbar-actions').innerHTML : '', 'i-mail');
+        var pb = TrycordShell.q('#topbar-actions [data-profile]');
         if (pb) pb.onclick = () => C.openProfileModal(peerId);
       },
       onEvent: (ev) => {

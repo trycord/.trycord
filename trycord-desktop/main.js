@@ -104,16 +104,22 @@ function createWindow() {
         win.reload();
         await new Promise((res) => setTimeout(res, 6000));
         const out = await win.webContents.executeJavaScript(`(() => {
-          const shell = !document.getElementById('shell-app').hidden;
-          const rail = document.querySelectorAll('#rail .spine-place[data-nav]').length;
-          const title = document.getElementById('page-title').textContent;
-          const atrium = !!document.querySelector('#view .atrium');
+          const desk = !!document.getElementById('shell-desktop')
+            && !document.getElementById('shell-desktop').hidden;
+          const shell = !!document.getElementById('shell-app')
+            && !document.getElementById('shell-app').hidden;
+          const rail = document.querySelectorAll((desk ? '#shell-desktop ' : '#shell-app ') + '.presence-spine .spine-place[data-nav]').length;
+          const title = document.getElementById(desk ? 'desk-page-title' : 'page-title').textContent;
+          const atrium = !!(desk
+            ? document.querySelector('#desk-view .atrium')
+            : document.querySelector('#view .atrium'));
           const pres = (typeof window.TrycordPresentation !== 'undefined')
             ? window.TrycordPresentation.mode() : 'unset';
-          return 'shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' atrium=' + (atrium ? 'yes' : 'no') + ' presentation=' + pres;
+          return 'desk-shell-visible=' + desk + ' shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' atrium=' + (atrium ? 'yes' : 'no') + ' presentation=' + pres;
         })()`);
         console.log('[smoke] home: ' + out);
-        if (!String(out).includes('rail-tabs=4') || !String(out).includes('atrium=yes') || !String(out).includes('presentation=desktop')) process.exitCode = 1;
+        if (!String(out).includes('rail-tabs=4') || !String(out).includes('atrium=yes') ||
+            !String(out).includes('presentation=desktop') || !String(out).includes('desk-shell-visible=true')) process.exitCode = 1;
       } catch (e) {
         console.log('[smoke] FAIL ' + e);
         process.exitCode = 1;
