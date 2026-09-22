@@ -342,7 +342,10 @@
       '<button type="submit" class="composer-send" id="msg-send" aria-label="Send message"><svg aria-hidden="true"><use href="#i-send"/></svg></button>' +
       '</div>' +
       '<div class="composer-hint">Enter to send · Shift+Enter for a new line</div>' +
-      '</form>';
+      '</form>' +
+      navigator.maxTouchPoints && navigator.maxTouchPoints > 0
+        ? '<div class="keyboard-inset" id="keyboard-inset" aria-hidden="true"></div>'
+        : '';
 
     var listEl = root.querySelector('#msg-list');
     var input = root.querySelector('#msg-input');
@@ -352,6 +355,24 @@
     var loadingMore = false;
     var manager = can(detail.id, 'MANAGE_MESSAGES');
     var me = TrycordState.user;
+
+    (function keyboardInset() {
+      var inset = root.querySelector('#keyboard-inset');
+      if (!inset || !window.visualViewport) return;
+      var height, raf = 0;
+      function update() {
+        var vv = window.visualViewport;
+        var h = Math.max(0, Math.min(vv.height * 0.5, window.innerHeight - vv.height));
+        if (h === height) return;
+        height = h;
+        inset.style.height = h ? h + 'px' : '';
+      }
+      function schedule() { cancelAnimationFrame(raf); raf = requestAnimationFrame(update); }
+      window.visualViewport.addEventListener('resize', schedule);
+      window.visualViewport.addEventListener('scroll', schedule);
+      window.addEventListener('resize', schedule);
+      schedule();
+    })();
 
     function groupable(prev, m) {
       if (!prev || String(prev.author_id) !== String(m.author_id)) return false;
