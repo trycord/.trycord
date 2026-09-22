@@ -108,10 +108,12 @@ function createWindow() {
           const rail = document.querySelectorAll('#rail .spine-place[data-nav]').length;
           const title = document.getElementById('page-title').textContent;
           const atrium = !!document.querySelector('#view .atrium');
-          return 'shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' atrium=' + (atrium ? 'yes' : 'no');
+          const pres = (typeof window.TrycordPresentation !== 'undefined')
+            ? window.TrycordPresentation.mode() : 'unset';
+          return 'shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' atrium=' + (atrium ? 'yes' : 'no') + ' presentation=' + pres;
         })()`);
         console.log('[smoke] home: ' + out);
-        if (!String(out).includes('rail-tabs=4') || !String(out).includes('atrium=yes')) process.exitCode = 1;
+        if (!String(out).includes('rail-tabs=4') || !String(out).includes('atrium=yes') || !String(out).includes('presentation=desktop')) process.exitCode = 1;
       } catch (e) {
         console.log('[smoke] FAIL ' + e);
         process.exitCode = 1;

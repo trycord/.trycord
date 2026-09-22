@@ -347,15 +347,11 @@
     }));
   }
 
-  // Layout mode for the rare cases JS must differ by viewport (e.g. which
-  // drawer to open). Visual layout stays in CSS; this is a media query,
-  // not a pixel sniff, and updates live on resize/rotation.
-  var mobileQuery = null;
-  try {
-    mobileQuery = window.matchMedia('(max-width: 900px)');
-  } catch (e) { /* very old browsers: assume desktop */ }
+  // Layout state comes from the single canonical source (presentation.js).
+  // All layout-dependent JS asks TrycordPresentation.isMobile() — never a
+  // private width sniff. Visual layout stays in CSS.
   function isMobileLayout() {
-    return !!(mobileQuery && mobileQuery.matches);
+    return !!(window.TrycordPresentation && window.TrycordPresentation.isMobile());
   }
 
   window.TrycordUi = {

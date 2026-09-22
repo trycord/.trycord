@@ -609,9 +609,16 @@ body {
   display: none;
 }
 
-/* ============ Mobile: from zero. Presence becomes a drawer; the canvas
-   IS the journey; the context surface stays on-canvas; corners stay
-   reachable. No bottom tab bar — that is desktop DNA grafted onto phones. ============ */
+/* ============ MOBILE STATE (≤900px) ============
+   Presentation contract: Desktop State is the base (≥901px). Everything in
+   this block re-declares the mobile presentation from zero: presence becomes
+   a drawer; the canvas IS the journey; the context surface stays on-canvas;
+   corners stay reachable. No bottom tab bar — that is desktop DNA grafted
+   onto phones.
+   Source of truth for the switch is js/presentation.js (single breakpoint);
+   CSS mirrors it here so Mobile State and Desktop State never interleave.
+   Sub-breakpoints (460px/560px) are density refinements INSIDE this state.
+   ============================================= */
 @media (max-width: 900px) {
   .presence-spine {
     position: fixed;

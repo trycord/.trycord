@@ -1,198 +1,175 @@
-# Trycord UI/UX Rebuild — Progress & Checkpoint
+# Trycord Nuclear UI/UX + Community Experience Overhaul — Progress
 
-Tracked per the nuclear-rebuild spec. Work happens in controlled batches:
-**implement → verify → record → continue**. If the work is interrupted,
-resume at the phase marked `IN PROGRESS` below — never restart the design.
+Execution: **inspect → implement → test → checkpoint → continue.** Work in
+phases; update this file after every completed phase. If a session ends, the
+next session resumes at the phase marked `IN PROGRESS` — never restart.
 
-## Invariants (must survive the entire rebuild — the contract)
+## Core contract (must survive the entire overhaul)
 
-- Product logic and backend contracts are preserved. The UI is presentation only.
-- Desktop smoke test selectors must keep working:
-  `#shell-app` visible, exactly **4** `.rail-item[data-nav]` entries, `#page-title`
-  non-empty, `#view h2` contains "Welcome back".
-- All `--tc-*` custom properties referenced by JS/CSS are defined in
-  `styles/tokens.css` (verified by `tokcheck.js` — 99/99). Never hardcode
-  colors/radii in JS.
+- **Backend / product logic is protected.** REST, WebSocket, auth, authz,
+  data, channels, memberships, roles, permissions, messages, DMs, presence,
+  notifications, uploads, moderation, discovery, settings, persistence,
+  routing, Electron integration, DB behavior — all untouched. Backend issues
+  found during the rebuild are recorded below, never silently "fixed".
+- **Mobile State is protected.** The existing mobile presentation is the
+  strongest visual direction — it is NOT nuked. Only genuine bugs get fixed.
+  Desktop changes must never propagate into Mobile State.
+- **Desktop State is rebuilt** (desktop browser + Electron — one shared
+  desktop presentation architecture; no Electron-only visual fork).
+- **Two deliberate presentation states**, not one fluid layout: the app knows
+  via `js/presentation.js` (single source of truth, sets
+  `data-presentation="desktop|mobile"` on `<html>`/`<body>`, fires
+  `trycord:presentation`). JS asks `TrycordPresentation.isMobile()/isDesktop()`
+  — never a private width sniff. CSS mirrors it (`layout.css` Mobile State
+  block = `@media (max-width: 900px)`; sub-breakpoints are refinements inside
+  that state only).
+- Smoke test contract (source of truth — do not invent old requirements):
+  `shell-app-visible=true rail-tabs=4 title=Home atrium=yes presentation=desktop`.
+- All `--tc-*` custom properties used by JS/CSS are defined in
+  `styles/tokens.css` (verified by `tokcheck.js`). Never hardcode colors/radii
+  in JS.
 - Theme hooks: `[data-theme]` ∈ dark(default)/light/high-contrast,
   `[data-density]` ∈ comfortable(default)/compact, `[data-font=legible]`,
   `html[data-motion="off"]`.
 - Channel isolation between workspaces must never regress.
 - CSS single entry: `index.html` links only `styles/layout.css`, which
-  @imports: tokens → reset → theme → globals → components → utilities.
-- Backend stays authoritative for security. No attack surface changes.
+  @imports: tokens → reset → theme → globals → components → utilities → pages.
+- DOM id/`data-*` contract for the shell (JS depends on these, R2 preserved):
+  `#rail`, `#rail-servers`, `#rail-account`, `#rail-avatar-img`, `#rail-status`,
+  `#rail-add`, `#dm-badge`, `#server-nav`, `#server-nav-body`,
+  `#account-strip/#account-avatar/-name/-sub`, `#page-title/#page-sub/#ctx-icon`,
+  `#topbar-actions`, `#conn-pill/#conn-text`, `#palette-btn`,
+  `#bell-btn/#bell-dot`, `#avatar-btn`, `#nav-toggle/#nav-back/#nav-scrim`,
+  `#view`, `#member-panel/-body`, `#shell-app/-public`, `#offline-banner`,
+  `#retry-link`, `#palette-root/#menu-root/#ctx-root/#toasts/#modal-root`.
 
-## Visual language (the spec, condensed)
+## Visual direction (spec condensed)
 
-- Charcoal layered surfaces; never pure black. Layers: base → shell → nav →
-  workspace → surface → raised → elevated → overlay.
-- Identity = amber→orange gradient, **used intentionally** (primary actions,
-  active/selected/focused, hero). Not everywhere.
-- Effect profile: blur 3/6, glass 4/6 (nav + overlays only, never full-screen),
-  shadows 3/6, gradients 5/6, glow 1/6 (focus rings + accent emphasis),
-  motion 7/6 premium (springy only where it pops; reduced-motion respected).
-- Typography is structure: quiet headings, dense hierarchy. No card-everything,
-  no Discord/Slack/Linear/Notion/Telegram/Apple copies.
-- Dedicated mobile architecture (MobileShell/MobileHeader/MainViewport/
-  MobileNavigation, 100dvh, safe areas, touch targets, no hover-only).
-- Every state designed: loading / empty / error / offline / permission /
-  not-found / expired / reconnecting. Never "Something went wrong." alone.
-- Final hostile QA across 320→2560px + "hide the logo" independence test.
+Original **premium atmospheric communication environment**: deep
+charcoal/near-black depth, amber→orange ambient energy, near-liquid glass,
+refined gradients, restrained shadows, excellent typography, subtle depth,
+exceptional spacing, smooth motion, strong spatial composition, low noise,
+intentional hierarchy. NOT Discord/Slack/SaaS/AI-dashboard/card-panel/landing
+with chat/generic glass template. Must feel like **Trycord**.
 
-## Phase checklist
+Absolute negative constraint — never reconstruct:
+`[ICON RAIL]+[TOP BAR]+[CENTERED PAGE]+[SECTION STACK]+[CARD]+[EMPTY STATE]`.
+
+Target desktop composition: **Presence Spine** (identity + Home/DMs/Activity
++ communities as presence marks + seam + current-place channels) → **Atrium /
+Conversation** (full-viewport, context header, messages/home — "entering a
+place", not operating a dashboard).
+
+Hierarchy mental model: COMMUNITY → PLACE → CHANNEL → CONVERSATION.
+
+Atmosphere profile: blur 3/5, glass 4/5, shadows 3/5, gradients 5/5, glow 1/5,
+motion 7/5 (intelligent interpretation).
+
+## Phase checklist (spec's phases)
 
 | # | Phase | Status |
 |---|-------|--------|
-| 0 | Server security backlog (tickets, heartbeat, headers, migrations) | DONE (commit c53ed9b) |
-| 1 | Audit current UI architecture + class/DOM contract inventory | DONE (inventory below) |
-| 2 | Design tokens + globals/reset/theme | DONE (commit pending record) |
-| 3 | Foundational surfaces & primitives (btn/input/menu/modal/toast/…) | DONE (golden cross-phase) |
-| 4 | App shell architecture: global rail → workspace nav → content | DONE |
-| 5 | Global navigation (rail/palette/search/user menu) | pending |
-| 6 | Workspace navigation (server nav, channels, categories) | pending |
-| 7 | Chat: message rows, grouped threads, composer | pending |
-| 8 | Direct messages (list, unread, presence, typing, attachments) | pending |
-| 9 | Home / Discovery / Profiles | pending |
-| 10 | Settings & security (account/appearance/application/about) | pending |
-| 11 | Moderation (roles/permissions/invites/admin) | pending |
-| 12 | Landing, legal, error/offline/reconnecting states | pending |
-| 13 | Mobile architecture (dedicated shell/nav, 320–2560) | pending |
-| 14 | Electron integration (same visual system, desktop smoke) | pending |
-| 15 | Performance + a11y + motion system pass | pending |
-| 16 | Polish (focus springs, keyboard map, consistency) | pending |
-| 17 | Hostile QA + visual independence + acceptance | pending |
+| 1 | Architecture audit | DONE (see "Phase 1 audit" below) |
+| 2 | Desktop/mobile state separation | DONE (this checkpoint) |
+| 3 | Design tokens | (tokens exist; refine for new desktop) pending |
+| 4 | Desktop Presence Spine | pending |
+| 5 | Atrium shell | pending |
+| 6 | Home experience | pending |
+| 7 | Community identity and navigation | pending |
+| 8 | Channel architecture | pending |
+| 9 | Conversation/message experience | pending |
+| 10 | DM experience | pending |
+| 11 | Profiles and people | pending |
+| 12 | Discovery | pending |
+| 13 | Community management | pending |
+| 14 | Settings | pending |
+| 15 | Motion and micro-interactions | pending |
+| 16 | Accessibility | pending |
+| 17 | Responsive/tablet behavior | pending |
+| 18 | Electron integration | pending |
+| 19 | Performance cleanup | pending |
+| 20 | Final QA | pending |
 
-## Phase 1 audit — captured contract (source files)
+## Phase 1 audit — current architecture (captured)
 
-- Client `trycord-client/`: JS ~141 KB (14 files) + CSS ~92 KB (8 files).
-- Render contract per file (classes / ids the CSS must style):
-  - `shell.js`: `#rail #rail-servers #rail-account #avatar-btn #bell-btn
-    #dm-badge #rail-add #mobilebar`; `.rail-item[data-nav] .rail-sep .rail-pill
-    .avatar.avatar-sm|online|idle .app-bar .bar-context .ctx-icon .ctx-title
-    .ctx-sub .bar-search .bar-actions .bar-notif .pill .dot .msg (+.cont)
-    .gutter .tick .body .head .author .time(.edited) .text .attachments
-    .attachment(-thumb|-ic|-name) .msg-actions .icon-btn .msg-touchbtn
-    .modal(.head|body|foot) .form-* .palette(-search|-section|-item) .user-row
-    .ctx-menu .ctx-item(.danger) .menu-item .set-*`
-  - `pages-workspace.js`: `.srv-head .tabs .tab(.active) .card(.head) .chan
-    .chan-btn .lbl .chan-dot .chan-badge .chan-x .cat .cat-head .cat-name
-    .composer(.inner|-toolbar) .composer-input .attach-btn .attach-chip(-ic)
-    #attach-preview #msg-send .composer-send .member-row .who .role -*
-    .perm -label -desc .invite -code -uses .set -form -head -desc -grid`;
-    permission-gated tabs overview/chat/members + roles/invites/settings.
-  - `pages-dms.js`: `.nav-label .dm-row(.active|.unread) .who .preview .when
-    .dm-search .notification .n-title .n-body .n-time`.
-  - `pages-browse.js`: `.toolbar .server-row .server-card .card-avatar -name
-    -sub -meta #browse-q #browse-sort #browse-results .sort-select #join-form
-    #join-code #join-lookup #join-result #do-join #act-list .act-row .act-avatar
-    -name -preview -when #fav-list`.
-  - `pages-home.js`: `.home-hero .home-title .home-sub .feature-grid
-    .feature-item #home-activity`.
-  - `pages-public.js`: `.auth-wrap .auth-card .brand .page-title #li-* #rg-*
-    #fg-* #rp-* .legal-note`.
-  - `pages-account.js`: `.set-cat[data-set-tab] #set-panel #name-form
-    #display-name #pw-form #pw-cur #pw-new #api-form #set-api #api-test
-    #api-status #clear-local #global-status #global-retry #up-status #about-body`.
-  - `ui.js / app.js / router.js`: `#conn-pill #conn-text #offline-banner #view
-    #modal-root .toast(-info|-error|-warning|-success) .palette` + avatars/toasts.
-- Sprite: 30 symbols in index.html; `i-inbox`, `i-check`, `i-user-plus` unused.
-- Known defects to fix during rebuild: `.app-side`/`#member-panel` have NO
-  container layout (dead); `#member-panel-body` never used; 14 old `!important`s;
-  old accent was indigo `#7e8cf5` (anti-pattern: purple-blue) → replaced by
-  amber/orange identity in token phase.
-- Desktop: `main.js --smoke-test` asserts (see invariants); client served
-  bundled via `trycord-desktop/client/`, refreshed by `scripts/copy-client.js`.
+- Client `trycord-client/`: 14 JS files + 9 CSS files (incl. showcase).
+  Load order: config → runtime-config → api → state → global-sync →
+  **presentation** → ui → shell → pages-* → router → app.
+- Routing: hash router (`router.js`) with auth guards; public routes
+  `#/ #/login #/register #/forgot-password #/reset-password/:t
+  #/verify-email/:t`; app routes `#/home #/servers #/discover #/discover/:id
+  #/join #/activity #/favorites #/dm #/dm/:id #/settings
+  #/server/:id/:tab/:channel`. `refreshChrome` recomputes the mobile back
+  button. `closeNav()` clears `nav-open`/`side-open` + scrim.
+- State: `TrycordState` (user, servers, DM list, friends, notifications)
+  + `TrycordApi` (token in `localStorage['trycord.token']`).
+  WS lives in `state.js`/`global-sync.js`. Channel switching cleanup is
+  wired in `router.js` (workspace/dms `cleanup()` before each route).
+- Presentation logic before this checkpoint was **scattered**: two
+  independent `matchMedia('(max-width: 900px)')` instances (`app.js` +
+  `ui.js`) and five CSS breakpoints across three files (900/760/560/460
+  + `pointer:coarse`/`hover:none`). Resolved in Phase 2 (below).
+- Electron: `trycord-desktop/main.js` — window 1280×800, min 900×600,
+  `--smoke-test` registers in-page then reloads and asserts the smoke
+  contract. Client served bundled from `trycord-desktop/client/`,
+  refreshed by `scripts/copy-client.js`.
+- Mobile today = R2's "from zero" composition (spine drawer + fused field,
+  no bottom tab bar) — the protected Mobile State.
+- Sprite: 45 symbols in index.html (`i-inbox`, `i-check`, `i-user-plus`
+  appear unused — confirm before any removal).
+- Known defects: `.app-side`/`#member-panel` had no container layout (fixed
+  in R2); `#member-panel-body` usage needs audit; 14 legacy `!important`s
+  noted in R1.
 
-## Per-batch verification record
+## Phase 2 checkpoint — two-state presentation separation (DONE)
 
-- **Phase 2 (tokens/globals/reset/theme)**: `tokcheck.js` — 99 referenced
-  tokens all defined ✔; CSS brace balance ✔; `layout.css` 6-file @import chain
-  resolves ✔. Fork `--tc-focus-ring` into color (`outline`) + `--tc-focus-shadow`
-  (`box-shadow`) because legacy consumers used both shorthands.
-- **Phase 3 (components)**: full rewrite, 427/427 old selectors preserved
-  (+3 additions: `.dm-row.unread`, `.dm-row.unread.active`,
-  `.palette-item.selected`), verified by selector diff vs committed file.
-  New presentation: glass chromium for menus/modals/palette/toasts/msg-actions
-  (`--tc-glass-bg` + `backdrop-filter: blur(...) saturate(1.35)`),
-  scrims (modal-overlay/palette-overlay) use `--tc-bg-scrim` + blur(3px),
-  primary actions on `--tc-accent-gradient` with `--tc-shadow-glow`,
-  active rails/channels/DM rows get accent indicator (`inset 2px`/gradient
-  pill), inputs/composer on `--tc-bg-subtle` wells with inset shadow,
-  media mobile/coarse/print blocks preserved. Brace balance OK; static
-  serve of layout.css 200.
-- Commit for Phase 2 checkpoint: e3e9509 (+ Phase 3 pending commit)
+Files changed:
+- **NEW `js/presentation.js`** — single canonical breakpoint
+  (`max-width: 900px`), sets `data-presentation`, fires
+  `trycord:presentation`, exposes
+  `window.TrycordPresentation = { isMobile, isDesktop, mode }`.
+- **`index.html`** — loads `presentation.js` before `ui.js`.
+- **`js/ui.js`** — deleted private `matchMedia`; `isMobileLayout()` now
+  delegates to `TrycordPresentation.isMobile()`.
+- **`js/app.js`** — deleted its private `matchMedia`; listens to
+  `trycord:presentation` → `TrycordRouter.refreshChrome()` (chrome-only,
+  never re-renders the view, so composer drafts survive).
+- **`styles/layout.css`** — Mobile State block header rewritten as the
+  formal presentation contract (Desktop = base, Mobile = `≤900px` from
+  zero, sub-breakpoints are refinements inside Mobile State only).
+- **`trycord-desktop/main.js`** — smoke now also asserts
+  `presentation=desktop` (window is 1280px → must be desktop).
 
-- **Phase 4 (app shell + index.html)**: rewrote `layout.css` (85/85 selector
-  count parity; 8 functionally-covered drops verified one-by-one, e.g.
-  `.rail-item.rail-pill` labels → now the left-edge accent bars; drawer
-  `nav-open` gated on `:not([hidden])` so no empty drawers). New composition:
-  `.app-rail` global sidebar (glass, `--tc-glass-strong` + blur, safe-area
-  padded) → `.app-context` workspace nav (glass) → `.app-main` whose chrome
-  (`.app-bar`) now lives INSIDE the main column + `.app-main-inner` wrapping
-  `#view` and `#member-panel`. `index.html` restructured accordingly
-  (bar moved under `#shell-app > .app-shell > .app-layout > .app-main`).
-  Fixed defects: `#member-panel`/`.app-side` now has real container layout
-  (right detail column, drawer on mobile); mobilebar padding no longer
-  overwritten by safe-area (explicit padding-* rules); scrims use
-  `--tc-bg-scrim` + blur(2px). Verification: static serve 200; index.html
-  tree check (shell-app / main-inner / bar-after-main / 30 sprite symbols);
-  braces 100/100; no JS dependency on old nesting.
+Guarantees:
+- Exactly **one** JS media query in the entire client (in
+  `presentation.js`). No scattered `innerWidth`/`matchMedia` layout checks.
+- Mobile State CSS and Desktop State CSS never interleave.
+- JS/layout-dependent behavior (drawer vs. persistent panels, back button)
+  asks the canonical module.
 
-- Commit log: phase 2 e3e9509 · phase 3 ed81b6b
-
-## R2 — Nuclear composition correction (supersedes R1 output)
-
-Design review showed R1 was still a **reskin, not a redesign**: the old DNA
-(a left icon rail + a top bar + a centered dashboard Home + section stacks)
-was still present underneath the new paint. Directive: treat the UI as a
-failed prototype and **nuke the composition** — keep every product contract
-(backend, APIs, auth, data, WS, permissions, functionality) and rebuild the
-experience as if the old UI never existed.
-
-### What was removed / replaced (the architectural test)
-
-| Removed (old DNA) | Replaced with |
-| --- | --- |
-| Conventional left icon rail (`app-rail`, `.rail-item` boxes, `.rail-pill` marks, `.rail-sep`, `.rail-sep` dividers) | **Presence spine** (`.presence-spine`): ONE living column — your identity (avatar + name + presence dot) at the head, places (Home/Messages/Discover/Activity), then communities as presence marks. No boxes, no pills, no dividers. **Blooms** from glyph-led (3.75rem) to a readable index (13.5rem) on hover / keyboard focus. Active = ambient edge-light bleeding toward content (thin gradient emission + halo), never a box. |
-| Conventional top navigation bar (`app-bar`, `.brand` in chrome, `.bar-search` box) | **In-content context surface** (`.ctx-surface`): a soft glass sheet INSIDE the conversation column with typographic title/subline (`ctx-head`), plus an **ambient corner** (command, bell, connection ember, self-avatar) that fades to ~40% opacity and surfaces on approach/focus. Brand removed from app chrome entirely. |
-| Centered dashboard content column, stacked section headings, section→container→empty-state→CTA composition on Home | **The Atrium**: one flowing environment (`.atrium`) anchored to the spine, full-width `#view`, a single prose tone (time-aware; no "Welcome back"), places as glowing presence threads with live rooms woven beneath each, people woven in as presence rows, quieter lines instead of empty-state cards, and a woven actions line at the foot (`.atrium-weather`) instead of CTA rows. |
-| Bottom mobile tab bar (`#mobilebar`, `.mnav`, brand padding) | **Mobile from zero**: spine becomes a slide-over presence drawer; the workspace column slides out beside it as one fused field; the ctx-surface stays on-canvas with the corner fully reachable. No tab strip. |
-| Ribbon-bar navigation / rigid nav regions | Navigation is spatial: places live in the spine, rooms fuse through a **glass seam** (`.app-context::after` light-thread, no border box), the current place's context is typography inside the canvas. |
-| Divider/rule furniture (`.rail-sep`, border-top rails) | Whispered seams (one-pixel gradient threads) only where structure continues. |
-
-### What stayed identical (the preserve list)
-
-- All DOM id hooks the JS depends on: `#rail`, `#rail-servers`, `#rail-account`,
-  `#rail-avatar-img`, `#rail-status`, `#rail-add`, `#dm-badge`, `#server-nav`,
-  `#server-nav-body`, `#account-strip/#account-avatar/-name/-sub`,
-  `#page-title/#page-sub/#ctx-icon`, `#topbar-actions`, `#conn-pill/
-  #conn-text`, `#palette-btn`, `#bell-btn/#bell-dot`, `#avatar-btn`,
-  `#nav-toggle/#nav-back/#nav-scrim`, `#view`, `#member-panel/-body`,
-  `#shell-app/-public`. Routers, state, WS, auth, permission flows untouched.
-- Desktop smoke contract updated once (selector rename is an implementation
-  detail, not a contract change): `#rail .rail-item[data-nav]` →
-  `#rail .spine-place[data-nav]` (still `rail-tabs=4`); Home assertion now
-  checks `.atrium` presence instead of "Welcome back" text.
-- `activityItem()` export kept byte-compatible for the Activity page.
-
-### Verification record (R2)
-
-- `tokcheck.js` — 114 referenced / 163 defined, **none missing** (added
-  `--tc-glass-border-strong`, dark + light). ✔
-- `import-walk.js` — 7-file @import chain intact ✔
-- `node --check` on shell/app/pages-home/pages-workspace/pages-dms/
-  pages-browse + desktop main/updater/copy-client ✔
-- CSS brace balance on all 4 sheets ✔
-- **Electron smoke (real bundle, temp backend 9977)**:
-  `shell-app-visible=true rail-tabs=4 title=Home atrium=yes` ✔
-  (This also retired the earlier unresolved `title=Servers welcome=no`
-   mystery — that check asserted markup the redesign intentionally removed.)
+Verification (Phase 2):
+- `node --check` on `presentation.js`, `ui.js`, `app.js`, desktop `main.js` ✔
+- CSS brace balance ✔ / `tokcheck.js` 114/163 none missing ✔ /
+  `import-walk.js` 7-file chain intact ✔
+- Electron smoke (real bundle, backend 9977): pending run — target
+  `shell-app-visible=true rail-tabs=4 title=Home atrium=yes presentation=desktop`
 - Desktop bundle refreshed via `scripts/copy-client.js`.
 
-### Open notes (R2)
+Screenshots for user visual QA (I cannot view images — user opens them):
+- `C:\Users\ultim\AppData\Local\Temp\opencode\shots\trycord-desktop.png` (1280×800, `#/home`)
+- `C:\Users\ultim\AppData\Local\Temp\opencode\shots\trycord-mobile.png` (390×844, `#/home`)
 
-- Per-community unread aggregates aren't exposed by the backend; the Atrium's
-  rooms show recent threads (activity) rather than unread counts. DMs carry
-  real unread emphasis. Revisit if the backend adds per-community unread.
-- Chat/DMs/Settings/Discover keep their functional layouts for now; the
-  shell, spine, and Atrium are the verified core. Remaining pages get the
-  same treatment in follow-up passes (per directive: shell first, then pages).
+## Backend issues discovered (documented, not fixed — per spec §35)
+
+- (none this checkpoint)
+
+## Open notes
+
+- R2's Presence Spine + Atrium + ctx-surface remain the current Desktop State
+  composition until Phases 4–6 rebuild/refine them per the new spec
+  (communities-as-presence-marks, no icon rail/top bar, Atrium as full
+  environment — R2 already removed the rejected architecture).
+- Chat/DMs/Settings/Discover still carry functional layouts; they get the
+  overhauled treatment in Phases 10–14.
+- Per-community unread aggregates aren't exposed by the backend; DMs carry
+  real unread emphasis. Revisit if backend adds it.

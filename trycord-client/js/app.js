@@ -210,13 +210,13 @@
       }
     }
     window.addEventListener('hashchange', () => window.TrycordRouter.route());
-    if (window.matchMedia) {
-      // Breakpoint crossings only refresh chrome affordances (back button).
-      // Never re-render the view: that would wipe composer drafts.
-      var mq = window.matchMedia('(max-width: 900px)');
-      var onMode = () => { if (window.TrycordRouter.refreshChrome) window.TrycordRouter.refreshChrome(); };
-      if (mq.addEventListener) mq.addEventListener('change', onMode);
-      else if (mq.addListener) mq.addListener(onMode);
+    // Presentation state is owned by presentation.js (single media query).
+    // Breakpoint crossings only refresh chrome affordances (back button).
+    // Never re-render the view: that would wipe composer drafts.
+    if (window.TrycordPresentation) {
+      document.addEventListener('trycord:presentation', () => {
+        if (window.TrycordRouter.refreshChrome) window.TrycordRouter.refreshChrome();
+      });
     }
     if (!location.hash) location.hash = '#/';
     await window.TrycordRouter.route();
