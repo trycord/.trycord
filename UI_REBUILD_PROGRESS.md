@@ -201,3 +201,6 @@ Deep end-to-end (`verify-deep.js`, real Electron, API 9977, desktop 1280×800
   overhauled treatment in Phases 10–14.
 - Per-community unread aggregates aren't exposed by the backend; DMs carry
   real unread emphasis. Revisit if backend adds it.
+## Phase 4+ — running (one-shot push-through, per user directive)
+- Pushed 3d4aabe..527b47b to origin/main (credential provided).
+- Phase 4 Presence Spine: IN PROGRESS.
