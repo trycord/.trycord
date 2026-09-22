@@ -243,7 +243,9 @@ const LEGACY_ALTERS = [
   ['users', 'terms_accepted_at', 'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64)'],
   ['users', 'password_changed_at', 'ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64)'],
   ['users', 'sessions_invalidated_at', 'ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64)'],
-  ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE'],
+  // SQLite cannot ADD COLUMN ... UNIQUE. The email column is created without
+  // the constraint here; uniqueness is enforced by a UNIQUE index below.
+  ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255)'],
   ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
   ['messages', 'edited_at', 'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64)'],
   ['dm_messages', 'edited_at', 'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64)'],
@@ -336,6 +338,11 @@ async function applySchema(conn) {
         await conn.exec(ddl);
       }
     }
+    // email uniqueness (SQLite can't express UNIQUE in ADD COLUMN). A plain
+    // index also exists later in INDEXES; this is the actual constraint.
+    await conn.exec(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email)'
+    );
   }
 
   // MySQL migrations. These MUST run before idx_messages_channel because

@@ -1,347 +1,229 @@
-/* API layer: centralized backend URL, token storage, typed endpoint helpers.
-   Backend resolution (most explicit wins):
-     1. ?api= URL parameter (used by the desktop exe's --api-url flag)
-     2. saved Server setting on this device (Settings -> Application)
-     3. window.TRYCORD_CONFIG.API_URL from config.js (edit without rebuilding)
-     4. built-in default (http://localhost:9971, or same-origin when served)
-   Errors are { code, message }; thrown Error carries .code for specific UX.
-   401 on an authenticated call => session dead => clear + go to login. */
-(function () {
-  // Token storage is instance-scoped (see state.js); fall back to the
-  // legacy flat key only before state loads.
-  function tokenKey() {
-    try {
-      var st = window.TrycordState;
-      if (st && st.tokenKey) return st.tokenKey();
-    } catch (e) { /* ignore */ }
-    return 'trycord.token';
-  }
-  var DEFAULT_API_URL = 'http://localhost:9971';
+// Trycord backend API client.
+// Implements the real HTTP contract of trycord-server (see server routes).
+// Every call returns `data` on success, and on failure throws `ApiError`
+// carrying { code, message, status, retryAfter }. Authorization is attached
+// from state.js (localStorage token) unless overridden.
 
-  // Returns a normalized http(s) base URL, or null if invalid.
-  // 'http://host:9971/' and 'http://host:9971' both become 'http://host:9971'.
-  // Anything non-http(s) (javascript:, data:, ftp:, bare words) is rejected.
-  function normalizeApiUrl(raw) {
-    if (!raw) return null;
-    var s = String(raw).trim().replace(/\/+$/, '');
-    if (!s) return null;
-    var u;
-    try {
-      u = new URL(s);
-    } catch (e) { return null; }
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-    if (!u.hostname) return null;
-    var path = u.pathname === '/' ? '' : u.pathname.replace(/\/+$/, '');
-    return u.origin + path;
-  }
+import { TrycordConfig } from './config.js';
 
-  function resolveApiBase() {
-    var q = null;
-    try { q = new URLSearchParams(location.search).get('api'); } catch (e) { /* ignore */ }
-    q = normalizeApiUrl(q);
-    if (q) return { url: q, source: 'startup argument' };
-    var saved = null;
+const TOKEN_KEY = 'trycord.token';
+
+export class ApiError extends Error {
+  constructor(code, message, status, retryAfter) {
+    super(message || code);
+    this.name = 'ApiError';
+    this.code = code || 'INTERNAL';
+    this.status = status || 500;
+    this.retryAfter = retryAfter || 0;
+  }
+}
+
+function base() {
+  return TrycordConfig.apiUrl().replace(/\/+$/, '');
+}
+
+export function token() {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+
+export function setToken(t) {
+  try {
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch { /* ignore */ }
+}
+
+export function apiBase() {
+  return base();
+}
+
+async function request(method, path, { body, auth = true, raw = false, form = false } = {}) {
+  const url = base() + path;
+  const headers = {};
+  if (auth) {
+    const t = token();
+    if (t) headers.Authorization = 'Bearer ' + t;
+  }
+  let payload = body;
+  if (body !== undefined && !form) {
+    headers['Content-Type'] = 'application/json';
+    payload = JSON.stringify(body);
+  }
+  let res;
+  try {
+    res = await fetch(url, { method, headers, body: payload, credentials: 'omit' });
+  } catch {
+    throw new ApiError('NETWORK', 'cannot reach the Trycord server', 0);
+  }
+  if (res.status === 401) {
+    // Token missing/bad/revoked: drop it and surface a typed error so the
+    // app can route back to login.
+    if (auth) setToken(null);
     try {
-      var st = window.TrycordState;
-      // Access config (device pointer at an instance), then legacy location.
-      saved = (st && st.access && st.access.apiBase) ||
-        (st && st.settings && st.settings.apiBase) || null;
-    } catch (e) { /* not loaded */ }
-    saved = normalizeApiUrl(saved);
-    if (saved) return { url: saved, source: 'saved setting' };
-    var cfg = null;
-    try { cfg = window.TRYCORD_CONFIG && window.TRYCORD_CONFIG.API_URL; } catch (e) { /* no config.js */ }
-    cfg = normalizeApiUrl(cfg);
-    if (cfg) return { url: cfg, source: 'server config' };
-    if (location.protocol === 'file:' || location.port === '5500') {
-      return { url: DEFAULT_API_URL, source: 'default' };
+      const e = await res.json().catch(() => null);
+      if (e && e.error) throw new ApiError(e.error.code, e.error.message, 401);
+    } catch (err) { if (err instanceof ApiError) throw err; }
+    throw new ApiError('AUTH_REQUIRED', 'you need to sign in', 401);
+  }
+  if (!res.ok) {
+    let info = null;
+    try { info = await res.json(); } catch { /* non-json error */ }
+    const retryAfter = parseInt(res.headers.get('Retry-After') || '0', 10) || 0;
+    if (info && info.error) {
+      throw new ApiError(info.error.code, info.error.message, res.status, retryAfter);
     }
-    return { url: location.origin.replace(/\/+$/, ''), source: 'default' };
+    throw new ApiError('HTTP_' + res.status, res.statusText || 'request failed', res.status, retryAfter);
   }
-
-  function baseUrl() {
-    return resolveApiBase().url;
+  if (raw) {
+    const buffer = await res.arrayBuffer();
+    return { buffer, headers: res.headers };
   }
+  if (res.status === 204) return null;
+  return res.json().catch(() => null);
+}
 
-  function apiError(data, status) {
-    var err = data && data.error;
-    var code = (err && err.code) || 'ERROR';
-    // Prefer the server's message (already human-readable). Fall back to
-    // something a person can act on instead of a bare HTTP status.
-    var message = (err && err.message) || (typeof err === 'string' ? err :
-      (!status ? "Couldn't reach the server. Check your connection and try again."
-               : 'The server returned an error (HTTP ' + status + ').'));
-    var e = new Error(message);
-    e.code = code;
-    e.status = status;
-    return e;
-  }
+const Api = {
+  // ---- instance / legal ----------------------------------------------
+  instance: () => request('GET', '/api/instance', { auth: false }),
+  legal: () => request('GET', '/api/legal', { auth: false }),
 
-  async function finish(res, authed) {
-    var text = await res.text();
-    var data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (e) { data = { raw: text }; }
-    if (res.status === 401 && authed) {
-      API.token = null;
-      if (window.TrycordState) TrycordState.user = null;
-      Trycord.setOnline(true);
-      location.hash = '#/login';
-      throw apiError({ error: { code: 'SESSION_REVOKED', message: 'Session expired — please log in again.' } }, 401);
-    }
-    if (!res.ok) throw apiError(data, res.status);
-    Trycord.setOnline(true);
-    return data;
-  }
+  // ---- auth ------------------------------------------------------------
+  register: (body) => request('POST', '/api/auth/register', { body, auth: false }),
+  login: (body) => request('POST', '/api/auth/login', { body, auth: false }),
+  logout: () => request('POST', '/api/auth/logout'),
+  changePassword: (body) => request('POST', '/api/auth/change-password', { body }),
+  revokeAllSessions: () => request('POST', '/api/auth/sessions/revoke-all'),
+  revokeOthers: () => request('POST', '/api/auth/sessions/revoke-others'),
+  forgotPassword: (body) => request('POST', '/api/auth/forgot-password', { body, auth: false }),
+  resetPassword: (body) => request('POST', '/api/auth/reset-password', { body, auth: false }),
+  verifyEmail: (body) => request('POST', '/api/auth/verify-email', { body, auth: false }),
+  verifyEmailResend: (body) => request('POST', '/api/auth/verify-email/resend', { body }),
+  changeEmail: (body) => request('POST', '/api/auth/change-email', { body }),
+  wsTicket: () => request('POST', '/api/auth/ws/ticket'),
 
-  async function call(path, opts) {
-    opts = opts || {};
-    var headers = { 'Content-Type': 'application/json' };
-    var authed = !!API.token;
-    if (authed) headers.Authorization = 'Bearer ' + API.token;
-    var res;
-    try {
-      res = await fetch(baseUrl() + path, {
-        method: opts.method || 'GET',
-        headers: headers,
-        body: opts.body ? JSON.stringify(opts.body) : undefined,
-      });
-    } catch (e) {
-      Trycord.setOnline(false);
-      var net = new Error('Cannot reach the server at ' + baseUrl() + '. Is it running?');
-      net.code = 'OFFLINE';
-      throw net;
-    }
-    return finish(res, authed);
-  }
+  // ---- users -------------------------------------------------------------
+  me: () => request('GET', '/api/users/me'),
+  updateMe: (body) => request('PATCH', '/api/users/me', { body }),
+  searchUsers: (q) => request('GET', '/api/users/search?q=' + encodeURIComponent(q)),
+  presence: (ids) => request('GET', '/api/users/presence?ids=' + encodeURIComponent(ids.join(','))),
+  user: (id) => request('GET', '/api/users/' + encodeURIComponent(id)),
+  legacyMe: () => request('GET', '/api/me'),
 
-  // Multipart upload: the browser sets the boundary itself (no Content-Type
-  // header here). Same auth, error, and 401 semantics as call().
-  async function multipart(path, file) {
-    var authed = !!API.token;
-    var fd = new FormData();
-    fd.append('file', file, (file && file.name) || 'upload');
-    var res;
-    try {
-      res = await fetch(baseUrl() + path, {
-        method: 'POST',
-        headers: authed ? { Authorization: 'Bearer ' + API.token } : {},
-        body: fd,
-      });
-    } catch (e) {
-      Trycord.setOnline(false);
-      var net = new Error('Cannot reach the server at ' + baseUrl() + '. Is it running?');
-      net.code = 'OFFLINE';
-      throw net;
-    }
-    return finish(res, authed);
-  }
+  // ---- servers -----------------------------------------------------------
+  servers: () => request('GET', '/api/servers'),
+  createServer: (body) => request('POST', '/api/servers', { body }),
+  server: (id) => request('GET', '/api/servers/' + encodeURIComponent(id)),
+  updateServer: (id, body) => request('PATCH', '/api/servers/' + encodeURIComponent(id), { body }),
+  deleteServer: (id) => request('DELETE', '/api/servers/' + encodeURIComponent(id)),
+  serverMembers: (id) => request('GET', '/api/servers/' + encodeURIComponent(id) + '/members'),
+  leaveServer: (id) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/leave'),
+  kickMember: (id, userId) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/kick', { body: { userId } }),
+  serverByCode: (code) => request('GET', '/api/servers/by-code/' + encodeURIComponent(code)),
+  joinServerByCode: (code) => request('POST', '/api/servers/join/' + encodeURIComponent(code)),
 
-  var API = {
-    call,
-    multipart,
+  // ---- channels -----------------------------------------------------------
+  channels: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/channels'),
+  createChannel: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels', { body }),
+  updateChannel: (serverId, channelId, body) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId), { body }),
+  deleteChannel: (serverId, channelId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId)),
 
-    get token() {
-      try { return localStorage.getItem(tokenKey()); } catch (e) { return null; }
-    },
-    set token(t) {
-      try {
-        if (t) localStorage.setItem(tokenKey(), t);
-        else localStorage.removeItem(tokenKey());
-      } catch (e) { /* ignore */ }
-    },
+  // ---- categories -----------------------------------------------------------
+  categories: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/categories'),
+  createCategory: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/categories', { body }),
+  deleteCategory: (serverId, categoryId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/categories/' + encodeURIComponent(categoryId)),
 
-    wsUrl(ticket) {
-      // Derive from the configured backend: http -> ws, https -> wss.
-      // No separate WebSocket host is ever hardcoded.
-      var wsBase = baseUrl().replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
-      return wsBase + '/?ticket=' + (ticket ? encodeURIComponent(ticket) : '');
-    },
+  // ---- messages -------------------------------------------------------------
+  messages: (channelId, { before, limit } = {}) => {
+    const q = new URLSearchParams();
+    if (before) q.set('before', before);
+    if (limit) q.set('limit', String(limit));
+    const qs = q.toString();
+    return request('GET', '/api/channels/' + encodeURIComponent(channelId) + '/messages' + (qs ? '?' + qs : ''));
+  },
+  sendMessage: (channelId, body) =>
+    request('POST', '/api/channels/' + encodeURIComponent(channelId) + '/messages', { body }),
+  updateMessage: (channelId, messageId, body) =>
+    request('PATCH', '/api/channels/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId), { body }),
+  deleteMessage: (channelId, messageId) =>
+    request('DELETE', '/api/channels/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId)),
 
-    // Short-lived, single-use ticket for the WebSocket handshake. The JWT is
-    // never put in a URL (logs, proxies, referrers); the gateway refuses
-    // legacy ?token= sockets.
-    wsTicket() {
-      return call('/api/auth/ws/ticket').then((d) => (d && d.ticket) || null);
-    },
+  // ---- attachments -------------------------------------------------------------
+  uploadAttachment: async (channelId, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request('POST', '/api/channels/' + encodeURIComponent(channelId) + '/attachments',
+      { body: fd, form: true });
+  },
+  attachmentUrl: (id) => base() + '/api/attachments/' + encodeURIComponent(id),
+  fetchAttachment: (id) => request('GET', '/api/attachments/' + encodeURIComponent(id), { raw: true }),
 
-    // Centralized backend configuration (single source of truth).
-    baseUrl,
-    baseSource: () => resolveApiBase().source,
-    normalizeUrl: normalizeApiUrl,
-    DEFAULT_API_URL,
+  // ---- roles ---------------------------------------------------------------------
+  serverPermissions: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/roles/permissions'),
+  roles: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/roles'),
+  createRole: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles', { body }),
+  updateRole: (serverId, roleId, body) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId), { body }),
+  deleteRole: (serverId, roleId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId)),
+  assignRole: (serverId, roleId, userId) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId) + '/assign', { body: { userId } }),
+  unassignRole: (serverId, roleId, userId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId) + '/assign/' + encodeURIComponent(userId)),
 
-    // Stable id for the current instance: explicit config first,
-    // otherwise derived from the backend URL. Scopes per-instance storage.
-    instanceId() {
-      try {
-        var cfg = window.TRYCORD_CONFIG && window.TRYCORD_CONFIG.instanceId;
-        if (cfg && String(cfg).trim()) {
-          return 'cfg-' + String(cfg).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        }
-      } catch (e) { /* ignore */ }
-      try {
-        return 'url-' + new URL(baseUrl()).host.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      } catch (e) {
-        return 'url-unknown';
-      }
-    },
+  // ---- invites ---------------------------------------------------------------------
+  invites: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/invites'),
+  createInvite: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/invites', { body }),
+  deleteInvite: (serverId, inviteId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/invites/' + encodeURIComponent(inviteId)),
+  invitePreview: (code) => request('GET', '/api/invites/' + encodeURIComponent(code) + '/preview'),
+  joinInvite: (code) => request('POST', '/api/invites/' + encodeURIComponent(code) + '/join'),
 
-    // Optional global service URL (empty = independent instance).
-    // Only ever used for explicitly global resources — never for chat.
-    globalUrl() {
-      try {
-        var g = window.TRYCORD_CONFIG && window.TRYCORD_CONFIG.globalUrl;
-        var n = normalizeApiUrl(g);
-        return n || '';
-      } catch (e) {
-        return '';
-      }
-    },
+  // ---- discovery ---------------------------------------------------------------------
+  discover: ({ q = '', page = 1, limit = 12 } = {}) => {
+    const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (q) qs.set('q', q);
+    return request('GET', '/api/discover/servers?' + qs.toString(), { auth: false });
+  },
+  discoverServer: (id) => request('GET', '/api/discover/servers/' + encodeURIComponent(id), { auth: false }),
+  joinDiscover: (id) => request('POST', '/api/discover/servers/' + encodeURIComponent(id) + '/join'),
 
-    // Probe a backend URL (used by the connection UI). Never throws.
-    async testConnection(raw) {
-      var url = normalizeApiUrl(raw);
-      if (!url) {
-        return { ok: false, code: 'INVALID_URL', message: 'Use an http(s) URL like http://51.79.44.111:9971' };
-      }
-      var t0 = Date.now();
-      try {
-        var ctrl = new AbortController();
-        var timer = setTimeout(() => ctrl.abort(), 8000);
-        var res;
-        try {
-          res = await fetch(url + '/api/health', { signal: ctrl.signal });
-        } finally {
-          clearTimeout(timer);
-        }
-        if (!res.ok) return { ok: false, code: 'BAD_STATUS', message: 'Server answered HTTP ' + res.status };
-        return { ok: true, url, latencyMs: Date.now() - t0 };
-      } catch (e) {
-        return { ok: false, code: 'UNREACHABLE', message: 'Unable to connect to ' + url };
-      }
-    },
+  // ---- activity ---------------------------------------------------------------------
+  activity: ({ limit = 20 } = {}) => request('GET', '/api/activity?limit=' + limit),
 
-    // auth
-    register: (body) => API.call('/api/auth/register', { method: 'POST', body }),
-    login: (body) => API.call('/api/auth/login', { method: 'POST', body }),
-    logout: () => API.call('/api/auth/logout', { method: 'POST' }),
-    changePassword: (body) => API.call('/api/auth/change-password', { method: 'POST', body }),
-    revokeAllSessions: () => API.call('/api/auth/sessions/revoke-all', { method: 'POST' }),
-    revokeOtherSessions: () => API.call('/api/auth/sessions/revoke-others', { method: 'POST' }),
-    forgotPassword: (body) => API.call('/api/auth/forgot-password', { method: 'POST', body }),
-    resetPassword: (body) => API.call('/api/auth/reset-password', { method: 'POST', body }),
-    verifyEmail: (body) => API.call('/api/auth/verify-email', { method: 'POST', body }),
-    resendVerification: (body) => API.call('/api/auth/verify-email/resend', { method: 'POST', body }),
-    changeEmail: (body) => API.call('/api/auth/change-email', { method: 'POST', body }),
-    // users
-    me: () => API.call('/api/users/me'),
-    patchMe: (body) => API.call('/api/users/me', { method: 'PATCH', body }),
-    // public instance metadata (no auth)
-    legal: () => API.call('/api/legal'),
-    // servers
-    myServers: () => API.call('/api/servers'),
-    createServer: (body) => API.call('/api/servers', { method: 'POST', body }),
-    serverDetail: (id) => API.call('/api/servers/' + encodeURIComponent(id)),
-    patchServer: (id, body) => API.call('/api/servers/' + encodeURIComponent(id), { method: 'PATCH', body }),
-    deleteServer: (id) => API.call('/api/servers/' + encodeURIComponent(id), { method: 'DELETE' }),
-    serverMembers: (id) => API.call('/api/servers/' + encodeURIComponent(id) + '/members'),
-    leaveServer: (id) => API.call('/api/servers/' + encodeURIComponent(id) + '/leave', { method: 'POST' }),
-    kickMember: (id, userId) => API.call('/api/servers/' + encodeURIComponent(id) + '/kick', { method: 'POST', body: { userId } }),
-    previewByCode: (code) => API.call('/api/servers/by-code/' + encodeURIComponent(code)),
-    joinByCode: (code) => API.call('/api/servers/join/' + encodeURIComponent(code), { method: 'POST' }),
-    // roles
-    serverPerms: (id) => API.call('/api/servers/' + encodeURIComponent(id) + '/roles/permissions'),
-    roles: (id) => API.call('/api/servers/' + encodeURIComponent(id) + '/roles'),
-    createRole: (id, body) => API.call('/api/servers/' + encodeURIComponent(id) + '/roles', { method: 'POST', body }),
-    patchRole: (id, roleId, body) => API.call('/api/servers/' + encodeURIComponent(id) + '/roles/' + encodeURIComponent(roleId), { method: 'PATCH', body }),
-    deleteRole: (id, roleId) => API.call('/api/servers/' + encodeURIComponent(id) + '/roles/' + encodeURIComponent(roleId), { method: 'DELETE' }),
-    assignRole: (id, roleId, userId) => API.call('/api/servers/' + encodeURIComponent(id) + '/roles/' + encodeURIComponent(roleId) + '/assign', { method: 'POST', body: { userId } }),
-    unassignRole: (id, roleId, userId) => API.call('/api/servers/' + encodeURIComponent(id) + '/roles/' + encodeURIComponent(roleId) + '/assign/' + encodeURIComponent(userId), { method: 'DELETE' }),
-    // invites
-    invites: (id) => API.call('/api/servers/' + encodeURIComponent(id) + '/invites'),
-    createInvite: (id, body) => API.call('/api/servers/' + encodeURIComponent(id) + '/invites', { method: 'POST', body }),
-    revokeInvite: (id, inviteId) => API.call('/api/servers/' + encodeURIComponent(id) + '/invites/' + encodeURIComponent(inviteId), { method: 'DELETE' }),
-    invitePreview: (code) => API.call('/api/invites/' + encodeURIComponent(code) + '/preview'),
-    joinWithInvite: (code) => API.call('/api/invites/' + encodeURIComponent(code) + '/join', { method: 'POST' }),
-    // categories + channels + messages
-    categories: (sid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/categories'),
-    createCategory: (sid, body) => API.call('/api/servers/' + encodeURIComponent(sid) + '/categories', { method: 'POST', body }),
-    deleteCategory: (sid, cid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/categories/' + encodeURIComponent(cid), { method: 'DELETE' }),
-    channels: (sid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels').then((d) => (d && d.channels) || []),
-    createChannel: (sid, body) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels', { method: 'POST', body }),
-    deleteChannel: (sid, cid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels/' + encodeURIComponent(cid), { method: 'DELETE' }),
-    messages: (cid, limit, before) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages?limit=' + (limit || 50) + (before ? '&before=' + encodeURIComponent(before) : '')),
-    postMessage: (cid, content, attachmentIds) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages', {
-      method: 'POST',
-      body: attachmentIds && attachmentIds.length ? { content, attachmentIds } : { content },
-    }),
-    patchMessage: (cid, mid, content) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages/' + encodeURIComponent(mid), { method: 'PATCH', body: { content } }),
-    deleteMessage: (cid, mid) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages/' + encodeURIComponent(mid), { method: 'DELETE' }),
-    // attachments (uploads feature)
-    uploadAttachment: (channelId, file) =>
-      API.multipart('/api/channels/' + encodeURIComponent(channelId) + '/attachments', file)
-        .then((d) => d && d.attachment),
-    attachmentUrl: (id) => baseUrl() + '/api/attachments/' + encodeURIComponent(id),
-    // Authored download: the Bearer token cannot ride on a plain <a href>,
-    // so callers fetch the blob and use an object URL.
-    async attachmentBlob(id) {
-      var res;
-      try {
-        res = await fetch(API.attachmentUrl(id), {
-          headers: API.token ? { Authorization: 'Bearer ' + API.token } : {},
-        });
-      } catch (e) {
-        Trycord.setOnline(false);
-        var net = new Error('Cannot reach the server at ' + baseUrl() + '. Is it running?');
-        net.code = 'OFFLINE';
-        throw net;
-      }
-      if (res.status === 401 && API.token) {
-        API.token = null;
-        if (window.TrycordState) TrycordState.user = null;
-        Trycord.setOnline(true);
-        location.hash = '#/login';
-        throw apiError({ error: { code: 'SESSION_REVOKED', message: 'Session expired — please log in again.' } }, 401);
-      }
-      if (!res.ok) throw apiError({ error: { code: 'NOT_FOUND', message: 'Attachment unavailable.' } }, res.status);
-      Trycord.setOnline(true);
-      return res.blob();
-    },
-    // browse + activity (discover is public: no membership required)
-    discover: (q, page, limit) => {
-      var qs = '?limit=' + (limit || 12) + '&page=' + (page || 1) + (q ? '&q=' + encodeURIComponent(q) : '');
-      return API.call('/api/discover/servers' + qs);
-    },
-    discoverPreview: (id) => API.call('/api/discover/servers/' + encodeURIComponent(id)),
-    joinPublic: (id) => API.call('/api/discover/servers/' + encodeURIComponent(id) + '/join', { method: 'POST' }),
-    activity: (limit) => API.call('/api/activity?limit=' + (limit || 20)),
-    health: () => API.call('/health'),
-    // direct messages
-    dms: () => API.call('/api/dms'),
-    openDM: (userId) => API.call('/api/dms', { method: 'POST', body: { userId } }),
-    dmDetail: (id) => API.call('/api/dms/' + encodeURIComponent(id)),
-    dmHistory: (id, before, limit) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages?limit=' + (limit || 50) + (before ? '&before=' + encodeURIComponent(before) : '')),
-    dmSend: (id, content) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages', { method: 'POST', body: { content } }),
-    dmEdit: (id, mid, content) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(mid), { method: 'PATCH', body: { content } }),
-    dmDelete: (id, mid) => API.call('/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(mid), { method: 'DELETE' }),
-    dmRead: (id) => API.call('/api/dms/' + encodeURIComponent(id) + '/read', { method: 'POST' }),
-    // friends
-    friends: () => API.call('/api/friends'),
-    friendRequests: () => API.call('/api/friends/requests'),
-    friendRequest: (userId) => API.call('/api/friends/requests', { method: 'POST', body: { userId } }),
-    friendAccept: (id) => API.call('/api/friends/requests/' + encodeURIComponent(id) + '/accept', { method: 'POST' }),
-    friendDecline: (id) => API.call('/api/friends/requests/' + encodeURIComponent(id) + '/decline', { method: 'POST' }),
-    friendCancel: (id) => API.call('/api/friends/requests/' + encodeURIComponent(id), { method: 'DELETE' }),
-    friendRemove: (userId) => API.call('/api/friends/' + encodeURIComponent(userId), { method: 'DELETE' }),
-    // directory + presence
-    userSearch: (q) => API.call('/api/users/search?q=' + encodeURIComponent(q)),
-    userProfile: (id) => API.call('/api/users/' + encodeURIComponent(id)),
-    presence: (ids) => API.call('/api/users/presence?ids=' + ids.map(encodeURIComponent).join(',')),
-    // notifications
-    notifications: (limit) => API.call('/api/notifications?limit=' + (limit || 30)),
-    notifRead: (id) => API.call('/api/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST' }),
-    notifReadAll: () => API.call('/api/notifications/read-all', { method: 'POST' }),
-  };
+  // ---- dms -----------------------------------------------------------------------
+  dms: () => request('GET', '/api/dms'),
+  dm: (id) => request('GET', '/api/dms/' + encodeURIComponent(id)),
+  openDm: (userId) => request('POST', '/api/dms', { body: { userId } }),
+  dmMessages: (id, { before, limit } = {}) => {
+    const q = new URLSearchParams();
+    if (before) q.set('before', before);
+    if (limit) q.set('limit', String(limit));
+    const qs = q.toString();
+    return request('GET', '/api/dms/' + encodeURIComponent(id) + '/messages' + (qs ? '?' + qs : ''));
+  },
+  sendDm: (id, content) => request('POST', '/api/dms/' + encodeURIComponent(id) + '/messages', { body: { content } }),
+  deleteDm: (id, messageId) =>
+    request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId)),
+  updateDm: (id, messageId, content) =>
+    request('PATCH', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId), { body: { content } }),
+  dmRead: (id) => request('POST', '/api/dms/' + encodeURIComponent(id) + '/read'),
 
-  window.TrycordApi = API;
-})();
+  // ---- friends ---------------------------------------------------------------------------
+  friends: () => request('GET', '/api/friends'),
+  friendRequests: () => request('GET', '/api/friends/requests'),
+  sendFriendRequest: (userId) => request('POST', '/api/friends/requests', { body: { userId } }),
+  acceptFriendRequest: (id) => request('POST', '/api/friends/requests/' + encodeURIComponent(id) + '/accept'),
+  declineFriendRequest: (id) => request('POST', '/api/friends/requests/' + encodeURIComponent(id) + '/decline'),
+  cancelFriendRequest: (id) => request('DELETE', '/api/friends/requests/' + encodeURIComponent(id)),
+  removeFriend: (userId) => request('DELETE', '/api/friends/' + encodeURIComponent(userId)),
+
+  // ---- notifications ----------------------------------------------------------------------
+  notifications: ({ limit = 30 } = {}) => request('GET', '/api/notifications?limit=' + limit),
+  readAllNotifications: () => request('POST', '/api/notifications/read-all'),
+  readNotification: (id) => request('POST', '/api/notifications/' + encodeURIComponent(id) + '/read'),
+};
+
+export default Api;

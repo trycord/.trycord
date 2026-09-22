@@ -1,192 +1,169 @@
-/* Client state, split into three scopes:
-   - access-point config:  which instance to talk to (this device's pointer)
-   - instance state:       token, favorites, recent — namespaced per instance
-   - global state:         appearance (theme/density), shared across instances
-   apiBase is access config, NOT a user preference: it selects the instance,
-   so it lives outside the namespaced and global buckets. */
-(function () {
-  function load(key, fallback) {
-    try {
-      var raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (e) { return fallback; }
-  }
-  function save(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* ignore */ }
-  }
-  function drop(key) {
-    try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
-  }
+// Central application state. Holds the authenticated session as revealed by
+// the real API + WebSocket system only. There is no fake data here.
 
-  function instanceSlug() {
-    try {
-      var id = window.TRYCORD_CONFIG && window.TRYCORD_CONFIG.instanceId;
-      if (id && String(id).trim()) {
-        return 'cfg-' + String(id).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      }
-    } catch (e) { /* ignore */ }
-    try {
-      var api = window.TrycordApi;
-      if (api && api.baseUrl) {
-        return 'url-' + new URL(api.baseUrl()).host.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      }
-      return 'url-unknown';
-    } catch (e) {
-      return 'url-unknown';
+import Api, { token, setToken } from './api.js';
+
+const LS_SERVER_ID = 'trycord.lastServerId';
+
+const state = {
+  me: null,            // { id, username, displayName, email, emailVerified, createdAt }
+  token: null,
+  servers: [],         // serverCore rows the user belongs to
+  serverDetail: null,  // detail for the current place, when in a server
+  channels: { categories: [], channels: [] }, // current server layout
+  members: [],         // current server member rows
+  permissions: [],     // current server permission strings (+is_owner via all)
+  roles: [],           // current server roles
+  presence: new Map(), // userId -> 'online'|'offline'
+  dms: [],             // dmSummary list
+  friends: [],         // friend rows
+  friendsIn: [],       // incoming requests
+  friendsOut: [],      // outgoing requests
+  notifUnread: 0,
+  activity: [],
+  online: false,       // WS connected?
+  lastServerId: null,
+  raw: {},             // per-session scratch (route locals, caches)
+};
+
+export function isAuthed() {
+  return !!(state.me && token());
+}
+
+export function currentServerId() {
+  return state.lastServerId || (state.servers[0] && state.servers[0].id) || null;
+}
+
+export function can(perm) {
+  const p = state.permissions || [];
+  return p.includes('*') || p.includes(perm);
+}
+
+export function peerPresence(id) {
+  return state.presence.get(id) || 'offline';
+}
+
+// ---- session ------------------------------------------------------------
+
+export function hydrate() {
+  state.token = token();
+  return state.token ? Api.me().then((me) => {
+    state.me = me;
+    return me;
+  }).catch(() => {
+    // token died server-side (revoked/expired)
+    clearSession();
+    return null;
+  }) : Promise.resolve(null);
+}
+
+export function applyAuth(payload) {
+  // payload: { token, user }
+  setToken(payload.token);
+  state.token = payload.token;
+  state.me = payload.user;
+  return state.me;
+}
+
+export function clearSession() {
+  setToken(null);
+  state.token = null;
+  state.me = null;
+  state.servers = [];
+  state.serverDetail = null;
+  state.channels = { categories: [], channels: [] };
+  state.members = [];
+  state.permissions = [];
+  state.roles = [];
+  state.dms = [];
+  state.friends = [];
+  state.friendsIn = [];
+  state.friendsOut = [];
+  state.activity = [];
+}
+
+// ---- data -----------------------------------------------------------------
+
+export async function refreshServers() {
+  state.servers = await Api.servers();
+  if (state.servers.length) {
+    const found = state.servers.find((s) => s.id === state.lastServerId);
+    if (!found && state.lastServerId) {
+      // server no longer among ours
+      state.lastServerId = null;
+      localStorage.removeItem(LS_SERVER_ID);
     }
   }
+  return state.servers;
+}
 
-  var slug = instanceSlug();
-  var NS = 'trycord:' + slug + ':';
+export async function enterServer(serverId) {
+  const [detail, layout, members, perms, roles] = await Promise.all([
+    Api.server(serverId),
+    Api.channels(serverId),
+    Api.serverMembers(serverId),
+    Api.serverPermissions(serverId),
+    Api.roles(serverId),
+  ]);
+  state.serverDetail = detail;
+  state.channels = layout;
+  state.members = members;
+  state.permissions = (perms && perms.permissions) || [];
+  state.roles = roles || [];
+  state.lastServerId = serverId;
+  try { localStorage.setItem(LS_SERVER_ID, serverId); } catch { /* ignore */ }
+  return { detail, layout, members, perms, roles };
+}
 
-  function rawGet(key) {
-    try { return localStorage.getItem(key); } catch (e) { return null; }
-  }
+export function leaveServerContext() {
+  state.serverDetail = null;
+  state.channels = { categories: [], channels: [] };
+  state.members = [];
+  state.permissions = [];
+  state.roles = [];
+  state.lastServerId = null;
+  try { localStorage.removeItem(LS_SERVER_ID); } catch { /* ignore */ }
+}
 
-  // One-time upgrade: import flat legacy keys into this instance's namespace.
-  // Tokens are stored raw (never JSON-encoded) to match the session format.
-  function migrateLegacy() {
-    if (rawGet(NS + 'token') !== null) return; // already migrated (or logged in)
-    var legacyToken = rawGet('trycord.token');
-    if (legacyToken) {
-      try { localStorage.setItem(NS + 'token', legacyToken); } catch (e) { /* ignore */ }
-      save(NS + 'favorites', load('trycord.favorites', []));
-      save(NS + 'recent', load('trycord.recent', []));
-      ['trycord.token', 'trycord.favorites', 'trycord.recent'].forEach(drop);
-    }
-  }
+export async function refreshDms() {
+  state.dms = await Api.dms();
+  return state.dms;
+}
 
-  // Access config migration: apiBase used to live in settings.
-  var access = load('trycord.access', null) || { apiBase: '' };
-  if (!access.apiBase) {
-    var legacySettings = load('trycord.settings', {});
-    if (legacySettings && legacySettings.apiBase) {
-      access.apiBase = legacySettings.apiBase;
-      delete legacySettings.apiBase;
-      save('trycord.settings', legacySettings);
-      save('trycord.access', access);
-    }
-  }
+export async function refreshFriends() {
+  const [friends, reqs] = await Promise.all([Api.friends(), Api.friendRequests()]);
+  state.friends = friends;
+  state.friendsIn = (reqs && reqs.incoming) || [];
+  state.friendsOut = (reqs && reqs.outgoing) || [];
+  return state;
+}
 
-  var State = {
-    user: null,
-    servers: [],
-    perms: {}, // serverId -> { is_owner, permissions[] }
-    // Social state is in-memory only: the server is authoritative, and these
-    // are refetched on boot and updated incrementally from WebSocket events.
-    dms: [], // [{ id, peer, lastMessage, unreadCount, updatedAt }]
-    friends: [], // [{ id, username, displayName, presence }]
-    requests: { incoming: [], outgoing: [] },
-    notifications: { items: [], unreadCount: 0 },
-    instanceSlug: slug,
-    access,
-    favorites: load(NS + 'favorites', []),
-    recent: load(NS + 'recent', []),
-    // Global preferences: deliberately shared across instances on this browser.
-    settings: Object.assign(
-      { theme: 'dark', density: 'comfortable' },
-      load('trycord.settings', {})
-    ),
+export async function refreshNotifications() {
+  try {
+    const n = await Api.notifications({ limit: 30 });
+    state.notifUnread = (n && n.unreadCount) || 0;
+    state.raw.notifications = (n && n.items) || [];
+  } catch { /* non-fatal */ }
+  return state.notifUnread;
+}
 
-    tokenKey: () => NS + 'token',
-    saveAccess() {
-      save('trycord.access', State.access);
-    },
-    saveSettings() {
-      save('trycord.settings', State.settings);
-      State.applyAppearance();
-    },
-    applyAppearance() {
-      document.documentElement.dataset.theme = State.settings.theme || 'dark';
-      document.documentElement.dataset.density = State.settings.density || 'comfortable';
-    },
-    setServers(list) {
-      State.servers = Array.isArray(list) ? list : [];
-      // prune favorites/recent for servers we no longer belong to
-      var ids = {};
-      State.servers.forEach((s) => { ids[s.id] = true; });
-      State.favorites = State.favorites.filter((id) => ids[id]);
-      State.recent = State.recent.filter((r) => ids[r.id]);
-      save(NS + 'favorites', State.favorites);
-      save(NS + 'recent', State.recent);
-    },
-    // Effective access for the open server: { is_owner, permissions[] }.
-    // '*' means all permissions (owner). Always mirrored by the backend.
-    setPerms(serverId, accessPerms) {
-      State.perms[serverId] = accessPerms || { is_owner: false, permissions: [] };
-    },
-    can(serverId, perm) {
-      var a = State.perms[serverId];
-      if (!a) return false;
-      if (a.is_owner) return true;
-      return (a.permissions || []).indexOf(perm) !== -1;
-    },
-    serverById(id) {
-      for (var i = 0; i < State.servers.length; i++) {
-        if (State.servers[i].id === id) return State.servers[i];
-      }
-      return null;
-    },
-    isFav(id) { return State.favorites.indexOf(id) !== -1; },
-    toggleFav(id) {
-      var i = State.favorites.indexOf(id);
-      if (i === -1) State.favorites.push(id);
-      else State.favorites.splice(i, 1);
-      save(NS + 'favorites', State.favorites);
-      return i === -1;
-    },
-    touchRecent(id) {
-      State.recent = [{ id, ts: Date.now() }].concat(
-        State.recent.filter((r) => r.id !== id)
-      ).slice(0, 8);
-      save(NS + 'recent', State.recent);
-    },
-    clearLocal() {
-      State.favorites = [];
-      State.recent = [];
-      save(NS + 'favorites', []);
-      save(NS + 'recent', []);
-    },
-    // --- social helpers (all in-memory; server is the source of truth) ---
-    setDMs(list) {
-      State.dms = Array.isArray(list) ? list : [];
-    },
-    dmUnreadTotal() {
-      return State.dms.reduce((n, c) => n + (c.unreadCount || 0), 0);
-    },
-    dmById(id) {
-      for (var i = 0; i < State.dms.length; i++) {
-        if (String(State.dms[i].id) === String(id)) return State.dms[i];
-      }
-      return null;
-    },
-    // Patch one conversation's preview/unread from a realtime event or send.
-    touchDM(id, patch) {
-      var c = State.dmById(id);
-      if (!c) return null;
-      Object.keys(patch || {}).forEach((k) => { c[k] = patch[k]; });
-      State.dms.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
-      return c;
-    },
-    setFriends(list) {
-      State.friends = Array.isArray(list) ? list : [];
-    },
-    setRequests(incoming, outgoing) {
-      State.requests = { incoming: incoming || [], outgoing: outgoing || [] };
-    },
-    pendingRequestCount() {
-      return (State.requests.incoming || []).length;
-    },
-    setNotifications(items, unreadCount) {
-      State.notifications = { items: Array.isArray(items) ? items : [], unreadCount: unreadCount || 0 };
-    },
-  };
+export async function refreshActivity() {
+  state.activity = await Api.activity({ limit: 20 });
+  return state.activity;
+}
 
-  migrateLegacy();
-  // Re-read in case migration just populated this instance.
-  State.favorites = load(NS + 'favorites', State.favorites);
-  State.recent = load(NS + 'recent', State.recent);
+export function setPresence(id, presence) {
+  state.presence.set(id, presence);
+}
 
-  State.applyAppearance();
-  window.TrycordState = State;
-})();
+export function setOnline(v) {
+  state.online = v;
+}
+
+export function serverWithId(list, id) {
+  return (list || []).find((s) => String(s.id) === String(id)) || null;
+}
+
+const TrycordState = state;
+export default TrycordState;
+export { Api };

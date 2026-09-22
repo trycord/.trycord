@@ -1,363 +1,197 @@
-/* UI primitives: escaping, toasts, modal/dialog, states, avatar, time. */
-(function () {
-  // Trycord icon vocabulary — ONE source of truth for typographic icons.
-  // These are text glyphs (arrows, math, geometric shapes) chosen for
-  // broad cross-platform rendering: every entry defaults to monochrome
-  // text presentation, never color emoji. Anything complex, brand-critical,
-  // or at risk of emoji substitution (bell, lock, logo) stays an inline
-  // SVG symbol in index.html instead. Use Ui.icon(name) so the language
-  // can evolve without hunting the codebase.
-  var icons = {
-    back: '←',
-    forward: '→',
-    close: '×',
-    add: '+',
-    more: '⋮',
-    overflow: '⋯',
-    search: '⌕',
-    command: '⌘',
-    settings: '⚙',
-    edit: '✎',
-    refresh: '↻',
-    external: '↗',
-    upload: '↑',
-    download: '↓',
-    check: '✓',
-    checks: '✓✓',
-    channel: '#',
-    mention: '@',
-    star: '☆',
-    starFilled: '★',
-    dot: '•',
-    chevron: '›',
-    empty: '○',
-    clock: '◷',
-    grid: '▦',
-  };
+// Low-level UI primitives: DOM helpers, escaping, toasts, modals,
+// popovers, and time formatting. Framework-free.
 
-  // <span class="ico" aria-hidden="true">X</span> — decorative by default.
-  // Icon-only controls MUST carry their own aria-label (never rely on this).
-  function icon(name, cls) {
-    var glyph = icons[name] || icons.empty;
-    return '<span class="ico' + (cls ? ' ' + cls : '') + '" aria-hidden="true">' + glyph + '</span>';
-  }
+import { TrycordConfig } from './config.js';
 
-  function esc(s) {
-    return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    })[c]);
-  }
+export function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-  function toast(message, type) {
-    var root = document.getElementById('toasts');
-    var el = document.createElement('div');
-    el.className = 'toast toast-' + (type || 'info');
-    el.setAttribute('role', 'status');
-    var content = document.createElement('div');
-    content.className = 'toast-content';
-    var title = document.createElement('div');
-    title.className = 'toast-title';
-    title.textContent = type === 'success' ? 'Success' : type === 'error' ? 'Error' : type === 'warning' ? 'Warning' : 'Info';
-    var span = document.createElement('div');
-    span.className = 'toast-message';
-    span.textContent = message;
-    content.append(title, span);
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'toast-close';
-    btn.setAttribute('aria-label', 'Dismiss');
-    btn.innerHTML = '&times;';
-    btn.onclick = () => el.remove();
-    el.append(content, btn);
-    root.appendChild(el);
-    setTimeout(() => { if (el.isConnected) el.remove(); }, 5000);
-  }
-
-  function openModal(opts) {
-    var root = document.getElementById('modal-root');
-    root.innerHTML = '';
-    var scrim = document.createElement('div');
-    scrim.className = 'modal-overlay';
-    var box = document.createElement('div');
-    box.className = 'modal';
-    box.setAttribute('role', 'dialog');
-    box.setAttribute('aria-modal', 'true');
-    box.setAttribute('aria-label', opts.title || 'Dialog');
-    var head = document.createElement('div');
-    head.className = 'modal-header';
-    var h2 = document.createElement('h2');
-    h2.className = 'modal-title';
-    h2.textContent = opts.title || '';
-    head.appendChild(h2);
-    var closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'modal-close';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.setAttribute('aria-label', 'Close');
-    head.appendChild(closeBtn);
-    var body = document.createElement('div');
-    body.className = 'modal-body';
-    if (typeof opts.body === 'string') body.innerHTML = opts.body;
-    else if (opts.body) body.appendChild(opts.body);
-    var foot = document.createElement('div');
-    foot.className = 'modal-footer';
-    function close() {
-      root.innerHTML = '';
-      document.removeEventListener('keydown', onKey);
-      if (opts.onClose) opts.onClose();
+export function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null) continue;
+      if (k === 'class') node.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
+      else if (k === 'html') node.innerHTML = v;
+      else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+      else if (k === 'dataset') Object.assign(node.dataset, v);
+      else if (v === true) node.setAttribute(k, '');
+      else if (k in node && k !== 'value' && k !== 'type') { try { node[k] = v; } catch { node.setAttribute(k, v); } }
+      else node.setAttribute(k, v);
     }
-    closeBtn.onclick = close;
-    function onKey(e) { if (e.key === 'Escape') close(); }
-    (opts.actions || [{ id: 'ok', label: 'OK', primary: true }]).forEach((a) => {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn' + (a.primary ? ' btn-primary' : '') + (a.danger ? ' btn-danger' : '');
-      b.textContent = a.label;
-      b.onclick = () => {
-        if (a.onClick) a.onClick(close);
-        else close();
-      };
-      foot.appendChild(b);
-      if (a.primary) setTimeout(() => b.focus(), 0);
+  }
+  for (const c of children.flat(Infinity)) {
+    if (c == null) continue;
+    node.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return node;
+}
+
+export function clear(node) {
+  while (node && node.firstChild) node.removeChild(node.firstChild);
+  return node;
+}
+
+export function qs(sel, root = document) { return root.querySelector(sel); }
+export function qsa(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
+
+// ---- toasts -----------------------------------------------------------
+
+export function toast(message, kind = 'info', timeout = 4200) {
+  const root = qs('#toast-root');
+  if (!root) return;
+  const t = el('div', { class: 'toast ' + kind, role: 'status' }, message);
+  root.appendChild(t);
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transition = 'opacity 240ms';
+    setTimeout(() => t.remove(), 260);
+  }, timeout);
+}
+
+// ---- modals --------------------------------------------------------------
+
+export function openModal({ title, body, footer, closeText = 'Close' }) {
+  let box;
+  const backdrop = el('div', { class: 'backdrop' }, (box = el('div', {
+    class: 'modal',
+    role: 'dialog',
+    'aria-modal': 'true',
+  })));
+  if (title) box.appendChild(el('h2', {}, title));
+  if (body) box.appendChild(el('div', {}, body));
+  if (footer) box.appendChild(el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)', justifyContent: 'flex-end' } }, footer));
+
+  function close() {
+    backdrop.remove();
+    document.removeEventListener('keydown', onKey);
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+  }
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+  document.addEventListener('keydown', onKey);
+  (qs('#modal-root') || document.body).appendChild(backdrop);
+  const first = box.querySelector('input, button, textarea, select, [tabindex]');
+  if (first) setTimeout(() => first.focus(), 30);
+  return { close, box };
+}
+
+export function confirmDialog({ title, message, confirmText = 'Confirm', danger = false, onConfirm }) {
+  let doClose = () => {};
+  const cancelBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const okBtn = el('button', { class: danger ? 'btn danger' : 'btn primary', type: 'button' }, confirmText);
+  const modal = openModal({
+    title, body: el('p', {}, message),
+    footer: [cancelBtn, okBtn],
+  });
+  doClose = modal.close;
+  cancelBtn.addEventListener('click', doClose);
+  okBtn.addEventListener('click', async () => {
+    try { await onConfirm(); } finally { doClose(); }
+  });
+  return modal;
+}
+
+// ---- popovers -----------------------------------------------------------
+
+export function showPopover(anchor, items, { onSelect } = {}) {
+  const root = qs('#popover-root') || document.body;
+  const pop = el('div', { class: 'popover', hidden: true });
+  for (const item of items || []) {
+    if (item.sep) { pop.appendChild(el('div', { class: 'pop-sep' })); continue; }
+    const b = el('button', { class: 'pop-item ' + (item.danger ? 'danger' : '') }, (() => {
+      if (item.html) return item.html();
+      const wrap = el('span', {});
+      wrap.append(el('span', {}, item.label));
+      if (item.desc) wrap.append(el('span', { class: 'pop-desc' }, item.desc));
+      return wrap;
+    })());
+    b.addEventListener('click', () => {
+      hidePopover();
+      if (onSelect) onSelect(item);
+      else if (item.onClick) item.onClick();
     });
-    scrim.addEventListener('mousedown', (e) => { if (e.target === scrim) close(); });
+    pop.appendChild(b);
+  }
+  root.appendChild(pop);
+  // position
+  const r = anchor.getBoundingClientRect();
+  pop.removeAttribute('hidden');
+  const pr = pop.getBoundingClientRect();
+  let left = r.left;
+  let top = r.bottom + 6;
+  if (left + pr.width > innerWidth - 8) left = innerWidth - pr.width - 8;
+  if (top + pr.height > innerHeight - 8) top = Math.max(8, r.top - pr.height - 6);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  function hide(e) {
+    if (e && pop.contains(e.target)) return;
+    hidePopover();
+  }
+  function hidePopover() {
+    pop.remove();
+    document.removeEventListener('pointerdown', hide);
+    document.removeEventListener('keydown', onKey);
+  }
+  function onKey(e) { if (e.key === 'Escape') hidePopover(); }
+  setTimeout(() => {
+    document.addEventListener('pointerdown', hide);
     document.addEventListener('keydown', onKey);
-    box.append(head, body, foot);
-    scrim.appendChild(box);
-    root.appendChild(scrim);
-    return close;
-  }
+  }, 0);
+  return { pop, hide: hidePopover };
+}
 
-  function confirmDialog(opts) {
-    return new Promise((resolve) => {
-      var msg = document.createElement('p');
-      msg.textContent = opts.message || 'Are you sure?';
-      openModal({
-        title: opts.title || 'Confirm',
-        body: msg,
-        onClose: () => resolve(false),
-        actions: [
-          { id: 'cancel', label: opts.cancelText || 'Cancel' },
-          {
-            id: 'ok', label: opts.confirmText || 'Confirm', primary: !opts.danger, danger: !!opts.danger,
-            onClick: (close) => { close(); resolve(true); },
-          },
-        ],
-      });
-    });
-  }
+// ---- time -----------------------------------------------------------------
 
-  function skeletons(n, cls) {
-    var html = '';
-    for (var i = 0; i < (n || 3); i++) html += '<div class="skeleton skeleton-text"></div>';
-    return '<div class="' + (cls || 'stack') + '" aria-busy="true" aria-label="Loading">' + html + '</div>';
-  }
+export function relTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const s = (Date.now() - d.getTime()) / 1000;
+  if (s < 45) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm';
+  if (s < 86400) return Math.floor(s / 3600) + 'h';
+  if (s < 604800) return Math.floor(s / 86400) + 'd';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
-  function emptyState(o) {
-    return (
-      '<div class="empty-state" role="status">' +
-      '<div class="empty-state-icon" aria-hidden="true">' + (o.icon || '○') + '</div>' +
-      '<h3 class="empty-state-title">' + esc(o.title || 'Nothing here yet') + '</h3>' +
-      '<p class="empty-state-text">' + esc(o.hint || '') + '</p>' +
-      '<div class="actions">' + (o.actions || '') + '</div></div>'
-    );
-  }
+export function fullTime(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
+}
 
-  function errorState(message, retryLabel) {
-    return (
-      '<div class="empty-state" role="alert">' +
-      '<div class="empty-state-icon" aria-hidden="true">⚠</div>' +
-      '<h3 class="empty-state-title">Something went wrong</h3>' +
-      '<p class="empty-state-text">' + esc(message || 'Request failed.') + '</p>' +
-      '<div class="actions"><button type="button" class="btn btn-primary" data-retry>' +
-      esc(retryLabel || 'Retry') + '</button></div></div>'
-    );
-  }
-
-  function avatarHtml(name, size) {
-    var n = String(name || '?').trim() || '?';
-    var hue = 0;
-    for (var i = 0; i < n.length; i++) hue = (hue * 31 + n.charCodeAt(i)) % 360;
-    return '<span class="avatar ' + (size || '') + '" aria-hidden="true" style="background:hsl(' +
-      hue + ',45%,42%)">' + esc(n[0].toUpperCase()) + '</span>';
-  }
-
-  function badge(text, kind) {
-    var cls = 'badge';
-    if (kind === 'owner') cls += ' badge-primary';
-    else if (kind === 'pub') cls += ' badge-success';
-    else if (kind === 'priv') cls += ' badge-secondary';
-    return '<span class="' + cls + '">' + esc(text) + '</span>';
-  }
-
-  function timeAgo(iso) {
-    if (!iso) return 'never';
-    var t = new Date(iso).getTime();
-    if (isNaN(t)) return 'never';
-    var s = Math.max(0, (Date.now() - t) / 1000);
-    if (s < 60) return 'just now';
-    if (s < 3600) return Math.floor(s / 60) + 'm ago';
-    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-    if (s < 86400 * 7) return Math.floor(s / 86400) + 'd ago';
-    return new Date(t).toLocaleDateString();
-  }
-
-  function fullDate(iso) {
-    if (!iso) return '—';
-    var d = new Date(iso);
-    return isNaN(d) ? '—' : d.toLocaleString();
-  }
-
-  function fieldError(input, msg) {
-    input.setAttribute('aria-invalid', msg ? 'true' : 'false');
-    var err = input.parentElement.querySelector('.field-err');
-    if (!err) {
-      err = document.createElement('div');
-      err.className = 'field-err';
-      input.after(err);
-    }
-    err.textContent = msg || '';
-    return !msg;
-  }
-
-  function setLoading(btn, loading, label) {
-    if (!btn) return;
-    if (loading) {
-      btn.dataset.label = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = label || 'Working…';
-    } else {
-      btn.disabled = false;
-      if (btn.dataset.label) btn.textContent = btn.dataset.label;
-    }
-  }
-
-  function dayLabel(iso) {
-    var d = new Date(iso);
-    if (isNaN(d)) return '';
-    var nowD = new Date();
-    var day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    var today = new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate());
-    var diff = Math.round((today - day) / 86400000);
-    if (diff <= 0) return 'Today';
-    if (diff === 1) return 'Yesterday';
-    return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: d.getFullYear() === nowD.getFullYear() ? undefined : 'numeric' });
-  }
-
-  function closeCtx() {
-    var root = document.getElementById('ctx-root');
-    if (root) root.innerHTML = '';
-    document.removeEventListener('keydown', ctxKey);
-  }
-
-  function ctxKey(e) {
-    if (e.key === 'Escape') closeCtx();
-  }
-
-  // Minimal permission-aware context menu. items: [{ label, icon, danger,
-  // onClick, hidden }]. Anchored at x/y, clamped to the viewport, keyboard
-  // dismissible, single-flight.
-  function contextMenu(x, y, items) {
-    closeCtx();
-    var list = (items || []).filter((it) => it && !it.hidden);
-    if (!list.length) return;
-    var root = document.getElementById('ctx-root');
-    if (!root) return;
-    var menu = document.createElement('div');
-    menu.className = 'ctx-menu';
-    menu.setAttribute('role', 'menu');
-    menu.style.position = 'fixed';
-    list.forEach((it) => {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.setAttribute('role', 'menuitem');
-      if (it.danger) b.className = 'danger';
-      b.innerHTML = (it.icon ? '<svg aria-hidden="true"><use href="#' + it.icon + '"/></svg>' : '') +
-        '<span>' + esc(it.label) + '</span>';
-      b.onclick = () => { closeCtx(); it.onClick && it.onClick(); };
-      menu.appendChild(b);
-    });
-    root.appendChild(menu);
-    var r = menu.getBoundingClientRect();
-    menu.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
-    menu.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
-    document.addEventListener('keydown', ctxKey);
-    setTimeout(() => {
-      document.addEventListener('mousedown', function outside(e) {
-        if (!menu.contains(e.target)) {
-          closeCtx();
-          document.removeEventListener('mousedown', outside);
-        }
-      });
-    }, 0);
-    var first = menu.querySelector('button');
-    if (first) first.focus({ preventScroll: true });
-  }
-
-  // Long-press for touch screens: fires fn(x, y) after 550ms of steady
-  // touch. Movement cancels. Never the only path — every long-press target
-  // also has a visible affordance (buttons, ⋮) or contextmenu handler.
-  function longPress(el, fn) {
-    var timer = null;
-    var sx = 0;
-    var sy = 0;
-    el.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) return;
-      sx = e.touches[0].clientX;
-      sy = e.touches[0].clientY;
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        fn(sx, sy);
-      }, 550);
-    }, { passive: true });
-    el.addEventListener('touchmove', (e) => {
-      if (!timer) return;
-      var t = e.touches[0];
-      if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) {
-        clearTimeout(timer);
-        timer = null;
-      }
-    }, { passive: true });
-    el.addEventListener('touchend', () => {
-      clearTimeout(timer);
-      timer = null;
-    });
-    el.addEventListener('touchcancel', () => {
-      clearTimeout(timer);
-      timer = null;
-    });
-  }
-
-  // Bind long-press to every element matching selector under root that
-  // doesn't already have one. Call after each list render.
-  function bindLongPress(root, selector, fn) {
-    root.querySelectorAll(selector).forEach((el) => {
-      if (el.dataset.lpBound) return;
-      el.dataset.lpBound = '1';
-      longPress(el, (x, y) => fn(el, x, y));
-    });
-  }
-
-  // Re-dispatch as contextmenu so touch/long-press flows through the exact
-  // same permission-aware menu code as right-click. One code path.
-  function fireContextMenu(el, x, y) {
-    el.dispatchEvent(new MouseEvent('contextmenu', {
-      bubbles: true, cancelable: true, clientX: x, clientY: y,
-    }));
-  }
-
-  // Layout state comes from the single canonical source (presentation.js).
-  // All layout-dependent JS asks TrycordPresentation.isMobile() — never a
-  // private width sniff. Visual layout stays in CSS.
-  function isMobileLayout() {
-    return !!(window.TrycordPresentation && window.TrycordPresentation.isMobile());
-  }
-
-  window.TrycordUi = {
-    esc, toast, openModal, confirmDialog, skeletons,
-    emptyState, errorState, avatarHtml, badge, timeAgo, fullDate, dayLabel,
-    fieldError, setLoading, contextMenu, closeCtx, longPress, bindLongPress,
-    fireContextMenu, isMobileLayout, icons, icon,
+export function mentionify(text, meUsername, meId) {
+  // Highlight @mentions and @me so the client can act on mentions.
+  // Pure presentation; no markdown engine. Also linkify bare URLs.
+  let out = esc(text);
+  const fmtMention = (m0, name) => {
+    const mine = name === meUsername || name === meId;
+    return '<span class="msg-mention">' + esc(m0) + '</span>';
   };
-})();
+  if (meUsername || meId) {
+    out = out.replace(/@((?:[A-Za-z0-9_.]{2,32})|me|Me)/g, fmtMention);
+  }
+  out = out.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+  out = out.replace(/\n/g, '<br>');
+  return out;
+}
+
+// ---- api base for attachment src ----------------------------------
+
+export function apiSrc(path) {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  return TrycordConfig.apiUrl().replace(/\/+$/, '') + path;
+}
+
+export default { esc, el, clear, toast, openModal, confirmDialog, showPopover, relTime, fullTime, mentionify, apiSrc };
