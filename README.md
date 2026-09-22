@@ -58,19 +58,22 @@ Set `HOST=127.0.0.1` for loopback only.
 
 **Run the web client separately (optional):**
 
-```bat
-cd trycord-client
-npm run serve   # 0.0.0.0:13331 by default (HOST/PORT env)
-```
-
-This serves static files only — no database, no API, no state. Point it at an
-instance without rebuilding:
+The web client is a pure static site (the server serves `trycord-client/`
+itself). To serve it from another static host, publish the folder anywhere;
+the client resolves its backend at runtime:
 
 ```bat
+# served by the Trycord server itself (default):
+#   http://localhost:9971  -> serves trycord-client/ automatically
+
+# alternative static host pinning the API origin in process env:
 set TRYCORD_API_URL=https://trycord.wispbyte.app
-set TRYCORD_INSTANCE_ID=official
-npm run serve
+# then point a static file server at the trycord-client/ directory
 ```
+
+The runtime config endpoint `/runtime-config.js` is only exposed by the
+Trycord server; a plain static host can rely on the `?api=` argument instead
+(desktop passes `--api-url=` automatically).
 
 **Run the desktop app:**
 
@@ -94,18 +97,14 @@ Output: `trycord-desktop/release/Trycord Setup x.x.x.exe` plus update metadata
 ## Point the client at another server
 
 One source of truth, no rebuild needed. Precedence: `?api=` launch argument
-(desktop `--api-url=`) → saved Server setting → `config.js` / runtime config
-(`window.TRYCORD_CONFIG.API_URL`) → default (`http://localhost:9971`, or
-same-origin when served by the server).
+(desktop `--api-url=`) → saved Server setting (localStorage) → runtime config
+(`window.TRYCORD_CONFIG.API_URL` from `/runtime-config.js`) → default
+(`http://localhost:9971`, or same-origin when served by the server).
 
-```js
-// trycord-client/config.js — e.g.:
-window.TRYCORD_CONFIG = { API_URL: 'http://51.79.44.111:9971' };
-```
-
-Or in the app: **Change** next to the server name on the login page (or
-Settings → Application → Test connection). WebSocket (`ws://`/`wss://`)
-derives from the same URL automatically. Only `http(s)` URLs are accepted.
+The client base URL is resolved at runtime in `trycord-client/js/config.js`.
+A deployment can pin the API origin without touching client files by setting
+`TRYCORD_API_URL` on the server, or the desktop exe can take `--api-url=`
+directly.
 
 ## Self-hosting
 
@@ -154,9 +153,10 @@ Trycord server (backend authority)
 Your database (SQLite file or MySQL)
 ```
 
-**`trycord-client`** — web access point. Static files only: app shell plus a
-tiny static file server (`serve.js`, `:13331`) with runtime config. No
-database, no API routes, no server state.
+**`trycord-client`** — web access point. Static files only: the supplied
+application shell (`index.html`), one stylesheet (`css/app.css`), and the
+ES-module JS client. No database, no API routes, no server state. The server
+serves this folder itself at `/`.
 
 **`trycord-desktop`** — desktop access point. The same client in an Electron
 window, with an auto-updater (Electron Builder + electron-updater, GitHub
@@ -181,13 +181,11 @@ trycord-server/src/
                      # invites, dms, friends, notifications, discovery, uploads
 
 trycord-client/
-├── index.html       # app shell (public + authenticated regions)
-├── serve.js         # access-point static server (:13331, runtime config)
-├── config.js        # runtime backend config (no rebuild to change)
-├── styles/          # tokens, theme, components, utilities, layout
-└── js/
-    ├── api.js state.js ui.js shell.js global-sync.js
-    ├── router.js app.js
+├── index.html       # supplied application shell (mobile + desktop presentations)
+├── css/app.css      # single stylesheet: tokens, spine -> environment, mobile, overlays
+└── js/              # ES modules
+    ├── app.js config.js api.js state.js ui.js components.js
+    ├── realtime.js presentation.js shell.js router.js
     ├── pages-public.js pages-home.js pages-browse.js
     └── pages-account.js pages-dms.js pages-workspace.js
 ```

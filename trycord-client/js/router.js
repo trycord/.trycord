@@ -1,201 +1,206 @@
-/* Hash router with auth guards. Public: #/ #/login #/register.
-   App (require session): everything else. DM detail: #/dm/:id. */
-(function () {
-  var C = window.TrycordComponents;
-  var Pub = window.TrycordPagesPublic;
-  var Home = window.TrycordPagesHome;
-  var Browse = window.TrycordPagesBrowse;
-  var Dms = window.TrycordPagesDms;
-  var Ws = window.TrycordPagesWorkspace;
-  var Acct = window.TrycordPagesAccount;
+// Hash router. Maps #/... routes to real page renderers. Guards routes,
+// re-renders the active shell's chrome, and cleans up listeners on change.
 
-  function showShell(which) {
-    document.getElementById('shell-public').hidden = which !== 'public';
-    var desk = !!window.TrycordPresentation && TrycordPresentation.isDesktop();
-    if (which === 'app') {
-      document.getElementById('shell-app').hidden = desk;
-      var ds = document.getElementById('shell-desktop');
-      if (ds) ds.hidden = !desk;
-      var skip = document.querySelector('.skip-link');
-      if (skip) skip.setAttribute('href', desk ? '#desk-view' : '#view');
-    } else {
-      document.getElementById('shell-app').hidden = true;
-      var d2 = document.getElementById('shell-desktop');
-      if (d2) d2.hidden = true;
-    }
+import { isAuthed, refreshServers } from './state.js';
+import PagesPublic from './pages-public.js';
+import { renderHome } from './pages-home.js';
+import { renderBrowse } from './pages-browse.js';
+import HelloDms from './pages-dms.js';
+import Workspace from './pages-workspace.js';
+import { renderAccount } from './pages-account.js';
+import { presentationMode, closeMobileDrawer } from './presentation.js';
+import { setNavRoute, renderAllChrome, renderContextHeader, renderMobileHeader } from './shell.js';
+import Api from './api.js';
+import { el, clear, toast } from './ui.js';
+
+let lastCleanup = null;
+let lastRoute = '';
+
+// The active view region depends on the presentation.
+function viewRegion() {
+  return presentationMode() === 'mobile'
+    ? document.getElementById('mobile-main')
+    : document.getElementById('view-root');
+}
+
+function activeShell() {
+  return presentationMode() === 'mobile' ? 'mobile' : 'desktop';
+}
+
+function runCleanup() {
+  if (lastCleanup) { try { lastCleanup(); } catch { /* ignore */ } lastCleanup = null; }
+}
+
+function setCleanup(fn) {
+  runCleanup();
+  lastCleanup = fn;
+}
+
+function parseHash() {
+  const raw = (location.hash || '#/').replace(/^#/, '');
+  if (!raw || raw === '/') return { name: 'home' };
+  const parts = raw.split('/').filter(Boolean).map(decodeURIComponent);
+  return { path: raw, parts };
+}
+
+function requireAuth() {
+  if (!isAuthed()) {
+    return false;
+  }
+  return true;
+}
+
+async function run() {
+  const { path, parts } = parseHash();
+  const region = viewRegion();
+  if (!region) return;
+
+  setNavRoute(() => path);
+  runCleanup();
+
+  closeMobileDrawer();
+
+  // --- public-only routes -----------------------------------------
+  if (path.startsWith('/login') || path === '' || path === '/') {
+    if (isAuthed()) { location.hash = '#/home'; return; }
+    renderContextHeader({});
+    PagesPublic.login(region);
+    setNavRoute(() => '/login');
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/register')) {
+    if (isAuthed()) { location.hash = '#/home'; return; }
+    PagesPublic.register(region);
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/forgot')) {
+    if (isAuthed()) { location.hash = '#/home'; return; }
+    PagesPublic.forgot(region);
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/legal/')) {
+    PagesPublic.legal(region, parts[1]);
+    renderAllChrome();
+    return;
   }
 
-  // Presentation crossings switch which shell is active AND re-render the
-  // view into the newly active shell (each shell owns its own view DOM, so
-  // the other shell's view would otherwise be empty). Composer drafts are
-  // preserved across the move: capture text, render, then restore it into
-  // the new shell's composer.
-  function applyShellPresentation() {
-    var draft = saveComposerDraft();
-    var loggedIn = !!(window.TrycordState && TrycordState.user);
-    if (!loggedIn) { showShell('public'); return; }
-    showShell('app');
-    updateBackButton(parse());
-    route().then(function () {
-      if (draft) restoreComposerDraft(draft);
-    });
+  // --- discover is public to browse, guarded to join -------------
+  if (path.startsWith('/discover')) {
+    const previewId = parts[1] || null;
+    await renderBrowse(region, { previewId });
+    renderAllChrome();
+    return;
   }
 
-  function saveComposerDraft() {
-    var root = TrycordShell.root();
-    if (!root) return null;
-    var ta = root.querySelector('#msg-input, #dm-input');
-    if (!ta || !ta.value) return null;
-    return { key: hashKey(location.hash), value: ta.value };
+  // --- everything below requires a session -------------------------
+  if (!requireAuth()) {
+    renderAllChrome();
+    location.hash = '#/login';
+    return;
   }
 
-  function restoreComposerDraft(draft) {
-    if (!draft) return;
-    var ta = TrycordShell.el('view');
-    if (!ta) return;
-    var input = ta.querySelector('#msg-input, #dm-input');
-    if (!input || hashKey(location.hash) !== draft.key) return;
-    input.value = draft.value;
+  // Warm the server list (we render chrome from it).
+  try { await refreshServers().catch(() => {}); } catch { /* offline */ }
+
+  // --- friends / dms -------------------------------------------------
+  if (path.startsWith('/friends')) {
+    setCleanup(() => { HelloDms.leaveDm(); });
+    await HelloDms.renderFriendsPage(region);
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/dms/')) {
+    setCleanup(() => { HelloDms.leaveDm(); });
+    await HelloDms.renderDms(region, { id: parts[1] });
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/dms')) {
+    setCleanup(() => { HelloDms.leaveDm(); });
+    await HelloDms.renderDms(region, {});
+    renderAllChrome();
+    return;
   }
 
-  function hashKey(h) {
-    return (h || '').replace(/^#/, '');
-  }
+  // --- account --------------------------------------------------------
+  if (path.startsWith('/account/password')) { await renderAccount(region, { tab: 'password' }); renderAllChrome(); return; }
+  if (path.startsWith('/account/sessions')) { await renderAccount(region, { tab: 'sessions' }); renderAllChrome(); return; }
+  if (path.startsWith('/account')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
 
-  function closeNav() {
-    document.body.classList.remove('nav-open');
-    document.body.classList.remove('side-open');
-    var scrim = TrycordShell.el('nav-scrim');
-    if (scrim) scrim.hidden = true;
-    var t = TrycordShell.el('nav-toggle');
-    if (t) t.setAttribute('aria-expanded', 'false');
-  }
-
-  // Mobile back button: visible on detail screens in mobile layout only.
-  // (CSS keeps it hidden on desktop regardless.)
-  function updateBackButton(r) {
-    var back = TrycordShell.el('nav-back');
-    if (!back) return;
-    var detail = r.name === 'workspace' || r.name === 'dm-detail' ||
-      r.name === 'preview' || r.name === 'settings';
-    back.hidden = !(detail && window.TrycordUi.isMobileLayout());
-  }
-
-  function parse() {
-    var h = location.hash || '#/';
-    var segs = h.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
-    if (segs.length === 1 && segs[0] === '') return { name: 'landing' };
-    if (segs[0] === 'server' && segs[1]) {
-      return { name: 'workspace', id: segs[1], tab: segs[2] || 'overview', channel: segs[3] || null };
-    }
-    if (segs[0] === 'dm' && segs[1]) {
-      return { name: 'dm-detail', id: segs[1] };
-    }
-    if (segs[0] === 'discover' && segs[1]) {
-      return { name: 'preview', id: segs[1] };
-    }
-    if (segs[0] === 'reset-password') return { name: 'reset-password', token: segs[1] || null };
-    if (segs[0] === 'verify-email') return { name: 'verify-email', token: segs[1] || null };
-    if (segs[0] === 'forgot-password') return { name: 'forgot-password' };
-    var simple = ['login', 'register', 'home', 'servers', 'discover', 'join', 'activity', 'favorites', 'dm', 'settings'];
-    if (simple.indexOf(segs[0]) !== -1) return { name: segs[0] };
-    return { name: 'unknown' };
-  }
-
-  var navigating = false;
-  async function route() {
-    if (navigating) return;
-    navigating = true;
+  // --- joins ------------------------------------------------------------
+  if (path.startsWith('/invite/')) {
+    const code = parts[1];
+    renderContextHeader({ title: 'Joining', sub: code });
+    clear(region);
+    region.appendChild(el('div', { class: 'empty-state' }, 'Joining…'));
     try {
-      C.closeMenus();
-      if (window.TrycordUi) TrycordUi.closeCtx();
-      closeNav();
-      if (window.TrycordPagesWorkspace && TrycordPagesWorkspace.cleanup) {
-        TrycordPagesWorkspace.cleanup();
-      }
-      if (window.TrycordPagesDms && TrycordPagesDms.cleanup) {
-        TrycordPagesDms.cleanup();
-      }
-      var r = parse();
-      var loggedIn = !!(window.TrycordState && TrycordState.user);
-
-      if (r.name === 'landing') {
-        if (loggedIn) { location.hash = '#/home'; return; }
-        showShell('public');
-        Pub.landing(document.getElementById('view-public'));
-        document.title = 'Trycord';
-        return;
-      }
-      if (r.name === 'login' || r.name === 'register') {
-        if (loggedIn) { location.hash = '#/home'; return; }
-        showShell('public');
-        (r.name === 'login' ? Pub.login : Pub.register)(document.getElementById('view-public'));
-        document.title = (r.name === 'login' ? 'Log in' : 'Sign up') + ' · Trycord';
-        return;
-      }
-      // Recovery routes are public (the token IS the credential) and work
-      // even when a stale session exists in this tab.
-      if (r.name === 'forgot-password') {
-        showShell('public');
-        Pub.forgotPassword(document.getElementById('view-public'));
-        document.title = 'Reset password · Trycord';
-        return;
-      }
-      if (r.name === 'reset-password') {
-        showShell('public');
-        Pub.resetPassword(document.getElementById('view-public'), r.token);
-        document.title = 'Set a new password · Trycord';
-        return;
-      }
-      if (r.name === 'verify-email') {
-        showShell('public');
-        Pub.verifyEmail(document.getElementById('view-public'), r.token);
-        document.title = 'Verify email · Trycord';
-        return;
-      }
-
-      if (!loggedIn) {
-        showShell('public');
-        location.hash = '#/login';
-        return;
-      }
-      showShell('app');
-      var activeHash = '#/' + r.name.split('/')[0];
-      if (r.name === 'workspace') activeHash = '#/servers';
-      if (r.name === 'preview') activeHash = '#/discover';
-      if (r.name === 'dm-detail') activeHash = '#/dm';
-      updateBackButton(r);
-      C.renderRail(activeHash);
-      C.renderUser();
-      C.hideServerNav();
-      var panel = TrycordShell.el('member-panel');
-      if (panel) panel.hidden = true;
-      var view = TrycordShell.el('view');
-
-      switch (r.name) {
-        case 'home': await Home.home(view); break;
-        case 'servers': Browse.servers(view); break;
-        case 'discover': await Browse.discover(view); break;
-        case 'preview': await Browse.preview(view, r.id); break;
-        case 'join': Browse.join(view); break;
-        case 'activity': await Browse.activity(view); break;
-        case 'favorites': Browse.favorites(view); break;
-        case 'dm': await Dms.list(view); break;
-        case 'dm-detail': await Dms.conversation(view, r.id); break;
-        case 'settings': Acct.settings(view); break;
-        case 'workspace':
-          await Ws.workspace(view, r.id, r.tab, r.channel);
-          break;
-        default: location.hash = '#/home'; return;
-      }
-      var pt = TrycordShell.el('page-title');
-      document.title = (pt ? pt.textContent : 'Trycord') + ' · Trycord';
-      view.focus({ preventScroll: true });
-      window.scrollTo(0, 0);
-    } finally {
-      navigating = false;
+      const res = await Api.joinInvite(code);
+      await refreshServers();
+      toast('You joined the server.', 'ok');
+      location.hash = '#/server/' + res.serverId;
+      return;
+    } catch (ex) {
+      clear(region);
+      region.appendChild(el('div', { class: 'form-error' }, ex.message || 'Invite invalid'));
+      renderAllChrome();
+      return;
     }
   }
 
-  window.TrycordRouter = { route, parse, refreshChrome: () => updateBackButton(parse()), applyShellPresentation };
-})();
+  // --- servers -----------------------------------------------------
+  if (path.startsWith('/servers/new')) {
+    await Workspace.renderNewServer(region);
+    renderAllChrome();
+    return;
+  }
+  if (parts[0] === 'server' && parts[1]) {
+    const serverId = parts[1];
+    const what = parts[2];
+    if (what === 'channel' && parts[3]) {
+      setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
+      await Workspace.renderChannel(region, serverId, parts[3]);
+      renderAllChrome();
+      return;
+    }
+    if (what === 'channels') { // /server/:id/channels/new
+      await Workspace.renderNewChannel(region, serverId);
+      renderAllChrome();
+      return;
+    }
+    if (what === 'invites') {
+      await Workspace.renderInvites(region, serverId);
+      renderAllChrome();
+      return;
+    }
+    if (what === 'settings') {
+      await Workspace.renderServerSettings(region, serverId);
+      renderAllChrome();
+      return;
+    }
+    if (parts.length === 2) {
+      await Workspace.renderServerLanding(region, serverId);
+      renderAllChrome();
+      return;
+    }
+    await Workspace.renderServerLanding(region, serverId);
+    renderAllChrome();
+    return;
+  }
+
+  // --- home as default ---------------------------------------------------
+  await renderHome(region);
+  renderAllChrome();
+}
+
+const Router = {
+  init() {
+    window.addEventListener('hashchange', () => run());
+    return run();
+  },
+  run,
+};
+
+export default Router;

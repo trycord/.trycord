@@ -104,18 +104,16 @@ function createWindow() {
         win.reload();
         await new Promise((res) => setTimeout(res, 6000));
         const out = await win.webContents.executeJavaScript(`(() => {
-          const desk = !!document.getElementById('shell-desktop')
-            && !document.getElementById('shell-desktop').hidden;
-          const shell = !!document.getElementById('shell-app')
-            && !document.getElementById('shell-app').hidden;
-          const rail = document.querySelectorAll((desk ? '#shell-desktop ' : '#shell-app ') + '.presence-spine .spine-place[data-nav]').length;
-          const title = document.getElementById(desk ? 'desk-page-title' : 'page-title').textContent;
-          const atrium = !!(desk
-            ? document.querySelector('#desk-view .atrium')
-            : document.querySelector('#view .atrium'));
+          const desk = !!document.getElementById('desktop-shell')
+            && !document.getElementById('desktop-shell').hidden;
+          const mobile = !!document.getElementById('mobile-shell')
+            && !document.getElementById('mobile-shell').hidden;
+          const rail = document.querySelectorAll('#global-navigation .nav-row[data-nav]').length;
+          const title = (document.getElementById('context-title') || {}).textContent || '';
+          const atrium = !!document.querySelector('#view-root .atrium');
           const pres = (typeof window.TrycordPresentation !== 'undefined')
             ? window.TrycordPresentation.mode() : 'unset';
-          return 'desk-shell-visible=' + desk + ' shell-app-visible=' + shell + ' rail-tabs=' + rail + ' title=' + title + ' atrium=' + (atrium ? 'yes' : 'no') + ' presentation=' + pres;
+          return 'desk-shell-visible=' + desk + ' mobile-shell-visible=' + mobile + ' rail-tabs=' + rail + ' title=' + title + ' atrium=' + (atrium ? 'yes' : 'no') + ' presentation=' + pres;
         })()`);
         console.log('[smoke] home: ' + out);
         if (!String(out).includes('rail-tabs=4') || !String(out).includes('atrium=yes') ||

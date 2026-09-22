@@ -1,90 +1,88 @@
-/* Presentation State — the single source of truth for which layout state
-   Trycord renders: MOBILE or DESKTOP.
+// Presentation. Chooses and applies the active shell (mobile vs desktop)
+// based on real geometry, not platform sniffing. Both shells live in the
+// supplied index.html; only one is visible at a time.
 
-   Sets <html data-presentation="mobile|desktop"> (and <body> once it exists)
-   and fires `trycord:presentation` on changes.
+const BREAKPOINT = 900;
+let modeCache = null; // 'mobile' | 'desktop'
+let onChange = null;
 
-   Two DELIBERATE shells, never a merged layout:
-   - #shell-app      → MobileShell (preserved current UI)
-   - #shell-desktop  → DesktopShell (separate DOM, built from zero)
-   Business logic/state is shared; the shell DOM and presentation are not.
+export function presentationMode() {
+  return modeCache || 'desktop';
+}
 
-   Rules:
-   - All layout-dependent JS asks TrycordPresentation.isMobile()/isDesktop().
-     Never sniff a private width inside a feature file.
-   - Chrome lookups go through TrycordShell.el(id) / .root() / .qsa() so they
-     resolve into whichever shell is active. Page renderers receive their
-     content root as a parameter and stay shell-agnostic.
-   - Overlay/business roots (#menu-root, #modal-root, #toasts, #ctx-root,
-     #palette-root, #offline-banner) stay global — they are not shell chrome.
-   - Visual responsiveness remains in CSS. This module only mirrors the
-     decisive breakpoint (max-width: 900px) into the app as self-knowledge.
-   - Never re-render the view from the change handler: that would wipe
-     composer drafts.
-*/
-(function () {
-  var BREAKPOINT = '(max-width: 900px)';
-  var mq = null;
-  try {
-    mq = window.matchMedia(BREAKPOINT);
-  } catch (e) { /* very old browsers: desktop */ }
-
-  function current() {
-    return mq && mq.matches ? 'mobile' : 'desktop';
+export function setPresentation(mode) {
+  if (mode !== 'mobile' && mode !== 'desktop') mode = 'desktop';
+  if (modeCache === mode && modeCache) {
+    // Still need the DOM correct on first call.
+    return mode;
   }
+  modeCache = mode;
+  apply(mode);
+  if (onChange) try { onChange(mode); } catch { /* ignore */ }
+  return mode;
+}
 
-  function apply() {
-    var p = current();
-    document.documentElement.setAttribute('data-presentation', p);
-    if (document.body) document.body.setAttribute('data-presentation', p);
-    return p;
+function apply(mode) {
+  const mobile = document.getElementById('mobile-shell');
+  const desktop = document.getElementById('desktop-shell');
+  if (!mobile || !desktop) return;
+  mobile.hidden = mode !== 'mobile';
+  desktop.hidden = mode !== 'desktop';
+  document.documentElement.dataset.presentation = mode;
+  // Keep focus/scroll sane across presentation switches.
+  if (mode === 'mobile') {
+    const main = document.getElementById('mobile-main');
+    if (main) main.scrollTop = 0;
+  } else {
+    const view = document.getElementById('view-root');
+    if (view) view.scrollTop = 0;
   }
+  closeMobileDrawer();
+}
 
-  function fire() {
-    apply();
-    try {
-      document.dispatchEvent(new CustomEvent('trycord:presentation', {
-        detail: { presentation: current() },
-      }));
-    } catch (e) { /* old browsers */ }
-  }
+export function updateFromViewport() {
+  const want = window.innerWidth < BREAKPOINT ? 'mobile' : 'desktop';
+  setPresentation(want);
+  return want;
+}
 
-  if (mq) {
-    if (mq.addEventListener) mq.addEventListener('change', fire);
-    else if (mq.addListener) mq.addListener(fire);
-  }
-  apply();
+// ---- mobile drawer --------------------------------------------------------
 
-  window.TrycordPresentation = {
-    isMobile: function () { return current() === 'mobile'; },
-    isDesktop: function () { return current() === 'desktop'; },
-    mode: current,
-  };
+export function isMobileDrawerOpen() {
+  const drawer = document.getElementById('mobile-navigation');
+  return !!drawer && drawer.classList.contains('open');
+}
 
-  // Shell resolution. Desktop uses desk-* ids to avoid clashing with the
-  // preserved MobileShell; everything maps here.
-  var DESK_PREFIX = 'desk-';
-  window.TrycordShell = {
-    active: function () { return TrycordPresentation.isDesktop() ? 'desktop' : 'mobile'; },
-    root: function () {
-      return document.getElementById(TrycordPresentation.isDesktop() ? 'shell-desktop' : 'shell-app');
-    },
-    // Logical id → element in the ACTIVE shell. Business roots stay unprefixed.
-    el: function (id) {
-      if (id === 'mobilebar' && TrycordPresentation.isDesktop()) return null;
-      if (id === 'menu-root' || id === 'modal-root' || id === 'toasts' ||
-          id === 'ctx-root' || id === 'palette-root' || id === 'offline-banner') {
-        return document.getElementById(id);
-      }
-      return document.getElementById(TrycordPresentation.isDesktop() ? DESK_PREFIX + id : id);
-    },
-    q: function (sel) {
-      var root = this.root();
-      return root ? root.querySelector(sel) : null;
-    },
-    qsa: function (sel) {
-      var root = this.root();
-      return root ? Array.prototype.slice.call(root.querySelectorAll(sel)) : [];
-    },
-  };
-})();
+export function openMobileDrawer() {
+  const drawer = document.getElementById('mobile-navigation');
+  const toggle = document.getElementById('mobile-nav-toggle');
+  if (!drawer) return;
+  drawer.hidden = false;
+  drawer.classList.add('open');
+  if (toggle) toggle.setAttribute('aria-expanded', 'true');
+}
+
+export function closeMobileDrawer() {
+  const drawer = document.getElementById('mobile-navigation');
+  const toggle = document.getElementById('mobile-nav-toggle');
+  if (!drawer) return;
+  drawer.classList.remove('open');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+export function onPresentationChange(fn) {
+  onChange = fn;
+}
+
+const TrycordPresentation = {
+  mode: presentationMode,
+  set: setPresentation,
+  viewport: updateFromViewport,
+  openDrawer: openMobileDrawer,
+  closeDrawer: closeMobileDrawer,
+  isDrawerOpen: isMobileDrawerOpen,
+  onChange: onPresentationChange,
+};
+
+export { TrycordPresentation };
+export default TrycordPresentation;

@@ -1,234 +1,86 @@
-/* Boot: shell wiring, session restore, connection status, routing. */
-(function () {
-  var C = window.TrycordComponents;
-  var Ui = window.TrycordUi;
+// Trycord client entrypoint (ES module).
+// Boot order: runtime config -> presentation -> shell wiring -> realtime -> router.
 
-  var Trycord = {
-    async refreshServers() {
-      try {
-        TrycordState.setServers(await TrycordApi.myServers());
-      } catch (e) {
-        TrycordState.setServers([]);
-      }
-      C.renderRail(location.hash);
-    },
+import { TrycordConfig } from './config.js';
+import { updateFromViewport, closeMobileDrawer, openMobileDrawer, onPresentationChange, setPresentation } from './presentation.js';
+import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends } from './state.js';
+import Realtime from './realtime.js';
+import Router from './router.js';
+import { renderAllChrome } from './shell.js';
+import { qs } from './ui.js';
+import TrycordPresentation from './presentation.js';
 
-    async refreshSocial() {
-      await Promise.all([
-        C.refreshDMList(),
-        C.refreshFriends(),
-        C.refreshNotifications(),
-      ]);
-    },
+let startup = Promise.resolve(null);
 
-    async logout() {
-      try { await TrycordApi.logout(); } catch (e) { /* token may already be dead */ }
-      TrycordApi.token = null;
-      TrycordState.user = null;
-      if (window.TrycordPagesWorkspace) TrycordPagesWorkspace.cleanup();
-      if (window.TrycordPagesDms) TrycordPagesDms.cleanup();
-      location.hash = '#/login';
-      Ui.toast('Logged out.', 'info');
-    },
+window.TrycordPresentation = TrycordPresentation;
 
-    setOnline(online) {
-      var pill = TrycordShell.el('conn-pill');
-      if (!pill) return;
-      var text = TrycordShell.el('conn-text');
-      var dot = pill.querySelector('.dot');
-      if (dot) dot.className = 'dot' + (online ? '' : ' dot-bad');
-      if (text) text.textContent = online ? 'Online' : 'Offline';
-      var banner = document.getElementById('offline-banner');
-      if (banner) banner.hidden = online;
-    },
-  };
-  window.Trycord = Trycord;
+async function boot() {
+  // 1) Remote runtime config (server-pinned API) — best-effort.
+  try { await TrycordConfig.loadRuntimeConfig(); } catch { /* ignore */ }
 
-  function showStaleClientNotice() {
-    if (document.getElementById('stale-client-notice')) return;
-    var div = document.createElement('div');
-    div.id = 'stale-client-notice';
-    div.setAttribute('role', 'alert');
-    div.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#141519;color:#edeff4;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:2rem;';
-    div.innerHTML =
-      '<div style="max-width:26rem;text-align:center;">' +
-      '<h1 style="font-size:1.25rem;margin:0 0 .5rem;">Trycord needs a refresh</h1>' +
-      '<p style="margin:0 0 1rem;color:#b9bec9;font-size:.9rem;">The app failed to start, usually because the browser kept an old copy of the client files. Reloading fetches the current version.</p>' +
-      '<button type="button" style="padding:.6rem 1.2rem;border:none;border-radius:8px;background:#6e6bf2;color:#fff;font:inherit;font-weight:600;cursor:pointer;">Reload Trycord</button></div>';
-    document.body.prepend(div);
-    var btn = div.querySelector('button');
-    if (btn) btn.onclick = () => location.reload();
-  }
-
-  // Fail visibly instead of leaving a blank page.
-  window.addEventListener('error', () => {
-    if (window.__trycordBooted) return;
-    try { showStaleClientNotice(); } catch (e) { /* last resort */ }
+  // 2) Presentation depends on geometry only.
+  updateFromViewport();
+  onPresentationChange(() => {
+    Router.run && Router.run();
+    renderAllChrome();
   });
 
-  function shellMismatch() {
-    return !(window.TrycordShell && TrycordShell.root() &&
-      TrycordShell.el('view') &&
-      TrycordShell.q('.presence-spine'));
-  }
-
-  function wireChrome() {
-    var retry = document.getElementById('retry-link');
-    if (retry) retry.onclick = () => location.reload();
-
-    var toggle = TrycordShell.el('nav-toggle');
-    var scrim = TrycordShell.el('nav-scrim');
-    if (toggle) {
-      toggle.onclick = () => {
-        var open = !document.body.classList.contains('nav-open');
-        document.body.classList.toggle('nav-open', open);
-        if (scrim) scrim.hidden = !open;
-        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      };
-    }
-    if (scrim) {
-      scrim.onclick = () => {
-        document.body.classList.remove('nav-open');
-        scrim.hidden = true;
-        if (toggle) toggle.setAttribute('aria-expanded', 'false');
-      };
-    }
-
-    var backBtn = TrycordShell.el('nav-back');
-    if (backBtn) {
-      backBtn.onclick = () => {
-        if (window.history.length > 1) window.history.back();
-        else location.hash = '#/home';
-      };
-    }
-
-    TrycordShell.qsa('.presence-spine .spine-place[data-nav]').forEach((b) => {
-      b.onclick = () => { location.hash = b.getAttribute('data-nav'); };
+  // 3) Mobile drawer controls.
+  const navToggle = qs('#mobile-nav-toggle');
+  if (navToggle) {
+    navToggle.addEventListener('click', () => {
+      if (document.getElementById('mobile-navigation').classList.contains('open')) closeMobileDrawer();
+      else openMobileDrawer();
     });
+  }
+  const actionsBtn = qs('#mobile-actions');
+  if (actionsBtn) actionsBtn.addEventListener('click', (e) => {
+    // placeholder: same as opening the drawer from the right edge
+    openMobileDrawer();
+  });
 
-    var railAdd = TrycordShell.el('rail-add');
-    if (railAdd) railAdd.onclick = () => C.createServerModal();
-
-    var railAccount = TrycordShell.el('rail-account');
-    if (railAccount) railAccount.onclick = (e) => C.toggleMenu(e.currentTarget);
-
-    var avatarBtn = TrycordShell.el('avatar-btn');
-    if (avatarBtn) avatarBtn.onclick = (e) => C.toggleMenu(e.currentTarget);
-
-    var bell = TrycordShell.el('bell-btn');
-    if (bell) bell.onclick = (e) => C.toggleBell(e.currentTarget);
-
-    var paletteBtn = TrycordShell.el('palette-btn');
-    if (paletteBtn) paletteBtn.onclick = () => C.openPalette();
-
-    var accTheme = TrycordShell.el('account-theme');
-    if (accTheme) {
-      accTheme.innerHTML = '<svg aria-hidden="true" style="width:1.1rem;height:1.1rem;"><use href="#i-theme"/></svg>';
-      accTheme.onclick = () => cycleTheme();
-    }
-    var accSettings = TrycordShell.el('account-settings');
-    if (accSettings) {
-      accSettings.innerHTML = '<svg aria-hidden="true" style="width:1.1rem;height:1.1rem;"><use href="#i-cog"/></svg>';
-      accSettings.onclick = () => { location.hash = '#/settings'; };
-    }
-
-    document.addEventListener('click', (e) => {
-      var root = document.getElementById('menu-root');
-      var trigActive = ['rail-account', 'avatar-btn', 'bell-btn'].some((id) => {
-        var el = TrycordShell.el(id);
-        return el && el.contains(e.target);
-      });
-      if (root && root.firstChild &&
-          !root.contains(e.target) &&
-          !trigActive) {
-        C.closeMenus();
-      }
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        C.closeMenus();
-        if (window.TrycordUi) TrycordUi.closeCtx();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        C.openPalette();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === ',') {
-        e.preventDefault();
-        location.hash = '#/settings';
-      }
-    });
-
-    // Restore saved appearance (theme/density/motion/font size).
-    try {
-      var savedTheme = localStorage.getItem('trycord-theme');
-      if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
-    } catch (e) {}
-    applyPrefs();
+  // 4) Session restore.
+  const restored = await hydrate(); // token->me
+  if (restored) {
+    // 5) Online gateway (WS) when authenticated.
+    Realtime.on('open', () => renderAllChrome());
+    Realtime.on('close', () => renderAllChrome());
+    Realtime.on('presence', (p) => { setPresence(p.userId, p.presence); renderAllChrome(); });
+    Realtime.connect();
+    refreshServers().catch(() => {});
+    refreshNotifications().catch(() => {});
+    refreshDms().catch(() => {});
+    refreshFriends().catch(() => {});
+  } else if (!isAuthed()) {
+    // No session: show the public/auth flow on the active shell.
+    renderAllChrome();
   }
 
-  function cycleTheme() {
-    var cur = document.documentElement.getAttribute('data-theme') || 'dark';
-    var next = cur === 'dark' ? 'light' : cur === 'light' ? 'high-contrast' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    try { localStorage.setItem('trycord-theme', next); } catch (e) {}
-    var sel = document.getElementById('set-theme');
-    if (sel) sel.value = next;
-    Ui.toast('Theme: ' + next, 'info');
-  }
-
-  function applyPrefs() {
-    try {
-      var fs = localStorage.getItem('trycord-font-scale');
-      if (fs) document.documentElement.style.fontSize = fs + 'px';
-    } catch (e) {}
-  }
-
-  async function probe() {
-    try {
-      await TrycordApi.health();
-      Trycord.setOnline(true);
-    } catch (e) {
-      Trycord.setOnline(false);
+  // Offline/online banner (connection status).
+  const statusEl = qs('#connection-status');
+  function paintStatus(on) {
+    if (!statusEl) return;
+    if (!on) {
+      statusEl.classList.add('show');
+      statusEl.textContent = 'Offline — reconnecting…';
+    } else {
+      statusEl.classList.remove('show');
     }
   }
+  setOnline(true); paintStatus(true);
+  window.addEventListener('online', () => { setOnline(true); paintStatus(true); });
+  window.addEventListener('offline', () => { setOnline(false); paintStatus(false); });
 
-  async function boot() {
-    if (shellMismatch()) {
-      showStaleClientNotice();
-      return;
-    }
-    wireChrome();
-    await probe();
-    setInterval(probe, 30000);
-    if (TrycordApi.token) {
-      try {
-        TrycordState.user = await TrycordApi.me();
-        await Trycord.refreshServers();
-        await Trycord.refreshSocial();
-      } catch (e) {
-        TrycordApi.token = null;
-        TrycordState.user = null;
-      }
-    }
-    window.addEventListener('hashchange', () => window.TrycordRouter.route());
-    // Presentation state is owned by presentation.js (single media query).
-    // Breakpoint crossings switch the active shell and re-render the view
-    // into it (each shell owns its own view DOM). router.js preserves the
-    // composer draft across the move.
-    if (window.TrycordPresentation) {
-      document.addEventListener('trycord:presentation', () => {
-        if (window.TrycordRouter.applyShellPresentation) {
-          window.TrycordRouter.applyShellPresentation();
-        } else if (window.TrycordRouter.refreshChrome) {
-          window.TrycordRouter.refreshChrome();
-        }
-      });
-    }
-    if (!location.hash) location.hash = '#/';
-    await window.TrycordRouter.route();
-    window.__trycordBooted = true;
-  }
+  // 6) Router: binds hash navigation and renders the active view.
+  Router.init();
 
-  document.addEventListener('DOMContentLoaded', boot);
-})();
+  // 7) Keep shell chrome in sync on every realtime notification.
+  Realtime.on('notification', () => {
+    refreshNotifications().catch(() => {});
+    renderAllChrome();
+  });
+}
+
+boot().then(() => { startup = Promise.resolve(true); });
+
+export default { boot };

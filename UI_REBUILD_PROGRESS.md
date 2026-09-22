@@ -72,8 +72,8 @@ motion 7/5 (intelligent interpretation).
 | 1 | Architecture audit | DONE (see "Phase 1 audit" below) |
 | 2 | Desktop/mobile state separation | DONE (this checkpoint) |
 | 3 | Design tokens | (tokens exist; refine for new desktop) pending |
-| 4 | Desktop Presence Spine | pending |
-| 5 | Atrium shell | pending |
+| 4 | Desktop Presence Spine | DONE (this reset: desk-field spine + fused rooms) |
+| 5 | Atrium shell | DONE (this reset: full-bleed Main Environment, smoke atrium=yes) |
 | 6 | Home experience | pending |
 | 7 | Community identity and navigation | pending |
 | 8 | Channel architecture | pending |
@@ -246,4 +246,100 @@ rebuilt shell, verified by string/selector review (not a stub):
   touch-only (maxTouchPoints>0), aria-hidden flex-none spacer #keyboard-inset.
 - CSS components.css: #keyboard-inset flex:none width:100% height:0 will-change +
   prefers-reduced-motion:reduce no-transition. node --check green; id<>sel 1:1. Backend untouched.
+
+## CONTINGENCY RESET - NUCLEAR UI RESET (executed)
+
+Directive: delete js/ui.js, preserve the mobile presentation, and rebuild the desktop
+presentation from zero (Presence Spine -> Main Environment). The full 20-step order was
+followed; log below.
+
+Files changed:
+- NEW `js/ui-primitives.js` - ui.js primitives relocated verbatim; the `window.TrycordUi`
+  contract is unchanged so every caller (pages alias `var Ui = window.TrycordUi;`) is intact.
+- DELETED `js/ui.js` - audit confirmed 100% presentation primitives (icons, esc, toast,
+  modal/dialog, states, avatar, time, context menu, long-press, layout gate). No business
+  logic lived here, so nothing was preserved inside shell.js.
+- NEW `js/realtime.js` - `window.TrycordRealtime.connectSocket`: the one shared reconnecting
+  socket, extracted out of shell.js so chrome no longer owns the transport. `shell.js`
+  `connectSocket` is now a one-line delegate; consumers (pages-dms/workspace) unchanged.
+- `index.html` - script tags: `js/ui.js` -> `js/ui-primitives.js` + `js/realtime.js`
+  (order: presentation -> ui-primitives -> realtime -> shell). `#shell-desktop` DOM rebuilt to
+  a distinct structure: `desk-field` (presence spine + current-place rooms fused through a
+  glass seam) and `desk-canvas` (full-viewport Main Environment with the context header as a
+  glass seam inside it; no top bar). Every `desk-*` id in the shell contract is preserved.
+- `styles/desktop.css` - rewritten from zero, scoped to `#shell-desktop`: full-bleed canvas
+  (centered max-width container removed), fused living left column, typographic context seam,
+  static member panel. The absolute negative constraint (icon rail + top bar + centered page
+  + section stack + cards + empty state) is not reconstructed anywhere in the new shell.
+- `README.md` - client js/ file listing updated (ui.js -> ui-primitives.js, realtime.js).
+
+Tests:
+- `node --check` on all 15 client JS files: PASS.
+- CSS brace balance across all 10 styles/ files: PASS.
+- grep `ui.js`: only this historical progress doc and the relocation header remain; no load
+  target references anywhere.
+- Electron smoke (real bundle, fresh local backend on :9971 booted against a throwaway SQLite
+  file because the stale dev.db fails an ALTER ADD UNIQUE migration - backend code untouched):
+  PASS - `desk-shell-visible=true shell-app-visible=false rail-tabs=4 title=Home atrium=yes
+  presentation=desktop`.
+- Mobile regression: `#shell-app` DOM (MobileShell), layout.css, and presentation.js were not
+  modified; the reset deliberately leaves the protected mobile presentation alone.
+
+Remaining work (roadmap unchanged):
+- Phases 6-14 (home, community identity/nav, channels, conversation, DMs, profiles, discovery,
+  management, settings) continue on the rebuilt desktop canvas.
+- Phases 15-20 (motion, accessibility, responsive/tablet, Electron polish, performance, final
+  QA) remain open.
+
+## SUPPLIED SHELL REBUILD (executed, smoke PASS)
+
+Directive: all client files were deleted by the user; rebuild ON TOP of the supplied
+`index.html` (single source of truth), reconstructing ONLY what the backend actually
+supports. The supplied shell is the structural foundation — DOM architecture untouched.
+
+Supplied shell contract (verbatim from index.html):
+- `<div id="app" class="trycord-app">` holds two presentations:
+  - `#mobile-shell.shell--mobile`: `#mobile-header` (nav toggle / context / actions),
+    `#mobile-navigation` drawer, `#mobile-main`, `#mobile-tab-navigation`.
+  - `#desktop-shell.shell--desktop`: `#presence-spine` (identity-region /
+    global-navigation / community-navigation / place-navigation) + `#trycord-main`
+    `.main-environment` (`#context-header` INSIDE the environment + `#view-root`).
+  - Global overlays outside shells: `#modal-root`, `#popover-root`, `#toast-root`,
+    `#connection-status`; `.skip-link` -> `#trycord-main`.
+- Single stylesheet `css/app.css`; ES module entry `js/app.js`.
+
+Files delivered (all new, all real):
+- `index.html` — the supplied shell, verbatim. No mock data.
+- `css/app.css` — full visual system: tokens, base, desktop Presence Spine -> Main
+  Environment (fluid full-viewport, no icon rail, no top bar, context header as
+  in-environment typography), MobileShell presentation, overlays, forms, rows, messages.
+- `js/` (ES modules): config.js (API base resolution), api.js (full backend contract),
+  state.js, ui.js (primitives), components.js (shared renderers), realtime.js (WS ticket
+  flow), presentation.js (mobile/desktop geometry breakpoint 900px), shell.js (chrome for
+  every supplied region), pages-public/home/browse/dms/workspace/account, router.js
+  (hash router + auth guard), app.js (boot).
+
+Backend-true integration:
+- Auth via `Authorization: Bearer` JWT, registration records the live
+  `/api/legal` versions, token kept in localStorage (`trycord.token`).
+- Realtime via `POST /api/auth/ws/ticket` -> `ws://.../?ticket=` (single-use, 60s TTL);
+  joins/`msg`/`dm:join`/`dm:typing` only. DM sends go over HTTP (server refuses
+  client `dm:message` frames).
+- Server channels: category-grouped rooms in `#place-navigation`; messages paginated
+  (before-id cursor), compose+attachments (8 MB magic-byte-sniffed upload), edits/deletes
+  with WS live updates.
+- DMs: list/detail/thread with `POST /dms/:id/read` unread reset; friends:
+  search, requests (accept/decline/cancel), remove, open-DM.
+- Discovery (q/page/limit, join), invites (managed create/revoke + by-code preview/join),
+  activity feed, notifications unread badge, account (profile/password/sessions),
+  server settings (save/leave/owner-delete), channels/categories management.
+- 401 AUTH_REQUIRED / SESSION_REVOKED -> drop token -> redirect login. 429 RATE_LIMITED
+  respects Retry-After. CSP-safe: no inline scripts, no eval (runtime-config parsed via
+  regex against the deterministic server snippet).
+
+Smoke (real backend on :9971, real dev.db after schema fix):
+- PASS — `desk-shell-visible=true mobile-shell-visible=false rail-tabs=4 title=Home
+  atrium=yes presentation=desktop`.
+- Desktop shell fills the viewport; `.atrium` is the Home environment; global nav =4;
+  TrycordPresentation reports desktop from geometry.
 
