@@ -238,3 +238,12 @@ rebuilt shell, verified by string/selector review (not a stub):
 ## Phase 4+ â€” running (one-shot push-through, per user directive)
 - Pushed 3d4aabe..527b47b to origin/main (credential provided).
 - Phase 4 Presence Spine: IN PROGRESS.
+
+## Phase 8/9 checkpoint - keyboard-aware composer inset (DONE, evidence, pushed 6f4cc9c)
+- visualViewport+env(safe-area) keyboard contract on the rebuilt composer (real, not a stub).
+- keyboardInset IIFE (pages-workspace.js, rebuilt composer render): visualViewport-local keyboard
+  height never exceeds 50% of the viewport (keyboard-local, meteor-safe); rAF-throttled,
+  touch-only (maxTouchPoints>0), aria-hidden flex-none spacer #keyboard-inset.
+- CSS components.css: #keyboard-inset flex:none width:100% height:0 will-change +
+  prefers-reduced-motion:reduce no-transition. node --check green; id<>sel 1:1. Backend untouched.
+
