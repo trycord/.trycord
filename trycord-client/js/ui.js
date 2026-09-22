@@ -20,7 +20,7 @@ export function el(tag, attrs, ...children) {
       if (k === 'class') node.className = v;
       else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
       else if (k === 'html') node.innerHTML = v;
-      else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+      else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
       else if (k === 'dataset') Object.assign(node.dataset, v);
       else if (v === true) node.setAttribute(k, '');
       else if (k in node && k !== 'value' && k !== 'type') { try { node[k] = v; } catch { node.setAttribute(k, v); } }

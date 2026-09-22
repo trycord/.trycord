@@ -20,6 +20,7 @@ async function boot() {
 
   // 2) Presentation depends on geometry only.
   updateFromViewport();
+  window.addEventListener('resize', updateFromViewport);
   onPresentationChange(() => {
     Router.run && Router.run();
     renderAllChrome();
