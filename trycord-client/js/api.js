@@ -267,7 +267,7 @@
     categories: (sid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/categories'),
     createCategory: (sid, body) => API.call('/api/servers/' + encodeURIComponent(sid) + '/categories', { method: 'POST', body }),
     deleteCategory: (sid, cid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/categories/' + encodeURIComponent(cid), { method: 'DELETE' }),
-    channels: (sid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels'),
+    channels: (sid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels').then((d) => (d && d.channels) || []),
     createChannel: (sid, body) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels', { method: 'POST', body }),
     deleteChannel: (sid, cid) => API.call('/api/servers/' + encodeURIComponent(sid) + '/channels/' + encodeURIComponent(cid), { method: 'DELETE' }),
     messages: (cid, limit, before) => API.call('/api/channels/' + encodeURIComponent(cid) + '/messages?limit=' + (limit || 50) + (before ? '&before=' + encodeURIComponent(before) : '')),

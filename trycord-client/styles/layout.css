@@ -1,16 +1,19 @@
-/* Trycord layout — an original spatial composition.
-   LEFT: a presence spine (self + places + communities fused into ONE
-         near-liquid column). It is quiet by default and BLOOMS into a
-         readable index on approach (hover / keyboard focus).
-   NEXT: the current place's rooms, merged through a glass seam — not a
-         separate panel; a continuation of the same field.
-   RIGHT: the content canvas, full-bleed. The context header is a soft
-         surface that lives INSIDE the canvas, and the far corner holds
-         ambient controls that surface on need (command, bell, presence,
-         self). Connection presence glows there, near identity.
-   Orange is atmosphere, not chrome: ambient edge-light, gradient
-   hairlines, soft halos, live embers.
-   No icon boxes. No pill marks. No dividers. No tab rail. No dashboard. */
+/* Trycord layout.
+   Two DELIBERATE presentations, never a merged layout:
+   - #shell-app    → MobileShell: the preserved current UI, drawer-based.
+                   All rules in this file are the MOBILE presentation,
+                   promoted to base — there is no embedded desktop
+                   composition to fall back on. It only renders when
+                   body[data-presentation="mobile"].
+   - #shell-desktop→ DesktopShell: separate DOM (desk-* ids), separate
+                   presentation in styles/desktop.css.
+   Both shells share logic/state (state.js, api, socket, renderers);
+   they do NOT share a shell DOM or a presentation.
+   The switch is js/presentation.js' single media query; CSS mirrors it
+   via [data-presentation]. No scattered breakpoints.
+
+   Sub-breakpoints (460px/560px) are density refinements INSIDE the
+   mobile presentation only. */
 
 @import "tokens.css";
 @import "reset.css";
@@ -19,6 +22,7 @@
 @import "components.css";
 @import "utilities.css";
 @import "pages.css";
+@import "desktop.css";
 
 /* Root: full viewport, no page scroll — surfaces scroll internally. */
 html,
@@ -85,7 +89,16 @@ body {
   display: none;
 }
 
-/* ============ App shell ============ */
+/* ============ Presentation gate ============
+   Exactly one shell is ever rendered. The switch is
+   body[data-presentation] set by js/presentation.js. */
+body[data-presentation="desktop"] #shell-app { display: none; }
+body[data-presentation="mobile"] #shell-desktop { display: none; }
+
+/* ============ MobileShell (#shell-app) ============
+   The preserved current UI. Drawers: a presence spine and the current
+   place's rooms slide from the left; the member/info side slides from
+   the right. The canvas IS the journey — no bottom tab bar. */
 .app-shell {
   display: flex;
   flex-direction: column;
@@ -99,21 +112,25 @@ body {
     var(--tc-bg-base);
 }
 
-/* The three regions row together; gaps become seams, not borders */
 .app-layout {
   display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
-/* ============ Presence spine: one living column, not a railtray ============ */
+/* ============ Presence spine: shared column skeleton ============ */
 .presence-spine {
-  --spine-w: 3.75rem;
+  --spine-w: 14.5rem;
   flex: none;
-  width: var(--spine-w);
-  min-width: var(--spine-w);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: calc(var(--tc-space-2) + env(safe-area-inset-top)) 0
+    calc(var(--tc-space-2) + env(safe-area-inset-bottom));
   background-color: var(--tc-glass-strong);
   background-image:
     var(--tc-atmo-spine),
@@ -122,35 +139,35 @@ body {
   -webkit-backdrop-filter: blur(var(--tc-glass-blur)) saturate(1.25);
   overflow-y: auto;
   overflow-x: hidden;
-  padding: calc(var(--tc-space-2) + env(safe-area-inset-top)) 0
-    calc(var(--tc-space-2) + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  z-index: 20;
-  transition: width var(--tc-duration-slow) var(--tc-ease-spring);
+}
+/* MobileShell: the spine is a reachable drawer at the left edge. */
+#shell-app .presence-spine {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  width: var(--spine-w);
+  min-width: var(--spine-w);
+  transform: translateX(-105%);
+  transition: transform var(--tc-duration-sheet) var(--tc-ease-spring);
+  box-shadow: var(--tc-shadow-xl);
+}
+body.nav-open #shell-app .presence-spine {
+  transform: none;
 }
 
-/* Bloom: on approach or keyboard focus the spine opens into a readable index.
-   Glyph-led when closed, name-led when open — one continuous column. */
-@media (hover: hover) and (pointer: fine) {
-  .presence-spine:hover,
-  .presence-spine:focus-within {
-    --spine-w: 13.5rem;
-  }
-}
-
-/* Items share one voice: row, no box, no border, no divider. */
+/* Items share one voice: row, no box, no border, no divider. Labels are
+   always readable — there is no collapsed icon state in the mobile shell. */
 .spine-identity,
 .spine-place {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0;
+  justify-content: flex-start;
+  gap: var(--tc-space-3);
   min-height: 2.45rem;
-  padding: 0;
+  padding: 0 var(--tc-space-3);
   margin: 0;
   background: transparent;
   border: none;
@@ -174,14 +191,6 @@ body {
   outline: 2px solid var(--tc-focus-ring);
   outline-offset: var(--tc-focus-ring-offset);
 }
-.presence-spine:hover .spine-identity,
-.presence-spine:focus-within .spine-identity,
-.presence-spine:hover .spine-place,
-.presence-spine:focus-within .spine-place {
-  justify-content: flex-start;
-  gap: var(--tc-space-3);
-  padding: 0 var(--tc-space-3);
-}
 
 /* Glyphs: flat symbols, no cells around them. Ember = unread. */
 .spine-glyph {
@@ -202,20 +211,14 @@ body {
   filter: drop-shadow(0 0 4px var(--tc-accent-glow));
 }
 
-/* Labels hide when the spine is closed; sleep in as width, wake on bloom. */
+/* Labels: always visible in the mobile shell. */
 .spine-label {
   overflow: hidden;
   white-space: nowrap;
-  width: 0;
-  opacity: 0;
-  flex: 1;
-  min-width: 0;
-  transition: opacity var(--tc-duration-fast) var(--tc-ease-out);
-}
-.presence-spine:hover .spine-label,
-.presence-spine:focus-within .spine-label {
   width: auto;
   opacity: 1;
+  flex: 1;
+  min-width: 0;
   padding-right: var(--tc-space-2);
 }
 .spine-identity .spine-label {
@@ -284,7 +287,7 @@ body {
   box-shadow: var(--tc-shadow-glow);
 }
 
-/* Unread count rides the glyph when the spine is closed, then the row. */
+/* Unread count rides the row. */
 .spine-badge {
   display: inline-flex;
   align-items: center;
@@ -311,7 +314,6 @@ body {
   margin-top: var(--tc-space-2);
   padding-top: var(--tc-space-2);
 }
-/* The spine to workspace transition is a whispered seam only when rooms exist */
 #rail-servers:not(:empty) {
   border-top: 1px solid var(--tc-glass-border);
 }
@@ -338,47 +340,48 @@ body {
   gap: 2px;
   margin-top: var(--tc-space-2);
   padding-top: var(--tc-space-2);
-}
-/* Only a seam, never a top border full-width box */
-.spine-base {
-  border-top: 1px solid transparent;
-}
-.presence-spine.has-places .spine-base {
-  border-top-color: var(--tc-glass-border);
+  border-top: 1px solid var(--tc-glass-border);
 }
 .spine-base .spine-place .spine-glyph {
   color: var(--tc-text-muted);
 }
 
-/* ============ Current place's rooms: fused through the glass seam ============ */
+/* ============ Current place's rooms: fused drawer beside the spine ============ */
 .app-context {
-  position: relative;
   display: flex;
   flex-direction: column;
-  flex: none;
-  width: 16rem;
-  min-width: 16rem;
   min-height: 0;
   background-color: var(--tc-glass-bg);
   background-image: radial-gradient(120% 70% at 0% 0%, rgba(245, 130, 23, 0.04), transparent 55%);
   backdrop-filter: blur(var(--tc-glass-blur)) saturate(1.25);
   -webkit-backdrop-filter: blur(var(--tc-glass-blur)) saturate(1.25);
   overflow: hidden;
-  z-index: 20;
 }
 .app-context[hidden] {
   display: none;
 }
-/* The seam: a vertical thread of light, not a panel edge */
-.app-context::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 8%;
-  bottom: 8%;
-  width: 1px;
-  background: linear-gradient(180deg, transparent, var(--tc-glass-border-strong) 50%, transparent);
-  pointer-events: none;
+/* MobileShell: rooms slide out fused beside the spine as one field */
+#shell-app .app-context {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(19rem, 88vw);
+  min-width: 0;
+  transform: translateX(-105%);
+  transition: transform var(--tc-duration-sheet) var(--tc-ease-spring);
+  box-shadow: var(--tc-shadow-xl);
+}
+/* Spine then rooms slide out together as one field */
+body.nav-open #shell-app .app-context:not([hidden]) {
+  transform: none;
+  left: 14.5rem;
+}
+@media (max-width: 460px) {
+  body.nav-open #shell-app .app-context:not([hidden]) {
+    left: 13.5rem;
+  }
 }
 .app-context-scroll {
   flex: 1 1 auto;
@@ -407,16 +410,16 @@ body {
 }
 
 /* Context header — a soft surface INSIDE the canvas, above the view.
-   Typographic title, not chrome. The corner is ambient and surfaces on
-   need: command, bell, connection embers, and your self. */
+   Typographic title, not chrome. The corner holds command, bell,
+   connection embers, and your self. */
 .ctx-surface {
-  --ctx-corner-opacity: 0.4;
+  --ctx-corner-opacity: 0.95;
   display: flex;
   align-items: center;
   gap: var(--tc-space-3);
   flex: none;
   min-height: 0;
-  margin: var(--tc-space-3) var(--tc-space-4) 0;
+  margin: var(--tc-space-2) var(--tc-space-2) 0;
   padding: var(--tc-space-1) var(--tc-space-2);
   border-radius: var(--tc-radius-lg);
   background-color: var(--tc-glass-bg);
@@ -427,10 +430,6 @@ body {
   min-width: 0;
   z-index: 15;
   box-shadow: var(--tc-shadow-sm);
-}
-.ctx-surface:hover,
-.ctx-surface:focus-within {
-  --ctx-corner-opacity: 1;
 }
 
 .ctx-head {
@@ -465,9 +464,11 @@ body {
   text-overflow: ellipsis;
   min-width: 0;
 }
+.ctx-head .ctx-sub {
+  display: none;
+}
 
-/* Ambient corner: bare controls that warm on need. Always reachable by
-   keyboard. Opacity fades until the canvas is approached or focused. */
+/* Corner controls */
 .topbar-actions,
 .bar-actions {
   display: flex;
@@ -475,20 +476,9 @@ body {
   gap: var(--tc-space-1);
   flex-shrink: 0;
   margin-left: auto;
-  opacity: var(--ctx-corner-opacity);
-  transition: opacity var(--tc-duration-normal) var(--tc-ease-out);
 }
-.topbar-actions:focus-within,
-.topbar-actions:hover {
-  opacity: 1;
-}
-/* Elements injected by pages (actions) flow through the corner */
 #topbar-actions {
   display: contents;
-}
-.ctx-surface:focus-within #topbar-actions,
-.ctx-surface:hover #topbar-actions {
-  opacity: 1;
 }
 
 .ambient-btn {
@@ -551,11 +541,11 @@ body {
 .pill.online .dot { background: var(--tc-online); box-shadow: 0 0 6px var(--tc-online); }
 .pill.off .dot { background: var(--tc-danger); box-shadow: 0 0 6px var(--tc-danger); }
 
-/* Mobile-only open/back switches for the spine drawer */
+/* Mobile open/back switches for the spine drawer */
 .bar-btn,
 .bar-nav,
 .bar-back {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: none;
@@ -587,16 +577,14 @@ body {
   min-height: 0;
   width: 100%;
   overflow-y: auto;
-  padding: var(--tc-space-3) var(--tc-space-4) var(--tc-space-4);
+  padding: var(--tc-space-3) var(--tc-space-3) var(--tc-space-2);
   background: var(--tc-bg-shell);
 }
 
-/* Detail column (members / info) — a continued glass field on the far side */
+/* Detail column (members / info) — a right drawer on the far side in the
+   MobileShell. Desktop re-presents it as a static in-flow column. */
 .app-side {
-  flex: none;
-  width: 15rem;
-  min-width: 15rem;
-  min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   background-color: var(--tc-glass-bg);
   background-image: radial-gradient(120% 70% at 100% 0%, rgba(245, 130, 23, 0.04), transparent 55%);
@@ -605,119 +593,38 @@ body {
   -webkit-backdrop-filter: blur(var(--tc-glass-blur-soft)) saturate(1.25);
   padding: var(--tc-space-2);
 }
+#shell-app .app-side {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
+  width: min(18rem, 88vw);
+  transform: translateX(105%);
+  transition: transform var(--tc-duration-sheet) var(--tc-ease-spring);
+  box-shadow: var(--tc-shadow-xl);
+}
 .app-side[hidden] {
   display: none;
 }
-
-/* ============ MOBILE STATE (≤900px) ============
-   Presentation contract: Desktop State is the base (≥901px). Everything in
-   this block re-declares the mobile presentation from zero: presence becomes
-   a drawer; the canvas IS the journey; the context surface stays on-canvas;
-   corners stay reachable. No bottom tab bar — that is desktop DNA grafted
-   onto phones.
-   Source of truth for the switch is js/presentation.js (single breakpoint);
-   CSS mirrors it here so Mobile State and Desktop State never interleave.
-   Sub-breakpoints (460px/560px) are density refinements INSIDE this state.
-   ============================================= */
-@media (max-width: 900px) {
-  .presence-spine {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 40;
-    --spine-w: 14.5rem;
-    min-width: 14.5rem;
-    width: 14.5rem;
-    transform: translateX(-105%);
-    transition: transform var(--tc-duration-sheet) var(--tc-ease-spring);
-    box-shadow: var(--tc-shadow-xl);
-  }
-  .presence-spine:hover,
-  .presence-spine:focus-within {
-    --spine-w: 14.5rem;
-    min-width: 14.5rem;
-    width: 14.5rem;
-  }
-  .presence-spine .spine-identity,
-  .presence-spine .spine-place {
-    justify-content: flex-start;
-    gap: var(--tc-space-3);
-    padding: 0 var(--tc-space-3);
-  }
-  .presence-spine .spine-label {
-    width: auto;
-    opacity: 1;
-    padding-right: var(--tc-space-2);
-  }
-  body.nav-open .presence-spine {
-    transform: none;
-  }
-  .app-context {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 40;
-    width: min(19rem, 88vw);
-    min-width: 0;
-    transform: translateX(-105%);
-    transition: transform var(--tc-duration-sheet) var(--tc-ease-spring);
-    box-shadow: var(--tc-shadow-xl);
-  }
-  .app-context[hidden] {
-    display: none;
-  }
-  /* Spine then rooms slide out together as one field */
-  body.nav-open .app-context:not([hidden]) {
-    transform: none;
-  }
-  /* Rooms drawer sits just shy of the spine */
-  body.nav-open .app-context:not([hidden]) {
-    left: 14.5rem;
-  }
-  @media (max-width: 460px) {
-    body.nav-open .app-context:not([hidden]) {
-      left: 13.5rem;
-    }
-  }
-  .app-side {
-    position: fixed;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 30;
-    width: min(18rem, 88vw);
-    min-width: 0;
-    transform: translateX(105%);
-    transition: transform var(--tc-duration-sheet) var(--tc-ease-spring);
-    box-shadow: var(--tc-shadow-xl);
-  }
-  body.nav-open .app-side:not([hidden]) {
-    transform: none;
-  }
-  .app-layout {
-    flex-direction: column;
-  }
-  .app-main {
-    width: 100%;
-  }
-  .app-view {
-    padding: var(--tc-space-3) var(--tc-space-3) var(--tc-space-2);
-  }
-  .ctx-surface {
-    margin: var(--tc-space-2) var(--tc-space-2) 0;
-    --ctx-corner-opacity: 0.95;
-  }
-  .bar-btn,
-  .bar-nav,
-  .bar-back {
-    display: inline-flex;
-  }
-  .ctx-head .ctx-sub {
-    display: none;
-  }
+body.nav-open #shell-app .app-side:not([hidden]) {
+  transform: none;
 }
+
+/* Scrim for drawers */
+.app-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: var(--tc-bg-scrim);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+.app-scrim[hidden] { display: none; }
 
 /* Phones: condense further; keep the connection ember, drop its word */
 @media (max-width: 560px) {
@@ -742,21 +649,6 @@ body {
   }
 }
 
-/* Scrim for drawers */
-.app-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 35;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: var(--tc-bg-scrim);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  cursor: pointer;
-}
-.app-scrim[hidden] { display: none; }
-
 /* Compat: JS-generated body copy + any cached old shell selectors */
 p.tc-body {
   color: var(--tc-text-secondary);
@@ -764,10 +656,6 @@ p.tc-body {
   max-width: 70ch;
 }
 .tc-nav, .tc-nav-scroll { min-width: 0; }
-.only-mobile { display: none; }
-@media (max-width: 900px) {
-  .only-mobile { display: inline-flex; }
-}
 
 /* ============ Public shell: editorial, atmospheric reading column ============ */
 #shell-public {
@@ -781,7 +669,7 @@ p.tc-body {
     radial-gradient(120% 70% at 50% -10%, rgba(245, 130, 23, 0.1), transparent 55%),
     var(--tc-bg-base);
 }
-#shell-public[hidden], #shell-app[hidden] { display: none; }
+#shell-public[hidden], #shell-app[hidden], #shell-desktop[hidden] { display: none; }
 .public-header {
   display: flex;
   align-items: center;

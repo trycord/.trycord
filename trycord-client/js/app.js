@@ -32,9 +32,9 @@
     },
 
     setOnline(online) {
-      var pill = document.getElementById('conn-pill');
+      var pill = TrycordShell.el('conn-pill');
       if (!pill) return;
-      var text = document.getElementById('conn-text');
+      var text = TrycordShell.el('conn-text');
       var dot = pill.querySelector('.dot');
       if (dot) dot.className = 'dot' + (online ? '' : ' dot-bad');
       if (text) text.textContent = online ? 'Online' : 'Offline';
@@ -67,17 +67,17 @@
   });
 
   function shellMismatch() {
-    return !(document.getElementById('shell-app') &&
-      document.getElementById('view') &&
-      document.getElementById('rail'));
+    return !(window.TrycordShell && TrycordShell.root() &&
+      TrycordShell.el('view') &&
+      TrycordShell.q('.presence-spine'));
   }
 
   function wireChrome() {
     var retry = document.getElementById('retry-link');
     if (retry) retry.onclick = () => location.reload();
 
-    var toggle = document.getElementById('nav-toggle');
-    var scrim = document.getElementById('nav-scrim');
+    var toggle = TrycordShell.el('nav-toggle');
+    var scrim = TrycordShell.el('nav-scrim');
     if (toggle) {
       toggle.onclick = () => {
         var open = !document.body.classList.contains('nav-open');
@@ -94,7 +94,7 @@
       };
     }
 
-    var backBtn = document.getElementById('nav-back');
+    var backBtn = TrycordShell.el('nav-back');
     if (backBtn) {
       backBtn.onclick = () => {
         if (window.history.length > 1) window.history.back();
@@ -102,31 +102,31 @@
       };
     }
 
-    document.querySelectorAll('#rail .spine-place[data-nav]').forEach((b) => {
+    TrycordShell.qsa('.presence-spine .spine-place[data-nav]').forEach((b) => {
       b.onclick = () => { location.hash = b.getAttribute('data-nav'); };
     });
 
-    var railAdd = document.getElementById('rail-add');
+    var railAdd = TrycordShell.el('rail-add');
     if (railAdd) railAdd.onclick = () => C.createServerModal();
 
-    var railAccount = document.getElementById('rail-account');
+    var railAccount = TrycordShell.el('rail-account');
     if (railAccount) railAccount.onclick = (e) => C.toggleMenu(e.currentTarget);
 
-    var avatarBtn = document.getElementById('avatar-btn');
+    var avatarBtn = TrycordShell.el('avatar-btn');
     if (avatarBtn) avatarBtn.onclick = (e) => C.toggleMenu(e.currentTarget);
 
-    var bell = document.getElementById('bell-btn');
+    var bell = TrycordShell.el('bell-btn');
     if (bell) bell.onclick = (e) => C.toggleBell(e.currentTarget);
 
-    var paletteBtn = document.getElementById('palette-btn');
+    var paletteBtn = TrycordShell.el('palette-btn');
     if (paletteBtn) paletteBtn.onclick = () => C.openPalette();
 
-    var accTheme = document.getElementById('account-theme');
+    var accTheme = TrycordShell.el('account-theme');
     if (accTheme) {
       accTheme.innerHTML = '<svg aria-hidden="true" style="width:1.1rem;height:1.1rem;"><use href="#i-theme"/></svg>';
       accTheme.onclick = () => cycleTheme();
     }
-    var accSettings = document.getElementById('account-settings');
+    var accSettings = TrycordShell.el('account-settings');
     if (accSettings) {
       accSettings.innerHTML = '<svg aria-hidden="true" style="width:1.1rem;height:1.1rem;"><use href="#i-cog"/></svg>';
       accSettings.onclick = () => { location.hash = '#/settings'; };
@@ -134,11 +134,13 @@
 
     document.addEventListener('click', (e) => {
       var root = document.getElementById('menu-root');
+      var trigActive = ['rail-account', 'avatar-btn', 'bell-btn'].some((id) => {
+        var el = TrycordShell.el(id);
+        return el && el.contains(e.target);
+      });
       if (root && root.firstChild &&
           !root.contains(e.target) &&
-          !e.target.closest('#rail-account') &&
-          !e.target.closest('#avatar-btn') &&
-          !e.target.closest('#bell-btn')) {
+          !trigActive) {
         C.closeMenus();
       }
     });
@@ -211,11 +213,16 @@
     }
     window.addEventListener('hashchange', () => window.TrycordRouter.route());
     // Presentation state is owned by presentation.js (single media query).
-    // Breakpoint crossings only refresh chrome affordances (back button).
-    // Never re-render the view: that would wipe composer drafts.
+    // Breakpoint crossings switch the active shell and re-render the view
+    // into it (each shell owns its own view DOM). router.js preserves the
+    // composer draft across the move.
     if (window.TrycordPresentation) {
       document.addEventListener('trycord:presentation', () => {
-        if (window.TrycordRouter.refreshChrome) window.TrycordRouter.refreshChrome();
+        if (window.TrycordRouter.applyShellPresentation) {
+          window.TrycordRouter.applyShellPresentation();
+        } else if (window.TrycordRouter.refreshChrome) {
+          window.TrycordRouter.refreshChrome();
+        }
       });
     }
     if (!location.hash) location.hash = '#/';

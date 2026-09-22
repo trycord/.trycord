@@ -159,13 +159,41 @@ Screenshots for user visual QA (I cannot view images — user opens them):
 - `C:\Users\ultim\AppData\Local\Temp\opencode\shots\trycord-desktop.png` (1280×800, `#/home`)
 - `C:\Users\ultim\AppData\Local\Temp\opencode\shots\trycord-mobile.png` (390×844, `#/home`)
 
+## Phase 3 checkpoint — workspace gate + deep test (DONE)
+
+Drive-by product bug found while building the deep test (documented, not
+hidden): `TrycordApi.channels(sid)` returned the raw `{categories, channels}`
+endpoint payload while both workspace consumers (`renderNav`, `renderChat`)
+expect the plain `channels` array. The nav/overview was silently falling back
+to "Couldn't load channels" and chat to "No channels yet" — on mobile too.
+Fix (one line, `api.js`): `.then((d) => (d && d.channels) || [])` — the
+client layer keeps unwrapping, backend untouched.
+
+Deep end-to-end (`verify-deep.js`, real Electron, API 9977, desktop 1280×800
+→ mobile 390×844, real created server + channels):
+- Registration rate limit respected (fresh account per run, localStorage
+  cleared — namespaced tokens persisted across runs otherwise).
+- `created` → `#/server/:id/overview` renders on **DesktopShell**:
+  server-nav visible (srv-head + category block + channel), overview view
+  with title + stat chips + "Open chat" → correct.
+- Overview → **chat**: `#/server/:id/chat` renders channel "general" with
+  composer (`#msg-input`), members button (`[data-members]`), "Open chat→
+  - members tab (clicking members button) renders the member list into the
+    view (workspace's member panel is a full tab, pre-existing mobile
+    behavior — the topbar actions are tab-specific and override the srv-menu/
+    fav set by `workspace()`; mirrored identically on mobile, not a desktop
+    regression).
+- Same flow re-renders into **MobileShell** at 390px (presentation=mobile,
+  `#shell-app` active, `#shell-desktop` hidden, desktop nav hidden, server-
+  nav visible) — cross-presentation workspace re-render ✔.
+- `routeCount`/`lastErr`/`routeLog` instrumentation: single clean route per
+  navigation, no stuck `navigating` guard, lastErr null throughout.
+
 ## Backend issues discovered (documented, not fixed — per spec §35)
 
 - (none this checkpoint)
 
 ## Open notes
-
-- R2's Presence Spine + Atrium + ctx-surface remain the current Desktop State
   composition until Phases 4–6 rebuild/refine them per the new spec
   (communities-as-presence-marks, no icon rail/top bar, Atrium as full
   environment — R2 already removed the rejected architecture).

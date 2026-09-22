@@ -11,22 +11,70 @@
 
   function showShell(which) {
     document.getElementById('shell-public').hidden = which !== 'public';
-    document.getElementById('shell-app').hidden = which !== 'app';
+    var desk = !!window.TrycordPresentation && TrycordPresentation.isDesktop();
+    if (which === 'app') {
+      document.getElementById('shell-app').hidden = desk;
+      var ds = document.getElementById('shell-desktop');
+      if (ds) ds.hidden = !desk;
+      var skip = document.querySelector('.skip-link');
+      if (skip) skip.setAttribute('href', desk ? '#desk-view' : '#view');
+    } else {
+      document.getElementById('shell-app').hidden = true;
+      var d2 = document.getElementById('shell-desktop');
+      if (d2) d2.hidden = true;
+    }
+  }
+
+  // Presentation crossings switch which shell is active AND re-render the
+  // view into the newly active shell (each shell owns its own view DOM, so
+  // the other shell's view would otherwise be empty). Composer drafts are
+  // preserved across the move: capture text, render, then restore it into
+  // the new shell's composer.
+  function applyShellPresentation() {
+    var draft = saveComposerDraft();
+    var loggedIn = !!(window.TrycordState && TrycordState.user);
+    if (!loggedIn) { showShell('public'); return; }
+    showShell('app');
+    updateBackButton(parse());
+    route().then(function () {
+      if (draft) restoreComposerDraft(draft);
+    });
+  }
+
+  function saveComposerDraft() {
+    var root = TrycordShell.root();
+    if (!root) return null;
+    var ta = root.querySelector('#msg-input, #dm-input');
+    if (!ta || !ta.value) return null;
+    return { key: hashKey(location.hash), value: ta.value };
+  }
+
+  function restoreComposerDraft(draft) {
+    if (!draft) return;
+    var ta = TrycordShell.el('view');
+    if (!ta) return;
+    var input = ta.querySelector('#msg-input, #dm-input');
+    if (!input || hashKey(location.hash) !== draft.key) return;
+    input.value = draft.value;
+  }
+
+  function hashKey(h) {
+    return (h || '').replace(/^#/, '');
   }
 
   function closeNav() {
     document.body.classList.remove('nav-open');
     document.body.classList.remove('side-open');
-    var scrim = document.getElementById('nav-scrim');
+    var scrim = TrycordShell.el('nav-scrim');
     if (scrim) scrim.hidden = true;
-    var t = document.getElementById('nav-toggle');
+    var t = TrycordShell.el('nav-toggle');
     if (t) t.setAttribute('aria-expanded', 'false');
   }
 
   // Mobile back button: visible on detail screens in mobile layout only.
   // (CSS keeps it hidden on desktop regardless.)
   function updateBackButton(r) {
-    var back = document.getElementById('nav-back');
+    var back = TrycordShell.el('nav-back');
     if (!back) return;
     var detail = r.name === 'workspace' || r.name === 'dm-detail' ||
       r.name === 'preview' || r.name === 'settings';
@@ -120,9 +168,9 @@
       C.renderRail(activeHash);
       C.renderUser();
       C.hideServerNav();
-      var panel = document.getElementById('member-panel');
+      var panel = TrycordShell.el('member-panel');
       if (panel) panel.hidden = true;
-      var view = document.getElementById('view');
+      var view = TrycordShell.el('view');
 
       switch (r.name) {
         case 'home': await Home.home(view); break;
@@ -140,7 +188,7 @@
           break;
         default: location.hash = '#/home'; return;
       }
-      var pt = document.getElementById('page-title');
+      var pt = TrycordShell.el('page-title');
       document.title = (pt ? pt.textContent : 'Trycord') + ' · Trycord';
       view.focus({ preventScroll: true });
       window.scrollTo(0, 0);
@@ -149,5 +197,5 @@
     }
   }
 
-  window.TrycordRouter = { route, parse, refreshChrome: () => updateBackButton(parse()) };
+  window.TrycordRouter = { route, parse, refreshChrome: () => updateBackButton(parse()), applyShellPresentation };
 })();
