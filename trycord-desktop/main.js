@@ -95,7 +95,7 @@ function createWindow() {
             if (!res.ok) return 'REGISTER-FAIL ' + res.status;
             const r = await res.json();
             localStorage.setItem('trycord.token', r.token);
-            location.hash = '#/home';
+            location.hash = '#/';
             return 'TOKEN-SET';
           } catch (e) { return 'PAGE-FAIL ' + e; }
         })()`);
@@ -113,11 +113,22 @@ function createWindow() {
           const homeEnvironment = !!document.querySelector('#view-root .home-environment');
           const pres = (typeof window.TrycordPresentation !== 'undefined')
             ? window.TrycordPresentation.mode() : 'unset';
-          return 'desk-shell-visible=' + desk + ' mobile-shell-visible=' + mobile + ' rail-tabs=' + rail + ' title=' + title + ' home-environment=' + (homeEnvironment ? 'yes' : 'no') + ' presentation=' + pres;
+          return 'desk-shell-visible=' + desk + ' mobile-shell-visible=' + mobile + ' rail-tabs=' + rail + ' title=' + title + ' home-environment=' + (homeEnvironment ? 'yes' : 'no') + ' presentation=' + pres + ' hash=' + location.hash;
         })()`);
         console.log('[smoke] home: ' + out);
         if (!String(out).includes('rail-tabs=4') || !String(out).includes('home-environment=yes') ||
-            !String(out).includes('presentation=desktop') || !String(out).includes('desk-shell-visible=true')) process.exitCode = 1;
+            !String(out).includes('presentation=desktop') || !String(out).includes('desk-shell-visible=true') ||
+            !String(out).includes('hash=#/home')) process.exitCode = 1;
+        const navOut = await win.webContents.executeJavaScript(`(async () => {
+          const btn = document.querySelector('#global-navigation [data-href="#/discover"]');
+          if (!btn) return 'NAV-BUTTON-MISSING';
+          btn.click();
+          await new Promise((res) => setTimeout(res, 1500));
+          const title = (document.getElementById('context-title') || {}).textContent || '';
+          return 'hash=' + location.hash + ' title=' + title;
+        })()`);
+        console.log('[smoke] nav: ' + navOut);
+        if (!String(navOut).includes('hash=#/discover') || !String(navOut).includes('title=Discover')) process.exitCode = 1;
       } catch (e) {
         console.log('[smoke] FAIL ' + e);
         process.exitCode = 1;
