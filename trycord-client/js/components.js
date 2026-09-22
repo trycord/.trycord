@@ -3,6 +3,7 @@
 
 import { esc, el, relTime, apiSrc, qs } from './ui.js';
 import { peerPresence, can } from './state.js';
+import Api from './api.js';
 
 const AVATAR_COLORS = [
   '#6ea8fe', '#8b5cf6', '#58c97a', '#e2b03c', '#e06a5e',
@@ -145,10 +146,35 @@ export function messageRow(msg, opts = {}) {
     for (const att of msg.attachments) {
       const isImg = /^image\//.test(String(att.mime || ''));
       if (isImg) {
-        const link = el('a', { class: 'msg-file image', href: apiSrc(att.url), target: '_blank', rel: 'noopener' });
-        const img = el('img', { src: apiSrc(att.url), alt: att.filename, loading: 'lazy' });
-        link.appendChild(img);
-        files.appendChild(link);
+        // Image bytes live behind the Bearer-authenticated
+        // GET /api/attachments/:id endpoint, which a plain <img src>
+        // can never satisfy (no Authorization header -> 401 -> broken
+        // image). Load the bytes with the real session and swap in a
+        // blob URL; on failure fall back to the file row + authed
+        // download instead of a broken tile.
+        const holder = el('span', { class: 'msg-file image is-loading' }, 'Loading ' + (att.filename || 'image') + '…');
+        files.appendChild(holder);
+        const fallbackRow = () => {
+          if (opts.onDownload) {
+            return el('span', { class: 'msg-file' },
+              el('a', { href: apiSrc(att.url), target: '_blank', rel: 'noopener', onClick: (e) => { opts.onDownload(e, att); } }, '⬇ ' + att.filename));
+          }
+          return el('span', { class: 'msg-file' }, att.filename || 'attachment');
+        };
+        Api.fetchAttachment(att.id).then((res) => {
+          let mime = att.mime || 'application/octet-stream';
+          try {
+            const h = res.headers && res.headers.get ? res.headers.get('content-type') : null;
+            if (h) mime = h;
+          } catch { /* keep declared mime */ }
+          const url = URL.createObjectURL(new Blob([res.buffer], { type: mime }));
+          const link = el('a', { class: 'msg-file image', href: url, target: '_blank', rel: 'noopener', title: att.filename || 'Open image' });
+          const img = el('img', { src: url, alt: att.filename || 'attached image', loading: 'lazy' });
+          img.addEventListener('load', () => { setTimeout(() => URL.revokeObjectURL(url), 30000); });
+          img.addEventListener('error', () => { try { URL.revokeObjectURL(url); } catch { /* ignore */ } holder.replaceWith(fallbackRow()); });
+          link.appendChild(img);
+          holder.replaceWith(link);
+        }).catch(() => { holder.replaceWith(fallbackRow()); });
       } else {
         files.appendChild(el('span', { class: 'msg-file' },
           el('a', { href: apiSrc(att.url), target: '_blank', rel: 'noopener', onClick: opts.onDownload ? (e) => { opts.onDownload(e, att); } : null }, '⬇ ' + att.filename)));

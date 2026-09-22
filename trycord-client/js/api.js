@@ -180,15 +180,37 @@ const Api = {
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/invites/' + encodeURIComponent(inviteId)),
   invitePreview: (code) => request('GET', '/api/invites/' + encodeURIComponent(code) + '/preview'),
   joinInvite: (code) => request('POST', '/api/invites/' + encodeURIComponent(code) + '/join'),
+// ---- discovery ---------------------------------------------------------------------
+discover: ({ q = '', page = 1, limit = 12 } = {}) => {
+    const qs = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+    });
 
-  // ---- discovery ---------------------------------------------------------------------
-  discover: ({ q = '', page = 1, limit = 12 } = {}) => {
-    const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
     if (q) qs.set('q', q);
-    return request('GET', '/api/discover/servers?' + qs.toString(), { auth: false });
-  },
-  discoverServer: (id) => request('GET', '/api/discover/servers/' + encodeURIComponent(id), { auth: false }),
-  joinDiscover: (id) => request('POST', '/api/discover/servers/' + encodeURIComponent(id) + '/join'),
+
+    // The current Trycord backend requires authentication for Discover.
+    // Use the existing stored session token.
+    return request(
+        'GET',
+        '/api/discover/servers?' + qs.toString(),
+        { auth: true }
+    );
+},
+
+discoverServer: (id) =>
+    request(
+        'GET',
+        '/api/discover/servers/' + encodeURIComponent(id),
+        { auth: true }
+    ),
+
+joinDiscover: (id) =>
+    request(
+        'POST',
+        '/api/discover/servers/' + encodeURIComponent(id) + '/join',
+        { auth: true }
+    ),
 
   // ---- activity ---------------------------------------------------------------------
   activity: ({ limit = 20 } = {}) => request('GET', '/api/activity?limit=' + limit),

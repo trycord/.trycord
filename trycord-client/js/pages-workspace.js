@@ -107,7 +107,7 @@ async function renderChannel(container, serverId, channelId) {
   const layout = State.channels;
   const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
   const chanName = channel ? channel.name : 'channel';
-  renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name });
+  renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#' });
 
   const conv = el('div', { class: 'conversation' });
   const thread = el('div', { class: 'thread' });
@@ -138,16 +138,42 @@ async function renderChannel(container, serverId, channelId) {
       feed.appendChild(emptyState('◌', 'No messages yet', 'Start the conversation.'));
     }
     for (const m of msgs) feed.appendChild(buildMsg(m));
+    groupFeed(feed);
     thread.scrollTop = thread.scrollHeight;
   }
 
   function buildMsg(m) {
-    return messageRow(m, {
+    const node = messageRow(m, {
       meId: State.me && State.me.id,
       onEdit: () => editMsg(m),
       onDelete: () => deleteMsg(m),
       onDownload: (e, att) => downloadAtt(e, att),
     });
+    stampMsgNode(node, m);
+    return node;
+  }
+
+  // Continuous-conversation grouping: same author, <5 min apart, later
+  // message collapses to avatar-space + body. Pure CSS class on top of
+  // the existing rows; actions stay reachable via :hover/:focus-within.
+  function stampMsgNode(node, m) {
+    try {
+      if (m && m.author_id) node.dataset.author = String(m.author_id);
+      if (m && m.created_at) node.dataset.ts = String(m.created_at);
+    } catch { /* grouping metadata is decorative */ }
+  }
+
+  function groupFeed(feedEl) {
+    let prev = null;
+    for (const node of feedEl.querySelectorAll(':scope > .msg')) {
+      const a = node.dataset.author || '';
+      const ts = Date.parse(node.dataset.ts || '') || 0;
+      const pa = prev ? (prev.dataset.author || '') : '';
+      const pts = prev ? (Date.parse(prev.dataset.ts || '') || 0) : 0;
+      const grouped = !!(prev && a && pa === a && ts >= pts && (ts - pts) < 5 * 60 * 1000);
+      node.classList.toggle('grouped', grouped);
+      prev = node;
+    }
   }
 
   function editMsg(m) {
@@ -255,7 +281,10 @@ async function renderChannel(container, serverId, channelId) {
   // Live updates
   const offMsg = Realtime.on('message', (m) => {
     if (String(m.channel_id) === String(channelId)) {
-      feed.appendChild(messageRow(m, { meId: State.me && State.me.id, onEdit: () => editMsg(m), onDelete: () => deleteMsg(m), onDownload: downloadAtt }));
+      const node = messageRow(m, { meId: State.me && State.me.id, onEdit: () => editMsg(m), onDelete: () => deleteMsg(m), onDownload: downloadAtt });
+      stampMsgNode(node, m);
+      feed.appendChild(node);
+      groupFeed(feed);
       thread.scrollTop = thread.scrollHeight;
     }
   });

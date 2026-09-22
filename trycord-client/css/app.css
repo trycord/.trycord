@@ -21,17 +21,17 @@
   color-scheme: dark;
 
   /* Palette */
-  --t-pg:        #141519;   /* page / base        */
-  --t-base:      #1b1c21;   /* spine              */
-  --t-base2:     #222329;   /* raised surface     */
-  --t-elev:      #2a2c33;   /* overlay / floating  */
-  --t-line:      #2e3038;   /* hairline           */
-  --t-line-hi:   #3a3c46;
-  --t-txt:       #e8e9eb;   /* primary text       */
-  --t-txt2:      #b3b6bd;   /* secondary text     */
-  --t-mut:       #7b7f88;   /* muted text         */
-  --t-accent:    #6ea8fe;   /* accent             */
-  --t-accent-2:  #8b5cf6;
+  --t-pg:        #0d0b0a;   /* page / base        */
+  --t-base:      #181311;   /* spine              */
+  --t-base2:     #281b16;   /* raised surface     */
+  --t-elev:      #32211a;   /* overlay / floating  */
+  --t-line:      rgba(255, 219, 191, 0.12);
+  --t-line-hi:   rgba(255, 219, 191, 0.22);
+  --t-txt:       #fff4eb;   /* primary text       */
+  --t-txt2:      #dfc9bb;   /* secondary text     */
+  --t-mut:       #a99284;   /* muted text         */
+  --t-accent:    #ff914d;   /* accent             */
+  --t-accent-2:  #ff4d1f;
   --t-ok:        #58c97a;
   --t-warn:      #e2b03c;
   --t-err:       #e06a5e;
@@ -173,6 +173,7 @@ img { max-width: 100%; }
   height: 100dvh;
   width: 100%;
   overflow: hidden;
+  background: #0d0b0a;
 }
 
 /* --- Presence Spine --------------------------------------- */
@@ -180,19 +181,21 @@ img { max-width: 100%; }
 .presence-spine {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  width: clamp(236px, 18.5vw, 316px);
+  align-items: stretch;
+  width: clamp(176px, 14vw, 224px);
   flex: 0 0 auto;
   height: 100dvh;
-  background: var(--t-base);
-  border-right: 1px solid var(--t-line);
-  padding: var(--t-d-3) 0;
+  background: linear-gradient(180deg, rgba(53, 32, 23, 0.82), rgba(20, 15, 13, 0.7));
+  border-right: 1px solid rgba(255, 211, 181, 0.16);
+  box-shadow: 18px 0 48px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(28px) saturate(135%);
+  padding: var(--t-d-3) 8px;
   overflow: hidden;
 }
 
 /* Identity — the authenticated user's real identity */
 .presence-spine__identity {
-  padding: 0 var(--t-d-4) var(--t-d-3);
+  padding: 0 0 var(--t-d-3);
   border-bottom: 1px solid var(--t-line);
 }
 
@@ -221,6 +224,12 @@ img { max-width: 100%; }
   padding-top: var(--t-d-3);
 }
 
+/* A Presence Spine remains compact, but it never hides the real places a
+   signed-in person can visit. It is navigation, not decoration. */
+.presence-spine .nav-row,
+.presence-spine .server-chip { margin: 2px 0; }
+.presence-spine .channel-row { width: calc(100% - var(--t-d-3)); margin-left: var(--t-d-3); }
+
 /* --- Main Environment -------------------------------------- */
 
 .main-environment {
@@ -230,24 +239,30 @@ img { max-width: 100%; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--t-pg);
+  position: relative;
+  background:
+    radial-gradient(ellipse 56% 48% at 82% -8%, rgba(255, 115, 43, 0.30), transparent 68%),
+    radial-gradient(ellipse 38% 36% at 25% 108%, rgba(161, 50, 12, 0.18), transparent 76%),
+    linear-gradient(132deg, #0b0908 8%, #15100e 54%, #100c0b 100%);
 }
 
 /* Context header — context lives INSIDE the environment. It is
    not a permanent application-wide top bar; it answers to the
    current place. */
 .context-header {
-  flex: 0 0 auto;
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 2;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--t-d-4);
-  padding: clamp(14px, 2.2vh, 22px) clamp(18px, 2.6vw, 34px) var(--t-d-3);
-  border-bottom: 1px solid var(--t-line);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--t-base) 60%, transparent), transparent 70%),
-    var(--t-pg);
+  padding: 18px clamp(20px, 3vw, 48px);
+  border: 0;
+  background: linear-gradient(180deg, rgba(13, 11, 10, 0.68), transparent);
+  pointer-events: none;
 }
+.context-header > * { pointer-events: auto; }
 
 .context-header__titles { min-width: 0; }
 .context-header__icon {
@@ -264,7 +279,7 @@ img { max-width: 100%; }
 .context-header[data-has-icon="true"] .context-header__icon { display: flex; }
 
 .context-title {
-  font-size: var(--t-fs-xl);
+  font-size: var(--t-fs-l);
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.15;
@@ -272,6 +287,7 @@ img { max-width: 100%; }
   overflow: hidden;
   text-overflow: ellipsis;
   margin: 0;
+  text-shadow: 0 2px 20px rgba(255, 111, 44, 0.16);
 }
 .context-sub {
   color: var(--t-mut);
@@ -295,7 +311,7 @@ img { max-width: 100%; }
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: clamp(18px, 3vh, 30px) clamp(18px, 3vw, 40px) var(--t-d-6);
+  padding: clamp(88px, 12vh, 132px) clamp(22px, 4vw, 72px) var(--t-d-6);
 }
 
 /* ============================================================
@@ -817,6 +833,31 @@ img { max-width: 100%; }
    12. HOME / ATRIUM
    ============================================================ */
 
+/* Home is one continuous activity field rather than a collection of panels. */
+.home-environment {
+  width: 100%;
+  min-height: calc(100dvh - 150px);
+  display: flex;
+  align-items: stretch;
+  margin: 0;
+}
+.home-stream {
+  width: 100%;
+  min-height: 100%;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(255, 222, 197, 0.16);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 202, 164, 0.11), rgba(39, 22, 16, 0.38));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 24px 80px rgba(0,0,0,0.26);
+  backdrop-filter: blur(26px) saturate(130%);
+}
+.home-event { padding: var(--t-d-4); border-radius: 18px; }
+.home-event + .home-event { margin-top: 2px; }
+.home-event .msg-text { color: var(--t-txt2); font-size: var(--t-fs-s); }
+.home-stream .empty-state { min-height: min(54dvh, 460px); }
+.home-empty-actions { display: flex; gap: var(--t-d-3); flex-wrap: wrap; justify-content: center; margin-top: var(--t-d-3); }
+
 .atrium {
   display: flex;
   flex-direction: column;
@@ -847,6 +888,11 @@ img { max-width: 100%; }
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  /* A comfortable reading measure centered in the environment; the
+     ambient depth of the Main Environment breathes around it. */
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
 }
 .conversation .thread {
   flex: 1 1 auto;
@@ -855,7 +901,9 @@ img { max-width: 100%; }
   display: flex;
   flex-direction: column;
   gap: var(--t-d-2);
+  padding-top: var(--t-d-2);
   padding-bottom: var(--t-d-5);
+  scroll-padding-bottom: var(--t-d-5);
 }
 .conversation .feed { display: flex; flex-direction: column; gap: 1px; }
 
@@ -871,7 +919,7 @@ img { max-width: 100%; }
 .msg {
   display: flex;
   gap: var(--t-d-3);
-  padding: 3px var(--t-d-3);
+  padding: 5px var(--t-d-3);
   border-radius: var(--t-r-s);
   border: 0;
   background: none;
@@ -882,13 +930,22 @@ img { max-width: 100%; }
 .msg:hover { background: color-mix(in srgb, var(--t-txt) 4%, transparent); }
 .msg .msg-body { flex: 1 1 auto; min-width: 0; }
 .msg .msg-head { display: flex; align-items: baseline; gap: var(--t-d-2); flex-wrap: wrap; }
-.msg .msg-author { font-weight: 700; font-size: var(--t-fs-m); }
-.msg .msg-time { color: var(--t-mut); font-size: var(--t-fs-xs); }
+.msg .msg-author { font-weight: 700; font-size: var(--t-fs-m); color: var(--t-txt); letter-spacing: 0.002em; }
+.msg .msg-time { color: var(--t-mut); font-size: var(--t-fs-xs); font-weight: 500; }
 .msg .msg-actions { margin-left: auto; opacity: 0; transition: opacity var(--t-fast); display: flex; gap: 2px; }
-.msg:hover .msg-actions { opacity: 1; }
+.msg:hover .msg-actions,
+.msg:focus-within .msg-actions { opacity: 1; }
 .msg .msg-actions button { color: var(--t-mut); font-size: var(--t-fs-xs); padding: 2px 6px; border-radius: var(--t-r-s); }
 .msg .msg-actions button:hover { color: var(--t-txt); background: var(--t-base2); }
-.msg .msg-text { color: var(--t-txt); white-space: pre-wrap; word-break: break-word; margin: 1px 0 0; font-size: var(--t-fs-m); }
+.msg .msg-actions button:focus-visible { opacity: 1; color: var(--t-txt); outline: 2px solid var(--t-accent); outline-offset: 1px; }
+.msg .msg-text { color: var(--t-txt); white-space: pre-wrap; word-break: break-word; margin: 2px 0 0; font-size: 0.95rem; line-height: 1.55; }
+/* Grouped continuation: same author, moments apart — hold the avatar
+   column, fold the author line, keep actions reachable. */
+.msg.grouped { padding-top: 1px; padding-bottom: 1px; }
+.msg.grouped > .avatar { visibility: hidden; }
+.msg.grouped .msg-author,
+.msg.grouped .msg-time,
+.msg.grouped .msg-edited { display: none; }
 .msg .msg-edited { color: var(--t-mut); font-size: var(--t-fs-xs); font-style: italic; margin-left: 4px; }
 .msg .msg-mention {
   background: color-mix(in srgb, var(--t-accent) 18%, transparent);
@@ -917,33 +974,69 @@ img { max-width: 100%; }
 }
 .msg-file a { color: inherit; }
 .msg-file.image { border: 0; padding: 0; background: none; }
-.msg-file.image img { border-radius: var(--t-r-s); max-height: 260px; object-fit: contain; }
+.msg-file.image img {
+  display: block;
+  border-radius: var(--t-r-s);
+  border: 1px solid var(--t-line);
+  max-width: min(100%, 480px);
+  max-height: 320px;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.3);
+  cursor: zoom-in;
+}
+.msg-file.image.is-loading {
+  border: 1px dashed var(--t-line-hi);
+  border-radius: var(--t-r-s);
+  padding: 14px var(--t-d-4);
+  max-width: 280px;
+  color: var(--t-mut);
+  font-style: italic;
+}
 
-/* Composer */
+/* Composer — an intentional interaction surface fused to the environment. */
 .composer {
   flex: 0 0 auto;
-  margin-top: var(--t-d-3);
+  margin-top: var(--t-d-4);
   border: 1px solid var(--t-line-hi);
-  border-radius: var(--t-r-m);
-  background: var(--t-base);
+  border-radius: var(--t-r-l);
+  background: color-mix(in srgb, var(--t-elev) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(120%);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: flex-end;
   gap: var(--t-d-2);
-  padding: var(--t-d-2) var(--t-d-3);
+  padding: var(--t-d-3) var(--t-d-3) var(--t-d-3) var(--t-d-2);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.composer:focus-within {
+  border-color: color-mix(in srgb, var(--t-accent) 65%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--t-accent) 45%, transparent),
+    0 12px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .composer textarea {
   flex: 1 1 auto;
-  min-height: 36px;
+  min-height: 42px;
   max-height: 160px;
   background: transparent;
   border: 0;
   resize: none;
-  padding: var(--t-d-2) 0;
+  padding: var(--t-d-2) var(--t-d-2);
+  color: var(--t-txt);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  font-family: inherit;
 }
 .composer textarea:focus { outline: none; }
-.composer .composer-actions { display: flex; align-items: center; gap: var(--t-d-2); flex: 0 0 auto; }
-.composer button.file-btn { color: var(--t-mut); font-size: 1.15rem; padding: 4px; }
-.composer button.file-btn:hover { color: var(--t-txt); }
+.composer .composer-actions { display: flex; align-items: center; gap: var(--t-d-2); flex: 0 0 auto; padding-bottom: 2px; }
+.composer button.file-btn { color: var(--t-mut); font-size: 1.15rem; padding: 6px 8px; border-radius: var(--t-r-s); }
+.composer button.file-btn:hover { color: var(--t-txt); background: var(--t-base2); }
+
+/* Narrow screens keep the reading measure fluid and the composer usable. */
+@media (max-width: 640px) {
+  .conversation { max-width: none; }
+  .msg { padding-left: var(--t-d-2); padding-right: var(--t-d-2); }
+  .msg-file.image img { max-height: 240px; }
+}
 
 /* ============================================================
    14. PUBLIC AUTH SURFACES

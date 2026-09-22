@@ -56,7 +56,7 @@ function createWindow() {
     minHeight: 600,
     title: 'Trycord',
     autoHideMenuBar: true,
-    backgroundColor: '#141519',
+    backgroundColor: '#0d0b0a',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -110,13 +110,13 @@ function createWindow() {
             && !document.getElementById('mobile-shell').hidden;
           const rail = document.querySelectorAll('#global-navigation .nav-row[data-nav]').length;
           const title = (document.getElementById('context-title') || {}).textContent || '';
-          const atrium = !!document.querySelector('#view-root .atrium');
+          const homeEnvironment = !!document.querySelector('#view-root .home-environment');
           const pres = (typeof window.TrycordPresentation !== 'undefined')
             ? window.TrycordPresentation.mode() : 'unset';
-          return 'desk-shell-visible=' + desk + ' mobile-shell-visible=' + mobile + ' rail-tabs=' + rail + ' title=' + title + ' atrium=' + (atrium ? 'yes' : 'no') + ' presentation=' + pres;
+          return 'desk-shell-visible=' + desk + ' mobile-shell-visible=' + mobile + ' rail-tabs=' + rail + ' title=' + title + ' home-environment=' + (homeEnvironment ? 'yes' : 'no') + ' presentation=' + pres;
         })()`);
         console.log('[smoke] home: ' + out);
-        if (!String(out).includes('rail-tabs=4') || !String(out).includes('atrium=yes') ||
+        if (!String(out).includes('rail-tabs=4') || !String(out).includes('home-environment=yes') ||
             !String(out).includes('presentation=desktop') || !String(out).includes('desk-shell-visible=true')) process.exitCode = 1;
       } catch (e) {
         console.log('[smoke] FAIL ' + e);

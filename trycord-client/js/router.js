@@ -38,7 +38,7 @@ function setCleanup(fn) {
 
 function parseHash() {
   const raw = (location.hash || '#/').replace(/^#/, '');
-  if (!raw || raw === '/') return { name: 'home' };
+  if (!raw || raw === '/') return { path: '/', parts: [] };
   const parts = raw.split('/').filter(Boolean).map(decodeURIComponent);
   return { path: raw, parts };
 }
@@ -50,7 +50,7 @@ function requireAuth() {
   return true;
 }
 
-async function run() {
+async function renderRoute() {
   const { path, parts } = parseHash();
   const region = viewRegion();
   if (!region) return;
@@ -193,6 +193,28 @@ async function run() {
   // --- home as default ---------------------------------------------------
   await renderHome(region);
   renderAllChrome();
+}
+
+async function run() {
+  try {
+    return await renderRoute();
+  } catch (ex) {
+    // A failed data request must not strand the desktop shell with the last
+    // view cleared. Keep real navigation mounted and give the user a route
+    // back to the live application.
+    const region = viewRegion();
+    if (region) {
+      clear(region);
+      renderContextHeader({ title: 'Unable to load this view' });
+      region.appendChild(el('div', { class: 'empty-state' },
+        el('div', { class: 'form-error' }, ex && ex.message ? ex.message : 'Please try again.'),
+        el('div', { class: 'row-line' },
+          el('button', { class: 'btn primary', type: 'button', onClick: () => { location.hash = '#/home'; } }, 'Home'),
+          el('button', { class: 'btn ghost', type: 'button', onClick: () => { run(); } }, 'Retry'))));
+    }
+    renderAllChrome();
+    return null;
+  }
 }
 
 const Router = {
