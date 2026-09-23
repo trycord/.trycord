@@ -219,11 +219,14 @@ trycord-server/.env.example
 
 # Hosting Modes
 
-Trycord supports two ways to expose the server.
+Trycord supports two explicit deployment modes, selected with
+`SERVER_HOST_TYPE` (`express` or `nginx`). Any other value is a hard startup
+error — Trycord never guesses its topology.
 
 ## Express
 
-The Trycord server handles HTTP, the API, WebSockets, and the web client directly.
+Set `SERVER_HOST_TYPE=express`. The Trycord server handles HTTP, the API,
+WebSockets, and the web client directly.
 
 ```text
 Internet
@@ -233,11 +236,14 @@ Trycord / Express
 Database
 ```
 
-This is the simplest option and works well for development and straightforward self-hosting.
+This is the simplest option and works well for development and straightforward
+self-hosting. Express binds `0.0.0.0` by default (`HOST=0.0.0.0`,
+`PORT=9971`), and the web client is served by Express from the bundled
+client. Health: `http://<host>:9971/health` and `/api/health`.
 
 ## Nginx
 
-For production deployments, nginx can sit in front of Trycord.
+For production deployments, nginx sits in front of Trycord.
 
 ```text
 Internet
@@ -246,12 +252,13 @@ Cloudflare / HTTPS
    ↓
 nginx
    ↓
-Trycord / Express
+Trycord / Express :9971
    ↓
 Database
 ```
 
-Nginx handles the public HTTPS connection and proxies API and WebSocket traffic to Trycord.
+Nginx handles the public HTTPS connection and proxies API and WebSocket
+traffic to Trycord.
 
 Trycord itself still handles:
 
@@ -264,6 +271,25 @@ Trycord itself still handles:
 - database access
 
 Nginx is only the public gateway.
+
+Set `SERVER_HOST_TYPE=nginx` server-side. In nginx mode Express binds
+`127.0.0.1` by default — the backend does not need a public port. Set
+`TRUST_PROXY=1` so client IPs and HTTPS detection come from the real
+forwarded headers (pinned to loopback only). At boot the server warns about
+inconsistent topology, e.g. a `TRYCORD_PUBLIC_URL` that includes an upstream
+port, a `CLIENT_ORIGIN` that contradicts the public origin, or
+`TRUST_PROXY=1` missing.
+
+A working nginx configuration is provided:
+
+```text
+trycord-server/deploy/nginx.conf.example
+```
+
+It serves the static client, proxies `/api/*` and `/ws` (with WebSocket
+upgrade headers), preserves Host/X-Real-IP/X-Forwarded-For/X-Forwarded-Proto,
+copies the Cloudflare client IP when present, and never falls back to the
+nginx default page.
 
 ---
 

@@ -16,7 +16,20 @@ const inviteRoutes = require('./routes/invites');
 const enforcement = require('./services/enforcement');
 
 const PORT = parseInt(process.env.PORT || '9971', 10);
-const HOST = process.env.HOST || '0.0.0.0';
+// §11 host type is validated strictly: exactly "express" (direct exposure)
+// or "nginx" (reverse-proxy deployment). Anything else is a hard startup
+// error — never silently fall back to a different topology.
+const HOST_TYPE = String(process.env.SERVER_HOST_TYPE || '').trim().toLowerCase();
+if (HOST_TYPE && HOST_TYPE !== 'express' && HOST_TYPE !== 'nginx') {
+  throw new Error('Invalid SERVER_HOST_TYPE. Expected "express" or "nginx".');
+}
+const nginxMode = HOST_TYPE === 'nginx';
+// §14/normal bind: in nginx mode the public listener is nginx, so Express
+// binds loopback unless the deployment explicitly requires another interface.
+// In express mode keep the existing direct-exposure default. dotenv injects
+// HOST from .env, so the per-mode default only applies when HOST is unset.
+const HOST = nginxMode ? (process.env.HOST || '127.0.0.1') : (process.env.HOST || '0.0.0.0');
+const isLoopbackHost = (h) => h === '127.0.0.1' || h === '::1' || h === '[::1]' || h === 'localhost' || /^127\./.test(h);
 
 function instanceConfig() {
   return {
@@ -60,6 +73,35 @@ async function boot() {
     );
   }
   const inst = instanceConfig();
+  console.log('[info] host type: ' + (nginxMode ? 'nginx (reverse proxy in front of :' + PORT + ')' : 'express (direct)'));
+  // §12 mode-specific validation: surface obviously inconsistent topology at
+  // boot instead of failing later at request time.
+  if (nginxMode) {
+    if (inst.publicUrl) {
+      try {
+        const pub = new URL(inst.publicUrl);
+        if (pub.port) {
+          console.warn('[warn] nginx mode: TRYCORD_PUBLIC_URL includes a port — the public origin should be the bare site URL (e.g. https://trycord.dev), not an upstream port.');
+        }
+        if (inst.clientOrigins.length && !inst.clientOrigins.includes(pub.origin)) {
+          console.warn('[warn] nginx mode: CLIENT_ORIGIN does not include the public origin (' + pub.origin + ') — CORS may be misconfigured.');
+        }
+      } catch { /* publicUrl invalid; other paths handle it */ }
+    }
+    if (process.env.HOST && !isLoopbackHost(process.env.HOST)) {
+      console.warn('[warn] nginx mode: HOST=' + process.env.HOST + ' is not a loopback interface. The public listener is nginx — keep Express on 127.0.0.1 unless the deployment explicitly requires another interface.');
+    }
+    if (String(process.env.TRUST_PROXY || '').trim() !== '1') {
+      console.warn('[warn] nginx mode: TRUST_PROXY=1 is not set. Client IPs and HTTPS detection will be wrong behind the proxy. Set it only when a proxy on the same host (nginx) is actually in front of Express.');
+    }
+  } else if (inst.publicUrl) {
+    try {
+      const u = new URL(inst.publicUrl);
+      if (u.port && String(parseInt(u.port, 10)) !== String(PORT)) {
+        console.warn('[warn] express mode: PUBLIC URL port ' + u.port + ' differs from listener port ' + PORT + ' — public links may not reach this listener as configured.');
+      }
+    } catch { /* publicUrl invalid; other paths handle it */ }
+  }
   await db.connect();
   console.log(`[info] database connected (${db.dialect})`);
 
@@ -104,7 +146,7 @@ async function boot() {
     try { const origin = new URL(o).origin; cspConnect.push(origin, origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')); cspImg.push(origin); } catch { /* ignore unparseable */ }
   };
   [apiOrigin, inst.publicUrl, inst.globalUrl].forEach((o) => o && addCspOrigin(o));
-  ['http://localhost:9971', 'http://127.0.0.1:9971', 'https://trycord.wispbyte.app'].forEach(addCspOrigin);
+  ['http://localhost:9971', 'http://127.0.0.1:9971', 'https://trycord.dev'].forEach(addCspOrigin);
   String(process.env.CSP_CONNECT_ORIGINS || '')
     .split(',').map((s) => s.trim()).filter(Boolean).forEach(addCspOrigin);
   const buildCsp = (allowInlineScripts) => [
