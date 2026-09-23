@@ -19,6 +19,18 @@ const TABLES = [
   'messages',
   'invites',
   'revoked_tokens',
+  // Phase 2 / overhaul features, in foreign-key order. Every table that the
+  // schema creates is represented here so `db.connect(schema) then copy`
+  // covers the whole feature set — not just the server-era tables.
+  'dm_conversations',
+  'dm_members',
+  'dm_messages',
+  'friend_requests',
+  'friendships',
+  'attachments',
+  'notifications',
+  'password_resets',
+  'email_verifications',
   // Trust & Safety, in foreign-key order: admins/reports only reference
   // users; moderation_actions reference users + reports; appeals reference
   // users + moderation_actions; audit_logs reference users + reports.
