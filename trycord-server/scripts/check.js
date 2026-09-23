@@ -19,6 +19,7 @@ async function main() {
     'member_roles', 'channels', 'messages', 'invites', 'revoked_tokens',
     'attachments', 'dm_conversations', 'dm_members', 'dm_messages',
     'friend_requests', 'friendships', 'notifications',
+    'admins', 'reports', 'moderation_actions', 'appeals', 'audit_logs',
   ];
   const missing = required.filter((t) => !names.includes(t));
   if (missing.length) throw new Error('missing tables: ' + missing.join(', '));
@@ -31,7 +32,7 @@ async function main() {
   const idxCreated = await conn.all("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_messages_created'");
   if (!idxCreated.length) throw new Error('missing index idx_messages_created');
 
-  console.log('schema check passed (' + names.length + ' tables, idx_messages_channel + idx_messages_created present)');
+  console.log('schema check passed (' + names.length + ' tables, both message indexes + T&S tables present)');
   await conn.close();
   fs.rmSync(dir, { recursive: true, force: true });
 }

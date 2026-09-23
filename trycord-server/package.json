@@ -25,7 +25,8 @@
     "migrate": "node scripts/migrate.js",
     "check": "node scripts/check.js",
     "test:regression": "node scripts/test-regression.js",
-    "test:phase2": "node scripts/test-phase2.js"
+    "test:phase2": "node scripts/test-phase2.js",
+    "test:trustsafety": "node scripts/test-trustsafety.js"
   },
   "license": "MIT",
   "dependencies": {

@@ -23,7 +23,11 @@ function tables(engine) {
       password_changed_at VARCHAR(64),
       sessions_invalidated_at VARCHAR(64),
       email VARCHAR(255) UNIQUE,
-      email_verified_at VARCHAR(64)
+      email_verified_at VARCHAR(64),
+      enforcement_state VARCHAR(16),
+      enforcement_expires_at VARCHAR(64),
+      enforcement_reason TEXT,
+      enforcement_updated_at VARCHAR(64)
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS servers (
@@ -35,6 +39,9 @@ function tables(engine) {
       is_public       INTEGER NOT NULL DEFAULT 0,
       is_discoverable INTEGER NOT NULL DEFAULT 1,
       created_at      VARCHAR(64) NOT NULL,
+      enforcement_state VARCHAR(16),
+      enforcement_reason TEXT,
+      enforcement_updated_at VARCHAR(64),
       FOREIGN KEY (owner_id) REFERENCES users(id)
     )${engine}`,
 
@@ -224,6 +231,73 @@ function tables(engine) {
       created_at VARCHAR(64) NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
+
+    // --- Trust & Safety (platform administration, separate from server
+    // moderation). Authority lives server-side in the admins table only;
+    // there is no client-declared isAdmin flag anywhere.
+    `CREATE TABLE IF NOT EXISTS admins (
+      user_id VARCHAR(64) PRIMARY KEY,
+      created_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS reports (
+      id         VARCHAR(64) PRIMARY KEY,
+      reporter_id VARCHAR(64) NOT NULL,
+      target_type VARCHAR(32) NOT NULL,
+      target_id   VARCHAR(64) NOT NULL,
+      reason      VARCHAR(255) NOT NULL,
+      description TEXT,
+      status      VARCHAR(16) NOT NULL DEFAULT 'OPEN',
+      assigned_admin_id VARCHAR(64),
+      created_at  VARCHAR(64) NOT NULL,
+      updated_at  VARCHAR(64) NOT NULL,
+      resolved_at VARCHAR(64),
+      resolution  VARCHAR(16),
+      FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (assigned_admin_id) REFERENCES users(id) ON DELETE SET NULL
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS moderation_actions (
+      id         VARCHAR(64) PRIMARY KEY,
+      actor_id   VARCHAR(64) NOT NULL,
+      target_type VARCHAR(32) NOT NULL,
+      target_id  VARCHAR(64) NOT NULL,
+      action_type VARCHAR(24) NOT NULL,
+      reason     TEXT NOT NULL,
+      expires_at VARCHAR(64),
+      report_id  VARCHAR(64),
+      created_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE SET NULL
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS appeals (
+      id          VARCHAR(64) PRIMARY KEY,
+      user_id     VARCHAR(64) NOT NULL,
+      action_id   VARCHAR(64) NOT NULL,
+      reason      TEXT NOT NULL,
+      status      VARCHAR(16) NOT NULL DEFAULT 'OPEN',
+      created_at  VARCHAR(64) NOT NULL,
+      updated_at  VARCHAR(64) NOT NULL,
+      reviewer_id VARCHAR(64),
+      decision    VARCHAR(16),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (action_id) REFERENCES moderation_actions(id) ON DELETE CASCADE,
+      FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE SET NULL
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS audit_logs (
+      id         VARCHAR(64) PRIMARY KEY,
+      actor_id   VARCHAR(64) NOT NULL,
+      action     VARCHAR(64) NOT NULL,
+      target_type VARCHAR(32),
+      target_id  VARCHAR(64),
+      reason     TEXT,
+      report_id  VARCHAR(64),
+      created_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
   ];
 }
 
@@ -249,6 +323,15 @@ const LEGACY_ALTERS = [
   ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
   ['messages', 'edited_at', 'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64)'],
   ['dm_messages', 'edited_at', 'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64)'],
+  // Trust & Safety: enforcement state mirrors the authoritative
+  // moderation_actions records so the hot auth path is one users read.
+  ['users', 'enforcement_state', 'ALTER TABLE users ADD COLUMN enforcement_state VARCHAR(16)'],
+  ['users', 'enforcement_expires_at', 'ALTER TABLE users ADD COLUMN enforcement_expires_at VARCHAR(64)'],
+  ['users', 'enforcement_reason', 'ALTER TABLE users ADD COLUMN enforcement_reason TEXT'],
+  ['users', 'enforcement_updated_at', 'ALTER TABLE users ADD COLUMN enforcement_updated_at VARCHAR(64)'],
+  ['servers', 'enforcement_state', 'ALTER TABLE servers ADD COLUMN enforcement_state VARCHAR(16)'],
+  ['servers', 'enforcement_reason', 'ALTER TABLE servers ADD COLUMN enforcement_reason TEXT'],
+  ['servers', 'enforcement_updated_at', 'ALTER TABLE servers ADD COLUMN enforcement_updated_at VARCHAR(64)'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -273,6 +356,13 @@ const MYSQL_MODIFY = [
 
 const MYSQL_ADD = [
   ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255) UNIQUE'],
+  ['users', 'enforcement_state', 'ALTER TABLE users ADD COLUMN enforcement_state VARCHAR(16)'],
+  ['users', 'enforcement_expires_at', 'ALTER TABLE users ADD COLUMN enforcement_expires_at VARCHAR(64)'],
+  ['users', 'enforcement_reason', 'ALTER TABLE users ADD COLUMN enforcement_reason TEXT'],
+  ['users', 'enforcement_updated_at', 'ALTER TABLE users ADD COLUMN enforcement_updated_at VARCHAR(64)'],
+  ['servers', 'enforcement_state', 'ALTER TABLE servers ADD COLUMN enforcement_state VARCHAR(16)'],
+  ['servers', 'enforcement_reason', 'ALTER TABLE servers ADD COLUMN enforcement_reason TEXT'],
+  ['servers', 'enforcement_updated_at', 'ALTER TABLE servers ADD COLUMN enforcement_updated_at VARCHAR(64)'],
 ];
 
 const INDEXES = [
@@ -298,6 +388,17 @@ const INDEXES = [
   'CREATE INDEX idx_password_resets_user ON password_resets(user_id)',
   'CREATE INDEX idx_email_verifications_token ON email_verifications(token_hash)',
   'CREATE INDEX idx_users_email ON users(email)',
+  // Trust & Safety access patterns: report queues, per-target enforcement
+  // history, appeal inboxes, and the audit trail.
+  'CREATE INDEX idx_reports_status ON reports(status, created_at)',
+  'CREATE INDEX idx_reports_target ON reports(target_type, target_id)',
+  'CREATE INDEX idx_mod_actions_target ON moderation_actions(target_type, target_id)',
+  'CREATE INDEX idx_mod_actions_actor ON moderation_actions(actor_id, created_at)',
+  'CREATE INDEX idx_mod_actions_active ON moderation_actions(action_type, expires_at)',
+  'CREATE INDEX idx_appeals_user ON appeals(user_id, status)',
+  'CREATE INDEX idx_appeals_action ON appeals(action_id)',
+  'CREATE INDEX idx_audit_created ON audit_logs(created_at)',
+  'CREATE INDEX idx_audit_actor ON audit_logs(actor_id, created_at)',
 ];
 
 const MYSQL_COLUMN_SQL =

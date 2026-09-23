@@ -9,7 +9,7 @@ const { effectivePermissions, isKnown } = require('./permissions');
 
 const LIST_COLS = `
   s.id, s.name, s.description, s.owner_id, s.join_code,
-  s.is_public, s.is_discoverable, s.created_at,
+  s.is_public, s.is_discoverable, s.created_at, s.enforcement_state,
   (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count,
   (SELECT COUNT(*) FROM channels c WHERE c.server_id = s.id) AS channel_count,
   (SELECT MAX(m2.created_at) FROM messages m2

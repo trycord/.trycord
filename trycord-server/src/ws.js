@@ -22,7 +22,7 @@ const WebSocket = require('ws');
 const db = require('./db');
 const { now, uuid, visibleChannel } = require('./util');
 const { hasPermission } = require('./services/permissions');
-const { tokenStale } = require('./middleware/auth');
+const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
 const dms = require('./services/dms');
 const uploads = require('./services/uploads');
 
@@ -163,6 +163,19 @@ function createGateway(server) {
     }
   }
 
+  // Cut every live socket for a user — used the instant enforcement lands,
+  // so a banned/suspended account cannot keep an existing connection open.
+  // A graceful close frame (1008) is sent; no hard terminate, so the peer
+  // actually observes the reason. Stuck sockets are reaped by the heartbeat.
+  function disconnectUser(userId, reason) {
+    const id = String(userId);
+    const set = userSockets.get(id);
+    if (!set) return;
+    [...set].forEach((c) => {
+      try { c.close(1008, String(reason || 'session closed')); } catch { /* gone already */ }
+    });
+  }
+
   // Ticket issuance/consumption. One HTTP call = one socket attempt.
   function issueTicket(claims) {
     const t = crypto.randomUUID();
@@ -201,9 +214,12 @@ function createGateway(server) {
       }
       // Mirror the HTTP layer: tickets issued before a password change or
       // "sign out everywhere" are dead. Socket sessions must never outlive them.
-      const row = await db.get('SELECT password_changed_at, sessions_invalidated_at FROM users WHERE id = ?', [user.id]);
+      const row = await db.get('SELECT password_changed_at, sessions_invalidated_at, enforcement_state, enforcement_expires_at FROM users WHERE id = ?', [user.id]);
       if (!row) { ws.close(1008, 'user not found'); return; }
       if (tokenStale(user, row)) { ws.close(1008, 'session revoked'); return; }
+      // A socket cannot open while the account is under enforcement, matching
+      // the HTTP gate exactly (same helper, same semantics).
+      if (authEnforced(user, row)) { ws.close(1008, 'account enforced'); return; }
 
       ws.user = user;
       ws.dmIds = new Set();
@@ -302,7 +318,7 @@ function createGateway(server) {
   }, HEARTBEAT_MS);
   heartbeat.unref();
 
-  return { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket };
+  return { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser };
 }
 
 module.exports = createGateway;

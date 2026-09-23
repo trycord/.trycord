@@ -2,6 +2,9 @@
 // Tokens issued before the account's password change or session-invalidation
 // markers are also rejected, so password changes and "sign out everywhere"
 // actually end old sessions instead of leaving them valid.
+// Trust & Safety: accounts under an active ban/suspension are rejected here
+// too — the enforcement columns ride along in the same single query as the
+// revocation flag, so the hot path stays one round trip.
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { fail } = require('../errors');
@@ -21,6 +24,17 @@ function tokenStale(user, row) {
   return false;
 }
 
+function enforced(user, row) {
+  const state = row ? row.enforcement_state : null;
+  if (state === 'banned') return { type: 'ACCOUNT_BAN' };
+  if (state === 'suspended') {
+    const exp = row.enforcement_expires_at;
+    if (exp && new Date(exp).getTime() < Date.now()) return null; // lapsed
+    return { type: 'SUSPENSION', until: exp };
+  }
+  return null;
+}
+
 function auth(req, res, next) {
   const token = (req.headers.authorization || '').replace(/^Bearer /, '');
   if (!token) return fail(res, 'AUTH_REQUIRED', 'authentication required');
@@ -34,7 +48,8 @@ function auth(req, res, next) {
   // along as a scalar subquery instead of a second sequential lookup.
   // Identical semantics: revoked jti, missing user, or stale markers reject.
   db.get(
-    `SELECT u.password_changed_at, u.sessions_invalidated_at,
+    `SELECT u.password_changed_at, u.sessions_invalidated_at, u.enforcement_state,
+       u.enforcement_expires_at,
        (SELECT 1 FROM revoked_tokens r WHERE r.jti = ?) AS revoked
      FROM users u WHERE u.id = ?`,
     [user.jti || '', user.id]
@@ -43,6 +58,8 @@ function auth(req, res, next) {
       if (!row) return fail(res, 'NOT_FOUND', 'user not found');
       if (user.jti && row.revoked) return fail(res, 'SESSION_REVOKED', 'session revoked');
       if (tokenStale(user, row)) return fail(res, 'SESSION_REVOKED', 'session revoked');
+      const ef = enforced(user, row);
+      if (ef) return fail(res, 'ACCOUNT_ENFORCED', 'account is subject to a moderation action', 403, ef);
       req.user = user;
       next();
     })
@@ -51,3 +68,4 @@ function auth(req, res, next) {
 
 module.exports = auth;
 module.exports.tokenStale = tokenStale;
+module.exports.enforced = enforced;

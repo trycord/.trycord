@@ -88,7 +88,7 @@ async function preview(code) {
   const srv = await db.get(
     `SELECT s.id, s.name, s.description, s.is_public, s.created_at,
       (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count
-    FROM servers s WHERE s.id = ?`,
+    FROM servers s WHERE s.id = ? AND s.enforcement_state IS NULL`,
     [invite.server_id]
   );
   if (!srv) return null;

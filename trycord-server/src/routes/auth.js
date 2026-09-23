@@ -10,6 +10,7 @@ const router = express.Router();
 const rateLimit = require('../middleware/ratelimit');
 const { TERMS_VERSION, PRIVACY_VERSION } = require('../legal');
 const { checkPassword } = require('../auth/passwords');
+const enforcement = require('../services/enforcement');
 
 function isUniqueViolation(e) {
   const msg = String((e && e.message) || '');
@@ -55,6 +56,18 @@ router.post('/login', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, 
     if (!user) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
     const ok = await bcrypt.compare(String(password), user.password_hash);
     if (!ok) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
+    // Trust & Safety: a correct login from a banned/suspended account must
+    // not mint new sessions — the account holder gets the enforcement
+    // details plus the action id so they can open an appeal with it.
+    const ef = enforcement.describeEffective(user);
+    if (ef) {
+      const action = await enforcement.activeAccountAction(user.id);
+      return fail(res, 'ACCOUNT_ENFORCED', 'this account is under a moderation action', 403, {
+        type: ef.type,
+        until: ef.until || null,
+        actionId: action ? action.id : null,
+      });
+    }
     res.json({
       token: sign(user),
       user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },
