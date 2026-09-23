@@ -65,22 +65,48 @@ export function openModal({ title, body, footer, closeText = 'Close' }) {
     role: 'dialog',
     'aria-modal': 'true',
   })));
-  if (title) box.appendChild(el('h2', {}, title));
+  const titleId = 'modal-title-' + Math.random().toString(36).slice(2, 8);
+  if (title) {
+    box.setAttribute('aria-labelledby', titleId);
+    box.appendChild(el('h2', { id: titleId }, title));
+  } else {
+    box.setAttribute('aria-label', 'Dialog');
+  }
   if (body) box.appendChild(el('div', {}, body));
   if (footer) box.appendChild(el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)', justifyContent: 'flex-end' } }, footer));
+
+  const prevFocus = document.activeElement;
+
+  function focusables() {
+    return Array.from(box.querySelectorAll(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+      .filter((n) => n.offsetParent !== null || n === document.activeElement);
+  }
 
   function close() {
     backdrop.remove();
     document.removeEventListener('keydown', onKey);
+    if (prevFocus && prevFocus !== document.body && typeof prevFocus.focus === 'function') {
+      try { prevFocus.focus(); } catch { /* ignore */ }
+    }
   }
   function onKey(e) {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') { close(); return; }
+    if (e.key === 'Tab') {
+      const f = focusables();
+      if (!f.length) { e.preventDefault(); return; }
+      const first = f[0];
+      const last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
   }
   backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
   document.addEventListener('keydown', onKey);
   (qs('#modal-root') || document.body).appendChild(backdrop);
   const first = box.querySelector('input, button, textarea, select, [tabindex]');
   if (first) setTimeout(() => first.focus(), 30);
+  else { box.tabIndex = -1; setTimeout(() => box.focus(), 30); }
   return { close, box };
 }
 
@@ -140,6 +166,9 @@ export function showPopover(anchor, items, { onSelect } = {}) {
     pop.remove();
     document.removeEventListener('pointerdown', hide);
     document.removeEventListener('keydown', onKey);
+    if (pop.contains(document.activeElement) && anchor && typeof anchor.focus === 'function') {
+      try { anchor.focus(); } catch { /* ignore */ }
+    }
   }
   function onKey(e) { if (e.key === 'Escape') hidePopover(); }
   setTimeout(() => {
