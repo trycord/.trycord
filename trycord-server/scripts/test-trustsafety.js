@@ -106,9 +106,13 @@ function wsClosed(ws, ms = 5000) {
   ok('sus-ws-ticket', !!susTicket);
   const ws = await wsOpen(susTicket);
   ok('sus-ws-open-before', ws.readyState === WebSocket.OPEN);
+  // Attach the close listener before enforcing: disconnectUser may close the
+  // socket before the enforce response returns, and a close event fired
+  // before the listener was attached would be lost.
+  const closed = wsClosed(ws);
   const suspend = await J('POST', '/api/admin/users/' + A.id + '/enforce', { actionType: 'SUSPENSION', reason: 'continued spam', expiresInHours: 24 }, adm.json.token);
   ok('suspension-applied', suspend.status === 200 && suspend.json.type === 'SUSPENSION' && !!suspend.json.expiresAt, 'status=' + suspend.status + ' ' + JSON.stringify(suspend.json).slice(0, 120));
-  const closeCode = await wsClosed(ws);
+  const closeCode = await closed;
   ok('suspension-cuts-live-socket', closeCode === 1008, 'code=' + closeCode);
   const deadSession = await J('GET', '/api/users/me', null, A.token);
   ok('suspension-invalidates-session', deadSession.status === 401 || deadSession.status === 403,

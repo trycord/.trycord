@@ -65,6 +65,16 @@ async function boot() {
 
   const app = express();
   const server = http.createServer(app);
+  // §76 proxy trust is deliberate and narrow: only a proxy on the loopback
+  // interface (nginx on the same host, which fronts Cloudflare in the
+  // documented production layout) may supply X-Forwarded-* headers. Arbitrary
+  // clients can never spoof their remote address, so rate limiting and
+  // HTTPS detection keep using the real client identity. Leave TRUST_PROXY
+  // unset unless the deployment actually has such a proxy.
+  if (String(process.env.TRUST_PROXY || '').trim() === '1') {
+    app.set('trust proxy', 'loopback');
+    console.log('[info] TRUST_PROXY=1: trusting X-Forwarded-* from loopback only');
+  }
   app.use(cors(corsOptions(inst.clientOrigins)));
   if (inst.clientOrigins.length) {
     console.log('[info] CORS allowlist: ' + inst.clientOrigins.join(', '));
