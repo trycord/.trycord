@@ -14,3 +14,6 @@ release/
 dist/
 trycord-desktop/client/
 *.zip
+
+# runtime logs
+*.log
