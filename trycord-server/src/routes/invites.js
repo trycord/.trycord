@@ -2,13 +2,14 @@
 // consume + preview scoped to a code (/api/invites/:code/...).
 const express = require('express');
 const auth = require('../middleware/auth');
+const rateLimit = require('../middleware/ratelimit');
 const { resolveServer, requirePerm } = require('../middleware/serverAccess');
 const { fail, serviceError } = require('../errors');
 const invites = require('../services/invites');
 
 // --- per-server management (MANAGE_INVITES) ---
 const managed = express.Router({ mergeParams: true });
-managed.use(auth, resolveServer);
+managed.use(auth, rateLimit({ windowMs: 60000, max: 120 }), resolveServer);
 
 managed.get('/', requirePerm('MANAGE_INVITES'), async (req, res, next) => {
   try {
@@ -33,7 +34,7 @@ managed.delete('/:inviteId', requirePerm('MANAGE_INVITES'), async (req, res, nex
 
 // --- code-scoped: preview (authed) + join (authed, validated, atomic) ---
 const byCode = express.Router();
-byCode.use(auth);
+byCode.use(auth, rateLimit({ windowMs: 60000, max: 120 }));
 
 byCode.get('/:code/preview', async (req, res, next) => {
   try {
@@ -43,7 +44,7 @@ byCode.get('/:code/preview', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-byCode.post('/:code/join', async (req, res, next) => {
+byCode.post('/:code/join', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
   try {
     res.json(await invites.joinWithCode(req.params.code, req.user));
   } catch (e) { serviceError(res, e); }

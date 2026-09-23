@@ -3,6 +3,7 @@
 const express = require('express');
 const db = require('../db');
 const auth = require('../middleware/auth');
+const rateLimit = require('../middleware/ratelimit');
 const { resolveServer, requireMember, requireOwner, requirePerm } = require('../middleware/serverAccess');
 const { fail, serviceError } = require('../errors');
 const servers = require('../services/servers');
@@ -17,7 +18,9 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', async (req, res, next) => {
+// Server creation is write-heavy (server + membership + roles + category +
+// channel in one transaction); cap it so a burst cannot hammer the DB.
+router.post('/', rateLimit({ windowMs: 60000, max: 10 }), async (req, res, next) => {
   try {
     const { name, description, joinCode, isPublic, isDiscoverable } = req.body || {};
     res.json(await servers.create({ name, description, joinCode, isPublic, isDiscoverable }, req.user));

@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 const db = require('../src/db');
+require('dotenv').config();
 
 const TABLES = [
   'users',
@@ -18,6 +19,14 @@ const TABLES = [
   'messages',
   'invites',
   'revoked_tokens',
+  // Trust & Safety, in foreign-key order: admins/reports only reference
+  // users; moderation_actions reference users + reports; appeals reference
+  // users + moderation_actions; audit_logs reference users + reports.
+  'admins',
+  'reports',
+  'moderation_actions',
+  'appeals',
+  'audit_logs',
 ];
 
 function isDuplicate(e) {
