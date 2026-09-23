@@ -1,33 +1,53 @@
 # Trycord
 
-A self-hostable community chat platform.
+**A self-hostable community chat platform.**
+
+Run your own instance, use the official one, or connect the clients to a server you control. Your communities, users, messages, permissions, and files stay on the server you choose.
 
 ## What is Trycord?
 
-Trycord is a community chat platform built around a simple idea: you should be
-able to run the server yourself if you want to.
+Trycord is a community chat platform built to be **self-hostable from day one**.
 
-The project includes a web client, a desktop client, and a Node.js server.
-The clients are access points only — they own nothing. Users, servers,
-messages, permissions, and storage all live on the Trycord server you
-configure, whether that's the official instance or one you host.
+It has three parts:
+
+- **Web client** for browsers
+- **Desktop client** for Windows and other Electron-supported platforms
+- **Server** that handles accounts, communities, messages, permissions, files, and realtime communication
+
+The clients are just clients. They don't own your data or run the backend.
+
+You can use the official Trycord server or run your own.
+
+---
 
 ## Features
 
-- Servers with invite codes, member management, and visibility controls
-- Channel categories and channel-based real-time chat over WebSockets
-- File attachments in channels (images, PDF, and text files) with permission-checked downloads
-- Roles and granular permissions, server discovery for public instances
-- Web client, desktop client (Electron), and self-hostable Node.js server
-- SQLite for development, MySQL for production
-- Per-instance browser state, so one client can hop between servers you run
+- 💬 Realtime community chat
+- 🏠 Communities with public or private visibility
+- 📁 Channels and channel categories
+- 👥 Member management
+- 🛡️ Roles and granular permissions
+- 🔗 Invite codes
+- 🔎 Public server discovery
+- 📎 File attachments for images, PDFs, and text files
+- 💬 Direct messages and friends
+- 🔔 Notifications
+- ⚡ WebSocket realtime communication
+- 🖥️ Web client
+- 💻 Electron desktop client
+- 🗄️ SQLite for development
+- 🐬 MySQL for production
+- 🌐 Fully self-hostable
 
-## Quick start
+---
 
-You only need a client to *use* Trycord. You only need the server to
-*host* an instance.
+# Quick Start
 
-**Run the server locally (it serves the web client itself):**
+You only need the **client** to use Trycord.
+
+You only need the **server** if you want to run your own instance.
+
+## Run a server locally
 
 ```bat
 cd trycord-server
@@ -35,89 +55,147 @@ npm install
 copy .env.example .env
 ```
 
-Edit `.env` at minimum:
+At minimum, configure:
 
 ```env
-JWT_SECRET=<output of: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
+JWT_SECRET=<generate a random secret>
 DB_CLIENT=sqlite
 DB_FILE=./dev.db
 ```
 
-Then:
+Generate a JWT secret with:
+
+```bat
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Then start the server:
 
 ```bat
 npm run seed
 npm start
 ```
 
-Open **http://localhost:9971** and log in with `demo` / `demo1234`.
-(The seed login is development-only — see `trycord-server/scripts/seed.js`.)
+Open:
 
-The server binds `HOST` (default `0.0.0.0`) on `PORT` (default `9971`).
-Set `HOST=127.0.0.1` for loopback only.
+**http://localhost:9971**
 
-**Run the web client separately (optional):**
+The development seed account is:
 
-The web client is a pure static site (the server serves `trycord-client/`
-itself). To serve it from another static host, publish the folder anywhere;
-the client resolves its backend at runtime:
-
-```bat
-# served by the Trycord server itself (default):
-#   http://localhost:9971  -> serves trycord-client/ automatically
-
-# alternative static host pinning the API origin in process env:
-set TRYCORD_API_URL=https://trycord.wispbyte.app
-# then point a static file server at the trycord-client/ directory
+```text
+Username: demo
+Password: demo1234
 ```
 
-The runtime config endpoint `/runtime-config.js` is only exposed by the
-Trycord server; a plain static host can rely on the `?api=` argument instead
-(desktop passes `--api-url=` automatically).
+The seed account is for development only.
 
-**Run the desktop app:**
+The server listens on:
+
+```text
+HOST=0.0.0.0
+PORT=9971
+```
+
+For local-only access, use:
+
+```env
+HOST=127.0.0.1
+```
+
+---
+
+# Web Client
+
+The server can serve the web client automatically, so you don't need to set up a separate web server.
+
+By default:
+
+```text
+http://localhost:9971
+        ↓
+Trycord server
+        ↓
+trycord-client/
+```
+
+You can also host `trycord-client/` separately on any static web host.
+
+The client determines which Trycord server to use at runtime, so you don't need to rebuild it every time you change servers.
+
+---
+
+# Desktop Client
+
+The desktop app is built with Electron.
 
 ```bat
 cd trycord-desktop
 npm install
 npm start
-Trycord.exe --api-url=http://51.79.44.111:9971
 ```
 
-Build a Windows installer without publishing:
+You can point it at a specific server:
+
+```bat
+Trycord.exe --api-url=http://localhost:9971
+```
+
+Build a Windows installer:
 
 ```bat
 npm run build:win
 ```
 
-Output: `trycord-desktop/release/Trycord Setup x.x.x.exe` plus update metadata
-(`latest.yml`). Publishing a release is explicit: `npm run release`
-(needs `GH_TOKEN`), or push a `v*` tag and let CI do it.
+The installer will be placed in:
 
-## Point the client at another server
+```text
+trycord-desktop/release/
+```
 
-One source of truth, no rebuild needed. Precedence: `?api=` launch argument
-(desktop `--api-url=`) → saved Server setting (localStorage) → runtime config
-(`window.TRYCORD_CONFIG.API_URL` from `/runtime-config.js`) → default
-(`http://localhost:9971`, or same-origin when served by the server).
+---
 
-The client base URL is resolved at runtime in `trycord-client/js/config.js`.
-A deployment can pin the API origin without touching client files by setting
-`TRYCORD_API_URL` on the server, or the desktop exe can take `--api-url=`
-directly.
+# Connecting to Another Server
 
-## Self-hosting
+The client can connect to different Trycord instances without rebuilding.
 
-Your instance, your database. There is **no bundled `server.db`** and no
-silent SQLite fallback: without database configuration the server refuses to
-start with a clear error.
+The server URL is resolved in this order:
+
+1. Desktop `--api-url=` argument
+2. `?api=` URL parameter
+3. Saved server setting
+4. Server runtime configuration
+5. Default local server
+
+The client configuration lives in:
+
+```text
+trycord-client/js/config.js
+```
+
+This means one client can be used with multiple Trycord servers.
+
+---
+
+# Self-Hosting
+
+Self-hosting means **your instance, your database, your rules**.
+
+Trycord does not require WispByte or any other specific hosting provider.
+
+## Development
+
+SQLite is supported for simple deployments and development:
 
 ```env
-# dev: a SQLite file YOU choose
 DB_CLIENT=sqlite
 DB_FILE=./dev.db
+```
 
-# production: your own MySQL (never official credentials)
+## Production
+
+For production, use MySQL:
+
+```env
 DB_CLIENT=mysql
 DB_HOST=localhost
 DB_PORT=3306
@@ -127,109 +205,262 @@ DB_PASSWORD=
 DB_SSL=false
 ```
 
-More knobs in `trycord-server/.env.example`: per-instance `JWT_SECRET`
-(required, never shared), `CLIENT_ORIGIN` (replaces open CORS),
-`TRYCORD_INSTANCE_ID` / `TRYCORD_NAME` / `TRYCORD_PUBLIC_URL`,
-optional `GLOBAL_TRYCORD_URL` (empty = fully independent). Migrating an old
-SQLite file: `node scripts/migrate.js --from ./old.db`.
+There is no hidden `server.db` and no silent fallback to SQLite.
 
-Global sync is optional and outbound-only: if the global service is down or
-unconfigured, local auth/chat/channels/WebSocket keep working. Appearance
-(theme/density) is shared on your device; tokens, favorites, and recents are
-scoped per instance (`trycord:<instance>:…`), with one-time migration.
+If the database isn't configured correctly, the server stops with a clear error.
 
-WispByte MySQL is only the official deployment's database — self-hosting
-never requires WispByte, and official credentials are never distributed.
-
-## Architecture
+More configuration options are documented in:
 
 ```text
-Web / Desktop client (access point, no database)
-        |  REST + WebSocket
-        v
-Trycord server (backend authority)
-        |
-        v
-Your database (SQLite file or MySQL)
+trycord-server/.env.example
 ```
 
-**`trycord-client`** — web access point. Static files only: the supplied
-application shell (`index.html`), one stylesheet (`css/app.css`), and the
-ES-module JS client. No database, no API routes, no server state. The server
-serves this folder itself at `/`.
+---
 
-**`trycord-desktop`** — desktop access point. The same client in an Electron
-window, with an auto-updater (Electron Builder + electron-updater, GitHub
-Releases). Still just an access point: no database, no server logic.
+# Hosting Modes
 
-**`trycord-server`** — backend authority. Handles authentication, servers,
-memberships, roles, permissions, channels, messages, WebSockets, discovery,
-invites, uploads, and database access (SQLite + MySQL adapters, one portable
-schema).
+Trycord supports two ways to expose the server.
 
-```
-trycord-server/src/
-├── server.js        # boot: validate env -> connect db -> schema -> listen
-├── db/              # validated config, sqlite+mysql adapters, portable schema
-├── ws.js            # realtime gateway (shares the HTTP server)
-├── errors.js util.js
-├── middleware/auth.js serverAccess.js
-├── routes/          # auth, users, servers, channels, categories, roles,
-│                    # invites, messages, attachments, discover,
-│                    # dms, friends, notifications, activity
-└── services/        # servers, memberships, roles, permissions, channels,
-                     # invites, dms, friends, notifications, discovery, uploads
+## Express
 
-trycord-client/
-├── index.html       # supplied application shell (mobile + desktop presentations)
-├── css/app.css      # single stylesheet: tokens, spine -> environment, mobile, overlays
-└── js/              # ES modules
-    ├── app.js config.js api.js state.js ui.js components.js
-    ├── realtime.js presentation.js shell.js router.js
-    ├── pages-public.js pages-home.js pages-browse.js
-    └── pages-account.js pages-dms.js pages-workspace.js
+The Trycord server handles HTTP, the API, WebSockets, and the web client directly.
+
+```text
+Internet
+   ↓
+Trycord / Express
+   ↓
+Database
 ```
 
-## Official instance
+This is the simplest option and works well for development and straightforward self-hosting.
 
-- Public instance: `https://trycord.wispbyte.app`
+## Nginx
 
-Self-hosted servers use their own URL and database. The official instance is
-simply the default destination, never the only one.
+For production deployments, nginx can sit in front of Trycord.
 
-## Releases
+```text
+Internet
+   ↓
+Cloudflare / HTTPS
+   ↓
+nginx
+   ↓
+Trycord / Express
+   ↓
+Database
+```
 
-Desktop releases live on [GitHub Releases](../../releases) with semantic
-versions (`1.0.0`, `1.0.1`, `1.1.0`, …; `-beta.N` for the beta channel).
-Installed desktop clients check for updates automatically and install on
-restart — see Settings → About & Updates in the app.
+Nginx handles the public HTTPS connection and proxies API and WebSocket traffic to Trycord.
 
-A release is cut by pushing a version tag; CI builds, validates, and
-publishes everything. Local builds never publish:
+Trycord itself still handles:
+
+- authentication
+- permissions
+- communities
+- messages
+- moderation
+- WebSockets
+- database access
+
+Nginx is only the public gateway.
+
+---
+
+# Architecture
+
+```text
+┌──────────────────────────┐
+│     Web / Desktop        │
+│         Client            │
+└────────────┬─────────────┘
+             │
+        REST + WebSocket
+             │
+             ▼
+┌──────────────────────────┐
+│      Trycord Server      │
+│                          │
+│ Auth · Communities       │
+│ Channels · Messages      │
+│ Roles · Permissions      │
+│ DMs · Friends            │
+│ Discovery · Uploads      │
+└────────────┬─────────────┘
+             │
+             ▼
+┌──────────────────────────┐
+│    Your Database         │
+│   SQLite or MySQL        │
+└──────────────────────────┘
+```
+
+### `trycord-client`
+
+The browser client.
+
+It contains the UI and client-side logic, but no database or server authority.
+
+### `trycord-desktop`
+
+The Electron version of the client.
+
+It uses the same Trycord platform and does not contain its own backend or database.
+
+### `trycord-server`
+
+The backend.
+
+It handles:
+
+- authentication
+- users
+- communities
+- memberships
+- roles
+- permissions
+- channels
+- messages
+- DMs
+- friends
+- notifications
+- invites
+- discovery
+- file uploads
+- WebSockets
+- database access
+
+---
+
+# Official Instance
+
+The official Trycord instance is:
+
+**https://trycord.dev**
+
+Self-hosted instances are completely independent.
+
+You do not need the official server to run Trycord.
+
+You do not need WispByte to self-host Trycord.
+
+---
+
+# Releases
+
+Desktop releases are published through GitHub Releases.
+
+Versions use semantic versioning:
+
+```text
+1.0.0
+1.0.1
+1.1.0
+```
+
+Beta releases use:
+
+```text
+1.0.0-beta.1
+```
+
+The desktop client checks for updates automatically.
+
+### Publishing a release
+
+Create and push a version tag:
 
 ```bat
 git tag v1.0.1
 git push origin v1.0.1
 ```
 
-Each published release must carry the installer, the update metadata
-(`latest.yml`, generated by electron-builder — never written by hand),
-and the blockmap, all agreeing on one version. The release workflow
-fails the job if any of those are missing, before and after publishing.
+CI then builds and publishes the release.
 
-## Documentation
+Local builds never publish automatically.
 
-- `trycord-server/.env.example` — every server setting, documented inline
-- `DESIGN_SYSTEM.md` — client design tokens and component inventory
-- `CONTRIBUTING.md` — how to work on the project
-- `SECURITY.md` — how to report vulnerabilities
+Each release includes:
 
-## Contributing
+- Windows installer
+- `latest.yml`
+- blockmap
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and small, focused pull
-requests are welcome. Please don't open PRs with unrelated drive-by changes
-bundled in.
+The release workflow validates that all required update files exist and use the same version.
 
-## License
+---
 
-MIT — see [LICENSE](LICENSE).
+# Project Structure
+
+The main directories are:
+
+```text
+trycord-server/
+    src/
+    scripts/
+
+trycord-client/
+    index.html
+    css/
+    js/
+
+trycord-desktop/
+    ...
+```
+
+Server code is organized roughly as:
+
+```text
+trycord-server/src/
+├── server.js
+├── db/
+├── ws.js
+├── middleware/
+├── routes/
+└── services/
+```
+
+Client code is organized as:
+
+```text
+trycord-client/
+├── index.html
+├── css/
+└── js/
+```
+
+---
+
+# Documentation
+
+Useful project documentation:
+
+| File | Purpose |
+|---|---|
+| `trycord-server/.env.example` | Server configuration |
+| `DESIGN_SYSTEM.md` | UI design system |
+| `CONTRIBUTING.md` | Development guide |
+| `SECURITY.md` | Security vulnerability reporting |
+
+---
+
+# Contributing
+
+Contributions are welcome.
+
+Before making changes, please read:
+
+```text
+CONTRIBUTING.md
+```
+
+Bug fixes and focused pull requests are preferred.
+
+Please avoid bundling unrelated changes into the same pull request.
+
+---
+
+# License
+
+Trycord is licensed under the **MIT License**.
+
+See [`LICENSE`](LICENSE) for the full license text.
