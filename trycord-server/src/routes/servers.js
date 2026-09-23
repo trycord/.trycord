@@ -47,7 +47,8 @@ router.post('/join/:code', async (req, res, next) => {
 
 router.get('/:id', resolveServer, requireMember, async (req, res, next) => {
   try {
-    res.json(await servers.detail(req.server.id, req.user.id));
+    // req.access already holds this request's computed permission set.
+    res.json(await servers.detail(req.server.id, req.user.id, req.access && req.access.permissions));
   } catch (e) { next(e); }
 });
 
@@ -55,7 +56,7 @@ router.patch('/:id', resolveServer, requirePerm('MANAGE_SERVER'), async (req, re
   try {
     const { name, description, isPublic, isDiscoverable } = req.body || {};
     await servers.update(req.server.id, { name, description, isPublic, isDiscoverable });
-    res.json(await servers.detail(req.server.id, req.user.id));
+    res.json(await servers.detail(req.server.id, req.user.id, req.access && req.access.permissions));
   } catch (e) { serviceError(res, e); }
 });
 

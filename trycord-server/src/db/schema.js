@@ -281,6 +281,9 @@ const INDEXES = [
   'CREATE INDEX idx_member_roles_lookup ON member_roles(server_id, user_id)',
   'CREATE INDEX idx_channels_server ON channels(server_id)',
   'CREATE INDEX idx_messages_channel ON messages(channel_id, created_at)',
+  // Backs ORDER BY created_at DESC scans that are not scoped to one
+  // channel (the /api/activity feed). Write overhead is one narrow index.
+  'CREATE INDEX idx_messages_created ON messages(created_at)',
   'CREATE INDEX idx_invites_server ON invites(server_id)',
   'CREATE INDEX idx_attachments_message ON attachments(message_id)',
   'CREATE INDEX idx_attachments_channel ON attachments(channel_id)',

@@ -34,13 +34,24 @@ async function api(method, path, token, body) {
   return { status: res.status, data };
 }
 
+// Get a short-lived WS ticket (server refuses legacy ?token= sockets).
+async function ticketFor(token) {
+  const r = await api('POST', '/api/auth/ws/ticket', token, {});
+  if (r.status !== 200 || !r.data || !r.data.ticket) {
+    throw new Error('ws ticket failed: ' + r.status + ' ' + JSON.stringify(r.data));
+  }
+  return r.data.ticket;
+}
+
 function connectWs(token) {
   return new Promise((resolve, reject) => {
-    const wsUrl = BASE.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/?token=' + token;
-    const ws = new WebSocket(wsUrl);
-    const timer = setTimeout(() => { try { ws.close(); } catch {} reject(new Error('ws connect timeout')); }, 8000);
-    ws.on('open', () => { clearTimeout(timer); resolve(ws); });
-    ws.on('error', (e) => { clearTimeout(timer); reject(e); });
+    ticketFor(token).then((ticket) => {
+      const wsUrl = BASE.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/?ticket=' + ticket;
+      const ws = new WebSocket(wsUrl);
+      const timer = setTimeout(() => { try { ws.close(); } catch {} reject(new Error('ws connect timeout')); }, 8000);
+      ws.on('open', () => { clearTimeout(timer); resolve(ws); });
+      ws.on('error', (e) => { clearTimeout(timer); reject(e); });
+    }).catch(reject);
   });
 }
 

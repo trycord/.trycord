@@ -95,34 +95,50 @@ function conversationShape(conv, peer, lastMessage, unreadCount, members) {
 
 // Everyone the user chats with, most-recently-active first, with the peer,
 // the latest message, and the unread count each.
+//
+// One membership query with scalar subqueries for the peer id, latest
+// message id, and unread count (all index-backed), then two batched
+// lookups (users, messages) in parallel — 3 round trips no matter how
+// many conversations, instead of 3 per conversation. Same shape as before.
 async function listMine(userId) {
   const memberships = await db.all(
-    `SELECT m.*, c.updated_at, c.created_at AS conv_created
+    `SELECT m.*, c.updated_at, c.created_at AS conv_created,
+       (SELECT om.user_id FROM dm_members om
+        WHERE om.conversation_id = m.conversation_id AND om.user_id != ? LIMIT 1) AS peer_id,
+       (SELECT dm.id FROM dm_messages dm
+        WHERE dm.conversation_id = m.conversation_id
+        ORDER BY dm.created_at DESC, dm.id DESC LIMIT 1) AS last_id,
+       (SELECT COUNT(*) FROM dm_messages um
+        WHERE um.conversation_id = m.conversation_id AND um.author_id != ?
+          AND (m.last_read_at IS NULL OR um.created_at > m.last_read_at)) AS unread_n
      FROM dm_members m JOIN dm_conversations c ON c.id = m.conversation_id
      WHERE m.user_id = ?`,
-    [userId]
+    [userId, userId, userId]
   );
-  const out = [];
-  for (const m of memberships) {
-    const peerRow = await db.get(
-      `SELECT u.* FROM users u
-       JOIN dm_members om ON om.user_id = u.id
-       WHERE om.conversation_id = ? AND om.user_id != ? LIMIT 1`,
-      [m.conversation_id, userId]
-    );
-    const last = await db.get(
-      `SELECT dm.*, u.username AS author_name, u.display_name AS author_display
-       FROM dm_messages dm JOIN users u ON u.id = dm.author_id
-       WHERE dm.conversation_id = ? ORDER BY dm.created_at DESC, dm.id DESC LIMIT 1`,
-      [m.conversation_id]
-    );
-    const unread = await db.get(
-      `SELECT COUNT(*) AS n FROM dm_messages
-       WHERE conversation_id = ? AND author_id != ?
-         AND ( ? IS NULL OR created_at > ? )`,
-      [m.conversation_id, userId, m.last_read_at, m.last_read_at]
-    );
-    out.push(conversationShape(
+  if (!memberships.length) return [];
+  const peerIds = [...new Set(memberships.map((m) => m.peer_id).filter(Boolean))].slice(0, 500);
+  const lastIds = [...new Set(memberships.map((m) => m.last_id).filter(Boolean))].slice(0, 500);
+  const [peerRows, lastRows] = await Promise.all([
+    peerIds.length
+      ? db.all(`SELECT id, username, display_name, created_at FROM users WHERE id IN (${peerIds.map(() => '?').join(',')})`, peerIds)
+      : [],
+    lastIds.length
+      ? db.all(
+        `SELECT dm.*, u.username AS author_name, u.display_name AS author_display
+         FROM dm_messages dm JOIN users u ON u.id = dm.author_id
+         WHERE dm.id IN (${lastIds.map(() => '?').join(',')})`,
+        lastIds
+      )
+      : [],
+  ]);
+  const peers = {};
+  for (const p of peerRows) peers[String(p.id)] = p;
+  const lasts = {};
+  for (const l of lastRows) lasts[String(l.id)] = l;
+  const out = memberships.map((m) => {
+    const peerRow = (m.peer_id && peers[String(m.peer_id)]) || null;
+    const last = (m.last_id && lasts[String(m.last_id)]) || null;
+    return conversationShape(
       { id: m.conversation_id, created_at: m.conv_created, updated_at: last ? last.created_at : m.updated_at },
       publicPeer(peerRow),
       last ? {
@@ -130,9 +146,9 @@ async function listMine(userId) {
         editedAt: last.edited_at || null,
         authorId: last.author_id, authorName: last.author_display || last.author_name,
       } : null,
-      unread ? unread.n : 0
-    ));
-  }
+      m.unread_n || 0
+    );
+  });
   out.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
   return out;
 }
@@ -263,17 +279,21 @@ async function markRead(userId, conversationId) {
 async function detail(userId, conversationId, opts) {
   const seen = await visibleConversation(conversationId, userId);
   if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
-  const peerRow = await db.get(
-    `SELECT u.* FROM users u
-     JOIN dm_members om ON om.user_id = u.id
-     WHERE om.conversation_id = ? AND om.user_id != ? LIMIT 1`,
-    [conversationId, userId]
-  );
-  const members = await db.all(
-    'SELECT user_id, last_read_at FROM dm_members WHERE conversation_id = ?',
-    [conversationId]
-  );
-  const messages = await history(userId, conversationId, opts);
+  // Peer, read positions, and history are independent once membership
+  // is validated — run them concurrently instead of sequentially.
+  const [peerRow, members, messages] = await Promise.all([
+    db.get(
+      `SELECT u.* FROM users u
+       JOIN dm_members om ON om.user_id = u.id
+       WHERE om.conversation_id = ? AND om.user_id != ? LIMIT 1`,
+      [conversationId, userId]
+    ),
+    db.all(
+      'SELECT user_id, last_read_at FROM dm_members WHERE conversation_id = ?',
+      [conversationId]
+    ),
+    history(userId, conversationId, opts),
+  ]);
   return {
     id: seen.conv.id,
     createdAt: seen.conv.created_at,

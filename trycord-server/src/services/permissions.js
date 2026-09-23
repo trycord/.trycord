@@ -23,7 +23,14 @@ async function getOwnerId(serverId, conn = db) {
 
 // Union of all permission strings granted to the user via roles.
 async function effectivePermissions(userId, serverId, conn = db) {
-  if ((await getOwnerId(serverId, conn)) === userId) return new Set(['*']);
+  return effectivePermissionsFor(await getOwnerId(serverId, conn), userId, serverId, conn);
+}
+
+// Same as effectivePermissions, but skips the owner lookup when the
+// caller already holds the server row (middleware, list flows). One
+// fewer round trip per call; identical result.
+async function effectivePermissionsFor(ownerId, userId, serverId, conn = db) {
+  if (ownerId === userId) return new Set(['*']);
   const rows = await conn.all(
     `SELECT r.permissions FROM member_roles mr
      JOIN roles r ON r.id = mr.role_id
@@ -44,4 +51,4 @@ async function hasPermission(userId, serverId, perm, conn = db) {
   return perms.has('*') || perms.has(perm);
 }
 
-module.exports = { PERMISSIONS, isKnown, getOwnerId, effectivePermissions, hasPermission };
+module.exports = { PERMISSIONS, isKnown, getOwnerId, effectivePermissions, effectivePermissionsFor, hasPermission };
