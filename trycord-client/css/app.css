@@ -540,6 +540,7 @@ img { max-width: 100%; }
   min-width: 20px;
   padding: 1px 7px;
   text-align: center;
+}
 .nav-row .nv-caret { flex: 0 0 auto; color: var(--t-mut); font-size: var(--t-fs-s); transform: rotate(-90deg); transition: transform var(--t-fast); }
 .nav-row .nv-caret.open { transform: rotate(0deg); }
 
