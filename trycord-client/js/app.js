@@ -2,7 +2,7 @@
 // Boot order: runtime config -> presentation -> shell wiring -> realtime -> router.
 
 import { TrycordConfig } from './config.js';
-import { updateFromViewport, closeMobileDrawer, openMobileDrawer, onPresentationChange, setPresentation } from './presentation.js';
+import { updateFromViewport, closeMobileDrawer, openMobileDrawer, onPresentationChange, setPresentation, initMobileGestures } from './presentation.js';
 import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends } from './state.js';
 import Realtime from './realtime.js';
 import Router from './router.js';
@@ -39,6 +39,9 @@ async function boot() {
     // placeholder: same as opening the drawer from the right edge
     openMobileDrawer();
   });
+
+  // Drawer gestures (edge swipe, drag-to-close, back/backdrop/Escape close).
+  initMobileGestures();
 
   // 4) Session restore.
   const restored = await hydrate(); // token->me

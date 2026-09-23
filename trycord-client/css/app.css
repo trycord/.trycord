@@ -118,6 +118,7 @@
   /* Elevation */
   --z-inline: 2;     /* context header, in-environment */
   --z-header: 20;    /* mobile header / tab bar   */
+  --z-drawer-back: 40; /* drawer backdrop (below the drawer) */
   --z-drawer: 50;    /* mobile navigation drawer  */
   --z-popover: 900;
   --z-modal: 1000;
@@ -431,11 +432,24 @@ img { max-width: 100%; }
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: var(--z-drawer);
   transform: translateX(-100%);
   transition: transform var(--t-med) var(--t-ease);
+  touch-action: pan-y; /* vertical scroll stays native; horizontal drag is ours */
 }
+.mobile-navigation.dragging { transition: none; }
 .mobile-navigation.open { transform: translateX(0); box-shadow: var(--t-sh-drawer); }
+.mobile-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--t-backdrop);
+  z-index: var(--z-drawer-back);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-med) var(--t-ease);
+}
+.mobile-navigation.open + .mobile-backdrop { opacity: 1; pointer-events: auto; }
 .mobile-navigation .presence-spine__identity,
 .mobile-navigation .presence-spine__global-navigation,
 .mobile-navigation .presence-spine__communities,
