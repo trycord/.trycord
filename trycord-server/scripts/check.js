@@ -27,7 +27,11 @@ async function main() {
   const idx = await conn.all("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_messages_channel'");
   if (!idx.length) throw new Error('missing index idx_messages_channel');
 
-  console.log('schema check passed (' + names.length + ' tables, idx_messages_channel present)');
+  // Backs the activity feed's global ORDER BY created_at DESC scan.
+  const idxCreated = await conn.all("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_messages_created'");
+  if (!idxCreated.length) throw new Error('missing index idx_messages_created');
+
+  console.log('schema check passed (' + names.length + ' tables, idx_messages_channel + idx_messages_created present)');
   await conn.close();
   fs.rmSync(dir, { recursive: true, force: true });
 }

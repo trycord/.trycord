@@ -68,11 +68,38 @@ function createGateway(server) {
     });
   }
 
+  // Channel rooms: serverId/channelId -> sockets currently joined there.
+  // Broadcasts walk the room instead of every connected socket, so one
+  // busy channel never taxes users in other channels. Membership in the
+  // set mirrors ws.serverId/ws.channelId exactly (same delivery rule).
+  const channelRooms = new Map();
+  function roomKey(serverId, channelId) {
+    return String(serverId) + '/' + String(channelId);
+  }
+  function leaveRoom(ws) {
+    if (ws.serverId === undefined || ws.channelId === undefined) return;
+    const set = channelRooms.get(roomKey(ws.serverId, ws.channelId));
+    if (set) {
+      set.delete(ws);
+      if (!set.size) channelRooms.delete(roomKey(ws.serverId, ws.channelId));
+    }
+  }
+  function joinRoom(ws, serverId, channelId) {
+    leaveRoom(ws);
+    ws.serverId = serverId;
+    ws.channelId = channelId;
+    const key = roomKey(serverId, channelId);
+    if (!channelRooms.has(key)) channelRooms.set(key, new Set());
+    channelRooms.get(key).add(ws);
+  }
+
   function broadcast(serverId, channelId, payload) {
     const data = JSON.stringify(payload);
-    wss.clients.forEach((c) => {
-      if (c.readyState === WebSocket.OPEN && c.serverId === serverId && c.channelId === channelId) {
-        c.send(data);
+    const set = channelRooms.get(roomKey(serverId, channelId));
+    if (!set) return;
+    set.forEach((c) => {
+      if (c.readyState === WebSocket.OPEN) {
+        try { c.send(data); } catch { /* dead socket: cleaned on close */ }
       }
     });
   }
@@ -197,7 +224,7 @@ function createGateway(server) {
       }
 
       trackOpen(ws, user.id);
-      ws.on('close', () => trackClose(ws, user.id));
+      ws.on('close', () => { leaveRoom(ws); trackClose(ws, user.id); });
       ws.on('message', (raw) => {
         const nowMs = Date.now();
         ws.msgTimes = ws.msgTimes.filter((t) => nowMs - t < MSG_WINDOW_MS);
@@ -215,8 +242,7 @@ function createGateway(server) {
           if (data.type === 'join') {
             const ch = await visibleChannel(data.channelId, user.id);
             if (!ch) return;
-            ws.serverId = ch.server_id;
-            ws.channelId = ch.id;
+            joinRoom(ws, ch.server_id, ch.id);
           } else if (data.type === 'msg') {
             if (!ws.channelId) return;
             const content = String(data.content || '').trim().slice(0, 2000);

@@ -14,8 +14,11 @@ const { hasPermission } = require('../services/permissions');
 const uploads = require('../services/uploads');
 
 const router = express.Router();
-router.use(auth);
-
+// Auth is applied per-route, not via router.use(auth): this router is
+// mounted at /api (a prefix of every API path), so router-level auth
+// would run — and bill two DB lookups — on every API request that merely
+// passes through on its way to another router. The two attachment
+// endpoints keep the exact same auth behavior via route-level middleware.
 const memory = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: uploads.MAX_SIZE, files: 1 },
@@ -35,6 +38,7 @@ function singleFile(req, res, next) {
 
 router.post(
   '/channels/:channelId/attachments',
+  auth,
   rateLimit({ windowMs: 60000, max: 30 }),
   singleFile,
   async (req, res, next) => {
@@ -59,7 +63,7 @@ router.post(
   }
 );
 
-router.get('/attachments/:id', async (req, res, next) => {
+router.get('/attachments/:id', auth, async (req, res, next) => {
   try {
     const a = await uploads.authorized(req.user.id, req.params.id);
     if (!a) return fail(res, 'NOT_FOUND', 'attachment not found');

@@ -30,18 +30,21 @@ function auth(req, res, next) {
   } catch {
     return fail(res, 'AUTH_REQUIRED', 'invalid or expired session');
   }
-  db.get('SELECT 1 FROM revoked_tokens WHERE jti = ?', [user.jti])
-    .then((revoked) => {
-      if (user.jti && revoked) return fail(res, 'SESSION_REVOKED', 'session revoked');
-      return db.get(
-        'SELECT password_changed_at, sessions_invalidated_at FROM users WHERE id = ?',
-        [user.id]
-      ).then((row) => {
-        if (!row) return fail(res, 'NOT_FOUND', 'user not found');
-        if (tokenStale(user, row)) return fail(res, 'SESSION_REVOKED', 'session revoked');
-        req.user = user;
-        next();
-      });
+  // One round trip for the whole session check: the revocation flag rides
+  // along as a scalar subquery instead of a second sequential lookup.
+  // Identical semantics: revoked jti, missing user, or stale markers reject.
+  db.get(
+    `SELECT u.password_changed_at, u.sessions_invalidated_at,
+       (SELECT 1 FROM revoked_tokens r WHERE r.jti = ?) AS revoked
+     FROM users u WHERE u.id = ?`,
+    [user.jti || '', user.id]
+  )
+    .then((row) => {
+      if (!row) return fail(res, 'NOT_FOUND', 'user not found');
+      if (user.jti && row.revoked) return fail(res, 'SESSION_REVOKED', 'session revoked');
+      if (tokenStale(user, row)) return fail(res, 'SESSION_REVOKED', 'session revoked');
+      req.user = user;
+      next();
     })
     .catch((e) => next(e));
 }

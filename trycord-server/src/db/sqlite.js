@@ -5,17 +5,35 @@ const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
+// Prepared statements are reusable across calls with different bindings,
+// so preparing the same SQL text on every request is pure overhead.
+// Cache them (bounded, oldest-first eviction). Safe because the schema is
+// fully applied at boot before any traffic, and DDL afterwards never runs.
+const STMT_CACHE_MAX = 500;
+
 function wrap(raw) {
+  const cache = new Map();
+  function stmt(sql) {
+    let s = cache.get(sql);
+    if (!s) {
+      s = raw.prepare(sql);
+      if (cache.size >= STMT_CACHE_MAX) {
+        cache.delete(cache.keys().next().value);
+      }
+      cache.set(sql, s);
+    }
+    return s;
+  }
   return {
     dialect: 'sqlite',
     async get(sql, params = []) {
-      return raw.prepare(sql).get(...params) || undefined;
+      return stmt(sql).get(...params) || undefined;
     },
     async all(sql, params = []) {
-      return raw.prepare(sql).all(...params);
+      return stmt(sql).all(...params);
     },
     async run(sql, params = []) {
-      const info = raw.prepare(sql).run(...params);
+      const info = stmt(sql).run(...params);
       return { changes: info.changes, lastID: info.lastInsertRowid };
     },
     async exec(sql) {

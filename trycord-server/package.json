@@ -23,7 +23,9 @@
     "start": "node src/server.js",
     "seed": "node scripts/seed.js",
     "migrate": "node scripts/migrate.js",
-    "check": "node scripts/check.js"
+    "check": "node scripts/check.js",
+    "test:regression": "node scripts/test-regression.js",
+    "test:phase2": "node scripts/test-phase2.js"
   },
   "license": "MIT",
   "dependencies": {

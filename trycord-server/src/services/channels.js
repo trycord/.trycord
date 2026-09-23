@@ -28,8 +28,11 @@ async function deleteCategory(serverId, categoryId) {
 }
 
 async function list(serverId) {
-  const cats = await categories(serverId);
-  const channels = await db.all('SELECT * FROM channels WHERE server_id = ? ORDER BY position, name', [serverId]);
+  // Categories and channels are independent — fetch concurrently.
+  const [cats, channels] = await Promise.all([
+    categories(serverId),
+    db.all('SELECT * FROM channels WHERE server_id = ? ORDER BY position, name', [serverId]),
+  ]);
   return { categories: cats, channels };
 }
 

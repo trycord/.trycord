@@ -9,22 +9,25 @@ async function get(serverId, userId, conn = db) {
 }
 
 async function list(serverId) {
-  const members = await db.all(
-    `SELECT u.id, u.username, u.display_name, m.nickname, m.joined_at,
-      CASE WHEN u.id = s.owner_id THEN 1 ELSE 0 END AS is_owner
-    FROM server_members m
-    JOIN users u ON u.id = m.user_id
-    JOIN servers s ON s.id = m.server_id
-    WHERE m.server_id = ?
-    ORDER BY is_owner DESC, m.joined_at ASC`,
-    [serverId]
-  );
-  const roleRows = await db.all(
-    `SELECT mr.user_id, r.id, r.name, r.position FROM member_roles mr
-     JOIN roles r ON r.id = mr.role_id
-     WHERE mr.server_id = ? ORDER BY r.position DESC`,
-    [serverId]
-  );
+  // Member rows and their roles are independent queries — run together.
+  const [members, roleRows] = await Promise.all([
+    db.all(
+      `SELECT u.id, u.username, u.display_name, m.nickname, m.joined_at,
+        CASE WHEN u.id = s.owner_id THEN 1 ELSE 0 END AS is_owner
+      FROM server_members m
+      JOIN users u ON u.id = m.user_id
+      JOIN servers s ON s.id = m.server_id
+      WHERE m.server_id = ?
+      ORDER BY is_owner DESC, m.joined_at ASC`,
+      [serverId]
+    ),
+    db.all(
+      `SELECT mr.user_id, r.id, r.name, r.position FROM member_roles mr
+       JOIN roles r ON r.id = mr.role_id
+       WHERE mr.server_id = ? ORDER BY r.position DESC`,
+      [serverId]
+    ),
+  ]);
   const byUser = {};
   for (const r of roleRows) {
     (byUser[r.user_id] = byUser[r.user_id] || []).push({ id: r.id, name: r.name });

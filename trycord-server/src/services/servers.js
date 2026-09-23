@@ -5,7 +5,7 @@ const db = require('../db');
 const { now, uuid } = require('../util');
 const roles = require('./roles');
 const { Codes } = require('../errors');
-const { effectivePermissions } = require('./permissions');
+const { effectivePermissions, isKnown } = require('./permissions');
 
 const LIST_COLS = `
   s.id, s.name, s.description, s.owner_id, s.join_code,
@@ -15,13 +15,39 @@ const LIST_COLS = `
   (SELECT MAX(m2.created_at) FROM messages m2
      JOIN channels c2 ON c2.id = m2.channel_id WHERE c2.server_id = s.id) AS last_activity_at`;
 
-async function withAccess(row, userId) {
+async function withAccess(row, userId, perms) {
   if (!row) return null;
   row.is_public = !!row.is_public;
   row.is_discoverable = !!row.is_discoverable;
   row.is_owner = row.owner_id === userId;
-  row.permissions = [...(await effectivePermissions(userId, row.id))];
+  // Callers that already hold the computed set (middleware req.access,
+  // the batched mine() flow) pass it in; otherwise compute as before.
+  row.permissions = perms || [...(await effectivePermissions(userId, row.id))];
   return row;
+}
+
+// One roles query for a whole server list instead of two queries per
+// row (owner lookup + roles). Returns serverId -> permission array.
+async function rolesForServers(userId, serverIds) {
+  const out = {};
+  const ids = (serverIds || []).filter(Boolean).slice(0, 500);
+  if (!ids.length) return out;
+  const ph = ids.map(() => '?').join(',');
+  const rows = await db.all(
+    `SELECT mr.server_id AS sid, r.permissions FROM member_roles mr
+     JOIN roles r ON r.id = mr.role_id
+     WHERE mr.user_id = ? AND mr.server_id IN (${ph})`,
+    [userId].concat(ids)
+  );
+  for (const r of rows) {
+    try {
+      for (const p of JSON.parse(r.permissions)) {
+        if (isKnown(p)) ((out[r.sid] = out[r.sid] || new Set())).add(p);
+      }
+    } catch { /* ignore malformed role row */ }
+  }
+  for (const k of Object.keys(out)) out[k] = [...out[k]];
+  return out;
 }
 
 function isUniqueViolation(e) {
@@ -70,16 +96,16 @@ async function create({ name, description, joinCode, isPublic, isDiscoverable },
   }
 }
 
-async function detail(serverId, userId) {
+async function detail(serverId, userId, perms) {
   const row = await db.get(
     `SELECT ${LIST_COLS},
       (SELECT COUNT(*) FROM messages m2
          JOIN channels c2 ON c2.id = m2.channel_id WHERE c2.server_id = s.id) AS message_count,
-      u.username AS owner_name, u.display_name AS owner_display
+       u.username AS owner_name, u.display_name AS owner_display
     FROM servers s JOIN users u ON u.id = s.owner_id WHERE s.id = ?`,
     [serverId]
   );
-  return withAccess(row, userId);
+  return withAccess(row, userId, perms);
 }
 
 async function mine(userId) {
@@ -89,7 +115,10 @@ async function mine(userId) {
      WHERE m.user_id = ? ORDER BY s.created_at DESC`,
     [userId]
   );
-  return Promise.all(rows.map((r) => withAccess(r, userId)));
+  // Owners bypass roles by contract; one query covers every other row.
+  const owners = new Set(rows.filter((r) => r.owner_id === userId).map((r) => r.id));
+  const batched = await rolesForServers(userId, rows.filter((r) => !owners.has(r.id)).map((r) => r.id));
+  return Promise.all(rows.map((r) => withAccess(r, userId, owners.has(r.id) ? ['*'] : (batched[r.id] || []))));
 }
 
 async function update(serverId, patch) {
