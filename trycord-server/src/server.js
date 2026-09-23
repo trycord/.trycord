@@ -330,6 +330,20 @@ async function boot() {
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     if (res.headersSent) return next(err);
+    const status = (err && (err.statusCode || err.status)) || 500;
+    // Client-side problems surface as proper 4xx (body-parser rejects with
+    // 413/400 for oversized or malformed JSON). Everything else stays a
+    // generic 500 — never stack traces, queries, or internals (§79).
+    if (status >= 400 && status < 500) {
+      const code = err && err.type === 'entity.too.large' ? 'PAYLOAD_TOO_LARGE'
+        : err && err.type === 'entity.parse.failed' ? 'BAD_JSON'
+        : 'BAD_REQUEST';
+      const message = status === 413 ? 'request body too large'
+        : status === 400 ? 'malformed request body'
+        : 'bad request';
+      console.warn('[warn] request rejected ' + status + ' (' + message + ')');
+      return res.status(status).json({ error: { code, message } });
+    }
     console.error('[error]', err && err.message ? err.message : err);
     res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
   });
