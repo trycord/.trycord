@@ -126,6 +126,7 @@ async function renderRoute() {
   }
 
   // --- account --------------------------------------------------------
+  if (path.startsWith('/account/appearance')) { await renderAccount(region, { tab: 'appearance' }); renderAllChrome(); return; }
   if (path.startsWith('/account/password')) { await renderAccount(region, { tab: 'password' }); renderAllChrome(); return; }
   if (path.startsWith('/account/sessions')) { await renderAccount(region, { tab: 'sessions' }); renderAllChrome(); return; }
   if (path.startsWith('/account')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }

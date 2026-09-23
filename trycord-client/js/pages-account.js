@@ -6,6 +6,7 @@ import State, { clearSession, refreshServers } from './state.js';
 import { esc, el, clear, toast, confirmDialog } from './ui.js';
 import { avatar } from './components.js';
 import { renderContextHeader } from './shell.js';
+import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette } from './theme.js';
 
 function accountTabs(active) {
   const tabs = el('div', { class: 'settings-nav' });
@@ -13,6 +14,7 @@ function accountTabs(active) {
     { id: 'profile', label: 'Profile', href: '#/account' },
     { id: 'password', label: 'Password', href: '#/account/password' },
     { id: 'sessions', label: 'Sessions', href: '#/account/sessions' },
+    { id: 'appearance', label: 'Appearance', href: '#/account/appearance' },
   ];
   for (const t of items) {
     const b = el('button', { class: 'btn ' + (active === t.id ? 'active' : 'ghost'), type: 'button' }, t.label);
@@ -22,6 +24,72 @@ function accountTabs(active) {
   return tabs;
 }
 
+function renderAppearance(wrap) {
+  const active = getTheme();
+  wrap.appendChild(el('div', { class: 'section-label' }, 'Theme'));
+  const grid = el('div', { class: 'theme-grid' });
+  for (const t of THEMES) {
+    const b = el('button', {
+      type: 'button',
+      class: 'theme-chip' + (t.id === active ? ' active' : ''),
+      'data-theme': t.id,
+      'aria-pressed': t.id === active ? 'true' : 'false',
+    });
+    const sw = el('span', { class: 'theme-chip-swatch', 'data-theme': t.id });
+    const name = el('strong', {}, t.label);
+    const desc = el('span', { class: 'muted small' }, t.blurb);
+    b.appendChild(sw);
+    b.appendChild(el('span', { class: 'theme-chip-label' }, name, desc));
+    b.addEventListener('click', () => {
+      setTheme(t.id);
+      for (const c of grid.querySelectorAll('.theme-chip')) {
+        const on = c.getAttribute('data-theme') === t.id;
+        c.classList.toggle('active', on);
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+      if (t.id === 'custom') {
+        customPanel.hidden = false;
+        refreshCustom();
+      } else {
+        customPanel.hidden = true;
+      }
+      renderContextHeader({ title: 'Account', sub: 'Your identity across Trycord' });
+    });
+    grid.appendChild(b);
+  }
+  wrap.appendChild(grid);
+  wrap.appendChild(el('p', { class: 'muted small' }, 'Themes override design tokens. Switching applies immediately and persists for this device.'));
+
+  const customPanel = el('div', { class: 'theme-custom', hidden: active !== 'custom' });
+  const palette = loadPalette();
+  const accentInput = el('input', { type: 'color', class: 'input', value: /^#[0-9a-f]{6}$/i.test(palette.accent) ? palette.accent : '#ff914d' });
+  const toneDark = el('button', { type: 'button', class: 'btn ' + (palette.tone === 'light' ? 'ghost' : 'active') }, 'Dark base');
+  const toneLight = el('button', { type: 'button', class: 'btn ' + (palette.tone === 'light' ? 'active' : 'ghost') }, 'Light base');
+  const refreshCustom = () => {
+    const p = loadPalette();
+    accentInput.value = /^#[0-9a-f]{6}$/i.test(p.accent) ? p.accent : '#ff914d';
+    toneDark.classList.toggle('active', p.tone !== 'light');
+    toneDark.classList.toggle('ghost', p.tone === 'light');
+    toneLight.classList.toggle('active', p.tone === 'light');
+    toneLight.classList.toggle('ghost', p.tone !== 'light');
+  };
+  accentInput.addEventListener('input', () => {
+    savePalette({ accent: accentInput.value, tone: loadPalette().tone });
+    if (getTheme() === 'custom') applyCustomPalette(loadPalette());
+  });
+  const chooseTone = (tone) => {
+    savePalette({ accent: loadPalette().accent, tone });
+    if (getTheme() === 'custom') applyCustomPalette(loadPalette());
+    refreshCustom();
+  };
+  toneDark.addEventListener('click', () => chooseTone('dark'));
+  toneLight.addEventListener('click', () => chooseTone('light'));
+  customPanel.appendChild(el('div', { class: 'field' }, el('label', {}, 'Accent color'), accentInput));
+  customPanel.appendChild(el('div', { class: 'field' }, el('label', {}, 'Base tone'), el('div', { class: 'row-line' }, toneDark, toneLight)));
+  customPanel.appendChild(el('p', { class: 'muted small' }, 'Two inputs derive the full custom theme (surfaces, text, ambient). Semantic colors stay from the base palette.'));
+  wrap.appendChild(customPanel);
+}
+
 export async function renderAccount(container, { tab = 'profile' } = {}) {
   clear(container);
   renderContextHeader({ title: 'Account', sub: 'Your identity across Trycord' });
@@ -29,7 +97,9 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   wrap.appendChild(accountTabs(tab));
 
   const me = State.me;
-  if (tab === 'password') {
+  if (tab === 'appearance') {
+    renderAppearance(wrap);
+  } else if (tab === 'password') {
     const err = el('div', { class: 'form-error', hidden: true });
     const cur = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', required: true });
     const next = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true });

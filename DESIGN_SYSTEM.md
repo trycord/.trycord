@@ -1,220 +1,114 @@
 # Trycord Design System
 
-A comprehensive, themeable design system built for the Trycord chat platform.
+The realized design system for the Trycord client. This document describes the
+**actual** implementation — one stylesheet, token-driven, theme-overridable —
+not a proposed one. It is the reconciliation target for spec §60–63, §55–59.
 
-## Features
+## Composition
 
-- **Themeable**: Dark, light, and high-contrast themes via CSS custom properties
-- **Accessible**: visible focus indicators, keyboard support, and reduced-motion handling
-- **Responsive**: Mobile-first design with breakpoints for all screen sizes
-- **Component-based**: Modular CSS architecture for easy maintenance
+- A single application stylesheet: `trycord-client/css/app.css` (referenced from
+  `index.html`). There are no `styles/*.css` imports, no separate token/theme
+  files, and no showcase page.
+- All visual constants are centralized in **design tokens** (CSS custom
+  properties in `:root`). Rules consume tokens only; nothing hardcodes colors,
+  radii, motion, or z-index inside components.
+- Two presentations, driven by geometry (breakpoint **900px**, single source in
+  `js/presentation.js` `BREAKPOINT` and mirrored in the CSS media queries):
+  - **Desktop** — Presence Spine → Main Environment (Atrium). Full viewport from
+    1280×720 through ultrawide; no icon rail, no fixed-width centered container,
+    no permanent top bar. Context lives inside the environment.
+  - **Mobile** — MobileShell: `#mobile-header`, `#mobile-navigation` (full
+    navigation drawer), `#mobile-backdrop`, `#mobile-main`, and the bottom tab
+    bar `#mobile-tab-navigation`.
+- Zero mock content: every surface renders from real application state.
 
-## File Structure
+## Design tokens (`--t-*`)
 
-```
-trycord-client/styles/
-├── tokens.css       # Design tokens (colors, typography, spacing, etc.)
-├── theme.css        # Theme definitions (dark, light, high-contrast)
-├── components.css   # Reusable UI components
-├── utilities.css    # Utility classes
-├── layout.css       # Entry point (imports all files below, then app shell)
-└── showcase.css     # Design system showcase page styles
-```
+| Group | Tokens | Notes |
+|-------|--------|-------|
+| Palette | `--t-pg`, `--t-base`, `--t-base2`, `--t-elev`, `--t-line`, `--t-line-hi`, `--t-txt`, `--t-txt2`, `--t-mut`, `--t-accent`, `--t-accent-2`, `--t-ok`, `--t-warn`, `--t-err` | colors + borders |
+| Typography | `--t-font`, `--t-mono`, `--t-fs-xs…--t-fs-2xl` | |
+| Motion | `--t-ease`, `--t-fast`, `--t-med`, `--t-slow`, `--t-spin` | |
+| Radii | `--t-r-s/m/l` | |
+| Density | `--t-d-2…--t-d-6`, `--t-d-*` overridden by `html[data-density="compact"|"roomy"]` | |
+| Derived glyph/foreground | `--t-on-accent`, `--t-accent-hi`, `--t-on-danger`, `--t-err-fg`, `--t-ok-fg`, `--t-warn-bg`, `--t-warn-fg`, `--t-warn-brd`, `--t-backdrop`, `--t-img-mat`, `--t-avatar-ring` | never raw hex on fills |
+| Ambient | `--t-env-base`, `--t-shell-gradient`, `--t-shell-edge`, `--t-env-glow-a/b`, `--t-env-depth`, `--t-header-fade`, `--t-title-glow`, `--t-hero-*` | themes re-tint the whole environment |
+| Glass | `--t-blur-s/m/l`, `--t-sat-s/m/l`, `--t-inset-hi`, `--t-inset-glass` | |
+| Shadows | `--t-sh-edge`, `--t-sh-drawer`, `--t-sh-1…4`, `--t-sh-hero` | restrained |
+| Opacity | `--t-op-mid`, `--t-op-fade`, `--t-op-dim` | |
+| Elevation | `--z-*` (`--z-inline` … `--z-skip`) | |
+| Breakpoints | comment block (900/640 px) | media queries cannot consume custom props |
 
-## Usage
+## Themes
 
-### Import All Styles
+A theme is a **visual configuration only**: token overrides, never component
+rewrites. Seven themes (`js/theme.js` `THEMES`, `html[data-theme="…"]`):
 
-```html
-<link rel="stylesheet" href="styles/tokens.css" />
-<link rel="stylesheet" href="styles/theme.css" />
-<link rel="stylesheet" href="styles/components.css" />
-<link rel="stylesheet" href="styles/utilities.css" />
-<link rel="stylesheet" href="styles/layout.css" />
-```
+`trycord` (default, the `:root` set) · `orthocord` · `midnight` · `ember` ·
+`light` · `high-contrast` · `custom`
 
-### Theme Switching
+- Switching: `setTheme(name)` in `js/theme.js` → sets `data-theme` (applies to
+  every token consumer immediately) and persists to `localStorage.trycord.theme`.
+- Boot restores the persisted theme in `js/app.js` (`applyTheme()`). Persistence
+  is the source of truth; the `data-theme` attribute is the live application.
+- **Custom** is derived from two inputs (accent color + base tone) persisted as
+  `localStorage.trycord.customPalette`. `applyCustomPalette()` computes the full
+  palette (`--c-*`) via deterministic HSL math and injects it inline; the CSS
+  `html[data-theme="custom"]` block maps `--c-*` onto the shared tokens.
+- **High Contrast** (§62) prioritizes readability, not color inversion:
+  near-black surfaces, `#fff`/bright tones, opaque visible borders (`--t-line`
+  solid), blur reduced to 0 with 100% saturation, raised disabled-opacity
+  tokens, and an unmistakable 3px cyan `:focus-visible` outline.
+- **Light** relandscapes glass (smaller blur), swaps inner highlights, and
+  softens shadows; `color-scheme: light`.
+- UI: **Account → Appearance** (`#/account/appearance`) renders a live theme
+  grid (real token swatches) plus the Custom panel.
 
-Switch themes by changing the `data-theme` attribute on `<html>`:
+## Components (real classes)
 
-```html
-<html data-theme="dark">
-<html data-theme="light">
-<html data-theme="high-contrast">
-```
+- Shell: `.shell`, `.shell--desktop`, `.shell--mobile`, `.trycord-app`,
+  `.presence-spine` (+ `__identity/__global-navigation/__communities/__place-navigation`),
+  `.main-environment`, `.context-header`, `.view-root`, `.mobile-*`.
+- Buttons: `.btn` with modifier classes `.primary`, `.ghost`, `.danger`,
+  `.active`, `.sm`. Disabled = `opacity: var(--t-op-mid)` + `not-allowed`.
+- Forms: `.input`, `.select`, `.textarea`, `.field`, `.label`, `.hint`,
+  `.form-error`, `.form-success`, `.auth-box`.
+- Identity: `.avatar` (sizes via components), presence dots, `.nav-row`,
+  `.nv-icon`, `.nv-count`, `.server-chip`, `.channel-row`, `.realm-title`.
+- Messaging: `.conversation`, `.msg` (+ `.msg-actions`, `:focus-within` reveal),
+  `.composer` (glass, `:focus-within` lift), `.home-environment`, hero/stream
+  surfaces.
+- Overlays: built by `js/ui.js` into `#modal-root` (focus-trapped dialogs with
+  focus restoration), `#popover-root`, `#toast-root`. Connection state banner:
+  `#connection-status`. Skip-to-content link: `.skip-link`.
 
-### Density Switching
+## Liquid glass rules (§59)
 
-Switch density by changing the `data-density` attribute on `<html>`:
+Translucent layered surfaces, controlled blur
+(`--t-sat-*`/`--t-blur-*`), specular inner highlights (`--t-inset-*`), rounded
+geometry, restrained borders, ambient interaction via the `--t-env-*`
+gradients. Glass communicates hierarchy; it never hides text behind
+low-contrast filters.
 
-```html
-<html data-density="compact">
-<html data-density="comfortable">
-<html data-density="spacious">
-```
+## Accessibility (§63)
 
-## Design Tokens
+- Keyboard navigation and `:focus-visible` outlines; dialogs trap focus and
+  restore it on close (`js/ui.js`).
+- `prefers-reduced-motion: reduce` collapses all animation/transition durations
+  to 0.001s.
+- Sufficient contrast in every theme; High Contrast goes further per §62.
+- Mobile touch targets sized for touch; gestures use single-source thresholds
+  (`GESTURE` in `js/presentation.js`: edge swipe to open, drag to close, axis
+  lock, velocity commit, incomplete-gesture restore). Back/Escape/backdrop and
+  every route change close the drawer; deep links resolve normally.
 
-### Colors
+## Verification contract
 
-| Token | Description |
-|-------|-------------|
-| `--tc-accent` | Primary brand color |
-| `--tc-bg` | Page background |
-| `--tc-surface` | Card/panel background |
-| `--tc-text` | Primary text |
-| `--tc-text-muted` | Secondary text |
-| `--tc-border` | Default border color |
-| `--tc-success` | Success feedback |
-| `--tc-warning` | Warning feedback |
-| `--tc-danger` | Error/danger feedback |
-
-### Typography
-
-| Token | Description |
-|-------|-------------|
-| `--tc-text-xs` | 0.75rem |
-| `--tc-text-sm` | 0.875rem |
-| `--tc-text-base` | 1rem |
-| `--tc-text-lg` | 1.125rem |
-| `--tc-text-xl` | 1.25rem |
-| `--tc-text-2xl` | 1.5rem |
-| `--tc-text-3xl` | 1.875rem |
-| `--tc-text-4xl` | 2.25rem |
-| `--tc-text-5xl` | 3rem |
-
-### Spacing
-
-| Token | Value |
-|-------|-------|
-| `--tc-space-1` | 0.25rem |
-| `--tc-space-2` | 0.5rem |
-| `--tc-space-3` | 0.75rem |
-| `--tc-space-4` | 1rem |
-| `--tc-space-5` | 1.25rem |
-| `--tc-space-6` | 1.5rem |
-| `--tc-space-8` | 2rem |
-| `--tc-space-10` | 2.5rem |
-| `--tc-space-12` | 3rem |
-
-### Border Radius
-
-| Token | Value |
-|-------|-------|
-| `--tc-radius-sm` | 0.25rem |
-| `--tc-radius-md` | 0.375rem |
-| `--tc-radius-lg` | 0.5rem |
-| `--tc-radius-xl` | 0.75rem |
-| `--tc-radius-2xl` | 1rem |
-| `--tc-radius-full` | 9999px |
-
-### Shadows
-
-| Token | Description |
-|-------|-------------|
-| `--tc-shadow-xs` | Subtle elevation |
-| `--tc-shadow-sm` | Card hover |
-| `--tc-shadow-md` | Dropdown menu |
-| `--tc-shadow-lg` | Modal |
-| `--tc-shadow-xl` | Toast |
-
-## Components
-
-### Buttons
-
-```html
-<button class="btn btn-primary">Primary</button>
-<button class="btn btn-secondary">Secondary</button>
-<button class="btn btn-danger">Danger</button>
-<button class="btn btn-ghost">Ghost</button>
-<button class="btn btn-success">Success</button>
-<button class="btn btn-warning">Warning</button>
-
-<!-- Sizes -->
-<button class="btn btn-primary btn-sm">Small</button>
-<button class="btn btn-primary">Default</button>
-<button class="btn btn-primary btn-lg">Large</button>
-<button class="btn btn-primary btn-block">Full Width</button>
-
-<!-- States -->
-<button class="btn btn-primary" disabled>Disabled</button>
-<button class="btn btn-primary is-loading">Loading</button>
-```
-
-### Forms
-
-```html
-<div class="form-group">
-  <label class="form-label">Email</label>
-  <input type="email" class="form-input" placeholder="you@example.com" />
-  <p class="form-hint">Helper text</p>
-</div>
-
-<div class="form-check">
-  <input type="checkbox" class="form-check-input" id="check" />
-  <label class="form-check-label" for="check">Label</label>
-</div>
-```
-
-### Avatars
-
-```html
-<div class="avatar avatar-sm">S</div>
-<div class="avatar avatar-md">M</div>
-<div class="avatar avatar-lg avatar-status online">L</div>
-```
-
-### Badges
-
-```html
-<span class="badge badge-primary">Primary</span>
-<span class="badge badge-success">Success</span>
-<span class="badge badge-dot badge-dot-success">Online</span>
-```
-
-### Cards
-
-```html
-<div class="card">
-  <div class="card-header">Header</div>
-  <div class="card-body">Body</div>
-  <div class="card-footer">Footer</div>
-</div>
-```
-
-### Modals
-
-```html
-<dialog class="modal">
-  <div class="modal-header">
-    <h2 class="modal-title">Title</h2>
-    <button class="modal-close">&times;</button>
-  </div>
-  <div class="modal-body">Content</div>
-  <div class="modal-footer">Actions</div>
-</dialog>
-```
-
-### Toasts
-
-```html
-<div class="toast toast-success">
-  <div class="toast-content">
-    <div class="toast-title">Success</div>
-    <div class="toast-message">Action completed.</div>
-  </div>
-  <button class="toast-close">&times;</button>
-</div>
-```
-
-## Accessibility
-
-- All interactive elements have visible focus indicators
-- Text/background contrast targets readable pairings in both themes
-- Reduced motion is supported via `prefers-reduced-motion`
-- Semantic HTML is used throughout
-- ARIA attributes are included where needed
-
-## View the Design System
-
-Open `showcase.html` in a browser to see all components and tokens in action.
+- Desktop smoke (`trycord-desktop` `npm run smoke`): asserts the shell renders,
+  presentation switches, 4 global destinations, **CSS parsed** (`cssRules` ≥ 150)
+  and **design tokens applied** (`body-bg = rgb(13, 11, 10)` on the default
+  theme).
+- Regression suite (`trycord-server/scripts/test-regression.js`): 65 checks.
+- Theme acceptance (§99): each theme must change surfaces, text, accents,
+  controls, navigation, messages and backgrounds; persistence, switching,
+  accessibility and High Contrast verified.

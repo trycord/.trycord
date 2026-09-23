@@ -141,6 +141,197 @@ html[data-density="roomy"] {
 }
 
 /* ============================================================
+   1b. THEME BLOCKS
+   ============================================================
+   A theme is a visual configuration: token overrides only, never
+   component rewrites (spec §60-62). The default "trycord" theme is
+   the token set in `:root` above and needs no block. "custom" is
+   driven by --c-* custom properties injected by js/theme.js.
+
+   Each block overrides palette, derived glyph/foreground tokens,
+   and the ambient gradients so switching re-tints every surface.
+   ============================================================ */
+
+/* --- Orthocord: cool steel on neutral charcoal ----------------------- */
+html[data-theme="orthocord"] {
+  color-scheme: dark;
+  --t-pg: #0e0e10;  --t-base: #151518;  --t-base2: #1f1f24;  --t-elev: #28282e;
+  --t-line: rgba(224, 228, 240, 0.14);  --t-line-hi: rgba(224, 228, 240, 0.24);
+  --t-txt: #f2f0ea;  --t-txt2: #c8c5bd;  --t-mut: #8e8b83;
+  --t-accent: #6ea8ff;  --t-accent-2: #2f6fd6;
+  --t-ok: #5cc98a;  --t-warn: #e0b64d;  --t-err: #e0675f;
+  --t-on-accent: #0c1320;  --t-accent-hi: #a9c9ff;
+  --t-err-fg: #ffb0a6;  --t-ok-fg: #b9f1cd;
+  --t-warn-bg: #333022;  --t-warn-fg: #efe6c8;  --t-warn-brd: #5a5133;
+  --t-backdrop: rgba(8, 10, 16, 0.62);  --t-img-mat: rgba(0, 0, 0, 0.3);
+  --t-avatar-ring: color-mix(in srgb, #fff 16%, transparent);
+  --t-env-base: #0e0e10;
+  --t-shell-gradient: linear-gradient(180deg, rgba(38, 48, 72, 0.72), rgba(16, 17, 22, 0.66));
+  --t-shell-edge: rgba(160, 192, 255, 0.14);
+  --t-env-glow-a: rgba(78, 120, 255, 0.22);
+  --t-env-glow-b: rgba(28, 44, 110, 0.18);
+  --t-env-depth: linear-gradient(132deg, #0b0c10 8%, #13141a 54%, #0e0f14 100%);
+  --t-header-fade: linear-gradient(180deg, rgba(14, 14, 16, 0.68), transparent);
+  --t-title-glow: rgba(110, 168, 255, 0.16);
+  --t-hero-edge: rgba(200, 218, 255, 0.14);
+  --t-hero-top: rgba(160, 190, 255, 0.09);
+  --t-hero-bottom: rgba(12, 16, 26, 0.38);
+}
+
+/* --- Midnight: deep indigo-blue, dim and focused ---------------------- */
+html[data-theme="midnight"] {
+  color-scheme: dark;
+  --t-pg: #070810;  --t-base: #0d0f1a;  --t-base2: #161930;  --t-elev: #1d2138;
+  --t-line: rgba(190, 200, 255, 0.13);  --t-line-hi: rgba(190, 200, 255, 0.22);
+  --t-txt: #e6e9ff;  --t-txt2: #b6bccf;  --t-mut: #79809a;
+  --t-accent: #a78bfa;  --t-accent-2: #6d5ae6;
+  --t-ok: #5cc98a;  --t-warn: #ddb64e;  --t-err: #e0675f;
+  --t-on-accent: #150f2e;  --t-accent-hi: #cab9ff;
+  --t-err-fg: #ffb0a6;  --t-ok-fg: #b9f1cd;
+  --t-warn-bg: #28241e;  --t-warn-fg: #efe7cf;  --t-warn-brd: #4c4430;
+  --t-backdrop: rgba(5, 6, 14, 0.66);  --t-img-mat: rgba(0, 0, 0, 0.34);
+  --t-avatar-ring: color-mix(in srgb, #fff 18%, transparent);
+  --t-env-base: #070810;
+  --t-shell-gradient: linear-gradient(180deg, rgba(34, 30, 72, 0.74), rgba(13, 14, 26, 0.66));
+  --t-shell-edge: rgba(176, 160, 255, 0.14);
+  --t-env-glow-a: rgba(122, 80, 255, 0.24);
+  --t-env-glow-b: rgba(40, 30, 120, 0.2);
+  --t-env-depth: linear-gradient(132deg, #05060d 8%, #0c0d1a 54%, #080911 100%);
+  --t-header-fade: linear-gradient(180deg, rgba(7, 8, 16, 0.7), transparent);
+  --t-title-glow: rgba(167, 139, 250, 0.18);
+  --t-hero-edge: rgba(190, 180, 255, 0.16);
+  --t-hero-top: rgba(170, 150, 255, 0.1);
+  --t-hero-bottom: rgba(8, 8, 20, 0.4);
+}
+
+/* --- Ember: hotter, saturated amber foreground ------------------------ */
+html[data-theme="ember"] {
+  color-scheme: dark;
+  --t-pg: #130b07;  --t-base: #1c120b;  --t-base2: #2b1a10;  --t-elev: #391f11;
+  --t-line: rgba(255, 196, 150, 0.16);  --t-line-hi: rgba(255, 196, 150, 0.28);
+  --t-txt: #fff2e6;  --t-txt2: #e2c2ab;  --t-mut: #b0846c;
+  --t-accent: #ff8a1f;  --t-accent-2: #ff4d1f;
+  --t-ok: #58c97a;  --t-warn: #e2b03c;  --t-err: #e06a5e;
+  --t-on-accent: #180f08;  --t-accent-hi: #ffc38a;
+  --t-err-fg: #ffb49e;  --t-ok-fg: #b9f0c9;
+  --t-warn-bg: #3d2c15;  --t-warn-fg: #f8eccb;  --t-warn-brd: #6a4f1e;
+  --t-backdrop: rgba(24, 8, 2, 0.62);  --t-img-mat: rgba(0, 0, 0, 0.34);
+  --t-avatar-ring: color-mix(in srgb, #fff 20%, transparent);
+  --t-env-base: #130b07;
+  --t-shell-gradient: linear-gradient(180deg, rgba(90, 44, 18, 0.82), rgba(30, 17, 10, 0.72));
+  --t-shell-edge: rgba(255, 178, 122, 0.2);
+  --t-env-glow-a: rgba(255, 112, 26, 0.38);
+  --t-env-glow-b: rgba(180, 58, 12, 0.24);
+  --t-env-depth: linear-gradient(132deg, #100904 8%, #1c110a 54%, #140c08 100%);
+  --t-header-fade: linear-gradient(180deg, rgba(19, 11, 7, 0.7), transparent);
+  --t-title-glow: rgba(255, 120, 40, 0.2);
+  --t-hero-edge: rgba(255, 196, 150, 0.2);
+  --t-hero-top: rgba(255, 166, 92, 0.14);
+  --t-hero-bottom: rgba(36, 16, 8, 0.42);
+}
+
+/* --- Light: warm pale surfaces with dark text -------------------------- */
+html[data-theme="light"] {
+  color-scheme: light;
+  --t-pg: #f6f0e7;  --t-base: #f0e9dc;  --t-base2: #e6dcc9;  --t-elev: #dccfb8;
+  --t-line: rgba(92, 60, 30, 0.16);  --t-line-hi: rgba(92, 60, 30, 0.3);
+  --t-txt: #2b211a;  --t-txt2: #5a4a3d;  --t-mut: #8a7766;
+  --t-accent: #c84f12;  --t-accent-2: #a8381b;
+  --t-ok: #2f8d50;  --t-warn: #8f6a16;  --t-err: #c03a2b;
+  --t-on-accent: #ffffff;  --t-accent-hi: #e26a28;
+  --t-err-fg: #a62a1f;  --t-ok-fg: #1f6b3a;
+  --t-warn-bg: #f4e6c0;  --t-warn-fg: #4d3d10;  --t-warn-brd: #c9a94f;
+  --t-backdrop: rgba(70, 48, 30, 0.32);  --t-img-mat: rgba(70, 50, 30, 0.22);
+  --t-avatar-ring: color-mix(in srgb, #000 24%, transparent);
+  --t-env-base: #f6f0e7;
+  --t-shell-gradient: linear-gradient(180deg, rgba(255, 246, 232, 0.78), rgba(244, 233, 214, 0.62));
+  --t-shell-edge: rgba(160, 104, 58, 0.2);
+  --t-env-glow-a: rgba(255, 168, 92, 0.24);
+  --t-env-glow-b: rgba(216, 140, 82, 0.16);
+  --t-env-depth: linear-gradient(132deg, #f8f3eb 8%, #f2e9da 54%, #f0e7d4 100%);
+  --t-header-fade: linear-gradient(180deg, rgba(246, 240, 231, 0.72), transparent);
+  --t-title-glow: rgba(200, 104, 42, 0.14);
+  --t-hero-edge: rgba(150, 104, 58, 0.18);
+  --t-hero-top: rgba(255, 230, 205, 0.5);
+  --t-hero-bottom: rgba(214, 184, 150, 0.3);
+  --t-blur-s: 8px;   --t-sat-s: 106%;
+  --t-blur-m: 12px;  --t-sat-m: 104%;
+  --t-blur-l: 14px;  --t-sat-l: 102%;
+  --t-inset-hi: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --t-inset-glass: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --t-sh-1: 0 16px 36px rgba(90, 60, 30, 0.2);
+  --t-sh-2: 0 22px 52px rgba(90, 60, 30, 0.24);
+  --t-sh-3: 0 10px 26px rgba(90, 60, 30, 0.18);
+  --t-sh-4: 0 8px 24px rgba(90, 60, 30, 0.2);
+  --t-sh-edge: 12px 0 36px rgba(90, 60, 30, 0.16);
+  --t-sh-drawer: 24px 0 48px rgba(90, 60, 30, 0.4);
+  --t-sh-hero: 0 20px 60px rgba(90, 60, 30, 0.16);
+}
+
+/* --- High Contrast: maximum readability -------------------------------- */
+html[data-theme="high-contrast"] {
+  color-scheme: dark;
+  --t-pg: #000000;  --t-base: #0b0b0d;  --t-base2: #16161a;  --t-elev: #212126;
+  --t-line: #5d5d66;  --t-line-hi: #9a9aa4;
+  --t-txt: #ffffff;  --t-txt2: #f2f2f5;  --t-mut: #c8c8cf;
+  --t-accent: #ffb054;  --t-accent-2: #ff7a1f;
+  --t-ok: #4fd98a;  --t-warn: #ffd75e;  --t-err: #ff7d7d;
+  --t-on-accent: #241605;  --t-accent-hi: #ffc98c;
+  --t-err-fg: #ffa0a0;  --t-ok-fg: #9ef2c0;
+  --t-warn-bg: #3a2f14;  --t-warn-fg: #ffecad;  --t-warn-brd: #8a7432;
+  --t-backdrop: rgba(0, 0, 0, 0.78);  --t-img-mat: rgba(0, 0, 0, 0.5);
+  --t-avatar-ring: color-mix(in srgb, #fff 32%, transparent);
+  --t-env-base: #000000;
+  --t-shell-gradient: linear-gradient(180deg, rgba(40, 36, 28, 0.9), rgba(10, 10, 12, 0.9));
+  --t-shell-edge: rgba(255, 176, 84, 0.26);
+  --t-env-glow-a: rgba(255, 150, 60, 0.16);
+  --t-env-glow-b: rgba(120, 70, 20, 0.1);
+  --t-env-depth: linear-gradient(132deg, #000 8%, #0a0a0c 54%, #050506 100%);
+  --t-header-fade: linear-gradient(180deg, rgba(0, 0, 0, 0.78), transparent);
+  --t-title-glow: rgba(255, 176, 84, 0.2);
+  --t-hero-edge: rgba(255, 190, 120, 0.22);
+  --t-hero-top: rgba(255, 200, 140, 0.12);
+  --t-hero-bottom: rgba(10, 6, 2, 0.5);
+  --t-blur-s: 0px;  --t-sat-s: 100%;
+  --t-blur-m: 0px;  --t-sat-m: 100%;
+  --t-blur-l: 0px;  --t-sat-l: 100%;
+  --t-inset-hi: none;  --t-inset-glass: none;
+  --t-op-mid: 0.75;  --t-op-fade: 0.7;  --t-op-dim: 0.8;
+}
+
+/* High Contrast focus must be unmistakable (§62). */
+html[data-theme="high-contrast"] button:focus-visible,
+html[data-theme="high-contrast"] a:focus-visible,
+html[data-theme="high-contrast"] input:focus-visible,
+html[data-theme="high-contrast"] select:focus-visible,
+html[data-theme="high-contrast"] textarea:focus-visible,
+html[data-theme="high-contrast"] [tabindex]:focus-visible {
+  outline: 3px solid #7fd6ff;
+  outline-offset: 2px;
+}
+
+/* --- Custom: palette injected as --c-* by js/theme.js ------------------ */
+html[data-theme="custom"] {
+  --t-pg: var(--c-pg);          --t-base: var(--c-base);
+  --t-base2: var(--c-base2);    --t-elev: var(--c-elev);
+  --t-txt: var(--c-txt);        --t-txt2: var(--c-txt2);  --t-mut: var(--c-mut);
+  --t-accent: var(--c-accent);  --t-accent-2: var(--c-accent2);
+  --t-accent-hi: var(--c-accent-hi);  --t-on-accent: var(--c-on-accent);
+  --t-line: var(--c-line);      --t-line-hi: var(--c-line-hi);
+  --t-env-base: var(--c-pg);
+  --t-shell-gradient: var(--c-shell);
+  --t-shell-edge: var(--c-shell-edge);
+  --t-env-glow-a: var(--c-glow-a);
+  --t-env-glow-b: var(--c-glow-b);
+  --t-env-depth: var(--c-depth);
+  --t-header-fade: var(--c-header-fade);
+  --t-title-glow: var(--c-title-glow);
+  --t-hero-edge: var(--c-hero-edge);
+  --t-hero-top: var(--c-hero-top);
+  --t-hero-bottom: var(--c-hero-bottom);
+}
+
+/* ============================================================
    2. BASE
    ============================================================ */
 
@@ -1160,6 +1351,45 @@ img { max-width: 100%; }
 
 .settings-nav { display: flex; gap: var(--t-d-2); flex-wrap: wrap; margin-bottom: var(--t-d-5); }
 .settings-nav .btn.active { background: var(--t-accent); border-color: var(--t-accent); color: var(--t-on-accent); }
+
+/* Theme picker (account > Appearance). Swatches render the real theme
+   tokens, so the grid also serves as a live index of the ecosystem. */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--t-d-3);
+}
+.theme-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--t-d-3);
+  text-align: left;
+  padding: var(--t-d-3);
+  border-radius: var(--t-r-m);
+  border: 1px solid var(--t-line);
+  background: var(--t-base2);
+  color: var(--t-txt);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--t-ease), background var(--t-fast) var(--t-ease);
+}
+.theme-chip:hover { border-color: var(--t-line-hi); }
+.theme-chip.active { border-color: var(--t-accent); background: var(--t-base); }
+.theme-chip-swatch {
+  flex: 0 0 44px;
+  height: 30px;
+  border-radius: var(--t-r-s);
+  border: 1px solid var(--t-line-hi);
+  background: var(--t-pg);
+}
+.theme-chip-swatch[data-theme="trycord"] { background: linear-gradient(120deg, #0d0b0a 35%, #32211a 65%, #ff914d); }
+.theme-chip-swatch[data-theme="orthocord"] { background: linear-gradient(120deg, #0e0e10 35%, #28282e 65%, #6ea8ff); }
+.theme-chip-swatch[data-theme="midnight"] { background: linear-gradient(120deg, #070810 35%, #1d2138 65%, #a78bfa); }
+.theme-chip-swatch[data-theme="ember"] { background: linear-gradient(120deg, #130b07 35%, #391f11 65%, #ff8a1f); }
+.theme-chip-swatch[data-theme="light"] { background: linear-gradient(120deg, #f6f0e7 35%, #dccfb8 65%, #c84f12); }
+.theme-chip-swatch[data-theme="high-contrast"] { background: linear-gradient(120deg, #000 35%, #212126 65%, #ffb054); }
+.theme-chip-swatch[data-theme="custom"] { background: linear-gradient(120deg, var(--t-base), var(--t-accent)); }
+.theme-chip-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.theme-custom { margin-top: var(--t-d-5); max-width: 420px; }
 
 .stat-inline { display: flex; gap: var(--t-d-4); color: var(--t-mut); font-size: var(--t-fs-s); margin-top: var(--t-d-2); }
 

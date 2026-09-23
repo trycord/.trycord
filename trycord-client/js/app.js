@@ -1,7 +1,8 @@
 // Trycord client entrypoint (ES module).
-// Boot order: runtime config -> presentation -> shell wiring -> realtime -> router.
+// Boot order: theme -> runtime config -> presentation -> shell wiring -> realtime -> router.
 
 import { TrycordConfig } from './config.js';
+import { applyTheme } from './theme.js';
 import { updateFromViewport, closeMobileDrawer, openMobileDrawer, onPresentationChange, setPresentation, initMobileGestures } from './presentation.js';
 import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends } from './state.js';
 import Realtime from './realtime.js';
@@ -15,6 +16,10 @@ let startup = Promise.resolve(null);
 window.TrycordPresentation = TrycordPresentation;
 
 async function boot() {
+  // 0) Theme (persisted, single source in theme.js; idempotent with the
+  //    inline bootstrap in index.html).
+  applyTheme();
+
   // 1) Remote runtime config (server-pinned API) — best-effort.
   try { await TrycordConfig.loadRuntimeConfig(); } catch { /* ignore */ }
 
