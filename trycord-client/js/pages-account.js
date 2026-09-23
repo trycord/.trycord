@@ -15,6 +15,7 @@ function accountTabs(active) {
     { id: 'password', label: 'Password', href: '#/account/password' },
     { id: 'sessions', label: 'Sessions', href: '#/account/sessions' },
     { id: 'appearance', label: 'Appearance', href: '#/account/appearance' },
+    { id: 'updates', label: 'Updates', href: '#/account/updates' },
   ];
   for (const t of items) {
     const b = el('button', { class: 'btn ' + (active === t.id ? 'active' : 'ghost'), type: 'button' }, t.label);
@@ -90,6 +91,81 @@ function renderAppearance(wrap) {
   wrap.appendChild(customPanel);
 }
 
+let updatesUnsub = null;
+
+function renderUpdates(wrap) {
+  const desk = (typeof window.trycordDesktop !== 'undefined') ? window.trycordDesktop : null;
+  wrap.appendChild(el('div', { class: 'section-label' }, 'Application'));
+
+  if (!desk) {
+    const box = el('div', { class: 'auth-box' });
+    box.appendChild(el('p', {}, 'You are running Trycord in a browser. The browser build does not auto-update.'));
+    box.appendChild(el('p', { class: 'muted small' }, 'The desktop app checks for and installs updates automatically.'));
+    wrap.appendChild(el('div', {},
+      el('a', { class: 'btn primary', href: 'https://github.com/LanxTheShowmaker/.trycord/releases', rel: 'noopener', target: '_blank' }, 'Download the desktop app')));
+    return;
+  }
+
+  const status = el('p', { class: 'muted small', 'aria-live': 'polite' }, 'Checking update status…');
+  const releaseLink = el('a', { class: 'btn', href: 'https://github.com/LanxTheShowmaker/.trycord/releases', rel: 'noopener', target: '_blank' }, 'Open Releases page');
+  const checkBtn = el('button', { class: 'btn primary', type: 'button' }, 'Check for updates');
+  const installBtn = el('button', { class: 'btn danger', type: 'button', hidden: true }, 'Restart & update');
+  let prefs = { autoInstall: true, channel: 'latest' };
+  let downloadedVersion = null;
+
+  const paint = () => {
+    version.textContent = 'Trycord on ' + (desk.platform || 'desktop');
+    latestBtn.classList.toggle('active', prefs.channel !== 'beta');
+    latestBtn.classList.toggle('ghost', prefs.channel === 'beta');
+    betaBtn.classList.toggle('active', prefs.channel === 'beta');
+    betaBtn.classList.toggle('ghost', prefs.channel !== 'beta');
+    autoToggle.checked = prefs.autoInstall !== false;
+  };
+
+  desk.updater.getPrefs().then((p) => { if (p) prefs = p; paint(); }).catch(() => { paint(); });
+
+  const version = el('div', { class: 'row-line' });
+  const latestBtn = el('button', { type: 'button', class: 'btn' }, 'Stable');
+  latestBtn.addEventListener('click', () => {
+    desk.updater.setPrefs({ channel: 'latest' }).then((p) => { prefs = p; paint(); status.textContent = 'Channel switched to Stable.'; }).catch(() => {});
+  });
+  const betaBtn = el('button', { type: 'button', class: 'btn' }, 'Beta (PTB)');
+  betaBtn.addEventListener('click', () => {
+    desk.updater.setPrefs({ channel: 'beta' }).then((p) => { prefs = p; paint(); status.textContent = 'Channel switched to Beta — you will see public test builds.'; }).catch(() => {});
+  });
+  const autoToggle = el('input', { type: 'checkbox', class: 'input' });
+  autoToggle.addEventListener('change', () => {
+    desk.updater.setPrefs({ autoInstall: autoToggle.checked }).then((p) => { prefs = p; paint(); }).catch(() => {});
+  });
+
+  const onEvent = (ev) => {
+    if (!ev || !ev.type) return;
+    if (ev.type === 'checking') status.textContent = 'Checking for updates…';
+    else if (ev.type === 'available') status.textContent = 'Update available — downloading…';
+    else if (ev.type === 'progress') status.textContent = Math.round((ev.percent || 0)) + '% downloaded';
+    else if (ev.type === 'downloaded') {
+      downloadedVersion = ev.version;
+      status.textContent = 'Ready to install.';
+      installBtn.hidden = false;
+    } else if (ev.type === 'not-available') status.textContent = 'You are up to date' + (ev.lastChecked ? ' (last checked ' + new Date(ev.lastChecked).toLocaleString() + ').' : '.');
+    else if (ev.type === 'error') {
+      status.textContent = 'Update check failed: ' + (ev.message || ev.kind || 'unknown') + '. You keep running the current version.';
+      installBtn.hidden = true;
+    }
+  };
+  if (updatesUnsub) { try { updatesUnsub(); } catch { /* ignore */ } updatesUnsub = null; }
+  updatesUnsub = desk.updater.onEvent(onEvent);
+  checkBtn.addEventListener('click', () => { status.textContent = 'Checking…'; desk.updater.check().catch(() => {}); });
+  installBtn.addEventListener('click', () => { desk.updater.install().catch(() => {}); });
+
+  wrap.appendChild(el('div', {}, version));
+  wrap.appendChild(el('div', { class: 'field' }, el('label', {}, 'Update channel'), el('div', { class: 'row-line' }, latestBtn, betaBtn),
+    el('span', { class: 'hint' }, 'Beta shows public test builds (PTB). Stable shows release builds.')));
+  wrap.appendChild(el('div', { class: 'field' }, el('div', { class: 'row-line' }, autoToggle, el('label', {}, 'Install updates automatically when quitting'))));
+  wrap.appendChild(el('div', { class: 'row-line' }, checkBtn, installBtn, releaseLink));
+  wrap.appendChild(status);
+}
+
 export async function renderAccount(container, { tab = 'profile' } = {}) {
   clear(container);
   renderContextHeader({ title: 'Account', sub: 'Your identity across Trycord' });
@@ -99,6 +175,8 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   const me = State.me;
   if (tab === 'appearance') {
     renderAppearance(wrap);
+  } else if (tab === 'updates') {
+    renderUpdates(wrap);
   } else if (tab === 'password') {
     const err = el('div', { class: 'form-error', hidden: true });
     const cur = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', required: true });

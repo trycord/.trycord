@@ -13,6 +13,23 @@
     content="Trycord communication client"
   >
 
+  <!-- Content Security Policy. Covers both browser (server-rendered, which
+       also sends its own header — policies intersect) and the desktop
+       Electron build loading this page from file://. 'self' covers the
+       local client; connect-src permits the configured API/WebSocket
+       backend; blob: is required for attachment previews. -->
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self';
+             img-src 'self' data: blob: http: https:;
+             media-src 'self' blob: http: https:;
+             font-src 'self' data:;
+             connect-src 'self' http: https: ws: wss:;
+             worker-src 'self' blob:;
+             object-src 'none'; frame-src 'none';
+             base-uri 'self'; form-action 'self'"
+  >
+
   <title>Trycord</title>
 
   <!-- Application stylesheet -->
