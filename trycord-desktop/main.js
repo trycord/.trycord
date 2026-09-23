@@ -39,6 +39,14 @@ function apiUrlFromArgs(argv) {
 
 const launchApiUrl = apiUrlFromArgs(process.argv);
 
+// The self-test must observe a deterministic client state: isolate it to a
+// throwaway profile so persisted user data (theme, sessions) cannot affect
+// assertions. This must happen before the first window is created.
+if (process.argv.includes('--smoke-test')) {
+  const os = require('os');
+  app.setPath('userData', path.join(os.tmpdir(), 'trycord-smoke-' + process.pid));
+}
+
 function clientEntry() {
   const bundled = path.join(__dirname, 'client', 'index.html');
   if (fs.existsSync(bundled)) return bundled;

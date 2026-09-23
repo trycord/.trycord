@@ -350,19 +350,13 @@ You do not need WispByte to self-host Trycord.
 
 Desktop releases are published through GitHub Releases.
 
-Versions use semantic versioning:
+Public artifact names carry no version number — the product is simply Trycord:
 
-```text
-1.0.0
-1.0.1
-1.1.0
-```
+- `Trycord.exe` — stable installer
+- `Trycord-PTB.exe` — public test build
 
-Beta releases use:
-
-```text
-1.0.0-beta.1
-```
+Update metadata keeps the internal version so the desktop client can resolve
+updates, but no version number is shown to users.
 
 The desktop client checks for updates automatically.
 
@@ -371,8 +365,8 @@ The desktop client checks for updates automatically.
 Create and push a version tag:
 
 ```bat
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.5.0
+git push origin v1.5.0
 ```
 
 CI then builds and publishes the release.

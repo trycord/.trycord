@@ -1,10 +1,13 @@
 // Release gate: verifies the local electron-builder output is a coherent,
-// publishable update set BEFORE anything is published.
+// publishable update set BEFORE anything is published. Version numbers are
+// deliberately absent from public artifact names (the product is Trycord; the
+// internal version only lives in update metadata).
 //
 // Windows (win32):
-//   - Windows NSIS installer exists:  release/Trycord Setup <version>.exe
+//   - Windows NSIS installer exists:  release/Trycord.exe
+//   - public test build exists:        release/Trycord-PTB.exe
 //   - update metadata exists:          release/latest.yml
-//   - blockmap exists:                 release/Trycord Setup <version>.exe.blockmap
+//   - blockmap exists:                 release/Trycord.exe.blockmap
 //   - latest.yml version matches package.json
 //   - latest.yml references an installer file that actually exists
 // Linux:
@@ -33,13 +36,18 @@ if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(String(pkgVersion))) {
   fail('package.json version is not semver: ' + pkgVersion);
 }
 
-const installerName = `Trycord Setup ${pkgVersion}.exe`;
+const installerName = 'Trycord.exe';
 const installerPath = path.join(releaseDir, installerName);
+const ptbName = 'Trycord-PTB.exe';
+const ptbPath = path.join(releaseDir, ptbName);
 const metaName = process.platform === 'linux' ? 'latest-linux.yml' : 'latest.yml';
 
 function checkWin() {
   if (!fs.existsSync(installerPath)) {
     fail('missing installer: release/' + installerName);
+  }
+  if (!fs.existsSync(ptbPath)) {
+    fail('missing public test build: release/' + ptbName);
   }
 }
 
@@ -68,12 +76,12 @@ if (process.platform !== 'linux') {
 }
 
 // Minimal latest.yml parse (flat keys + files list). electron-builder writes:
-//   version: 1.0.1
+//   version: 1.5.0
 //   files:
-//     - url: Trycord-Setup-1.0.1.exe
+//     - url: Trycord.exe
 //       sha512: ...
 //       size: 123
-//   path: Trycord-Setup-1.0.1.exe
+//   path: Trycord.exe
 //   sha512: ...
 const meta = fs.readFileSync(metaPath, 'utf8');
 function field(name) {
@@ -95,10 +103,10 @@ if (process.platform === 'linux') {
   console.log(`release validation passed: ${appImages.join(', ')} + ${metaName}, versions agree`);
   return;
 }
-// electron-builder dash-normalizes spaces in the metadata path.
-const expectedPath = installerName.replace(/ /g, '-');
+// electron-builder keeps the versionless artifact name in the metadata path.
+const expectedPath = installerName;
 if (metaPath_ !== expectedPath) {
   fail(`latest.yml path (${metaPath_}) does not reference the installer (${expectedPath})`);
 }
 
-console.log(`release validation passed: Trycord Setup ${pkgVersion}.exe + latest.yml + blockmap, versions agree`);
+console.log(`release validation passed: Trycord.exe + Trycord-PTB.exe + latest.yml + blockmap, versions agree`);

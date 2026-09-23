@@ -1,6 +1,6 @@
 {
   "name": "trycord-desktop",
-  "version": "1.0.1",
+  "version": "1.5.0",
   "description": "Trycord desktop app: the web client in a native desktop window",
   "author": "Trycord",
   "repository": {
@@ -54,6 +54,12 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -63,7 +69,10 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Trycord",
-      "artifactName": "Trycord Setup ${version}.${ext}"
+      "artifactName": "Trycord.${ext}"
+    },
+    "portable": {
+      "artifactName": "Trycord-PTB.${ext}"
     },
     "linux": {
       "target": [
