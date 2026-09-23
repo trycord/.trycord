@@ -36,8 +36,13 @@ async function list(serverId) {
 }
 
 async function joinInner(serverId, userId, username, conn) {
-  const srv = await conn.get('SELECT id FROM servers WHERE id = ?', [serverId]);
+  const srv = await conn.get('SELECT id, enforcement_state FROM servers WHERE id = ?', [serverId]);
   if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'server not found' };
+  // Trust & Safety: suspended servers are closed to new members. Existing
+  // members are handled by the access chain (resolveServer).
+  if (srv.enforcement_state === 'suspended') {
+    throw { code: 'SERVER_SUSPENDED', message: 'server is suspended' };
+  }
   if (await get(serverId, userId, conn)) throw { code: 'ALREADY_MEMBER', message: 'already a member' };
   await conn.run(
     'INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)',

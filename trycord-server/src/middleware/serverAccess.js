@@ -5,6 +5,7 @@ const db = require('../db');
 const { fail } = require('../errors');
 const { isMember } = require('../util');
 const { getOwnerId, effectivePermissionsFor } = require('../services/permissions');
+const { isPlatformAdmin } = require('../services/enforcement');
 
 function serverIdOf(req) {
   return req.params.serverId || req.params.id || null;
@@ -14,6 +15,12 @@ async function resolveServer(req, res, next) {
   try {
     const srv = await db.get('SELECT * FROM servers WHERE id = ?', [serverIdOf(req)]);
     if (!srv) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
+    // Trust & Safety: suspended servers are out of reach for everyone except
+    // the owner (still needs a maintenance access path) and platform admins
+    // (who may need to inspect before lifting). Everything else gets 403.
+    if (srv.enforcement_state === 'suspended' && !(req.user && (req.user.id === srv.owner_id || (await isPlatformAdmin(req.user.id))))) {
+      return fail(res, 'SERVER_SUSPENDED', 'server is suspended', 403, { suspended: true });
+    }
     req.server = srv;
     next();
   } catch (e) { next(e); }

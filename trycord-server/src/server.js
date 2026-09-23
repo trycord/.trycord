@@ -13,6 +13,7 @@ const cors = require('cors');
 const db = require('./db');
 const createGateway = require('./ws');
 const inviteRoutes = require('./routes/invites');
+const enforcement = require('./services/enforcement');
 
 const PORT = parseInt(process.env.PORT || '9971', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -196,6 +197,9 @@ async function boot() {
   app.use('/api/dms', require('./routes/dms'));
   app.use('/api/friends', require('./routes/friends'));
   app.use('/api/notifications', require('./routes/notifications'));
+  app.use('/api/reports', require('./routes/reports'));
+  app.use('/api/appeals', require('./routes/appeals'));
+  app.use('/api/admin', require('./routes/admin'));
 
   // Back-compat alias for older clients.
   app.get('/api/me', require('./middleware/auth'), async (req, res, next) => {
@@ -243,12 +247,32 @@ async function boot() {
       'Deploy the full repository (with trycord-client/) or ignore this if API-only.');
   }
 
-  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket } = createGateway(server);
+  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser } = createGateway(server);
   require('./routes/auth').setTicketIssuer(issueTicket);
   require('./routes/messages').setBroadcaster(broadcast);
   require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });
   require('./routes/friends').setGateway({ sendToUser });
   require('./routes/users').setGateway({ getPresence });
+  require('./routes/admin').setGateway({ disconnectUser });
+
+  // Trust & Safety: bootstrap platform admins from ADMIN_USERNAMES before
+  // the server accepts traffic. Idempotent — re-runs promote any new names
+  // and leave existing admins untouched.
+  const bootstrapAdmins = (async () => {
+    const names = String(process.env.ADMIN_USERNAMES || '')
+      .split(',').map((s) => s.trim()).filter(Boolean);
+    if (!names.length) {
+      console.log('[info] ADMIN_USERNAMES not set — no platform admins bootstrapped');
+      return;
+    }
+    for (const username of names) {
+      const u = await db.get('SELECT * FROM users WHERE username = ?', [username]);
+      if (!u) { console.warn(`[warn] ADMIN_USERNAMES: no user "${username}" yet — promote by re-running with the account created`); continue; }
+      await enforcement.ensureAdminUser(u.id);
+      console.log(`[info] platform admin: ${username}`);
+    }
+  })();
+  await bootstrapAdmins;
 
   // Consistent error envelope for anything that escapes routes.
   // eslint-disable-next-line no-unused-vars

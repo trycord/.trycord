@@ -13,7 +13,7 @@ function pageArgs(page, limit) {
 async function search({ q, page, limit }) {
   const { limit: lim, page: pg, offset } = pageArgs(page, limit);
   const term = String(q || '').trim();
-  const where = ['s.is_public = 1', 's.is_discoverable = 1'];
+  const where = ['s.is_public = 1', 's.is_discoverable = 1', 's.enforcement_state IS NULL'];
   const vals = [];
   if (term) {
     where.push('(s.name LIKE ? OR s.description LIKE ?)');
@@ -41,7 +41,7 @@ async function preview(serverId) {
     `SELECT s.id, s.name, s.description, s.created_at,
       (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count
     FROM servers s
-    WHERE s.id = ? AND s.is_public = 1 AND s.is_discoverable = 1`,
+    WHERE s.id = ? AND s.is_public = 1 AND s.is_discoverable = 1 AND s.enforcement_state IS NULL`,
     [serverId]
   );
   if (!srv) return null;
