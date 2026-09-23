@@ -4,7 +4,7 @@
 // degrades gracefully (update UI shows browser-mode state).
 const { contextBridge, ipcRenderer } = require('electron');
 
-let version = '1.5.0';
+let version = '1.6.0';
 try {
   // eslint-disable-next-line global-require, import/no-dynamic-require
   const pkg = require('./package.json');
