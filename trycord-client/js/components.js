@@ -22,6 +22,22 @@ export function initialOf(name) {
   return (s[0] || '?').toUpperCase();
 }
 
+// Load a Bearer-authenticated image (channel attachment or profile media)
+// into an object URL. Resolves null on any failure so callers can keep a
+// colored-initial fallback instead of a broken <img>.
+export async function loadAuthedImage(path) {
+  if (!path) return null;
+  try {
+    const res = await Api.fetchProfileImage(path);
+    let mime = 'application/octet-stream';
+    try {
+      const h = res.headers && res.headers.get ? res.headers.get('content-type') : null;
+      if (h) mime = h;
+    } catch { /* keep declared mime */ }
+    return URL.createObjectURL(new Blob([res.buffer], { type: mime }));
+  } catch { return null; }
+}
+
 export function avatar(user, { size = 'sm', withPresence = true } = {}) {
   const name = (user && (user.displayName || user.username)) || '?';
   const a = el('span', {
@@ -30,6 +46,19 @@ export function avatar(user, { size = 'sm', withPresence = true } = {}) {
     title: name,
     'aria-hidden': 'true',
   }, initialOf(name));
+  // Upgrade to the user's image when present. The bytes live behind the
+  // Bearer-authenticated route, so a bare <img src> would 401; fetch with
+  // the real session and swap in a blob URL.
+  if (user && user.avatarUrl) {
+    const path = user.avatarUrl;
+    loadAuthedImage(path).then((url) => {
+      if (!url || !a.isConnected) return;
+      a.classList.add('has-img');
+      a.textContent = '';
+      a.appendChild(el('img', { class: 'avatar-img', src: url, alt: '', loading: 'lazy' }));
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    });
+  }
   if (withPresence && user && user.id) {
     const dot = el('span', { class: 'presence-dot ' + (peerPresence(user.id) === 'online' ? 'online' : '') });
     a.appendChild(dot);

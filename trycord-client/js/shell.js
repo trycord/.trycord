@@ -34,7 +34,7 @@ export function renderIdentity(region) {
   box.appendChild(avatar(me, { size: '', withPresence: true }));
   const text = el('div', { class: 'iden-text' });
   text.appendChild(el('div', { class: 'iden-name' }, me.displayName || me.username));
-  text.appendChild(el('div', { class: 'iden-sub' }, me.username));
+  text.appendChild(el('div', { class: 'iden-sub' }, me.username + (me.statusText ? ' · ' + me.statusText : '')));
   box.appendChild(text);
   const actions = el('div', { class: 'iden-actions' });
   actions.appendChild(el('button', { type: 'button', title: 'Settings', 'aria-label': 'Settings', onClick: () => { location.hash = '#/account'; } }, '⚙'));

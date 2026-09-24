@@ -78,4 +78,21 @@ router.get('/attachments/:id', auth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Profile media (avatars / banners) are public identity by design — any
+// authenticated user may load them. The file id must carry the pf- prefix
+// (enforced by storeProfileMedia), so this route cannot serve a message
+// attachment.
+router.get('/attachments/profile/:id', auth, async (req, res, next) => {
+  try {
+    const row = await uploads.profileMedia(req.params.id);
+    if (!row) return fail(res, 'NOT_FOUND', 'attachment not found');
+    res.setHeader('Content-Type', row.mime);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.sendFile(uploads.filePath(row.id), { dotfiles: 'allow' }, (err) => {
+      if (err && !res.headersSent) return fail(res, 'NOT_FOUND', 'attachment not found');
+    });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

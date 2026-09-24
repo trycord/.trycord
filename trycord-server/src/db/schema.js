@@ -27,7 +27,11 @@ function tables(engine) {
       enforcement_state VARCHAR(16),
       enforcement_expires_at VARCHAR(64),
       enforcement_reason TEXT,
-      enforcement_updated_at VARCHAR(64)
+      enforcement_updated_at VARCHAR(64),
+      bio TEXT,
+      avatar_url VARCHAR(512),
+      banner_url VARCHAR(512),
+      status_text VARCHAR(128)
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS servers (
@@ -241,6 +245,20 @@ function tables(engine) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
 
+    // --- Profile media (avatars / banners). Files on disk keyed by id (pf-
+    // prefixed); this row carries the exact sniffed mime for serving and the
+    // ownership/kind trace for cleanup.
+    `CREATE TABLE IF NOT EXISTS profile_media (
+      id         VARCHAR(64) PRIMARY KEY,
+      user_id    VARCHAR(64) NOT NULL,
+      kind       VARCHAR(16) NOT NULL,
+      filename   VARCHAR(255) NOT NULL,
+      mime       VARCHAR(64) NOT NULL,
+      size       INTEGER NOT NULL DEFAULT 0,
+      created_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
     `CREATE TABLE IF NOT EXISTS reports (
       id         VARCHAR(64) PRIMARY KEY,
       reporter_id VARCHAR(64) NOT NULL,
@@ -332,6 +350,11 @@ const LEGACY_ALTERS = [
   ['servers', 'enforcement_state', 'ALTER TABLE servers ADD COLUMN enforcement_state VARCHAR(16)'],
   ['servers', 'enforcement_reason', 'ALTER TABLE servers ADD COLUMN enforcement_reason TEXT'],
   ['servers', 'enforcement_updated_at', 'ALTER TABLE servers ADD COLUMN enforcement_updated_at VARCHAR(64)'],
+  // Profiles: public identity fields (Slice 2). NULL = not set.
+  ['users', 'bio', 'ALTER TABLE users ADD COLUMN bio TEXT'],
+  ['users', 'avatar_url', 'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)'],
+  ['users', 'banner_url', 'ALTER TABLE users ADD COLUMN banner_url VARCHAR(512)'],
+  ['users', 'status_text', 'ALTER TABLE users ADD COLUMN status_text VARCHAR(128)'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -363,6 +386,10 @@ const MYSQL_ADD = [
   ['servers', 'enforcement_state', 'ALTER TABLE servers ADD COLUMN enforcement_state VARCHAR(16)'],
   ['servers', 'enforcement_reason', 'ALTER TABLE servers ADD COLUMN enforcement_reason TEXT'],
   ['servers', 'enforcement_updated_at', 'ALTER TABLE servers ADD COLUMN enforcement_updated_at VARCHAR(64)'],
+  ['users', 'bio', 'ALTER TABLE users ADD COLUMN bio TEXT'],
+  ['users', 'avatar_url', 'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)'],
+  ['users', 'banner_url', 'ALTER TABLE users ADD COLUMN banner_url VARCHAR(512)'],
+  ['users', 'status_text', 'ALTER TABLE users ADD COLUMN status_text VARCHAR(128)'],
 ];
 
 const INDEXES = [
@@ -388,6 +415,7 @@ const INDEXES = [
   'CREATE INDEX idx_password_resets_user ON password_resets(user_id)',
   'CREATE INDEX idx_email_verifications_token ON email_verifications(token_hash)',
   'CREATE INDEX idx_users_email ON users(email)',
+  'CREATE INDEX idx_profile_media_user ON profile_media(user_id)',
   // Trust & Safety access patterns: report queues, per-target enforcement
   // history, appeal inboxes, and the audit trail.
   'CREATE INDEX idx_reports_status ON reports(status, created_at)',

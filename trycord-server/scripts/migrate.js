@@ -31,6 +31,8 @@ const TABLES = [
   'notifications',
   'password_resets',
   'email_verifications',
+  // Profile media reference only users.
+  'profile_media',
   // Trust & Safety, in foreign-key order: admins/reports only reference
   // users; moderation_actions reference users + reports; appeals reference
   // users + moderation_actions; audit_logs reference users + reports.

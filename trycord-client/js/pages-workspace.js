@@ -1,4 +1,4 @@
-// Server workspace: the main Environment when inside a community.
+﻿// Server workspace: the main Environment when inside a community.
 //   /server/:id                 -> landing (channel list summary)
 //   /server/:id/channel/:cid    -> channel conversation
 //   /server/:id/channels/new    -> create channel
@@ -10,7 +10,7 @@ import Api from './api.js';
 import State, {
   enterServer, refreshServers, leaveServerContext, can, isAuthed, currentServerId, peerPresence,
 } from './state.js';
-import { esc, el, clear, toast, relTime, confirmDialog } from './ui.js';
+import { esc, el, clear, toast, relTime, confirmDialog, openModal } from './ui.js';
 import { avatar, emptyState, messageRow, channelRow } from './components.js';
 import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNavigation } from './shell.js';
 import Realtime from './realtime.js';
@@ -34,14 +34,14 @@ async function renderServerLanding(container, serverId) {
     container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this server'));
     return;
   }
-  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
+  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' Â· ' + (server.member_count || 0) + ' members' });
   const wrap = el('div', { class: 'page atrium' });
   wrap.appendChild(el('h2', {}, 'Channels'));
   const layout = State.channels;
   const categories = layout.categories || [];
   const channels = layout.channels || [];
   if (!channels.length) {
-    wrap.appendChild(emptyState('◌', 'No channels yet', 'Create a channel to get started.'));
+    wrap.appendChild(emptyState('â—Œ', 'No channels yet', 'Create a channel to get started.'));
   } else {
     for (const cat of categories) {
       const inCat = channels.filter((ch) => String(ch.category_id) === String(cat.id));
@@ -72,17 +72,79 @@ async function renderServerLanding(container, serverId) {
     }
   }
   wrap.appendChild(el('div', { class: 'section-label' }, 'Members'));
-  for (const m of (State.members || []).slice(0, 24)) {
-    const row = el('div', { class: 'row' });
-    row.appendChild(avatar({ id: m.user_id || m.id, username: m.username, displayName: m.display_name }, { withPresence: true }));
-    const mm = el('div', { class: 'row-main' });
-    mm.appendChild(el('div', { class: 'row-title' }, m.display_name || m.username));
-    mm.appendChild(el('div', { class: 'row-sub' }, '@' + (m.username || '')));
-    row.appendChild(mm);
-    wrap.appendChild(row);
-  }
+  renderMemberList(wrap, serverId);
   container.appendChild(wrap);
   renderAllChrome();
+}
+
+// Community member list with per-community nicknames. Re-renderable in place
+// so a nickname change in the modal updates this section without a reroute.
+function renderMemberList(wrap, serverId) {
+  const old = wrap.querySelector('.member-list');
+  if (old) old.remove();
+  const listBox = el('div', { class: 'member-list' });
+  const canNickname = can('KICK_MEMBERS') || can('*');
+  for (const m of (State.members || []).slice(0, 24)) {
+    const row = el('div', { class: 'row' });
+    const rid = m.user_id || m.id;
+    const avatarEl = avatar({ id: rid, username: m.username, displayName: m.display_name, avatarUrl: m.avatar_url }, { withPresence: true });
+    avatarEl.style.cursor = 'pointer';
+    avatarEl.addEventListener('click', () => { location.hash = '#/users/' + rid; });
+    row.appendChild(avatarEl);
+    const mm = el('div', { class: 'row-main' });
+    const nameEl = el('div', { class: 'row-title', style: { cursor: 'pointer' } }, m.nickname || m.display_name || m.username);
+    nameEl.addEventListener('click', () => { location.hash = '#/users/' + rid; });
+    mm.appendChild(nameEl);
+    const sub = m.nickname
+      ? '@' + (m.username || '') + (m.display_name && m.display_name !== m.username ? ' Â· ' + m.display_name : '')
+      : '@' + (m.username || '');
+    mm.appendChild(el('div', { class: 'row-sub' }, sub));
+    row.appendChild(mm);
+    const mine = State.me && String(rid) === String(State.me.id);
+    if (mine || canNickname) {
+      const nick = el('button', { class: 'btn sm', type: 'button', title: 'Set nickname' }, 'nick');
+      nick.addEventListener('click', () => openNicknameModal(serverId, m, wrap));
+      row.appendChild(nick);
+    }
+    listBox.appendChild(row);
+  }
+  wrap.appendChild(listBox);
+}
+
+function openNicknameModal(serverId, member, wrap) {
+  const name = member.nickname || member.display_name || member.username;
+  const input = el('input', { class: 'input', type: 'text', maxlength: 32, placeholder: 'Nickname (2-32 chars)', value: name });
+  const err = el('div', { class: 'form-error', hidden: true });
+  const save = el('button', { class: 'btn primary', type: 'button' }, 'Save');
+  const clearBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Clear');
+  const modal = openModal({
+    title: 'Nickname',
+    body: el('div', {}, err,
+      el('p', { class: 'muted small' }, 'Set how @' + (member.username || '') + ' appears in this community. Empty clears it.'),
+      input),
+    footer: [clearBtn, save],
+  });
+  const saveIt = async () => {
+    err.hidden = true;
+    try {
+      const res = await Api.setNickname(serverId, member.user_id || member.id, input.value.trim());
+      toast(res && res.nickname ? 'Nickname saved.' : 'Nickname cleared.', 'ok');
+      modal.close();
+      await enterServer(serverId).catch(() => {});
+      if (wrap) renderMemberList(wrap, serverId);
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
+  };
+  save.addEventListener('click', saveIt);
+  clearBtn.addEventListener('click', async () => {
+    err.hidden = true;
+    try {
+      await Api.setNickname(serverId, member.user_id || member.id, '');
+      toast('Nickname cleared.', 'ok');
+      modal.close();
+      await enterServer(serverId).catch(() => {});
+      if (wrap) renderMemberList(wrap, serverId);
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
+  });
 }
 
 async function renderChannel(container, serverId, channelId) {
@@ -135,7 +197,7 @@ async function renderChannel(container, serverId, channelId) {
       return;
     }
     if (!msgs.length) {
-      feed.appendChild(emptyState('◌', 'No messages yet', 'Start the conversation.'));
+      feed.appendChild(emptyState('â—Œ', 'No messages yet', 'Start the conversation.'));
     }
     for (const m of msgs) feed.appendChild(buildMsg(m));
     groupFeed(feed);
@@ -221,7 +283,7 @@ async function renderChannel(container, serverId, channelId) {
 
   // ---- composer ----
   const composer = el('div', { class: 'composer' });
-  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, '📎');
+  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, 'ðŸ“Ž');
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
@@ -387,7 +449,7 @@ async function renderInvites(container, serverId) {
     let invites = [];
     try { invites = await Api.invites(serverId); } catch { /* ignore */ }
     if (!invites.length) {
-      listPane.appendChild(emptyState('◇', 'No invites yet', 'Create one above to share a link.'));
+      listPane.appendChild(emptyState('â—‡', 'No invites yet', 'Create one above to share a link.'));
       return;
     }
     for (const inv of invites) {
@@ -398,8 +460,8 @@ async function renderInvites(container, serverId) {
       m.appendChild(el('div', { class: 'row-sub' },
         inv.uses + ' uses' +
         (inv.max_uses ? '/' + inv.max_uses : '') +
-        (inv.expires_at ? ' · expires ' + relTime(inv.expires_at) : '') +
-        (inv.revoked ? ' · REVOKED' : '')));
+        (inv.expires_at ? ' Â· expires ' + relTime(inv.expires_at) : '') +
+        (inv.revoked ? ' Â· REVOKED' : '')));
       row.appendChild(m);
       const copyBtn = el('button', { class: 'btn sm', type: 'button' }, 'Copy link');
       copyBtn.addEventListener('click', async () => {
@@ -493,7 +555,7 @@ async function renderServerSettings(container, serverId) {
     card.appendChild(el('div', { class: 'hr' }));
     const delInput = el('input', { class: 'input', type: 'text', placeholder: 'Type server name to confirm' });
     const delBtn = el('button', { class: 'btn danger block', type: 'button', style: { marginTop: 'var(--t-d-3)' } }, 'Delete server');
-    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone — delete server'), delInput, delBtn));
+    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone â€” delete server'), delInput, delBtn));
     delBtn.addEventListener('click', async () => {
       if (delInput.value.trim() !== server.name) { toast('Type the exact server name to confirm.', 'warn'); return; }
       confirmDialog({
@@ -538,7 +600,7 @@ async function renderNewServer(container, serverId) {
     el('div', { class: 'field' }, el('label', {}, 'Description'), desc),
     el('div', { class: 'field' }, el('label', {}, 'Join code'), joinCode,
       el('span', { class: 'hint' }, 'Leave blank to auto-generate one.')),
-    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public — joinable by code or invite link')),
+    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public â€” joinable by code or invite link')),
     el('div', { class: 'field' }, el('label', { class: 'switch' }, isDisc, ' Discoverable in the browse feed')),
     createBtn);
 

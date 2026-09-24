@@ -9,6 +9,7 @@ import HelloDms from './pages-dms.js';
 import Workspace from './pages-workspace.js';
 import { renderAccount } from './pages-account.js';
 import { renderAdmin } from './pages-admin.js';
+import { renderProfile } from './pages-profile.js';
 import { presentationMode, closeMobileDrawer } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader, renderMobileHeader } from './shell.js';
 import Api from './api.js';
@@ -163,6 +164,13 @@ async function renderRoute() {
       renderAllChrome();
       return;
     }
+  }
+
+  // --- profile -> public page ----------------------------------------------
+  if (path.startsWith('/users/')) {
+    await renderProfile(region, { id: parts[1] });
+    renderAllChrome();
+    return;
   }
 
   // --- servers -----------------------------------------------------

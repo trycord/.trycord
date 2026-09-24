@@ -8,6 +8,7 @@ const { resolveServer, requireMember, requireOwner, requirePerm } = require('../
 const { fail, serviceError } = require('../errors');
 const servers = require('../services/servers');
 const memberships = require('../services/memberships');
+const permissions = require('../services/permissions');
 
 const router = express.Router();
 router.use(auth);
@@ -86,6 +87,22 @@ router.post('/:id/kick', resolveServer, requirePerm('KICK_MEMBERS'), async (req,
     const { userId } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
     res.json(await memberships.kick(req.server.id, req.user.id, userId));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Set/clear a member nickname. Anyone may set their own; staff (KICK_MEMBERS)
+// may set any member's. resolver + memberships gate membership itself.
+router.patch('/:id/members/:userId/nickname', resolveServer, requireMember, async (req, res, next) => {
+  try {
+    const targetId = req.params.userId;
+    const mine = String(targetId) === String(req.user.id);
+    if (!mine) {
+      const perms = await permissions.effectivePermissions(req.user.id, req.server.id);
+      if (!perms.has('*') && !perms.has('KICK_MEMBERS')) {
+        return fail(res, 'PERMISSION_DENIED', 'you can only change your own nickname here');
+      }
+    }
+    res.json(await memberships.setNickname(req.server.id, targetId, (req.body || {}).nickname));
   } catch (e) { serviceError(res, e); }
 });
 

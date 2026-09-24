@@ -188,6 +188,49 @@ async function purgePending() {
   removeFiles(rows.map((r) => r.id));
 }
 
+// Profile media (avatars / banners). Same disk store and magic-byte
+// validation as attachments, but identity content: served by a dedicated
+// profile route, not by server/channel membership. Files are prefixed so the
+// serving route can never touch a message attachment, and each file has a
+// profile_media row carrying the sniffed mime + ownership.
+async function storeProfileMedia({ userId, kind, buffer, originalName }) {
+  if (!buffer || buffer.length === 0) {
+    return { error: 'VALIDATION_ERROR', message: 'empty file' };
+  }
+  const mime = sniffBinary(buffer);
+  if (!mime) {
+    return { error: 'VALIDATION_ERROR', message: 'profile images must be PNG, JPEG, GIF, or WebP' };
+  }
+  const id = 'pf-' + uuid();
+  fs.writeFileSync(filePath(id), buffer);
+  try {
+    await db.run(
+      'INSERT INTO profile_media (id, user_id, kind, filename, mime, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, userId, kind, cleanFilename(originalName) || 'profile', mime, buffer.length, now()]
+    );
+  } catch (e) {
+    try { fs.unlinkSync(filePath(id)); } catch { /* nothing to clean */ }
+    throw e;
+  }
+  return { id, url: '/api/attachments/profile/' + id, mime, size: buffer.length, kind };
+}
+
+async function profileMedia(id) {
+  if (!/^pf-[a-f0-9-]{1,64}$/.test(String(id || ''))) return null;
+  return db.get('SELECT * FROM profile_media WHERE id = ?', [id]);
+}
+
+// Best-effort removal of a previously set profile image: deletes the disk
+// file and its row. Accepts only profile-prefixed paths so a malformed
+// profile row can never delete a message attachment.
+async function removeProfileFile(urlOrId) {
+  const idMatch = String(urlOrId || '').match(/^(?:.*\/)+?(pf-[a-f0-9-]{1,64})$/);
+  const id = idMatch ? idMatch[1] : (/^pf-[a-f0-9-]{1,64}$/.test(String(urlOrId || '')) ? String(urlOrId) : null);
+  if (!id) return;
+  try { fs.unlinkSync(filePath(id)); } catch { /* already gone */ }
+  try { await db.run('DELETE FROM profile_media WHERE id = ?', [id]); } catch { /* row already gone */ }
+}
+
 function ensureDir() {
   fs.mkdirSync(uploadsDir(), { recursive: true });
 }
@@ -198,6 +241,9 @@ module.exports = {
   MAX_ATTACHMENTS_PER_MESSAGE,
   filePath,
   store,
+  storeProfileMedia,
+  profileMedia,
+  removeProfileFile,
   attachToMessage,
   getForMessage,
   getForMessages,
