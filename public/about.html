@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About — Trycord</title>
+  <meta name="description" content="What Trycord is: an original client and server for private, self-hostable community messaging, with a desktop app, published on GitHub.">
+  <link rel="icon" href="./assets/trycord-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="wrap nav-wrap">
+      <a class="brand" href="./index.html">
+        <img class="brand-mark" src="./assets/trycord-mark.svg" alt="" width="30" height="30">
+        <span class="brand-name">Trycord</span>
+      </a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <a href="./index.html">Home</a>
+        <a href="./features.html">Features</a>
+        <a href="./documentation.html">Docs</a>
+        <a href="./download.html">Download</a>
+        <a href="./about.html">About</a>
+        <a href="./contact.html">Contact</a>
+        <a class="btn-open" href="/">Open the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="page tight">
+    <div class="prose">
+      <h1>About Trycord</h1>
+      <p class="lede">
+        Trycord is a messaging platform with an original client and server,
+        built around one idea: communities should run themselves.
+      </p>
+
+      <h2>What it is</h2>
+      <p>
+        Trycord is not a hosted service that holds anyone's conversations for
+        them. It is software you run. The server is a self-contained Node.js
+        application you configure from environment variables and point at the
+        database of your choice. It serves the web client itself, and it powers
+        a desktop app that wraps the same client with automatic updates.
+      </p>
+      <p>
+        Because the people who run an instance own it, the defaults lean toward
+        privacy and control: nothing is created implicitly, sensible limits are
+        on by default, and pages are served with a restrictive security policy.
+      </p>
+
+      <h2>The pieces</h2>
+      <ul>
+        <li><strong>trycord-server</strong> — the Node.js server: HTTP API, WebSocket gateway, auth, and static file serving.</li>
+        <li><strong>trycord-client</strong> — the web application: communities, channels, direct messages, profiles, and settings.</li>
+        <li><strong>trycord-desktop</strong> — an Electron wrapper around the client for Windows, with installers and portable builds published from the repository.</li>
+        <li><strong>public</strong> — this static website: plain, editable HTML documents shared by every instance's server.</li>
+      </ul>
+
+      <h2>Principles</h2>
+      <ul>
+        <li><strong>Direct and dependable</strong> — a focused feature set that works, rather than a sprawling one that demands attention.</li>
+        <li><strong>Complete by default</strong> — the client and server ship together and are tested against each other.</li>
+        <li><strong>Honest by design</strong> — if a capability (like sending recovery email) is not configured, the app says so instead of pretending.</li>
+        <li><strong>Yours to run</strong> — no managed service, no account-vendor lock-in, no implicit data stores.</li>
+      </ul>
+
+      <h2>Source and license</h2>
+      <p>
+        The project is developed in the open and published to
+        <a href="https://github.com/LanxTheShowmaker/.trycord" rel="external">github.com/LanxTheShowmaker/.trycord</a>.
+        The desktop package is MIT-licensed; see the repository for details.
+      </p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="./index.html">
+          <img class="brand-mark" src="./assets/trycord-mark.svg" alt="" width="30" height="30">
+          <span class="brand-name">Trycord</span>
+        </a>
+        <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Product</h2>
+        <a href="./features.html">Features</a>
+        <a href="./download.html">Download</a>
+        <a href="./documentation.html">Documentation</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Project</h2>
+        <a href="./about.html">About</a>
+        <a href="./contact.html">Contact</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Legal</h2>
+        <a href="./terms.html">Terms of Service</a>
+        <a href="./privacy.html">Privacy Policy</a>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>&copy; <span data-year>2026</span> Trycord</span>
+      <span class="muted">Your instance, your conversations, your rules.</span>
+    </div>
+  </footer>
+
+  <script src="./js/site.js"></script>
+</body>
+</html>

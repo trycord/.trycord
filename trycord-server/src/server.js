@@ -299,6 +299,55 @@ async function boot() {
       'Deploy the full repository (with trycord-client/) or ignore this if API-only.');
   }
 
+  // Serve the public website (repo-root public/, optional). Plain editable
+  // HTML/CSS/JS under the same origin as the app, plus clean URLs for the main
+  // pages. Mounted AFTER the client so the app keeps the root and any shared
+  // asset names; the public/index.html landing is previewable at /welcome (an
+  // operator may also serve public/ from the domain root in front of a reverse
+  // proxy).
+  let publicDir = null;
+  for (const candidate of [
+    path.join(__dirname, '..', '..', 'public'),
+    path.join(__dirname, '..', 'public'),
+  ]) {
+    if (fs.existsSync(path.join(candidate, 'index.html'))) {
+      publicDir = candidate;
+      app.use(express.static(candidate, {
+        setHeaders(res) {
+          res.setHeader('Cache-Control', 'no-cache');
+        },
+      }));
+      break;
+    }
+  }
+  if (publicDir) {
+    const sendPublic = (res, name, status) => {
+      res.status(status || 200).set('Cache-Control', 'no-cache').sendFile(name, { root: publicDir }, (err) => {
+        if (err && !res.headersSent) {
+          res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
+        }
+      });
+    };
+    // Map one public HTML file to one clean URL. Missing files fall back to the
+    // site's own 404 page instead of a bare Express "Cannot GET".
+    const publicPage = (name) => {
+      return (req, res) => {
+        const exists = fs.existsSync(path.join(publicDir, name));
+        sendPublic(res, exists ? name : '404.html', exists ? 200 : 404);
+      };
+    };
+    app.get('/terms', publicPage('terms.html'));
+    app.get('/privacy', publicPage('privacy.html'));
+    app.get('/about', publicPage('about.html'));
+    app.get('/contact', publicPage('contact.html'));
+    app.get('/features', publicPage('features.html'));
+    app.get('/docs', publicPage('documentation.html'));
+    app.get('/download', publicPage('download.html'));
+    app.get('/welcome', publicPage('index.html'));
+    app.get('/404', publicPage('404.html'));
+    console.log('[info] serving public website from ' + publicDir);
+  }
+
   const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser } = createGateway(server);
   require('./routes/auth').setTicketIssuer(issueTicket);
   require('./routes/messages').setBroadcaster(broadcast);
@@ -325,6 +374,19 @@ async function boot() {
     }
   })();
   await bootstrapAdmins;
+
+  // Public site 404 page for unknown non-API GETs (only when the public
+  // website is present). API paths keep their JSON error envelope below.
+  if (publicDir) {
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api/') || req.path.startsWith('/uploads') || req.path.startsWith('/ws')) {
+        return next();
+      }
+      res.status(404).set('Cache-Control', 'no-cache').sendFile('404.html', { root: publicDir }, (err) => {
+        if (err && !res.headersSent) next(err);
+      });
+    });
+  }
 
   // Consistent error envelope for anything that escapes routes.
   // eslint-disable-next-line no-unused-vars
