@@ -37,7 +37,7 @@ export function renderIdentity(region) {
   text.appendChild(el('div', { class: 'iden-sub' }, me.username + (me.statusText ? ' · ' + me.statusText : '')));
   box.appendChild(text);
   const actions = el('div', { class: 'iden-actions' });
-  actions.appendChild(el('button', { type: 'button', title: 'Settings', 'aria-label': 'Settings', onClick: () => { location.hash = '#/account'; } }, '⚙'));
+  actions.appendChild(el('button', { type: 'button', title: 'Settings', 'aria-label': 'Settings', onClick: () => { location.hash = '#/settings'; } }, '⚙'));
   box.appendChild(actions);
   region.appendChild(box);
 }
@@ -102,19 +102,18 @@ export function renderPlaceNavigation(region) {
     return;
   }
 
-  // Membership actions for the current server
+  // Current-community actions ("Full navigation" model). Only items the
+  // viewer is actually allowed to open are shown, gated on real permissions.
   const actions = el('div', { class: 'row-line', style: { padding: 'var(--t-d-2) var(--t-d-4)', gap: '6px', flexWrap: 'wrap' } });
-  actions.appendChild(el('button', {
-    class: 'btn ghost sm', type: 'button', onClick: () => { location.hash = '#/server/' + sid + '/invites'; },
-  }, 'Invite'));
-  if (can('MANAGE_CHANNELS')) {
-    actions.appendChild(el('button', {
-      class: 'btn ghost sm', type: 'button', onClick: () => { location.hash = '#/server/' + sid + '/channels/new'; },
-    }, '+ Channel'));
-    actions.appendChild(el('button', {
-      class: 'btn ghost sm', type: 'button', onClick: () => { location.hash = '#/server/' + sid + '/settings'; },
-    }, 'Settings'));
-  }
+  const placeLink = (label, href) => {
+    const active = route === href.replace('#', '');
+    const btn = el('button', { class: 'btn ghost sm' + (active ? ' active' : ''), type: 'button' }, label);
+    btn.addEventListener('click', () => { location.hash = href; });
+    return btn;
+  };
+  if (can('MANAGE_INVITES')) actions.appendChild(placeLink('Invite', '#/server/' + sid + '/invites'));
+  if (can('MANAGE_CHANNELS')) actions.appendChild(placeLink('+ Channel', '#/server/' + sid + '/channels/new'));
+  if (can('MANAGE_SERVER')) actions.appendChild(placeLink('Settings', '#/server/' + sid + '/settings'));
   region.appendChild(actions);
 
   // Channel list grouped by category
@@ -196,7 +195,7 @@ export function renderMobileTabs(region) {
     { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
     { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
     { id: 'discover', label: 'Browse', icon: '⌕', href: '#/discover' },
-    { id: 'account', label: 'You', icon: '☺', href: '#/account' },
+    { id: 'account', label: 'You', icon: '☺', href: '#/settings' },
   ];
   for (const t of tabs) {
     const active = route.startsWith(t.href.replace('#', ''));

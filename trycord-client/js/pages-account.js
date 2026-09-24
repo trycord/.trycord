@@ -11,11 +11,11 @@ import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalett
 function accountTabs(active) {
   const tabs = el('div', { class: 'settings-nav' });
   const items = [
-    { id: 'profile', label: 'Profile', href: '#/account' },
-    { id: 'password', label: 'Password', href: '#/account/password' },
-    { id: 'sessions', label: 'Sessions', href: '#/account/sessions' },
-    { id: 'appearance', label: 'Appearance', href: '#/account/appearance' },
-    { id: 'updates', label: 'Updates', href: '#/account/updates' },
+    { id: 'profile', label: 'Profile', href: '#/settings' },
+    { id: 'password', label: 'Password', href: '#/settings/password' },
+    { id: 'sessions', label: 'Sessions', href: '#/settings/sessions' },
+    { id: 'appearance', label: 'Appearance', href: '#/settings/appearance' },
+    { id: 'updates', label: 'Updates', href: '#/settings/updates' },
   ];
   for (const t of items) {
     const b = el('button', { class: 'btn ' + (active === t.id ? 'active' : 'ghost'), type: 'button' }, t.label);
@@ -54,7 +54,7 @@ function renderAppearance(wrap) {
       } else {
         customPanel.hidden = true;
       }
-      renderContextHeader({ title: 'Account', sub: 'Your identity across Trycord' });
+      renderContextHeader({ title: 'Settings', sub: 'Your account and preferences' });
     });
     grid.appendChild(b);
   }
@@ -245,14 +245,77 @@ function renderProfileEditor(wrap) {
   });
   profileCard.appendChild(form);
 
+  // ---- email + verification status ----
   const emailBox = el('div', { class: 'field' });
   emailBox.appendChild(el('label', {}, 'Email'));
-  if (me && me.email) {
-    emailBox.appendChild(el('div', { class: 'muted small' },
-      esc(me.email) + (me.emailVerified ? ' · verified' : ' · unverified')));
-  } else {
-    emailBox.appendChild(el('div', { class: 'muted small' }, 'No email on file.'));
+  const emailLine = el('div', { class: 'muted small' });
+  const emailNote = el('div', { class: 'muted small', style: { marginTop: 'var(--t-d-2)' } });
+  const emailActions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-2)' } });
+
+  const paintEmail = (cur) => {
+    cur = cur || State.me || {};
+    clear(emailLine);
+    if (cur.email) {
+      emailLine.appendChild(document.createTextNode(String(cur.email) + (cur.emailVerified ? ' · verified' : ' · unverified')));
+    } else {
+      emailLine.appendChild(document.createTextNode('No recovery email on file.'));
+    }
+  };
+  paintEmail(me);
+
+  const sendTo = async (address) => {
+    try {
+      await Api.verifyEmailResend({ email: address });
+      emailNote.textContent = 'Verification email sent to ' + address + ' — click the link inside to confirm. It is valid for 24 hours and single use.';
+      return true;
+    } catch (ex) {
+      emailNote.textContent = ex.message || 'Could not send the email.';
+      return false;
+    }
+  };
+
+  if (me && me.email && !me.emailVerified) {
+    const resend = el('button', { class: 'btn sm', type: 'button' }, 'Resend verification');
+    resend.addEventListener('click', () => sendTo(me.email));
+    emailActions.appendChild(resend);
   }
+
+  const changePanel = el('div', { style: { marginTop: 'var(--t-d-3)' }, hidden: true });
+  const newEmail = el('input', { class: 'input', type: 'email', placeholder: 'new@example.com', required: true });
+  const curPass = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', placeholder: 'Current password', required: true });
+  const sendBtn = el('button', { class: 'btn primary sm', type: 'submit' }, (me && me.email ? 'Change' : 'Add') + ' email');
+  const changeForm = el('form', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--t-d-3)' } },
+    el('div', { class: 'field' }, el('label', {}, 'New recovery email'), newEmail),
+    el('div', { class: 'field' }, el('label', {}, 'Current password'), curPass,
+      el('span', { class: 'hint' }, 'Required to prove this is your account.')),
+    el('div', {}, sendBtn));
+  changePanel.appendChild(changeForm);
+  changeForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    sendBtn.setAttribute('aria-busy', 'true');
+    try {
+      const target = newEmail.value.trim();
+      await Api.changeEmail({ currentPassword: curPass.value, newEmail: target });
+      changePanel.hidden = true;
+      newEmail.value = '';
+      curPass.value = '';
+      await sendTo(target);
+      toast('Email change requested.', 'ok');
+    } catch (ex) {
+      emailNote.textContent = ex.message || 'Could not request the change.';
+    } finally {
+      sendBtn.removeAttribute('aria-busy');
+    }
+  });
+
+  const changeBtn = el('button', { class: 'btn sm', type: 'button' }, (me && me.email) ? 'Change email' : 'Add email');
+  changeBtn.addEventListener('click', () => { changePanel.hidden = !changePanel.hidden; });
+  emailActions.appendChild(changeBtn);
+
+  emailBox.appendChild(emailLine);
+  emailBox.appendChild(emailActions);
+  emailBox.appendChild(emailNote);
+  emailBox.appendChild(changePanel);
   profileCard.appendChild(emailBox);
   wrap.appendChild(profileCard);
 }
@@ -332,7 +395,7 @@ function renderUpdates(wrap) {
 
 export async function renderAccount(container, { tab = 'profile' } = {}) {
   clear(container);
-  renderContextHeader({ title: 'Account', sub: 'Your identity across Trycord' });
+  renderContextHeader({ title: 'Settings', sub: 'Your account and preferences' });
   const wrap = el('div', { class: 'page atrium' });
   wrap.appendChild(accountTabs(tab));
 

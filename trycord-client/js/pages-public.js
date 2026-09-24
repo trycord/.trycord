@@ -2,7 +2,7 @@
 
 import Api from './api.js';
 import { esc, el, clear, toast, qs } from './ui.js';
-import { applyAuth } from './state.js';
+import State, { applyAuth, isAuthed } from './state.js';
 import { renderContextHeader } from './shell.js';
 
 let legal = { termsVersion: '1.0', privacyVersion: '1.0' };
@@ -172,10 +172,55 @@ function legalPage(container, kind) {
   container.appendChild(wrap);
 }
 
+// Consumes the single-use link mailed by the recovery service. Public route:
+// verification happens with or without a session and never reveals whether a
+// given address exists ahead of the attempt.
+function verifyEmailPage(container, token) {
+  clear(container);
+  renderContextHeader({ title: 'Verify email' });
+  const wrap = el('div', { class: 'auth-wrap' });
+  const card = el('div', { class: 'auth-box' });
+  card.appendChild(el('h1', {}, 'Confirm your email'));
+  card.appendChild(el('p', { class: 'auth-sub' }, 'Confirming your recovery address…'));
+  const msg = el('div', { class: 'muted small', 'aria-live': 'polite' });
+  const err = el('div', { class: 'form-error', hidden: true });
+  const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)' } });
+  card.appendChild(err);
+  card.appendChild(msg);
+  card.appendChild(actions);
+  wrap.appendChild(card);
+  container.appendChild(wrap);
+
+  (async () => {
+    try {
+      await Api.verifyEmail({ token });
+      let me = null;
+      if (isAuthed()) {
+        try { me = await Api.me(); State.me = me; } catch { /* keep local session state */ }
+      }
+      msg.textContent = me
+        ? 'Your email ' + esc(me.email) + ' is verified.'
+        : 'Your email is verified and saved to your account.';
+      actions.appendChild(el('button', {
+        class: 'btn primary', type: 'button',
+        onClick: () => { location.hash = me ? '#/settings' : '#/login'; },
+      }, me ? 'Open your account' : 'Sign in'));
+    } catch (ex) {
+      err.hidden = false;
+      err.textContent = ex.message || 'This verification link is no longer valid. Request a new one from your settings.';
+      actions.appendChild(el('button', {
+        class: 'btn primary', type: 'button',
+        onClick: () => { location.hash = isAuthed() ? '#/settings' : '#/login'; },
+      }, isAuthed() ? 'Open your account' : 'Sign in'));
+    }
+  })();
+}
+
 const PagesPublic = {
   login: loginForm,
   register: registerForm,
   forgot: forgotForm,
+  verify: verifyEmailPage,
   legal: legalPage,
   currentLegal: () => legal,
 };

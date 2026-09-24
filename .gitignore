@@ -11,6 +11,7 @@ uploads/
 
 # build outputs (never commit binaries)
 release/
+release-fresh/
 dist/
 trycord-desktop/client/
 *.zip
