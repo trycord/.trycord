@@ -8,6 +8,7 @@ import { renderBrowse } from './pages-browse.js';
 import HelloDms from './pages-dms.js';
 import Workspace from './pages-workspace.js';
 import { renderAccount } from './pages-account.js';
+import { renderAdmin } from './pages-admin.js';
 import { presentationMode, closeMobileDrawer } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader, renderMobileHeader } from './shell.js';
 import Api from './api.js';
@@ -131,6 +132,18 @@ async function renderRoute() {
   if (path.startsWith('/account/password')) { await renderAccount(region, { tab: 'password' }); renderAllChrome(); return; }
   if (path.startsWith('/account/sessions')) { await renderAccount(region, { tab: 'sessions' }); renderAllChrome(); return; }
   if (path.startsWith('/account')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
+
+  // --- platform admin ------------------------------------------------------
+  if (path.startsWith('/admin/')) {
+    await renderAdmin(region, { section: parts[1] });
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/admin')) {
+    await renderAdmin(region, { section: 'overview' });
+    renderAllChrome();
+    return;
+  }
 
   // --- joins ------------------------------------------------------------
   if (path.startsWith('/invite/')) {

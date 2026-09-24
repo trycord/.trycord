@@ -57,6 +57,12 @@ export function renderGlobalNavigation(region) {
     });
     region.appendChild(row);
   }
+  if (State.me && State.me.isAdmin) {
+    region.appendChild(navRow({
+      label: 'Admin', icon: '🛡', href: '#/admin', active: route.startsWith('/admin'),
+      onClick: () => { location.hash = '#/admin'; },
+    }));
+  }
 }
 
 export function renderCommunities(region) {

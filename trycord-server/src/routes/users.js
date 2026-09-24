@@ -5,6 +5,7 @@ const db = require('../db');
 const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
+const enforcement = require('../services/enforcement');
 
 let gateway = { getPresence: null };
 function setGateway(gw) {
@@ -32,9 +33,13 @@ router.get('/me', async (req, res, next) => {
     const row = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
     if (!row) return fail(res, 'NOT_FOUND', 'user not found');
     // Email recovery state is private to the owner — never on publicUser.
+    // isAdmin mirrors the adminGuard table (presentation only; every admin
+    // route re-checks server-side, so a forged client value cannot escalate).
+    const isAdmin = await enforcement.isPlatformAdmin(req.user.id);
     res.json(Object.assign(publicUser(row), {
       email: row.email || null,
       emailVerified: !!row.email_verified_at,
+      isAdmin,
     }));
   } catch (e) { next(e); }
 });
