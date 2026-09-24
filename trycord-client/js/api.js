@@ -246,6 +246,54 @@ joinDiscover: (id) =>
   notifications: ({ limit = 30 } = {}) => request('GET', '/api/notifications?limit=' + limit),
   readAllNotifications: () => request('POST', '/api/notifications/read-all'),
   readNotification: (id) => request('POST', '/api/notifications/' + encodeURIComponent(id) + '/read'),
+
+  // ---- platform admin ---------------------------------------------------------------
+  adminOverview: () => request('GET', '/api/admin/overview'),
+  adminUsers: ({ q = '', limit = 25 } = {}) =>
+    request('GET', '/api/admin/users?q=' + encodeURIComponent(q) + '&limit=' + limit),
+  adminUserActions: (userId) =>
+    request('GET', '/api/admin/users/' + encodeURIComponent(userId) + '/actions'),
+  adminEnforceUser: (userId, actionType, reason, { hours, reportId, confirm } = {}) =>
+    request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/enforce',
+      { body: { actionType, reason, expiresInHours: hours, reportId, confirm } }),
+  adminLiftUser: (userId, reason) =>
+    request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/lift', { body: { reason } }),
+  adminServers: ({ q = '', limit = 25 } = {}) =>
+    request('GET', '/api/admin/servers?q=' + encodeURIComponent(q) + '&limit=' + limit),
+  adminServerActions: (serverId) =>
+    request('GET', '/api/admin/servers/' + encodeURIComponent(serverId) + '/actions'),
+  adminEnforceServer: (serverId, actionType, reason, { reportId, confirm } = {}) =>
+    request('POST', '/api/admin/servers/' + encodeURIComponent(serverId) + '/enforce',
+      { body: { actionType, reason, reportId, confirm } }),
+  adminLiftServer: (serverId, reason) =>
+    request('POST', '/api/admin/servers/' + encodeURIComponent(serverId) + '/lift', { body: { reason } }),
+  adminReports: ({ status, limit = 50 } = {}) => {
+    const q = new URLSearchParams();
+    if (status) q.set('status', status);
+    q.set('limit', String(limit));
+    const qs = q.toString();
+    return request('GET', '/api/admin/reports' + (qs ? '?' + qs : ''));
+  },
+  adminReport: (id) => request('GET', '/api/admin/reports/' + encodeURIComponent(id)),
+  adminUpdateReport: (id, body) =>
+    request('PATCH', '/api/admin/reports/' + encodeURIComponent(id), { body }),
+  adminAppeals: ({ status, limit = 50 } = {}) => {
+    const q = new URLSearchParams();
+    if (status) q.set('status', status);
+    q.set('limit', String(limit));
+    const qs = q.toString();
+    return request('GET', '/api/admin/appeals' + (qs ? '?' + qs : ''));
+  },
+  adminAppeal: (id) => request('GET', '/api/admin/appeals/' + encodeURIComponent(id)),
+  adminDecideAppeal: (id, decision, reason) =>
+    request('PATCH', '/api/admin/appeals/' + encodeURIComponent(id), { body: { decision, reason } }),
+  adminAudit: ({ actorId, action, limit = 50 } = {}) => {
+    const q = new URLSearchParams();
+    if (actorId) q.set('actorId', actorId);
+    if (action) q.set('action', action);
+    q.set('limit', String(limit));
+    return request('GET', '/api/admin/audit?' + q.toString());
+  },
 };
 
 export default Api;
