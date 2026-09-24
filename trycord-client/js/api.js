@@ -109,6 +109,17 @@ const Api = {
   user: (id) => request('GET', '/api/users/' + encodeURIComponent(id)),
   legacyMe: () => request('GET', '/api/me'),
 
+  // ---- profile media -----------------------------------------------------
+  uploadProfileImage: (kind, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request('POST', kind === 'banner' ? '/api/users/me/banner' : '/api/users/me/avatar',
+      { body: fd, form: true });
+  },
+  removeProfileImage: (kind) =>
+    request('DELETE', kind === 'banner' ? '/api/users/me/banner' : '/api/users/me/avatar'),
+  fetchProfileImage: (path) => request('GET', path, { raw: true }),
+
   // ---- servers -----------------------------------------------------------
   servers: () => request('GET', '/api/servers'),
   createServer: (body) => request('POST', '/api/servers', { body }),
@@ -118,6 +129,8 @@ const Api = {
   serverMembers: (id) => request('GET', '/api/servers/' + encodeURIComponent(id) + '/members'),
   leaveServer: (id) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/leave'),
   kickMember: (id, userId) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/kick', { body: { userId } }),
+  setNickname: (serverId, userId, nickname) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/members/' + encodeURIComponent(userId) + '/nickname', { body: { nickname } }),
   serverByCode: (code) => request('GET', '/api/servers/by-code/' + encodeURIComponent(code)),
   joinServerByCode: (code) => request('POST', '/api/servers/join/' + encodeURIComponent(code)),
 

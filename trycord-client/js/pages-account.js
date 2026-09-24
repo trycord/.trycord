@@ -4,8 +4,8 @@
 import Api from './api.js';
 import State, { clearSession, refreshServers } from './state.js';
 import { esc, el, clear, toast, confirmDialog } from './ui.js';
-import { avatar } from './components.js';
-import { renderContextHeader } from './shell.js';
+import { avatar, loadAuthedImage } from './components.js';
+import { renderContextHeader, renderAllChrome } from './shell.js';
 import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette } from './theme.js';
 
 function accountTabs(active) {
@@ -92,6 +92,170 @@ function renderAppearance(wrap) {
 }
 
 let updatesUnsub = null;
+
+function renderProfileEditor(wrap) {
+  const me = State.me;
+  const err = el('div', { class: 'form-error', hidden: true });
+  const okBox = el('div', { class: 'form-success', hidden: true });
+
+  const display = el('input', {
+    class: 'input', type: 'text', value: me ? (me.displayName || '') : '', maxlength: 32,
+  });
+  const bio = el('textarea', {
+    class: 'input', maxlength: 200, rows: 3, placeholder: 'Tell people about yourself',
+  }, (me && me.bio) || '');
+  const statusText = el('input', {
+    class: 'input', type: 'text', maxlength: 64, placeholder: 'e.g. building something cool',
+    value: (me && me.statusText) || '',
+  });
+
+  const profileCard = el('div', { class: 'auth-box' });
+
+  // ---- live preview card (banner + avatar + name + bio + status) -------
+  const bannerBox = el('div', { class: 'prof-banner' });
+  const avatarHolder = el('div', { class: 'prof-avatar' }, avatar(me, { size: 'lg', withPresence: false }));
+  const previewName = el('strong', {}, me ? (me.displayName || me.username) : '');
+  const previewSub = el('div', { class: 'muted small' }, me ? '@' + me.username : '');
+  const previewStatus = el('div', { class: 'prof-status small' }, (me && me.statusText) || '');
+  const previewBio = el('div', { class: 'prof-bio' }, (me && me.bio) || '');
+  const paint = () => {
+    const cur = State.me;
+    previewName.textContent = display.value || (cur && cur.username) || '';
+    previewBio.textContent = bio.value.trim();
+    previewStatus.textContent = statusText.value.trim();
+    previewStatus.hidden = !statusText.value.trim();
+  };
+  [display, bio, statusText].forEach((n) => n.addEventListener('input', paint));
+
+  const paintMedia = () => {
+    const cur = State.me;
+    bannerBox.classList.toggle('has-banner', !!(cur && cur.bannerUrl));
+    bannerBox.style.backgroundImage = '';
+    if (cur && cur.bannerUrl) {
+      loadAuthedImage(cur.bannerUrl).then((url) => {
+        if (url) {
+          bannerBox.style.backgroundImage = 'url("' + url + '")';
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        }
+      });
+    }
+    if (cur && cur.avatarUrl) {
+      loadAuthedImage(cur.avatarUrl).then((url) => {
+        if (!url) return;
+        clear(avatarHolder);
+        const a = el('span', { class: 'avatar lg has-img', style: { background: 'var(--t-sur2, #333)' } });
+        a.appendChild(el('img', { class: 'avatar-img', src: url, alt: '' }));
+        avatarHolder.appendChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      });
+    } else {
+      clear(avatarHolder);
+      avatarHolder.appendChild(avatar(State.me, { size: 'lg', withPresence: false }));
+    }
+  };
+  paintMedia();
+
+  const preview = el('div', { class: 'prof-preview' }, bannerBox, avatarHolder,
+    el('div', { class: 'prof-preview-body' }, previewName, previewSub, previewStatus, previewBio));
+  profileCard.appendChild(preview);
+  profileCard.appendChild(el('div', { class: 'hr' }));
+
+  // ---- media pickers ----
+  const avatarInput = el('input', { type: 'file', accept: 'image/*', hidden: true });
+  const bannerInput = el('input', { type: 'file', accept: 'image/*', hidden: true });
+  const avatarBtn = el('button', { class: 'btn', type: 'button' }, 'Change avatar');
+  const avatarRm = el('button', { class: 'btn ghost', type: 'button', hidden: me ? !me.avatarUrl : true }, 'Remove avatar');
+  const bannerBtn = el('button', { class: 'btn', type: 'button' }, 'Change banner');
+  const bannerRm = el('button', { class: 'btn ghost', type: 'button', hidden: me ? !me.bannerUrl : true }, 'Remove banner');
+  const mediaStatus = el('div', { class: 'muted small', 'aria-live': 'polite' });
+
+  async function upload(kind, file) {
+    if (!file) return;
+    if (!/^image\//.test(file.type || '')) { toast('Only images can be used.', 'error'); return; }
+    mediaStatus.textContent = 'Uploading ' + kind + '…';
+    try {
+      const updated = await Api.uploadProfileImage(kind, file);
+      State.me = { ...State.me, ...updated };
+      okBox.hidden = false;
+      if (kind === 'avatar') avatarRm.hidden = !updated.avatarUrl;
+      else bannerRm.hidden = !updated.bannerUrl;
+      toast(kind === 'avatar' ? 'Avatar updated.' : 'Banner updated.', 'ok');
+      paintMedia();
+      mediaStatus.textContent = '';
+    } catch (ex) {
+      mediaStatus.textContent = '';
+      toast(ex.message || 'Upload failed', 'error');
+    }
+  }
+  avatarBtn.addEventListener('click', () => avatarInput.click());
+  bannerBtn.addEventListener('click', () => bannerInput.click());
+  avatarInput.addEventListener('change', () => upload('avatar', avatarInput.files[0]));
+  bannerInput.addEventListener('change', () => upload('banner', bannerInput.files[0]));
+  avatarRm.addEventListener('click', async () => {
+    try {
+      const updated = await Api.removeProfileImage('avatar');
+      State.me = { ...State.me, ...updated };
+      avatarRm.hidden = true;
+      paintMedia();
+      toast('Avatar removed.', 'ok');
+    } catch (ex) { toast(ex.message || 'Failed', 'error'); }
+  });
+  bannerRm.addEventListener('click', async () => {
+    try {
+      const updated = await Api.removeProfileImage('banner');
+      State.me = { ...State.me, ...updated };
+      bannerRm.hidden = true;
+      paintMedia();
+      toast('Banner removed.', 'ok');
+    } catch (ex) { toast(ex.message || 'Failed', 'error'); }
+  });
+
+  profileCard.appendChild(el('div', { class: 'section-label' }, 'Picture'));
+  profileCard.appendChild(el('div', { class: 'row-line' }, avatarBtn, avatarRm, bannerBtn, bannerRm));
+  profileCard.appendChild(avatarInput);
+  profileCard.appendChild(bannerInput);
+  profileCard.appendChild(mediaStatus);
+  profileCard.appendChild(el('div', { class: 'hr' }));
+
+  const saveBtn = el('button', { class: 'btn primary', type: 'submit' }, 'Save profile');
+  const form = el('form', {}, err, okBox,
+    el('div', { class: 'field' }, el('label', {}, 'Display name'), display,
+      el('span', { class: 'hint' }, 'Shown across communities and DMs.')),
+    el('div', { class: 'field' }, el('label', {}, 'Status'), statusText,
+      el('span', { class: 'hint' }, 'A short line shown on your identity and profile.')),
+    el('div', { class: 'field' }, el('label', {}, 'About you'), bio,
+      el('span', { class: 'hint' }, bio.value.length + '/200 characters')),
+    el('div', {}, saveBtn));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.hidden = true;
+    okBox.hidden = true;
+    try {
+      const updated = await Api.updateMe({
+        displayName: display.value.trim() || (me && me.username),
+        bio: bio.value.trim(),
+        statusText: statusText.value.trim(),
+      });
+      State.me = { ...State.me, ...updated };
+      okBox.hidden = false;
+      paint();
+      toast('Profile saved.', 'ok');
+      renderAllChrome();
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
+  });
+  profileCard.appendChild(form);
+
+  const emailBox = el('div', { class: 'field' });
+  emailBox.appendChild(el('label', {}, 'Email'));
+  if (me && me.email) {
+    emailBox.appendChild(el('div', { class: 'muted small' },
+      esc(me.email) + (me.emailVerified ? ' · verified' : ' · unverified')));
+  } else {
+    emailBox.appendChild(el('div', { class: 'muted small' }, 'No email on file.'));
+  }
+  profileCard.appendChild(emailBox);
+  wrap.appendChild(profileCard);
+}
 
 function renderUpdates(wrap) {
   const desk = (typeof window.trycordDesktop !== 'undefined') ? window.trycordDesktop : null;
@@ -233,50 +397,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     wrap.appendChild(el('p', { class: 'muted small' }, 'Token-based sessions expire after 7 days or when revoked.'));
   } else {
     // profile
-    const err = el('div', { class: 'form-error', hidden: true });
-    const ok = el('div', { class: 'form-success', hidden: true });
-    const display = el('input', {
-      class: 'input', type: 'text', value: me ? (me.displayName || '') : '', maxlength: 32,
-    });
-    const saveBtn = el('button', { class: 'btn primary', type: 'submit' }, 'Save profile');
-
-    const profileCard = el('div', { class: 'auth-box' });
-    const top = el('div', { class: 'row-line' });
-    if (me) top.appendChild(avatar(me, { size: 'lg', withPresence: false }));
-    top.appendChild(el('div', {},
-      el('strong', {}, me ? (me.displayName || me.username) : ''),
-      el('div', { class: 'muted small' }, me ? '@' + me.username : '')));
-    profileCard.appendChild(top);
-    profileCard.appendChild(el('div', { class: 'hr' }));
-
-    const form = el('form', {}, err, ok,
-      el('div', { class: 'field' }, el('label', {}, 'Display name'), display,
-        el('span', { class: 'hint' }, 'Shown across communities and DMs.')),
-      el('div', {}, saveBtn));
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      err.hidden = true;
-      ok.hidden = true;
-      try {
-        const updated = await Api.updateMe({ displayName: display.value.trim() || me.username });
-        State.me = { ...me, ...updated };
-        ok.hidden = false;
-        toast('Profile saved.', 'ok');
-      } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
-    });
-    profileCard.appendChild(form);
-
-    const emailBox = el('div', { class: 'field' });
-    emailBox.appendChild(el('label', {}, 'Email'));
-    if (me && me.email) {
-      emailBox.appendChild(el('div', { class: 'muted small' },
-        esc(me.email) + (me.emailVerified ? ' · verified' : ' · unverified')));
-    } else {
-      emailBox.appendChild(el('div', { class: 'muted small' }, 'No email on file.'));
-    }
-    profileCard.appendChild(emailBox);
-
-    wrap.appendChild(profileCard);
+    renderProfileEditor(wrap);
 
     const logoutBtn = el('button', { class: 'btn danger', type: 'button' }, 'Sign out');
     logoutBtn.addEventListener('click', async () => {
