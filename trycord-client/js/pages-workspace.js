@@ -387,6 +387,11 @@ async function renderChannel(container, serverId, channelId) {
 async function renderNewChannel(container, serverId) {
   clear(container);
   try { await ensureServer(serverId); } catch { /* toast below */ }
+  if (!can('MANAGE_CHANNELS')) {
+    renderContextHeader({ title: 'New channel' });
+    container.appendChild(el('div', { class: 'form-error' }, 'You need permission to manage channels in this community.'));
+    return;
+  }
   renderContextHeader({ title: 'New channel' });
   const wrap = el('div', { class: 'auth-wrap' });
   const card = el('div', { class: 'auth-box' });
@@ -430,6 +435,11 @@ async function renderInvites(container, serverId) {
   let server;
   try { ({ detail: server } = await ensureServer(serverId)); }
   catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message)); return; }
+  if (!can('MANAGE_INVITES')) {
+    renderContextHeader({ title: 'Invites', sub: server.name });
+    container.appendChild(el('div', { class: 'form-error' }, 'You need permission to manage invites in this community.'));
+    return;
+  }
   renderContextHeader({ title: 'Invites', sub: server.name });
   const wrap = el('div', { class: 'page atrium' });
 
@@ -497,6 +507,11 @@ async function renderServerSettings(container, serverId) {
   let server;
   try { ({ detail: server } = await ensureServer(serverId)); }
   catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message)); return; }
+  if (!can('MANAGE_SERVER')) {
+    renderContextHeader({ title: 'Settings', sub: server.name });
+    container.appendChild(el('div', { class: 'form-error' }, 'You need permission to manage this community\'s settings.'));
+    return;
+  }
   renderContextHeader({ title: 'Settings', sub: server.name });
   const wrap = el('div', { class: 'auth-wrap' });
   const card = el('div', { class: 'auth-box' });

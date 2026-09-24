@@ -100,7 +100,7 @@ router.post('/change-password', auth, rateLimit({ windowMs: 60000, max: 20 }), a
     const row = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
     if (!row) return fail(res, 'NOT_FOUND', 'user not found');
     const ok = await bcrypt.compare(String(currentPassword), row.password_hash);
-    if (!ok) return fail(res, 'AUTH_REQUIRED', 'current password is incorrect');
+    if (!ok) return fail(res, 'BAD_PASSWORD', 'current password is incorrect');
     const reuse = await bcrypt.compare(String(newPassword), row.password_hash);
     if (reuse) return fail(res, 'VALIDATION_ERROR', 'new password must be different from the current one');
     const hash = await bcrypt.hash(String(newPassword), 10);

@@ -131,6 +131,8 @@ async function verifyEmail(token) {
     throw { code: 'AUTH_REQUIRED', message: 'This verification link is no longer valid. Request a new one.' };
   }
   const ts = now();
+  const taken = await db.get('SELECT id FROM users WHERE email = ? AND id != ?', [row.email, row.user_id]);
+  if (taken) throw { code: 'CONFLICT', message: 'that email is already in use by another account' };
   await db.transaction(async (t) => {
     await t.run('UPDATE users SET email = ?, email_verified_at = ? WHERE id = ?', [row.email, ts, row.user_id]);
     await t.run('UPDATE email_verifications SET used_at = ? WHERE id = ?', [ts, row.id]);
@@ -149,7 +151,7 @@ async function requestEmailChange(userId, currentPassword, newEmail) {
   const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
   if (!user) throw { code: 'NOT_FOUND', message: 'user not found' };
   const ok = await bcrypt.compare(String(currentPassword), user.password_hash);
-  if (!ok) throw { code: 'AUTH_REQUIRED', message: 'current password is incorrect' };
+  if (!ok) throw { code: 'BAD_PASSWORD', message: 'current password is incorrect' };
   if (user.email === normalized) throw { code: 'VALIDATION_ERROR', message: 'that is already your recovery email' };
   return requestVerification(userId, normalized);
 }

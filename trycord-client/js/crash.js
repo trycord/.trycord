@@ -30,7 +30,11 @@
     document.body.appendChild(e);
   }
   window.addEventListener('error', function (ev) {
-    if (ev && ev.message) paintError('A script error occurred: ' + String(ev.message).slice(0, 160));
+    var where = '';
+    if (ev && ev.filename) {
+      try { where = ' in ' + decodeURIComponent(ev.filename).split('/').pop(); } catch (e) { where = ' in ' + ev.filename; }
+    }
+    if (ev && ev.message) paintError('A script error occurred' + where + ': ' + String(ev.message).slice(0, 160));
   });
   window.addEventListener('unhandledrejection', function (ev) {
     if (ev && ev.reason && ev.reason.name === 'TypeError' && /(?:loading.*chunk|module\s+script|imported)\s+/i.test(String(ev.reason.message))) {

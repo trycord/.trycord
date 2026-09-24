@@ -88,6 +88,12 @@ async function renderRoute() {
     renderAllChrome();
     return;
   }
+  // Public email-verification link (single-use, token in the URL).
+  if (path.startsWith('/verify-email/')) {
+    PagesPublic.verify(region, parts[1]);
+    renderAllChrome();
+    return;
+  }
 
   // --- discover is public to browse, guarded to join -------------
   if (path.startsWith('/discover')) {
@@ -127,7 +133,12 @@ async function renderRoute() {
     return;
   }
 
-  // --- account --------------------------------------------------------
+  // --- settings (account hub; /account* kept as working aliases) ----------
+  if (path.startsWith('/settings/updates')) { await renderAccount(region, { tab: 'updates' }); renderAllChrome(); return; }
+  if (path.startsWith('/settings/appearance')) { await renderAccount(region, { tab: 'appearance' }); renderAllChrome(); return; }
+  if (path.startsWith('/settings/password')) { await renderAccount(region, { tab: 'password' }); renderAllChrome(); return; }
+  if (path.startsWith('/settings/sessions')) { await renderAccount(region, { tab: 'sessions' }); renderAllChrome(); return; }
+  if (path.startsWith('/settings')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
   if (path.startsWith('/account/updates')) { await renderAccount(region, { tab: 'updates' }); renderAllChrome(); return; }
   if (path.startsWith('/account/appearance')) { await renderAccount(region, { tab: 'appearance' }); renderAllChrome(); return; }
   if (path.startsWith('/account/password')) { await renderAccount(region, { tab: 'password' }); renderAllChrome(); return; }
