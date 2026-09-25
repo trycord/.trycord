@@ -1,5 +1,4 @@
 
-> **AI / CODING AGENT:** Read `ARCHITECTURE.md` and `DESIGN_SYSTEM.md` before modifying Trycord. `ARCHITECTURE.md` is the preservation and routing contract.
 # Trycord
 
 **A self-hostable community chat platform.**
@@ -488,5 +487,4 @@ Trycord is licensed under the **MIT License**.
 See [`LICENSE`](LICENSE) for the full license text.
 
 
-## UI architecture handoff
-Read `ARCHITECTURE_TEMPLATE.md` and `DESIGN_SYSTEM.md` before changing the client. Preserve the existing feature surface while evolving the Ember chat UI.
+
