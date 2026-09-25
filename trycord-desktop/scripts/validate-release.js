@@ -5,7 +5,7 @@
 //
 // Windows (win32):
 //   - Windows NSIS installer exists:  release/Trycord.exe
-//   - public test build exists:        release/Trycord-PTB.exe
+//   - public test build exists:        release/TrycordPTB.exe
 //   - update metadata exists:          release/latest.yml
 //   - blockmap exists:                 release/Trycord.exe.blockmap
 //   - latest.yml version matches package.json
@@ -38,7 +38,7 @@ if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(String(pkgVersion))) {
 
 const installerName = 'Trycord.exe';
 const installerPath = path.join(releaseDir, installerName);
-const ptbName = 'Trycord-PTB.exe';
+  const ptbName = 'TrycordPTB.exe';
 const ptbPath = path.join(releaseDir, ptbName);
 const metaName = process.platform === 'linux' ? 'latest-linux.yml' : 'latest.yml';
 
@@ -109,4 +109,4 @@ if (metaPath_ !== expectedPath) {
   fail(`latest.yml path (${metaPath_}) does not reference the installer (${expectedPath})`);
 }
 
-console.log(`release validation passed: Trycord.exe + Trycord-PTB.exe + latest.yml + blockmap, versions agree`);
+console.log(`release validation passed: Trycord.exe + TrycordPTB.exe + latest.yml + blockmap, versions agree`);
