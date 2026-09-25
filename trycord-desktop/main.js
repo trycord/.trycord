@@ -57,12 +57,14 @@ let mainWin = null;
 let updaterApi = null;
 
 function createWindow() {
+  const iconPath = path.join(__dirname, 'build', 'icon.ico');
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     title: 'Trycord',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     autoHideMenuBar: true,
     backgroundColor: '#0d0b0a',
     webPreferences: {

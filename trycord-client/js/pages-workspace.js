@@ -34,14 +34,14 @@ async function renderServerLanding(container, serverId) {
     container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this server'));
     return;
   }
-  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' Â· ' + (server.member_count || 0) + ' members' });
+  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
   const wrap = el('div', { class: 'page atrium' });
   wrap.appendChild(el('h2', {}, 'Channels'));
   const layout = State.channels;
   const categories = layout.categories || [];
   const channels = layout.channels || [];
   if (!channels.length) {
-    wrap.appendChild(emptyState('â—Œ', 'No channels yet', 'Create a channel to get started.'));
+    wrap.appendChild(emptyState('◌', 'No channels yet', 'Create a channel to get started.'));
   } else {
     for (const cat of categories) {
       const inCat = channels.filter((ch) => String(ch.category_id) === String(cat.id));
@@ -96,7 +96,7 @@ function renderMemberList(wrap, serverId) {
     nameEl.addEventListener('click', () => { location.hash = '#/users/' + rid; });
     mm.appendChild(nameEl);
     const sub = m.nickname
-      ? '@' + (m.username || '') + (m.display_name && m.display_name !== m.username ? ' Â· ' + m.display_name : '')
+      ? '@' + (m.username || '') + (m.display_name && m.display_name !== m.username ? ' · ' + m.display_name : '')
       : '@' + (m.username || '');
     mm.appendChild(el('div', { class: 'row-sub' }, sub));
     row.appendChild(mm);
@@ -197,7 +197,7 @@ async function renderChannel(container, serverId, channelId) {
       return;
     }
     if (!msgs.length) {
-      feed.appendChild(emptyState('â—Œ', 'No messages yet', 'Start the conversation.'));
+      feed.appendChild(emptyState('◌', 'No messages yet', 'Start the conversation.'));
     }
     for (const m of msgs) feed.appendChild(buildMsg(m));
     groupFeed(feed);
@@ -283,7 +283,7 @@ async function renderChannel(container, serverId, channelId) {
 
   // ---- composer ----
   const composer = el('div', { class: 'composer' });
-  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, 'ðŸ“Ž');
+  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, '📎');
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
@@ -382,6 +382,182 @@ async function renderChannel(container, serverId, channelId) {
   renderAllChrome();
 }
 
+// ---- community management surfaces ----------------------------------------
+
+async function renderServerMembers(container, serverId) {
+  clear(container);
+  let server;
+  try { ({ detail: server } = await ensureServer(serverId)); }
+  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
+  renderContextHeader({ title: 'Members', sub: server.name });
+  const wrap = el('div', { class: 'page atrium community-manager' });
+  const head = el('div', { class: 'community-manager__head' },
+    el('div', {}, el('h1', {}, 'Members'), el('p', { class: 'muted' }, 'Manage the people who belong to this community.')),
+    el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/server/' + serverId; } }, 'Back to chat'));
+  wrap.appendChild(head);
+  const search = el('input', { class: 'input', type: 'search', placeholder: 'Search members…' });
+  wrap.appendChild(el('div', { class: 'community-manager__toolbar' }, search));
+  const list = el('div', { class: 'community-list' });
+  wrap.appendChild(list);
+  const paint = () => {
+    clear(list);
+    const q = search.value.trim().toLowerCase();
+    const members = (State.members || []).filter(m => !q || String(m.username || '').toLowerCase().includes(q) || String(m.display_name || '').toLowerCase().includes(q) || String(m.nickname || '').toLowerCase().includes(q));
+    if (!members.length) { list.appendChild(emptyState('⌕', 'No members found', q ? 'Try a different search.' : 'This community has no visible members.')); return; }
+    for (const m of members) {
+      const id = m.user_id || m.id;
+      const row = el('article', { class: 'community-member-card' });
+      row.appendChild(avatar({ id, username: m.username, displayName: m.nickname || m.display_name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }));
+      const info = el('div', { class: 'community-member-card__info' });
+      info.appendChild(el('strong', {}, m.nickname || m.display_name || m.username || 'Unknown'));
+      info.appendChild(el('span', { class: 'muted small' }, '@' + (m.username || 'unknown')));
+      const roles = Array.isArray(m.roles) ? m.roles : [];
+      const roleBox = el('div', { class: 'role-pills' });
+      if (m.is_owner) roleBox.appendChild(el('span', { class: 'role-pill owner' }, 'Owner'));
+      for (const r of roles.slice(0, 5)) roleBox.appendChild(el('span', { class: 'role-pill' }, r.name || 'Role'));
+      if (!m.is_owner && !roles.length) roleBox.appendChild(el('span', { class: 'role-pill muted-role' }, 'Member'));
+      info.appendChild(roleBox);
+      row.appendChild(info);
+      const actions = el('div', { class: 'community-member-card__actions' });
+      actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => { location.hash = '#/users/' + id; } }, 'Profile'));
+      if (String(id) === String(State.me && State.me.id) || can('KICK_MEMBERS')) {
+        actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => openNicknameModal(serverId, m, wrap) }, 'Nickname'));
+      }
+      if (can('MANAGE_ROLES') && !m.is_owner) {
+        const roleSelect = el('select', { class: 'input sm', title: 'Assign role' });
+        roleSelect.appendChild(el('option', { value: '' }, 'Role…'));
+        for (const role of State.roles || []) {
+          if (role.is_default) continue;
+          const opt = el('option', { value: role.id }, role.name || 'Role');
+          roleSelect.appendChild(opt);
+        }
+        roleSelect.addEventListener('change', async () => {
+          if (!roleSelect.value) return;
+          try { await Api.assignRole(serverId, roleSelect.value, id); await enterServer(serverId); paint(); toast('Role assigned.', 'ok'); }
+          catch (ex) { toast(ex.message || 'Could not assign role.', 'error'); }
+          finally { roleSelect.value = ''; }
+        });
+        actions.appendChild(roleSelect);
+      }
+      if (!m.is_owner && can('KICK_MEMBERS')) {
+        actions.appendChild(el('button', { class: 'btn danger sm', type: 'button', onClick: async () => {
+          try { await Api.kickMember(serverId, id); await enterServer(serverId); paint(); toast('Member removed.', 'ok'); }
+          catch (ex) { toast(ex.message || 'Could not remove member.', 'error'); }
+        } }, 'Remove'));
+      }
+      row.appendChild(actions);
+      list.appendChild(row);
+    }
+  };
+  search.addEventListener('input', paint);
+  paint();
+  container.appendChild(wrap);
+}
+
+async function renderServerRoles(container, serverId) {
+  clear(container);
+  let server;
+  try { ({ detail: server } = await ensureServer(serverId)); }
+  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
+  renderContextHeader({ title: 'Roles', sub: server.name });
+  const wrap = el('div', { class: 'page atrium community-manager' });
+  wrap.appendChild(el('div', { class: 'community-manager__head' },
+    el('div', {}, el('h1', {}, 'Roles'), el('p', { class: 'muted' }, 'Define visible roles and the permissions they grant.')),
+    el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/server/' + serverId; } }, 'Back to chat')));
+  if (!can('MANAGE_ROLES')) {
+    wrap.appendChild(el('div', { class: 'form-error' }, 'You need Manage Roles permission to edit roles.'));
+    const list = el('div', { class: 'community-list' });
+    for (const r of State.roles || []) list.appendChild(el('div', { class: 'community-role-card' }, el('strong', {}, r.name || 'Role'), el('span', { class: 'muted small' }, String((r.permissions || []).length) + ' permissions')));
+    wrap.appendChild(list); container.appendChild(wrap); return;
+  }
+  const permsInfo = await Api.serverPermissions(serverId).catch(() => ({ all: [] }));
+  const allPerms = Array.isArray(permsInfo.all) ? permsInfo.all : [];
+  const list = el('div', { class: 'community-list' });
+  const formWrap = el('div', { class: 'community-role-editor' });
+  const name = el('input', { class: 'input', type: 'text', maxlength: 32, placeholder: 'Role name' });
+  const permGrid = el('div', { class: 'permission-grid' });
+  const checks = new Map();
+  for (const perm of allPerms) {
+    const input = el('input', { type: 'checkbox' });
+    checks.set(perm, input);
+    permGrid.appendChild(el('label', { class: 'permission-item' }, input, el('span', {}, perm)));
+  }
+  const create = el('button', { class: 'btn primary', type: 'button' }, 'Create role');
+  formWrap.append(el('div', { class: 'field' }, el('label', {}, 'Role name'), name), el('div', { class: 'section-label' }, 'Permissions'), permGrid, create);
+  wrap.appendChild(formWrap); wrap.appendChild(el('div', { class: 'section-label' }, 'Existing roles')); wrap.appendChild(list);
+  const paint = () => {
+    clear(list);
+    for (const role of [...(State.roles || [])].sort((a,b) => (Number(b.position)||0)-(Number(a.position)||0))) {
+      const row = el('article', { class: 'community-role-card' });
+      const title = el('div', { class: 'community-role-card__main' });
+      title.appendChild(el('span', { class: 'role-pill' }, role.name || 'Role'));
+      title.appendChild(el('span', { class: 'muted small' }, String((role.permissions || []).length) + ' permissions'));
+      row.appendChild(title);
+      if (!role.is_default) {
+        const actions = el('div', { class: 'community-member-card__actions' });
+        const del = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
+        del.addEventListener('click', async () => {
+          try { await Api.deleteRole(serverId, role.id); await enterServer(serverId); paint(); toast('Role deleted.', 'ok'); }
+          catch (ex) { toast(ex.message || 'Could not delete role.', 'error'); }
+        });
+        actions.appendChild(del); row.appendChild(actions);
+      }
+      list.appendChild(row);
+    }
+  };
+  create.addEventListener('click', async () => {
+    const roleName = name.value.trim();
+    if (!roleName) { toast('Enter a role name.', 'warn'); return; }
+    const permissions = [...checks.entries()].filter(([, input]) => input.checked).map(([key]) => key);
+    try { await Api.createRole(serverId, { name: roleName, permissions }); name.value = ''; checks.forEach(i => { i.checked = false; }); await enterServer(serverId); paint(); toast('Role created.', 'ok'); }
+    catch (ex) { toast(ex.message || 'Could not create role.', 'error'); }
+  });
+  paint(); container.appendChild(wrap);
+}
+
+async function renderServerCategories(container, serverId) {
+  clear(container);
+  let server;
+  try { ({ detail: server } = await ensureServer(serverId)); }
+  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
+  renderContextHeader({ title: 'Categories', sub: server.name });
+  const wrap = el('div', { class: 'page atrium community-manager' });
+  wrap.appendChild(el('div', { class: 'community-manager__head' },
+    el('div', {}, el('h1', {}, 'Channel categories'), el('p', { class: 'muted' }, 'Organize channels into clean sections.')),
+    el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/server/' + serverId; } }, 'Back to chat')));
+  if (!can('MANAGE_CHANNELS')) { wrap.appendChild(el('div', { class: 'form-error' }, 'You need Manage Channels permission to edit categories.')); container.appendChild(wrap); return; }
+  const createRow = el('div', { class: 'community-manager__toolbar' });
+  const input = el('input', { class: 'input', type: 'text', maxlength: 64, placeholder: 'New category name' });
+  const add = el('button', { class: 'btn primary', type: 'button' }, 'Add category');
+  createRow.append(input, add); wrap.appendChild(createRow);
+  const list = el('div', { class: 'community-list' }); wrap.appendChild(list);
+  const paint = () => {
+    clear(list);
+    const cats = State.channels.categories || [];
+    if (!cats.length) { list.appendChild(emptyState('≡', 'No categories', 'Channels without a category appear under Text channels.')); return; }
+    for (const cat of cats) {
+      const channels = (State.channels.channels || []).filter(c => String(c.category_id) === String(cat.id));
+      const row = el('article', { class: 'community-category-card' });
+      const main = el('div', { class: 'community-category-card__main' });
+      main.appendChild(el('strong', {}, cat.name || 'Category'));
+      main.appendChild(el('span', { class: 'muted small' }, channels.length + ' channel' + (channels.length === 1 ? '' : 's')));
+      row.appendChild(main);
+      const del = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
+      del.addEventListener('click', async () => {
+        try { await Api.deleteCategory(serverId, cat.id); await enterServer(serverId); paint(); toast('Category deleted.', 'ok'); }
+        catch (ex) { toast(ex.message || 'Could not delete category.', 'error'); }
+      });
+      row.appendChild(del); list.appendChild(row);
+    }
+  };
+  add.addEventListener('click', async () => {
+    const n = input.value.trim(); if (!n) return;
+    try { await Api.createCategory(serverId, { name: n }); input.value = ''; await enterServer(serverId); paint(); toast('Category created.', 'ok'); }
+    catch (ex) { toast(ex.message || 'Could not create category.', 'error'); }
+  });
+  paint(); container.appendChild(wrap);
+}
+
 // ---- create channel ---------------------------------------------------------
 
 async function renderNewChannel(container, serverId) {
@@ -459,7 +635,7 @@ async function renderInvites(container, serverId) {
     let invites = [];
     try { invites = await Api.invites(serverId); } catch { /* ignore */ }
     if (!invites.length) {
-      listPane.appendChild(emptyState('â—‡', 'No invites yet', 'Create one above to share a link.'));
+      listPane.appendChild(emptyState('◇', 'No invites yet', 'Create one above to share a link.'));
       return;
     }
     for (const inv of invites) {
@@ -470,8 +646,8 @@ async function renderInvites(container, serverId) {
       m.appendChild(el('div', { class: 'row-sub' },
         inv.uses + ' uses' +
         (inv.max_uses ? '/' + inv.max_uses : '') +
-        (inv.expires_at ? ' Â· expires ' + relTime(inv.expires_at) : '') +
-        (inv.revoked ? ' Â· REVOKED' : '')));
+        (inv.expires_at ? ' · expires ' + relTime(inv.expires_at) : '') +
+        (inv.revoked ? ' · REVOKED' : '')));
       row.appendChild(m);
       const copyBtn = el('button', { class: 'btn sm', type: 'button' }, 'Copy link');
       copyBtn.addEventListener('click', async () => {
@@ -547,6 +723,13 @@ async function renderServerSettings(container, serverId) {
 
   card.appendChild(form);
 
+  const management = el('div', { class: 'community-manager__toolbar', style: { marginTop: 'var(--t-d-5)', flexWrap: 'wrap' } });
+  management.appendChild(el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/server/' + serverId + '/members'; } }, 'Members'));
+  management.appendChild(el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/server/' + serverId + '/roles'; } }, 'Roles'));
+  management.appendChild(el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/server/' + serverId + '/categories'; } }, 'Categories'));
+  management.appendChild(el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/server/' + serverId + '/invites'; } }, 'Invites'));
+  card.appendChild(management);
+
   const danger = el('div', { class: 'hr' });
   card.appendChild(danger);
   const leaveBtn = el('button', { class: 'btn danger block', type: 'button' }, 'Leave server');
@@ -570,7 +753,7 @@ async function renderServerSettings(container, serverId) {
     card.appendChild(el('div', { class: 'hr' }));
     const delInput = el('input', { class: 'input', type: 'text', placeholder: 'Type server name to confirm' });
     const delBtn = el('button', { class: 'btn danger block', type: 'button', style: { marginTop: 'var(--t-d-3)' } }, 'Delete server');
-    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone â€” delete server'), delInput, delBtn));
+    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone — delete server'), delInput, delBtn));
     delBtn.addEventListener('click', async () => {
       if (delInput.value.trim() !== server.name) { toast('Type the exact server name to confirm.', 'warn'); return; }
       confirmDialog({
@@ -615,7 +798,7 @@ async function renderNewServer(container, serverId) {
     el('div', { class: 'field' }, el('label', {}, 'Description'), desc),
     el('div', { class: 'field' }, el('label', {}, 'Join code'), joinCode,
       el('span', { class: 'hint' }, 'Leave blank to auto-generate one.')),
-    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public â€” joinable by code or invite link')),
+    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public — joinable by code or invite link')),
     el('div', { class: 'field' }, el('label', { class: 'switch' }, isDisc, ' Discoverable in the browse feed')),
     createBtn);
 
@@ -655,5 +838,8 @@ export default {
   renderNewChannel,
   renderInvites,
   renderServerSettings,
+  renderServerMembers,
+  renderServerRoles,
+  renderServerCategories,
   renderNewServer,
 };

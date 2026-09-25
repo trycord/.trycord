@@ -349,3 +349,14 @@ table.plain td { color: var(--txt2); }
   .hero .cta { flex-direction: column; align-items: stretch; }
   .hero .cta .btn { text-align: center; }
 }
+/* Ember identity layer. Content and navigation remain unchanged. */
+:root { --pg:#100b09; --base:#17100d; --base2:#21150f; --elev:#2a1911; --line:rgba(255,174,112,.14); --line-hi:rgba(255,174,112,.28); --txt:#fff7ef; --txt2:#e5cfc0; --mut:#9f8170; --accent:#ff8a24; --accent-2:#e95718; --on-accent:#1d1008; }
+body { background:radial-gradient(700px 340px at 80% -10%,rgba(255,115,35,.12),transparent 65%),var(--pg); }
+.site-header { background:rgba(16,11,9,.88); border-bottom-color:var(--line); }
+.site-nav a:hover,.site-nav a[aria-current="page"] { background:var(--base2); }
+.hero { background:radial-gradient(650px 360px at 25% 0%,rgba(255,138,36,.13),transparent 70%),radial-gradient(620px 320px at 80% 8%,rgba(233,87,24,.08),transparent 70%); }
+.card { background:rgba(23,16,13,.92); border-color:var(--line); }
+.card.lead { background:var(--base2); border-color:var(--line-hi); }
+.btn-primary,.site-nav .btn-open { background:var(--accent); color:var(--on-accent); }
+.btn-primary:hover,.site-nav .btn-open:hover { background:#ffc27d; }
+.prose pre { background:#120c0a; }

@@ -32,6 +32,11 @@
 
   <title>Trycord</title>
 
+  <!-- Brand logo -->
+  <link rel="icon" href="./assets/trycord-logo.ico" type="image/x-icon">
+  <link rel="icon" href="./assets/trycord-logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/trycord-logo.png">
+
   <!-- Application stylesheet -->
   <link rel="stylesheet" href="./css/app.css">
 </head>
@@ -210,11 +215,19 @@
           JavaScript renders the currently active real
           application surface here.
         -->
-        <section
-          id="view-root"
-          class="view-root"
-          aria-live="polite"
-        ></section>
+        <div class="chat-environment">
+          <section
+            id="view-root"
+            class="view-root"
+            aria-live="polite"
+          ></section>
+
+          <aside
+            id="member-sidebar"
+            class="member-sidebar"
+            aria-label="Community members"
+          ></aside>
+        </div>
 
       </main>
 

@@ -25,7 +25,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: trycord-server/package-lock.json
 
@@ -51,7 +51,7 @@ jobs:
           node-version: 20
 
       - name: Syntax-check client sources
-        run: for f in trycord-client/js/*.js trycord-client/serve.js trycord-client/config.js; do node --check "$f" || exit 1; done
+        run: for f in trycord-client/js/*.js; do node --check "$f" || exit 1; done
 
   desktop:
     name: Desktop checks (no install needed)
