@@ -352,7 +352,16 @@ export function renderBackendSelector(mount) {
       clearSession();
     }
     toast('Backend switched. Reloading…', 'ok');
-    location.reload();
+    // Reload WITH ?api=: the serving server reflects the configured backend
+    // into its CSP connect-src, so the rebooted page may actually reach it.
+    // Hash routing is preserved.
+    try {
+      const u = new URL(location.href);
+      u.searchParams.set('api', next);
+      location.href = u.toString();
+    } catch {
+      location.reload();
+    }
   });
   resetBtn.addEventListener('click', () => {
     TrycordConfig.resetBackend();
@@ -360,7 +369,13 @@ export function renderBackendSelector(mount) {
       try { Realtime.disconnect(); } catch { /* ignore */ }
       clearSession();
       toast('Backend reset. Reloading…', 'ok');
-      location.reload();
+      try {
+        const u = new URL(location.href);
+        u.searchParams.delete('api');
+        location.href = u.toString();
+      } catch {
+        location.reload();
+      }
       return;
     }
     renderBackendSelector(mount);
