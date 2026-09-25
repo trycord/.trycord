@@ -32,6 +32,9 @@ function publicUser(row) {
     avatarUrl: row.avatar_url || null,
     bannerUrl: row.banner_url || null,
     statusText: row.status_text || null,
+    // Server-controlled bot identity (platform admins set it). Rows that do
+    // not select the column default to false — never inferred client-side.
+    isBot: !!row.is_bot,
   };
 }
 
@@ -159,7 +162,7 @@ router.get('/search', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, 
     if (q.length < 2) return fail(res, 'VALIDATION_ERROR', 'type at least 2 characters to search');
     const lit = escapeLike(q);
     const rows = await db.all(
-      `SELECT id, username, display_name, created_at, bio, avatar_url, banner_url, status_text FROM users
+      `SELECT id, username, display_name, created_at, bio, avatar_url, banner_url, status_text, is_bot FROM users
        WHERE username LIKE ? ESCAPE '!' OR username LIKE ? ESCAPE '!'
        ORDER BY CASE WHEN username LIKE ? ESCAPE '!' THEN 0 ELSE 1 END, username
        LIMIT 20`,
@@ -186,7 +189,7 @@ router.get('/presence', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const row = await db.get(
-      'SELECT id, username, display_name, created_at, bio, avatar_url, banner_url, status_text FROM users WHERE id = ?',
+      'SELECT id, username, display_name, created_at, bio, avatar_url, banner_url, status_text, is_bot FROM users WHERE id = ?',
       [req.params.id]
     );
     if (!row) return fail(res, 'NOT_FOUND', 'user not found');
@@ -207,6 +210,30 @@ router.get('/:id', async (req, res, next) => {
       profile.relation = friend ? 'friend' : pending
         ? (String(pending.from_user_id) === String(me) ? 'pending-out' : 'pending-in')
         : 'none';
+    }
+    // Community-aware profile: when the viewer names a server they both
+    // belong to, attach that community's membership (nickname, roles,
+    // joined date). Never leaks memberships of other servers.
+    const serverId = String(req.query.serverId || '');
+    if (serverId) {
+      const [mine, theirs] = await Promise.all([
+        db.get('SELECT nickname FROM server_members WHERE server_id = ? AND user_id = ?', [serverId, me]),
+        db.get('SELECT nickname, joined_at FROM server_members WHERE server_id = ? AND user_id = ?', [serverId, row.id]),
+      ]);
+      if (mine && theirs) {
+        const mroles = await db.all(
+          `SELECT r.id, r.name, r.color, r.position FROM member_roles mr
+           JOIN roles r ON r.id = mr.role_id
+           WHERE mr.server_id = ? AND mr.user_id = ? ORDER BY r.position DESC`,
+          [serverId, row.id]
+        );
+        profile.membership = {
+          serverId,
+          nickname: theirs.nickname || null,
+          joinedAt: theirs.joined_at,
+          roles: mroles.map((r) => ({ id: r.id, name: r.name, color: r.color || null })),
+        };
+      }
     }
     res.json(profile);
   } catch (e) { serviceError(res, e); }

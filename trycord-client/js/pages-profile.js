@@ -2,7 +2,7 @@
 // GET /api/users/:id plus the shell chrome — no mock data.
 
 import Api from './api.js';
-import State, { refreshFriends } from './state.js';
+import State, { refreshFriends, currentServerId } from './state.js';
 import { el, clear, toast } from './ui.js';
 import { avatar, loadAuthedImage } from './components.js';
 import { renderContextHeader } from './shell.js';
@@ -15,7 +15,9 @@ export async function renderProfile(container, { id } = {}) {
 
   let profile;
   try {
-    profile = await Api.user(id);
+    // Community-aware when opened from a server context: the backend only
+    // attaches membership both viewer and target share — nothing else leaks.
+    profile = await Api.user(id, currentServerId());
   } catch (ex) {
     wrap.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load this profile'));
     container.appendChild(wrap);
@@ -41,14 +43,36 @@ export async function renderProfile(container, { id } = {}) {
   const name = (profile.displayName || profile.username) || '?';
   const avatarBox = avatar({ id: profile.id, avatarUrl: profile.avatarUrl, username: profile.username, displayName: name }, { size: 'lg', withPresence: true });
 
+  const nameLine = el('div', { class: 'member-name-line' },
+    el('strong', { class: 'prof-name' }, name),
+    profile.isBot ? el('span', { class: 'bot-tag' }, 'BOT') : null);
   const card = el('div', { class: 'auth-box' }, banner, el('div', { class: 'prof-avatar' }, avatarBox),
     el('div', { class: 'prof-preview-body' },
-      el('strong', { class: 'prof-name' }, name),
+      nameLine,
       el('div', { class: 'muted small' }, '@' + profile.username),
       el('div', { class: 'prof-presence' }, profile.presence === 'online' ? '● online' : 'offline'),
       profile.statusText ? el('div', { class: 'prof-status' }, profile.statusText) : null,
       profile.bio ? el('div', { class: 'prof-bio' }, profile.bio) : el('div', { class: 'muted small' }, 'No bio yet.'),
       el('div', { class: 'muted small', style: { marginTop: 'var(--t-d-2)' } }, 'Member since ' + fullTime(profile.createdAt))));
+  if (profile.membership) {
+    const mbox = el('div', { class: 'prof-community' });
+    mbox.appendChild(el('div', { class: 'section-label' }, 'In this community'));
+    if (profile.membership.nickname) {
+      mbox.appendChild(el('div', {}, el('strong', {}, profile.membership.nickname), el('span', { class: 'muted small' }, ' (nickname)')));
+    }
+    if (profile.membership.joinedAt) {
+      mbox.appendChild(el('div', { class: 'muted small' }, 'Joined ' + fullTime(profile.membership.joinedAt)));
+    }
+    const pills = el('div', { class: 'role-pills' });
+    for (const r of profile.membership.roles || []) {
+      const pill = el('span', { class: 'role-pill' }, r.name || 'Role');
+      if (r.color) { pill.style.color = r.color; pill.style.borderColor = r.color; }
+      pills.appendChild(pill);
+    }
+    if (!(profile.membership.roles || []).length) pills.appendChild(el('span', { class: 'role-pill muted-role' }, 'Member'));
+    mbox.appendChild(pills);
+    card.appendChild(mbox);
+  }
 
   // ---- actions -----------------------------------------------------------
   const isSelf = profile.relation === 'self';

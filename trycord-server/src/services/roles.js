@@ -7,7 +7,7 @@ const ALL = Object.keys(PERMISSIONS);
 
 const DEFAULT_ROLES = [
   { name: 'Admin', position: 3, permissions: ALL, is_default: 0 },
-  { name: 'Moderator', position: 2, permissions: ['KICK_MEMBERS', 'MANAGE_MESSAGES', 'MANAGE_INVITES', 'SEND_MESSAGES'], is_default: 0 },
+  { name: 'Moderator', position: 2, permissions: ['KICK_MEMBERS', 'BAN_MEMBERS', 'MANAGE_MESSAGES', 'MANAGE_INVITES', 'SEND_MESSAGES'], is_default: 0 },
   { name: 'Member', position: 1, permissions: ['SEND_MESSAGES'], is_default: 1 },
 ];
 
@@ -15,7 +15,16 @@ function parseRow(r) {
   if (!r) return null;
   let permissions = [];
   try { permissions = JSON.parse(r.permissions); } catch { /* keep empty */ }
-  return { ...r, permissions, is_default: !!r.is_default };
+  return { ...r, color: r.color || null, permissions, is_default: !!r.is_default };
+}
+
+// Role colors are persisted display hints only — validated hex, never free
+// text, so clients can style role pills/names without guessing from names.
+function cleanColor(color) {
+  if (color == null || color === '') return null;
+  const c = String(color).trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(c)) throw { code: 'VALIDATION_ERROR', message: 'role color must be a hex color like #ff8a24' };
+  return '#' + c.slice(1).toLowerCase();
 }
 
 async function createDefaults(serverId, conn = db) {
@@ -49,7 +58,7 @@ function isUniqueViolation(e) {
   return /UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) || e.code === 'ER_DUP_ENTRY' || e.code === 'SQLITE_CONSTRAINT_UNIQUE';
 }
 
-async function create(serverId, { name, permissions }) {
+async function create(serverId, { name, permissions, color }) {
   const clean = String(name || '').trim().slice(0, 32);
   if (!clean) throw { code: 'VALIDATION_ERROR', message: 'role name required' };
   const perms = Array.isArray(permissions) ? permissions.filter(isKnown) : [];
@@ -58,8 +67,8 @@ async function create(serverId, { name, permissions }) {
   try {
     const id = uuid();
     await db.run(
-      'INSERT INTO roles (id, server_id, name, position, permissions, is_default) VALUES (?, ?, ?, ?, ?, 0)',
-      [id, serverId, clean, posRow.p, JSON.stringify(perms)]
+      'INSERT INTO roles (id, server_id, name, color, position, permissions, is_default) VALUES (?, ?, ?, ?, ?, ?, 0)',
+      [id, serverId, clean, cleanColor(color), posRow.p, JSON.stringify(perms)]
     );
     return get(id);
   } catch (e) {
@@ -68,7 +77,7 @@ async function create(serverId, { name, permissions }) {
   }
 }
 
-async function update(role, { name, permissions }) {
+async function update(role, { name, permissions, color }) {
   const sets = [];
   const vals = [];
   if (name !== undefined) {
@@ -81,6 +90,10 @@ async function update(role, { name, permissions }) {
     if (!Array.isArray(permissions)) throw { code: 'VALIDATION_ERROR', message: 'permissions must be an array' };
     sets.push('permissions = ?');
     vals.push(JSON.stringify(permissions.filter(isKnown)));
+  }
+  if (color !== undefined) {
+    sets.push('color = ?');
+    vals.push(cleanColor(color));
   }
   if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'nothing to update' };
   vals.push(role.id);
@@ -99,6 +112,39 @@ async function remove(role) {
   if (n.n > 0) throw { code: 'ROLE_IN_USE', message: `role is assigned to ${n.n} member(s)` };
   await db.run('DELETE FROM roles WHERE id = ?', [role.id]);
   return { ok: true };
+}
+
+// Atomic hierarchy reorder: the client sends the full desired order; every
+// id must belong to this server. Positions are rewritten 0..n in one
+// transaction so concurrent readers never see a half-applied order.
+async function reorder(serverId, orderedIds) {
+  if (!Array.isArray(orderedIds) || !orderedIds.length) {
+    throw { code: 'VALIDATION_ERROR', message: 'orderedIds must be a non-empty array' };
+  }
+  return db.transaction(async (t) => {
+    const rows = await t.all('SELECT id FROM roles WHERE server_id = ?', [serverId]);
+    const known = new Set(rows.map((r) => String(r.id)));
+    const clean = orderedIds.map(String);
+    if (clean.length !== known.size || !clean.every((id) => known.has(id))) {
+      throw { code: 'VALIDATION_ERROR', message: 'orderedIds must contain exactly the server roles' };
+    }
+    let pos = 0;
+    for (const id of clean) {
+      await t.run('UPDATE roles SET position = ? WHERE id = ?', [pos++, id]);
+    }
+    return list(serverId);
+  });
+}
+
+// Highest role position a user holds (owner = Infinity). Centralizes the
+// hierarchy rule so assign/unassign/kick/ban/timeout all enforce it.
+async function topPosition(serverId, userId, conn = db) {
+  try {
+    const srv = await conn.get('SELECT owner_id FROM servers WHERE id = ?', [serverId]);
+    if (srv && String(srv.owner_id) === String(userId)) return Infinity;
+  } catch { /* fall through to roles */ }
+  const rs = await userRoles(userId, serverId, conn);
+  return rs.length ? Math.max(...rs.map((r) => r.position)) : -1;
 }
 
 async function userRoles(userId, serverId, conn = db) {
@@ -133,5 +179,5 @@ async function ensureDefault(serverId, userId, conn = db) {
 
 module.exports = {
   DEFAULT_ROLES, createDefaults, list, get, defaultRole, byName,
-  create, update, remove, userRoles, assign, unassign, ensureDefault,
+  create, update, remove, reorder, topPosition, userRoles, assign, unassign, ensureDefault,
 };

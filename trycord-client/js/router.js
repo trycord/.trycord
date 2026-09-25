@@ -1,7 +1,7 @@
 // Hash router. Maps #/... routes to real page renderers. Guards routes,
 // re-renders the active shell's chrome, and cleans up listeners on change.
 
-import { isAuthed, refreshServers } from './state.js';
+import { isAuthed, refreshServers, clearViewRefresh } from './state.js';
 import PagesPublic from './pages-public.js';
 import { renderHome } from './pages-home.js';
 import { renderBrowse } from './pages-browse.js';
@@ -31,6 +31,8 @@ function activeShell() {
 
 function runCleanup() {
   if (lastCleanup) { try { lastCleanup(); } catch { /* ignore */ } lastCleanup = null; }
+  // A realtime community event must never repaint the view we just left.
+  try { clearViewRefresh(); } catch { /* ignore */ }
 }
 
 function setCleanup(fn) {

@@ -198,17 +198,30 @@ export function renderMemberSidebar(region) {
       label = role ? String(role.name || 'ROLE').toUpperCase() : 'ROLE';
     }
     const group = el('section', { class: 'member-group' });
-    group.appendChild(el('div', { class: 'member-group__label' }, label + ' · ' + members.length));
+    const groupLabel = el('div', { class: 'member-group__label' }, label + ' · ' + members.length);
+    if (key !== '__owner__' && key !== '__member__') {
+      const role = roleById.get(key);
+      if (role && role.color) groupLabel.style.color = role.color;
+    }
+    group.appendChild(groupLabel);
     for (const m of members) {
       const id = m.user_id || m.id;
       const name = m.nickname || m.display_name || m.username || 'Unknown';
       const rolesForMember = Array.isArray(m.roles) ? m.roles : [];
+      const top = m.is_owner ? null
+        : rolesForMember.map((r) => roleById.get(String(r.id)) || r)
+          .sort((a, b) => Number(b.position || 0) - Number(a.position || 0))[0] || null;
       const row = el('button', { class: 'member-item', type: 'button', title: '@' + (m.username || '') });
       row.appendChild(avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }));
       const info = el('span', { class: 'member-item__info' });
-      info.appendChild(el('span', { class: 'member-item__name' }, name));
-      const roleText = m.is_owner ? 'Owner' : (rolesForMember[0] && rolesForMember[0].name) || 'Member';
-      info.appendChild(el('span', { class: 'member-item__role' }, roleText));
+      const nameLine = el('span', { class: 'member-item__name' }, name);
+      if (m.is_bot) nameLine.appendChild(el('span', { class: 'bot-tag' }, 'BOT'));
+      info.appendChild(nameLine);
+      const roleText = m.is_owner ? 'Owner' : (top && top.name) || 'Member';
+      const roleLine = el('span', { class: 'member-item__role' });
+      if (top && top.color) roleLine.appendChild(el('span', { class: 'role-color-dot', style: { background: top.color } }));
+      roleLine.appendChild(el('span', {}, roleText));
+      info.appendChild(roleLine);
       row.appendChild(info);
       row.addEventListener('click', () => { location.hash = '#/users/' + id; });
       group.appendChild(row);
@@ -390,6 +403,7 @@ export function syncMobileNavigation(mobileNav) {
       ['Invite', '#/server/' + sid + '/invites', can('MANAGE_INVITES')],
       ['Members', '#/server/' + sid + '/members', true],
       ['Roles', '#/server/' + sid + '/roles', true],
+      ['Categories', '#/server/' + sid + '/categories', can('MANAGE_CHANNELS')],
       ['Settings', '#/server/' + sid + '/settings', can('MANAGE_SERVER')],
     ];
     for (const [label, href, allowed] of toolsList) {

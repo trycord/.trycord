@@ -8,6 +8,7 @@ const PERMISSIONS = {
   MANAGE_ROLES: 'Create, edit, assign, and delete roles.',
   MANAGE_INVITES: 'Create and revoke invites.',
   KICK_MEMBERS: 'Remove members from the server.',
+  BAN_MEMBERS: 'Ban/unban members and manage timeouts.',
   MANAGE_MESSAGES: 'Delete any message in the server.',
   SEND_MESSAGES: 'Post messages in channels.',
 };

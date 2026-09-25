@@ -351,13 +351,14 @@ async function boot() {
     console.log('[info] serving public website from ' + publicDir);
   }
 
-  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser } = createGateway(server);
+  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer } = createGateway(server);
   require('./routes/auth').setTicketIssuer(issueTicket);
   require('./routes/messages').setBroadcaster(broadcast);
   require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });
   require('./routes/friends').setGateway({ sendToUser });
   require('./routes/users').setGateway({ getPresence });
   require('./routes/admin').setGateway({ disconnectUser });
+  require('./services/events').setGateway({ broadcast: broadcastServer, evict: evictUserFromServer });
 
   // Trust & Safety: bootstrap platform admins from ADMIN_USERNAMES before
   // the server accepts traffic. Idempotent — re-runs promote any new names

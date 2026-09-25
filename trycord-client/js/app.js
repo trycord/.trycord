@@ -4,7 +4,7 @@
 import { TrycordConfig } from './config.js';
 import { applyTheme } from './theme.js';
 import { updateFromViewport, closeMobileDrawer, openMobileDrawer, onPresentationChange, setPresentation, initMobileGestures } from './presentation.js';
-import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends } from './state.js';
+import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends, setServerRoomHooks } from './state.js';
 import Realtime from './realtime.js';
 import Router from './router.js';
 import { renderAllChrome } from './shell.js';
@@ -20,7 +20,10 @@ async function boot() {
   //    inline bootstrap in index.html).
   applyTheme();
 
-  // 1) Remote runtime config (server-pinned API) — best-effort.
+  // 1) Backend configuration: static backend.json first (operator pin),
+  // then the server-provided runtime config. Both best-effort. Everything
+  // below (session restore, realtime, routes) resolves BACKEND_URL live.
+  try { await TrycordConfig.loadStaticConfig(); } catch { /* ignore */ }
   try { await TrycordConfig.loadRuntimeConfig(); } catch { /* ignore */ }
 
   // 2) Presentation depends on geometry only.
@@ -48,7 +51,12 @@ async function boot() {
   // Drawer gestures (edge swipe, drag-to-close, back/backdrop/Escape close).
   initMobileGestures();
 
-  // 4) Session restore.
+  // 4) Session restore. Wire community room hooks first (state must not
+  // import realtime directly — realtime imports state).
+  setServerRoomHooks({
+    join: (serverId) => Realtime.joinServer(serverId),
+    leave: () => Realtime.leaveServer(),
+  });
   const restored = await hydrate(); // token->me
   if (restored) {
     // 5) Online gateway (WS) when authenticated.

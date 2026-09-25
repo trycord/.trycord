@@ -101,6 +101,7 @@ async function detail(serverId, userId, perms) {
     `SELECT ${LIST_COLS},
       (SELECT COUNT(*) FROM messages m2
          JOIN channels c2 ON c2.id = m2.channel_id WHERE c2.server_id = s.id) AS message_count,
+      (SELECT COUNT(*) FROM roles r WHERE r.server_id = s.id) AS role_count,
        u.username AS owner_name, u.display_name AS owner_display
     FROM servers s JOIN users u ON u.id = s.owner_id WHERE s.id = ?`,
     [serverId]

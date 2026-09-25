@@ -7,6 +7,7 @@ const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const { now, uuid, visibleChannel } = require('../util');
 const { hasPermission } = require('../services/permissions');
+const memberships = require('../services/memberships');
 const uploads = require('../services/uploads');
 
 let broadcast = () => {};
@@ -58,6 +59,9 @@ router.post('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next)
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     if (!(await hasPermission(req.user.id, ch.server_id, 'SEND_MESSAGES'))) {
       return fail(res, 'PERMISSION_DENIED', 'you cannot post in this server');
+    }
+    if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
+      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
     }
     const content = String((req.body || {}).content || '').trim().slice(0, 2000);
     // Attachments and text are independent: a message may carry files

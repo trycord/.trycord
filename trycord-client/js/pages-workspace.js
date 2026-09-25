@@ -9,6 +9,7 @@
 import Api from './api.js';
 import State, {
   enterServer, refreshServers, leaveServerContext, can, isAuthed, currentServerId, peerPresence,
+  refreshBans, setViewRefresh, refreshServerView,
 } from './state.js';
 import { esc, el, clear, toast, relTime, confirmDialog, openModal } from './ui.js';
 import { avatar, emptyState, messageRow, channelRow } from './components.js';
@@ -16,6 +17,44 @@ import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNav
 import Realtime from './realtime.js';
 
 let activeChannelId = null;
+
+// Community realtime wiring (subscribed once — module evaluates once).
+// Structural events arrive on the server room; the handler refreshes state
+// (serialized, so rapid events converge) and repaints the active view via
+// its refresh hook. If WE were removed, drop context and go home.
+const COMMUNITY_EVENTS = [
+  'member_joined', 'member_left', 'member_kicked', 'member_banned',
+  'member_unbanned', 'member_timeout', 'member_updated', 'member_roles_updated',
+  'role_created', 'role_updated', 'role_deleted', 'roles_reordered',
+  'channel_created', 'channel_updated', 'channel_deleted', 'channels_reordered',
+  'category_created', 'category_updated', 'category_deleted', 'categories_reordered',
+  'invite_created', 'invite_revoked', 'server_updated',
+];
+const SELF_REMOVAL = new Set(['member_left', 'member_kicked', 'member_banned']);
+let communityWired = false;
+function wireCommunityEvents() {
+  if (communityWired) return;
+  communityWired = true;
+  for (const type of COMMUNITY_EVENTS) {
+    Realtime.on(type, async (payload) => {
+      try {
+        const sid = currentServerId();
+        if (!sid || !isAuthed()) return;
+        const me = State.me && State.me.id;
+        if (me && payload && SELF_REMOVAL.has(type) && String(payload.userId) === String(me)) {
+          leaveServerContext();
+          renderAllChrome();
+          if (!location.hash.startsWith('#/home')) location.hash = '#/home';
+          toast('You were removed from that community.', 'warn');
+          return;
+        }
+        await refreshServerView();
+        renderAllChrome();
+      } catch { /* realtime refresh must never break the loop */ }
+    });
+  }
+}
+wireCommunityEvents();
 
 function ensureServer(serverId) {
   return enterServer(serverId).catch((ex) => {
@@ -36,6 +75,13 @@ async function renderServerLanding(container, serverId) {
   }
   renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
   const wrap = el('div', { class: 'page atrium' });
+  const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
+  const stats = el('div', { class: 'stat-inline' });
+  stats.appendChild(el('span', {}, String(server.member_count || 0) + ' members · ' + String(onlineCount) + ' online'));
+  stats.appendChild(el('span', {}, String(server.channel_count || 0) + ' channels'));
+  stats.appendChild(el('span', {}, String(server.role_count || 0) + ' roles'));
+  if (server.message_count != null) stats.appendChild(el('span', {}, String(server.message_count) + ' messages'));
+  wrap.appendChild(stats);
   wrap.appendChild(el('h2', {}, 'Channels'));
   const layout = State.channels;
   const categories = layout.categories || [];
@@ -74,6 +120,7 @@ async function renderServerLanding(container, serverId) {
   wrap.appendChild(el('div', { class: 'section-label' }, 'Members'));
   renderMemberList(wrap, serverId);
   container.appendChild(wrap);
+  setViewRefresh(() => { renderServerLanding(container, serverId).catch(() => {}); });
   renderAllChrome();
 }
 
@@ -379,10 +426,109 @@ async function renderChannel(container, serverId, channelId) {
     activeChannelId = null;
   };
   container._cleanup = cleanup;
+  // Structural realtime events refresh state first (refreshServerView);
+  // this hook then reconciles the open conversation: retitle on rename,
+  // leave the view if the channel is gone.
+  setViewRefresh(() => {
+    const layout = State.channels || { channels: [] };
+    const ch = (layout.channels || []).find((c) => String(c.id) === String(channelId));
+    if (!ch) { location.hash = '#/server/' + serverId; return; }
+    renderContextHeader({ title: '#' + (ch.name || 'channel'), sub: ch.topic ? esc(ch.topic) : server.name, icon: '#' });
+  });
   renderAllChrome();
 }
 
 // ---- community management surfaces ----------------------------------------
+
+function memberTopRole(m) {
+  const roles = Array.isArray(m.roles) ? m.roles : [];
+  const byId = new Map((State.roles || []).map((r) => [String(r.id), r]));
+  let top = null;
+  for (const r of roles) {
+    const full = byId.get(String(r.id)) || r;
+    if (!top || Number(full.position || 0) > Number(top.position || 0)) top = full;
+  }
+  return top;
+}
+
+function timedOutUntil(m) {
+  if (!m || !m.timeout_expires_at) return null;
+  const t = new Date(m.timeout_expires_at).getTime();
+  return Number.isFinite(t) && t > Date.now() ? m.timeout_expires_at : null;
+}
+
+function rolePill(r, { removable = false, onRemove = null } = {}) {
+  const pill = el('span', { class: 'role-pill' + (removable ? '' : '') },
+    r.color ? el('span', { class: 'role-color-dot', style: { background: r.color } }) : null,
+    el('span', {}, r.name || 'Role'));
+  if (r.color) { pill.style.color = r.color; pill.style.borderColor = r.color; }
+  if (removable) {
+    const x = el('button', { class: 'role-unassign', type: 'button', title: 'Remove role', 'aria-label': 'Remove role ' + (r.name || '') }, '×');
+    x.addEventListener('click', onRemove);
+    const wrap = el('span', { class: 'role-pill-wrap' }, pill, x);
+    return wrap;
+  }
+  return pill;
+}
+
+function openBanModal(serverId, m, onDone) {
+  const id = m.user_id || m.id;
+  const reason = el('input', { class: 'input', type: 'text', maxlength: 500, placeholder: 'Reason (optional)' });
+  const dur = el('select', { class: 'input' });
+  [['', 'Permanent'], ['60', '1 hour'], ['1440', '1 day'], ['10080', '7 days']].forEach(([v, label]) => {
+    const o = el('option', { value: v }, label);
+    dur.appendChild(o);
+  });
+  const err = el('div', { class: 'form-error', hidden: true });
+  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const go = el('button', { class: 'btn danger', type: 'button' }, 'Ban member');
+  const modal = openModal({
+    title: 'Ban @' + (m.username || ''),
+    body: el('div', {}, err,
+      el('div', { class: 'field' }, el('label', {}, 'Reason'), reason),
+      el('div', { class: 'field' }, el('label', {}, 'Duration'), dur),
+      el('p', { class: 'muted small' }, 'Banned users are removed immediately and cannot rejoin until unbanned or the ban expires.')),
+    footer: [cancel, go],
+  });
+  cancel.addEventListener('click', () => modal.close());
+  go.addEventListener('click', async () => {
+    err.hidden = true;
+    try {
+      await Api.banMember(serverId, id, { reason: reason.value.trim() || undefined, minutes: dur.value ? Number(dur.value) : undefined });
+      modal.close();
+      toast('Member banned.', 'ok');
+      await onDone();
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not ban member.'; }
+  });
+}
+
+function openTimeoutModal(serverId, m, onDone) {
+  const id = m.user_id || m.id;
+  const dur = el('select', { class: 'input' });
+  [['10', '10 minutes'], ['60', '1 hour'], ['1440', '1 day'], ['10080', '7 days'], ['', 'Clear timeout']].forEach(([v, label]) => {
+    dur.appendChild(el('option', { value: v }, label));
+  });
+  const err = el('div', { class: 'form-error', hidden: true });
+  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const go = el('button', { class: 'btn primary', type: 'button' }, 'Apply');
+  const modal = openModal({
+    title: 'Timeout @' + (m.username || ''),
+    body: el('div', {}, err,
+      el('div', { class: 'field' }, el('label', {}, 'Duration'), dur),
+      el('p', { class: 'muted small' }, 'Timed-out members stay in the community but cannot post until it lapses.')),
+    footer: [cancel, go],
+  });
+  cancel.addEventListener('click', () => modal.close());
+  go.addEventListener('click', async () => {
+    err.hidden = true;
+    try {
+      await Api.timeoutMember(serverId, id, dur.value === '' ? null : Number(dur.value));
+      modal.close();
+      toast(dur.value === '' ? 'Timeout cleared.' : 'Member timed out.', 'ok');
+      await onDone();
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not set timeout.'; }
+  });
+}
 
 async function renderServerMembers(container, serverId) {
   clear(container);
@@ -395,62 +541,189 @@ async function renderServerMembers(container, serverId) {
     el('div', {}, el('h1', {}, 'Members'), el('p', { class: 'muted' }, 'Manage the people who belong to this community.')),
     el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/server/' + serverId; } }, 'Back to chat'));
   wrap.appendChild(head);
+  const counts = el('div', { class: 'stat-inline' });
+  wrap.appendChild(counts);
+
+  const toolbar = el('div', { class: 'community-manager__toolbar' });
   const search = el('input', { class: 'input', type: 'search', placeholder: 'Search members…' });
-  wrap.appendChild(el('div', { class: 'community-manager__toolbar' }, search));
+  const roleFilter = el('select', { class: 'input sm', title: 'Filter by role' });
+  // Seeded before the first paint: paint() reads the value before it
+  // rebuilds the live role options, and an empty value would filter all out.
+  roleFilter.appendChild(el('option', { value: 'all' }, 'All roles'));
+  const presFilter = el('select', { class: 'input sm', title: 'Filter by presence' });
+  presFilter.appendChild(el('option', { value: 'all' }, 'All statuses'));
+  presFilter.appendChild(el('option', { value: 'online' }, 'Online'));
+  presFilter.appendChild(el('option', { value: 'offline' }, 'Offline'));
+  const botsOnly = el('input', { type: 'checkbox' });
+  const sortSel = el('select', { class: 'input sm', title: 'Sort members' });
+  [['name', 'Sort: name'], ['newest', 'Sort: newest'], ['oldest', 'Sort: oldest'], ['role', 'Sort: top role']].forEach(([v, label]) => {
+    sortSel.appendChild(el('option', { value: v }, label));
+  });
+  toolbar.append(search, roleFilter, presFilter, el('label', { class: 'switch' }, botsOnly, ' Bots only'), sortSel);
+  wrap.appendChild(toolbar);
+
   const list = el('div', { class: 'community-list' });
   wrap.appendChild(list);
+  const banSection = el('div', {});
+  wrap.appendChild(banSection);
+
+  const reload = async () => {
+    await ensureServer(serverId);
+    if (can('BAN_MEMBERS')) { try { await refreshBans(); } catch { /* bans stay stale-empty */ } }
+    paint();
+  };
+  setViewRefresh(() => { reload().catch(() => {}); });
+
   const paint = () => {
     clear(list);
     const q = search.value.trim().toLowerCase();
-    const members = (State.members || []).filter(m => !q || String(m.username || '').toLowerCase().includes(q) || String(m.display_name || '').toLowerCase().includes(q) || String(m.nickname || '').toLowerCase().includes(q));
-    if (!members.length) { list.appendChild(emptyState('⌕', 'No members found', q ? 'Try a different search.' : 'This community has no visible members.')); return; }
+    const roleId = roleFilter.value || 'all';
+    const pres = presFilter.value;
+    const bots = botsOnly.checked;
+    const sort = sortSel.value;
+    const online = (m) => peerPresence(m.user_id || m.id) === 'online';
+    let members = (State.members || []).filter((m) => {
+      if (q && ![m.username, m.display_name, m.nickname].some((v) => String(v || '').toLowerCase().includes(q))) return false;
+      if (roleId !== 'all' && !(Array.isArray(m.roles) && m.roles.some((r) => String(r.id) === roleId))) return false;
+      if (pres !== 'all' && (online(m) ? 'online' : 'offline') !== pres) return false;
+      if (bots && !m.is_bot) return false;
+      return true;
+    });
+    const dispName = (m) => m.nickname || m.display_name || m.username || 'Unknown';
+    const topPos = (m) => { const t = memberTopRole(m); return t ? Number(t.position || 0) : -1; };
+    members = [...members].sort((a, b) => {
+      if (sort === 'newest') return String(b.joined_at || '').localeCompare(String(a.joined_at || ''));
+      if (sort === 'oldest') return String(a.joined_at || '').localeCompare(String(b.joined_at || ''));
+      if (sort === 'role') return topPos(b) - topPos(a) || dispName(a).localeCompare(dispName(b));
+      return dispName(a).localeCompare(dispName(b));
+    });
+
+    const total = (State.members || []).length;
+    const onlineCount = (State.members || []).filter(online).length;
+    clear(counts);
+    counts.appendChild(el('span', {}, String(total) + ' total · ' + String(onlineCount) + ' online'));
+
+    // Role filter options follow live roles.
+    const curRole = roleFilter.value;
+    clear(roleFilter);
+    roleFilter.appendChild(el('option', { value: 'all' }, 'All roles'));
+    for (const r of [...(State.roles || [])].sort((a, b) => Number(b.position || 0) - Number(a.position || 0))) {
+      const o = el('option', { value: String(r.id) }, (r.name || 'Role'));
+      if (String(r.id) === curRole) o.selected = true;
+      roleFilter.appendChild(o);
+    }
+    roleFilter.value = [...roleFilter.options].some((o) => o.value === curRole) ? curRole : 'all';
+
+    if (!members.length) {
+      list.appendChild(emptyState('⌕', 'No members found', 'Try a different search or filter.'));
+    }
     for (const m of members) {
       const id = m.user_id || m.id;
+      const mine = String(id) === String(State.me && State.me.id);
       const row = el('article', { class: 'community-member-card' });
       row.appendChild(avatar({ id, username: m.username, displayName: m.nickname || m.display_name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }));
       const info = el('div', { class: 'community-member-card__info' });
-      info.appendChild(el('strong', {}, m.nickname || m.display_name || m.username || 'Unknown'));
-      info.appendChild(el('span', { class: 'muted small' }, '@' + (m.username || 'unknown')));
+      const nameLine = el('div', { class: 'member-name-line' },
+        el('strong', {}, dispName(m)),
+        m.is_bot ? el('span', { class: 'bot-tag' }, 'BOT') : null);
+      info.appendChild(nameLine);
+      const sub = '@' + (m.username || 'unknown') +
+        (m.joined_at ? ' · joined ' + relTime(m.joined_at) : '') +
+        (m.status_text ? ' · ' + m.status_text : '');
+      info.appendChild(el('span', { class: 'muted small' }, sub));
+      const to = timedOutUntil(m);
+      if (to) info.appendChild(el('span', { class: 'badge warn' }, 'Timed out · ' + relTime(to)));
       const roles = Array.isArray(m.roles) ? m.roles : [];
       const roleBox = el('div', { class: 'role-pills' });
       if (m.is_owner) roleBox.appendChild(el('span', { class: 'role-pill owner' }, 'Owner'));
-      for (const r of roles.slice(0, 5)) roleBox.appendChild(el('span', { class: 'role-pill' }, r.name || 'Role'));
+      for (const r of roles.slice(0, 8)) {
+        roleBox.appendChild(rolePill(r, {
+          removable: can('MANAGE_ROLES') && !m.is_owner,
+          onRemove: async () => {
+            try { await Api.unassignRole(serverId, r.id, id); await reload(); toast('Role removed.', 'ok'); }
+            catch (ex) { toast(ex.message || 'Could not remove role.', 'error'); }
+          },
+        }));
+      }
       if (!m.is_owner && !roles.length) roleBox.appendChild(el('span', { class: 'role-pill muted-role' }, 'Member'));
       info.appendChild(roleBox);
       row.appendChild(info);
       const actions = el('div', { class: 'community-member-card__actions' });
       actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => { location.hash = '#/users/' + id; } }, 'Profile'));
-      if (String(id) === String(State.me && State.me.id) || can('KICK_MEMBERS')) {
+      if (mine || can('KICK_MEMBERS')) {
         actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => openNicknameModal(serverId, m, wrap) }, 'Nickname'));
       }
       if (can('MANAGE_ROLES') && !m.is_owner) {
+        const assigned = new Set(roles.map((r) => String(r.id)));
         const roleSelect = el('select', { class: 'input sm', title: 'Assign role' });
         roleSelect.appendChild(el('option', { value: '' }, 'Role…'));
         for (const role of State.roles || []) {
-          if (role.is_default) continue;
-          const opt = el('option', { value: role.id }, role.name || 'Role');
-          roleSelect.appendChild(opt);
+          if (role.is_default || assigned.has(String(role.id))) continue;
+          roleSelect.appendChild(el('option', { value: role.id }, role.name || 'Role'));
         }
         roleSelect.addEventListener('change', async () => {
           if (!roleSelect.value) return;
-          try { await Api.assignRole(serverId, roleSelect.value, id); await enterServer(serverId); paint(); toast('Role assigned.', 'ok'); }
+          try { await Api.assignRole(serverId, roleSelect.value, id); await reload(); toast('Role assigned.', 'ok'); }
           catch (ex) { toast(ex.message || 'Could not assign role.', 'error'); }
           finally { roleSelect.value = ''; }
         });
         actions.appendChild(roleSelect);
       }
-      if (!m.is_owner && can('KICK_MEMBERS')) {
-        actions.appendChild(el('button', { class: 'btn danger sm', type: 'button', onClick: async () => {
-          try { await Api.kickMember(serverId, id); await enterServer(serverId); paint(); toast('Member removed.', 'ok'); }
-          catch (ex) { toast(ex.message || 'Could not remove member.', 'error'); }
-        } }, 'Remove'));
+      if (!m.is_owner && !mine && can('KICK_MEMBERS')) {
+        actions.appendChild(el('button', { class: 'btn danger sm', type: 'button', onClick: () => {
+          confirmDialog({
+            title: 'Remove member?', message: '@' + (m.username || '') + ' will leave this community immediately.',
+            danger: true, confirmText: 'Remove',
+            onConfirm: async () => {
+              try { await Api.kickMember(serverId, id); await reload(); toast('Member removed.', 'ok'); }
+              catch (ex) { toast(ex.message || 'Could not remove member.', 'error'); }
+            },
+          });
+        } }, 'Kick'));
+      }
+      if (!m.is_owner && !mine && can('BAN_MEMBERS')) {
+        actions.appendChild(el('button', { class: 'btn danger sm', type: 'button', onClick: () => openBanModal(serverId, m, reload) }, 'Ban'));
+        actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => openTimeoutModal(serverId, m, reload) }, 'Timeout'));
       }
       row.appendChild(actions);
       list.appendChild(row);
     }
+
+    clear(banSection);
+    if (can('BAN_MEMBERS')) {
+      banSection.appendChild(el('div', { class: 'section-label' }, 'Banned (' + (State.bans || []).length + ')'));
+      if (!(State.bans || []).length) {
+        banSection.appendChild(el('p', { class: 'muted small' }, 'No active bans.'));
+      }
+      const blist = el('div', { class: 'community-list' });
+      for (const b of State.bans || []) {
+        const row = el('article', { class: 'community-member-card' });
+        const info = el('div', { class: 'community-member-card__info' });
+        info.appendChild(el('strong', {}, b.displayName || b.username || 'Unknown'));
+        info.appendChild(el('span', { class: 'muted small' },
+          '@' + (b.username || '?') +
+          (b.reason ? ' · ' + b.reason : '') +
+          (b.expiresAt ? ' · expires ' + relTime(b.expiresAt) : ' · permanent') +
+          (b.actorName ? ' · by ' + b.actorName : '')));
+        row.appendChild(info);
+        const unban = el('button', { class: 'btn sm', type: 'button' }, 'Unban');
+        unban.addEventListener('click', async () => {
+          try { await Api.unbanMember(serverId, b.userId); await reload(); toast('Ban lifted.', 'ok'); }
+          catch (ex) { toast(ex.message || 'Could not lift ban.', 'error'); }
+        });
+        row.appendChild(el('div', { class: 'community-member-card__actions' }, unban));
+        blist.appendChild(row);
+      }
+      banSection.appendChild(blist);
+    }
   };
-  search.addEventListener('input', paint);
-  paint();
+  const repaint = () => paint();
+  search.addEventListener('input', repaint);
+  roleFilter.addEventListener('change', repaint);
+  presFilter.addEventListener('change', repaint);
+  botsOnly.addEventListener('change', repaint);
+  sortSel.addEventListener('change', repaint);
+  await reload();
   container.appendChild(wrap);
 }
 
@@ -475,6 +748,7 @@ async function renderServerRoles(container, serverId) {
   const list = el('div', { class: 'community-list' });
   const formWrap = el('div', { class: 'community-role-editor' });
   const name = el('input', { class: 'input', type: 'text', maxlength: 32, placeholder: 'Role name' });
+  const colorNew = el('input', { type: 'color', class: 'input', value: '#ff8a24', title: 'Role color' });
   const permGrid = el('div', { class: 'permission-grid' });
   const checks = new Map();
   for (const perm of allPerms) {
@@ -483,36 +757,125 @@ async function renderServerRoles(container, serverId) {
     permGrid.appendChild(el('label', { class: 'permission-item' }, input, el('span', {}, perm)));
   }
   const create = el('button', { class: 'btn primary', type: 'button' }, 'Create role');
-  formWrap.append(el('div', { class: 'field' }, el('label', {}, 'Role name'), name), el('div', { class: 'section-label' }, 'Permissions'), permGrid, create);
-  wrap.appendChild(formWrap); wrap.appendChild(el('div', { class: 'section-label' }, 'Existing roles')); wrap.appendChild(list);
+  formWrap.append(
+    el('div', { class: 'field' }, el('label', {}, 'Role name'), name),
+    el('div', { class: 'field' }, el('label', {}, 'Color'), colorNew),
+    el('div', { class: 'section-label' }, 'Permissions'), permGrid, create);
+  wrap.appendChild(formWrap); wrap.appendChild(el('div', { class: 'section-label' }, 'Existing roles (top first)')); wrap.appendChild(list);
+
+  const reload = async () => { await ensureServer(serverId); paint(); };
+  setViewRefresh(() => { reload().catch(() => {}); });
+
+  const sortedRoles = () => [...(State.roles || [])].sort((a, b) => Number(b.position || 0) - Number(a.position || 0));
+  const memberCount = (roleId) => (State.members || []).filter((m) => (m.roles || []).some((r) => String(r.id) === String(roleId))).length;
+
   const paint = () => {
     clear(list);
-    for (const role of [...(State.roles || [])].sort((a,b) => (Number(b.position)||0)-(Number(a.position)||0))) {
+    const ordered = sortedRoles();
+    ordered.forEach((role, idx) => {
       const row = el('article', { class: 'community-role-card' });
-      const title = el('div', { class: 'community-role-card__main' });
-      title.appendChild(el('span', { class: 'role-pill' }, role.name || 'Role'));
-      title.appendChild(el('span', { class: 'muted small' }, String((role.permissions || []).length) + ' permissions'));
-      row.appendChild(title);
+      const main = el('div', { class: 'community-role-card__main' });
+      const pill = el('span', { class: 'role-pill' },
+        role.color ? el('span', { class: 'role-color-dot', style: { background: role.color } }) : null,
+        el('span', {}, role.name || 'Role'));
+      if (role.color) { pill.style.color = role.color; pill.style.borderColor = role.color; }
+      main.appendChild(pill);
+      main.appendChild(el('span', { class: 'muted small' },
+        memberCount(role.id) + ' members · ' + String((role.permissions || []).length) + ' permissions' +
+        (role.is_default ? ' · default' : '')));
+      row.appendChild(main);
       if (!role.is_default) {
         const actions = el('div', { class: 'community-member-card__actions' });
-        const del = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
-        del.addEventListener('click', async () => {
-          try { await Api.deleteRole(serverId, role.id); await enterServer(serverId); paint(); toast('Role deleted.', 'ok'); }
-          catch (ex) { toast(ex.message || 'Could not delete role.', 'error'); }
+        const edit = el('button', { class: 'btn sm', type: 'button' }, 'Edit');
+        edit.addEventListener('click', () => openRoleEditor(serverId, role, allPerms, reload));
+        const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, '▲');
+        up.addEventListener('click', async () => {
+          const ids = ordered.map((r) => String(r.id));
+          [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+          try { await Api.reorderRoles(serverId, ids); await reload(); }
+          catch (ex) { toast(ex.message || 'Could not reorder roles.', 'error'); }
         });
-        actions.appendChild(del); row.appendChild(actions);
+        const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === ordered.length - 1 }, '▼');
+        down.addEventListener('click', async () => {
+          const ids = ordered.map((r) => String(r.id));
+          [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+          try { await Api.reorderRoles(serverId, ids); await reload(); }
+          catch (ex) { toast(ex.message || 'Could not reorder roles.', 'error'); }
+        });
+        const del = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
+        del.addEventListener('click', () => {
+          confirmDialog({
+            title: 'Delete role?', message: (role.name || 'Role') + ' will be removed. Members keep their other roles.',
+            danger: true, confirmText: 'Delete',
+            onConfirm: async () => {
+              try { await Api.deleteRole(serverId, role.id); await reload(); toast('Role deleted.', 'ok'); }
+              catch (ex) { toast(ex.message || 'Could not delete role.', 'error'); }
+            },
+          });
+        });
+        actions.append(edit, up, down, del);
+        row.appendChild(actions);
       }
       list.appendChild(row);
-    }
+    });
   };
   create.addEventListener('click', async () => {
     const roleName = name.value.trim();
     if (!roleName) { toast('Enter a role name.', 'warn'); return; }
     const permissions = [...checks.entries()].filter(([, input]) => input.checked).map(([key]) => key);
-    try { await Api.createRole(serverId, { name: roleName, permissions }); name.value = ''; checks.forEach(i => { i.checked = false; }); await enterServer(serverId); paint(); toast('Role created.', 'ok'); }
-    catch (ex) { toast(ex.message || 'Could not create role.', 'error'); }
+    try {
+      await Api.createRole(serverId, { name: roleName, permissions, color: colorNew.value });
+      name.value = ''; checks.forEach((i) => { i.checked = false; });
+      await reload(); toast('Role created.', 'ok');
+    } catch (ex) { toast(ex.message || 'Could not create role.', 'error'); }
   });
   paint(); container.appendChild(wrap);
+}
+
+function openRoleEditor(serverId, role, allPerms, onDone) {
+  const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: role.name || '' });
+  const colorRow = el('div', { class: 'row-line' });
+  const color = el('input', { type: 'color', class: 'input', value: /^#[0-9a-f]{6}$/i.test(role.color || '') ? role.color : '#ff8a24' });
+  const clearColor = el('button', { class: 'btn ghost sm', type: 'button' }, 'No color');
+  let useColor = !!role.color;
+  const paintColor = () => { color.disabled = !useColor; clearColor.textContent = useColor ? 'No color' : 'Use color'; };
+  clearColor.addEventListener('click', () => { useColor = !useColor; paintColor(); });
+  paintColor();
+  colorRow.append(color, clearColor);
+  const permGrid = el('div', { class: 'permission-grid' });
+  const checks = new Map();
+  const current = new Set(role.permissions || []);
+  for (const perm of allPerms) {
+    const input = el('input', { type: 'checkbox' });
+    input.checked = current.has(perm);
+    checks.set(perm, input);
+    permGrid.appendChild(el('label', { class: 'permission-item' }, input, el('span', {}, perm)));
+  }
+  const err = el('div', { class: 'form-error', hidden: true });
+  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const save = el('button', { class: 'btn primary', type: 'button' }, 'Save role');
+  const modal = openModal({
+    title: 'Edit role',
+    body: el('div', {}, err,
+      el('div', { class: 'field' }, el('label', {}, 'Name'), name),
+      el('div', { class: 'field' }, el('label', {}, 'Color'), colorRow),
+      el('div', { class: 'section-label' }, 'Permissions'), permGrid),
+    footer: [cancel, save],
+  });
+  cancel.addEventListener('click', () => modal.close());
+  save.addEventListener('click', async () => {
+    err.hidden = true;
+    try {
+      await Api.updateRole(serverId, role.id, {
+        name: name.value.trim(),
+        permissions: [...checks.entries()].filter(([, i]) => i.checked).map(([k]) => k),
+        color: useColor ? color.value : null,
+      });
+      modal.close();
+      toast('Role updated.', 'ok');
+      await onDone();
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not update role.'; }
+  });
 }
 
 async function renderServerCategories(container, serverId) {
@@ -531,31 +894,169 @@ async function renderServerCategories(container, serverId) {
   const add = el('button', { class: 'btn primary', type: 'button' }, 'Add category');
   createRow.append(input, add); wrap.appendChild(createRow);
   const list = el('div', { class: 'community-list' }); wrap.appendChild(list);
+  const reload = async () => { await ensureServer(serverId); paint(); };
+  setViewRefresh(() => { reload().catch(() => {}); });
   const paint = () => {
     clear(list);
-    const cats = State.channels.categories || [];
-    if (!cats.length) { list.appendChild(emptyState('≡', 'No categories', 'Channels without a category appear under Text channels.')); return; }
-    for (const cat of cats) {
-      const channels = (State.channels.channels || []).filter(c => String(c.category_id) === String(cat.id));
+    const cats = [...(State.channels.categories || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
+    const allChannels = [...(State.channels.channels || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
+    if (!cats.length && !allChannels.length) {
+      list.appendChild(emptyState('≡', 'No categories', 'Channels without a category appear under Text channels.'));
+    }
+    cats.forEach((cat, idx) => {
+      const channels = allChannels.filter((c) => String(c.category_id) === String(cat.id));
       const row = el('article', { class: 'community-category-card' });
       const main = el('div', { class: 'community-category-card__main' });
       main.appendChild(el('strong', {}, cat.name || 'Category'));
       main.appendChild(el('span', { class: 'muted small' }, channels.length + ' channel' + (channels.length === 1 ? '' : 's')));
       row.appendChild(main);
-      const del = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
-      del.addEventListener('click', async () => {
-        try { await Api.deleteCategory(serverId, cat.id); await enterServer(serverId); paint(); toast('Category deleted.', 'ok'); }
-        catch (ex) { toast(ex.message || 'Could not delete category.', 'error'); }
+      const actions = el('div', { class: 'community-member-card__actions' });
+      const rename = el('button', { class: 'btn sm', type: 'button' }, 'Rename');
+      rename.addEventListener('click', () => openCategoryRename(serverId, cat, reload));
+      const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, '▲');
+      up.addEventListener('click', async () => {
+        const ids = cats.map((c) => String(c.id));
+        [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+        try { await Api.reorderCategories(serverId, ids); await reload(); }
+        catch (ex) { toast(ex.message || 'Could not reorder categories.', 'error'); }
       });
-      row.appendChild(del); list.appendChild(row);
+      const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === cats.length - 1 }, '▼');
+      down.addEventListener('click', async () => {
+        const ids = cats.map((c) => String(c.id));
+        [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+        try { await Api.reorderCategories(serverId, ids); await reload(); }
+        catch (ex) { toast(ex.message || 'Could not reorder categories.', 'error'); }
+      });
+      const del = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
+      del.addEventListener('click', () => {
+        confirmDialog({
+          title: 'Delete category?',
+          message: (cat.name || 'Category') + ' will be removed. Its ' + channels.length + ' channel(s) become uncategorized — channels are never deleted with it.',
+          danger: true, confirmText: 'Delete',
+          onConfirm: async () => {
+            try { await Api.deleteCategory(serverId, cat.id); await reload(); toast('Category deleted.', 'ok'); }
+            catch (ex) { toast(ex.message || 'Could not delete category.', 'error'); }
+          },
+        });
+      });
+      actions.append(rename, up, down, del);
+      row.appendChild(actions);
+      list.appendChild(row);
+      for (const ch of channels) {
+        const chRow = el('div', { class: 'community-channel-row' });
+        chRow.appendChild(el('span', { class: 'ch-prefix' }, '#'));
+        chRow.appendChild(el('span', { class: 'ch-name' }, ch.name || 'channel'));
+        if (ch.topic) chRow.appendChild(el('span', { class: 'row-sub' }, ch.topic));
+        chRow.appendChild(el('span', { class: 'spacer' }));
+        const edit = el('button', { class: 'btn sm', type: 'button' }, 'Edit');
+        edit.addEventListener('click', () => openChannelEditor(serverId, ch, cats, reload));
+        const chDel = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
+        chDel.addEventListener('click', () => {
+          confirmDialog({
+            title: 'Delete channel?',
+            message: '#' + (ch.name || 'channel') + ' and its messages will be permanently deleted.',
+            danger: true, confirmText: 'Delete',
+            onConfirm: async () => {
+              try { await Api.deleteChannel(serverId, ch.id); await reload(); toast('Channel deleted.', 'ok'); }
+              catch (ex) { toast(ex.message || 'Could not delete channel.', 'error'); }
+            },
+          });
+        });
+        chRow.append(edit, chDel);
+        list.appendChild(chRow);
+      }
+    });
+    const ungrouped = allChannels.filter((c) => !c.category_id);
+    if (ungrouped.length) {
+      list.appendChild(el('div', { class: 'section-label' }, 'Text channels'));
+      for (const ch of ungrouped) {
+        const chRow = el('div', { class: 'community-channel-row' });
+        chRow.appendChild(el('span', { class: 'ch-prefix' }, '#'));
+        chRow.appendChild(el('span', { class: 'ch-name' }, ch.name || 'channel'));
+        if (ch.topic) chRow.appendChild(el('span', { class: 'row-sub' }, ch.topic));
+        chRow.appendChild(el('span', { class: 'spacer' }));
+        const edit = el('button', { class: 'btn sm', type: 'button' }, 'Edit');
+        edit.addEventListener('click', () => openChannelEditor(serverId, ch, cats, reload));
+        const chDel = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
+        chDel.addEventListener('click', () => {
+          confirmDialog({
+            title: 'Delete channel?',
+            message: '#' + (ch.name || 'channel') + ' and its messages will be permanently deleted.',
+            danger: true, confirmText: 'Delete',
+            onConfirm: async () => {
+              try { await Api.deleteChannel(serverId, ch.id); await reload(); toast('Channel deleted.', 'ok'); }
+              catch (ex) { toast(ex.message || 'Could not delete channel.', 'error'); }
+            },
+          });
+        });
+        chRow.append(edit, chDel);
+        list.appendChild(chRow);
+      }
     }
   };
   add.addEventListener('click', async () => {
     const n = input.value.trim(); if (!n) return;
-    try { await Api.createCategory(serverId, { name: n }); input.value = ''; await enterServer(serverId); paint(); toast('Category created.', 'ok'); }
+    try { await Api.createCategory(serverId, { name: n }); input.value = ''; await reload(); toast('Category created.', 'ok'); }
     catch (ex) { toast(ex.message || 'Could not create category.', 'error'); }
   });
   paint(); container.appendChild(wrap);
+}
+
+function openCategoryRename(serverId, cat, onDone) {
+  const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: cat.name || '' });
+  const err = el('div', { class: 'form-error', hidden: true });
+  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const save = el('button', { class: 'btn primary', type: 'button' }, 'Rename');
+  const modal = openModal({
+    title: 'Rename category',
+    body: el('div', {}, err, el('div', { class: 'field' }, el('label', {}, 'Name'), name)),
+    footer: [cancel, save],
+  });
+  cancel.addEventListener('click', () => modal.close());
+  save.addEventListener('click', async () => {
+    err.hidden = true;
+    try {
+      await Api.renameCategory(serverId, cat.id, name.value.trim());
+      modal.close();
+      toast('Category renamed.', 'ok');
+      await onDone();
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not rename category.'; }
+  });
+}
+
+function openChannelEditor(serverId, ch, cats, onDone) {
+  const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: ch.name || '' });
+  const topic = el('input', { class: 'input', type: 'text', maxlength: 200, value: ch.topic || '' });
+  const catSel = el('select', { class: 'input' });
+  catSel.appendChild(el('option', { value: '' }, 'No category'));
+  for (const c of cats) {
+    const o = el('option', { value: String(c.id) }, c.name || 'Category');
+    if (String(ch.category_id) === String(c.id)) o.selected = true;
+    catSel.appendChild(o);
+  }
+  const err = el('div', { class: 'form-error', hidden: true });
+  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const save = el('button', { class: 'btn primary', type: 'button' }, 'Save channel');
+  const modal = openModal({
+    title: 'Edit channel',
+    body: el('div', {}, err,
+      el('div', { class: 'field' }, el('label', {}, 'Name'), name),
+      el('div', { class: 'field' }, el('label', {}, 'Topic'), topic),
+      el('div', { class: 'field' }, el('label', {}, 'Category'), catSel)),
+    footer: [cancel, save],
+  });
+  cancel.addEventListener('click', () => modal.close());
+  save.addEventListener('click', async () => {
+    err.hidden = true;
+    try {
+      await Api.updateChannel(serverId, ch.id, {
+        name: name.value.trim(), topic: topic.value.trim(), categoryId: catSel.value || null,
+      });
+      modal.close();
+      toast('Channel updated.', 'ok');
+      await onDone();
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not update channel.'; }
+  });
 }
 
 // ---- create channel ---------------------------------------------------------

@@ -7,6 +7,8 @@ import { esc, el, clear, toast, confirmDialog } from './ui.js';
 import { avatar, loadAuthedImage } from './components.js';
 import { renderContextHeader, renderAllChrome } from './shell.js';
 import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';
+import { renderBackendSelector } from './pages-public.js';
+import Realtime from './realtime.js';
 
 function accountTabs(active) {
   const tabs = el('div', { class: 'settings-nav' });
@@ -441,12 +443,12 @@ function renderUpdates(wrap) {
     box.appendChild(el('p', {}, 'You are running Trycord in a browser. The browser build does not auto-update.'));
     box.appendChild(el('p', { class: 'muted small' }, 'The desktop app checks for and installs updates automatically.'));
     wrap.appendChild(el('div', {},
-      el('a', { class: 'btn primary', href: 'https://github.com/LanxTheShowmaker/.trycord/releases', rel: 'noopener', target: '_blank' }, 'Download the desktop app')));
+      el('a', { class: 'btn primary', href: 'https://github.com/trycord/.trycord/releases', rel: 'noopener', target: '_blank' }, 'Download the desktop app')));
     return;
   }
 
   const status = el('p', { class: 'muted small', 'aria-live': 'polite' }, 'Checking update status…');
-  const releaseLink = el('a', { class: 'btn', href: 'https://github.com/LanxTheShowmaker/.trycord/releases', rel: 'noopener', target: '_blank' }, 'Open Releases page');
+  const releaseLink = el('a', { class: 'btn', href: 'https://github.com/trycord/.trycord/releases', rel: 'noopener', target: '_blank' }, 'Open Releases page');
   const checkBtn = el('button', { class: 'btn primary', type: 'button' }, 'Check for updates');
   const installBtn = el('button', { class: 'btn danger', type: 'button', hidden: true }, 'Restart & update');
   let prefs = { autoInstall: true, channel: 'latest' };
@@ -552,6 +554,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
           try {
             await Api.revokeAllSessions();
           } finally {
+            try { Realtime.disconnect(); } catch { /* ignore */ }
             clearSession();
             location.hash = '#/login';
           }
@@ -577,11 +580,17 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     const logoutBtn = el('button', { class: 'btn danger', type: 'button' }, 'Sign out');
     logoutBtn.addEventListener('click', async () => {
       try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
+      // Shut the gateway down first: a lingering socket would keep
+      // reconnecting (and reusing a dead token) after sign-out.
+      try { Realtime.disconnect(); } catch { /* ignore */ }
       clearSession();
       location.hash = '#/login';
     });
     wrap.appendChild(el('div', { class: 'section-label' }, 'Session'));
     wrap.appendChild(el('div', { class: 'row-line' }, logoutBtn));
+    const backendBox = el('div', { class: 'auth-box', style: { marginTop: 'var(--t-d-5)' } });
+    renderBackendSelector(backendBox);
+    wrap.appendChild(backendBox);
   }
 
   container.appendChild(wrap);

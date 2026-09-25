@@ -61,6 +61,7 @@ function tables(engine) {
       id          VARCHAR(64) PRIMARY KEY,
       server_id   VARCHAR(64) NOT NULL,
       name        VARCHAR(64) NOT NULL,
+      color       VARCHAR(16),
       position    INTEGER NOT NULL DEFAULT 0,
       permissions TEXT NOT NULL,
       is_default  INTEGER NOT NULL DEFAULT 0,
@@ -74,9 +75,27 @@ function tables(engine) {
       server_id VARCHAR(64) NOT NULL,
       nickname  TEXT,
       joined_at VARCHAR(64) NOT NULL,
+      timeout_expires_at VARCHAR(64),
       UNIQUE (user_id, server_id),
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+
+    // Community bans: persistent per-server ban state. A ban row blocks
+    // (re)joining; expiry makes temporary bans self-lifting. Distinct from
+    // platform enforcement (admins table) — this is community moderation.
+    `CREATE TABLE IF NOT EXISTS server_bans (
+      id         VARCHAR(64) PRIMARY KEY,
+      server_id  VARCHAR(64) NOT NULL,
+      user_id    VARCHAR(64) NOT NULL,
+      actor_id   VARCHAR(64) NOT NULL,
+      reason     TEXT,
+      expires_at VARCHAR(64),
+      created_at VARCHAR(64) NOT NULL,
+      UNIQUE (server_id, user_id),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (actor_id) REFERENCES users(id)
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS member_roles (
@@ -355,6 +374,10 @@ const LEGACY_ALTERS = [
   ['users', 'avatar_url', 'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)'],
   ['users', 'banner_url', 'ALTER TABLE users ADD COLUMN banner_url VARCHAR(512)'],
   ['users', 'status_text', 'ALTER TABLE users ADD COLUMN status_text VARCHAR(128)'],
+  // F1/F2 community overhaul: persisted role colors, bot identity, timeouts.
+  ['users', 'is_bot', 'ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0'],
+  ['roles', 'color', 'ALTER TABLE roles ADD COLUMN color VARCHAR(16)'],
+  ['server_members', 'timeout_expires_at', 'ALTER TABLE server_members ADD COLUMN timeout_expires_at VARCHAR(64)'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -390,10 +413,14 @@ const MYSQL_ADD = [
   ['users', 'avatar_url', 'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)'],
   ['users', 'banner_url', 'ALTER TABLE users ADD COLUMN banner_url VARCHAR(512)'],
   ['users', 'status_text', 'ALTER TABLE users ADD COLUMN status_text VARCHAR(128)'],
+  ['users', 'is_bot', 'ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0'],
+  ['roles', 'color', 'ALTER TABLE roles ADD COLUMN color VARCHAR(16)'],
+  ['server_members', 'timeout_expires_at', 'ALTER TABLE server_members ADD COLUMN timeout_expires_at VARCHAR(64)'],
 ];
 
 const INDEXES = [
   'CREATE INDEX idx_members_server ON server_members(server_id)',
+  'CREATE INDEX idx_bans_server ON server_bans(server_id)',
   'CREATE INDEX idx_roles_server ON roles(server_id)',
   'CREATE INDEX idx_member_roles_lookup ON member_roles(server_id, user_id)',
   'CREATE INDEX idx_channels_server ON channels(server_id)',

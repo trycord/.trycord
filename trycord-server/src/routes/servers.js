@@ -8,6 +8,7 @@ const { resolveServer, requireMember, requireOwner, requirePerm } = require('../
 const { fail, serviceError } = require('../errors');
 const servers = require('../services/servers');
 const memberships = require('../services/memberships');
+const events = require('../services/events');
 const permissions = require('../services/permissions');
 
 const router = express.Router();
@@ -45,7 +46,9 @@ router.get('/by-code/:code', async (req, res, next) => {
 // Legacy permanent-code join (kept for back-compat; invites are the real system).
 router.post('/join/:code', async (req, res, next) => {
   try {
-    res.json(await memberships.joinByCode(req.params.code, req.user));
+    const out = await memberships.joinByCode(req.params.code, req.user);
+    if (out && out.serverId) events.emit(out.serverId, 'member_joined', { userId: String(req.user.id) });
+    res.json(out);
   } catch (e) { serviceError(res, e); }
 });
 
@@ -60,7 +63,9 @@ router.patch('/:id', resolveServer, requirePerm('MANAGE_SERVER'), async (req, re
   try {
     const { name, description, isPublic, isDiscoverable } = req.body || {};
     await servers.update(req.server.id, { name, description, isPublic, isDiscoverable });
-    res.json(await servers.detail(req.server.id, req.user.id, req.access && req.access.permissions));
+    const detail = await servers.detail(req.server.id, req.user.id, req.access && req.access.permissions);
+    events.emit(req.server.id, 'server_updated', { server: { id: detail.id, name: detail.name } });
+    res.json(detail);
   } catch (e) { serviceError(res, e); }
 });
 
@@ -90,6 +95,40 @@ router.post('/:id/kick', resolveServer, requirePerm('KICK_MEMBERS'), async (req,
   } catch (e) { serviceError(res, e); }
 });
 
+// Ban: persistent per-server ban (member removed now, rejoin blocked until
+// lifted/expired). Hierarchy is enforced in the service; BAN_MEMBERS gates.
+router.post('/:id/ban', resolveServer, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
+  try {
+    const { userId, reason, minutes } = req.body || {};
+    if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
+    res.json(await memberships.ban(req.server.id, req.user.id, userId, { reason, minutes }));
+  } catch (e) { serviceError(res, e); }
+});
+
+router.post('/:id/unban', resolveServer, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
+  try {
+    const { userId } = req.body || {};
+    if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
+    res.json(await memberships.unban(req.server.id, userId));
+  } catch (e) { serviceError(res, e); }
+});
+
+router.get('/:id/bans', resolveServer, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
+  try {
+    res.json(await memberships.listBans(req.server.id));
+  } catch (e) { next(e); }
+});
+
+// Timeout: member stays but cannot post until it lapses. minutes null/0
+// clears. Enforced on every message send, server-side.
+router.post('/:id/timeout', resolveServer, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
+  try {
+    const { userId, minutes } = req.body || {};
+    if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
+    res.json(await memberships.timeout(req.server.id, req.user.id, userId, minutes));
+  } catch (e) { serviceError(res, e); }
+});
+
 // Set/clear a member nickname. Anyone may set their own; staff (KICK_MEMBERS)
 // may set any member's. resolver + memberships gate membership itself.
 router.patch('/:id/members/:userId/nickname', resolveServer, requireMember, async (req, res, next) => {
@@ -102,7 +141,9 @@ router.patch('/:id/members/:userId/nickname', resolveServer, requireMember, asyn
         return fail(res, 'PERMISSION_DENIED', 'you can only change your own nickname here');
       }
     }
-    res.json(await memberships.setNickname(req.server.id, targetId, (req.body || {}).nickname));
+    const out = await memberships.setNickname(req.server.id, targetId, (req.body || {}).nickname);
+    events.emit(req.server.id, 'member_updated', { userId: String(targetId) });
+    res.json(out);
   } catch (e) { serviceError(res, e); }
 });
 
