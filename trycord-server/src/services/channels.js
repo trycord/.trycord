@@ -27,6 +27,58 @@ async function deleteCategory(serverId, categoryId) {
   return { ok: true };
 }
 
+async function renameCategory(serverId, categoryId, name) {
+  const clean = String(name || '').trim().slice(0, 32);
+  if (!clean) throw { code: 'VALIDATION_ERROR', message: 'category name required' };
+  const cat = await db.get('SELECT * FROM categories WHERE id = ? AND server_id = ?', [categoryId, serverId]);
+  if (!cat) throw { code: 'NOT_FOUND', message: 'category not found' };
+  await db.run('UPDATE categories SET name = ? WHERE id = ?', [clean, cat.id]);
+  return db.get('SELECT * FROM categories WHERE id = ?', [cat.id]);
+}
+
+// Atomic reorder of this server's categories. The id list must match
+// exactly; positions are rewritten 0..n in one transaction.
+async function reorderCategories(serverId, orderedIds) {
+  if (!Array.isArray(orderedIds) || !orderedIds.length) {
+    throw { code: 'VALIDATION_ERROR', message: 'orderedIds must be a non-empty array' };
+  }
+  return db.transaction(async (t) => {
+    const rows = await t.all('SELECT id FROM categories WHERE server_id = ?', [serverId]);
+    const known = new Set(rows.map((r) => String(r.id)));
+    const clean = orderedIds.map(String);
+    if (clean.length !== known.size || !clean.every((id) => known.has(id))) {
+      throw { code: 'VALIDATION_ERROR', message: 'orderedIds must contain exactly the server categories' };
+    }
+    let pos = 0;
+    for (const id of clean) {
+      await t.run('UPDATE categories SET position = ? WHERE id = ?', [pos++, id]);
+    }
+    return list(serverId);
+  });
+}
+
+// Atomic reorder of this server's channels. Same exact-match contract as
+// categories; channel<->category association is unchanged (use update to
+// move a channel between categories first).
+async function reorderChannels(serverId, orderedIds) {
+  if (!Array.isArray(orderedIds) || !orderedIds.length) {
+    throw { code: 'VALIDATION_ERROR', message: 'orderedIds must be a non-empty array' };
+  }
+  return db.transaction(async (t) => {
+    const rows = await t.all('SELECT id FROM channels WHERE server_id = ?', [serverId]);
+    const known = new Set(rows.map((r) => String(r.id)));
+    const clean = orderedIds.map(String);
+    if (clean.length !== known.size || !clean.every((id) => known.has(id))) {
+      throw { code: 'VALIDATION_ERROR', message: 'orderedIds must contain exactly the server channels' };
+    }
+    let pos = 0;
+    for (const id of clean) {
+      await t.run('UPDATE channels SET position = ? WHERE id = ?', [pos++, id]);
+    }
+    return list(serverId);
+  });
+}
+
 async function list(serverId) {
   // Categories and channels are independent — fetch concurrently.
   const [cats, channels] = await Promise.all([
@@ -90,4 +142,4 @@ async function remove(serverId, channelId) {
   });
 }
 
-module.exports = { categories, createCategory, deleteCategory, list, create, update, remove };
+module.exports = { categories, createCategory, renameCategory, reorderCategories, deleteCategory, list, create, update, remove, reorderChannels };

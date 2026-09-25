@@ -2029,3 +2029,53 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
 }
+
+/* ============================================================
+   F1/F2 community surfaces: bot identity, persisted role colors,
+   member management rows, channel rows, community profile block.
+   ============================================================ */
+
+.bot-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--t-accent) 18%, transparent);
+  color: var(--t-accent);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+}
+.member-name-line { display: flex; align-items: center; min-width: 0; }
+.member-name-line strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-color-dot {
+  display: inline-block;
+  width: 9px; height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+.role-pill-wrap { display: inline-flex; align-items: center; gap: 2px; }
+.role-unassign {
+  display: inline-grid;
+  place-items: center;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  color: var(--t-mut);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.role-unassign:hover { color: var(--t-err); background: color-mix(in srgb, var(--t-err) 14%, transparent); }
+.community-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 22px;
+  border-radius: 9px;
+  color: var(--t-txt2);
+}
+.community-channel-row:hover { background: color-mix(in srgb, var(--t-txt) 4%, transparent); }
+.community-channel-row .ch-name { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.prof-community { margin-top: var(--t-d-4); padding-top: var(--t-d-3); border-top: 1px solid var(--t-line); display: flex; flex-direction: column; gap: 6px; }

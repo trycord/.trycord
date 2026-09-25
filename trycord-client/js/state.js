@@ -14,6 +14,7 @@ const state = {
   members: [],         // current server member rows
   permissions: [],     // current server permission strings (+is_owner via all)
   roles: [],           // current server roles
+  bans: [],            // current server bans (staff only, refreshed on demand)
   presence: new Map(), // userId -> 'online'|'offline'
   dms: [],             // dmSummary list
   friends: [],         // friend rows
@@ -40,7 +41,28 @@ export function can(perm) {
 }
 
 export function peerPresence(id) {
-  return state.presence.get(id) || 'offline';
+  return state.presence.get(String(id)) || state.presence.get(id) || 'offline';
+}
+
+// Server-room hooks (join/leave the community realtime room). Set once by
+// app.js — state must not import realtime (realtime imports state).
+let serverRoomHooks = { join() {}, leave() {} };
+export function setServerRoomHooks(hooks) {
+  serverRoomHooks = Object.assign({ join() {}, leave() {} }, hooks || {});
+}
+
+// Active view repaint hook, set by workspace renderers so realtime community
+// events can repaint the current view. Cleared on every route change.
+export function setViewRefresh(fn) {
+  state.raw.refresh = typeof fn === 'function' ? fn : null;
+}
+export function clearViewRefresh() {
+  state.raw.refresh = null;
+}
+export function repaintView() {
+  try {
+    if (typeof state.raw.refresh === 'function') state.raw.refresh();
+  } catch { /* a stale view must never break the event loop */ }
 }
 
 // ---- session ------------------------------------------------------------
@@ -48,6 +70,12 @@ export function peerPresence(id) {
 export function hydrate() {
   state.token = token();
   return state.token ? Api.me().then((me) => {
+    // A 200 with an empty/non-JSON body yields null — treat it exactly
+    // like a dead session instead of storing a null user.
+    if (!me || typeof me !== 'object' || !me.id) {
+      clearSession();
+      return null;
+    }
     state.me = me;
     return me;
   }).catch(() => {
@@ -57,8 +85,20 @@ export function hydrate() {
   }) : Promise.resolve(null);
 }
 
+function validAuthPayload(payload) {
+  return !!(payload && typeof payload === 'object' &&
+    typeof payload.token === 'string' && payload.token &&
+    payload.user && typeof payload.user === 'object' && payload.user.id);
+}
+
 export function applyAuth(payload) {
-  // payload: { token, user }
+  // Contract: { token: string, user: { id, ... } }. Never dereference the
+  // payload before proving its shape — a misconfigured backend, proxy, or
+  // captive portal can answer 200 with HTML/empty bodies, which the API
+  // layer surfaces as null. Callers catch the thrown error and show it.
+  if (!validAuthPayload(payload)) {
+    throw new Error('The backend did not return a valid session. Check the configured backend and try again.');
+  }
   setToken(payload.token);
   state.token = payload.token;
   state.me = payload.user;
@@ -112,15 +152,54 @@ export async function enterServer(serverId) {
   state.roles = roles || [];
   state.lastServerId = serverId;
   try { localStorage.setItem(LS_SERVER_ID, serverId); } catch { /* ignore */ }
+  // Join the community realtime room, then backfill live presence for every
+  // visible member (pushes alone only reach friends/DM peers otherwise).
+  try { serverRoomHooks.join(serverId); } catch { /* ignore */ }
+  try {
+    const ids = (members || []).map((m) => m.user_id || m.id).filter(Boolean).slice(0, 100);
+    if (ids.length) {
+      const snap = await Api.presence(ids);
+      if (snap && typeof snap === 'object') {
+        for (const [id, p] of Object.entries(snap)) {
+          state.presence.set(String(id), p);
+          state.presence.set(id, p);
+        }
+      }
+    }
+  } catch { /* presence is best-effort */ }
   return { detail, layout, members, perms, roles };
 }
 
+// Serialized community refresh for realtime handlers: concurrent events
+// chain instead of racing, so state always converges to the latest fetch.
+let serverRefreshChain = Promise.resolve();
+export function refreshServerView() {
+  const sid = state.lastServerId;
+  if (!sid) return Promise.resolve(null);
+  const run = serverRefreshChain.then(() => enterServer(sid)).catch(() => null);
+  serverRefreshChain = run.catch(() => null);
+  return run.then(() => { repaintView(); return null; });
+}
+
+export async function refreshBans() {
+  const sid = state.lastServerId;
+  if (!sid) { state.bans = []; return state.bans; }
+  try {
+    state.bans = (await Api.serverBans(sid)) || [];
+  } catch {
+    state.bans = [];
+  }
+  return state.bans;
+}
+
 export function leaveServerContext() {
+  try { serverRoomHooks.leave(); } catch { /* ignore */ }
   state.serverDetail = null;
   state.channels = { categories: [], channels: [] };
   state.members = [];
   state.permissions = [];
   state.roles = [];
+  state.bans = [];
   state.lastServerId = null;
   try { localStorage.removeItem(LS_SERVER_ID); } catch { /* ignore */ }
 }
@@ -153,7 +232,7 @@ export async function refreshActivity() {
 }
 
 export function setPresence(id, presence) {
-  state.presence.set(id, presence);
+  state.presence.set(String(id), presence);
 }
 
 export function setOnline(v) {

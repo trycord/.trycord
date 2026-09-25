@@ -20,6 +20,7 @@ async function main() {
     'attachments', 'dm_conversations', 'dm_members', 'dm_messages',
     'friend_requests', 'friendships', 'notifications',
     'admins', 'reports', 'moderation_actions', 'appeals', 'audit_logs',
+    'server_bans',
   ];
   const missing = required.filter((t) => !names.includes(t));
   if (missing.length) throw new Error('missing tables: ' + missing.join(', '));

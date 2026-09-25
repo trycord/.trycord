@@ -110,6 +110,27 @@ router.post('/users/:id/lift', async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
+// Bot identity is server-controlled and persisted: only platform admins can
+// flip it. The flag flows into member lists, search, and profiles so the
+// client can answer "is this a bot?" from real data, never heuristics.
+router.post('/users/:id/bot', async (req, res, next) => {
+  try {
+    const target = await db.get('SELECT id FROM users WHERE id = ?', [req.params.id]);
+    if (!target) return fail(res, 'NOT_FOUND', 'user not found');
+    const isBot = (req.body || {}).isBot;
+    if (typeof isBot !== 'boolean') return fail(res, 'VALIDATION_ERROR', 'isBot must be a boolean');
+    await db.run('UPDATE users SET is_bot = ? WHERE id = ?', [isBot ? 1 : 0, target.id]);
+    try {
+      const { uuid, now } = require('../util');
+      await db.run(
+        'INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [uuid(), req.user.id, isBot ? 'bot_flag_set' : 'bot_flag_cleared', 'user', target.id, null, now()]
+      );
+    } catch { /* audit is best-effort */ }
+    res.json({ id: target.id, isBot });
+  } catch (e) { serviceError(res, e); }
+});
+
 // --- servers ---
 
 router.get('/servers', async (req, res, next) => {

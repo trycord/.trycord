@@ -6,6 +6,7 @@ const rateLimit = require('../middleware/ratelimit');
 const { resolveServer, requirePerm } = require('../middleware/serverAccess');
 const { fail, serviceError } = require('../errors');
 const invites = require('../services/invites');
+const events = require('../services/events');
 
 // --- per-server management (MANAGE_INVITES) ---
 const managed = express.Router({ mergeParams: true });
@@ -20,7 +21,9 @@ managed.get('/', requirePerm('MANAGE_INVITES'), async (req, res, next) => {
 managed.post('/', requirePerm('MANAGE_INVITES'), async (req, res, next) => {
   try {
     const { maxUses, expiresInHours } = req.body || {};
-    res.json(await invites.create(req.server.id, req.user.id, { maxUses, expiresInHours }));
+    const inv = await invites.create(req.server.id, req.user.id, { maxUses, expiresInHours });
+    events.emit(req.server.id, 'invite_created', { invite: inv });
+    res.json(inv);
   } catch (e) { serviceError(res, e); }
 });
 
@@ -28,7 +31,9 @@ managed.delete('/:inviteId', requirePerm('MANAGE_INVITES'), async (req, res, nex
   try {
     const inv = await invites.getById(req.params.inviteId);
     if (!inv || inv.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'invite not found');
-    res.json(await invites.revoke(inv));
+    const out = await invites.revoke(inv);
+    events.emit(req.server.id, 'invite_revoked', { inviteId: String(inv.id) });
+    res.json(out);
   } catch (e) { next(e); }
 });
 
@@ -46,7 +51,9 @@ byCode.get('/:code/preview', async (req, res, next) => {
 
 byCode.post('/:code/join', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
   try {
-    res.json(await invites.joinWithCode(req.params.code, req.user));
+    const out = await invites.joinWithCode(req.params.code, req.user);
+    if (out && out.serverId) events.emit(out.serverId, 'member_joined', { userId: String(req.user.id) });
+    res.json(out);
   } catch (e) { serviceError(res, e); }
 });
 

@@ -18,8 +18,10 @@ export class ApiError extends Error {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 25000;
+
 function base() {
-  return TrycordConfig.apiUrl().replace(/\/+$/, '');
+  return TrycordConfig.backendUrl().replace(/\/+$/, '');
 }
 
 export function token() {
@@ -50,10 +52,15 @@ async function request(method, path, { body, auth = true, raw = false, form = fa
     payload = JSON.stringify(body);
   }
   let res;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
   try {
-    res = await fetch(url, { method, headers, body: payload, credentials: 'omit' });
-  } catch {
+    res = await fetch(url, { method, headers, body: payload, credentials: 'omit', signal: ctrl.signal });
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new ApiError('TIMEOUT', 'the request timed out — the backend may be unreachable', 0);
     throw new ApiError('NETWORK', 'cannot reach the Trycord server', 0);
+  } finally {
+    clearTimeout(timer);
   }
   if (res.status === 401) {
     // Token missing/bad/revoked: drop it and surface a typed error so the
@@ -106,7 +113,7 @@ const Api = {
   updateMe: (body) => request('PATCH', '/api/users/me', { body }),
   searchUsers: (q) => request('GET', '/api/users/search?q=' + encodeURIComponent(q)),
   presence: (ids) => request('GET', '/api/users/presence?ids=' + encodeURIComponent(ids.join(','))),
-  user: (id) => request('GET', '/api/users/' + encodeURIComponent(id)),
+  user: (id, serverId) => request('GET', '/api/users/' + encodeURIComponent(id) + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
   legacyMe: () => request('GET', '/api/me'),
 
   // ---- profile media -----------------------------------------------------
@@ -129,6 +136,10 @@ const Api = {
   serverMembers: (id) => request('GET', '/api/servers/' + encodeURIComponent(id) + '/members'),
   leaveServer: (id) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/leave'),
   kickMember: (id, userId) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/kick', { body: { userId } }),
+  banMember: (id, userId, body) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/ban', { body: { userId, ...(body || {}) } }),
+  unbanMember: (id, userId) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/unban', { body: { userId } }),
+  serverBans: (id) => request('GET', '/api/servers/' + encodeURIComponent(id) + '/bans'),
+  timeoutMember: (id, userId, minutes) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/timeout', { body: { userId, minutes } }),
   setNickname: (serverId, userId, nickname) =>
     request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/members/' + encodeURIComponent(userId) + '/nickname', { body: { nickname } }),
   serverByCode: (code) => request('GET', '/api/servers/by-code/' + encodeURIComponent(code)),
@@ -147,6 +158,12 @@ const Api = {
   createCategory: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/categories', { body }),
   deleteCategory: (serverId, categoryId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/categories/' + encodeURIComponent(categoryId)),
+  renameCategory: (serverId, categoryId, name) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/categories/' + encodeURIComponent(categoryId), { body: { name } }),
+  reorderCategories: (serverId, orderedIds) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/categories/reorder', { body: { orderedIds } }),
+  reorderChannels: (serverId, orderedIds) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels/reorder', { body: { orderedIds } }),
 
   // ---- messages -------------------------------------------------------------
   messages: (channelId, { before, limit } = {}) => {
@@ -185,6 +202,8 @@ const Api = {
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId) + '/assign', { body: { userId } }),
   unassignRole: (serverId, roleId, userId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId) + '/assign/' + encodeURIComponent(userId)),
+  reorderRoles: (serverId, orderedIds) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles/reorder', { body: { orderedIds } }),
 
   // ---- invites ---------------------------------------------------------------------
   invites: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/invites'),
@@ -271,6 +290,8 @@ joinDiscover: (id) =>
       { body: { actionType, reason, expiresInHours: hours, reportId, confirm } }),
   adminLiftUser: (userId, reason) =>
     request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/lift', { body: { reason } }),
+  adminSetBot: (userId, isBot) =>
+    request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/bot', { body: { isBot: !!isBot } }),
   adminServers: ({ q = '', limit = 25 } = {}) =>
     request('GET', '/api/admin/servers?q=' + encodeURIComponent(q) + '&limit=' + limit),
   adminServerActions: (serverId) =>

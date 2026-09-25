@@ -20,7 +20,7 @@
 const crypto = require('crypto');
 const WebSocket = require('ws');
 const db = require('./db');
-const { now, uuid, visibleChannel } = require('./util');
+const { now, uuid, visibleChannel, isMember } = require('./util');
 const { hasPermission } = require('./services/permissions');
 const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
 const dms = require('./services/dms');
@@ -104,6 +104,72 @@ function createGateway(server) {
     });
   }
 
+  // Server rooms: serverId -> sockets that opened the community. Structural
+  // changes (roles, channels, members, invites, settings) have no single
+  // channel to broadcast on, so they fan out here. Join is membership-gated
+  // exactly like channel join; delivery additionally requires the socket to
+  // still be a member, so a removed socket can never linger on events.
+  const serverRooms = new Map();
+  function leaveServerRoom(ws) {
+    if (ws.serverRoom === undefined) return;
+    const set = serverRooms.get(String(ws.serverRoom));
+    if (set) {
+      set.delete(ws);
+      if (!set.size) serverRooms.delete(String(ws.serverRoom));
+    }
+    ws.serverRoom = undefined;
+  }
+  function joinServerRoom(ws, serverId) {
+    leaveServerRoom(ws);
+    ws.serverRoom = String(serverId);
+    const key = String(serverId);
+    if (!serverRooms.has(key)) serverRooms.set(key, new Set());
+    serverRooms.get(key).add(ws);
+  }
+  async function broadcastServer(serverId, payload) {
+    const data = JSON.stringify(payload);
+    const set = serverRooms.get(String(serverId));
+    if (!set) return;
+    for (const c of [...set]) {
+      if (c.readyState !== WebSocket.OPEN) continue;
+      if (!c.user) continue;
+      try {
+        if (!(await isMember(c.user.id, serverId))) continue;
+      } catch { continue; }
+      try { c.send(data); } catch { /* dead socket: cleaned on close */ }
+    }
+  }
+  // Remove one user's sockets from a server's rooms (kick/ban/leave): they
+  // stop receiving that community immediately. The socket itself stays up
+  // so other servers and DMs keep working; broadcastServer additionally
+  // re-checks membership per send, so removal is enforced twice.
+  function evictUserFromServer(serverId, userId) {
+    const set = serverRooms.get(String(serverId));
+    if (set) {
+      [...set].forEach((c) => {
+        if (c.user && String(c.user.id) === String(userId)) {
+          set.delete(c);
+          if (c.serverRoom !== undefined && String(c.serverRoom) === String(serverId)) c.serverRoom = undefined;
+        }
+      });
+      if (!set.size) serverRooms.delete(String(serverId));
+    }
+    if (channelRooms.size) {
+      for (const [key, room] of channelRooms) {
+        if (!key.startsWith(String(serverId) + '/')) continue;
+        [...room].forEach((c) => {
+          if (c.user && String(c.user.id) === String(userId)) {
+            room.delete(c);
+            if (c.serverId !== undefined && String(c.serverId) === String(serverId)) {
+              c.serverId = undefined; c.channelId = undefined;
+            }
+          }
+        });
+        if (!room.size) channelRooms.delete(key);
+      }
+    }
+  }
+
   // DM delivery: every connected socket of every participant. Clients
   // dedupe by message id (the sender's own tabs get the event too).
   function broadcastDm(memberIds, payload) {
@@ -117,8 +183,11 @@ function createGateway(server) {
     });
   }
 
-  // Users who should hear about this user's presence flips: DM peers plus
-  // friends. Best-effort: presence must never break messaging.
+  // Users who should hear about this user's presence flips: DM peers,
+  // friends, plus fellow members of every shared community (so member
+  // lists can show live online/offline state). Best-effort: presence must
+  // never break messaging. Fan-out stays bounded: announcePresence only
+  // sends to currently-online targets.
   async function affectedUsers(userId) {
     try {
       const peers = await db.all(
@@ -128,8 +197,14 @@ function createGateway(server) {
         [userId, userId]
       );
       const friends = await db.all('SELECT friend_id AS id FROM friendships WHERE user_id = ?', [userId]);
+      const members = await db.all(
+        `SELECT m2.user_id AS id FROM server_members m
+         JOIN server_members m2 ON m2.server_id = m.server_id
+         WHERE m.user_id = ? AND m2.user_id != ?`,
+        [userId, userId]
+      );
       const ids = new Set();
-      peers.concat(friends).forEach((r) => ids.add(String(r.id)));
+      peers.concat(friends).concat(members).forEach((r) => ids.add(String(r.id)));
       ids.delete(String(userId));
       return [...ids];
     } catch {
@@ -240,7 +315,7 @@ function createGateway(server) {
       }
 
       trackOpen(ws, user.id);
-      ws.on('close', () => { leaveRoom(ws); trackClose(ws, user.id); });
+      ws.on('close', () => { leaveRoom(ws); leaveServerRoom(ws); trackClose(ws, user.id); });
       ws.on('message', (raw) => {
         const nowMs = Date.now();
         ws.msgTimes = ws.msgTimes.filter((t) => nowMs - t < MSG_WINDOW_MS);
@@ -259,6 +334,15 @@ function createGateway(server) {
             const ch = await visibleChannel(data.channelId, user.id);
             if (!ch) return;
             joinRoom(ws, ch.server_id, ch.id);
+          } else if (data.type === 'join-server') {
+            // Open a community: membership verified, same as channel join.
+            // Structural events for this server fan out to this room.
+            const sid = String(data.serverId || '');
+            if (!sid) return;
+            if (!(await isMember(user.id, sid))) return;
+            joinServerRoom(ws, sid);
+          } else if (data.type === 'leave-server') {
+            leaveServerRoom(ws);
           } else if (data.type === 'msg') {
             if (!ws.channelId) return;
             const content = String(data.content || '').trim().slice(0, 2000);
@@ -268,6 +352,14 @@ function createGateway(server) {
             if (!ch) return;
             // Same gate as the HTTP post: membership alone is not enough.
             if (!(await hasPermission(user.id, ch.server_id, 'SEND_MESSAGES'))) return;
+            // Timed-out members stay connected (read-only) but cannot post.
+            try {
+              const t = await db.get(
+                'SELECT timeout_expires_at FROM server_members WHERE server_id = ? AND user_id = ?',
+                [ch.server_id, user.id]
+              );
+              if (t && t.timeout_expires_at && new Date(t.timeout_expires_at).getTime() > Date.now()) return;
+            } catch { /* fail open to the permission gate above */ }
             const msg = {
               id: uuid(), channel_id: ch.id, server_id: ch.server_id,
               author_id: user.id, user: user.username, content, created_at: now(),
@@ -318,7 +410,7 @@ function createGateway(server) {
   }, HEARTBEAT_MS);
   heartbeat.unref();
 
-  return { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser };
+  return { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer };
 }
 
 module.exports = createGateway;

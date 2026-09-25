@@ -25,14 +25,19 @@ let typingTimer = null;
 let closedIntentionally = false;
 
 function wsUrl(ticket) {
-  const api = TrycordConfig.apiUrl().replace(/\/+$/, '');
-  const base = api.replace(/^http/i, 'ws');
-  return base + '/?ticket=' + encodeURIComponent(ticket);
+  // Single derivation from BACKEND_URL: https -> wss, http -> ws.
+  return TrycordConfig.wsUrl(ticket);
 }
 
 async function connect() {
-  if (!isAuthed() || closedIntentionally) return;
+  // Explicit (re)connect: a previous intentional shutdown no longer applies.
+  closedIntentionally = false;
   clearTimeout(reconnectTimer);
+  // Never stack sockets: an already-open/connecting gateway is reused, a
+  // stale one is torn down before dialing fresh.
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  if (ws) { try { ws.close(1000, 'reconnect'); } catch { /* ignore */ } ws = null; }
+  if (!isAuthed()) return;
   try {
     const { ticket } = await Api.wsTicket();
     if (!ticket) throw new Error('no ticket');
@@ -41,6 +46,7 @@ async function connect() {
     scheduleReconnect();
     return;
   }
+  if (closedIntentionally || !isAuthed()) return;
 
   ws = new WebSocket(wsUrl(currentTicket));
 
@@ -103,6 +109,8 @@ const TrycordRealtime = {
   },
   join(channelId) { joinedChannel = channelId; send({ type: 'join', channelId }); },
   leaveChannel() { joinedChannel = null; },
+  joinServer(serverId) { send({ type: 'join-server', serverId }); },
+  leaveServer() { send({ type: 'leave-server' }); },
   sendMessageToChannel(content, attachments) {
     const body = {};
     if (content) body.content = content;
