@@ -200,11 +200,12 @@ async function boot() {
 
   // Safe public instance metadata. Never secrets, paths, or credentials.
   app.get('/api/instance', (req, res) => {
+    const mail = require('./auth/mail');
     res.json({
       instanceId: inst.instanceId,
       name: inst.name,
       globalSync: inst.globalUrl !== '',
-      features: { publicDiscovery: true, uploads: true },
+      features: { publicDiscovery: true, uploads: true, email: mail.mode() === 'smtp' && !!process.env.SMTP_HOST },
     });
   });
 
@@ -343,6 +344,8 @@ async function boot() {
     app.get('/features', publicPage('features.html'));
     app.get('/docs', publicPage('documentation.html'));
     app.get('/download', publicPage('download.html'));
+    app.get('/security', publicPage('security.html'));
+    app.get('/status', publicPage('status.html'));
     app.get('/welcome', publicPage('index.html'));
     app.get('/404', publicPage('404.html'));
     console.log('[info] serving public website from ' + publicDir);

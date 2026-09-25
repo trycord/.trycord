@@ -52,8 +52,10 @@ export const TrycordConfig = {
   },
 
   // Fetch the server-provided /runtime-config.js when served over http(s).
-  // Harmless no-op when it fails (offline, file://, server pinned elsewhere).
+  // Harmless no-op when it fails (offline, server pinned elsewhere). File and
+  // other non-HTTP(S) clients skip the request instead of logging a failed fetch.
   async loadRuntimeConfig() {
+    if (window.location.protocol !== 'http:' && window.location.protocol !== 'https:') return null;
     try {
       const base = window.location.origin.replace(/\/+$/, '');
       const res = await fetch(base + '/runtime-config.js', { cache: 'no-store' });

@@ -11,6 +11,7 @@ const rateLimit = require('../middleware/ratelimit');
 const { TERMS_VERSION, PRIVACY_VERSION } = require('../legal');
 const { checkPassword } = require('../auth/passwords');
 const enforcement = require('../services/enforcement');
+const recovery = require('../auth/recovery');
 
 function isUniqueViolation(e) {
   const msg = String((e && e.message) || '');
@@ -19,7 +20,9 @@ function isUniqueViolation(e) {
 
 router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
-    const { username, password, displayName, termsVersion, privacyVersion } = req.body || {};
+    const { username, password, displayName, email: rawEmail, termsVersion, privacyVersion } = req.body || {};
+    const email = rawEmail ? recovery.normalizeEmail(rawEmail) : null;
+    if (rawEmail && !email) return fail(res, 'VALIDATION_ERROR', 'email address is invalid');
     if (!username || !password) return fail(res, 'VALIDATION_ERROR', 'username and password required');
     const pwErr = checkPassword(password);
     if (pwErr) return fail(res, 'VALIDATION_ERROR', pwErr);
@@ -32,19 +35,24 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
     if (!/^[A-Za-z0-9_.]{2,32}$/.test(name)) {
       return fail(res, 'VALIDATION_ERROR', 'username must be 2-32 chars: letters, numbers, _ or .');
     }
+    if (email) {
+      const taken = await db.get('SELECT id FROM users WHERE email = ?', [email]);
+      if (taken) return fail(res, 'CONFLICT', 'that email is already in use');
+    }
     const id = uuid();
     const hash = await bcrypt.hash(String(password), 10);
     try {
       await db.run(
-        'INSERT INTO users (id, username, display_name, password_hash, created_at, terms_version, privacy_version, terms_accepted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, name, String(displayName || name).slice(0, 32), hash, now(), TERMS_VERSION, PRIVACY_VERSION, now()]
+        'INSERT INTO users (id, username, display_name, password_hash, created_at, terms_version, privacy_version, terms_accepted_at, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, String(displayName || name).slice(0, 32), hash, now(), TERMS_VERSION, PRIVACY_VERSION, now(), email]
       );
     } catch (e) {
       if (isUniqueViolation(e)) return fail(res, 'CONFLICT', 'username taken');
       throw e;
     }
+    if (email) recovery.requestVerification(id, email).catch(() => {});
     const token = sign({ id, username: name });
-    res.json({ token, user: { id, username: name, displayName: displayName || name, createdAt: now() } });
+    res.json({ token, user: { id, username: name, displayName: displayName || name, email: email || null, emailVerified: false, createdAt: now() } });
   } catch (e) { next(e); }
 });
 

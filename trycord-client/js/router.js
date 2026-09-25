@@ -54,6 +54,7 @@ function requireAuth() {
 
 async function renderRoute() {
   const { path, parts } = parseHash();
+  document.documentElement.dataset.route = path || '/';
   const region = viewRegion();
   if (!region) return;
 
@@ -68,6 +69,9 @@ async function renderRoute() {
     renderContextHeader({});
     PagesPublic.login(region);
     setNavRoute(() => '/login');
+    // The default route renders the login surface. Normalize presentation state
+    // so route-scoped auth layout applies to both `/` and `/login`.
+    document.documentElement.dataset.route = '/login';
     renderAllChrome();
     return;
   }
@@ -80,6 +84,12 @@ async function renderRoute() {
   if (path.startsWith('/forgot')) {
     if (isAuthed()) { location.hash = '#/home'; return; }
     PagesPublic.forgot(region);
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/reset-password/')) {
+    if (isAuthed()) { location.hash = '#/home'; return; }
+    PagesPublic.resetPassword(region, parts[1]);
     renderAllChrome();
     return;
   }
@@ -147,7 +157,8 @@ async function renderRoute() {
 
   // --- platform admin ------------------------------------------------------
   if (path.startsWith('/admin/')) {
-    await renderAdmin(region, { section: parts[1] });
+    const adminSection = parts[1] === 'servers' ? 'communities' : (parts[1] || 'overview');
+    await renderAdmin(region, { section: adminSection });
     renderAllChrome();
     return;
   }
@@ -206,6 +217,21 @@ async function renderRoute() {
     }
     if (what === 'invites') {
       await Workspace.renderInvites(region, serverId);
+      renderAllChrome();
+      return;
+    }
+    if (what === 'members') {
+      await Workspace.renderServerMembers(region, serverId);
+      renderAllChrome();
+      return;
+    }
+    if (what === 'roles') {
+      await Workspace.renderServerRoles(region, serverId);
+      renderAllChrome();
+      return;
+    }
+    if (what === 'categories') {
+      await Workspace.renderServerCategories(region, serverId);
       renderAllChrome();
       return;
     }

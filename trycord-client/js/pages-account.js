@@ -6,7 +6,7 @@ import State, { clearSession, refreshServers } from './state.js';
 import { esc, el, clear, toast, confirmDialog } from './ui.js';
 import { avatar, loadAuthedImage } from './components.js';
 import { renderContextHeader, renderAllChrome } from './shell.js';
-import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette } from './theme.js';
+import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';
 
 function accountTabs(active) {
   const tabs = el('div', { class: 'settings-nav' });
@@ -89,6 +89,118 @@ function renderAppearance(wrap) {
   customPanel.appendChild(el('div', { class: 'field' }, el('label', {}, 'Base tone'), el('div', { class: 'row-line' }, toneDark, toneLight)));
   customPanel.appendChild(el('p', { class: 'muted small' }, 'Two inputs derive the full custom theme (surfaces, text, ambient). Semantic colors stay from the base palette.'));
   wrap.appendChild(customPanel);
+  renderThemeStudio(wrap);
+}
+
+// Custom Theme Studio: safe guided tokens plus validated advanced CSS.
+// Structure, navigation, and authorization UI are never editable here;
+// unsafe CSS is rejected before apply, and failures recover to Ember.
+function renderThemeStudio(wrap) {
+  const studio = el('div', { class: 'theme-studio' });
+  studio.appendChild(el('div', { class: 'section-label' }, 'Custom theme studio'));
+  studio.appendChild(el('p', { class: 'muted small' },
+    'Guided controls adjust the Custom theme safely. Advanced CSS allows deep visual restyling, but structural layout, navigation, and safety surfaces are protected and unsafe CSS is rejected.'));
+
+  const state = loadCustomTheme();
+  const tokens = Object.assign({}, DEFAULT_CUSTOM_TOKENS, state.tokens || {});
+
+  const grid = el('div', { class: 'theme-studio__row' });
+  for (const def of CUSTOM_TOKEN_DEFS) {
+    const select = el('select', { class: 'input' });
+    for (const opt of def.options) {
+      const o = el('option', { value: opt }, opt);
+      if (tokens[def.key] === opt) o.selected = true;
+      select.appendChild(o);
+    }
+    select.addEventListener('change', () => {
+      tokens[def.key] = select.value;
+      const next = saveCustomTheme({ tokens, css: cssInput.value });
+      if (getTheme() === 'custom') {
+        const res = applyCustomTheme(next);
+        paintErrors(res);
+        if (res.ok) toast('Custom theme updated.', 'ok');
+      }
+    });
+    grid.appendChild(el('div', { class: 'field' }, el('label', {}, def.label), select));
+  }
+  studio.appendChild(grid);
+
+  const cssInput = el('textarea', {
+    class: 'theme-studio__css',
+    spellcheck: 'false',
+    placeholder: '/* Advanced visual CSS. Structural layout, navigation, and safety surfaces are protected. */',
+  }, state.css || '');
+  studio.appendChild(el('div', { class: 'field' }, el('label', {}, 'Advanced CSS (visual properties only)'), cssInput));
+
+  const errorsBox = el('div', { class: 'theme-studio__errors' });
+  const paintErrors = (res) => {
+    clear(errorsBox);
+    const problems = [...(res.errors || []), ...(res.problems || [])];
+    if (!problems.length && res.ok) {
+      errorsBox.appendChild(el('div', { class: 'form-success' }, 'Custom theme is valid and active.'));
+      return;
+    }
+    for (const p of problems.slice(0, 8)) errorsBox.appendChild(el('div', { class: 'form-error' }, p));
+  };
+  studio.appendChild(errorsBox);
+
+  const actions = el('div', { class: 'row-line' });
+  const validateBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Validate');
+  validateBtn.addEventListener('click', () => {
+    paintErrors(validateCustomCss(cssInput.value));
+  });
+  const applyBtn = el('button', { class: 'btn primary', type: 'button' }, 'Apply and save');
+  applyBtn.addEventListener('click', () => {
+    const next = saveCustomTheme({ tokens, css: cssInput.value });
+    setTheme('custom');
+    const res = applyCustomTheme(next);
+    paintErrors(res);
+    if (res.ok) toast('Custom theme applied.', 'ok');
+    else toast('Custom theme rejected; Ember restored.', 'error');
+  });
+  const resetBtn = el('button', { class: 'btn danger', type: 'button' }, 'Reset to Ember');
+  resetBtn.addEventListener('click', () => {
+    recoverToEmber();
+    toast('Ember theme restored.', 'ok');
+  });
+  const exportBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Export');
+  exportBtn.addEventListener('click', () => {
+    const blob = new Blob([serializeCustomTheme({ tokens, css: cssInput.value })], { type: 'application/json' });
+    const a = el('a', { href: URL.createObjectURL(blob), download: 'trycord-custom-theme.json' });
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  });
+  const importBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Import');
+  const fileInput = el('input', { type: 'file', accept: '.json,.css,.txt', hidden: true });
+  importBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        let next;
+        try { next = parseCustomTheme(reader.result); }
+        catch { next = { tokens, css: String(reader.result || '') }; }
+        const check = validateCustomCss(next.css);
+        if (!check.ok) { paintErrors(check); return; }
+        saveCustomTheme(next);
+        cssInput.value = next.css || '';
+        setTheme('custom');
+        const res = applyCustomTheme(next);
+        paintErrors(res);
+        if (res.ok) toast('Custom theme imported.', 'ok');
+      } catch (ex) {
+        paintErrors({ ok: false, errors: [ex.message || 'Import failed.'] });
+      }
+      fileInput.value = '';
+    };
+    reader.readAsText(file);
+  });
+  actions.append(validateBtn, applyBtn, resetBtn, exportBtn, importBtn, fileInput);
+  studio.appendChild(actions);
+  wrap.appendChild(studio);
 }
 
 let updatesUnsub = null;

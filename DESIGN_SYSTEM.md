@@ -44,7 +44,7 @@ not a proposed one. It is the reconciliation target for spec §60–63, §55–5
 A theme is a **visual configuration only**: token overrides, never component
 rewrites. Seven themes (`js/theme.js` `THEMES`, `html[data-theme="…"]`):
 
-`trycord` (default, the `:root` set) · `orthocord` · `midnight` · `ember` ·
+`ember` (default) · `trycord` · `orthocord` · `midnight` ·
 `light` · `high-contrast` · `custom`
 
 - Switching: `setTheme(name)` in `js/theme.js` → sets `data-theme` (applies to

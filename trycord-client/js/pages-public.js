@@ -72,7 +72,23 @@ function registerForm(container) {
   const username = el('input', { class: 'input', type: 'text', autocomplete: 'username', placeholder: 'username', minlength: 2, maxlength: 32, required: true });
   const display = el('input', { class: 'input', type: 'text', autocomplete: 'nickname', placeholder: 'Display name (optional)', maxlength: 32 });
   const password = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: 'Password (8+ characters)', minlength: 8, required: true });
+  const email = el('input', { class: 'input', type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
+  const emailHint = el('span', { class: 'hint' }, 'Optional. Verification and recovery require email delivery on this instance.');
+  const emailField = el('div', { class: 'field' }, el('label', {}, 'Email', el('span', { class: 'badge' }, 'optional')), email, emailHint);
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Create account');
+
+  // The server exposes only a boolean capability. SMTP credentials never leave the server.
+  Api.instance().then((info) => {
+    const enabled = !!(info && info.features && info.features.email);
+    email.disabled = !enabled;
+    emailField.classList.toggle('is-disabled', !enabled);
+    emailHint.textContent = enabled
+      ? 'Optional. A verification link will be sent after signup.'
+      : 'Optional email is unavailable until SMTP delivery is configured on this instance.';
+  }).catch(() => {
+    email.disabled = true;
+    emailField.classList.add('is-disabled');
+  });
 
   const form = el('form', {}, err,
     el('div', { class: 'field' },
@@ -81,10 +97,11 @@ function registerForm(container) {
       el('span', { class: 'hint' }, 'Letters, numbers, dots and underscores. 2–32 characters.')),
     el('div', { class: 'field' }, el('label', { for: 'reg-display' }, 'Display name'), display),
     el('div', { class: 'field' }, el('label', { for: 'reg-password' }, 'Password'), password),
+    emailField,
     el('p', { class: 'small muted' },
       'By continuing you agree to the ',
-      el('a', { href: '#/legal/terms', target: '_blank', rel: 'noopener' }, 'Terms of Service'),
-      ' and ', el('a', { href: '#/legal/privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'),
+      el('a', { href: '/terms', target: '_blank', rel: 'noopener' }, 'Terms of Service'),
+      ' and ', el('a', { href: '/privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'),
       '. (v' + esc(legal.termsVersion) + ' / v' + esc(legal.privacyVersion) + ')'),
     submit);
 
@@ -101,6 +118,7 @@ function registerForm(container) {
         username: username.value.trim(),
         password: password.value,
         displayName: display.value.trim() || undefined,
+        email: email.value.trim() || undefined,
         termsVersion: legal.termsVersion,
         privacyVersion: legal.privacyVersion,
       });
@@ -163,6 +181,45 @@ function forgotForm(container) {
   container.appendChild(box);
 }
 
+function resetPasswordPage(container, token) {
+  clear(container);
+  renderContextHeader({ title: 'Reset password' });
+  const box = el('div', { class: 'auth-wrap' });
+  const card = el('div', { class: 'auth-box' });
+  card.appendChild(el('h1', {}, 'Choose a new password'));
+  card.appendChild(el('p', { class: 'auth-sub' }, 'Set a new password for your Trycord account.'));
+  const err = el('div', { class: 'form-error', hidden: true });
+  const ok = el('div', { class: 'form-success', hidden: true });
+  const password = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true, placeholder: 'New password' });
+  const confirm = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true, placeholder: 'Repeat new password' });
+  const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Reset password');
+  const form = el('form', {}, ok, err,
+    el('div', { class: 'field' }, el('label', {}, 'New password'), password),
+    el('div', { class: 'field' }, el('label', {}, 'Confirm password'), confirm),
+    submit);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.hidden = true; ok.hidden = true;
+    if (!token) { err.hidden = false; err.textContent = 'This reset link is missing its token.'; return; }
+    if (password.value !== confirm.value) { err.hidden = false; err.textContent = 'Passwords do not match.'; return; }
+    submit.setAttribute('aria-busy', 'true');
+    try {
+      const res = await Api.resetPassword({ token, newPassword: password.value, confirmPassword: confirm.value });
+      ok.hidden = false;
+      ok.textContent = 'Password reset successfully. You can now sign in.';
+      form.reset();
+      submit.hidden = true;
+      card.appendChild(el('a', { class: 'btn primary', href: '#/login' }, 'Continue to sign in'));
+    } catch (ex) {
+      err.hidden = false;
+      err.textContent = ex.message || 'This reset link is no longer valid.';
+    } finally { submit.removeAttribute('aria-busy'); }
+  });
+  card.appendChild(form);
+  card.appendChild(el('p', { class: 'auth-alt' }, el('a', { href: '#/login' }, 'Back to sign in')));
+  box.appendChild(card); container.appendChild(box);
+}
+
 function legalPage(container, kind) {
   clear(container);
   const titles = { terms: 'Terms of Service', privacy: 'Privacy Policy' };
@@ -220,6 +277,7 @@ const PagesPublic = {
   login: loginForm,
   register: registerForm,
   forgot: forgotForm,
+  resetPassword: resetPasswordPage,
   verify: verifyEmailPage,
   legal: legalPage,
   currentLegal: () => legal,
