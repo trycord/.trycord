@@ -381,7 +381,7 @@ Desktop releases are published through GitHub Releases.
 Public artifact names carry no version number — the product is simply Trycord:
 
 - `Trycord.exe` — stable installer
-- `Trycord-PTB.exe` — public test build
+- `TrycordPTB.exe` — portable build (no install, still self-updates)
 
 Update metadata keeps the internal version so the desktop client can resolve
 updates, but no version number is shown to users.

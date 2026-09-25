@@ -1,6 +1,6 @@
 {
   "name": "trycord-desktop",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "Trycord desktop app: the web client in a native desktop window",
   "author": "Trycord",
   "repository": {
@@ -43,8 +43,9 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "LanxTheShowmaker",
-        "repo": ".trycord"
+        "owner": "trycord",
+        "repo": ".trycord",
+        "releaseType": "release"
       }
     ],
     "win": {
@@ -73,7 +74,7 @@
       "artifactName": "Trycord.${ext}"
     },
     "portable": {
-      "artifactName": "Trycord-PTB.${ext}"
+      "artifactName": "TrycordPTB.${ext}"
     },
     "linux": {
       "icon": "build/icon.png",
