@@ -145,26 +145,59 @@ async function boot() {
   const addCspOrigin = (o) => {
     try { const origin = new URL(o).origin; cspConnect.push(origin, origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')); cspImg.push(origin); } catch { /* ignore unparseable */ }
   };
+  // Reduce a candidate to a bare origin string (scheme + host + port) or
+  // null. Origins cannot carry spaces, quotes, or semicolons, so the
+  // result is always safe to interpolate into the CSP header.
+  const cspOriginOf = (o) => {
+    try {
+      const u = new URL(String(o || '').trim());
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+      return u.origin;
+    } catch { return null; }
+  };
+  const wsOriginOf = (origin) => origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
   [apiOrigin, inst.publicUrl, inst.globalUrl].forEach((o) => o && addCspOrigin(o));
   ['http://localhost:9971', 'http://127.0.0.1:9971', 'https://trycord.dev'].forEach(addCspOrigin);
   String(process.env.CSP_CONNECT_ORIGINS || '')
     .split(',').map((s) => s.trim()).filter(Boolean).forEach(addCspOrigin);
-  const buildCsp = (allowInlineScripts) => [
-    "default-src 'self'",
-    `connect-src ${[...new Set(cspConnect)].join(' ')}`,
-    allowInlineScripts ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    `img-src ${[...new Set(cspImg)].join(' ')}`,
-    "font-src 'self' data:",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-  ].join('; ');
-  const appCsp = buildCsp(false);
-  const showcaseCsp = buildCsp(true);
+  // The served client's own static pin (backend.json) is part of the
+  // centralized backend configuration: allow it once the client directory
+  // is located below. Self-hosters repoint the client by editing that one
+  // file — no source changes, no extra env needed for the common case.
+  function allowClientStaticBackend(clientDir) {
+    if (!clientDir) return;
+    try {
+      const raw = fs.readFileSync(path.join(clientDir, 'backend.json'), 'utf8');
+      const pinned = cspOriginOf(JSON.parse(raw).backendUrl);
+      if (pinned) addCspOrigin(pinned);
+    } catch { /* missing/unparseable file means "no static pin" */ }
+  }
+  const buildCsp = (allowInlineScripts, extraOrigins) => {
+    const connect = [...new Set([...cspConnect, ...(extraOrigins || [])])];
+    return [
+      "default-src 'self'",
+      `connect-src ${connect.join(' ')}`,
+      allowInlineScripts ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      `img-src ${[...new Set(cspImg)].join(' ')}`,
+      "font-src 'self' data:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join('; ');
+  };
   app.use((req, res, next) => {
-    res.setHeader('Content-Security-Policy', req.path.indexOf('showcase') !== -1 ? showcaseCsp : appCsp);
+    // The client's top-precedence backend travels in ?api= (desktop exe,
+    // bookmarks, backend-selector reloads). Reflect that configured origin
+    // — and only that origin — into connect-src so the served page may
+    // reach exactly the backend it was told to use. Anything else still
+    // requires the allowlist above (TRYCORD_API_URL, backend.json,
+    // CSP_CONNECT_ORIGINS, localhost, trycord.dev).
+    const extra = [];
+    const apiParam = cspOriginOf(req.query && req.query.api);
+    if (apiParam) extra.push(apiParam, wsOriginOf(apiParam));
+    res.setHeader('Content-Security-Policy', req.path.indexOf('showcase') !== -1 ? buildCsp(true, extra) : buildCsp(false, extra));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -298,6 +331,8 @@ async function boot() {
   if (!clientDir) {
     console.warn('[warn] web client NOT served: no index.html found next to the server. ' +
       'Deploy the full repository (with trycord-client/) or ignore this if API-only.');
+  } else {
+    allowClientStaticBackend(clientDir);
   }
 
   // Serve the public website (repo-root public/, optional). Plain editable
