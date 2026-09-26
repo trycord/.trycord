@@ -506,6 +506,105 @@ img { max-width: 100%; }
   .shell--desktop .presence-spine { transition: none !important; }
 }
 
+/* ---- collapsible sidebar -------------------------------------------------- */
+/* Collapsed: icon-only rail, labels hidden, tooltips via title attribute.
+   The spine narrows to just the icon column; the nav column collapses. */
+.shell--desktop.sidebar-collapsed .presence-spine {
+  grid-template-columns: var(--ui-rail) !important;
+  width: var(--ui-rail) !important;
+}
+.shell--desktop.sidebar-collapsed .presence-spine__identity,
+.shell--desktop.sidebar-collapsed .presence-spine__global-navigation,
+.shell--desktop.sidebar-collapsed .presence-spine__place-navigation {
+  display: none !important;
+}
+/* Collapse toggle button — visible in both expanded and collapsed states */
+.sidebar-collapse-toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--t-mut);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid var(--t-line);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.sidebar-collapse-toggle:hover {
+  background: var(--t-base2);
+  color: var(--t-txt);
+  border-color: var(--t-line-hi);
+}
+/* When collapsed, the rail-foot toggle gets a divider */
+.shell--desktop.sidebar-collapsed .rail-foot .sidebar-collapse-toggle {
+  margin-top: 8px;
+  position: relative;
+}
+.shell--desktop.sidebar-collapsed .rail-foot .sidebar-collapse-toggle::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 1px;
+  background: var(--t-line);
+}
+/* Profile editor: full-width settings panel */
+.profile-editor {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-5);
+}
+.profile-editor .section-label {
+  font-size: var(--t-fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--t-mut);
+  margin-bottom: var(--t-d-2);
+}
+.profile-editor .field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-2);
+}
+.profile-editor .field label {
+  font-size: var(--t-fs-s);
+  font-weight: 600;
+  color: var(--t-txt2);
+}
+.profile-editor .input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--t-r-s);
+  border: 1px solid var(--t-line);
+  background: var(--t-pg);
+  color: var(--t-txt);
+  font-size: var(--t-fs-m);
+}
+.profile-editor .input:focus {
+  outline: none;
+  border-color: var(--t-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--t-accent) 20%, transparent);
+}
+.profile-editor .hr {
+  height: 1px;
+  background: var(--t-line);
+  margin: var(--t-d-4) 0;
+}
+.profile-editor .row-line {
+  display: flex;
+  align-items: center;
+  gap: var(--t-d-3);
+  flex-wrap: wrap;
+}
+
 .presence-spine__identity {
   grid-column: 2 !important;
   grid-row: 1 !important;
@@ -1860,8 +1959,8 @@ html[data-route^="/verify-email/"] #member-sidebar { display: none !important; }
 .settings-nav { display: flex; gap: var(--t-d-2); flex-wrap: wrap; margin-bottom: var(--t-d-5); padding: 4px; background: var(--t-base); border: 1px solid var(--t-line); border-radius: 9px; width: max-content; max-width: 100%; }
 .settings-nav .btn { border: 0; background: transparent; }
 .settings-nav .btn.active { background: var(--t-accent); color: var(--t-on-accent); }
-/* Two-level settings layout: sidebar nav + content. */
-.settings-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--t-d-5); align-items: start; }
+/* Two-column settings layout: sticky sidebar nav + content. */
+.settings-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--t-d-5); align-items: start; }
 .settings-layout > .settings-nav {
   flex-direction: column;
   align-items: stretch;
@@ -1886,12 +1985,23 @@ html[data-route^="/verify-email/"] #member-sidebar { display: none !important; }
 .settings-layout > .settings-nav .btn.active { background: color-mix(in srgb, var(--t-accent) 16%, transparent); color: var(--t-txt); }
 .settings-layout > .settings-nav .settings-signout { margin-top: 10px; color: var(--t-err); }
 .settings-layout > .settings-nav .settings-signout:hover { background: color-mix(in srgb, var(--t-err) 12%, transparent); color: var(--t-err); }
-.settings-body { min-width: 0; display: flex; flex-direction: column; }
+.settings-body { min-width: 0; display: flex; flex-direction: column; gap: var(--t-d-5); }
 .settings-body > .auth-box:first-child { margin-top: 0; }
+/* Profile editor uses full content width — no narrow auth-box constraint. */
+.settings-body .profile-editor {
+  width: 100%;
+  max-width: 100%;
+}
 .section-label.danger { color: var(--t-err); }
 @media (max-width: 900px) {
   .settings-layout { grid-template-columns: 1fr; }
-  .settings-layout > .settings-nav { position: static; flex-direction: row; width: 100%; }
+  .settings-layout > .settings-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 4px;
+  }
   .settings-layout > .settings-nav .btn { width: auto; }
   .settings-layout > .settings-nav .settings-signout { margin-top: 0; margin-left: auto; }
 }
