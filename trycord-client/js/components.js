@@ -181,6 +181,15 @@ export function messageRow(msg, opts = {}) {
     const pin = el('span', { class: 'msg-pinned', title: 'Pinned message' }, '📌');
     head.appendChild(pin);
   }
+  if (opts.onHover) {
+    const bar = el('div', { class: 'msg-hoverbar' });
+    const react = el('button', { type: 'button', title: 'Add reaction', 'aria-label': 'Add reaction' }, '😊');
+    react.addEventListener('click', (e) => { e.stopPropagation(); opts.onHover('react', react); });
+    const more = el('button', { type: 'button', title: 'More actions', 'aria-label': 'More actions' }, '⋯');
+    more.addEventListener('click', (e) => { e.stopPropagation(); opts.onHover('more', more); });
+    bar.append(react, more);
+    row.appendChild(bar);
+  }
 
   if (msg.attachments && msg.attachments.length) {
     const files = el('div', { class: 'msg-files' });

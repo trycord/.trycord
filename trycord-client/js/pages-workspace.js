@@ -295,6 +295,18 @@ async function renderChannel(container, serverId, channelId) {
   thread.appendChild(feed);
   conv.appendChild(thread);
 
+  // Channel intro block: always tops the feed (scrolls away with
+  // history), doubled as the empty state when there is nothing yet.
+  function channelIntro(withCta) {
+    const box = el('div', { class: 'channel-intro' }, el('div', { class: 'channel-intro__mark' }, '#'));
+    box.setAttribute('data-intro', '1');
+    box.appendChild(el('h2', { class: 'channel-intro__title' }, 'Welcome to #' + chanName));
+    box.appendChild(el('p', { class: 'channel-intro__sub' },
+      (channel && channel.topic) ? channel.topic : 'This is the beginning of the conversation.'));
+    if (withCta) box.appendChild(el('p', { class: 'channel-intro__cta' }, 'Send the first message below.'));
+    return box;
+  }
+
   // ---- history ----
   async function loadOlder(anchor) {
     let msgs = [];
@@ -302,21 +314,25 @@ async function renderChannel(container, serverId, channelId) {
     if (!msgs.length) return;
     const frag = document.createDocumentFragment();
     for (const m of msgs) frag.appendChild(buildMsg(m));
-    thread.insertBefore(thread.firstChild || feed, feed);
-    // prepend in order
-    while (frag.firstChild) feed.insertBefore(frag.firstChild, feed.firstChild);
+    // prepend in order, below the intro block (never above it)
+    const at = feed.querySelector('[data-intro]')?.nextSibling || feed.firstChild;
+    while (frag.firstChild) feed.insertBefore(frag.firstChild, at);
   }
 
   async function reload() {
     clear(feed);
+    feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messages…'));
     let msgs = [];
     try { msgs = await Api.messages(channelId, { limit: 50 }); } catch (ex) {
+      clear(feed);
       feed.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load messages'));
+      const retry = el('button', { class: 'btn sm', type: 'button' }, 'Try again');
+      retry.addEventListener('click', () => reload().catch(() => {}));
+      feed.appendChild(retry);
       return;
     }
-    if (!msgs.length) {
-      feed.appendChild(emptyState('#', 'Welcome to #' + chanName, 'This is the beginning of the conversation.'));
-    }
+    clear(feed);
+    feed.appendChild(channelIntro(msgs.length === 0));
     for (const m of msgs) feed.appendChild(buildMsg(m));
     groupFeed(feed);
     thread.scrollTop = thread.scrollHeight;
@@ -383,26 +399,37 @@ async function renderChannel(container, serverId, channelId) {
       onDelete: () => deleteMsg(m),
       onDownload: (e, att) => downloadAtt(e, att),
       onReact: (emoji, mine) => toggleReaction(m.id, emoji, mine),
+      onHover: (action, anchor) => {
+        if (action === 'react') {
+          showEmojiPicker(anchor, (emoji) => toggleReaction(m.id, emoji, false));
+          return;
+        }
+        const r = anchor.getBoundingClientRect();
+        openMsgMenu(r.left, r.bottom + 4, m, isMine);
+      },
     });
     stampMsgNode(node, m);
     node.addEventListener('contextmenu', (e) => {
       if (e.target.closest('a, button')) return;
       e.preventDefault();
-      const authorName = m.author_display || m.author_name || m.user || 'Unknown';
-      const pinned = pinState.get(String(m.id)) ?? !!m.pinned;
-      showContextMenu(e.clientX, e.clientY, [
-        ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
-        { label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') },
-        ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { location.hash = '#/users/' + m.author_id; } }] : []),
-        { label: 'Add reaction…', onSelect: () => pickReaction(m.id) },
-        ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
-        ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
-        ...(can('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
-        { label: 'Report message', onSelect: () => openReportModal(m) },
-        ...((can('MANAGE_MESSAGES') || isMine) ? [{ label: 'Delete message', danger: true, onSelect: () => deleteMsg(m) }] : []),
-      ]);
+      openMsgMenu(e.clientX, e.clientY, m, isMine);
     });
     return node;
+  }
+  function openMsgMenu(x, y, m, isMine) {
+    const authorName = m.author_display || m.author_name || m.user || 'Unknown';
+    const pinned = pinState.get(String(m.id)) ?? !!m.pinned;
+    showContextMenu(x, y, [
+      ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
+      { label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') },
+      ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { location.hash = '#/users/' + m.author_id; } }] : []),
+      { label: 'Add reaction…', onSelect: () => pickReaction(m.id) },
+      ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
+      ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
+      ...(can('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
+      { label: 'Report message', onSelect: () => openReportModal(m) },
+      ...((can('MANAGE_MESSAGES') || isMine) ? [{ label: 'Delete message', danger: true, onSelect: () => deleteMsg(m) }] : []),
+    ]);
   }
 
   // Continuous-conversation grouping: same author, <5 min apart, later
@@ -484,6 +511,21 @@ async function renderChannel(container, serverId, channelId) {
   composer.appendChild(ta);
   composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
   conv.appendChild(composer);
+  // Locked composer states mirror the server gates (which remain
+  // authoritative): no SEND_MESSAGES, or unverified email.
+  {
+    const me = State.me;
+    const locked = !can('SEND_MESSAGES') ? 'You do not have permission to send messages here.'
+      : (me && !me.emailVerified) ? 'Verify your email to send messages.' : null;
+    if (locked) {
+      ta.disabled = true;
+      ta.placeholder = locked;
+      sendBtn.disabled = true;
+      fileBtn.disabled = true;
+      emojiBtn.disabled = true;
+      composer.classList.add('locked');
+    }
+  }
 
   let pending = [];
   fileBtn.addEventListener('click', () => fileInput.click());
@@ -550,6 +592,14 @@ async function renderChannel(container, serverId, channelId) {
       meId: State.me && State.me.id,
       onEdit: () => editMsg(m), onDelete: () => deleteMsg(m), onDownload: downloadAtt,
       onReact: (emoji, mine) => toggleReaction(m.id, emoji, mine),
+      onHover: (action, anchor) => {
+        if (action === 'react') {
+          showEmojiPicker(anchor, (emoji) => toggleReaction(m.id, emoji, false));
+          return;
+        }
+        const r = anchor.getBoundingClientRect();
+        openMsgMenu(r.left, r.bottom + 4, m, State.me && String(m.author_id) === String(State.me.id));
+      },
     });
     stampMsgNode(node, m);
     const prev = feed.querySelector(sel);
