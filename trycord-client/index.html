@@ -123,29 +123,32 @@
            ==================================================== -->
 
       <aside
-        id="presence-spine"
-        class="presence-spine"
+        id="app-rail"
+        class="app-rail"
         aria-label="Trycord navigation"
       >
 
-        <!-- Authenticated user's real identity -->
+        <!-- Identity lives in the context sidebar header; kept as an empty
+             landmark so the region is addressable by the shell. -->
         <header
           id="identity-region"
-          class="presence-spine__identity"
+          class="rail-identity"
         ></header>
 
         <!-- Global destinations:
-             Home / DMs / other real application destinations -->
+             Home / DMs / other real application destinations.
+             Collapsed into the rail on desktop; kept as a landmark for
+             assistive tech and future per-context rail groups. -->
         <nav
           id="global-navigation"
-          class="presence-spine__global-navigation"
+          class="rail-global-nav"
           aria-label="Global navigation"
         ></nav>
 
         <!-- Real communities belonging to the authenticated user -->
         <section
           id="community-navigation"
-          class="presence-spine__communities"
+          class="app-rail__items"
           aria-label="Communities"
         ></section>
 
@@ -153,7 +156,7 @@
              community/place -->
         <section
           id="place-navigation"
-          class="presence-spine__place-navigation"
+          class="context-sidebar"
           aria-label="Current place navigation"
         ></section>
 
@@ -166,7 +169,7 @@
 
       <main
         id="trycord-main"
-        class="main-environment"
+        class="main-content"
       >
 
         <!--

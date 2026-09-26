@@ -14,7 +14,7 @@ function loginForm(container) {
   clear(container);
   renderContextHeader({ title: 'Welcome back' });
   const box = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'auth-box' });
+  const card = el('div', { class: 'card card--auth' });
   card.appendChild(el('h1', {}, 'Sign in'));
   card.appendChild(el('p', { class: 'auth-sub' }, 'Back to your communities, conversations and presence.'));
 
@@ -79,7 +79,7 @@ function registerForm(container) {
   clear(container);
   renderContextHeader({ title: 'Create an account' });
   const box = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'auth-box' });
+  const card = el('div', { class: 'card card--auth' });
   card.appendChild(el('h1', {}, 'Join Trycord'));
   card.appendChild(el('p', { class: 'auth-sub' },
     'A self-hosted community chat. Pick a name and agree to the policies to continue.'));
@@ -168,7 +168,7 @@ function forgotForm(container) {
   clear(container);
   renderContextHeader({ title: 'Reset password' });
   const box = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'auth-box' });
+  const card = el('div', { class: 'card card--auth' });
   card.appendChild(el('h1', {}, 'Forgot password'));
   card.appendChild(el('p', { class: 'auth-sub' },
     "Tell us the email on your account and we'll send a reset link if it exists."));
@@ -206,7 +206,7 @@ function resetPasswordPage(container, token) {
   clear(container);
   renderContextHeader({ title: 'Reset password' });
   const box = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'auth-box' });
+  const card = el('div', { class: 'card card--auth' });
   card.appendChild(el('h1', {}, 'Choose a new password'));
   card.appendChild(el('p', { class: 'auth-sub' }, 'Set a new password for your Trycord account.'));
   const err = el('div', { class: 'form-error', hidden: true });
@@ -257,7 +257,7 @@ function verifyEmailPage(container, token) {
   clear(container);
   renderContextHeader({ title: 'Verify email' });
   const wrap = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'auth-box' });
+  const card = el('div', { class: 'card card--auth' });
   card.appendChild(el('h1', {}, 'Confirm your email'));
   card.appendChild(el('p', { class: 'auth-sub' }, 'Confirming your recovery address…'));
   const msg = el('div', { class: 'muted small', 'aria-live': 'polite' });

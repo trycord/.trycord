@@ -3,8 +3,8 @@
 
 import Api from './api.js';
 import State, { refreshDms, refreshFriends, isAuthed } from './state.js';
-import { esc, el, clear, toast, relTime, showEmojiPicker, insertAtCursor } from './ui.js';
-import { avatar, emptyState } from './components.js';
+import { esc, el, clear, toast, relTime, showEmojiPicker, insertAtCursor, openModal } from './ui.js';
+import { avatar, emptyState, messageRow } from './components.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
 
@@ -31,7 +31,7 @@ async function renderDmList(container) {
   } else {
     for (const dm of dms) {
       const r = el('button', {
-        class: 'row', type: 'button',
+        class: 'row row--surface', type: 'button',
         dataset: { dmId: dm.id },
         onClick: () => { location.hash = '#/dms/' + dm.id; },
       });
@@ -105,28 +105,20 @@ async function renderDmThread(container, dmId) {
   }
 
   function appendDmMessage(m, toFeed) {
-    // Authoritative-id dedup (F2): the sender's POST is already in the
-    // feed via reload(), and the server fans dm:message back to the
-    // sender's own sockets too. Never render an id twice.
     const target = toFeed || feed;
     if (m && m.id && target.querySelector('[data-message-id="' + m.id + '"]')) return null;
     const mine = String(m.authorId) === String(State.me && State.me.id);
-    const row = el('div', { class: 'msg' + (mine ? ' mine' : ''), dataset: { messageId: m.id } });
-    row.appendChild(avatar({ id: m.authorId, username: m.authorName }, { withPresence: false }));
-    const body = el('div', { class: 'msg-body' });
-    const head = el('div', { class: 'msg-head' });
-    head.appendChild(el('span', { class: 'msg-author' }, m.authorName));
-    head.appendChild(el('span', { class: 'msg-time' }, relTime(m.createdAt)));
-    if (m.editedAt) head.appendChild(el('span', { class: 'msg-edited' }, 'edited'));
-    const actions = el('span', { class: 'msg-actions' });
-    if (mine) {
-      actions.appendChild(el('button', { type: 'button', title: 'Delete', onClick: () => removeDm(dmId, m.id, m) }, '🗑'));
-      actions.appendChild(el('button', { type: 'button', title: 'Edit', onClick: () => editDm(dmId, m) }, '✎'));
-    }
-    head.appendChild(actions);
-    body.appendChild(head);
-    body.appendChild(el('div', { class: 'msg-text' }, esc(m.content)));
-    row.appendChild(body);
+    const row = messageRow({
+      id: m.id,
+      author_id: m.authorId,
+      author_name: m.authorName,
+      content: m.content,
+      created_at: m.createdAt,
+      edited_at: m.editedAt,
+      meId: State.me && State.me.id,
+      onDelete: mine ? () => removeDm(dmId, m.id, m) : null,
+      onEdit: mine ? () => editDm(dmId, m) : null,
+    });
     target.appendChild(row);
     return row;
   }
@@ -140,18 +132,17 @@ async function renderDmThread(container, dmId) {
   async function editDm(cid, m) {
     const textarea = el('textarea', { class: 'textarea', style: { minHeight: '60px' } }, m.content);
     const saveBtn = el('button', { class: 'btn primary sm', type: 'button' }, 'Save');
-    const modal = el('div', { class: 'modal-root' });
-    const box = el('div', { class: 'modal' });
-    box.appendChild(el('h3', {}, 'Edit message'));
-    box.appendChild(textarea);
-    box.appendChild(el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-3)' } },
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.remove() }, 'Cancel'), saveBtn));
-    modal.appendChild(box);
-    container.appendChild(modal);
+    const cancelBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+    const modal = openModal({
+      title: 'Edit message',
+      body: textarea,
+      footer: el('div', { class: 'row-line' }, cancelBtn, saveBtn),
+    });
+    cancelBtn.addEventListener('click', () => modal.close());
     saveBtn.addEventListener('click', async () => {
       try {
         await Api.updateDm(cid, m.id, textarea.value.trim());
-        modal.remove();
+        modal.close();
       } catch (ex) { toast(ex.message || 'Cannot edit', 'error'); }
     });
   }
@@ -272,7 +263,7 @@ async function renderFriends(container) {
       return;
     }
     for (const u of items) {
-      const r = el('div', { class: 'row' });
+      const r = el('div', { class: 'row row--surface' });
       r.appendChild(avatar(u, { withPresence: true }));
       const m = el('div', { class: 'row-main' });
       m.appendChild(el('div', { class: 'row-title' }, u.displayName || u.username));
@@ -309,7 +300,7 @@ async function renderFriendsList(wrap) {
   if (State.friendsIn.length) {
     reqsBox.appendChild(el('div', { class: 'section-label' }, 'Incoming requests'));
     for (const r of State.friendsIn) {
-      const row = el('div', { class: 'row' });
+      const row = el('div', { class: 'row row--surface' });
       row.appendChild(avatar(r.from, { withPresence: false }));
       const m = el('div', { class: 'row-main' });
       m.appendChild(el('div', { class: 'row-title' }, r.from.displayName || r.from.username));
@@ -330,7 +321,7 @@ async function renderFriendsList(wrap) {
   if (State.friendsOut.length) {
     reqsBox.appendChild(el('div', { class: 'section-label' }, 'Outgoing requests'));
     for (const r of State.friendsOut) {
-      const row = el('div', { class: 'row' });
+      const row = el('div', { class: 'row row--surface' });
       row.appendChild(avatar(r.to, { withPresence: false }));
       const m = el('div', { class: 'row-main' });
       m.appendChild(el('div', { class: 'row-title' }, r.to.displayName || r.to.username));
@@ -346,7 +337,7 @@ async function renderFriendsList(wrap) {
   if (State.friends.length) {
     reqsBox.appendChild(el('div', { class: 'section-label' }, 'Friends'));
     for (const f of State.friends) {
-      const row = el('div', { class: 'row' });
+      const row = el('div', { class: 'row row--surface' });
       row.appendChild(avatar(f, { withPresence: true }));
       const m = el('div', { class: 'row-main' });
       m.appendChild(el('div', { class: 'row-title' }, f.displayName || f.username));

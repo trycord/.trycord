@@ -38,7 +38,7 @@ export async function renderSupport(container) {
 
   const grid = el('div', { class: 'theme-grid' });
   const card = (title, text, href, label) => {
-    const box = el('div', { class: 'auth-box' });
+    const box = el('div', { class: 'card card--auth' });
     box.appendChild(el('h1', { style: { fontSize: '1.15rem' } }, title));
     box.appendChild(el('p', { class: 'auth-sub' }, text));
     box.appendChild(el('a', { class: 'btn primary', href }, label));
@@ -92,8 +92,8 @@ export async function renderMyAppeals(container) {
     return;
   }
   for (const a of items) {
-    const row = el('article', { class: 'community-member-card' });
-    const info = el('div', { class: 'community-member-card__info' });
+    const row = el('article', { class: 'card card--list' });
+    const info = el('div', { class: 'card--list__info' });
     info.appendChild(el('strong', {}, (a.action_type || 'Moderation action') + ' · ' + (APPEAL_STATUS_LABEL[a.status] || a.status || '')));
     info.appendChild(el('span', { class: 'muted small' },
       'Submitted ' + esc(a.created_at || '') + (a.updated_at && a.updated_at !== a.created_at ? ' · updated ' + esc(a.updated_at) : '')));
@@ -107,7 +107,7 @@ export function renderNewAppeal(container) {
   clear(container);
   renderContextHeader({ title: 'Appeal a decision', sub: 'Ask for a second look' });
   const wrap = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'auth-box' });
+  const card = el('div', { class: 'card card--auth' });
   card.appendChild(el('h1', {}, 'Appeal a moderation decision'));
   card.appendChild(el('p', { class: 'auth-sub' },
     'Enter the action ID from your enforcement notice and explain why it should be reconsidered. You do not need to be signed in.'));

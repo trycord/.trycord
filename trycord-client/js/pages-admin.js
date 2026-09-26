@@ -120,7 +120,7 @@ async function renderOverview(body, show, seq) {
 // ---- users ----------------------------------------------------------------
 
 function userRow(u, onChanged) {
-  const row = el('div', { class: 'admin-row' });
+  const row = el('div', { class: 'card card--list--row' });
   const who = el('div', { class: 'admin-avatar' }, initialOf(u.displayName || u.username));
   const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
   idt.append(
@@ -250,7 +250,7 @@ function liftUserModal(user, onDone) {
 // ---- communities ------------------------------------------------------------
 
 function serverRow(s, onChanged) {
-  const row = el('div', { class: 'admin-row' });
+  const row = el('div', { class: 'card card--list--row' });
   const who = el('div', { class: 'admin-avatar' }, initialOf(s.name || s.id));
   const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
   idt.append(
@@ -405,7 +405,7 @@ function serverRemoveModal(server, onDone) {
 // ---- reports ---------------------------------------------------------------
 
 function reportRow(r, refresh) {
-  const row = el('div', { class: 'admin-row' });
+  const row = el('div', { class: 'card card--list--row' });
   row.appendChild(statusChip(r.status));
   const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
   idt.append(
@@ -493,7 +493,7 @@ async function renderReports(body, show, seq) {
 // ---- appeals ---------------------------------------------------------------
 
 function appealRow(a, refresh) {
-  const row = el('div', { class: 'admin-row' });
+  const row = el('div', { class: 'card card--list--row' });
   row.appendChild(statusChip(a.status));
   const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
   idt.append(
@@ -563,7 +563,7 @@ async function renderAppeals(body, show, seq) {
 // ---- audit -----------------------------------------------------------------
 
 function auditRow(a) {
-  const row = el('div', { class: 'admin-row' });
+  const row = el('div', { class: 'card card--list--row' });
   row.appendChild(statusChip(a.action));
   const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
   idt.append(
@@ -624,7 +624,7 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
   // Section renderers append their toolbar + list directly, so the loading
   // node must not linger in body: give them a fresh container that show()
   // repaints, keeping exactly one loading/empty state on screen.
-  const sec = el('div', { class: 'admin-section' });
+  const sec = el('div', { class: 'admin-block' });
   const showSec = (node) => { if (seq === adminSeq) { clear(sec); sec.appendChild(node); } };
   show(sec);
   sec.appendChild(el('div', { class: 'empty-state' }, 'Loading…'));

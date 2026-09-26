@@ -2,7 +2,7 @@
 // based on real geometry, not platform sniffing. Both shells live in the
 // supplied index.html; only one is visible at a time.
 
-const BREAKPOINT = 900;
+const BREAKPOINT = 600;
 let modeCache = null; // 'mobile' | 'desktop'
 let onChange = null;
 let gestureInit = false;

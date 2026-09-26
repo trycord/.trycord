@@ -1,4 +1,4 @@
-﻿// Server workspace: the main Environment when inside a community.
+// Server workspace: the main Environment when inside a community.
 //   /server/:id                 -> landing (channel list summary)
 //   /server/:id/channel/:cid    -> channel conversation
 //   /server/:id/channels/new    -> create channel
@@ -108,7 +108,7 @@ async function renderServerLanding(container, serverId) {
       wrap.appendChild(el('div', { class: 'section-label' }, cat.name));
       for (const ch of inCat) {
         const r = el('button', {
-          class: 'channel-row', type: 'button', style: { marginLeft: 0, width: '100%' },
+          class: 'row row--channel', type: 'button', style: { marginLeft: 0, width: '100%' },
           onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + ch.id; },
         });
         r.appendChild(el('span', { class: 'ch-prefix' }, '#'));
@@ -121,7 +121,7 @@ async function renderServerLanding(container, serverId) {
     if (ungrouped.length) {
       for (const ch of ungrouped) {
         const r = el('button', {
-          class: 'channel-row', type: 'button', style: { marginLeft: 0, width: '100%' },
+          class: 'row row--channel', type: 'button', style: { marginLeft: 0, width: '100%' },
           onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + ch.id; },
         });
         r.appendChild(el('span', { class: 'ch-prefix' }, '#'));
@@ -913,9 +913,9 @@ async function renderServerMembers(container, serverId) {
     for (const m of members) {
       const id = m.user_id || m.id;
       const mine = String(id) === String(State.me && State.me.id);
-      const row = el('article', { class: 'community-member-card' });
+      const row = el('article', { class: 'card card--list' });
       row.appendChild(avatar({ id, username: m.username, displayName: m.nickname || m.display_name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }));
-      const info = el('div', { class: 'community-member-card__info' });
+      const info = el('div', { class: 'card--list__info' });
       const nameLine = el('div', { class: 'member-name-line' },
         el('strong', {}, dispName(m)),
         m.is_bot ? el('span', { class: 'bot-tag' }, 'BOT') : null);
@@ -941,7 +941,7 @@ async function renderServerMembers(container, serverId) {
       if (!m.is_owner && !roles.length) roleBox.appendChild(el('span', { class: 'role-pill muted-role' }, 'Member'));
       info.appendChild(roleBox);
       row.appendChild(info);
-      const actions = el('div', { class: 'community-member-card__actions' });
+      const actions = el('div', { class: 'card--list__actions' });
       actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => { location.hash = '#/users/' + id; } }, 'Profile'));
       if (mine || can('KICK_MEMBERS')) {
         actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => openNicknameModal(serverId, m, wrap) }, 'Nickname'));
@@ -990,8 +990,8 @@ async function renderServerMembers(container, serverId) {
       }
       const blist = el('div', { class: 'community-list' });
       for (const b of State.bans || []) {
-        const row = el('article', { class: 'community-member-card' });
-        const info = el('div', { class: 'community-member-card__info' });
+        const row = el('article', { class: 'card card--list' });
+        const info = el('div', { class: 'card--list__info' });
         info.appendChild(el('strong', {}, b.displayName || b.username || 'Unknown'));
         info.appendChild(el('span', { class: 'muted small' },
           '@' + (b.username || '?') +
@@ -1004,7 +1004,7 @@ async function renderServerMembers(container, serverId) {
           try { await Api.unbanMember(serverId, b.userId); await reload(); toast('Ban lifted.', 'ok'); }
           catch (ex) { toast(ex.message || 'Could not lift ban.', 'error'); }
         });
-        row.appendChild(el('div', { class: 'community-member-card__actions' }, unban));
+        row.appendChild(el('div', { class: 'card--list__actions' }, unban));
         blist.appendChild(row);
       }
       banSection.appendChild(blist);
@@ -1075,7 +1075,7 @@ async function renderServerRoles(container, serverId) {
         (role.is_default ? ' · default' : '')));
       row.appendChild(main);
       if (!role.is_default) {
-        const actions = el('div', { class: 'community-member-card__actions' });
+        const actions = el('div', { class: 'card--list__actions' });
         const edit = el('button', { class: 'btn sm', type: 'button' }, 'Edit');
         edit.addEventListener('click', () => openRoleEditor(serverId, role, allPerms, reload));
         const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, '▲');
@@ -1197,7 +1197,7 @@ async function renderServerCategories(container, serverId) {
       main.appendChild(el('strong', {}, cat.name || 'Category'));
       main.appendChild(el('span', { class: 'muted small' }, channels.length + ' channel' + (channels.length === 1 ? '' : 's')));
       row.appendChild(main);
-      const actions = el('div', { class: 'community-member-card__actions' });
+      const actions = el('div', { class: 'card--list__actions' });
       const rename = el('button', { class: 'btn sm', type: 'button' }, 'Rename');
       rename.addEventListener('click', () => openCategoryRename(serverId, cat, reload));
       const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, '▲');
@@ -1358,7 +1358,7 @@ async function renderNewChannel(container, serverId) {
   }
   renderContextHeader({ title: 'New channel' });
   const wrap = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'auth-box' });
+  const card = el('div', { class: 'card card--auth' });
   const err = el('div', { class: 'form-error', hidden: true });
   const name = el('input', { class: 'input', type: 'text', placeholder: 'channel-name', maxlength: 32, required: true });
   const topic = el('input', { class: 'input', type: 'text', placeholder: 'Topic (optional)', maxlength: 200 });
@@ -1565,7 +1565,7 @@ async function renderNewServer(container, serverId) {
   if (serverId) container.classList.add('hide-nav'); // not used by desktop chrome
   renderContextHeader({ title: 'Create a server' });
   const wrap = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'auth-box' });
+  const card = el('div', { class: 'card card--auth' });
   const err = el('div', { class: 'form-error', hidden: true });
   const name = el('input', { class: 'input', type: 'text', placeholder: 'My community', maxlength: 64, required: true });
   const desc = el('textarea', { class: 'textarea', placeholder: 'What is your community about? (optional)', maxlength: 400 });
