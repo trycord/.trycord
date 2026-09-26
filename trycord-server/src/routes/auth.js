@@ -51,6 +51,9 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
       throw e;
     }
     if (email) recovery.requestVerification(id, email).catch(() => {});
+    // Listed platform admins are promoted at creation too, not just at
+    // boot — accounts made after the server started must not miss it.
+    await enforcement.ensureListedAdmin(id, name);
     const token = sign({ id, username: name });
     res.json({ token, user: { id, username: name, displayName: displayName || name, email: email || null, emailVerified: false, createdAt: now() } });
   } catch (e) { next(e); }
@@ -76,6 +79,9 @@ router.post('/login', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, 
         actionId: action ? action.id : null,
       });
     }
+    // Same promotion at login: covers listed names whose accounts
+    // postdate the last boot, with case-insensitive matching.
+    await enforcement.ensureListedAdmin(user.id, user.username);
     res.json({
       token: sign(user),
       user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },

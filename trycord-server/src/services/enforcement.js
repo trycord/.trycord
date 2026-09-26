@@ -192,6 +192,32 @@ async function ensureAdminUser(userId) {
   );
 }
 
+// ADMIN_USERNAMES handling. The boot bootstrap alone was a footgun:
+// accounts created AFTER boot (or with different case) never became
+// admins, and nothing told the operator why. These helpers run the same
+// idempotent promotion at registration and login, with case-insensitive
+// matching because usernames preserve case but operators type env vars
+// by hand. Never throws — admin promotion must not fail authentication.
+function listedAdminNames() {
+  return String(process.env.ADMIN_USERNAMES || '')
+    .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+}
+
+function isListedAdminName(username) {
+  const name = String(username || '').trim().toLowerCase();
+  return !!name && listedAdminNames().includes(name);
+}
+
+async function ensureListedAdmin(userId, username) {
+  try {
+    if (!userId || !isListedAdminName(username)) return false;
+    await ensureAdminUser(userId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   ACTION_TYPES,
   USER_ACTIONS,
@@ -206,4 +232,7 @@ module.exports = {
   audit,
   isPlatformAdmin,
   ensureAdminUser,
+  listedAdminNames,
+  isListedAdminName,
+  ensureListedAdmin,
 };
