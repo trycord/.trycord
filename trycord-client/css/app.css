@@ -1653,13 +1653,27 @@ html[data-route^="/verify-email/"] #member-sidebar { display: none !important; }
 .settings-layout > .settings-nav {
   flex-direction: column;
   align-items: stretch;
+  gap: 2px;
   width: 100%;
   margin-bottom: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
   position: sticky;
   top: var(--t-d-4);
 }
-.settings-layout > .settings-nav .btn { justify-content: flex-start; width: 100%; }
-.settings-layout > .settings-nav .settings-signout { margin-top: var(--t-d-3); }
+.settings-layout > .settings-nav .btn {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--t-txt2);
+  font-weight: 600;
+}
+.settings-layout > .settings-nav .btn:hover { background: var(--t-base2); color: var(--t-txt); }
+.settings-layout > .settings-nav .btn.active { background: color-mix(in srgb, var(--t-accent) 16%, transparent); color: var(--t-txt); }
+.settings-layout > .settings-nav .settings-signout { margin-top: 10px; color: var(--t-err); }
+.settings-layout > .settings-nav .settings-signout:hover { background: color-mix(in srgb, var(--t-err) 12%, transparent); color: var(--t-err); }
 .settings-body { min-width: 0; display: flex; flex-direction: column; }
 .settings-body > .auth-box:first-child { margin-top: 0; }
 .section-label.danger { color: var(--t-err); }
@@ -1724,6 +1738,11 @@ html[data-route^="/verify-email/"] #member-sidebar { display: none !important; }
 .prof-border { border: 1px solid var(--t-line); border-radius: var(--t-r-m); padding: 18px; }
 
 .community-manager { width: min(var(--ui-page-width), calc(100% - 32px)); margin: 0 auto; padding: 28px 0 48px; }
+/* Management surfaces take the full page: the boxed narrow column is gone,
+   navigation lives in the Discord-style sidebar instead of per-page bars. */
+.page.community-manager { max-width: none; width: 100%; padding-left: clamp(16px, 3vw, 42px); padding-right: clamp(16px, 3vw, 42px); }
+.settings-form { display: flex; flex-direction: column; gap: var(--t-d-4); max-width: 720px; }
+.settings-form .btn.block { width: 100%; }
 .community-manager__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; padding: 18px 20px; border: 1px solid var(--t-line); border-radius: 14px; background: var(--t-base); }
 .community-manager__head h1 { font-size: 1.45rem; margin: 0 0 3px; }
 .community-manager__head p { margin: 0; color: var(--t-mut); }

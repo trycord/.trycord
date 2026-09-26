@@ -350,6 +350,8 @@ joinDiscover: (id) =>
     return request('GET', '/api/admin/reports' + (qs ? '?' + qs : ''));
   },
   adminReport: (id) => request('GET', '/api/admin/reports/' + encodeURIComponent(id)),
+  reportContent: (targetType, targetId, reason) =>
+    request('POST', '/api/reports', { body: { targetType, targetId, reason } }),
   adminUpdateReport: (id, body) =>
     request('PATCH', '/api/admin/reports/' + encodeURIComponent(id), { body }),
   adminAppeals: ({ status, limit = 50 } = {}) => {
