@@ -455,7 +455,9 @@ img { max-width: 100%; }
 .presence-spine {
   display: grid !important;
   grid-template-columns: var(--ui-rail) var(--ui-nav) !important;
-  grid-template-rows: var(--ui-header) minmax(0, 196px) minmax(0, 1fr) !important;
+  /* Row 2 sizes to the global destinations (never clips them); the
+     place column below absorbs all remaining space and scrolls. */
+  grid-template-rows: var(--ui-header) auto minmax(0, 1fr) !important;
   height: 100dvh !important;
   min-height: 0 !important;
   overflow: hidden !important;
@@ -508,11 +510,14 @@ img { max-width: 100%; }
   overflow-x: hidden !important;
   padding: 12px 10px 18px;
   background: var(--t-base);
-  /* Flex column so the session footer pins to the bottom (reference
-     sidebar-user pattern) while the channel list scrolls above it. */
+  /* Flex column: header pinned, scroll middle, footer docked. The
+     region itself never scrolls, so the footer can no longer cover
+     nav rows on short viewports. */
   display: flex !important;
   flex-direction: column !important;
+  overflow-y: hidden !important;
 }
+.place-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 
 .main-environment {
   grid-column: 2 !important;
@@ -1054,12 +1059,10 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: auto;
   padding: 10px 8px 4px;
   border-top: 1px solid var(--t-line);
-  position: sticky;
-  bottom: 0;
   background: var(--t-base);
+  flex: 0 0 auto;
 }
 .place-session__info { min-width: 0; flex: 1 1 auto; }
 .place-session__name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1171,6 +1174,10 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   z-index: 5;
 }
 .verify-banner__text { margin-right: 4px; }
+.report-cats { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.report-cat { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.report-cat:hover { background: var(--t-base2); }
+.report-cat input { accent-color: var(--t-accent); }
 .notif-row { align-items: center; }
 .notif-row.unread { border-color: color-mix(in srgb, var(--t-accent) 55%, var(--t-line)); }
 .unread-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--t-accent); }
@@ -1431,12 +1438,12 @@ select.input { appearance: auto; }
   width: 100%;
   min-height: 100%;
   overflow: auto;
-  padding: 10px;
-  border: 1px solid var(--t-hero-edge);
-  border-radius: 28px;
-  background: linear-gradient(135deg, var(--t-hero-top), var(--t-hero-bottom));
-  box-shadow: var(--t-inset-hi), var(--t-sh-hero);
-  backdrop-filter: blur(var(--t-blur-m)) saturate(var(--t-sat-m));
+  padding: 12px clamp(16px, 3vw, 42px) 48px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 .home-event { padding: var(--t-d-4); border-radius: 18px; }
 .home-event + .home-event { margin-top: 2px; }

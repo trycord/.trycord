@@ -11,7 +11,7 @@ import State, {
   enterServer, refreshServers, leaveServerContext, can, isAuthed, currentServerId, peerPresence,
   refreshBans, setViewRefresh, refreshServerView, refreshMutes, isMuted, setMuted,
 } from './state.js';
-import { esc, el, clear, toast, relTime, confirmDialog, openModal, showContextMenu, showEmojiPicker, insertAtCursor, copyText } from './ui.js';
+import { esc, el, clear, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, showEmojiPicker, insertAtCursor, copyText } from './ui.js';
 function pickReaction(messageId) {
   showEmojiPicker(document.body, async (emoji) => {
     try { await Api.addReaction(activeChannelId, messageId, emoji); }
@@ -316,28 +316,13 @@ async function renderChannel(container, serverId, channelId) {
 
   function openReportModal(m) {
     const authorName = m.author_display || m.author_name || m.user || 'Unknown';
-    const reason = el('textarea', { class: 'textarea', style: { minHeight: '80px' }, maxlength: 255, placeholder: 'Why are you reporting this message?' });
-    const err = el('div', { class: 'form-error', hidden: true });
-    const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
-    const go = el('button', { class: 'btn danger', type: 'button' }, 'Report message');
-    const modal = openModal({
+    openReportDialog({
+      targetType: 'message',
+      targetId: m.id,
       title: 'Report message',
-      body: el('div', {},
-        el('p', { class: 'muted small' }, 'From ' + authorName + '. Moderators will review it.'),
-        err, reason),
-      footer: el('div', { class: 'row-line' }, cancel, go),
+      subtitle: 'From ' + authorName + '. Moderators will review it.',
+      onSubmit: ({ category, extra }) => Api.reportContent('message', m.id, category, extra || undefined),
     });
-    cancel.addEventListener('click', () => modal.close());
-    go.addEventListener('click', async () => {
-      const text = reason.value.trim();
-      if (text.length < 3) { err.hidden = false; err.textContent = 'Please say why (3+ characters).'; return; }
-      try {
-        await Api.reportContent('message', m.id, text);
-        modal.close();
-        toast('Reported. Moderators will review it.', 'ok');
-      } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not send report.'; }
-    });
-    setTimeout(() => { try { reason.focus(); } catch { /* ignore */ } }, 50);
   }
   // Per-view pin state (id -> bool), seeded from payloads and kept fresh
   // by pin/unpin broadcasts so menus and badges never go stale.

@@ -315,6 +315,66 @@ export async function copyText(text, label = 'Copied to clipboard.') {
   toast(label, 'ok');
 }
 
+// ---- report dialog --------------------------------------------------------
+// Trust & Safety entry point shared by message/user reports. Fixed
+// categories map to the report reason (the backend has no category
+// enum — reason + free-text description is the whole contract), so the
+// admin queue shows a consistent label plus details.
+export const REPORT_CATEGORIES = [
+  'Harassment or bullying',
+  'Spam',
+  'Scam or fraud',
+  'Hate or discriminatory content',
+  'Threats or violence',
+  'Sexual or inappropriate content',
+  'Impersonation',
+  'Illegal content',
+  'Other',
+];
+
+export function openReportDialog({ targetType, targetId, title, subtitle, onSubmit }) {
+  const err = el('div', { class: 'form-error', hidden: true });
+  const cats = el('div', { class: 'report-cats', role: 'radiogroup', 'aria-label': 'Reason' });
+  const group = 'rep-' + Math.random().toString(36).slice(2, 8);
+  REPORT_CATEGORIES.forEach((c, i) => {
+    const radio = el('input', { type: 'radio', name: group });
+    if (i === 0) radio.checked = true;
+    cats.appendChild(el('label', { class: 'report-cat' }, radio, el('span', {}, c)));
+  });
+  const details = el('textarea', { class: 'textarea', style: { minHeight: '80px' }, maxlength: 4000, placeholder: 'Additional information (optional)' });
+  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const go = el('button', { class: 'btn danger', type: 'button' }, 'Submit report');
+  const modal = openModal({
+    title: title || 'Report',
+    body: el('div', {},
+      subtitle ? el('p', { class: 'muted small' }, subtitle) : null,
+      el('div', { class: 'field' }, el('label', {}, 'Why are you reporting this?'), cats),
+      el('div', { class: 'field' }, el('label', {}, 'Additional information'), details),
+      err),
+    footer: el('div', { class: 'row-line' }, cancel, go),
+  });
+  cancel.addEventListener('click', () => modal.close());
+  go.addEventListener('click', async () => {
+    const picked = cats.querySelector('input:checked');
+    const category = picked ? picked.closest('label').textContent.trim() : REPORT_CATEGORIES[0];
+    const extra = details.value.trim();
+    err.hidden = true;
+    go.disabled = true;
+    try {
+      if (onSubmit) await onSubmit({ targetType, targetId, category, extra });
+      modal.close();
+      toast('Reported. Moderators will review it.', 'ok');
+    } catch (ex) {
+      err.hidden = false;
+      err.textContent = ex.message || 'Could not send report.';
+    } finally {
+      go.disabled = false;
+    }
+  });
+  setTimeout(() => { try { details.focus(); } catch { /* ignore */ } }, 50);
+  return modal;
+}
+
 // ---- emoji picker ---------------------------------------------------------
 // Curated unicode palette that inserts at the caller's cursor. Pure
 // client-side: no backend, no contracts — the composer sends plain text.
