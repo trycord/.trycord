@@ -246,14 +246,15 @@ export function showUserCard(clientX, clientY, { avatarEl, title, sub, statusLin
   closeContextMenu();
   const root = qs('#popover-root') || document.body;
   const pop = el('div', { class: 'popover user-card', role: 'dialog', 'aria-label': title || 'User' });
+  pop.appendChild(el('div', { class: 'user-card__banner' }));
   const head = el('div', { class: 'user-card__head' });
   if (avatarEl) head.appendChild(avatarEl);
-  const idBox = el('div', { class: 'user-card__id' });
+  pop.appendChild(head);
+  const idBox = el('div', { class: 'user-card__body' });
   idBox.appendChild(el('strong', { class: 'user-card__name' }, title || 'Unknown'));
   if (sub) idBox.appendChild(el('span', { class: 'muted small' }, sub));
   if (statusLine) idBox.appendChild(el('span', { class: 'user-card__status' }, statusLine));
-  head.appendChild(idBox);
-  pop.appendChild(head);
+  pop.appendChild(idBox);
   const btnBox = el('div', { class: 'user-card__actions' });
   for (const a of actions || []) {
     const b = el('button', {

@@ -508,6 +508,10 @@ img { max-width: 100%; }
   overflow-x: hidden !important;
   padding: 12px 10px 18px;
   background: var(--t-base);
+  /* Flex column so the session footer pins to the bottom (reference
+     sidebar-user pattern) while the channel list scrolls above it. */
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 .main-environment {
@@ -578,8 +582,23 @@ img { max-width: 100%; }
   flex: 0 0 auto !important;
   display: flex !important;
   align-items: center !important;
-  gap: 5px !important;
+  gap: 6px !important;
+  margin-left: auto !important;
 }
+/* Chat-header icon buttons: every contextual header action renders as a
+   34px quiet icon button (reference chat-actions pattern). */
+.context-actions button {
+  width: 34px !important;
+  height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  color: var(--t-mut) !important;
+  background: transparent !important;
+  font-size: 1rem !important;
+}
+.context-actions button:hover { background: var(--t-base2) !important; color: var(--t-txt) !important; }
 
 .chat-environment {
   flex: 1 1 auto !important;
@@ -776,27 +795,44 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .presence-spine__communities .server-chip {
   background: var(--t-base2);
-  border: 1px solid var(--t-line);
+  border: 1px solid transparent;
   color: var(--t-txt2);
+  border-radius: 14px;
+  transition:
+    border-radius var(--t-fast) var(--t-ease),
+    background var(--t-fast) var(--t-ease),
+    transform var(--t-fast) var(--t-ease);
 }
-.presence-spine__communities .server-chip::after {
-  content: "";
-  position: absolute;
-  left: -9px;
-  top: 50%;
-  width: 3px;
-  height: 0;
-  border-radius: 0 3px 3px 0;
-  transform: translateY(-50%);
+.presence-spine__communities .server-chip:hover {
   background: var(--t-accent);
-  transition: height var(--t-fast) var(--t-ease);
+  border-color: transparent;
+  border-radius: 12px;
+  color: var(--t-on-accent);
+  transform: translateY(-1px);
 }
 .presence-spine__communities .server-chip.active {
-  background: color-mix(in srgb, var(--t-accent) 17%, var(--t-base2));
-  border-color: color-mix(in srgb, var(--t-accent) 55%, var(--t-line));
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--t-accent) 13%, transparent);
+  background: var(--t-accent);
+  border-color: transparent;
+  border-radius: 12px;
+  color: var(--t-on-accent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--t-accent) 22%, transparent);
 }
-.presence-spine__communities .server-chip.active::after { height: 28px; }
+/* Divider line between community icons and rail actions (create/discover). */
+.presence-spine__communities .community-actions {
+  margin-top: 2px;
+  padding-top: 12px;
+  position: relative;
+}
+.presence-spine__communities .community-actions::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 1px;
+  background: var(--t-line);
+}
 .presence-spine__communities .chip-name,
 .presence-spine__communities .chip-live { display: none; }
 .presence-spine__communities .nav-row {
@@ -815,12 +851,12 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .channel-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   margin: 1px 0;
-  padding: 7px 9px;
-  border-radius: 9px;
+  padding: 6px 10px;
+  border-radius: 8px;
   color: var(--t-mut);
   text-align: left;
 }
@@ -866,9 +902,9 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 44px;
+  min-height: 58px;
   margin: 0 0 8px;
-  padding: 4px 5px 9px;
+  padding: 0 6px 0 8px;
   border-bottom: 1px solid var(--t-line);
   position: relative;
 }
@@ -1012,8 +1048,45 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .pop-sep { height: 1px; background: var(--t-line); margin: 6px 0; }
 .pop-item[disabled] { opacity: 0.45; cursor: default; }
 .pop-item[disabled]:hover { background: transparent; }
-/* User popup card (Checkpoint C): anchored mini profile. */
-.user-card { min-width: 240px; }
+/* Session footer pinned to the bottom of the place navigation
+   (reference sidebar-user pattern): live identity + settings shortcut. */
+.place-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 10px 8px 4px;
+  border-top: 1px solid var(--t-line);
+  position: sticky;
+  bottom: 0;
+  background: var(--t-base);
+}
+.place-session__info { min-width: 0; flex: 1 1 auto; }
+.place-session__name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.place-session__status { color: var(--t-mut); font-size: var(--t-fs-xs); }
+.place-session__settings {
+  flex: 0 0 auto;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  color: var(--t-mut);
+  background: transparent;
+  font-size: 1rem;
+}
+.place-session__settings:hover { background: var(--t-base2); color: var(--t-txt); }
+/* User popup card (Checkpoint C, reference user-popup pattern): banner
+   with overlapping avatar, name + handle, Message/Profile actions. */
+.user-card { min-width: 240px; width: 300px; max-width: calc(100vw - 32px); padding: 0 0 6px; overflow: hidden; }
+.user-card__banner {
+  height: 72px;
+  margin: 0;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--t-base2) 60%, transparent),
+    color-mix(in srgb, var(--t-accent) 38%, var(--t-base2)));
+}
+.popover.user-card .user-card__head { align-items: flex-end; padding: 0 14px; }
+.popover.user-card .user-card__head .avatar { width: 72px; height: 72px; font-size: 1.5rem; margin-top: -36px; border: 6px solid var(--t-elev); flex-shrink: 0; }
+.user-card__body { padding: 8px 14px 4px; display: flex; flex-direction: column; gap: 2px; }
 .user-card__head { display: flex; gap: var(--t-d-3); align-items: center; padding: var(--t-d-2); }
 .user-card__id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .user-card__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1325,14 +1398,15 @@ select.input { appearance: auto; }
 
 .msg {
   display: flex;
-  gap: 11px;
-  padding: 7px 10px;
-  border-radius: 10px;
+  gap: 12px;
+  padding: 8px;
+  margin: 2px 0;
+  border-radius: 6px;
   width: 100%;
   text-align: left;
   position: relative;
 }
-.msg:hover { background: color-mix(in srgb, var(--t-accent) 4%, transparent); }
+.msg:hover { background: color-mix(in srgb, var(--t-txt) 4%, transparent); }
 .msg .msg-body { flex: 1 1 auto; min-width: 0; }
 .msg .msg-head { display: flex; align-items: baseline; gap: var(--t-d-2); flex-wrap: wrap; }
 .msg .msg-author { font-weight: 700; font-size: var(--t-fs-m); color: var(--t-txt); letter-spacing: 0.002em; }

@@ -64,7 +64,7 @@ function memberCard(e, m) {
   const id = m.user_id || m.id;
   const name = m.nickname || m.display_name || m.username || 'Unknown';
   showUserCard(e.clientX, e.clientY, {
-    avatarEl: avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }),
+    avatarEl: avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'lg', withPresence: true }),
     title: name,
     sub: '@' + (m.username || 'unknown'),
     statusLine: m.status_text || null,
@@ -254,6 +254,24 @@ export function renderPlaceNavigation(region) {
   renderCategory('Text channels', grouped.get('__none__') || [], '__none__');
 
   if (!channels.length) region.appendChild(el('div', { class: 'place-empty compact' }, 'No channels yet.'));
+
+  // Session footer (reference sidebar-user pattern): live identity with a
+  // settings shortcut. Additive only — identity-region stays untouched.
+  const me = State.me;
+  if (me) {
+    const foot = el('div', { class: 'place-session' });
+    foot.appendChild(avatar(
+      { id: me.id, username: me.username, displayName: me.display_name, avatarUrl: me.avatar_url },
+      { size: 'sm', withPresence: true }));
+    const info = el('div', { class: 'place-session__info' });
+    info.appendChild(el('div', { class: 'place-session__name' }, me.display_name || me.username || 'You'));
+    info.appendChild(el('div', { class: 'place-session__status' }, 'Online'));
+    foot.appendChild(info);
+    const gear = el('button', { class: 'place-session__settings', type: 'button', title: 'Settings', 'aria-label': 'Open settings' }, '⚙');
+    gear.addEventListener('click', () => { location.hash = '#/settings'; });
+    foot.appendChild(gear);
+    region.appendChild(foot);
+  }
 }
 
 
