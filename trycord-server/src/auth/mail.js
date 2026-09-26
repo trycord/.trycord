@@ -99,9 +99,30 @@ async function sendMail({ to, subject, text, html, kind }) {
   return { delivered: true, captured: false };
 }
 
-function publicUrl() {
-  const raw = (process.env.PUBLIC_URL || process.env.TRYCORD_PUBLIC_URL || 'http://localhost:9971').trim();
+// Base URL of the Trycord CLIENT APP, used for links inside emails
+// (verification, password reset). The client uses hash routing, so links
+// are built as `${clientUrl}/#/path/<token>` with the `#` kept literal —
+// never encode the whole URL (that turns `#` into `%23` and breaks the
+// fragment). Only the token itself is component-encoded.
+//
+// Precedence: explicit CLIENT_URL first (production points it at the
+// hosted app, e.g. https://trycord.dev/trycord-client/index.html), then
+// the legacy PUBLIC_URL/TRYCORD_PUBLIC_URL (self-hosted setups where the
+// server root serves the client), then localhost.
+function clientUrl() {
+  const raw = (process.env.CLIENT_URL || process.env.PUBLIC_URL || process.env.TRYCORD_PUBLIC_URL || 'http://localhost:9971').trim();
   return raw.replace(/\/+$/, '');
 }
 
-module.exports = { sendMail, publicUrl, mode, mailConfig, describe };
+// Email deep link into the client. The fragment MUST stay a literal `#`
+// so the client's hash router receives the route; only the token is
+// encoded (hex tokens pass through unchanged). A base ending in a file
+// (…/index.html) joins directly; a bare host gets the `/` separator.
+function clientLink(path, token) {
+  const base = clientUrl();
+  const frag = '#/' + String(path).replace(/^\/+/, '') + '/' + encodeURIComponent(String(token));
+  const sep = /\.(html?|php|aspx?)$/i.test(base) ? '' : '/';
+  return base + sep + frag;
+}
+
+module.exports = { sendMail, clientUrl, clientLink, mode, mailConfig, describe };

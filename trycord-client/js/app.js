@@ -34,19 +34,8 @@ async function boot() {
     renderAllChrome();
   });
 
-  // 3) Mobile drawer controls.
-  const navToggle = qs('#mobile-nav-toggle');
-  if (navToggle) {
-    navToggle.addEventListener('click', () => {
-      if (document.getElementById('mobile-navigation').classList.contains('open')) closeMobileDrawer();
-      else openMobileDrawer();
-    });
-  }
-  const actionsBtn = qs('#mobile-actions');
-  if (actionsBtn) actionsBtn.addEventListener('click', (e) => {
-    // placeholder: same as opening the drawer from the right edge
-    openMobileDrawer();
-  });
+  // 3) Mobile drawer controls removed with the drawer (clean slate for
+  // the remake). Bottom tabs remain the interim mobile navigation.
 
   // Drawer gestures (edge swipe, drag-to-close, back/backdrop/Escape close).
   initMobileGestures();

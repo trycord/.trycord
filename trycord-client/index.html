@@ -81,43 +81,14 @@
       aria-label="Trycord mobile application"
       hidden
     >
+      <!-- Mobile drawer navigation was removed for a clean-slate remake.
+           Bottom tabs (renderMobileTabs) remain the interim navigation. -->
       <header class="mobile-header">
-        <button
-          id="mobile-nav-toggle"
-          type="button"
-          aria-label="Open navigation"
-          aria-controls="mobile-navigation"
-          aria-expanded="false"
-        >
-          <span aria-hidden="true">☰</span>
-        </button>
-
         <div
           id="mobile-context"
           class="mobile-context"
         ></div>
-
-        <button
-          id="mobile-actions"
-          type="button"
-          aria-label="Open actions"
-        >
-          <span aria-hidden="true">•••</span>
-        </button>
       </header>
-
-      <aside
-        id="mobile-navigation"
-        class="mobile-navigation"
-        aria-label="Trycord navigation"
-        hidden
-      ></aside>
-
-      <div
-        id="mobile-backdrop"
-        class="mobile-backdrop"
-        aria-hidden="true"
-      ></div>
 
       <main
         id="mobile-main"

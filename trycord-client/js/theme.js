@@ -289,8 +289,8 @@ function applyGuidedTokens(p) {
 // ---- Advanced custom CSS (validated, recoverable) -----------------------
 
 const PROTECTED_IDS = new Set([
-  'app', 'mobile-shell', 'mobile-navigation', 'mobile-backdrop', 'mobile-main',
-  'mobile-tab-navigation', 'mobile-nav-toggle', 'mobile-actions', 'mobile-context',
+  'app', 'mobile-shell', 'mobile-main',
+  'mobile-tab-navigation', 'mobile-context',
   'desktop-shell', 'presence-spine', 'identity-region', 'global-navigation',
   'community-navigation', 'place-navigation', 'trycord-main', 'context-header',
   'context-title', 'view-root', 'member-sidebar', 'modal-root', 'popover-root',
@@ -308,7 +308,7 @@ const PROTECTED_CLASSES = new Set([
   'auth-wrap', 'auth-box', 'form-error', 'form-success', 'btn',
   'modal', 'backdrop', 'popover', 'pop-item', 'toast', 'connection-status',
   'settings-nav', 'theme-chip', 'admin-row', 'admin-chip',
-  'mobile-header', 'mobile-navigation', 'mobile-main', 'mobile-tab-navigation',
+  'mobile-header', 'mobile-main', 'mobile-tab-navigation',
 ]);
 
 // Layout/behavior properties are never allowed in custom CSS. Visual-only.
