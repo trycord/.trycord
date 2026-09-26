@@ -33,7 +33,10 @@ export function isAuthed() {
 }
 
 export function currentServerId() {
-  return state.lastServerId || (state.servers[0] && state.servers[0].id) || null;
+  // A malformed backend payload (e.g. empty-body 200) must never brick
+  // every chrome paint with a null-index TypeError — degrade to null.
+  const list = Array.isArray(state.servers) ? state.servers : [];
+  return state.lastServerId || (list[0] && list[0].id) || null;
 }
 
 export function can(perm) {
@@ -126,7 +129,8 @@ export function clearSession() {
 // ---- data -----------------------------------------------------------------
 
 export async function refreshServers() {
-  state.servers = await Api.servers();
+  const list = await Api.servers();
+  state.servers = Array.isArray(list) ? list : [];
   if (state.servers.length) {
     const found = state.servers.find((s) => s.id === state.lastServerId);
     if (!found && state.lastServerId) {
@@ -147,8 +151,8 @@ export async function enterServer(serverId) {
     Api.roles(serverId),
   ]);
   state.serverDetail = detail;
-  state.channels = layout;
-  state.members = members;
+  state.channels = (layout && typeof layout === 'object') ? layout : { categories: [], channels: [] };
+  state.members = Array.isArray(members) ? members : [];
   state.permissions = (perms && perms.permissions) || [];
   state.roles = roles || [];
   state.lastServerId = serverId;
@@ -206,13 +210,14 @@ export function leaveServerContext() {
 }
 
 export async function refreshDms() {
-  state.dms = await Api.dms();
+  const dms = await Api.dms();
+  state.dms = Array.isArray(dms) ? dms : [];
   return state.dms;
 }
 
 export async function refreshFriends() {
   const [friends, reqs] = await Promise.all([Api.friends(), Api.friendRequests()]);
-  state.friends = friends;
+  state.friends = Array.isArray(friends) ? friends : [];
   state.friendsIn = (reqs && reqs.incoming) || [];
   state.friendsOut = (reqs && reqs.outgoing) || [];
   return state;
@@ -245,7 +250,8 @@ export function setMuted(channelId, muted) {
 }
 
 export async function refreshActivity() {
-  state.activity = await Api.activity({ limit: 20 });
+  const activity = await Api.activity({ limit: 20 });
+  state.activity = Array.isArray(activity) ? activity : [];
   return state.activity;
 }
 

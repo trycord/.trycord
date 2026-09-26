@@ -218,7 +218,7 @@ export function renderPlaceNavigation(region) {
   clear(region);
   if (!isAuthed()) return;
   const sid = currentServerId();
-  const server = State.servers.find((x) => String(x.id) === String(sid));
+  const server = (State.servers || []).find((x) => String(x.id) === String(sid));
   const route = currentRoute();
   if (!sid) {
     region.appendChild(el('div', { class: 'place-empty' },
