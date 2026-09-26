@@ -17,7 +17,7 @@
   "scripts": {
     "dev": "node scripts/copy-client.js && electron .",
     "start": "node scripts/copy-client.js && electron .",
-    "smoke": "node scripts/copy-client.js && electron . --smoke-test",
+    "smoke": "node scripts/copy-client.js && electron . --smoke-test --api-url=http://localhost:9971",
     "dist": "node scripts/copy-client.js && electron-builder --win portable --publish never",
     "build": "node scripts/copy-client.js && electron-builder --publish never",
     "build:win": "node scripts/copy-client.js && electron-builder --win --publish never",

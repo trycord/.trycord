@@ -139,7 +139,9 @@ function createWindow() {
           console.log('[smoke] FAIL stylesheet did not parse');
           process.exitCode = 1;
         }
-        if (!String(out).includes('body-bg=rgb(13, 11, 10)')) {
+        // Ember default page token (--t-pg #130b07). Keep in sync with
+        // the Ember block in trycord-client/css/app.css.
+        if (!String(out).includes('body-bg=rgb(19, 11, 7)')) {
           console.log('[smoke] FAIL design tokens did not apply');
           process.exitCode = 1;
         }

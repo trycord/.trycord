@@ -5,7 +5,7 @@
 
 import { esc, el, clear, qs } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, realmTitle } from './components.js';
-import State, { isAuthed, currentServerId, can } from './state.js';
+import State, { isAuthed, currentServerId, can, peerPresence } from './state.js';
 import { closeMobileDrawer } from './presentation.js';
 
 const DESTINATIONS = [
@@ -112,7 +112,23 @@ export function renderPlaceNavigation(region) {
   addMenuItem('Roles', '#/server/' + sid + '/roles');
   addMenuItem('Categories', '#/server/' + sid + '/categories', can('MANAGE_CHANNELS'));
   addMenuItem('Community settings', '#/server/' + sid + '/settings', can('MANAGE_SERVER'));
-  menu.addEventListener('click', (e) => { e.stopPropagation(); menuBox.hidden = !menuBox.hidden; });
+  menu.addEventListener('click', (e) => {
+    e.stopPropagation();
+    menuBox.hidden = !menuBox.hidden;
+    if (!menuBox.hidden) {
+      const closer = (ev) => {
+        if (ev.key === 'Escape' || !menuBox.contains(ev.target)) {
+          menuBox.hidden = true;
+          document.removeEventListener('click', closer);
+          document.removeEventListener('keydown', closer);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener('click', closer);
+        document.addEventListener('keydown', closer);
+      }, 0);
+    }
+  });
   header.append(menu, menuBox);
   region.appendChild(header);
 
@@ -157,17 +173,35 @@ export function renderPlaceNavigation(region) {
 }
 
 
+const LS_HIDE_MEMBERS = 'trycord.hideMembers';
+
+export function membersHidden() {
+  try { return localStorage.getItem(LS_HIDE_MEMBERS) === '1'; } catch { return false; }
+}
+
+export function toggleMembers() {
+  try {
+    localStorage.setItem(LS_HIDE_MEMBERS, membersHidden() ? '0' : '1');
+  } catch { /* ignore */ }
+  renderMemberSidebar(qs('#member-sidebar'));
+}
+
 export function renderMemberSidebar(region) {
   clear(region);
   if (!isAuthed() || !currentServerId() || !State.serverDetail) {
     region.hidden = true;
     return;
   }
+  if (membersHidden()) {
+    region.hidden = true;
+    return;
+  }
   region.hidden = false;
   const server = State.serverDetail;
+  const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
   region.appendChild(el('div', { class: 'member-sidebar__header' },
     el('span', {}, 'Members'),
-    el('span', { class: 'member-count' }, String((State.members || []).length))
+    el('span', { class: 'member-count' }, String(onlineCount) + ' online')
   ));
 
   const roles = Array.isArray(State.roles) ? [...State.roles].sort((a,b) => (Number(b.position)||0) - (Number(a.position)||0)) : [];
@@ -467,4 +501,4 @@ export function renderAllChrome() {
   renderMemberSidebar(qs('#member-sidebar'));
 }
 
-export default { renderAllChrome, renderContextHeader, renderIdentity, renderGlobalNavigation, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, syncMobileNavigation, setNavRoute, DESTINATIONS };
+export default { renderAllChrome, renderContextHeader, renderIdentity, renderGlobalNavigation, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, syncMobileNavigation, setNavRoute, membersHidden, toggleMembers, DESTINATIONS };

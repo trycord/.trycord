@@ -12,8 +12,8 @@ import State, {
   refreshBans, setViewRefresh, refreshServerView,
 } from './state.js';
 import { esc, el, clear, toast, relTime, confirmDialog, openModal } from './ui.js';
-import { avatar, emptyState, messageRow, channelRow } from './components.js';
-import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNavigation } from './shell.js';
+import { avatar, emptyState, messageRow, channelRow, initialOf } from './components.js';
+import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNavigation, toggleMembers, membersHidden } from './shell.js';
 import Realtime from './realtime.js';
 
 let activeChannelId = null;
@@ -76,12 +76,19 @@ async function renderServerLanding(container, serverId) {
   renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
   const wrap = el('div', { class: 'page atrium' });
   const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
+  const hero = el('div', { class: 'community-hero' });
+  hero.appendChild(el('div', { class: 'community-hero__mark' }, initialOf(server.name)));
+  const heroText = el('div', { class: 'community-hero__text' });
+  heroText.appendChild(el('h2', { class: 'community-hero__name' }, server.name || 'Community'));
+  if (server.description) heroText.appendChild(el('p', { class: 'muted' }, server.description));
   const stats = el('div', { class: 'stat-inline' });
   stats.appendChild(el('span', {}, String(server.member_count || 0) + ' members · ' + String(onlineCount) + ' online'));
   stats.appendChild(el('span', {}, String(server.channel_count || 0) + ' channels'));
   stats.appendChild(el('span', {}, String(server.role_count || 0) + ' roles'));
   if (server.message_count != null) stats.appendChild(el('span', {}, String(server.message_count) + ' messages'));
-  wrap.appendChild(stats);
+  heroText.appendChild(stats);
+  hero.appendChild(heroText);
+  wrap.appendChild(hero);
   wrap.appendChild(el('h2', {}, 'Channels'));
   const layout = State.channels;
   const categories = layout.categories || [];
@@ -216,7 +223,21 @@ async function renderChannel(container, serverId, channelId) {
   const layout = State.channels;
   const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
   const chanName = channel ? channel.name : 'channel';
-  renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#' });
+  const memberToggle = el('button', {
+    class: 'btn icon', type: 'button',
+    title: membersHidden() ? 'Show member list' : 'Hide member list',
+    'aria-label': membersHidden() ? 'Show member list' : 'Hide member list',
+    'aria-pressed': membersHidden() ? 'false' : 'true',
+    onClick: (e) => {
+      toggleMembers();
+      const hidden = membersHidden();
+      const btn = e.currentTarget;
+      btn.title = hidden ? 'Show member list' : 'Hide member list';
+      btn.setAttribute('aria-label', btn.title);
+      btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
+    },
+  }, '☰');
+  renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [memberToggle] });
 
   const conv = el('div', { class: 'conversation' });
   const thread = el('div', { class: 'thread' });

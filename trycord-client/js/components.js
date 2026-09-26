@@ -96,6 +96,8 @@ export function serverChip(server, { active = false, onClick } = {}) {
   const chip = el('button', {
     class: 'server-chip' + (active ? ' active' : ''),
     type: 'button',
+    title: server.name || 'Community',
+    'aria-label': server.name || 'Community',
     onClick,
     dataset: { serverId: server.id },
   });
