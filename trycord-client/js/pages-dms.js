@@ -75,13 +75,30 @@ async function renderDmThread(container, dmId) {
   thread.appendChild(feed);
   conv.appendChild(thread);
 
+  function dmIntro() {
+    const box = el('div', { class: 'channel-intro' }, el('div', { class: 'channel-intro__mark' }, '✉'));
+    box.appendChild(el('h2', { class: 'channel-intro__title' }, peer.displayName || peer.username));
+    box.appendChild(el('p', { class: 'channel-intro__sub' }, 'This is the beginning of your conversation.'));
+    return box;
+  }
+
   // load history
   async function reload() {
-    let msgs = [];
-    try { msgs = await Api.dmMessages(dmId, { limit: 50 }); } catch { /* offline */ }
     clear(feed);
+    feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messages…'));
+    let msgs = [];
+    try { msgs = await Api.dmMessages(dmId, { limit: 50 }); } catch (ex) {
+      clear(feed);
+      feed.appendChild(el('div', { class: 'form-error' }, (ex && ex.message) || 'Cannot load messages'));
+      const retry = el('button', { class: 'btn sm', type: 'button' }, 'Try again');
+      retry.addEventListener('click', () => reload().catch(() => {}));
+      feed.appendChild(retry);
+      return;
+    }
+    clear(feed);
+    feed.appendChild(dmIntro());
     if (!msgs.length) {
-      feed.appendChild(emptyState('◌', 'No messages yet', 'Say something kind.'));
+      feed.appendChild(emptyState('✉', 'No messages yet', 'Say something kind.'));
     }
     for (const m of msgs) {
       appendDmMessage(m, feed, dmId);
@@ -150,6 +167,16 @@ async function renderDmThread(container, dmId) {
   composer.appendChild(ta);
   composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
   conv.appendChild(composer);
+  {
+    const me = State.me;
+    if (me && !me.emailVerified) {
+      ta.disabled = true;
+      ta.placeholder = 'Verify your email to send messages.';
+      sendBtn.disabled = true;
+      emojiBtn.disabled = true;
+      composer.classList.add('locked');
+    }
+  }
 
   function send() {
     const content = ta.value.trim();
