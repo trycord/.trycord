@@ -173,6 +173,11 @@ async function renderRoute() {
     renderAllChrome();
     return;
   }
+  if (path.startsWith('/menu')) {
+    await Workspace.renderMenu(region);
+    renderAllChrome();
+    return;
+  }
 
   // --- settings (account hub; /account* kept as working aliases) ----------
   if (path.startsWith('/settings/updates')) { await renderAccount(region, { tab: 'updates' }); renderAllChrome(); return; }
