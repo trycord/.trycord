@@ -22,7 +22,7 @@ async function fetchPage(increment) {
 function serverCard(s, onClick) {
   const c = el('div', { class: 'stack' });
   const btn = el('button', {
-    class: 'row', type: 'button',
+    class: 'row row--surface', type: 'button',
     onClick,
   });
   const b = el('span', { class: 'chip-badge' }, (s.name || '?')[0].toUpperCase());
@@ -78,7 +78,7 @@ export async function renderBrowse(container, { previewId } = {}) {
       (detail.member_count || 0) + ' members'));
     const ch = el('div', { class: 'stack' });
     for (const c of detail.channels || []) {
-      ch.appendChild(el('div', { class: 'channel-row', style: { marginLeft: 0, width: '100%' } },
+      ch.appendChild(el('div', { class: 'row row--channel', style: { marginLeft: 0, width: '100%' } },
         el('span', { class: 'ch-prefix' }, '#'), el('span', { class: 'ch-name' }, c.name)));
     }
     if (detail.channels && detail.channels.length) previewPane.appendChild(ch);

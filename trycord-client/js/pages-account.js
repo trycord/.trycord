@@ -456,7 +456,7 @@ function renderUpdates(wrap) {
   wrap.appendChild(el('div', { class: 'section-label' }, 'Application'));
 
   if (!desk) {
-    const box = el('div', { class: 'auth-box' });
+    const box = el('div', { class: 'card card--auth' });
     box.appendChild(el('p', {}, 'You are running Trycord in a browser. The browser build does not auto-update.'));
     box.appendChild(el('p', { class: 'muted small' }, 'The desktop app checks for and installs updates automatically.'));
     wrap.appendChild(el('div', {},
@@ -531,7 +531,7 @@ function renderPasswordSection(wrap, container, tab) {
   const cur = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', required: true });
   const next = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true });
   const submit = el('button', { class: 'btn primary', type: 'submit' }, 'Change password');
-  const form = el('form', { class: 'auth-box' }, err,
+  const form = el('form', { class: 'card card--auth' }, err,
     el('div', { class: 'field' }, el('label', {}, 'Current password'), cur),
     el('div', { class: 'field' }, el('label', {}, 'New password'), next,
       el('span', { class: 'hint' }, '8+ characters. All other sessions will be signed out.')),
@@ -620,7 +620,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   } else if (tab === 'backend') {
     body.appendChild(el('div', { class: 'section-label' }, 'Backend'));
     body.appendChild(el('p', { class: 'muted small' }, 'Choose which Trycord server this app talks to. Switching servers signs you out here first.'));
-    const backendBox = el('div', { class: 'auth-box' });
+    const backendBox = el('div', { class: 'card card--auth' });
     renderBackendSelector(backendBox);
     body.appendChild(backendBox);
   } else {

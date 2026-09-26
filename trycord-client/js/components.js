@@ -74,11 +74,65 @@ export function realmTitle(text) {
   return el('div', { class: 'realm-title' }, text);
 }
 
+// Community mark. Communities have no stored icon, so identity is derived
+// deterministically from the name (same palette as avatars) and the initial
+// is shown. Used by the rail and the community header.
+export function communityMark(name, { size = '' } = {}) {
+  return el('span', {
+    class: 'community-mark' + (size ? ' ' + size : ''),
+    style: { background: hashColor(name) },
+    'aria-hidden': 'true',
+  }, initialOf(name));
+}
+
+// Sidebar group: a labelled, optionally collapsible section. Collapsed state
+// is owned by the caller (it persists per community), so this is a pure
+// renderer.
+export function navGroup({ label, collapsible = false, collapsed = false, action = null, id = null }) {
+  const group = el('section', { class: 'nav-group' + (collapsible ? ' nav-group--collapsible' : ''), dataset: id ? { group: id } : {} });
+  if (label) {
+    const head = el('div', {
+      class: 'nav-group__head',
+      role: collapsible ? 'button' : null,
+      tabindex: collapsible ? '0' : null,
+      'aria-expanded': collapsible ? (collapsed ? 'false' : 'true') : null,
+    });
+    if (collapsible) {
+      head.appendChild(el('span', { class: 'nav-group__caret' }, '▾'));
+    }
+    head.appendChild(el('span', { class: 'nav-group__label' }, label));
+    if (action) head.appendChild(action);
+    if (collapsible) {
+      let onToggle = null;
+      const toggle = () => {
+        const next = !group.classList.contains('is-collapsed');
+        group.classList.toggle('is-collapsed', next);
+        head.setAttribute('aria-expanded', next ? 'false' : 'true');
+        if (typeof onToggle === 'function') onToggle(next);
+      };
+      group.onToggleChange = (fn) => { onToggle = fn; };
+      head.addEventListener('click', (e) => {
+        if (action && e.target.closest('.nav-group__action')) return;
+        toggle();
+      });
+      head.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      });
+      if (collapsed) group.classList.add('is-collapsed');
+    }
+    group.appendChild(head);
+  }
+  const list = el('div', { class: 'nav-group__list' });
+  group.appendChild(list);
+  group.list = list;
+  return group;
+}
+
 // ---- navigation rows -----------------------------------------------------
 
 export function navRow({ label, sub, icon, href, active, count, onClick }) {
   const row = el('button', {
-    class: 'nav-row' + (active ? ' active' : ''),
+    class: 'row row--nav' + (active ? ' active' : ''),
     type: 'button',
     title: label,
     'aria-label': label,
@@ -113,7 +167,7 @@ export function serverChip(server, { active = false, onClick } = {}) {
 
 export function channelRow(channel, { active = false, muted = false, onClick } = {}) {
   const row = el('button', {
-    class: 'channel-row' + (active ? ' active' : '') + (muted ? ' muted' : ''),
+    class: 'row row--channel' + (active ? ' active' : '') + (muted ? ' muted' : ''),
     type: 'button',
     title: muted ? '#' + (channel.name || 'channel') + ' (muted)' : '#' + (channel.name || 'channel'),
     onClick,

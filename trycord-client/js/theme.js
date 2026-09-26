@@ -319,23 +319,27 @@ function applyGuidedTokens(p) {
 const PROTECTED_IDS = new Set([
   'app', 'mobile-shell', 'mobile-main',
   'mobile-tab-navigation', 'mobile-context',
-  'desktop-shell', 'presence-spine', 'identity-region', 'global-navigation',
+  'desktop-shell', 'app-rail', 'identity-region', 'global-navigation',
   'community-navigation', 'place-navigation', 'trycord-main', 'context-header',
   'context-title', 'view-root', 'member-sidebar', 'modal-root', 'popover-root',
   'toast-root', 'connection-status',
 ]);
 
 const PROTECTED_CLASSES = new Set([
-  'presence-spine', 'presence-spine__identity', 'presence-spine__global-navigation',
-  'presence-spine__communities', 'presence-spine__place-navigation',
-  'main-environment', 'context-header', 'chat-environment', 'view-root',
+  // Application shell: rail / context sidebar / main content.
+  'app-rail', 'app-rail__items', 'rail-identity', 'rail-global-nav',
+  'context-sidebar', 'main-content',
+  'context-header', 'chat-environment', 'view-root',
   'member-sidebar', 'shell', 'shell--desktop', 'shell--mobile',
-  'nav-row', 'server-chip', 'channel-row', 'channel-section', 'place-header',
-  'place-menu', 'place-actions', 'identity', 'community-actions',
-  'member-item', 'member-group', 'msg', 'msg-actions', 'composer',
-  'auth-wrap', 'auth-box', 'form-error', 'form-success', 'btn',
-  'modal', 'backdrop', 'popover', 'pop-item', 'toast', 'connection-status',
-  'settings-nav', 'theme-chip', 'admin-row', 'admin-chip',
+  // Navigation primitives.
+  'row', 'row--nav', 'row--dm', 'row--member', 'row--channel',
+  'server-chip', 'channel-category', 'place-header',
+  'place-menu', 'place-actions', 'community-actions',
+  'member-group', 'msg', 'msg-actions', 'composer',
+  // Overlays + controls.
+  'auth-wrap', 'card', 'card--auth', 'form-error', 'form-success', 'btn',
+  'popover', 'pop-item', 'toast', 'connection-status',
+  'settings-nav', 'theme-chip', 'admin-chip',
   'mobile-header', 'mobile-main', 'mobile-tab-navigation',
 ]);
 
@@ -584,9 +588,11 @@ export function verifyCustomSafety() {
     problems.push('View region `' + viewSel + '` is not visibly laid out.');
   }
   if (mode === 'desktop') {
-    const spine = visibleSize('.presence-spine');
-    if (spine.present && spine.display !== 'none' && spine.width < 40) {
-      problems.push('Navigation spine collapsed below a usable width.');
+    // The rail is the anchor column of the desktop frame; if custom CSS
+    // collapses it, navigation becomes unusable.
+    const rail = visibleSize('#community-navigation');
+    if (rail.present && rail.display !== 'none' && rail.width < 40) {
+      problems.push('Application rail collapsed below a usable width.');
     }
     const member = document.getElementById('member-sidebar');
     if (member && !member.hidden) {

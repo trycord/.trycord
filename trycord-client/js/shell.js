@@ -4,7 +4,7 @@
 // context header, and the MobileShell drawer + bottom tabs.
 
 import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, showUserCard, copyText } from './ui.js';
-import { avatar, navRow, serverChip, channelRow, realmTitle } from './components.js';
+import { avatar, navRow, serverChip, channelRow, communityMark, navGroup } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications } from './state.js';
 import { closeMobileDrawer, toggleDesktopNav, isDesktopNavOpen } from './presentation.js';
@@ -157,92 +157,92 @@ function currentRoute() {
 
 // ---- desktop presence spine ---------------------------------------------
 
-export function renderIdentity(region) {
-  clear(region);
-  if (!isAuthed()) return;
-  const me = State.me || {};
-  const box = el('div', { class: 'identity' });
-  box.appendChild(avatar(me, { size: '', withPresence: true }));
-  const text = el('div', { class: 'iden-text' });
-  text.appendChild(el('div', { class: 'iden-name' }, me.displayName || me.username || 'You'));
-  text.appendChild(el('div', { class: 'iden-sub' }, '@' + (me.username || '') + (me.statusText ? ' · ' + me.statusText : '')));
-  box.appendChild(text);
-  const actions = el('div', { class: 'iden-actions' });
-  actions.appendChild(el('button', { type: 'button', title: 'Settings', 'aria-label': 'Settings', onClick: () => { location.hash = '#/settings'; } }, '⚙'));
-  box.appendChild(actions);
-  region.appendChild(box);
-}
-
-export function renderGlobalNavigation(region) {
-  clear(region);
-  if (!isAuthed()) return;
-  const route = currentRoute();
-  region.appendChild(realmTitle('Navigate'));
-  for (const d of DESTINATIONS) {
-    const active = route.startsWith(d.href.replace('#', ''));
-    const count = (d.id === 'dms' || d.id === 'notifications') && State.notifUnread ? State.notifUnread : 0;
-    region.appendChild(navRow({
-      label: d.label, icon: d.icon, href: d.href, active, count,
-      onClick: () => { location.hash = d.href; },
-    }));
-  }
-  if (State.me && State.me.isAdmin) {
-    region.appendChild(navRow({
-      label: 'Admin', icon: '🛡', href: '#/admin', active: route.startsWith('/admin'),
-      onClick: () => { location.hash = '#/admin'; },
-    }));
-  }
-}
-
 export function renderCommunities(region) {
   clear(region);
   if (!isAuthed()) return;
-  region.appendChild(realmTitle('Communities'));
-  for (const s of State.servers || []) {
-    const chip = serverChip(s, {
-      active: String(s.id) === String(currentServerId()),
-      onClick: () => { location.hash = '#/server/' + s.id; },
-    });
-    chip.addEventListener('contextmenu', (e) => serverChipMenu(e, s));
-    region.appendChild(chip);
+  const route = currentRoute();
+
+  // Rail groups, in order: global destinations, then the user's
+  // communities, then creation. Discover lives in the global group
+  // only — it is a primary destination, not a community action.
+  const globalItems = [
+    { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
+    { id: 'dms', label: 'Direct messages', icon: '✉', href: '#/dms' },
+    { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
+    { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
+    { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends', badge: () => (State.friendsIn || []).length },
+  ];
+
+  const railButton = ({ label, icon, href, active, badge }) => {
+    const btn = el('button', {
+      class: 'rail-nav-item' + (active ? ' active' : ''),
+      type: 'button',
+      title: label,
+      'aria-label': label,
+      'aria-current': active ? 'page' : null,
+      dataset: { label },
+      onClick: () => { location.hash = href; },
+    }, el('span', { class: 'rail-nav-icon' }, icon));
+    const count = badge ? badge() : 0;
+    if (count > 0) {
+      btn.appendChild(el('span', { class: 'rail-nav-badge' }, count > 99 ? '99+' : String(count)));
+    }
+    return btn;
+  };
+
+  for (const item of globalItems) {
+    region.appendChild(railButton({
+      label: item.label, icon: item.icon, href: item.href, badge: item.badge,
+      active: route === item.href.replace('#', '') || route.startsWith(item.href.replace('#', '') + '/'),
+    }));
   }
-  const actions = el('div', { class: 'community-actions' });
-  actions.appendChild(el('button', { class: 'nav-row community-action', type: 'button', title: 'Create a community', onClick: () => { location.hash = '#/servers/new'; } },
-    el('span', { class: 'nv-icon' }, '+'), el('span', { class: 'nv-label' }, 'Create community')));
-  actions.appendChild(el('button', { class: 'nav-row community-action', type: 'button', title: 'Discover communities', onClick: () => { location.hash = '#/discover'; } },
-    el('span', { class: 'nv-icon' }, '⌕'), el('span', { class: 'nv-label' }, 'Discover')));
-  region.appendChild(actions);
-  // Rail bottom actions (template app-rail-bottom): notifications with
-  // unread badge + settings shortcut, pinned to the rail foot.
+
+  const servers = State.servers || [];
+  if (servers.length) {
+    region.appendChild(el('div', { class: 'rail-divider' }));
+    for (const s of servers) {
+      const chip = serverChip(s, {
+        active: String(s.id) === String(currentServerId()),
+        onClick: () => { location.hash = '#/server/' + s.id; },
+      });
+      chip.dataset.label = s.name || 'Community';
+      chip.addEventListener('contextmenu', (e) => serverChipMenu(e, s));
+      region.appendChild(chip);
+    }
+  }
+
+  // Creation action. Discover is deliberately absent: it is a global
+  // destination above, and duplicating it here double-counts it.
+  const create = el('button', {
+    class: 'rail-nav-item community-action',
+    type: 'button',
+    title: 'Create a community',
+    'aria-label': 'Create a community',
+    dataset: { label: 'Create a community' },
+    onClick: () => { location.hash = '#/servers/new'; },
+  }, el('span', { class: 'rail-nav-icon' }, '+'));
+  region.appendChild(el('div', { class: 'rail-divider' }));
+  region.appendChild(create);
+
   const foot = el('div', { class: 'rail-foot' });
-  const bell = el('button', {
-    class: 'nav-row rail-foot-btn' + (currentRoute().startsWith('/notifications') ? ' active' : ''),
-    type: 'button', title: 'Notifications', 'aria-label': 'Notifications',
-    onClick: () => { location.hash = '#/notifications'; },
-  }, el('span', { class: 'nv-icon' }, '🔔'));
-  if (State.notifUnread) bell.appendChild(el('span', { class: 'nv-count rail-badge' }, String(State.notifUnread > 99 ? '99+' : State.notifUnread)));
-  const gear = el('button', {
-    class: 'nav-row rail-foot-btn' + ((currentRoute().startsWith('/settings') || currentRoute().startsWith('/account')) ? ' active' : ''),
-    type: 'button', title: 'Settings', 'aria-label': 'Settings',
-    onClick: () => { location.hash = '#/settings'; },
-  }, el('span', { class: 'nv-icon' }, '⚙'));
-  foot.append(bell, gear);
-  // Sidebar collapse toggle — always visible in the icon rail.
+  const me = State.me;
+  if (me) {
+    foot.appendChild(railButton({
+      label: 'Your account',
+      icon: '',
+      href: '#/settings',
+      active: route.startsWith('/settings') || route.startsWith('/account'),
+    }));
+    // Swap the icon slot for the real avatar.
+    const accountBtn = foot.lastElementChild;
+    clear(accountBtn);
+    accountBtn.appendChild(avatar(me, { size: 'sm', withPresence: true }));
+  }
   foot.appendChild(sidebarToggleButton());
   region.appendChild(foot);
 }
 
-// Application context, derived from the ROUTE (not lastServerId): home
-// surfaces (home, DMs, friends, notifications, discover, settings…)
-// render the home sidebar, /server/* routes render the server sidebar.
-// Switching routes visibly swaps the whole second column.
-export function sidebarContext() {
-  const m = /^\/server\/([^/]+)/.exec(currentRoute() || '');
-  if (m && m[1]) return { type: 'server', serverId: m[1] };
-  return { type: 'home' };
-}
-
-// Background refresh for the home sidebar (DMs, requests, unread).
+// Background refresh for the DM context (conversations, requests, unread).
 // Throttled + single-flight: the repaint it triggers re-enters this
 // renderer, which returns early — no refresh loop possible.
 let homeRefreshAt = 0;
@@ -261,124 +261,186 @@ function refreshHomeSidebar(region) {
   });
 }
 
-// Home/DM context sidebar: conversation search, new-message shortcut, and
-// the live DM conversation list. Primary destinations (Friends,
-// Notifications, Discover) live ONLY in the global navigation — never
-// duplicated here. No server content renders here — ever.
-function renderHomeSidebar(region) {
-  const route = currentRoute();
-  const search = el('input', {
-    class: 'input home-search', type: 'search',
-    placeholder: 'Find or start a conversation', 'aria-label': 'Filter conversations',
-  });
-  const listBox = el('div', { class: 'home-dm-list' });
-  const paintDMs = (q) => {
-    clear(listBox);
-    const query = String(q || '').trim().toLowerCase();
-    const dms = State.dms || [];
-    const shown = query
-      ? dms.filter((d) => String((d.peer && (d.peer.displayName || d.peer.username)) || '').toLowerCase().includes(query))
-      : dms;
-    if (!shown.length) {
-      listBox.appendChild(el('div', { class: 'place-empty compact' },
-        dms.length ? 'No conversations match.' : 'No conversations yet.'));
-      return;
-    }
-    for (const dm of shown) {
-      const peer = dm.peer || {};
-      const name = peer.displayName || peer.username || 'Unknown';
-      const active = route === '/dms/' + dm.id;
-      const row = el('button', {
-        class: 'dm-row' + (active ? ' active' : '') + (dm.unreadCount ? ' unread' : ''),
-        type: 'button', title: name,
-        onClick: () => { location.hash = '#/dms/' + dm.id; },
-      });
-      row.appendChild(avatar(peer, { size: 'sm', withPresence: true }));
-      const main = el('div', { class: 'dm-row__main' });
-      const top = el('div', { class: 'dm-row__top' });
-      top.appendChild(el('span', { class: 'dm-row__name' }, name));
-      if (dm.lastMessage) top.appendChild(el('span', { class: 'dm-row__time' }, relTime(dm.lastMessage.createdAt)));
-      main.appendChild(top);
-      main.appendChild(el('div', { class: 'dm-row__sub' },
-        dm.lastMessage ? String(dm.lastMessage.content || '').slice(0, 80) : 'Say hello'));
-      row.appendChild(main);
-      if (dm.unreadCount) row.appendChild(el('span', { class: 'nv-count' }, String(dm.unreadCount > 99 ? '99+' : dm.unreadCount)));
-      listBox.appendChild(row);
-    }
-  };
-  search.addEventListener('input', () => paintDMs(search.value));
-  region.appendChild(search);
-  const newDm = el('button', { class: 'btn ghost sm home-newdm', type: 'button', onClick: () => { location.hash = '#/friends'; } }, '＋ New message');
-  region.appendChild(newDm);
+// ---- context sidebar ------------------------------------------------------
+// One component tree, composed per context:
+//
+//   ctx-head      optional context header (community identity, page title)
+//   ctx-scroll    the only scrolling region: nav groups for this context
+//   user-controls pinned session bar
+//
+// The global rail owns global destinations; everything below is contextual.
 
-  region.appendChild(el('div', { class: 'channel-section__title' }, el('span', {}, 'Direct messages')));
-  paintDMs('');
-  region.appendChild(listBox);
-  refreshHomeSidebar(region);
+const LS_COLLAPSED_GROUPS = 'trycord.collapsedGroups';
+
+function collapsedGroups() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_COLLAPSED_GROUPS) || '[]');
+    return new Set(Array.isArray(raw) ? raw : []);
+  } catch { return new Set(); }
+}
+function persistCollapsedGroups(set) {
+  try { localStorage.setItem(LS_COLLAPSED_GROUPS, JSON.stringify([...set])); } catch { /* ignore */ }
 }
 
-export function renderPlaceNavigation(region) {
-  clear(region);
-  if (!isAuthed()) return;
-  const ctx = sidebarContext();
-  if (ctx.type !== 'server') {
-    renderHomeSidebar(region);
-    return;
-  }
-  const sid = ctx.serverId;
-  const server = (State.servers || []).find((x) => String(x.id) === String(sid));
-  const route = currentRoute();
-
-  const serverName = server ? server.name : (State.serverDetail && State.serverDetail.name) || 'Community';
-  const header = el('div', { class: 'place-header' });
-  header.appendChild(el('div', { class: 'place-header__name' }, serverName));
-  const menu = el('button', { class: 'place-header__menu', type: 'button', title: 'Community settings and tools', 'aria-label': 'Community menu' }, '⌄');
-  const menuBox = el('div', { class: 'place-menu', hidden: true });
-  const addMenuItem = (label, href, allowed=true) => {
-    if (!allowed) return;
-    const b = el('button', { type: 'button', class: 'place-menu__item' }, label);
-    b.addEventListener('click', () => { menuBox.hidden = true; location.hash = href; });
-    menuBox.appendChild(b);
+// Anchored dropdown panel. Self-contained (no portal) so it inherits the
+// sidebar's stacking context; closes on outside click and Escape.
+function dropdownPanel(anchor, buildItems) {
+  const panel = el('div', { class: 'ctx-dropdown', role: 'menu', hidden: true });
+  const close = () => {
+    panel.hidden = true;
+    anchor.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', onAway, true);
+    document.removeEventListener('keydown', onKey, true);
   };
-  addMenuItem('Invite people', '#/server/' + sid + '/invites', can('MANAGE_INVITES'));
-  addMenuItem('Community members', '#/server/' + sid + '/members');
-  addMenuItem('Roles', '#/server/' + sid + '/roles');
-  addMenuItem('Categories', '#/server/' + sid + '/categories', can('MANAGE_CHANNELS'));
-  addMenuItem('Community settings', '#/server/' + sid + '/settings', can('MANAGE_SERVER'));
-  menu.addEventListener('click', (e) => {
+  const onAway = (e) => { if (!panel.contains(e.target) && !anchor.contains(e.target)) close(); };
+  const onKey = (e) => { if (e.key === 'Escape') { close(); anchor.focus(); } };
+  anchor.setAttribute('aria-haspopup', 'menu');
+  anchor.setAttribute('aria-expanded', 'false');
+  anchor.addEventListener('click', (e) => {
     e.stopPropagation();
-    menuBox.hidden = !menuBox.hidden;
-    if (!menuBox.hidden) {
-      const closer = (ev) => {
-        if (ev.key === 'Escape' || !menuBox.contains(ev.target)) {
-          menuBox.hidden = true;
-          document.removeEventListener('click', closer);
-          document.removeEventListener('keydown', closer);
-        }
-      };
+    const open = panel.hidden;
+    if (open) {
+      clear(panel);
+      for (const item of buildItems()) {
+        if (!item) continue;
+        if (item.sep) { panel.appendChild(el('div', { class: 'ctx-dropdown__sep' })); continue; }
+        const b = el('button', {
+          class: 'ctx-dropdown__item' + (item.danger ? ' is-danger' : ''),
+          type: 'button', role: 'menuitem',
+        }, el('span', { class: 'ctx-dropdown__icon' }, item.icon || ''), el('span', {}, item.label));
+        b.addEventListener('click', () => { close(); item.onSelect(); });
+        panel.appendChild(b);
+      }
+    }
+    panel.hidden = !open;
+    anchor.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
       setTimeout(() => {
-        document.addEventListener('click', closer);
-        document.addEventListener('keydown', closer);
+        document.addEventListener('click', onAway, true);
+        document.addEventListener('keydown', onKey, true);
       }, 0);
     }
   });
-  header.append(menu, menuBox);
-  region.appendChild(header);
+  return panel;
+}
 
-  // Scroll region: header stays pinned, footer stays docked, only this
-  // middle column scrolls — a sticky footer over scrolling content used
-  // to cover nav rows on short viewports.
-  const scroll = el('div', { class: 'place-scroll' });
+// Community header. Communities have no stored banner, so identity is built
+// from the derived community mark plus a restrained accent wash. If a banner
+// ever exists it is layered behind the mark without changing the geometry.
+function communityHeader(sid, server) {
+  const name = (server && server.name) || (State.serverDetail && State.serverDetail.name) || 'Community';
+  const head = el('header', { class: 'ctx-head ctx-head--community' });
+  const bar = el('div', { class: 'ctx-head__bar' });
+  bar.appendChild(el('span', { class: 'ctx-head__mark' }, communityMark(name)));
+  const text = el('div', { class: 'ctx-head__text' });
+  text.appendChild(el('div', { class: 'ctx-head__title' }, name));
+  text.appendChild(el('div', { class: 'ctx-head__sub' }, (server && server.is_owner) ? 'Your community' : 'Community'));
+  bar.appendChild(text);
+
+  const trigger = el('button', {
+    class: 'ctx-head__action', type: 'button',
+    title: 'Community menu', 'aria-label': 'Community menu for ' + name,
+  }, '⌄');
+  bar.appendChild(trigger);
+  head.appendChild(bar);
+
+  // Community-level actions live here, not scattered through the channel
+  // list. Every entry is permission-gated by the existing role system.
+  const panel = dropdownPanel(trigger, () => {
+    const items = [];
+    items.push({ label: 'Community overview', icon: '⌂', onSelect: () => { location.hash = '#/server/' + sid; } });
+    if (can('MANAGE_INVITES')) {
+      items.push({ label: 'Invite people', icon: '✉', onSelect: () => { location.hash = '#/server/' + sid + '/invites'; } });
+    }
+    if (can('MANAGE_CHANNELS')) {
+      items.push({ label: 'Create channel', icon: '＋', onSelect: () => { location.hash = '#/server/' + sid + '/channels/new'; } });
+    }
+    items.push({ sep: true });
+    items.push({ label: 'Leave community', icon: '⤶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
+    return items;
+  });
+  head.appendChild(panel);
+  return head;
+}
+
+function serverChipMenuLeave(sid, server) {
+  if (server && server.is_owner) {
+    toast('You own this community. Transfer or delete it first.', 'warn');
+    return;
+  }
+  confirmDialog({
+    title: 'Leave ' + ((server && server.name) || 'community') + '?',
+    message: 'You can rejoin later with a new invite.',
+    danger: true, confirmText: 'Leave',
+    onConfirm: async () => {
+      try {
+        await Api.leaveServer(sid);
+        await refreshServers();
+        leaveServerContext();
+        location.hash = '#/home';
+      } catch (ex) { toast(ex.message || 'Failed', 'error'); }
+    },
+  });
+}
+
+// Generic context header for non-community contexts.
+function pageHeader(title, sub) {
+  const head = el('header', { class: 'ctx-head' });
+  const bar = el('div', { class: 'ctx-head__bar' });
+  const text = el('div', { class: 'ctx-head__text' });
+  text.appendChild(el('div', { class: 'ctx-head__title' }, title));
+  if (sub) text.appendChild(el('div', { class: 'ctx-head__sub' }, sub));
+  bar.appendChild(text);
+  head.appendChild(bar);
+  return head;
+}
+
+// Pinned session bar, shared by every context.
+function sessionBar() {
+  const me = State.me;
+  if (!me) return null;
+  const bar = el('div', { class: 'user-controls' });
+  const idBox = el('button', {
+    class: 'user-controls__identity', type: 'button',
+    title: 'Your account', 'aria-label': 'Your account',
+    onClick: () => { location.hash = '#/settings'; },
+  });
+  idBox.appendChild(el('span', { class: 'user-controls__avatar' }, avatar(
+    { id: me.id, username: me.username, displayName: me.display_name, avatarUrl: me.avatar_url },
+    { size: 'sm', withPresence: true })));
+  const info = el('span', { class: 'user-controls__info' });
+  info.appendChild(el('span', { class: 'user-controls__name' }, me.display_name || me.username || 'You'));
+  info.appendChild(el('span', { class: 'user-controls__status' }, 'Online'));
+  idBox.appendChild(info);
+  bar.appendChild(idBox);
+  const buttons = el('div', { class: 'user-controls__buttons' });
+  buttons.appendChild(el('button', {
+    class: 'user-controls__btn', type: 'button',
+    title: 'Settings', 'aria-label': 'Settings',
+    onClick: () => { location.hash = '#/settings'; },
+  }, '⚙'));
+  bar.appendChild(buttons);
+  return bar;
+}
+
+// ---- community context ----------------------------------------------------
+
+function communityContext(region, sid) {
+  const route = currentRoute();
+  const server = (State.servers || []).find((x) => String(x.id) === String(sid));
+
+  region.appendChild(communityHeader(sid, server));
+
+  const scroll = el('div', { class: 'ctx-scroll' });
   region.appendChild(scroll);
 
-  const actionRow = el('div', { class: 'place-actions' });
-  if (can('MANAGE_INVITES')) actionRow.appendChild(el('button', { type: 'button', title: 'Invite people', onClick: () => { location.hash = '#/server/' + sid + '/invites'; } }, '＋ Invite'));
-  if (can('MANAGE_CHANNELS')) actionRow.appendChild(el('button', { type: 'button', title: 'Create channel', onClick: () => { location.hash = '#/server/' + sid + '/channels/new'; } }, '＋ Channel'));
-  if (actionRow.children.length) scroll.appendChild(actionRow);
+  const collapsed = collapsedGroups();
+  const groupKey = (catId) => 'cat:' + sid + ':' + catId;
 
   const layout = State.channels || { categories: [], channels: [] };
   const categories = layout.categories || [];
   const channels = layout.channels || [];
+
   const grouped = new Map();
   grouped.set('__none__', []);
   for (const c of categories) grouped.set(String(c.id), []);
@@ -389,103 +451,321 @@ export function renderPlaceNavigation(region) {
   }
 
   const channelRowEl = (ch) => {
+    const active = route === '/server/' + sid + '/channel/' + ch.id;
+    const muted = isMuted(ch.id);
     const row = channelRow(ch, {
-      active: route === '/server/' + sid + '/channel/' + ch.id,
-      muted: isMuted(ch.id),
+      active, muted,
       onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; },
     });
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      showContextMenu(e.clientX, e.clientY, [
+      const items = [
         { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } },
         { label: 'Copy channel ID', onSelect: () => copyText(String(ch.id), 'Channel ID copied.') },
-      ]);
+      ];
+      if (can('MANAGE_CHANNELS')) {
+        items.push({ sep: true });
+        items.push({ label: 'Edit channel', icon: '✎', onSelect: () => { location.hash = '#/server/' + sid + '/channels/new'; } });
+      }
+      showContextMenu(e.clientX, e.clientY, items);
     });
     return row;
   };
 
-  const renderCategory = (label, list, catId) => {
-    // Empty sections never render: an empty uncategorized group produced a
-    // duplicate bare "TEXT CHANNELS" header under the real categories.
-    // Zero channels overall are covered by the place-empty note below.
+  // One group per category. Uncategorized channels sit in a leading group so
+  // they are never visually merged with a real category.
+  const addChannelGroup = (label, list, catId) => {
     if (!list.length) return;
-    // Uncategorized channels render bare when real categories exist
-    // (Discord behavior): no redundant second "Text channels" header.
-    if (catId === '__none__' && categories.length) {
-      for (const ch of list) scroll.appendChild(channelRowEl(ch));
-      return;
-    }
-    const section = el('section', { class: 'channel-section', dataset: { category: catId } });
-    const title = el('div', { class: 'channel-section__title' });
-    const caret = el('span', { class: 'channel-section__caret' }, '⌄');
-    title.append(caret, el('span', { class: 'channel-section__label' }, label));
-    title.addEventListener('click', (e) => {
-      if (e.target.closest('.section-action')) return;
-      section.classList.toggle('collapsed');
+    const key = groupKey(catId);
+    const group = navGroup({
+      label,
+      collapsible: true,
+      collapsed: collapsed.has(key),
+      id: catId,
     });
-    if (can('MANAGE_CHANNELS')) {
-      const add = el('button', { class: 'section-action', type: 'button', title: 'Create channel', 'aria-label': 'Create channel' }, '+');
-      add.addEventListener('click', (e) => {
-        e.stopPropagation();
-        location.hash = '#/server/' + sid + '/channels/new';
-      });
-      title.appendChild(add);
-    }
-    section.appendChild(title);
-    const listBox = el('div', { class: 'channel-section__list' });
-    for (const ch of list) listBox.appendChild(channelRowEl(ch));
-    section.appendChild(listBox);
-    scroll.appendChild(section);
+    group.onToggleChange((isCollapsed) => {
+      const set = collapsedGroups();
+      if (isCollapsed) set.add(key); else set.delete(key);
+      persistCollapsedGroups(set);
+    });
+    for (const ch of list) group.list.appendChild(channelRowEl(ch));
+    scroll.appendChild(group);
   };
 
-  for (const cat of categories) renderCategory(cat.name || 'Category', grouped.get(String(cat.id)) || [], String(cat.id));
-  renderCategory('Text channels', grouped.get('__none__') || [], '__none__');
+  const uncategorised = grouped.get('__none__') || [];
+  if (uncategorised.length) addChannelGroup(categories.length ? 'Channels' : 'Text channels', uncategorised, '__none__');
+  for (const cat of categories) {
+    addChannelGroup(cat.name || 'Category', grouped.get(String(cat.id)) || [], String(cat.id));
+  }
+  if (!channels.length) {
+    scroll.appendChild(el('div', { class: 'ctx-empty' }, 'No channels yet.'));
+  }
 
-  if (!channels.length) scroll.appendChild(el('div', { class: 'place-empty compact' }, 'No channels yet.'));
-
-  // Server management section (merged nav): the per-page button bars are
-  // gone — these links live in the Discord-style sidebar with an active
-  // state, so every management surface is one click away from anywhere.
-  const manage = el('section', { class: 'channel-section' });
-  manage.appendChild(el('div', { class: 'channel-section__title' }, el('span', {}, 'Server settings')));
-  const manageList = el('div', { class: 'channel-section__list' });
+  // Community management. Semantically distinct from channels: different
+  // group treatment, and only destinations this user may actually open.
+  const manage = navGroup({ label: 'Community', collapsible: true, collapsed: collapsed.has('manage:' + sid), id: 'manage' });
+  manage.onToggleChange((isCollapsed) => {
+    const set = collapsedGroups();
+    if (isCollapsed) set.add('manage:' + sid); else set.delete('manage:' + sid);
+    persistCollapsedGroups(set);
+  });
   const manageLinks = [
-    { label: 'General', icon: '⚙', href: '#/server/' + sid + '/settings', path: '/server/' + sid + '/settings' },
-    { label: 'Members', icon: '👥', href: '#/server/' + sid + '/members', path: '/server/' + sid + '/members' },
-    { label: 'Roles', icon: '🏷', href: '#/server/' + sid + '/roles', path: '/server/' + sid + '/roles' },
-    { label: 'Categories', icon: '≡', href: '#/server/' + sid + '/categories', path: '/server/' + sid + '/categories' },
-    { label: 'Invites', icon: '✉', href: '#/server/' + sid + '/invites', path: '/server/' + sid + '/invites' },
+    { label: 'Overview', href: '#/server/' + sid, path: '/server/' + sid, exact: true, show: true },
+    { label: 'Members', href: '#/server/' + sid + '/members', path: '/server/' + sid + '/members', show: true },
+    { label: 'Roles', href: '#/server/' + sid + '/roles', path: '/server/' + sid + '/roles', show: can('MANAGE_ROLES') || can('MANAGE_SERVER') },
+    { label: 'Categories', href: '#/server/' + sid + '/categories', path: '/server/' + sid + '/categories', show: can('MANAGE_CHANNELS') },
+    { label: 'Invites', href: '#/server/' + sid + '/invites', path: '/server/' + sid + '/invites', show: can('MANAGE_INVITES') },
+    { label: 'Community settings', href: '#/server/' + sid + '/settings', path: '/server/' + sid + '/settings', show: can('MANAGE_SERVER') },
   ];
   for (const m of manageLinks) {
-    manageList.appendChild(navRow({
-      label: m.label, icon: m.icon, href: m.href,
-      active: route === m.path || route.startsWith(m.path + '/'),
+    if (!m.show) continue;
+    const active = m.exact ? route === m.path : (route === m.path || route.startsWith(m.path + '/'));
+    manage.list.appendChild(navRow({
+      label: m.label, href: m.href, active,
       onClick: () => { location.hash = m.href; },
     }));
   }
-  manage.appendChild(manageList);
-  scroll.appendChild(manage);
+  if (manage.list.children.length) scroll.appendChild(manage);
 
-  // Session footer (reference sidebar-user pattern): live identity with a
-  // settings shortcut. Additive only — identity-region stays untouched.
-  const me = State.me;
-  if (me) {
-    const foot = el('div', { class: 'place-session' });
-    foot.appendChild(avatar(
-      { id: me.id, username: me.username, displayName: me.display_name, avatarUrl: me.avatar_url },
-      { size: 'sm', withPresence: true }));
-    const info = el('div', { class: 'place-session__info' });
-    info.appendChild(el('div', { class: 'place-session__name' }, me.display_name || me.username || 'You'));
-    info.appendChild(el('div', { class: 'place-session__status' }, 'Online'));
-    foot.appendChild(info);
-    const gear = el('button', { class: 'place-session__settings', type: 'button', title: 'Settings', 'aria-label': 'Open settings' }, '⚙');
-    gear.addEventListener('click', () => { location.hash = '#/settings'; });
-    foot.appendChild(gear);
-    region.appendChild(foot);
-  }
+  const bar = sessionBar();
+  if (bar) region.appendChild(bar);
 }
 
+// ---- DMs context ----------------------------------------------------------
+
+function dmsContext(region) {
+  const route = currentRoute();
+  region.appendChild(pageHeader('Direct messages', 'Your conversations'));
+
+  const scroll = el('div', { class: 'ctx-scroll' });
+  region.appendChild(scroll);
+
+  const search = el('input', {
+    class: 'input ctx-search', type: 'search',
+    placeholder: 'Find a conversation', 'aria-label': 'Filter conversations',
+  });
+  const listBox = el('div', { class: 'ctx-list' });
+
+  const paint = (q) => {
+    clear(listBox);
+    const query = String(q || '').trim().toLowerCase();
+    const dms = State.dms || [];
+    const shown = query
+      ? dms.filter((d) => String((d.peer && (d.peer.displayName || d.peer.username)) || '').toLowerCase().includes(query))
+      : dms;
+    if (!shown.length) {
+      listBox.appendChild(el('div', { class: 'ctx-empty' },
+        dms.length ? 'No conversations match.' : 'No conversations yet. Start one from a profile.'));
+      return;
+    }
+    for (const dm of shown) {
+      const peer = dm.peer || {};
+      const name = peer.displayName || peer.username || 'Unknown';
+      const active = route === '/dms/' + dm.id;
+      const row = el('button', {
+        class: 'row row--dm' + (active ? ' active' : '') + (dm.unreadCount ? ' is-unread' : ''),
+        type: 'button', title: name,
+        onClick: () => { location.hash = '#/dms/' + dm.id; },
+      });
+      row.appendChild(avatar(peer, { size: 'sm', withPresence: true }));
+      const main = el('div', { class: 'row__stack' });
+      const top = el('div', { class: 'row__line' });
+      top.appendChild(el('span', { class: 'row__title' }, name));
+      if (dm.lastMessage) top.appendChild(el('span', { class: 'row__time' }, relTime(dm.lastMessage.createdAt)));
+      main.appendChild(top);
+      main.appendChild(el('div', { class: 'row__sub' },
+        dm.lastMessage ? String(dm.lastMessage.content || '').slice(0, 80) : 'Say hello'));
+      row.appendChild(main);
+      if (dm.unreadCount) {
+        row.appendChild(el('span', { class: 'row__count' },
+          String(dm.unreadCount > 99 ? '99+' : dm.unreadCount)));
+      }
+      listBox.appendChild(row);
+    }
+  };
+
+  const compose = el('div', { class: 'ctx-actions' });
+  compose.appendChild(el('button', {
+    class: 'btn primary block', type: 'button',
+    onClick: () => { location.hash = '#/friends'; },
+  }, 'New message'));
+  scroll.appendChild(compose);
+  scroll.appendChild(search);
+  scroll.appendChild(listBox);
+  search.addEventListener('input', () => paint(search.value));
+  paint('');
+
+  const bar = sessionBar();
+  if (bar) region.appendChild(bar);
+  refreshHomeSidebar(region);
+}
+
+// ---- settings context -----------------------------------------------------
+
+const SETTINGS_SECTIONS = [
+  { id: 'profile', label: 'My Account', path: '/settings' },
+  { id: 'security', label: 'Security', path: '/settings/security' },
+  { id: 'appearance', label: 'Appearance', path: '/settings/appearance' },
+  { id: 'backend', label: 'Backend', path: '/settings/backend' },
+  { id: 'updates', label: 'Updates', path: '/settings/updates' },
+];
+
+function settingsContext(region) {
+  const route = currentRoute();
+  region.appendChild(pageHeader('Settings', 'Your account and preferences'));
+  const scroll = el('div', { class: 'ctx-scroll' });
+  region.appendChild(scroll);
+
+  const group = navGroup({ label: 'Settings' });
+  for (const s of SETTINGS_SECTIONS) {
+    const active = route === s.path || route.startsWith(s.path + '/');
+    group.list.appendChild(navRow({
+      label: s.label, href: '#' + s.path, active,
+      onClick: () => { location.hash = '#' + s.path; },
+    }));
+  }
+  scroll.appendChild(group);
+
+  if (State.me && State.me.isAdmin) {
+    const admin = navGroup({ label: 'Administration' });
+    admin.list.appendChild(navRow({
+      label: 'Admin console', href: '#/admin', active: route.startsWith('/admin'),
+      onClick: () => { location.hash = '#/admin'; },
+    }));
+    scroll.appendChild(admin);
+  }
+
+  const bar = sessionBar();
+  if (bar) region.appendChild(bar);
+}
+
+// ---- friends / notifications / discover / profile / admin -----------------
+
+function simpleListContext(region, { title, sub, groups }) {
+  const route = currentRoute();
+  region.appendChild(pageHeader(title, sub));
+  const scroll = el('div', { class: 'ctx-scroll' });
+  region.appendChild(scroll);
+  for (const g of groups) {
+    if (!g || !g.items.length) continue;
+    const group = navGroup({ label: g.label });
+    for (const item of g.items) {
+      const active = item.exact ? route === item.path : (route === item.path || route.startsWith(item.path + '/'));
+      group.list.appendChild(navRow({
+        label: item.label, href: '#' + item.path, active,
+        onClick: () => { location.hash = '#' + item.path; },
+      }));
+    }
+    scroll.appendChild(group);
+  }
+  const bar = sessionBar();
+  if (bar) region.appendChild(bar);
+}
+
+function friendsContext(region) {
+  const requests = (State.friendsIn || []).length;
+  simpleListContext(region, {
+    title: 'Friends',
+    sub: requests ? requests + ' request' + (requests === 1 ? '' : 's') + ' pending' : 'People you know',
+    groups: [{ label: 'People', items: [
+      { label: 'All friends', path: '/friends', exact: true },
+      { label: 'Add friend', path: '/friends', exact: true },
+    ] }],
+  });
+}
+
+function notificationsContext(region) {
+  simpleListContext(region, {
+    title: 'Notifications',
+    sub: State.notifUnread ? State.notifUnread + ' unread' : 'All caught up',
+    groups: [{ label: 'Activity', items: [
+      { label: 'All notifications', path: '/notifications', exact: true },
+    ] }],
+  });
+}
+
+function discoverContext(region) {
+  simpleListContext(region, {
+    title: 'Discover',
+    sub: 'Communities on this instance',
+    groups: [{ label: 'Browse', items: [
+      { label: 'Discover communities', path: '/discover', exact: true },
+    ] }, { label: 'Create', items: [
+      { label: 'Create a community', path: '/servers/new', exact: true },
+    ] }],
+  });
+}
+
+function profileContext(region, userId) {
+  simpleListContext(region, {
+    title: 'Profile',
+    sub: userId ? 'User profile' : 'Your profile',
+    groups: [{ label: 'You', items: [
+      { label: 'Your profile', path: '/users/' + (State.me && State.me.id), exact: true },
+      { label: 'Edit profile', path: '/settings', exact: true },
+    ] }],
+  });
+}
+
+const ADMIN_SECTIONS = [
+  { label: 'Overview', path: '/admin' },
+  { label: 'Users', path: '/admin/users' },
+  { label: 'Communities', path: '/admin/communities' },
+  { label: 'Reports', path: '/admin/reports' },
+  { label: 'Appeals', path: '/admin/appeals' },
+  { label: 'Audit log', path: '/admin/audit' },
+];
+
+function adminContext(region) {
+  const route = currentRoute();
+  region.appendChild(pageHeader('Administration', 'Moderation and platform health'));
+  const scroll = el('div', { class: 'ctx-scroll' });
+  region.appendChild(scroll);
+  const group = navGroup({ label: 'Console' });
+  for (const s of ADMIN_SECTIONS) {
+    const active = route === s.path || route.startsWith(s.path + '/');
+    group.list.appendChild(navRow({
+      label: s.label, href: '#' + s.path, active,
+      onClick: () => { location.hash = '#' + s.path; },
+    }));
+  }
+  scroll.appendChild(group);
+  const bar = sessionBar();
+  if (bar) region.appendChild(bar);
+}
+
+// ---- dispatcher -----------------------------------------------------------
+
+export function sidebarContext() {
+  const path = currentRoute() || '';
+  const server = /^\/server\/([^/]+)/.exec(path);
+  if (server && server[1]) return { type: 'community', serverId: server[1] };
+  if (path === '/dms' || path.startsWith('/dms/')) return { type: 'dms' };
+  if (path.startsWith('/settings') || path.startsWith('/account')) return { type: 'settings' };
+  if (path.startsWith('/admin')) return { type: 'admin' };
+  if (path.startsWith('/notifications')) return { type: 'notifications' };
+  if (path.startsWith('/friends')) return { type: 'friends' };
+  if (path.startsWith('/discover')) return { type: 'discover' };
+  if (path.startsWith('/users/')) return { type: 'profile', userId: path.split('/')[2] };
+  return { type: 'dms' };
+}
+
+export function renderPlaceNavigation(region) {
+  clear(region);
+  if (!isAuthed()) return;
+  const ctx = sidebarContext();
+  switch (ctx.type) {
+    case 'community': return communityContext(region, ctx.serverId);
+    case 'settings': return settingsContext(region);
+    case 'admin': return adminContext(region);
+    case 'friends': return friendsContext(region);
+    case 'notifications': return notificationsContext(region);
+    case 'discover': return discoverContext(region);
+    case 'profile': return profileContext(region, ctx.userId);
+    default: return dmsContext(region);
+  }
+}
 
 const LS_HIDE_MEMBERS = 'trycord.hideMembers';
 const LS_SIDEBAR_COLLAPSED = 'trycord.sidebarCollapsed';
@@ -599,7 +879,7 @@ export function renderMemberSidebar(region) {
       const top = m.is_owner ? null
         : rolesForMember.map((r) => roleById.get(String(r.id)) || r)
           .sort((a, b) => Number(b.position || 0) - Number(a.position || 0))[0] || null;
-      const row = el('button', { class: 'member-item', type: 'button', title: '@' + (m.username || '') });
+      const row = el('button', { class: 'row row--member', type: 'button', title: '@' + (m.username || '') });
       row.appendChild(avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }));
       const info = el('span', { class: 'member-item__info' });
       const nameLine = el('span', { class: 'member-item__name' }, name);
@@ -679,9 +959,9 @@ export function renderMobileTabs(region) {
   const tabs = [
     { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
     { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
-    { id: 'discover', label: 'Browse', icon: '⌕', href: '#/discover' },
+    { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
+    { id: 'notifications', label: 'Alerts', icon: '♧', href: '#/notifications' },
     { id: 'menu', label: 'Menu', icon: '☰', href: '#/menu' },
-    { id: 'account', label: 'You', icon: '☺', href: '#/settings' },
   ];
   for (const t of tabs) {
     const active = route.startsWith(t.href.replace('#', ''));
@@ -696,8 +976,6 @@ export function renderMobileTabs(region) {
 }
 
 export function renderAllChrome() {
-  renderIdentity(qs('#identity-region'));
-  renderGlobalNavigation(qs('#global-navigation'));
   renderCommunities(qs('#community-navigation'));
   renderPlaceNavigation(qs('#place-navigation'));
   renderMobileTabs(qs('#mobile-tab-navigation'));
@@ -746,4 +1024,4 @@ export function renderVerifyBanner() {
   }
 }
 
-export default { renderAllChrome, renderVerifyBanner, renderContextHeader, renderIdentity, renderGlobalNavigation, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, setNavRoute, membersHidden, toggleMembers, isSidebarCollapsed, toggleSidebar, applySidebarState, DESTINATIONS };
+export default { renderAllChrome, renderVerifyBanner, renderContextHeader, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, setNavRoute, membersHidden, toggleMembers, isSidebarCollapsed, toggleSidebar, applySidebarState };
