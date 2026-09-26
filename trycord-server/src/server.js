@@ -338,7 +338,7 @@ async function boot() {
   // Serve the public website (repo-root public/, optional). Plain editable
   // HTML/CSS/JS under the same origin as the app, plus clean URLs for the main
   // pages. Mounted AFTER the client so the app keeps the root and any shared
-  // asset names; the public/index.html landing is previewable at /welcome (an
+  // asset names; the public/home.html landing is previewable at /welcome (an
   // operator may also serve public/ from the domain root in front of a reverse
   // proxy).
   let publicDir = null;
@@ -346,7 +346,7 @@ async function boot() {
     path.join(__dirname, '..', '..', 'public'),
     path.join(__dirname, '..', 'public'),
   ]) {
-    if (fs.existsSync(path.join(candidate, 'index.html'))) {
+    if (fs.existsSync(path.join(candidate, 'home.html'))) {
       publicDir = candidate;
       app.use(express.static(candidate, {
         setHeaders(res) {
@@ -381,7 +381,7 @@ async function boot() {
     app.get('/download', publicPage('download.html'));
     app.get('/security', publicPage('security.html'));
     app.get('/status', publicPage('status.html'));
-    app.get('/welcome', publicPage('index.html'));
+    app.get('/welcome', publicPage('home.html'));
     app.get('/404', publicPage('404.html'));
     console.log('[info] serving public website from ' + publicDir);
   }
