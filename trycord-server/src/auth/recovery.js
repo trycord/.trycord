@@ -55,7 +55,7 @@ async function requestPasswordReset(email) {
   console.log(`[security] password_reset_requested user=${user.id}`);
   try {
     const tpl = templates.passwordReset({
-      link: `${mail.publicUrl()}/#/reset-password/${token}`,
+      link: mail.clientLink('reset-password', token),
       minutes: ttlMinutes(),
     });
     await mail.sendMail({ to: normalized, ...tpl, kind: 'password-reset' });
@@ -108,7 +108,7 @@ async function requestVerification(userId, email) {
   );
   try {
     const tpl = templates.verification({
-      link: `${mail.publicUrl()}/#/verify-email/${token}`,
+      link: mail.clientLink('verify-email', token),
       hours: 24,
     });
     await mail.sendMail({ to: normalized, ...tpl, kind: 'verification' });
