@@ -1010,6 +1010,15 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .pop-item.danger { color: var(--t-err); }
 .pop-item.danger:hover { background: color-mix(in srgb, var(--t-err) 14%, transparent); }
 .pop-sep { height: 1px; background: var(--t-line); margin: 6px 0; }
+.pop-item[disabled] { opacity: 0.45; cursor: default; }
+.pop-item[disabled]:hover { background: transparent; }
+/* User popup card (Checkpoint C): anchored mini profile. */
+.user-card { min-width: 240px; }
+.user-card__head { display: flex; gap: var(--t-d-3); align-items: center; padding: var(--t-d-2); }
+.user-card__id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.user-card__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-card__status { font-size: var(--t-fs-s); color: var(--t-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-card__actions { display: flex; gap: var(--t-d-2); flex-wrap: wrap; padding: var(--t-d-2); border-top: 1px solid var(--t-line); }
 
 .toast-root {
   position: fixed !important;
@@ -1498,6 +1507,27 @@ html[data-route^="/verify-email/"] #member-sidebar { display: none !important; }
 .settings-nav { display: flex; gap: var(--t-d-2); flex-wrap: wrap; margin-bottom: var(--t-d-5); padding: 4px; background: var(--t-base); border: 1px solid var(--t-line); border-radius: 9px; width: max-content; max-width: 100%; }
 .settings-nav .btn { border: 0; background: transparent; }
 .settings-nav .btn.active { background: var(--t-accent); color: var(--t-on-accent); }
+/* Two-level settings layout: sidebar nav + content. */
+.settings-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--t-d-5); align-items: start; }
+.settings-layout > .settings-nav {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  margin-bottom: 0;
+  position: sticky;
+  top: var(--t-d-4);
+}
+.settings-layout > .settings-nav .btn { justify-content: flex-start; width: 100%; }
+.settings-layout > .settings-nav .settings-signout { margin-top: var(--t-d-3); }
+.settings-body { min-width: 0; display: flex; flex-direction: column; }
+.settings-body > .auth-box:first-child { margin-top: 0; }
+.section-label.danger { color: var(--t-err); }
+@media (max-width: 900px) {
+  .settings-layout { grid-template-columns: 1fr; }
+  .settings-layout > .settings-nav { position: static; flex-direction: row; width: 100%; }
+  .settings-layout > .settings-nav .btn { width: auto; }
+  .settings-layout > .settings-nav .settings-signout { margin-top: 0; margin-left: auto; }
+}
 
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--t-d-3); }
 .theme-chip {

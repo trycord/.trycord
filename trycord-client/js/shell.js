@@ -3,10 +3,80 @@
 // navigation, communities, current-place navigation), the in-environment
 // context header, and the MobileShell drawer + bottom tabs.
 
-import { esc, el, clear, qs } from './ui.js';
+import { esc, el, clear, qs, toast, confirmDialog, showContextMenu, showUserCard, copyText } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, realmTitle } from './components.js';
-import State, { isAuthed, currentServerId, can, peerPresence } from './state.js';
+import Api from './api.js';
+import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext } from './state.js';
 import { closeMobileDrawer } from './presentation.js';
+
+// Shared context-menu builders (Checkpoint C). `contextmenu` fires on
+// right-click (desktop) and long-press (mobile browsers), so one wiring
+// covers both shells.
+
+function serverChipMenu(e, s) {
+  e.preventDefault();
+  e.stopPropagation();
+  const sid = String(s.id);
+  const isCurrent = sid === String(currentServerId());
+  showContextMenu(e.clientX, e.clientY, [
+    { label: 'Open community', desc: s.name || '', onSelect: () => { location.hash = '#/server/' + sid; closeMobileDrawer(); } },
+    ...(isCurrent && can('MANAGE_SERVER')
+      ? [{ label: 'Community settings', onSelect: () => { location.hash = '#/server/' + sid + '/settings'; } }]
+      : (s.is_owner && !isCurrent
+        ? [{ label: 'Community settings', onSelect: () => { location.hash = '#/server/' + sid + '/settings'; } }]
+        : [])),
+    { label: 'Copy server ID', onSelect: () => copyText(sid, 'Server ID copied.') },
+    { sep: true },
+    {
+      label: 'Leave community', danger: true,
+      onSelect: () => {
+        if (s.is_owner) { toast('You own this community. Transfer or delete it first.', 'warn'); return; }
+        confirmDialog({
+          title: 'Leave ' + (s.name || 'community') + '?',
+          message: 'You can rejoin later with a new invite.',
+          danger: true, confirmText: 'Leave',
+          onConfirm: async () => {
+            try {
+              await Api.leaveServer(sid);
+              await refreshServers();
+              if (isCurrent) leaveServerContext();
+              location.hash = '#/home';
+            } catch (ex) { toast(ex.message || 'Failed', 'error'); }
+          },
+        });
+      },
+    },
+  ]);
+}
+
+async function messageMember(userId) {
+  try {
+    const dm = await Api.openDm(userId);
+    const id = (dm && (dm.id || dm.dm_id)) || dm;
+    location.hash = '#/dms/' + id;
+    closeMobileDrawer();
+  } catch (ex) { toast(ex.message || 'Could not open conversation.', 'error'); }
+}
+
+function memberCard(e, m) {
+  e.preventDefault();
+  e.stopPropagation();
+  const id = m.user_id || m.id;
+  const name = m.nickname || m.display_name || m.username || 'Unknown';
+  showUserCard(e.clientX, e.clientY, {
+    avatarEl: avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }),
+    title: name,
+    sub: '@' + (m.username || 'unknown'),
+    statusLine: m.status_text || null,
+    actions: [
+      { label: 'View profile', onSelect: () => { location.hash = '#/users/' + id; } },
+      ...(String(id) === String(State.me && State.me.id)
+        ? []
+        : [{ label: 'Message', primary: true, onSelect: () => messageMember(id) }]),
+      { label: 'Copy user ID', onSelect: () => copyText(String(id), 'User ID copied.') },
+    ],
+  });
+}
 
 const DESTINATIONS = [
   { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
@@ -69,10 +139,12 @@ export function renderCommunities(region) {
   if (!isAuthed()) return;
   region.appendChild(realmTitle('Communities'));
   for (const s of State.servers || []) {
-    region.appendChild(serverChip(s, {
+    const chip = serverChip(s, {
       active: String(s.id) === String(currentServerId()),
       onClick: () => { location.hash = '#/server/' + s.id; },
-    }));
+    });
+    chip.addEventListener('contextmenu', (e) => serverChipMenu(e, s));
+    region.appendChild(chip);
   }
   const actions = el('div', { class: 'community-actions' });
   actions.appendChild(el('button', { class: 'nav-row community-action', type: 'button', title: 'Create a community', onClick: () => { location.hash = '#/servers/new'; } },
@@ -160,7 +232,16 @@ export function renderPlaceNavigation(region) {
     const listBox = el('div', { class: 'channel-section__list' });
     for (const ch of list) {
       const active = route === '/server/' + sid + '/channel/' + ch.id;
-      listBox.appendChild(channelRow(ch, { active, onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } }));
+      const row = channelRow(ch, { active, onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } });
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showContextMenu(e.clientX, e.clientY, [
+          { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } },
+          { label: 'Copy channel ID', onSelect: () => copyText(String(ch.id), 'Channel ID copied.') },
+        ]);
+      });
+      listBox.appendChild(row);
     }
     section.appendChild(listBox);
     region.appendChild(section);
@@ -258,6 +339,7 @@ export function renderMemberSidebar(region) {
       info.appendChild(roleLine);
       row.appendChild(info);
       row.addEventListener('click', () => { location.hash = '#/users/' + id; });
+      row.addEventListener('contextmenu', (e) => memberCard(e, m));
       group.appendChild(row);
     }
     region.appendChild(group);
@@ -403,6 +485,7 @@ export function syncMobileNavigation(mobileNav) {
     for (const s of State.servers || []) {
       const active = String(s.id) === String(sid);
       const chip = serverChip(s, { active, onClick: () => { location.hash = '#/server/' + s.id; closeMobileDrawer(); } });
+      chip.addEventListener('contextmenu', (e) => serverChipMenu(e, s));
       list.appendChild(chip);
     }
     if (!State.servers || !State.servers.length) {

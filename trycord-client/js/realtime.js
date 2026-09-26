@@ -118,7 +118,12 @@ const TrycordRealtime = {
     send({ type: 'msg', ...body });
   },
   joinDm(conversationId) { joinedDm = conversationId; send({ type: 'dm:join', conversationId }); },
-  leaveDm() { joinedDm = null; },
+  // Tell the server to prune this DM room too (F3): without dm:leave the
+  // socket accumulated every DM ever opened and kept receiving them.
+  leaveDm() {
+    if (joinedDm) send({ type: 'dm:leave', conversationId: joinedDm });
+    joinedDm = null;
+  },
   typing(conversationId) {
     // throttled ephemeral echo
     const now = Date.now();

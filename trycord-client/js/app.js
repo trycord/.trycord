@@ -62,7 +62,16 @@ async function boot() {
     // 5) Online gateway (WS) when authenticated.
     Realtime.on('open', () => renderAllChrome());
     Realtime.on('close', () => renderAllChrome());
-    Realtime.on('presence', (p) => { setPresence(p.userId, p.presence); renderAllChrome(); });
+    // Presence flips are cheap state but expensive paint: a busy server
+    // can emit many per second, and every one repainted the whole chrome
+    // (F4). Apply state immediately, debounce the repaint; the trailing
+    // call always converges to the latest presence map.
+    let presencePaint = null;
+    Realtime.on('presence', (p) => {
+      setPresence(p.userId, p.presence);
+      clearTimeout(presencePaint);
+      presencePaint = setTimeout(() => renderAllChrome(), 750);
+    });
     Realtime.connect();
     refreshServers().catch(() => {});
     refreshNotifications().catch(() => {});

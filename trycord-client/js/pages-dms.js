@@ -9,6 +9,14 @@ import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
 
 let activeDmId = null;
+// Live DM subscriptions for the open thread. Dropped on every thread
+// switch/unmount (F3): without this each render stacked 3 permanent
+// handlers that all consumed every later dm event.
+let dmSubs = [];
+function dropDmSubs() {
+  for (const off of dmSubs) { try { off(); } catch { /* ignore */ } }
+  dmSubs = [];
+}
 
 async function renderDmList(container) {
   clear(container);
@@ -44,6 +52,9 @@ async function renderDmList(container) {
 }
 
 async function renderDmThread(container, dmId) {
+  // Tear down the previous thread first: its handlers close over a
+  // detached feed and must never consume another event.
+  leaveDm();
   activeDmId = dmId;
   clear(container);
   let detail;
@@ -79,6 +90,11 @@ async function renderDmThread(container, dmId) {
   }
 
   function appendDmMessage(m, toFeed) {
+    // Authoritative-id dedup (F2): the sender's POST is already in the
+    // feed via reload(), and the server fans dm:message back to the
+    // sender's own sockets too. Never render an id twice.
+    const target = toFeed || feed;
+    if (m && m.id && target.querySelector('[data-message-id="' + m.id + '"]')) return null;
     const mine = String(m.authorId) === String(State.me && State.me.id);
     const row = el('div', { class: 'msg' + (mine ? ' mine' : ''), dataset: { messageId: m.id } });
     row.appendChild(avatar({ id: m.authorId, username: m.authorName }, { withPresence: false }));
@@ -96,7 +112,7 @@ async function renderDmThread(container, dmId) {
     body.appendChild(head);
     body.appendChild(el('div', { class: 'msg-text' }, esc(m.content)));
     row.appendChild(body);
-    (toFeed || feed).appendChild(row);
+    target.appendChild(row);
     return row;
   }
 
@@ -168,28 +184,36 @@ async function renderDmThread(container, dmId) {
   container.appendChild(conv);
   await reload();
   Realtime.joinDm(dmId);
-  Realtime.on('dm:message', (m) => {
-    if (String(m.conversationId) === String(dmId)) appendDmMessage(m);
-  });
-  Realtime.on('dm:message_deleted', (m) => {
-    if (String(m.conversationId) === String(dmId)) {
-      const node = feed.querySelector('[data-message-id="' + m.id + '"]');
-      if (node) node.remove();
-    }
-  });
-  Realtime.on('dm:message_updated', (m) => {
-    if (String(m.conversationId) === String(dmId)) {
-      const node = feed.querySelector('[data-message-id="' + m.id + '"]');
-      if (node) {
-        const t = node.querySelector('.msg-text');
-        if (t) t.textContent = m.content;
+  dmSubs = [
+    Realtime.on('dm:message', (m) => {
+      if (String(m.conversationId) === String(dmId)) appendDmMessage(m);
+    }),
+    Realtime.on('dm:message_deleted', (m) => {
+      if (String(m.conversationId) === String(dmId)) {
+        const node = feed.querySelector('[data-message-id="' + m.id + '"]');
+        if (node) node.remove();
       }
-    }
-  });
+    }),
+    Realtime.on('dm:message_updated', (m) => {
+      if (String(m.conversationId) === String(dmId)) {
+        const node = feed.querySelector('[data-message-id="' + m.id + '"]');
+        if (node) {
+          const t = node.querySelector('.msg-text');
+          if (t) t.textContent = m.content;
+        }
+      }
+    }),
+    // Reconnect resync (F4): reload() is authoritative (clear + refetch),
+    // so catching up after offline time cannot duplicate state.
+    Realtime.on('open', () => {
+      if (String(activeDmId) === String(dmId)) reload().catch(() => {});
+    }),
+  ];
   Api.dmRead(dmId).catch(() => {});
 }
 
 export function leaveDm() {
+  dropDmSubs();
   if (activeDmId) Realtime.leaveDm();
   activeDmId = null;
 }
