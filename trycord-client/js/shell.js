@@ -227,6 +227,8 @@ export function renderCommunities(region) {
     onClick: () => { location.hash = '#/settings'; },
   }, el('span', { class: 'nv-icon' }, '⚙'));
   foot.append(bell, gear);
+  // Sidebar collapse toggle — always visible in the icon rail.
+  foot.appendChild(sidebarToggleButton());
   region.appendChild(foot);
 }
 
@@ -259,9 +261,10 @@ function refreshHomeSidebar(region) {
   });
 }
 
-// Home/DM context sidebar: conversation search, shortcuts (Friends with
-// incoming-request count, Notifications with unread, Discover) and the
-// live DM conversation list. No server content renders here — ever.
+// Home/DM context sidebar: conversation search, new-message shortcut, and
+// the live DM conversation list. Primary destinations (Friends,
+// Notifications, Discover) live ONLY in the global navigation — never
+// duplicated here. No server content renders here — ever.
 function renderHomeSidebar(region) {
   const route = currentRoute();
   const search = el('input', {
@@ -307,31 +310,6 @@ function renderHomeSidebar(region) {
   region.appendChild(search);
   const newDm = el('button', { class: 'btn ghost sm home-newdm', type: 'button', onClick: () => { location.hash = '#/friends'; } }, '＋ New message');
   region.appendChild(newDm);
-
-  const shortcuts = el('div', { class: 'home-shortcuts' });
-  const reqCount = (State.friendsIn || []).length;
-  const unread = State.notifUnread || 0;
-  const links = [
-    { label: 'Friends', icon: '☺', href: '#/friends', path: '/friends', badge: reqCount || 0 },
-    { label: 'Notifications', icon: '♧', href: '#/notifications', path: '/notifications', badge: unread },
-    { label: 'Discover', icon: '⌕', href: '#/discover', path: '/discover', badge: 0 },
-  ];
-  for (const l of links) {
-    const b = navRow({
-      label: l.label, icon: l.icon, href: l.href,
-      active: route === l.path || route.startsWith(l.path + '/'),
-      count: l.badge,
-      onClick: () => { location.hash = l.href; },
-    });
-    shortcuts.appendChild(b);
-  }
-  if (reqCount) {
-    shortcuts.appendChild(el('button', {
-      class: 'btn sm home-requests', type: 'button',
-      onClick: () => { location.hash = '#/friends'; },
-    }, reqCount + ' message request' + (reqCount === 1 ? '' : 's')));
-  }
-  region.appendChild(shortcuts);
 
   region.appendChild(el('div', { class: 'channel-section__title' }, el('span', {}, 'Direct messages')));
   paintDMs('');
@@ -510,6 +488,7 @@ export function renderPlaceNavigation(region) {
 
 
 const LS_HIDE_MEMBERS = 'trycord.hideMembers';
+const LS_SIDEBAR_COLLAPSED = 'trycord.sidebarCollapsed';
 
 export function membersHidden() {
   try { return localStorage.getItem(LS_HIDE_MEMBERS) === '1'; } catch { return false; }
@@ -520,6 +499,43 @@ export function toggleMembers() {
     localStorage.setItem(LS_HIDE_MEMBERS, membersHidden() ? '0' : '1');
   } catch { /* ignore */ }
   renderMemberSidebar(qs('#member-sidebar'));
+}
+
+// ---- collapsible sidebar ---------------------------------------------------
+// Persistent preference (localStorage). Collapsed = icon-only rail with
+// tooltips; expanded = full labels. Survives navigation and reloads.
+
+export function isSidebarCollapsed() {
+  try { return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === '1'; } catch { return false; }
+}
+
+export function toggleSidebar() {
+  const next = !isSidebarCollapsed();
+  try { localStorage.setItem(LS_SIDEBAR_COLLAPSED, next ? '1' : '0'); } catch { /* ignore */ }
+  applySidebarState();
+}
+
+export function applySidebarState() {
+  const shell = qs('#desktop-shell');
+  if (shell) shell.classList.toggle('sidebar-collapsed', isSidebarCollapsed());
+  // Re-render chrome so tooltips and aria states update immediately.
+  renderAllChrome();
+}
+
+function sidebarToggleButton() {
+  const collapsed = isSidebarCollapsed();
+  const btn = el('button', {
+    class: 'sidebar-collapse-toggle',
+    type: 'button',
+    title: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
+    'aria-label': collapsed ? 'Expand sidebar' : 'Collapse sidebar',
+    'aria-pressed': collapsed ? 'true' : 'false',
+  }, collapsed ? '▶' : '◀');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleSidebar();
+  });
+  return btn;
 }
 
 export function renderMemberSidebar(region) {
@@ -730,4 +746,4 @@ export function renderVerifyBanner() {
   }
 }
 
-export default { renderAllChrome, renderVerifyBanner, renderContextHeader, renderIdentity, renderGlobalNavigation, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, setNavRoute, membersHidden, toggleMembers, DESTINATIONS };
+export default { renderAllChrome, renderVerifyBanner, renderContextHeader, renderIdentity, renderGlobalNavigation, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, setNavRoute, membersHidden, toggleMembers, isSidebarCollapsed, toggleSidebar, applySidebarState, DESTINATIONS };

@@ -12,8 +12,6 @@ import Realtime from './realtime.js';
 
 function accountTabs(active) {
   const tabs = el('div', { class: 'settings-nav' });
-  // Only sections that actually exist. Legacy password/sessions routes
-  // highlight Security — they render the same page.
   const items = [
     { id: 'profile', label: 'My Account', href: '#/settings', match: ['profile'] },
     { id: 'security', label: 'Security', href: '#/settings/security', match: ['security', 'password', 'sessions'] },
@@ -241,7 +239,7 @@ function renderProfileEditor(wrap) {
     value: (me && me.statusText) || '',
   });
 
-  const profileCard = el('div', { class: 'auth-box' });
+  const profileCard = el('div', { class: 'profile-editor' });
 
   // ---- live preview card (banner + avatar + name + bio + status) -------
   const bannerBox = el('div', { class: 'prof-banner' });
@@ -342,7 +340,7 @@ function renderProfileEditor(wrap) {
     } catch (ex) { toast(ex.message || 'Failed', 'error'); }
   });
 
-  profileCard.appendChild(el('div', { class: 'section-label' }, 'Picture'));
+  profileCard.appendChild(el('div', { class: 'section-label' }, 'Profile picture'));
   profileCard.appendChild(el('div', { class: 'row-line' }, avatarBtn, avatarRm, bannerBtn, bannerRm));
   profileCard.appendChild(avatarInput);
   profileCard.appendChild(bannerInput);
@@ -378,6 +376,7 @@ function renderProfileEditor(wrap) {
   profileCard.appendChild(form);
 
   // ---- email + verification status ----
+  profileCard.appendChild(el('div', { class: 'section-label' }, 'Account email'));
   const emailBox = el('div', { class: 'field' });
   emailBox.appendChild(el('label', {}, 'Email'));
   const emailLine = el('div', { class: 'muted small' });
