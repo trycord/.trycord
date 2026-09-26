@@ -1,1 +1,81 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Status · Trycord</title><link rel="icon" href="/assets/trycord-logo.ico" type="image/x-icon"><link rel="icon" href="/assets/trycord-logo.png" type="image/png"><link rel="stylesheet" href="/css/site.css"></head><body><header class="site-header"><div class="wrap nav-wrap"><a class="brand" href="/welcome"><img class="brand-mark" src="/assets/trycord-logo.png" alt=""><span class="brand-name">Trycord</span></a><nav class="site-nav"><a href="/welcome">Home</a><a href="/features">Features</a><a href="/docs">Docs</a><a href="/security">Security</a></nav></div></header><main class="site-main"><article class="page prose"><p class="kicker">Service status</p><h1>Trycord status</h1><p class="lede">This page provides a lightweight browser check for the local instance.</p><div class="card"><p id="status-text">Checking health…</p><p class="muted small" id="status-detail"></p></div></article></main><script src="/js/status.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Status — Trycord</title>
+  <meta name="description" content="Live service status for this Trycord instance.">
+  <link rel="icon" href="/assets/trycord-logo.ico" type="image/x-icon">
+  <link rel="icon" href="/assets/trycord-logo.png" type="image/png">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="wrap nav-wrap">
+      <a class="brand" href="/welcome">
+        <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
+        <span class="brand-name">Trycord</span>
+      </a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <a href="/welcome">Home</a>
+        <a href="/features">Features</a>
+        <a href="/docs">Docs</a>
+        <a href="/download">Download</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a><a href="/security">Security</a><a href="/status">Status</a>
+        <a class="btn-open" href="/">Open the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="page tight">
+    <div class="prose">
+      <p class="kicker">Service status</p>
+      <h1>Trycord status</h1>
+      <p class="lede">This page provides a lightweight browser check for the local instance.</p>
+      <div class="card">
+        <p id="status-text">Checking health…</p>
+        <p class="muted small" id="status-detail"></p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/welcome">
+          <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
+          <span class="brand-name">Trycord</span>
+        </a>
+        <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Product</h2>
+        <a href="/features">Features</a>
+        <a href="/download">Download</a>
+        <a href="/docs">Documentation</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Project</h2>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Legal</h2>
+        <a href="/terms">Terms of Service</a>
+        <a href="/privacy">Privacy Policy</a>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>&copy; <span data-year>2026</span> Trycord</span>
+      <span class="muted">Your instance, your conversations, your rules.</span>
+    </div>
+  </footer>
+
+  <script src="/js/site.js"></script>
+  <script src="/js/status.js"></script>
+</body>
+</html>
