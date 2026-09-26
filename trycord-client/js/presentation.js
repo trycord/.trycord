@@ -58,6 +58,40 @@ export function updateFromViewport() {
   return want;
 }
 
+// ---- desktop pop-out rail -------------------------------------------------
+// The presence spine is off-canvas on desktop (see CSS). These helpers
+// own the open state. Null-safe: with no spine element they no-op.
+
+export function isDesktopNavOpen() {
+  const shell = document.getElementById('desktop-shell');
+  return !!shell && shell.classList.contains('nav-open');
+}
+
+export function openDesktopNav() {
+  const shell = document.getElementById('desktop-shell');
+  const drop = document.getElementById('desktop-backdrop');
+  if (!shell) return;
+  shell.classList.add('nav-open');
+  if (drop) drop.hidden = false;
+  const t = shell.querySelector('.nav-toggle');
+  if (t) t.setAttribute('aria-expanded', 'true');
+}
+
+export function closeDesktopNav() {
+  const shell = document.getElementById('desktop-shell');
+  const drop = document.getElementById('desktop-backdrop');
+  if (!shell) return;
+  shell.classList.remove('nav-open');
+  if (drop) drop.hidden = true;
+  const t = shell.querySelector('.nav-toggle');
+  if (t) t.setAttribute('aria-expanded', 'false');
+}
+
+export function toggleDesktopNav() {
+  if (isDesktopNavOpen()) closeDesktopNav();
+  else openDesktopNav();
+}
+
 // ---- mobile drawer --------------------------------------------------------
 
 export function isMobileDrawerOpen() {
@@ -196,6 +230,12 @@ function initMobileGestures() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && isMobileDrawerOpen()) closeMobileDrawer();
   });
+  // Escape closes the desktop pop-out rail; backdrop click too.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isDesktopNavOpen()) closeDesktopNav();
+  });
+  const drop = document.getElementById('desktop-backdrop');
+  if (drop) drop.addEventListener('click', () => closeDesktopNav());
 
   // Tap outside — the backdrop covers everything the drawer does not.
   const backdrop = document.getElementById('mobile-backdrop');
@@ -213,6 +253,10 @@ const TrycordPresentation = {
   openDrawer: openMobileDrawer,
   closeDrawer: closeMobileDrawer,
   isDrawerOpen: isMobileDrawerOpen,
+  openNav: openDesktopNav,
+  closeNav: closeDesktopNav,
+  toggleNav: toggleDesktopNav,
+  isNavOpen: isDesktopNavOpen,
   onChange: onPresentationChange,
   initGesture: initMobileGestures,
   GESTURE,
