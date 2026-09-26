@@ -75,10 +75,11 @@ async function renderDmThread(container, dmId) {
   thread.appendChild(feed);
   conv.appendChild(thread);
 
-  function dmIntro() {
+  function dmIntro(withCta) {
     const box = el('div', { class: 'channel-intro' }, el('div', { class: 'channel-intro__mark' }, '✉'));
     box.appendChild(el('h2', { class: 'channel-intro__title' }, peer.displayName || peer.username));
     box.appendChild(el('p', { class: 'channel-intro__sub' }, 'This is the beginning of your conversation.'));
+    if (withCta) box.appendChild(el('p', { class: 'channel-intro__cta' }, 'Say something kind below.'));
     return box;
   }
 
@@ -96,10 +97,7 @@ async function renderDmThread(container, dmId) {
       return;
     }
     clear(feed);
-    feed.appendChild(dmIntro());
-    if (!msgs.length) {
-      feed.appendChild(emptyState('✉', 'No messages yet', 'Say something kind.'));
-    }
+    feed.appendChild(dmIntro(msgs.length === 0));
     for (const m of msgs) {
       appendDmMessage(m, feed, dmId);
     }

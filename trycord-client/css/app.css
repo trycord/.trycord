@@ -518,6 +518,33 @@ img { max-width: 100%; }
   overflow-y: hidden !important;
 }
 .place-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+/* Home/DM context sidebar: search, shortcuts, conversation list. */
+.home-search { width: 100%; margin-bottom: 8px; }
+.home-newdm { width: 100%; margin-bottom: 10px; }
+.home-shortcuts { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+.home-shortcuts .nav-row { width: 100%; }
+.home-requests { margin-top: 6px; width: 100%; }
+.home-dm-list { display: flex; flex-direction: column; gap: 1px; }
+.dm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  color: var(--t-txt2);
+  text-align: left;
+}
+.dm-row:hover { background: color-mix(in srgb, var(--t-txt) 5%, transparent); }
+.dm-row.active { background: color-mix(in srgb, var(--t-accent) 13%, transparent); color: var(--t-txt); }
+.dm-row.unread .dm-row__name { font-weight: 800; color: var(--t-txt); }
+.dm-row__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dm-row__top { display: flex; align-items: baseline; gap: 8px; }
+.dm-row__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; font-size: 0.88rem; }
+.dm-row__time { flex: 0 0 auto; color: var(--t-mut); font-size: var(--t-fs-xs); }
+.dm-row__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t-mut); font-size: var(--t-fs-s); }
+.dm-row .nv-count { flex: 0 0 auto; }
 
 .main-environment {
   grid-column: 2 !important;

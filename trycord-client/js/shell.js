@@ -3,10 +3,10 @@
 // navigation, communities, current-place navigation), the in-environment
 // context header, and the MobileShell drawer + bottom tabs.
 
-import { esc, el, clear, qs, toast, confirmDialog, openModal, openReportDialog, showContextMenu, showUserCard, copyText } from './ui.js';
+import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, showUserCard, copyText } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, realmTitle } from './components.js';
 import Api from './api.js';
-import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted } from './state.js';
+import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications } from './state.js';
 import { closeMobileDrawer } from './presentation.js';
 
 // Shared context-menu builders (Checkpoint C). `contextmenu` fires on
@@ -230,19 +230,126 @@ export function renderCommunities(region) {
   region.appendChild(foot);
 }
 
+// Application context, derived from the ROUTE (not lastServerId): home
+// surfaces (home, DMs, friends, notifications, discover, settings…)
+// render the home sidebar, /server/* routes render the server sidebar.
+// Switching routes visibly swaps the whole second column.
+export function sidebarContext() {
+  const m = /^\/server\/([^/]+)/.exec(currentRoute() || '');
+  if (m && m[1]) return { type: 'server', serverId: m[1] };
+  return { type: 'home' };
+}
+
+// Background refresh for the home sidebar (DMs, requests, unread).
+// Throttled + single-flight: the repaint it triggers re-enters this
+// renderer, which returns early — no refresh loop possible.
+let homeRefreshAt = 0;
+let homeRefreshOn = false;
+function refreshHomeSidebar(region) {
+  const now = Date.now();
+  if (homeRefreshOn || now - homeRefreshAt < 30000) return;
+  homeRefreshOn = true;
+  homeRefreshAt = now;
+  Promise.allSettled([refreshDms(), refreshFriends(), refreshNotifications()]).finally(() => {
+    homeRefreshOn = false;
+    if (region.isConnected) {
+      try { renderPlaceNavigation(region); } catch { /* stale view */ }
+      try { renderAllChrome(); } catch { /* ignore */ }
+    }
+  });
+}
+
+// Home/DM context sidebar: conversation search, shortcuts (Friends with
+// incoming-request count, Notifications with unread, Discover) and the
+// live DM conversation list. No server content renders here — ever.
+function renderHomeSidebar(region) {
+  const route = currentRoute();
+  const search = el('input', {
+    class: 'input home-search', type: 'search',
+    placeholder: 'Find or start a conversation', 'aria-label': 'Filter conversations',
+  });
+  const listBox = el('div', { class: 'home-dm-list' });
+  const paintDMs = (q) => {
+    clear(listBox);
+    const query = String(q || '').trim().toLowerCase();
+    const dms = State.dms || [];
+    const shown = query
+      ? dms.filter((d) => String((d.peer && (d.peer.displayName || d.peer.username)) || '').toLowerCase().includes(query))
+      : dms;
+    if (!shown.length) {
+      listBox.appendChild(el('div', { class: 'place-empty compact' },
+        dms.length ? 'No conversations match.' : 'No conversations yet.'));
+      return;
+    }
+    for (const dm of shown) {
+      const peer = dm.peer || {};
+      const name = peer.displayName || peer.username || 'Unknown';
+      const active = route === '/dms/' + dm.id;
+      const row = el('button', {
+        class: 'dm-row' + (active ? ' active' : '') + (dm.unreadCount ? ' unread' : ''),
+        type: 'button', title: name,
+        onClick: () => { location.hash = '#/dms/' + dm.id; },
+      });
+      row.appendChild(avatar(peer, { size: 'sm', withPresence: true }));
+      const main = el('div', { class: 'dm-row__main' });
+      const top = el('div', { class: 'dm-row__top' });
+      top.appendChild(el('span', { class: 'dm-row__name' }, name));
+      if (dm.lastMessage) top.appendChild(el('span', { class: 'dm-row__time' }, relTime(dm.lastMessage.createdAt)));
+      main.appendChild(top);
+      main.appendChild(el('div', { class: 'dm-row__sub' },
+        dm.lastMessage ? String(dm.lastMessage.content || '').slice(0, 80) : 'Say hello'));
+      row.appendChild(main);
+      if (dm.unreadCount) row.appendChild(el('span', { class: 'nv-count' }, String(dm.unreadCount > 99 ? '99+' : dm.unreadCount)));
+      listBox.appendChild(row);
+    }
+  };
+  search.addEventListener('input', () => paintDMs(search.value));
+  region.appendChild(search);
+  const newDm = el('button', { class: 'btn ghost sm home-newdm', type: 'button', onClick: () => { location.hash = '#/friends'; } }, '＋ New message');
+  region.appendChild(newDm);
+
+  const shortcuts = el('div', { class: 'home-shortcuts' });
+  const reqCount = (State.friendsIn || []).length;
+  const unread = State.notifUnread || 0;
+  const links = [
+    { label: 'Friends', icon: '☺', href: '#/friends', path: '/friends', badge: reqCount || 0 },
+    { label: 'Notifications', icon: '♧', href: '#/notifications', path: '/notifications', badge: unread },
+    { label: 'Discover', icon: '⌕', href: '#/discover', path: '/discover', badge: 0 },
+  ];
+  for (const l of links) {
+    const b = navRow({
+      label: l.label, icon: l.icon, href: l.href,
+      active: route === l.path || route.startsWith(l.path + '/'),
+      count: l.badge,
+      onClick: () => { location.hash = l.href; },
+    });
+    shortcuts.appendChild(b);
+  }
+  if (reqCount) {
+    shortcuts.appendChild(el('button', {
+      class: 'btn sm home-requests', type: 'button',
+      onClick: () => { location.hash = '#/friends'; },
+    }, reqCount + ' message request' + (reqCount === 1 ? '' : 's')));
+  }
+  region.appendChild(shortcuts);
+
+  region.appendChild(el('div', { class: 'channel-section__title' }, el('span', {}, 'Direct messages')));
+  paintDMs('');
+  region.appendChild(listBox);
+  refreshHomeSidebar(region);
+}
+
 export function renderPlaceNavigation(region) {
   clear(region);
   if (!isAuthed()) return;
-  const sid = currentServerId();
-  const server = (State.servers || []).find((x) => String(x.id) === String(sid));
-  const route = currentRoute();
-  if (!sid) {
-    region.appendChild(el('div', { class: 'place-empty' },
-      el('div', { class: 'place-empty__icon' }, '＋'),
-      el('strong', {}, 'Choose a community'),
-      el('span', {}, 'Your channels will appear here.')));
+  const ctx = sidebarContext();
+  if (ctx.type !== 'server') {
+    renderHomeSidebar(region);
     return;
   }
+  const sid = ctx.serverId;
+  const server = (State.servers || []).find((x) => String(x.id) === String(sid));
+  const route = currentRoute();
 
   const serverName = server ? server.name : (State.serverDetail && State.serverDetail.name) || 'Community';
   const header = el('div', { class: 'place-header' });
@@ -547,6 +654,7 @@ export function renderMobileTabs(region) {
     { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
     { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
     { id: 'discover', label: 'Browse', icon: '⌕', href: '#/discover' },
+    { id: 'menu', label: 'Menu', icon: '☰', href: '#/menu' },
     { id: 'account', label: 'You', icon: '☺', href: '#/settings' },
   ];
   for (const t of tabs) {

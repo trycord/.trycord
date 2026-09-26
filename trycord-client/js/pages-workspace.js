@@ -1684,10 +1684,89 @@ async function togglePinReaction(channelId, messageId, emoji, mine) {
   } catch (ex) { toast(ex.message || 'Could not react.', 'error'); }
 }
 
+// Interim menu page: with the mobile drawer removed, small screens need
+// a single surface reaching servers, channels, friends, notifications
+// and admin. Plain list reusing existing rows; replaced wholesale when
+// the new drawer lands.
+async function renderMenu(container) {
+  clear(container);
+  renderContextHeader({ title: 'Menu', sub: 'Everywhere in Trycord' });
+  const wrap = el('div', { class: 'page atrium' });
+  const me = State.me || {};
+  const acct = el('button', { class: 'row', type: 'button', onClick: () => { location.hash = '#/settings'; } });
+  acct.appendChild(avatar(me, { size: 'sm', withPresence: true }));
+  const am = el('div', { class: 'row-main' });
+  am.appendChild(el('div', { class: 'row-title' }, me.displayName || me.username || 'You'));
+  am.appendChild(el('div', { class: 'row-sub' }, 'Open settings'));
+  acct.appendChild(am);
+  wrap.appendChild(acct);
+
+  const route = location.hash.replace(/^#/, '');
+  const appSec = el('div', { class: 'stack' });
+  appSec.appendChild(el('div', { class: 'section-label' }, 'App'));
+  const links = [
+    { label: 'Friends', href: '#/friends', path: '/friends' },
+    { label: 'Notifications', href: '#/notifications', path: '/notifications', badge: State.notifUnread },
+    { label: 'Discover', href: '#/discover', path: '/discover' },
+  ];
+  if (me && me.isAdmin) links.push({ label: 'Admin', href: '#/admin', path: '/admin', badge: 0 });
+  for (const l of links) {
+    const b = el('button', {
+      class: 'row' + (route === l.path || route.startsWith(l.path + '/') ? ' active' : ''),
+      type: 'button', onClick: () => { location.hash = l.href; },
+    });
+    const bm = el('div', { class: 'row-main' });
+    bm.appendChild(el('div', { class: 'row-title' }, l.label));
+    b.appendChild(bm);
+    if (l.badge) b.appendChild(el('span', { class: 'nv-count' }, String(l.badge > 99 ? '99+' : l.badge)));
+    appSec.appendChild(b);
+  }
+  wrap.appendChild(appSec);
+
+  const srvSec = el('div', { class: 'stack' });
+  srvSec.appendChild(el('div', { class: 'section-label' }, 'Communities'));
+  wrap.appendChild(srvSec);
+  container.appendChild(wrap);
+  let servers = [];
+  try { servers = await refreshServers(); } catch { /* offline */ }
+  if (!servers.length) {
+    srvSec.appendChild(el('p', { class: 'muted small' }, 'No communities yet.'));
+    const go = el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/discover'; } }, 'Discover communities');
+    srvSec.appendChild(go);
+    renderAllChrome();
+    return;
+  }
+  for (const s of servers) {
+    srvSec.appendChild(el('div', { class: 'section-label' }, s.name || 'Community'));
+    let channels = [];
+    try {
+      const layout = await Api.channels(s.id);
+      channels = layout.channels || [];
+    } catch { /* skip */ }
+    if (!channels.length) {
+      srvSec.appendChild(el('p', { class: 'muted small' }, 'No channels yet.'));
+      continue;
+    }
+    for (const ch of channels) {
+      const b = el('button', {
+        class: 'row' + (route === '/server/' + s.id + '/channel/' + ch.id ? ' active' : ''),
+        type: 'button', onClick: () => { location.hash = '#/server/' + s.id + '/channel/' + ch.id; },
+      });
+      const bm = el('div', { class: 'row-main' });
+      bm.appendChild(el('div', { class: 'row-title' }, '# ' + (ch.name || 'channel')));
+      if (ch.topic) bm.appendChild(el('div', { class: 'row-sub' }, ch.topic));
+      b.appendChild(bm);
+      srvSec.appendChild(b);
+    }
+  }
+  renderAllChrome();
+}
+
 export default {
   renderServerLanding,
   renderChannel,
   renderChannelPins,
+  renderMenu,
   renderNewChannel,
   renderInvites,
   renderServerSettings,
