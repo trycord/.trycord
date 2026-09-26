@@ -49,6 +49,8 @@ function wsClosed(ws, ms = 5000) {
     const u = pfx + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
     const r = await J('POST', '/api/auth/register', { username: u, password: 'secret123', termsVersion: legal.termsVersion, privacyVersion: legal.privacyVersion });
     if (r.status !== 200) throw new Error('register failed: ' + r.status + ' ' + JSON.stringify(r.json));
+    const v = await J('POST', '/api/test/self-verify', null, r.json.token);
+    if (v.status !== 200) throw new Error('self-verify failed — boot the server with ALLOW_TEST_HOOKS=true');
     return { name: u, token: r.json.token, id: r.json.user.id };
   }
 

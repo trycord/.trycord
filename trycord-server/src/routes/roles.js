@@ -32,7 +32,7 @@ router.get('/', requireMember, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
+router.post('/', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
     const { name, permissions, color } = req.body || {};
     const role = await roles.create(req.server.id, { name, permissions, color });
@@ -41,7 +41,7 @@ router.post('/', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
-router.patch('/:roleId', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
+router.patch('/:roleId', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
     const role = await roles.get(req.params.roleId);
     if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
@@ -54,7 +54,7 @@ router.patch('/:roleId', requirePerm('MANAGE_ROLES'), async (req, res, next) => 
 
 // Atomic hierarchy reorder. MANAGE_ROLES gates the endpoint; the service
 // validates the id set. Reordering never changes anyone's membership.
-router.post('/reorder', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
+router.post('/reorder', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
     const { orderedIds } = req.body || {};
     const list = await roles.reorder(req.server.id, orderedIds);
@@ -63,7 +63,7 @@ router.post('/reorder', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
-router.delete('/:roleId', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
+router.delete('/:roleId', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
     const role = await roles.get(req.params.roleId);
     if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
@@ -73,7 +73,7 @@ router.delete('/:roleId', requirePerm('MANAGE_ROLES'), async (req, res, next) =>
   } catch (e) { serviceError(res, e); }
 });
 
-router.post('/:roleId/assign', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
+router.post('/:roleId/assign', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
     const role = await roles.get(req.params.roleId);
     if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
@@ -90,7 +90,7 @@ router.post('/:roleId/assign', requirePerm('MANAGE_ROLES'), async (req, res, nex
   } catch (e) { next(e); }
 });
 
-router.delete('/:roleId/assign/:userId', requirePerm('MANAGE_ROLES'), async (req, res, next) => {
+router.delete('/:roleId/assign/:userId', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
     const role = await roles.get(req.params.roleId);
     if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');

@@ -28,6 +28,10 @@ async function J(method, p, body, tok, form) {
     const r = await J('POST', '/api/auth/register', { username: u, password: 'secret123', termsVersion: legal.termsVersion, privacyVersion: legal.privacyVersion });
     ok('mkuser-' + pfx, r.status === 200 && !!(r.json && r.json.token), 'status=' + r.status + ' ' + JSON.stringify(r.json).slice(0, 120));
     if (r.status !== 200) throw new Error('register failed, aborting (likely rate window)');
+    // Verified-only writes: suites mark probe users verified through the
+    // test hook (server must boot with ALLOW_TEST_HOOKS=true).
+    const v = await J('POST', '/api/test/self-verify', null, r.json.token);
+    if (v.status !== 200) throw new Error('self-verify failed — boot the server with ALLOW_TEST_HOOKS=true');
     return { name: u, token: r.json.token, id: r.json.user.id };
   }
   const A = await mkuser('rgA'); const B = await mkuser('rgB');

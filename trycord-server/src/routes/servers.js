@@ -22,7 +22,7 @@ router.get('/', async (req, res, next) => {
 
 // Server creation is write-heavy (server + membership + roles + category +
 // channel in one transaction); cap it so a burst cannot hammer the DB.
-router.post('/', rateLimit({ windowMs: 60000, max: 10 }), async (req, res, next) => {
+router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 10 }), async (req, res, next) => {
   try {
     const { name, description, joinCode, isPublic, isDiscoverable } = req.body || {};
     res.json(await servers.create({ name, description, joinCode, isPublic, isDiscoverable }, req.user));
@@ -44,7 +44,7 @@ router.get('/by-code/:code', async (req, res, next) => {
 });
 
 // Legacy permanent-code join (kept for back-compat; invites are the real system).
-router.post('/join/:code', async (req, res, next) => {
+router.post('/join/:code', auth.requireVerified, async (req, res, next) => {
   try {
     const out = await memberships.joinByCode(req.params.code, req.user);
     if (out && out.serverId) events.emit(out.serverId, 'member_joined', { userId: String(req.user.id) });
@@ -59,7 +59,7 @@ router.get('/:id', resolveServer, requireMember, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.patch('/:id', resolveServer, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
+router.patch('/:id', resolveServer, auth.requireVerified, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
   try {
     const { name, description, isPublic, isDiscoverable } = req.body || {};
     await servers.update(req.server.id, { name, description, isPublic, isDiscoverable });
@@ -69,7 +69,7 @@ router.patch('/:id', resolveServer, requirePerm('MANAGE_SERVER'), async (req, re
   } catch (e) { serviceError(res, e); }
 });
 
-router.delete('/:id', resolveServer, requireOwner, async (req, res, next) => {
+router.delete('/:id', resolveServer, auth.requireVerified, requireOwner, async (req, res, next) => {
   try {
     res.json(await servers.remove(req.server.id));
   } catch (e) { next(e); }
@@ -87,7 +87,7 @@ router.post('/:id/leave', resolveServer, async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
-router.post('/:id/kick', resolveServer, requirePerm('KICK_MEMBERS'), async (req, res, next) => {
+router.post('/:id/kick', resolveServer, auth.requireVerified, requirePerm('KICK_MEMBERS'), async (req, res, next) => {
   try {
     const { userId } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
@@ -97,7 +97,7 @@ router.post('/:id/kick', resolveServer, requirePerm('KICK_MEMBERS'), async (req,
 
 // Ban: persistent per-server ban (member removed now, rejoin blocked until
 // lifted/expired). Hierarchy is enforced in the service; BAN_MEMBERS gates.
-router.post('/:id/ban', resolveServer, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
+router.post('/:id/ban', resolveServer, auth.requireVerified, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
   try {
     const { userId, reason, minutes } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
@@ -105,7 +105,7 @@ router.post('/:id/ban', resolveServer, requirePerm('BAN_MEMBERS'), async (req, r
   } catch (e) { serviceError(res, e); }
 });
 
-router.post('/:id/unban', resolveServer, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
+router.post('/:id/unban', resolveServer, auth.requireVerified, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
   try {
     const { userId } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
@@ -121,7 +121,7 @@ router.get('/:id/bans', resolveServer, requirePerm('BAN_MEMBERS'), async (req, r
 
 // Timeout: member stays but cannot post until it lapses. minutes null/0
 // clears. Enforced on every message send, server-side.
-router.post('/:id/timeout', resolveServer, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
+router.post('/:id/timeout', resolveServer, auth.requireVerified, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
   try {
     const { userId, minutes } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
@@ -131,7 +131,7 @@ router.post('/:id/timeout', resolveServer, requirePerm('BAN_MEMBERS'), async (re
 
 // Set/clear a member nickname. Anyone may set their own; staff (KICK_MEMBERS)
 // may set any member's. resolver + memberships gate membership itself.
-router.patch('/:id/members/:userId/nickname', resolveServer, requireMember, async (req, res, next) => {
+router.patch('/:id/members/:userId/nickname', resolveServer, auth.requireVerified, requireMember, async (req, res, next) => {
   try {
     const targetId = req.params.userId;
     const mine = String(targetId) === String(req.user.id);

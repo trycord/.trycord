@@ -96,6 +96,8 @@ async function main() {
       termsVersion: legal.termsVersion, privacyVersion: legal.privacyVersion,
     });
     ok(r.status === 200 && r.data.token && r.data.user, 'register ' + name);
+    const v = await api('POST', '/api/test/self-verify', r.data.token);
+    ok(v.status === 200, 'self-verify ' + name + ' (server needs ALLOW_TEST_HOOKS=true)');
     return r.data;
   }
   const alice = await register('alice');

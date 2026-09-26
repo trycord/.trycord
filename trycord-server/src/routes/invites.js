@@ -18,7 +18,7 @@ managed.get('/', requirePerm('MANAGE_INVITES'), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-managed.post('/', requirePerm('MANAGE_INVITES'), async (req, res, next) => {
+managed.post('/', auth.requireVerified, requirePerm('MANAGE_INVITES'), async (req, res, next) => {
   try {
     const { maxUses, expiresInHours } = req.body || {};
     const inv = await invites.create(req.server.id, req.user.id, { maxUses, expiresInHours });
@@ -27,7 +27,7 @@ managed.post('/', requirePerm('MANAGE_INVITES'), async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
-managed.delete('/:inviteId', requirePerm('MANAGE_INVITES'), async (req, res, next) => {
+managed.delete('/:inviteId', auth.requireVerified, requirePerm('MANAGE_INVITES'), async (req, res, next) => {
   try {
     const inv = await invites.getById(req.params.inviteId);
     if (!inv || inv.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'invite not found');
@@ -49,7 +49,7 @@ byCode.get('/:code/preview', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-byCode.post('/:code/join', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
+byCode.post('/:code/join', auth.requireVerified, rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
   try {
     const out = await invites.joinWithCode(req.params.code, req.user);
     if (out && out.serverId) events.emit(out.serverId, 'member_joined', { userId: String(req.user.id) });

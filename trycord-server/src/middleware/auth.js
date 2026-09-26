@@ -49,7 +49,7 @@ function auth(req, res, next) {
   // Identical semantics: revoked jti, missing user, or stale markers reject.
   db.get(
     `SELECT u.password_changed_at, u.sessions_invalidated_at, u.enforcement_state,
-       u.enforcement_expires_at,
+       u.enforcement_expires_at, u.email_verified_at,
        (SELECT 1 FROM revoked_tokens r WHERE r.jti = ?) AS revoked
      FROM users u WHERE u.id = ?`,
     [user.jti || '', user.id]
@@ -61,11 +61,25 @@ function auth(req, res, next) {
       const ef = enforced(user, row);
       if (ef) return fail(res, 'ACCOUNT_ENFORCED', 'account is subject to a moderation action', 403, ef);
       req.user = user;
+      // Authoritative verification state for this session. Write routes
+      // that require a verified email use requireVerified below; reads
+      // and account-recovery flows never check it.
+      req.verified = !!row.email_verified_at;
       next();
     })
     .catch((e) => next(e));
 }
 
+// Email-verification guard for normal user functionality (messages,
+// reactions, community management, social writes). Reads, auth flows,
+// account maintenance, safety flows (reports/appeals) and platform admin
+// routes intentionally do NOT use this — see each router for its list.
+function requireVerified(req, res, next) {
+  if (req.verified) return next();
+  return fail(res, 'EMAIL_NOT_VERIFIED', 'verify your email to use this', 403);
+}
+
 module.exports = auth;
 module.exports.tokenStale = tokenStale;
 module.exports.enforced = enforced;
+module.exports.requireVerified = requireVerified;

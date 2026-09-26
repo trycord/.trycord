@@ -53,7 +53,7 @@ router.get('/requests', async (req, res, next) => {
 });
 
 // POST /api/friends/requests { userId }
-router.post('/requests', rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
+router.post('/requests', auth.requireVerified, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const out = await friends.request(req.user.id, String(((req.body || {}).userId) || ''));
     if (out.autoAccepted) {
@@ -66,7 +66,7 @@ router.post('/requests', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
 });
 
 // POST /api/friends/requests/:id/accept
-router.post('/requests/:id/accept', async (req, res, next) => {
+router.post('/requests/:id/accept', auth.requireVerified, async (req, res, next) => {
   try {
     const out = await friends.accept(req.user.id, req.params.id);
     await notify(out.friendId, 'friend_accepted', req.user.id, null);
@@ -75,21 +75,21 @@ router.post('/requests/:id/accept', async (req, res, next) => {
 });
 
 // POST /api/friends/requests/:id/decline
-router.post('/requests/:id/decline', async (req, res, next) => {
+router.post('/requests/:id/decline', auth.requireVerified, async (req, res, next) => {
   try {
     res.json(await friends.decline(req.user.id, req.params.id));
   } catch (e) { serviceError(res, e); }
 });
 
 // DELETE /api/friends/requests/:id — cancel my outgoing request.
-router.delete('/requests/:id', async (req, res, next) => {
+router.delete('/requests/:id', auth.requireVerified, async (req, res, next) => {
   try {
     res.json(await friends.cancel(req.user.id, req.params.id));
   } catch (e) { serviceError(res, e); }
 });
 
 // DELETE /api/friends/:userId — remove a friendship.
-router.delete('/:userId', async (req, res, next) => {
+router.delete('/:userId', auth.requireVerified, async (req, res, next) => {
   try {
     res.json(await friends.remove(req.user.id, req.params.userId));
   } catch (e) { serviceError(res, e); }
