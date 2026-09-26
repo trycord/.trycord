@@ -578,10 +578,10 @@ img { max-width: 100%; }
 }
 
 /* ---- collapsible sidebar -------------------------------------------------- */
-/* Collapsed: the icon rail stays. The context sidebar is reachable on demand
-   (hamburger -> .nav-open drawer, or rail hover), so navigation is never
-   locked away by the stored preference. The preference only decides the
-   default state. */
+/* Collapsed: the icon rail stays, the context sidebar is released, and the
+   main content column takes the freed width immediately. The stored
+   preference only decides the default state; the context-header hamburger
+   still opens it on demand. Nothing opens on hover any more. */
 .shell--desktop.sidebar-collapsed {
   grid-template-columns: var(--ui-rail) minmax(0, 1fr) !important;
 }
@@ -595,7 +595,7 @@ img { max-width: 100%; }
 /* Collapsed: the rail stays, the context sidebar is released, and the main
    content column takes the freed width immediately (no reserved track left
    behind). The stored preference only decides the default state; the
-   hamburger and rail hover still open it on demand. */
+   hamburger still opens it on demand. */
 .shell--desktop.sidebar-collapsed {
   grid-template-columns: var(--ui-rail) minmax(0, 1fr) !important;
 }
@@ -613,20 +613,6 @@ img { max-width: 100%; }
 .shell--desktop.sidebar-collapsed .view-root > .home-environment {
   max-width: none;
   margin-inline: 0;
-}
-/* Rail hover flyout (pointer affordance, desktop only). */
-@media (hover: hover) {
-  .shell--desktop.sidebar-collapsed .app-rail__items:hover + .context-sidebar,
-  .shell--desktop.sidebar-collapsed .context-sidebar:hover {
-    display: flex !important;
-    position: fixed !important;
-    left: var(--ui-rail) !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    width: var(--ui-sidebar) !important;
-    z-index: 55 !important;
-    box-shadow: var(--t-sh-drawer) !important;
-  }
 }
 /* Explicit toggle: the context-header hamburger (.nav-toggle) flips
    .nav-open, which slides the context sidebar in as an overlay drawer.
@@ -2319,8 +2305,7 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 }
 
 /* Tablet: 600–759px — the rail stays, the context sidebar becomes an
-   overlay drawer driven by the context-header hamburger (and rail hover
-   on pointer devices). */
+   overlay drawer driven by the context-header hamburger. */
 @media (max-width: 759px) and (min-width: 600px) {
   :root { --ui-sidebar: 232px; --ui-members: 0px; }
   .shell--desktop {
@@ -2332,20 +2317,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   .rail-identity,
   .context-sidebar {
     display: none !important;
-  }
-  /* Rail hover flyout for pointer devices. */
-  @media (hover: hover) {
-    .app-rail__items:hover + .context-sidebar,
-    .context-sidebar:hover {
-      display: flex !important;
-      position: fixed !important;
-      left: var(--ui-rail) !important;
-      top: 0 !important;
-      bottom: 0 !important;
-      width: var(--ui-sidebar) !important;
-      z-index: 55 !important;
-      box-shadow: var(--t-sh-drawer) !important;
-    }
   }
 }
 

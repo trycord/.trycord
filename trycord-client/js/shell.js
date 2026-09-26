@@ -7,7 +7,7 @@ import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openRepor
 import { avatar, navRow, serverChip, channelRow, communityMark, navGroup } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications } from './state.js';
-import { closeMobileDrawer, toggleDesktopNav, isDesktopNavOpen } from './presentation.js';
+import { closeMobileDrawer, toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 
 // Shared context-menu builders (Checkpoint C). `contextmenu` fires on
 // right-click (desktop) and long-press (mobile browsers), so one wiring
@@ -802,6 +802,39 @@ export function applySidebarState() {
   renderAllChrome();
 }
 
+// Widths below this cannot dock the context sidebar; it becomes an overlay.
+const SIDEBAR_DOCK_MIN = 760;
+
+function contextSidebarDocked() {
+  return window.innerWidth >= SIDEBAR_DOCK_MIN;
+}
+
+function contextSidebarVisible() {
+  const shell = qs('#desktop-shell');
+  if (!shell) return false;
+  if (shell.classList.contains('sidebar-collapsed')) return isDesktopNavOpen();
+  if (isDesktopNavOpen()) return true;
+  return contextSidebarDocked();
+}
+
+// The context-header hamburger is a true visibility toggle. When the sidebar
+// is docked it collapses it (releasing the content column); when it is
+// off-canvas it opens/closes the overlay drawer. Previously it only ever
+// opened the overlay, so pressing it against a docked sidebar looked dead.
+export function toggleContextSidebar() {
+  const shell = qs('#desktop-shell');
+  if (!shell) return;
+  if (contextSidebarDocked()) {
+    if (isDesktopNavOpen()) closeDesktopNav();
+    toggleSidebar();
+    return;
+  }
+  if (isDesktopNavOpen()) closeDesktopNav();
+  else openDesktopNav();
+  const btn = qs('.nav-toggle');
+  if (btn) btn.setAttribute('aria-expanded', isDesktopNavOpen() ? 'true' : 'false');
+}
+
 function sidebarToggleButton() {
   const collapsed = isSidebarCollapsed();
   const btn = el('button', {
@@ -917,7 +950,7 @@ export function renderContextHeader({ title, sub, icon, actions } = {}) {
     title: 'Navigation', 'aria-label': 'Toggle navigation',
     'aria-expanded': isDesktopNavOpen() ? 'true' : 'false',
   }, '☰');
-  navToggle.addEventListener('click', () => toggleDesktopNav());
+  navToggle.addEventListener('click', () => toggleContextSidebar());
   header.appendChild(navToggle);
 
   const titles = el('div', { class: 'context-header__titles' });
