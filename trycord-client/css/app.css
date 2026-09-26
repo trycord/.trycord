@@ -628,7 +628,7 @@ img { max-width: 100%; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.member-count { color: var(--t-mut); font-weight: 700; }
+.member-count { color: var(--t-mut); font-weight: 700; flex-shrink: 0; white-space: nowrap; }
 .member-group { margin: 0 0 16px; }
 .member-group__label {
   padding: 0 8px 6px;
