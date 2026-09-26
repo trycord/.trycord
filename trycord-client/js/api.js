@@ -9,12 +9,15 @@ import { TrycordConfig } from './config.js';
 const TOKEN_KEY = 'trycord.token';
 
 export class ApiError extends Error {
-  constructor(code, message, status, retryAfter) {
+  constructor(code, message, status, retryAfter, details) {
     super(message || code);
     this.name = 'ApiError';
     this.code = code || 'INTERNAL';
     this.status = status || 500;
     this.retryAfter = retryAfter || 0;
+    // Server-provided context (e.g. the action id on ACCOUNT_ENFORCED).
+    // Never sensitive: the server decides what goes in here.
+    this.details = details || null;
   }
 }
 
@@ -68,7 +71,7 @@ async function request(method, path, { body, auth = true, raw = false, form = fa
     if (auth) setToken(null);
     try {
       const e = await res.json().catch(() => null);
-      if (e && e.error) throw new ApiError(e.error.code, e.error.message, 401);
+      if (e && e.error) throw new ApiError(e.error.code, e.error.message, 401, 0, e.error.details);
     } catch (err) { if (err instanceof ApiError) throw err; }
     throw new ApiError('AUTH_REQUIRED', 'you need to sign in', 401);
   }
@@ -77,7 +80,7 @@ async function request(method, path, { body, auth = true, raw = false, form = fa
     try { info = await res.json(); } catch { /* non-json error */ }
     const retryAfter = parseInt(res.headers.get('Retry-After') || '0', 10) || 0;
     if (info && info.error) {
-      throw new ApiError(info.error.code, info.error.message, res.status, retryAfter);
+      throw new ApiError(info.error.code, info.error.message, res.status, retryAfter, info.error.details);
     }
     throw new ApiError('HTTP_' + res.status, res.statusText || 'request failed', res.status, retryAfter);
   }
@@ -247,6 +250,12 @@ joinDiscover: (id) =>
   // ---- activity ---------------------------------------------------------------------
   activity: ({ limit = 20 } = {}) => request('GET', '/api/activity?limit=' + limit),
 
+  // ---- support / appeals ------------------------------------------------------
+  // Submit is anonymous by design (possession of the action id is the key);
+  // listing is scoped to the signed-in user.
+  submitAppeal: (body) => request('POST', '/api/appeals', { body, auth: false }),
+  myAppeals: () => request('GET', '/api/appeals/mine'),
+
   // ---- dms -----------------------------------------------------------------------
   dms: () => request('GET', '/api/dms'),
   dm: (id) => request('GET', '/api/dms/' + encodeURIComponent(id)),
@@ -296,9 +305,20 @@ joinDiscover: (id) =>
     request('GET', '/api/admin/servers?q=' + encodeURIComponent(q) + '&limit=' + limit),
   adminServerActions: (serverId) =>
     request('GET', '/api/admin/servers/' + encodeURIComponent(serverId) + '/actions'),
-  adminEnforceServer: (serverId, actionType, reason, { reportId, confirm } = {}) =>
-    request('POST', '/api/admin/servers/' + encodeURIComponent(serverId) + '/enforce',
-      { body: { actionType, reason, reportId, confirm } }),
+  adminEnforceServer: (serverId, actionType, reason, { reportId, confirm } = {}) => {
+    // The server exposes suspend/remove (there is no /enforce endpoint):
+    // route here so every caller uses the real contract.
+    const type = String(actionType || '').toUpperCase();
+    if (type === 'SERVER_REMOVAL') {
+      return request('POST', '/api/admin/servers/' + encodeURIComponent(serverId) + '/remove',
+        { body: { reason, confirm } });
+    }
+    if (type === 'SERVER_SUSPENSION') {
+      return request('POST', '/api/admin/servers/' + encodeURIComponent(serverId) + '/suspend',
+        { body: { reason, reportId } });
+    }
+    throw new Error('Unknown community action: ' + String(actionType || '(none)'));
+  },
   adminLiftServer: (serverId, reason) =>
     request('POST', '/api/admin/servers/' + encodeURIComponent(serverId) + '/lift', { body: { reason } }),
   adminReports: ({ status, limit = 50 } = {}) => {

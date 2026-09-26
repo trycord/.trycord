@@ -10,6 +10,7 @@ import Workspace from './pages-workspace.js';
 import { renderAccount } from './pages-account.js';
 import { renderAdmin } from './pages-admin.js';
 import { renderProfile } from './pages-profile.js';
+import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support.js';
 import { presentationMode, closeMobileDrawer } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader, renderMobileHeader } from './shell.js';
 import Api from './api.js';
@@ -111,6 +112,28 @@ async function renderRoute() {
   if (path.startsWith('/discover')) {
     const previewId = parts[1] || null;
     await renderBrowse(region, { previewId });
+    renderAllChrome();
+    return;
+  }
+
+  // --- support hub + appeals (submission is anonymous by design) ------
+  if (path.startsWith('/support/appeals/new')) {
+    renderNewAppeal(region);
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/support/appeals')) {
+    if (!requireAuth()) {
+      renderAllChrome();
+      location.hash = '#/login';
+      return;
+    }
+    await renderMyAppeals(region);
+    renderAllChrome();
+    return;
+  }
+  if (path.startsWith('/support')) {
+    await renderSupport(region);
     renderAllChrome();
     return;
   }

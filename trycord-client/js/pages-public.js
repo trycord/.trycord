@@ -46,7 +46,15 @@ function loginForm(container) {
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
-      err.textContent = ex.message || 'Sign in failed';
+      clear(err);
+      err.appendChild(el('span', {}, ex.message || 'Sign in failed'));
+      // Enforced accounts get their action id back from the server: link
+      // straight to the appeal form with it prefilled.
+      const actionId = ex && ex.details && ex.details.actionId;
+      if (ex && ex.code === 'ACCOUNT_ENFORCED' && actionId) {
+        err.appendChild(el('div', { style: { marginTop: 'var(--t-d-2)' } },
+          el('a', { class: 'btn sm', href: '#/support/appeals/new?action=' + encodeURIComponent(actionId) }, 'Appeal this decision')));
+      }
     } finally {
       busy = false;
       submit.removeAttribute('aria-busy');
@@ -61,7 +69,7 @@ function loginForm(container) {
   card.appendChild(el('p', { class: 'auth-alt' },
     'New here? ', el('a', { href: '#/register' }, 'Create an account')));
   card.appendChild(el('p', { class: 'auth-alt' },
-    el('a', { href: '#/forgot' }, 'Forgot password?')));
+    el('a', { href: '#/forgot' }, 'Forgot password?'), ' · ', el('a', { href: '#/support' }, 'Support')));
   box.appendChild(card);
   container.appendChild(box);
   username.focus();
@@ -150,7 +158,7 @@ function registerForm(container) {
   renderBackendSelector(backendBox);
   card.appendChild(backendBox);
   card.appendChild(el('p', { class: 'auth-alt' },
-    'Already registered? ', el('a', { href: '#/login' }, 'Sign in')));
+    'Already registered? ', el('a', { href: '#/login' }, 'Sign in'), ' · ', el('a', { href: '#/support' }, 'Support')));
   box.appendChild(card);
   container.appendChild(box);
   username.focus();

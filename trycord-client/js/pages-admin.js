@@ -59,6 +59,18 @@ function statusChip(status) {
   return el('span', { class: 'admin-chip ' + cls }, status);
 }
 
+// Translate server error codes into plain hoster language. Only maps codes
+// whose meaning is unambiguous; everything else falls through to the
+// server's own message so we never fabricate a cause.
+function adminError(ex, fallback) {
+  const code = ex && ex.code;
+  if (code === 'AUTH_REQUIRED') return 'You need to sign in to perform this action.';
+  if (code === 'PERMISSION_DENIED') return 'You do not have permission to perform this action.';
+  if (code === 'NOT_FOUND' || code === 'SERVER_NOT_FOUND') return 'This community could not be found. It may already be gone.';
+  if (code === 'USER_NOT_FOUND') return 'This account could not be found.';
+  return (ex && ex.message) || fallback || 'The request could not be completed. Please try again.';
+}
+
 function statTile(label, value) {
   return el('div', { class: 'admin-stat' }, el('b', {}, value), el('span', {}, label));
 }
@@ -204,7 +216,7 @@ function userEnforceModal(user, onDone) {
       modal.close();
       toast('Action applied.', 'ok');
       onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed to apply action.'; }
+    } catch (ex) { err.hidden = false; err.textContent = adminError(ex, 'Failed to apply action.'); }
   }
   return modal;
 }
@@ -230,7 +242,7 @@ function liftUserModal(user, onDone) {
       modal.close();
       toast('Enforcement lifted.', 'ok');
       onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed to lift.'; }
+    } catch (ex) { err.hidden = false; err.textContent = adminError(ex, 'Failed to lift.'); }
   }
   return modal;
 }
@@ -328,7 +340,7 @@ function serverEnforceModal(server, onDone) {
       modal.close();
       toast('Action applied.', 'ok');
       onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed to apply action.'; }
+    } catch (ex) { err.hidden = false; err.textContent = adminError(ex, 'Failed to apply action.'); }
   }
   return modal;
 }
@@ -354,7 +366,7 @@ function serverLiftModal(server, onDone) {
       modal.close();
       toast('Enforcement lifted.', 'ok');
       onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed to lift.'; }
+    } catch (ex) { err.hidden = false; err.textContent = adminError(ex, 'Failed to lift.'); }
   }
   return modal;
 }
@@ -385,7 +397,7 @@ function serverRemoveModal(server, onDone) {
       modal.close();
       toast('Community removed.', 'ok');
       onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed to remove.'; }
+    } catch (ex) { err.hidden = false; err.textContent = adminError(ex, 'Failed to remove.'); }
   }
   return modal;
 }
@@ -524,7 +536,7 @@ function appealDecisionModal(appeal, decision, onDone) {
       modal.close();
       toast(approve ? 'Appeal approved.' : 'Appeal denied.', 'ok');
       onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed to decide appeal.'; }
+    } catch (ex) { err.hidden = false; err.textContent = adminError(ex, 'Failed to decide appeal.'); }
   }
   return modal;
 }

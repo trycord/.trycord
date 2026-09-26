@@ -145,6 +145,19 @@ async function listAppeals(input = {}) {
   );
 }
 
+// Own appeals, scoped to the caller (mirrors the reports pattern: only the
+// appellant sees their own). No enumeration risk — user_id comes from auth.
+async function listMine(userId) {
+  return db.all(
+    `SELECT a.id, a.status, a.decision, a.created_at, a.updated_at,
+            m.action_type, m.reason AS action_reason, m.target_type, m.target_id
+     FROM appeals a
+     JOIN moderation_actions m ON m.id = a.action_id
+     WHERE a.user_id = ? ORDER BY a.created_at DESC LIMIT 100`,
+    [userId]
+  );
+}
+
 // Approve = lift the enforcement (for account/server actions) and record.
 async function decideAppeal(adminId, id, input, lift) {
   const decision = String((input && input.decision) || '').toUpperCase();
@@ -175,5 +188,6 @@ module.exports = {
   actionExists,
   submitAppeal,
   listAppeals,
+  listMine,
   decideAppeal,
 };
