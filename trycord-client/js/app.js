@@ -2,7 +2,7 @@
 // Boot order: theme -> runtime config -> presentation -> shell wiring -> realtime -> router.
 
 import { TrycordConfig } from './config.js';
-import { applyTheme } from './theme.js';
+import { applyTheme, watchSystemTheme } from './theme.js';
 import { updateFromViewport, closeMobileDrawer, openMobileDrawer, onPresentationChange, setPresentation, initMobileGestures } from './presentation.js';
 import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends, refreshMutes, setServerRoomHooks } from './state.js';
 import Realtime from './realtime.js';
@@ -19,6 +19,7 @@ async function boot() {
   // 0) Theme (persisted, single source in theme.js; idempotent with the
   //    inline bootstrap in index.html).
   applyTheme();
+  watchSystemTheme();
 
   // 1) Backend configuration: static backend.json first (operator pin),
   // then the server-provided runtime config. Both best-effort. Everything

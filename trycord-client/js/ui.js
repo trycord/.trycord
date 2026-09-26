@@ -58,7 +58,7 @@ export function toast(message, kind = 'info', timeout = 4200) {
 
 // ---- modals --------------------------------------------------------------
 
-export function openModal({ title, body, footer, closeText = 'Close' }) {
+export function openModal({ title, eyebrow, closable, body, footer, closeText = 'Close' }) {
   let box;
   const backdrop = el('div', { class: 'backdrop' }, (box = el('div', {
     class: 'modal',
@@ -66,9 +66,24 @@ export function openModal({ title, body, footer, closeText = 'Close' }) {
     'aria-modal': 'true',
   })));
   const titleId = 'modal-title-' + Math.random().toString(36).slice(2, 8);
-  if (title) {
-    box.setAttribute('aria-labelledby', titleId);
-    box.appendChild(el('h2', { id: titleId }, title));
+  const doClose = () => close();
+  if (title || closable) {
+    const head = el('div', { class: 'modal-head' });
+    const titles = el('div', {});
+    if (eyebrow) titles.appendChild(el('p', { class: 'eyebrow' }, eyebrow));
+    if (title) {
+      box.setAttribute('aria-labelledby', titleId);
+      titles.appendChild(el('h2', { id: titleId }, title));
+    } else {
+      box.setAttribute('aria-label', 'Dialog');
+    }
+    head.appendChild(titles);
+    if (closable) {
+      const x = el('button', { class: 'modal-close', type: 'button', 'aria-label': 'Close dialog' }, '×');
+      x.addEventListener('click', doClose);
+      head.appendChild(x);
+    }
+    box.appendChild(head);
   } else {
     box.setAttribute('aria-label', 'Dialog');
   }
@@ -334,29 +349,25 @@ export const REPORT_CATEGORIES = [
 
 export function openReportDialog({ targetType, targetId, title, subtitle, onSubmit }) {
   const err = el('div', { class: 'form-error', hidden: true });
-  const cats = el('div', { class: 'report-cats', role: 'radiogroup', 'aria-label': 'Reason' });
-  const group = 'rep-' + Math.random().toString(36).slice(2, 8);
-  REPORT_CATEGORIES.forEach((c, i) => {
-    const radio = el('input', { type: 'radio', name: group });
-    if (i === 0) radio.checked = true;
-    cats.appendChild(el('label', { class: 'report-cat' }, radio, el('span', {}, c)));
-  });
+  const sel = el('select', { class: 'input', 'aria-label': 'Reason' });
+  for (const c of REPORT_CATEGORIES) sel.appendChild(el('option', { value: c }, c));
   const details = el('textarea', { class: 'textarea', style: { minHeight: '80px' }, maxlength: 4000, placeholder: 'Additional information (optional)' });
   const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
   const go = el('button', { class: 'btn danger', type: 'button' }, 'Submit report');
   const modal = openModal({
     title: title || 'Report',
+    eyebrow: 'Trust & Safety',
+    closable: true,
     body: el('div', {},
       subtitle ? el('p', { class: 'muted small' }, subtitle) : null,
-      el('div', { class: 'field' }, el('label', {}, 'Why are you reporting this?'), cats),
+      el('div', { class: 'field' }, el('label', {}, 'Reason'), sel),
       el('div', { class: 'field' }, el('label', {}, 'Additional information'), details),
       err),
     footer: el('div', { class: 'row-line' }, cancel, go),
   });
   cancel.addEventListener('click', () => modal.close());
   go.addEventListener('click', async () => {
-    const picked = cats.querySelector('input:checked');
-    const category = picked ? picked.closest('label').textContent.trim() : REPORT_CATEGORIES[0];
+    const category = sel.value || REPORT_CATEGORIES[0];
     const extra = details.value.trim();
     err.hidden = true;
     go.disabled = true;

@@ -4,6 +4,7 @@
 export const DEFAULT_THEME = 'ember';
 
 export const THEMES = [
+  { id: 'system', label: 'System', blurb: 'Follows your OS light/dark setting.' },
   { id: 'trycord', label: 'Trycord', blurb: 'Charcoal depth with amber ambient energy.' },
   { id: 'orthocord', label: 'Orthocord', blurb: 'Cool steel hues on neutral charcoal.' },
   { id: 'midnight', label: 'Midnight', blurb: 'Deep indigo-blue, dim and focused.' },
@@ -59,6 +60,18 @@ export function getTheme() {
   return DEFAULT_THEME;
 }
 
+// System theme resolution: 'system' is a selection, never a stylesheet
+// target. Dark OS setting resolves to Ember (the default dark theme),
+// light resolves to Light. The data-theme attribute always carries the
+// resolved built-in id so every themed surface responds.
+export function resolveTheme(name) {
+  if (name !== 'system') return name;
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'ember';
+  } catch { /* unsupported: fall through to light */ }
+  return 'light';
+}
+
 export function applyTheme() {
   const name = getTheme();
   if (name === 'custom') {
@@ -67,7 +80,7 @@ export function applyTheme() {
     clearCustomCss();
     clearCustomInline();
   }
-  document.documentElement.setAttribute('data-theme', name);
+  document.documentElement.setAttribute('data-theme', resolveTheme(name));
   return name;
 }
 
@@ -79,9 +92,24 @@ export function setTheme(name) {
     clearCustomCss();
     clearCustomInline();
   }
-  document.documentElement.setAttribute('data-theme', name);
+  document.documentElement.setAttribute('data-theme', resolveTheme(name));
   try { localStorage.setItem(LS_THEME, name); } catch { /* ignore */ }
   return name;
+}
+
+// Re-apply when the OS scheme flips while System is selected. Live,
+// no reload, no state loss — same as manual switching.
+let sysWatcher = null;
+export function watchSystemTheme() {
+  try {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const reapply = () => { if (getTheme() === 'system') applyTheme(); };
+    if (sysWatcher) {
+      try { sysWatcher.mq.removeEventListener('change', sysWatcher.fn); } catch { /* ignore */ }
+    }
+    sysWatcher = { mq, fn: reapply };
+    mq.addEventListener('change', reapply);
+  } catch { /* matchMedia unsupported */ }
 }
 
 // ---- Custom palette -----------------------------------------------------

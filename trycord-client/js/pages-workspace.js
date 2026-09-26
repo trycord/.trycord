@@ -279,7 +279,15 @@ async function renderChannel(container, serverId, channelId) {
     class: 'btn icon', type: 'button', title: 'Pinned messages', 'aria-label': 'Pinned messages',
     onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + channelId + '/pins'; },
   }, '☆');
-  renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [searchBtn, pinsBtn, bellBtn, memberToggle] });
+  const moreBtn = el('button', {
+    class: 'btn icon', type: 'button', title: 'Community actions', 'aria-label': 'Community actions',
+    onClick: () => {
+      // Reuses the sidebar community menu — one menu, two entry points.
+      const menu = document.querySelector('#place-navigation .place-header__menu');
+      if (menu) menu.click();
+    },
+  }, '⋯');
+  renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [searchBtn, pinsBtn, bellBtn, moreBtn, memberToggle] });
 
   const conv = el('div', { class: 'conversation' });
   const thread = el('div', { class: 'thread' });
@@ -307,7 +315,7 @@ async function renderChannel(container, serverId, channelId) {
       return;
     }
     if (!msgs.length) {
-      feed.appendChild(emptyState('◌', 'No messages yet', 'Start the conversation.'));
+      feed.appendChild(emptyState('#', 'Welcome to #' + chanName, 'This is the beginning of the conversation.'));
     }
     for (const m of msgs) feed.appendChild(buildMsg(m));
     groupFeed(feed);
@@ -390,7 +398,7 @@ async function renderChannel(container, serverId, channelId) {
         ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
         ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
         ...(can('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
-        ...(!isMine ? [{ label: 'Report message', onSelect: () => openReportModal(m) }] : []),
+        { label: 'Report message', onSelect: () => openReportModal(m) },
         ...((can('MANAGE_MESSAGES') || isMine) ? [{ label: 'Delete message', danger: true, onSelect: () => deleteMsg(m) }] : []),
       ]);
     });
