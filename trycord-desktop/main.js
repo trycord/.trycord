@@ -154,7 +154,8 @@ function createWindow() {
           return 'desk-shell-visible=' + desk + ' mobile-shell-visible=' + mobile + ' rail-tabs=' + rail + ' title=' + title + ' home-environment=' + (homeEnvironment ? 'yes' : 'no') + ' presentation=' + pres + ' hash=' + location.hash + ' cssRules=' + rules + ' body-bg=' + bodyBg + ' spine-pos=' + spinePos;
         })()`);
         console.log('[smoke] home: ' + out);
-        if (!String(out).includes('rail-tabs=4') || !String(out).includes('home-environment=yes') ||
+        // rail-tabs counts the global destinations (Home/DMs/Notifications/Discover/Friends).
+        if (!String(out).includes('rail-tabs=5') || !String(out).includes('home-environment=yes') ||
             !String(out).includes('presentation=desktop') || !String(out).includes('desk-shell-visible=true') ||
             !String(out).includes('hash=#/home')) process.exitCode = 1;
         const ruleMatch = String(out).match(/cssRules=(\d+)/);

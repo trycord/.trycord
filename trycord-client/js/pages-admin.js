@@ -157,7 +157,7 @@ async function renderUsers(body, show, seq) {
   const search = el('input', { class: 'input', type: 'search', placeholder: 'Search users by name…', 'aria-label': 'Search users' });
   toolbar.appendChild(search);
   const listWrap = el('div', { class: 'admin-list' });
-  body.append(toolbar, listWrap);
+  show(el('div', {}, toolbar, listWrap));
   const render = async (q) => {
     const found = await Api.adminUsers({ q });
     if (seq !== adminSeq) return;
@@ -291,7 +291,7 @@ async function renderCommunities(body, show, seq) {
   const search = el('input', { class: 'input', type: 'search', placeholder: 'Search communities by name…', 'aria-label': 'Search communities' });
   toolbar.appendChild(search);
   const listWrap = el('div', { class: 'admin-list' });
-  body.append(toolbar, listWrap);
+  show(el('div', {}, toolbar, listWrap));
   const render = async (q) => {
     const found = await Api.adminServers({ q });
     if (seq !== adminSeq) return;
@@ -478,7 +478,7 @@ async function renderReports(body, show, seq) {
     REPORT_STATUSES.map((s) => el('option', { value: s }, s)));
   toolbar.append(sel, el('span', { class: 'muted small' }, 'Reports stay scoped: reviewers see actionable cases only.'));
   const listWrap = el('div', { class: 'admin-list' });
-  body.append(toolbar, listWrap);
+  show(el('div', {}, toolbar, listWrap));
   const render = async (status) => {
     const found = await Api.adminReports({ status });
     if (seq !== adminSeq) return;
@@ -548,7 +548,7 @@ async function renderAppeals(body, show, seq) {
     APPEAL_STATUSES.map((s) => el('option', { value: s }, s)));
   toolbar.appendChild(sel);
   const listWrap = el('div', { class: 'admin-list' });
-  body.append(toolbar, listWrap);
+  show(el('div', {}, toolbar, listWrap));
   const render = async (status) => {
     const found = await Api.adminAppeals({ status });
     if (seq !== adminSeq) return;
@@ -586,7 +586,7 @@ async function renderAudit(body, show, seq) {
   const info = el('span', { class: 'muted small' }, 'Server keeps the most recent entries per query.');
   toolbar.append(search, info);
   const listWrap = el('div', { class: 'admin-list' });
-  body.append(toolbar, listWrap);
+  show(el('div', {}, toolbar, listWrap));
   const render = async (action) => {
     const found = await Api.adminAudit({ action });
     if (seq !== adminSeq) return;
@@ -621,14 +621,20 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
 
   const seq = ++adminSeq;
   const show = (node) => { if (seq === adminSeq) { clear(body); body.appendChild(node); } };
-  show(el('div', { class: 'empty-state' }, 'Loading…'));
+  // Section renderers append their toolbar + list directly, so the loading
+  // node must not linger in body: give them a fresh container that show()
+  // repaints, keeping exactly one loading/empty state on screen.
+  const sec = el('div', { class: 'admin-section' });
+  const showSec = (node) => { if (seq === adminSeq) { clear(sec); sec.appendChild(node); } };
+  show(sec);
+  sec.appendChild(el('div', { class: 'empty-state' }, 'Loading…'));
   try {
-    if (section === 'users') await renderUsers(body, show, seq);
-    else if (section === 'communities') await renderCommunities(body, show, seq);
-    else if (section === 'reports') await renderReports(body, show, seq);
-    else if (section === 'appeals') await renderAppeals(body, show, seq);
-    else if (section === 'audit') await renderAudit(body, show, seq);
-    else await renderOverview(body, show, seq);
+    if (section === 'users') await renderUsers(sec, showSec, seq);
+    else if (section === 'communities') await renderCommunities(sec, showSec, seq);
+    else if (section === 'reports') await renderReports(sec, showSec, seq);
+    else if (section === 'appeals') await renderAppeals(sec, showSec, seq);
+    else if (section === 'audit') await renderAudit(sec, showSec, seq);
+    else await renderOverview(sec, showSec, seq);
   } catch (ex) {
     if (seq !== adminSeq) return;
     clear(body);

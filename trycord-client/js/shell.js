@@ -3,7 +3,7 @@
 // navigation, communities, current-place navigation), the in-environment
 // context header, and the MobileShell drawer + bottom tabs.
 
-import { esc, el, clear, qs, toast, confirmDialog, showContextMenu, showUserCard, copyText } from './ui.js';
+import { esc, el, clear, qs, toast, confirmDialog, openModal, openReportDialog, showContextMenu, showUserCard, copyText } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, realmTitle } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted } from './state.js';
@@ -62,7 +62,33 @@ function memberCard(e, m) {
   e.preventDefault();
   e.stopPropagation();
   const id = m.user_id || m.id;
+  const sid = currentServerId();
   const name = m.nickname || m.display_name || m.username || 'Unknown';
+  const mine = String(id) === String(State.me && State.me.id);
+  const canMod = !m.is_owner && !mine && !!sid;
+  const modTimeout = () => {
+    const dur = el('select', { class: 'input' });
+    [['60', '1 hour'], ['1440', '1 day'], ['10080', '7 days']].forEach(([v, label]) => {
+      dur.appendChild(el('option', { value: v }, label));
+    });
+    const err = el('div', { class: 'form-error', hidden: true });
+    const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+    const go = el('button', { class: 'btn danger', type: 'button' }, 'Time out');
+    const modal = openModal({
+      title: 'Time out @' + (m.username || ''),
+      body: el('div', {}, el('div', { class: 'field' }, el('label', {}, 'Duration'), dur), err),
+      footer: el('div', { class: 'row-line' }, cancel, go),
+    });
+    cancel.addEventListener('click', () => modal.close());
+    go.addEventListener('click', async () => {
+      try {
+        await Api.timeoutMember(sid, id, Number(dur.value));
+        modal.close();
+        toast('Member timed out.', 'ok');
+        renderAllChrome();
+      } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not time out.'; }
+    });
+  };
   showUserCard(e.clientX, e.clientY, {
     avatarEl: avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'lg', withPresence: true }),
     title: name,
@@ -70,9 +96,42 @@ function memberCard(e, m) {
     statusLine: m.status_text || null,
     actions: [
       { label: 'View profile', onSelect: () => { location.hash = '#/users/' + id; } },
-      ...(String(id) === String(State.me && State.me.id)
-        ? []
-        : [{ label: 'Message', primary: true, onSelect: () => messageMember(id) }]),
+      ...(mine ? [] : [{ label: 'Message', primary: true, onSelect: () => messageMember(id) }]),
+      ...(!mine ? [{
+        label: 'Add friend', onSelect: async () => {
+          try { await Api.sendFriendRequest(id); toast('Friend request sent.', 'ok'); }
+          catch (ex) { toast(ex.message || 'Could not send request.', 'error'); }
+        },
+      }] : []),
+      ...(!mine ? [{
+        label: 'Report user', onSelect: () => openReportDialog({
+          targetType: 'user', targetId: id, title: 'Report user', subtitle: '@' + (m.username || 'unknown'),
+          onSubmit: ({ category, extra }) => Api.reportContent('user', id, category, extra || undefined),
+        }),
+      }] : []),
+      ...(canMod && can('BAN_MEMBERS') ? [{
+        label: 'Timeout', onSelect: modTimeout,
+      }] : []),
+      ...(canMod && can('KICK_MEMBERS') ? [{
+        label: 'Kick', danger: true, onSelect: () => confirmDialog({
+          title: 'Remove member?', message: '@' + (m.username || '') + ' will leave this community immediately.',
+          danger: true, confirmText: 'Remove',
+          onConfirm: async () => {
+            try { await Api.kickMember(sid, id); toast('Member removed.', 'ok'); renderAllChrome(); }
+            catch (ex) { toast(ex.message || 'Could not remove member.', 'error'); }
+          },
+        }),
+      }] : []),
+      ...(canMod && can('BAN_MEMBERS') ? [{
+        label: 'Ban', danger: true, onSelect: () => confirmDialog({
+          title: 'Ban @' + (m.username || '') + '?', message: 'They will be removed and blocked from rejoining.',
+          danger: true, confirmText: 'Ban',
+          onConfirm: async () => {
+            try { await Api.banMember(sid, id, {}); toast('Member banned.', 'ok'); renderAllChrome(); }
+            catch (ex) { toast(ex.message || 'Could not ban member.', 'error'); }
+          },
+        }),
+      }] : []),
       { label: 'Copy user ID', onSelect: () => copyText(String(id), 'User ID copied.') },
     ],
   });
@@ -205,10 +264,16 @@ export function renderPlaceNavigation(region) {
   header.append(menu, menuBox);
   region.appendChild(header);
 
+  // Scroll region: header stays pinned, footer stays docked, only this
+  // middle column scrolls — a sticky footer over scrolling content used
+  // to cover nav rows on short viewports.
+  const scroll = el('div', { class: 'place-scroll' });
+  region.appendChild(scroll);
+
   const actionRow = el('div', { class: 'place-actions' });
   if (can('MANAGE_INVITES')) actionRow.appendChild(el('button', { type: 'button', title: 'Invite people', onClick: () => { location.hash = '#/server/' + sid + '/invites'; } }, '＋ Invite'));
   if (can('MANAGE_CHANNELS')) actionRow.appendChild(el('button', { type: 'button', title: 'Create channel', onClick: () => { location.hash = '#/server/' + sid + '/channels/new'; } }, '＋ Channel'));
-  if (actionRow.children.length) region.appendChild(actionRow);
+  if (actionRow.children.length) scroll.appendChild(actionRow);
 
   const layout = State.channels || { categories: [], channels: [] };
   const categories = layout.categories || [];
@@ -222,11 +287,34 @@ export function renderPlaceNavigation(region) {
     grouped.get(key).push(ch);
   }
 
+  const channelRowEl = (ch) => {
+    const row = channelRow(ch, {
+      active: route === '/server/' + sid + '/channel/' + ch.id,
+      muted: isMuted(ch.id),
+      onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; },
+    });
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenu(e.clientX, e.clientY, [
+        { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } },
+        { label: 'Copy channel ID', onSelect: () => copyText(String(ch.id), 'Channel ID copied.') },
+      ]);
+    });
+    return row;
+  };
+
   const renderCategory = (label, list, catId) => {
     // Empty sections never render: an empty uncategorized group produced a
     // duplicate bare "TEXT CHANNELS" header under the real categories.
     // Zero channels overall are covered by the place-empty note below.
     if (!list.length) return;
+    // Uncategorized channels render bare when real categories exist
+    // (Discord behavior): no redundant second "Text channels" header.
+    if (catId === '__none__' && categories.length) {
+      for (const ch of list) scroll.appendChild(channelRowEl(ch));
+      return;
+    }
     const section = el('section', { class: 'channel-section', dataset: { category: catId } });
     const title = el('div', { class: 'channel-section__title' });
     const caret = el('span', { class: 'channel-section__caret' }, '⌄');
@@ -234,27 +322,15 @@ export function renderPlaceNavigation(region) {
     title.addEventListener('click', () => { section.classList.toggle('collapsed'); });
     section.appendChild(title);
     const listBox = el('div', { class: 'channel-section__list' });
-    for (const ch of list) {
-      const active = route === '/server/' + sid + '/channel/' + ch.id;
-      const row = channelRow(ch, { active, muted: isMuted(ch.id), onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } });
-      row.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        showContextMenu(e.clientX, e.clientY, [
-          { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } },
-          { label: 'Copy channel ID', onSelect: () => copyText(String(ch.id), 'Channel ID copied.') },
-        ]);
-      });
-      listBox.appendChild(row);
-    }
+    for (const ch of list) listBox.appendChild(channelRowEl(ch));
     section.appendChild(listBox);
-    region.appendChild(section);
+    scroll.appendChild(section);
   };
 
   for (const cat of categories) renderCategory(cat.name || 'Category', grouped.get(String(cat.id)) || [], String(cat.id));
   renderCategory('Text channels', grouped.get('__none__') || [], '__none__');
 
-  if (!channels.length) region.appendChild(el('div', { class: 'place-empty compact' }, 'No channels yet.'));
+  if (!channels.length) scroll.appendChild(el('div', { class: 'place-empty compact' }, 'No channels yet.'));
 
   // Server management section (merged nav): the per-page button bars are
   // gone — these links live in the Discord-style sidebar with an active
@@ -277,7 +353,7 @@ export function renderPlaceNavigation(region) {
     }));
   }
   manage.appendChild(manageList);
-  region.appendChild(manage);
+  scroll.appendChild(manage);
 
   // Session footer (reference sidebar-user pattern): live identity with a
   // settings shortcut. Additive only — identity-region stays untouched.
@@ -314,7 +390,9 @@ export function toggleMembers() {
 
 export function renderMemberSidebar(region) {
   clear(region);
-  if (!isAuthed() || !currentServerId() || !State.serverDetail) {
+  // The member panel belongs to community surfaces only. On home, DMs,
+  // settings and other app routes it hid a stale community's roster.
+  if (!isAuthed() || !currentServerId() || !State.serverDetail || !currentRoute().startsWith('/server/')) {
     region.hidden = true;
     return;
   }

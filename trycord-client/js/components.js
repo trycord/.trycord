@@ -80,6 +80,9 @@ export function navRow({ label, sub, icon, href, active, count, onClick }) {
   const row = el('button', {
     class: 'nav-row' + (active ? ' active' : ''),
     type: 'button',
+    title: label,
+    'aria-label': label,
+    'aria-current': active ? 'page' : null,
     dataset: { nav: label.toLowerCase().replace(/\s+/g, '-') },
     onClick: onClick,
   });
@@ -98,6 +101,7 @@ export function serverChip(server, { active = false, onClick } = {}) {
     type: 'button',
     title: server.name || 'Community',
     'aria-label': server.name || 'Community',
+    'aria-current': active ? 'page' : null,
     onClick,
     dataset: { serverId: server.id },
   });
