@@ -222,7 +222,10 @@ export function renderPlaceNavigation(region) {
   }
 
   const renderCategory = (label, list, catId) => {
-    if (!list.length && catId !== '__none__') return;
+    // Empty sections never render: an empty uncategorized group produced a
+    // duplicate bare "TEXT CHANNELS" header under the real categories.
+    // Zero channels overall are covered by the place-empty note below.
+    if (!list.length) return;
     const section = el('section', { class: 'channel-section', dataset: { category: catId } });
     const title = el('div', { class: 'channel-section__title' });
     const caret = el('span', { class: 'channel-section__caret' }, '⌄');
