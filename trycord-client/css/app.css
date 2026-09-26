@@ -2079,3 +2079,94 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .community-channel-row:hover { background: color-mix(in srgb, var(--t-txt) 4%, transparent); }
 .community-channel-row .ch-name { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .prof-community { margin-top: var(--t-d-4); padding-top: var(--t-d-3); border-top: 1px solid var(--t-line); display: flex; flex-direction: column; gap: 6px; }
+
+/* ============================================================
+   Checkpoint A: Discord-style community presentation.
+   Layout hooks and IDs are unchanged; this is presentation only.
+   ============================================================ */
+
+/* --- Community rail: icon morph + active pill --- */
+.presence-spine__communities .server-chip {
+  transition: border-radius var(--t-fast) var(--t-ease), background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+}
+.presence-spine__communities .server-chip:hover { border-radius: 17px; transform: translateY(-1px); }
+.presence-spine__communities .server-chip.active { border-radius: 17px; }
+.presence-spine__communities .server-chip:hover::after { height: 14px; }
+.presence-spine__communities .nav-row { transition: border-radius var(--t-fast) var(--t-ease), color var(--t-fast), border-color var(--t-fast); }
+.presence-spine__communities .nav-row:hover { border-radius: 17px; }
+
+/* --- Channel sidebar: header hierarchy --- */
+.presence-spine__place-navigation .place-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--t-base);
+  padding: 12px 10px;
+  margin: -12px -10px 8px;
+  border-bottom: 1px solid var(--t-line);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+.place-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 8px;
+  right: 8px;
+  z-index: 30;
+}
+.channel-section__title { border-radius: 6px; }
+.channel-section__title:hover { background: color-mix(in srgb, var(--t-txt) 5%, transparent); }
+.channel-section.collapsed .channel-section__list { display: none; }
+.channel-section__caret { transition: transform var(--t-fast) var(--t-ease); }
+.channel-section.collapsed .channel-section__caret { transform: rotate(-90deg); }
+
+/* --- Community landing hero --- */
+.community-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 22px;
+  margin-bottom: 6px;
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-l);
+  background:
+    radial-gradient(420px 160px at 12% 0%, color-mix(in srgb, var(--t-accent) 12%, transparent), transparent 70%),
+    var(--t-base);
+  box-shadow: var(--t-sh-1);
+}
+.community-hero__mark {
+  flex: 0 0 auto;
+  width: 72px; height: 72px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 22px;
+  background: linear-gradient(145deg, var(--t-accent), var(--t-accent-2));
+  color: var(--t-on-accent);
+  font-size: 1.9rem;
+  font-weight: 800;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--t-accent) 30%, transparent);
+}
+.community-hero__text { min-width: 0; flex: 1 1 auto; }
+.community-hero__name { margin: 0 0 4px; font-size: var(--t-fs-xl); letter-spacing: -0.02em; }
+.community-hero__text .muted { margin: 0 0 8px; }
+
+/* --- Profile: full-width card instead of auth-box constraint --- */
+.prof-card {
+  width: 100%;
+  max-width: 860px;
+  background: var(--t-base);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-l);
+  box-shadow: var(--t-sh-2);
+  padding: 0 26px 26px;
+  overflow: hidden;
+}
+.prof-card .prof-banner { height: 160px; margin: 0 -26px; border-radius: 0; }
+.prof-card .prof-avatar { margin-top: -34px; }
+.prof-card .prof-avatar .avatar.lg { width: 76px; height: 76px; border: 3px solid var(--t-base); }
+@media (min-width: 901px) {
+  .community-hero { padding: 26px 28px; }
+}
+@media (max-width: 640px) {
+  .community-hero { flex-direction: column; align-items: flex-start; padding: 18px; }
+  .community-hero__mark { width: 56px; height: 56px; border-radius: 17px; font-size: 1.5rem; }
+  .prof-card { padding: 0 16px 18px; }
+}

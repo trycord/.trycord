@@ -46,7 +46,7 @@ export async function renderProfile(container, { id } = {}) {
   const nameLine = el('div', { class: 'member-name-line' },
     el('strong', { class: 'prof-name' }, name),
     profile.isBot ? el('span', { class: 'bot-tag' }, 'BOT') : null);
-  const card = el('div', { class: 'auth-box' }, banner, el('div', { class: 'prof-avatar' }, avatarBox),
+  const card = el('div', { class: 'prof-card' }, banner, el('div', { class: 'prof-avatar' }, avatarBox),
     el('div', { class: 'prof-preview-body' },
       nameLine,
       el('div', { class: 'muted small' }, '@' + profile.username),
