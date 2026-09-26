@@ -416,8 +416,9 @@ async function boot() {
       return;
     }
     for (const username of names) {
-      const u = await db.get('SELECT * FROM users WHERE username = ?', [username]);
-      if (!u) { console.warn(`[warn] ADMIN_USERNAMES: no user "${username}" yet — promote by re-running with the account created`); continue; }
+      // Case-insensitive: usernames preserve case, operators do not.
+      const u = await db.get('SELECT * FROM users WHERE lower(username) = lower(?)', [username]);
+      if (!u) { console.warn(`[warn] ADMIN_USERNAMES: no user "${username}" yet — it will be promoted automatically at registration/login`); continue; }
       await enforcement.ensureAdminUser(u.id);
       console.log(`[info] platform admin: ${username}`);
     }
