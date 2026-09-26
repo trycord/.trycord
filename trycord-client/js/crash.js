@@ -48,4 +48,21 @@
       paintError('The page loaded but rendered nothing. Reload to retry.');
     }
   }, 9000);
+  // Self-healing: if the app finishes rendering AFTER the watchdog fired
+  // (slow boot, rate-limited boot, long debug session), remove the false
+  // alarm instead of covering a working app forever. Event-driven via
+  // MutationObserver: zero polling cost, lives as long as the page.
+  function heal() {
+    try {
+      if (document.querySelector('#view-root > *, #mobile-main > *')) {
+        var e = document.getElementById('trycord-crash');
+        if (e && e.parentNode) e.parentNode.removeChild(e);
+      }
+    } catch (err) { /* never break the page from the guard itself */ }
+  }
+  if (typeof MutationObserver !== 'undefined') {
+    try {
+      new MutationObserver(heal).observe(document.documentElement, { childList: true, subtree: true });
+    } catch (err) { /* observer unavailable: watchdog still works one-way */ }
+  }
 }());

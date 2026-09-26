@@ -212,6 +212,22 @@ export function renderCommunities(region) {
   actions.appendChild(el('button', { class: 'nav-row community-action', type: 'button', title: 'Discover communities', onClick: () => { location.hash = '#/discover'; } },
     el('span', { class: 'nv-icon' }, '⌕'), el('span', { class: 'nv-label' }, 'Discover')));
   region.appendChild(actions);
+  // Rail bottom actions (template app-rail-bottom): notifications with
+  // unread badge + settings shortcut, pinned to the rail foot.
+  const foot = el('div', { class: 'rail-foot' });
+  const bell = el('button', {
+    class: 'nav-row rail-foot-btn' + (currentRoute().startsWith('/notifications') ? ' active' : ''),
+    type: 'button', title: 'Notifications', 'aria-label': 'Notifications',
+    onClick: () => { location.hash = '#/notifications'; },
+  }, el('span', { class: 'nv-icon' }, '🔔'));
+  if (State.notifUnread) bell.appendChild(el('span', { class: 'nv-count rail-badge' }, String(State.notifUnread > 99 ? '99+' : State.notifUnread)));
+  const gear = el('button', {
+    class: 'nav-row rail-foot-btn' + ((currentRoute().startsWith('/settings') || currentRoute().startsWith('/account')) ? ' active' : ''),
+    type: 'button', title: 'Settings', 'aria-label': 'Settings',
+    onClick: () => { location.hash = '#/settings'; },
+  }, el('span', { class: 'nv-icon' }, '⚙'));
+  foot.append(bell, gear);
+  region.appendChild(foot);
 }
 
 export function renderPlaceNavigation(region) {
@@ -318,8 +334,19 @@ export function renderPlaceNavigation(region) {
     const section = el('section', { class: 'channel-section', dataset: { category: catId } });
     const title = el('div', { class: 'channel-section__title' });
     const caret = el('span', { class: 'channel-section__caret' }, '⌄');
-    title.append(caret, el('span', {}, label));
-    title.addEventListener('click', () => { section.classList.toggle('collapsed'); });
+    title.append(caret, el('span', { class: 'channel-section__label' }, label));
+    title.addEventListener('click', (e) => {
+      if (e.target.closest('.section-action')) return;
+      section.classList.toggle('collapsed');
+    });
+    if (can('MANAGE_CHANNELS')) {
+      const add = el('button', { class: 'section-action', type: 'button', title: 'Create channel', 'aria-label': 'Create channel' }, '+');
+      add.addEventListener('click', (e) => {
+        e.stopPropagation();
+        location.hash = '#/server/' + sid + '/channels/new';
+      });
+      title.appendChild(add);
+    }
     section.appendChild(title);
     const listBox = el('div', { class: 'channel-section__list' });
     for (const ch of list) listBox.appendChild(channelRowEl(ch));
