@@ -109,4 +109,49 @@ if (metaPath_ !== expectedPath) {
   fail(`latest.yml path (${metaPath_}) does not reference the installer (${expectedPath})`);
 }
 
+// Backend-config coherence (Checkpoint D): the production pin must be
+// identical everywhere, or the shipped client and the desktop default
+// silently point at different backends. backend.json wins over the
+// config.js default at runtime, so drift here is a live misroute.
+(function checkBackendPin() {
+  const clientDir = path.join(root, '..', 'trycord-client');
+  const backendJson = path.join(clientDir, 'backend.json');
+  const configJs = path.join(clientDir, 'js', 'config.js');
+  if (!fs.existsSync(backendJson)) fail('missing trycord-client/backend.json (production backend pin)');
+  let pin;
+  try {
+    pin = JSON.parse(fs.readFileSync(backendJson, 'utf8')).backendUrl;
+  } catch (e) {
+    fail('trycord-client/backend.json is not valid JSON: ' + (e && e.message ? e.message : e));
+  }
+  if (!/^https:\/\//i.test(String(pin || '').trim())) {
+    fail('trycord-client/backend.json backendUrl must be an https URL, got: ' + pin);
+  }
+  let configSrc = '';
+  try {
+    configSrc = fs.readFileSync(configJs, 'utf8');
+  } catch (e) {
+    fail('cannot read trycord-client/js/config.js: ' + (e && e.message ? e.message : e));
+  }
+  const m = configSrc.match(/DEFAULT_BACKEND_URL\s*=\s*'([^']+)'/);
+  if (!m) fail('DEFAULT_BACKEND_URL not found in trycord-client/js/config.js');
+  const norm = (u) => String(u).trim().replace(/\/+$/, '').toLowerCase();
+  if (norm(pin) !== norm(m[1])) {
+    fail(`backend pin drift: backend.json (${pin}) != config.js default (${m[1]})`);
+  }
+  // The bundled copy the exe actually reads must match the source pin.
+  const bundled = path.join(root, 'client', 'backend.json');
+  if (fs.existsSync(bundled)) {
+    try {
+      const bPin = JSON.parse(fs.readFileSync(bundled, 'utf8')).backendUrl;
+      if (norm(bPin) !== norm(pin)) {
+        fail(`bundled client/backend.json (${bPin}) is stale vs source pin (${pin}) — rerun copy-client`);
+      }
+    } catch (e) {
+      fail('bundled client/backend.json is not valid JSON');
+    }
+  }
+  console.log(`backend pin coherent: ${pin}`);
+})();
+
 console.log(`release validation passed: Trycord.exe + TrycordPTB.exe + latest.yml + blockmap, versions agree`);

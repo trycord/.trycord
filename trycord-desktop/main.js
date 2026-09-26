@@ -1,7 +1,11 @@
 // Trycord desktop window (Electron access point).
 // Loads the bundled web client (client/, copied from trycord-client at build).
-// Backend: --api-url=<url> startup argument, else the client's own
-// configuration (config.js / saved setting), else http://localhost:9971.
+// Backend precedence at launch:
+//   1. --api-url=<url> startup argument (dev/smoke/self-host default route)
+//   2. Bundled client/backend.json pin (the production backend for end users)
+//   3. No ?api= at all: the client's own chain decides (saved setting, then
+//      file:// local default). The shipped exe therefore reaches production
+//      out of the box instead of pointing at localhost.
 //   Trycord.exe --api-url=http://51.79.44.111:9971
 // Dev:      npm run dev        (no update server contact)
 // Build:    npm run build      (local package, never publishes)
@@ -37,7 +41,26 @@ function apiUrlFromArgs(argv) {
   return null;
 }
 
-const launchApiUrl = apiUrlFromArgs(process.argv);
+function bundledBackendPin() {
+  // Single production pin, shared with the web client: read the bundled
+  // backend.json (falling back to the source tree when running unpacked).
+  // Returns a plausible http(s) URL or null — never throws.
+  const candidates = [
+    path.join(__dirname, 'client', 'backend.json'),
+    path.join(__dirname, '..', 'trycord-client', 'backend.json'),
+  ];
+  for (const file of candidates) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const v = String((json && json.backendUrl) || '').trim().replace(/\/+$/, '');
+      if (/^https?:\/\//i.test(v)) return v;
+    } catch { /* corrupt pin: ignore, fall through */ }
+  }
+  return null;
+}
+
+const launchApiUrl = apiUrlFromArgs(process.argv) || bundledBackendPin();
 
 // The self-test must observe a deterministic client state: isolate it to a
 // throwaway profile so persisted user data (theme, sessions) cannot affect
