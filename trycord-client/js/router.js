@@ -12,7 +12,7 @@ import { renderAdmin } from './pages-admin.js';
 import { renderProfile } from './pages-profile.js';
 import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support.js';
 import { renderNotifications } from './pages-notifications.js';
-import { presentationMode, closeMobileDrawer } from './presentation.js';
+import { presentationMode, closeMobileDrawer, closeDesktopNav } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader, renderMobileHeader } from './shell.js';
 import Api from './api.js';
 import { el, clear, toast } from './ui.js';
@@ -66,6 +66,7 @@ async function renderRoute() {
   runCleanup();
 
   closeMobileDrawer();
+  closeDesktopNav();
 
   // --- public-only routes -----------------------------------------
   if (path.startsWith('/login') || path === '' || path === '/') {

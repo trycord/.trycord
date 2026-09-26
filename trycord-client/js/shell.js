@@ -7,7 +7,7 @@ import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openRepor
 import { avatar, navRow, serverChip, channelRow, realmTitle } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications } from './state.js';
-import { closeMobileDrawer } from './presentation.js';
+import { closeMobileDrawer, toggleDesktopNav, isDesktopNavOpen } from './presentation.js';
 
 // Shared context-menu builders (Checkpoint C). `contextmenu` fires on
 // right-click (desktop) and long-press (mobile browsers), so one wiring
@@ -613,6 +613,16 @@ export function renderContextHeader({ title, sub, icon, actions } = {}) {
   if (!header) return;
   header.dataset.hasIcon = icon ? 'true' : 'false';
   clear(header);
+
+  // Pop-out rail toggle: the spine is off-canvas on desktop, this
+  // hamburger is its only persistent entry point.
+  const navToggle = el('button', {
+    class: 'nav-toggle', type: 'button',
+    title: 'Navigation', 'aria-label': 'Toggle navigation',
+    'aria-expanded': isDesktopNavOpen() ? 'true' : 'false',
+  }, '☰');
+  navToggle.addEventListener('click', () => toggleDesktopNav());
+  header.appendChild(navToggle);
 
   const titles = el('div', { class: 'context-header__titles' });
   if (icon) titles.appendChild(el('div', { class: 'context-header__icon' }, icon));

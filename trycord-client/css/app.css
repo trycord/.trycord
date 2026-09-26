@@ -441,9 +441,9 @@ img { max-width: 100%; }
 
 .shell--desktop {
   display: grid !important;
-  /* The navigation track follows the rendered spine. When auth routes
-     hide the spine, this track collapses instead of trapping content. */
-  grid-template-columns: auto minmax(0, 1fr) !important;
+  /* Single multifunctional rail, popped out on demand: the main column
+     owns the full width and the spine overlays it when opened. */
+  grid-template-columns: minmax(0, 1fr) !important;
   height: 100dvh !important;
   width: 100% !important;
   overflow: hidden !important;
@@ -464,6 +464,46 @@ img { max-width: 100%; }
   background: var(--t-base);
   border-right: 1px solid var(--t-line);
   box-shadow: var(--t-sh-edge);
+}
+/* Pop-out rail: the spine lives off-canvas and slides over the main
+   column when .nav-open is set. One rail, on demand. */
+.shell--desktop .presence-spine {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  z-index: 60 !important;
+  width: calc(var(--ui-rail) + var(--ui-nav)) !important;
+  max-width: calc(100vw - 64px) !important;
+  transform: translateX(-105%) !important;
+  transition: transform 220ms var(--t-ease, ease) !important;
+  box-shadow: 24px 0 64px rgba(0, 0, 0, 0.5) !important;
+}
+.shell--desktop.nav-open .presence-spine {
+  transform: translateX(0) !important;
+}
+.desktop-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 55 !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+.desktop-backdrop[hidden] { display: none !important; }
+.nav-toggle {
+  flex: 0 0 auto !important;
+  width: 34px !important;
+  height: 34px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  color: var(--t-mut) !important;
+  background: transparent !important;
+  font-size: 1.1rem !important;
+}
+.nav-toggle:hover { background: var(--t-base2) !important; color: var(--t-txt) !important; }
+@media (prefers-reduced-motion: reduce) {
+  .shell--desktop .presence-spine { transition: none !important; }
 }
 
 .presence-spine__identity {
@@ -547,7 +587,7 @@ img { max-width: 100%; }
 .dm-row .nv-count { flex: 0 0 auto; }
 
 .main-environment {
-  grid-column: 2 !important;
+  grid-column: 1 !important;
   min-width: 0 !important;
   min-height: 0 !important;
   height: 100dvh !important;
