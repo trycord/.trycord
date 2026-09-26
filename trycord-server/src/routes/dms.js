@@ -35,7 +35,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // POST /api/dms { userId } — get-or-create (idempotent, race-safe).
-router.post('/', rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
+router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const peerId = String(((req.body || {}).userId) || '');
     const { conversation, created } = await dms.getOrCreate({ id: req.user.id }, peerId);
@@ -67,7 +67,7 @@ router.get('/:id/messages', async (req, res, next) => {
 });
 
 // POST /api/dms/:id/messages { content } — persist, broadcast, notify.
-router.post('/:id/messages', rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
+router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
     const msg = await dms.send(req.user.id, req.user.username, req.params.id, (req.body || {}).content);
     const members = await dms.memberIds(req.params.id);
@@ -87,7 +87,7 @@ router.post('/:id/messages', rateLimit({ windowMs: 60000, max: 40 }), async (req
 });
 
 // DELETE /api/dms/:id/messages/:messageId — author only, hard delete.
-router.delete('/:id/messages/:messageId', async (req, res, next) => {
+router.delete('/:id/messages/:messageId', auth.requireVerified, async (req, res, next) => {
   try {
     const out = await dms.remove(req.user.id, req.params.id, req.params.messageId);
     const members = await dms.memberIds(req.params.id);
@@ -97,7 +97,7 @@ router.delete('/:id/messages/:messageId', async (req, res, next) => {
 });
 
 // PATCH /api/dms/:id/messages/:messageId — author-only edit.
-router.patch('/:id/messages/:messageId', rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
+router.patch('/:id/messages/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
     const out = await dms.edit(req.user.id, req.params.id, req.params.messageId, (req.body || {}).content, req.user.username);
     const members = await dms.memberIds(req.params.id);

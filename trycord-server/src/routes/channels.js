@@ -23,7 +23,7 @@ router.get('/', requireMember, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
+router.post('/', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
     const { name, topic, categoryId } = req.body || {};
     if (!name || !String(name).trim()) return fail(res, 'VALIDATION_ERROR', 'name required');
@@ -33,7 +33,7 @@ router.post('/', requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
-router.patch('/:channelId', requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
+router.patch('/:channelId', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
     const ch = await db.get('SELECT * FROM channels WHERE id = ? AND server_id = ?', [req.params.channelId, req.server.id]);
     if (!ch) return fail(res, 'NOT_FOUND', 'channel not found');
@@ -44,7 +44,7 @@ router.patch('/:channelId', requirePerm('MANAGE_CHANNELS'), async (req, res, nex
   } catch (e) { serviceError(res, e); }
 });
 
-router.post('/reorder', requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
+router.post('/reorder', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
     const { orderedIds } = req.body || {};
     const layout = await channels.reorderChannels(req.server.id, orderedIds);
@@ -53,7 +53,7 @@ router.post('/reorder', requirePerm('MANAGE_CHANNELS'), async (req, res, next) =
   } catch (e) { serviceError(res, e); }
 });
 
-router.delete('/:channelId', requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
+router.delete('/:channelId', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
     const out = await channels.remove(req.server.id, req.params.channelId);
     events.emit(req.server.id, 'channel_deleted', { channelId: String(req.params.channelId) });
@@ -99,7 +99,7 @@ router.get('/:channelId/pins', requireMember, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/:channelId/pins', requirePerm('MANAGE_MESSAGES'), rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
+router.post('/:channelId/pins', auth.requireVerified, requirePerm('MANAGE_MESSAGES'), rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
   try {
     const ch = await pinChannel(req);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
@@ -121,7 +121,7 @@ router.post('/:channelId/pins', requirePerm('MANAGE_MESSAGES'), rateLimit({ wind
   } catch (e) { next(e); }
 });
 
-router.delete('/:channelId/pins/:messageId', requirePerm('MANAGE_MESSAGES'), async (req, res, next) => {
+router.delete('/:channelId/pins/:messageId', auth.requireVerified, requirePerm('MANAGE_MESSAGES'), async (req, res, next) => {
   try {
     const ch = await pinChannel(req);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');

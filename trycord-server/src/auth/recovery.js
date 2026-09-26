@@ -8,6 +8,7 @@ const db = require('../db');
 const { now, uuid, sign } = require('../util');
 const { checkPassword } = require('./passwords');
 const mail = require('./mail');
+const templates = require('./emailTemplates');
 
 function ttlMinutes() {
   const n = parseInt(process.env.RESET_TOKEN_TTL_MIN || '60', 10);
@@ -53,15 +54,11 @@ async function requestPasswordReset(email) {
   );
   console.log(`[security] password_reset_requested user=${user.id}`);
   try {
-    await mail.sendMail({
-      to: normalized,
-      subject: 'Reset your Trycord password',
-      text:
-        `Someone requested a password reset for this Trycord account.\n\n` +
-        `Reset it here (valid ${ttlMinutes()} minutes, single use):\n` +
-        `${mail.publicUrl()}/#/reset-password/${token}\n\n` +
-        `If that wasn't you, ignore this email — your password is unchanged.`,
+    const tpl = templates.passwordReset({
+      link: `${mail.publicUrl()}/#/reset-password/${token}`,
+      minutes: ttlMinutes(),
     });
+    await mail.sendMail({ to: normalized, ...tpl, kind: 'password-reset' });
   } catch (e) {
     console.log(`[security] password_reset_email_failed user=${user.id}: ${(e && e.message) || e}`);
   }
@@ -110,14 +107,11 @@ async function requestVerification(userId, email) {
     [uuid(), userId, normalized, tokenHash(token), expires, null, now()]
   );
   try {
-    await mail.sendMail({
-      to: normalized,
-      subject: 'Verify your Trycord email',
-      text:
-        `Confirm this address for your Trycord account:\n\n` +
-        `${mail.publicUrl()}/#/verify-email/${token}\n\n` +
-        `The link is valid 24 hours and single use. If that wasn't you, ignore this email.`,
+    const tpl = templates.verification({
+      link: `${mail.publicUrl()}/#/verify-email/${token}`,
+      hours: 24,
     });
+    await mail.sendMail({ to: normalized, ...tpl, kind: 'verification' });
   } catch (e) {
     console.log(`[security] verification_email_failed user=${userId}: ${(e && e.message) || e}`);
   }

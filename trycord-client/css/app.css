@@ -1156,6 +1156,21 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   0%, 40% { background: color-mix(in srgb, var(--t-accent) 22%, transparent); }
   100% { background: transparent; }
 }
+.verify-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--t-d-3);
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--t-accent) 14%, var(--t-base));
+  border-bottom: 1px solid color-mix(in srgb, var(--t-accent) 40%, var(--t-line));
+  color: var(--t-txt);
+  font-size: var(--t-fs-s);
+  font-weight: 600;
+  z-index: 5;
+}
+.verify-banner__text { margin-right: 4px; }
 .notif-row { align-items: center; }
 .notif-row.unread { border-color: color-mix(in srgb, var(--t-accent) 55%, var(--t-line)); }
 .unread-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--t-accent); }

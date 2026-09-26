@@ -27,6 +27,8 @@ async function J(method, p, body, tok) {
     const r = await J('POST', '/api/auth/register', { username: u, password: 'secret123', termsVersion: legal.termsVersion, privacyVersion: legal.privacyVersion });
     ok('mkuser-' + pfx, r.status === 200 && !!(r.json && r.json.token), 'status=' + r.status);
     if (r.status !== 200) throw new Error('register failed, aborting');
+    const v = await J('POST', '/api/test/self-verify', null, r.json.token);
+    if (v.status !== 200) throw new Error('self-verify failed — boot the server with ALLOW_TEST_HOOKS=true');
     return { name: u, token: r.json.token, id: r.json.user.id };
   }
   const A = await mkuser('f1A'); // owner

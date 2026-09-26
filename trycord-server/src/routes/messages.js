@@ -81,7 +81,7 @@ router.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
+router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
@@ -125,7 +125,7 @@ router.post('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next)
   } catch (e) { next(e); }
 });
 
-router.delete('/:messageId', async (req, res, next) => {
+router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
@@ -145,7 +145,7 @@ router.delete('/:messageId', async (req, res, next) => {
 
 // PATCH /:messageId — author-only edit. Moderators can delete but never
 // rewrite someone else's words. Broadcasts message_updated.
-router.patch('/:messageId', rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
+router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
@@ -172,7 +172,7 @@ router.patch('/:messageId', rateLimit({ windowMs: 60000, max: 40 }), async (req,
 
 // ---- reactions ------------------------------------------------------
 // POST /api/channels/:channelId/messages/:messageId/reactions { emoji }
-router.post('/:messageId/reactions', rateLimit({ windowMs: 60000, max: 120 }), async (req, res, next) => {
+router.post('/:messageId/reactions', auth.requireVerified, rateLimit({ windowMs: 60000, max: 120 }), async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
@@ -198,7 +198,7 @@ router.post('/:messageId/reactions', rateLimit({ windowMs: 60000, max: 120 }), a
 });
 
 // DELETE .../reactions/:emoji — removes only the caller's own reaction.
-router.delete('/:messageId/reactions/:emoji', async (req, res, next) => {
+router.delete('/:messageId/reactions/:emoji', auth.requireVerified, async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');

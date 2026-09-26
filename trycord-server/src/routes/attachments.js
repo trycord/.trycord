@@ -39,6 +39,7 @@ function singleFile(req, res, next) {
 router.post(
   '/channels/:channelId/attachments',
   auth,
+  auth.requireVerified,
   rateLimit({ windowMs: 60000, max: 30 }),
   singleFile,
   async (req, res, next) => {

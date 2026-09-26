@@ -627,6 +627,48 @@ export function renderAllChrome() {
   renderMobileTabs(qs('#mobile-tab-navigation'));
   syncMobileNavigation(qs('#mobile-navigation'));
   renderMemberSidebar(qs('#member-sidebar'));
+  renderVerifyBanner();
 }
 
-export default { renderAllChrome, renderContextHeader, renderIdentity, renderGlobalNavigation, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, syncMobileNavigation, setNavRoute, membersHidden, toggleMembers, DESTINATIONS };
+// Email-verification notice (UX only — the backend is the authority).
+// Shows in both shells while the session is unverified, with resend or
+// add-email paths. Disappears on the next chrome paint after verify.
+export function renderVerifyBanner() {
+  const me = State.me;
+  const show = !!(isAuthed() && me && !me.emailVerified);
+  for (const shell of [qs('#trycord-main'), qs('#mobile-shell')]) {
+    if (!shell) continue;
+    let bar = shell.querySelector(':scope > .verify-banner');
+    if (!show) {
+      if (bar) bar.remove();
+      continue;
+    }
+    if (!bar) {
+      bar = el('div', { class: 'verify-banner', role: 'status' });
+      shell.prepend(bar);
+    } else {
+      clear(bar);
+    }
+    const hasEmail = !!(me && me.email);
+    bar.appendChild(el('span', { class: 'verify-banner__text' }, hasEmail
+      ? 'Verify your email to unlock messaging.'
+      : 'Add an email address to verify your account.'));
+    if (hasEmail) {
+      const resend = el('button', { class: 'btn sm', type: 'button' }, 'Resend email');
+      resend.addEventListener('click', async () => {
+        resend.disabled = true;
+        try {
+          await Api.verifyEmailResend({ email: me.email });
+          toast('Verification email sent.', 'ok');
+        } catch (ex) { toast(ex.message || 'Could not resend.', 'error'); }
+        finally { resend.disabled = false; }
+      });
+      bar.appendChild(resend);
+    }
+    const go = el('button', { class: 'btn ghost sm', type: 'button' }, hasEmail ? 'Settings' : 'Add email');
+    go.addEventListener('click', () => { location.hash = '#/settings'; });
+    bar.appendChild(go);
+  }
+}
+
+export default { renderAllChrome, renderVerifyBanner, renderContextHeader, renderIdentity, renderGlobalNavigation, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, syncMobileNavigation, setNavRoute, membersHidden, toggleMembers, DESTINATIONS };

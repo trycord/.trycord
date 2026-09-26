@@ -287,6 +287,12 @@ async function boot() {
   app.use('/api/reports', require('./routes/reports'));
   app.use('/api/appeals', require('./routes/appeals'));
   app.use('/api/admin', require('./routes/admin'));
+  // Test hooks for automated suites (email verification without an inbox).
+  // Strictly opt-in: unmounted in every other boot, where the paths 404.
+  if (process.env.ALLOW_TEST_HOOKS === 'true') {
+    app.use('/api/test', require('./routes/test'));
+    console.warn('[warn] ALLOW_TEST_HOOKS is enabled — test endpoints are mounted (never do this in production)');
+  }
 
   // Back-compat alias for older clients.
   app.get('/api/me', require('./middleware/auth'), async (req, res, next) => {

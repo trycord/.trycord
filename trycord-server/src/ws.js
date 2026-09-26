@@ -289,7 +289,7 @@ function createGateway(server) {
       }
       // Mirror the HTTP layer: tickets issued before a password change or
       // "sign out everywhere" are dead. Socket sessions must never outlive them.
-      const row = await db.get('SELECT password_changed_at, sessions_invalidated_at, enforcement_state, enforcement_expires_at FROM users WHERE id = ?', [user.id]);
+      const row = await db.get('SELECT password_changed_at, sessions_invalidated_at, enforcement_state, enforcement_expires_at, email_verified_at FROM users WHERE id = ?', [user.id]);
       if (!row) { ws.close(1008, 'user not found'); return; }
       if (tokenStale(user, row)) { ws.close(1008, 'session revoked'); return; }
       // A socket cannot open while the account is under enforcement, matching
@@ -297,6 +297,9 @@ function createGateway(server) {
       if (authEnforced(user, row)) { ws.close(1008, 'account enforced'); return; }
 
       ws.user = user;
+      // Authoritative verification state for this socket. Re-read on
+      // demand below so verifying mid-session unblocks without reconnect.
+      ws.verified = !!row.email_verified_at;
       ws.dmIds = new Set();
       ws.msgTimes = [];
       ws.strikes = 0;
@@ -345,6 +348,16 @@ function createGateway(server) {
             leaveServerRoom(ws);
           } else if (data.type === 'msg') {
             if (!ws.channelId) return;
+            // Email verification gate, same as REST posts. Re-read once
+            // when cached false so a verification that lands mid-session
+            // takes effect without forcing a reconnect.
+            if (!ws.verified) {
+              try {
+                const v = await db.get('SELECT email_verified_at FROM users WHERE id = ?', [user.id]);
+                ws.verified = !!(v && v.email_verified_at);
+              } catch { /* stay unverified on read failure */ }
+              if (!ws.verified) return;
+            }
             const content = String(data.content || '').trim().slice(0, 2000);
             const ids = uploads.sanitizeIds(data.attachments);
             if (!content && !ids.length) return;
