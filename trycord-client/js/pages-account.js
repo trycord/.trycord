@@ -12,18 +12,36 @@ import Realtime from './realtime.js';
 
 function accountTabs(active) {
   const tabs = el('div', { class: 'settings-nav' });
+  // Only sections that actually exist. Legacy password/sessions routes
+  // highlight Security — they render the same page.
   const items = [
-    { id: 'profile', label: 'Profile', href: '#/settings' },
-    { id: 'password', label: 'Password', href: '#/settings/password' },
-    { id: 'sessions', label: 'Sessions', href: '#/settings/sessions' },
-    { id: 'appearance', label: 'Appearance', href: '#/settings/appearance' },
-    { id: 'updates', label: 'Updates', href: '#/settings/updates' },
+    { id: 'profile', label: 'My Account', href: '#/settings', match: ['profile'] },
+    { id: 'security', label: 'Security', href: '#/settings/security', match: ['security', 'password', 'sessions'] },
+    { id: 'appearance', label: 'Appearance', href: '#/settings/appearance', match: ['appearance'] },
+    { id: 'backend', label: 'Backend', href: '#/settings/backend', match: ['backend'] },
+    { id: 'updates', label: 'Updates', href: '#/settings/updates', match: ['updates'] },
   ];
   for (const t of items) {
-    const b = el('button', { class: 'btn ' + (active === t.id ? 'active' : 'ghost'), type: 'button' }, t.label);
+    const on = t.id === active || (t.match || []).includes(active);
+    const b = el('button', { class: 'btn ' + (on ? 'active' : 'ghost'), type: 'button' }, t.label);
     b.addEventListener('click', () => { location.hash = t.href; });
     tabs.appendChild(b);
   }
+  const signOut = el('button', { class: 'btn danger ghost settings-signout', type: 'button' }, 'Sign out');
+  signOut.addEventListener('click', () => {
+    confirmDialog({
+      title: 'Sign out?',
+      message: 'You will need to sign in again on this device.',
+      danger: true, confirmText: 'Sign out',
+      onConfirm: async () => {
+        try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
+        try { Realtime.disconnect(); } catch { /* ignore */ }
+        clearSession();
+        location.hash = '#/login';
+      },
+    });
+  });
+  tabs.appendChild(signOut);
   return tabs;
 }
 
@@ -507,90 +525,109 @@ function renderUpdates(wrap) {
   wrap.appendChild(status);
 }
 
+function renderPasswordSection(wrap, container, tab) {
+  wrap.appendChild(el('div', { class: 'section-label' }, 'Password'));
+  wrap.appendChild(el('p', { class: 'muted small' }, 'Changing your password signs out every other session immediately. This device stays signed in.'));
+  const err = el('div', { class: 'form-error', hidden: true });
+  const cur = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', required: true });
+  const next = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true });
+  const submit = el('button', { class: 'btn primary', type: 'submit' }, 'Change password');
+  const form = el('form', { class: 'auth-box' }, err,
+    el('div', { class: 'field' }, el('label', {}, 'Current password'), cur),
+    el('div', { class: 'field' }, el('label', {}, 'New password'), next,
+      el('span', { class: 'hint' }, '8+ characters. All other sessions will be signed out.')),
+    el('div', {}, submit));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.hidden = true;
+    try {
+      const res = await Api.changePassword({ currentPassword: cur.value, newPassword: next.value });
+      // res carries a fresh token (others invalidated) with the new secret — apply it.
+      State.token = res.token;
+      localStorage.setItem('trycord.token', res.token);
+      State.me = res.user;
+      clear(container);
+      renderAccount(container, { tab });
+      toast('Password changed. Other sessions signed out.', 'ok');
+    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
+  });
+  wrap.appendChild(form);
+}
+
+function renderSessionsSection(wrap) {
+  wrap.appendChild(el('div', { class: 'section-label' }, 'Sessions'));
+  wrap.appendChild(el('p', { class: 'muted small' }, 'Every device you signed in on holds a session. Revoking one signs that device out.'));
+  const revokeAll = el('button', { class: 'btn danger', type: 'button' }, 'Sign out all sessions');
+  revokeAll.addEventListener('click', () => {
+    confirmDialog({
+      title: 'Sign out every device?',
+      message: 'This signs out this device too. You will need to sign in again.',
+      danger: true, confirmText: 'Sign out everywhere',
+      onConfirm: async () => {
+        try {
+          await Api.revokeAllSessions();
+        } finally {
+          try { Realtime.disconnect(); } catch { /* ignore */ }
+          clearSession();
+          location.hash = '#/login';
+        }
+      },
+    });
+  });
+  const revokeOthers = el('button', { class: 'btn', type: 'button' }, 'Sign out other sessions');
+  revokeOthers.addEventListener('click', async () => {
+    try {
+      const res = await Api.revokeOthers();
+      State.token = res.token;
+      localStorage.setItem('trycord.token', res.token);
+      toast('Other sessions signed out.', 'ok');
+    } catch (ex) { toast(ex.message || 'Failed', 'error'); }
+  });
+  wrap.appendChild(el('div', { class: 'row-line' }, revokeOthers, revokeAll));
+  wrap.appendChild(el('p', { class: 'muted small' }, 'Token-based sessions expire after 7 days or when revoked.'));
+}
+
+function renderDangerZone(wrap) {
+  wrap.appendChild(el('div', { class: 'section-label danger' }, 'Danger zone'));
+  const logoutBtn = el('button', { class: 'btn danger', type: 'button' }, 'Sign out');
+  logoutBtn.addEventListener('click', async () => {
+    try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
+    // Shut the gateway down first: a lingering socket would keep
+    // reconnecting (and reusing a dead token) after sign-out.
+    try { Realtime.disconnect(); } catch { /* ignore */ }
+    clearSession();
+    location.hash = '#/login';
+  });
+  wrap.appendChild(el('p', { class: 'muted small' }, 'Sign out on this device. Use Security to sign out everywhere.'));
+  wrap.appendChild(el('div', { class: 'row-line' }, logoutBtn));
+}
+
 export async function renderAccount(container, { tab = 'profile' } = {}) {
   clear(container);
   renderContextHeader({ title: 'Settings', sub: 'Your account and preferences' });
-  const wrap = el('div', { class: 'page atrium' });
+  const wrap = el('div', { class: 'page atrium settings-layout' });
   wrap.appendChild(accountTabs(tab));
+  const body = el('div', { class: 'settings-body' });
+  wrap.appendChild(body);
 
-  const me = State.me;
   if (tab === 'appearance') {
-    renderAppearance(wrap);
+    renderAppearance(body);
   } else if (tab === 'updates') {
-    renderUpdates(wrap);
-  } else if (tab === 'password') {
-    const err = el('div', { class: 'form-error', hidden: true });
-    const cur = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', required: true });
-    const next = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true });
-    const submit = el('button', { class: 'btn primary', type: 'submit' }, 'Change password');
-    const form = el('form', { class: 'auth-box' }, err,
-      el('div', { class: 'field' }, el('label', {}, 'Current password'), cur),
-      el('div', { class: 'field' }, el('label', {}, 'New password'), next,
-        el('span', { class: 'hint' }, '8+ characters. All other sessions will be signed out.')),
-      el('div', {}, submit));
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      err.hidden = true;
-      try {
-        const res = await Api.changePassword({ currentPassword: cur.value, newPassword: next.value });
-        // res carries a fresh token (others invalidated) with the new secret — apply it.
-        State.token = res.token;
-        localStorage.setItem('trycord.token', res.token);
-        State.me = res.user;
-        clear(container);
-        renderAccount(container, { tab });
-        toast('Password changed. Other sessions signed out.', 'ok');
-      } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
-    });
-    wrap.appendChild(form);
-  } else if (tab === 'sessions') {
-    const revokeAll = el('button', { class: 'btn danger', type: 'button' }, 'Sign out all sessions');
-    revokeAll.addEventListener('click', () => {
-      confirmDialog({
-        title: 'Sign out every device?',
-        message: 'This signs out this device too. You will need to sign in again.',
-        danger: true, confirmText: 'Sign out everywhere',
-        onConfirm: async () => {
-          try {
-            await Api.revokeAllSessions();
-          } finally {
-            try { Realtime.disconnect(); } catch { /* ignore */ }
-            clearSession();
-            location.hash = '#/login';
-          }
-        },
-      });
-    });
-    const revokeOthers = el('button', { class: 'btn', type: 'button' }, 'Sign out other sessions');
-    revokeOthers.addEventListener('click', async () => {
-      try {
-        const res = await Api.revokeOthers();
-        State.token = res.token;
-        localStorage.setItem('trycord.token', res.token);
-        toast('Other sessions signed out.', 'ok');
-      } catch (ex) { toast(ex.message || 'Failed', 'error'); }
-    });
-    wrap.appendChild(el('div', { class: 'section-label' }, 'Session control'));
-    wrap.appendChild(el('div', { class: 'row-line' }, revokeOthers, revokeAll));
-    wrap.appendChild(el('p', { class: 'muted small' }, 'Token-based sessions expire after 7 days or when revoked.'));
-  } else {
-    // profile
-    renderProfileEditor(wrap);
-
-    const logoutBtn = el('button', { class: 'btn danger', type: 'button' }, 'Sign out');
-    logoutBtn.addEventListener('click', async () => {
-      try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
-      // Shut the gateway down first: a lingering socket would keep
-      // reconnecting (and reusing a dead token) after sign-out.
-      try { Realtime.disconnect(); } catch { /* ignore */ }
-      clearSession();
-      location.hash = '#/login';
-    });
-    wrap.appendChild(el('div', { class: 'section-label' }, 'Session'));
-    wrap.appendChild(el('div', { class: 'row-line' }, logoutBtn));
-    const backendBox = el('div', { class: 'auth-box', style: { marginTop: 'var(--t-d-5)' } });
+    renderUpdates(body);
+  } else if (tab === 'security' || tab === 'password' || tab === 'sessions') {
+    // Legacy password/sessions routes render the unified Security page.
+    renderPasswordSection(body, container, 'security');
+    renderSessionsSection(body);
+  } else if (tab === 'backend') {
+    body.appendChild(el('div', { class: 'section-label' }, 'Backend'));
+    body.appendChild(el('p', { class: 'muted small' }, 'Choose which Trycord server this app talks to. Switching servers signs you out here first.'));
+    const backendBox = el('div', { class: 'auth-box' });
     renderBackendSelector(backendBox);
-    wrap.appendChild(backendBox);
+    body.appendChild(backendBox);
+  } else {
+    // profile = My Account
+    renderProfileEditor(body);
+    renderDangerZone(body);
   }
 
   container.appendChild(wrap);

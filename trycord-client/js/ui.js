@@ -178,6 +178,142 @@ export function showPopover(anchor, items, { onSelect } = {}) {
   return { pop, hide: hidePopover };
 }
 
+// ---- context menus + user cards -------------------------------------------
+// Cursor-anchored menu for right-click / long-press. Items:
+//   { label, desc?, danger?, disabled?, onSelect? } or { sep: true }.
+// Works for mouse and touch (the `contextmenu` event fires on long-press
+// in mobile browsers), so one wiring covers desktop and mobile.
+export function showContextMenu(clientX, clientY, items) {
+  closeContextMenu();
+  const root = qs('#popover-root') || document.body;
+  const pop = el('div', { class: 'popover ctx-menu', role: 'menu' });
+  for (const item of items || []) {
+    if (item.sep) { pop.appendChild(el('div', { class: 'pop-sep' })); continue; }
+    const b = el('button', {
+      class: 'pop-item' + (item.danger ? ' danger' : ''),
+      type: 'button', role: 'menuitem', disabled: !!item.disabled,
+    });
+    const wrap = el('span', {});
+    wrap.append(el('span', {}, item.label));
+    if (item.desc) wrap.append(el('span', { class: 'pop-desc' }, item.desc));
+    b.appendChild(wrap);
+    b.addEventListener('click', () => {
+      closeContextMenu();
+      if (item.onSelect) item.onSelect();
+    });
+    pop.appendChild(b);
+  }
+  if (!pop.children.length) return { pop: null, hide: () => {} };
+  root.appendChild(pop);
+  const pr = pop.getBoundingClientRect();
+  let left = clientX;
+  let top = clientY;
+  if (left + pr.width > innerWidth - 8) left = Math.max(8, innerWidth - pr.width - 8);
+  if (top + pr.height > innerHeight - 8) top = Math.max(8, innerHeight - pr.height - 8);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  const onKey = (e) => { if (e.key === 'Escape') closeContextMenu(); };
+  const onScroll = () => closeContextMenu();
+  const onDown = (e) => { if (!pop.contains(e.target)) closeContextMenu(); };
+  setTimeout(() => {
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+  }, 0);
+  pop._ctxCleanup = () => {
+    document.removeEventListener('pointerdown', onDown);
+    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('scroll', onScroll, true);
+    window.removeEventListener('resize', onScroll);
+  };
+  const first = pop.querySelector('.pop-item:not([disabled])');
+  if (first) { try { first.focus({ preventScroll: true }); } catch { /* ignore */ } }
+  return { pop, hide: closeContextMenu };
+}
+
+export function closeContextMenu() {
+  for (const pop of Array.from(document.querySelectorAll('.popover.ctx-menu, .popover.user-card'))) {
+    try { if (pop._ctxCleanup) pop._ctxCleanup(); } catch { /* ignore */ }
+    pop.remove();
+  }
+}
+
+// Mini profile card anchored at a cursor point. The caller supplies the
+// rendered avatar node (avatar lives in components.js; ui.js stays
+// dependency-free) plus plain action descriptors.
+export function showUserCard(clientX, clientY, { avatarEl, title, sub, statusLine, actions } = {}) {
+  closeContextMenu();
+  const root = qs('#popover-root') || document.body;
+  const pop = el('div', { class: 'popover user-card', role: 'dialog', 'aria-label': title || 'User' });
+  const head = el('div', { class: 'user-card__head' });
+  if (avatarEl) head.appendChild(avatarEl);
+  const idBox = el('div', { class: 'user-card__id' });
+  idBox.appendChild(el('strong', { class: 'user-card__name' }, title || 'Unknown'));
+  if (sub) idBox.appendChild(el('span', { class: 'muted small' }, sub));
+  if (statusLine) idBox.appendChild(el('span', { class: 'user-card__status' }, statusLine));
+  head.appendChild(idBox);
+  pop.appendChild(head);
+  const btnBox = el('div', { class: 'user-card__actions' });
+  for (const a of actions || []) {
+    const b = el('button', {
+      class: 'btn sm' + (a.primary ? ' primary' : '') + (a.danger ? ' danger' : ''),
+      type: 'button',
+    }, a.label);
+    b.addEventListener('click', () => {
+      closeContextMenu();
+      if (a.onSelect) a.onSelect();
+    });
+    btnBox.appendChild(b);
+  }
+  if (btnBox.children.length) pop.appendChild(btnBox);
+  root.appendChild(pop);
+  const pr = pop.getBoundingClientRect();
+  let left = clientX;
+  let top = clientY;
+  if (left + pr.width > innerWidth - 8) left = Math.max(8, innerWidth - pr.width - 8);
+  if (top + pr.height > innerHeight - 8) top = Math.max(8, innerHeight - pr.height - 8);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  const onKey = (e) => { if (e.key === 'Escape') closeContextMenu(); };
+  const onDown = (e) => { if (!pop.contains(e.target)) closeContextMenu(); };
+  const onScroll = () => closeContextMenu();
+  setTimeout(() => {
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+  }, 0);
+  pop._ctxCleanup = () => {
+    document.removeEventListener('pointerdown', onDown);
+    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('scroll', onScroll, true);
+    window.removeEventListener('resize', onScroll);
+  };
+  return { pop, hide: closeContextMenu };
+}
+
+export async function copyText(text, label = 'Copied to clipboard.') {
+  const value = String(text == null ? '' : text);
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    // Clipboard API unavailable (permissions / non-secure context):
+    // fall back to a transient textarea + execCommand.
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    } catch { toast('Copy failed.', 'error'); return; }
+  }
+  toast(label, 'ok');
+}
+
 // ---- time -----------------------------------------------------------------
 
 export function relTime(iso) {

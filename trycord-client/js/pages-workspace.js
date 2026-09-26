@@ -11,7 +11,7 @@ import State, {
   enterServer, refreshServers, leaveServerContext, can, isAuthed, currentServerId, peerPresence,
   refreshBans, setViewRefresh, refreshServerView,
 } from './state.js';
-import { esc, el, clear, toast, relTime, confirmDialog, openModal } from './ui.js';
+import { esc, el, clear, toast, relTime, confirmDialog, openModal, showContextMenu, copyText } from './ui.js';
 import { avatar, emptyState, messageRow, channelRow, initialOf } from './components.js';
 import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNavigation, toggleMembers, membersHidden } from './shell.js';
 import Realtime from './realtime.js';
@@ -273,13 +273,28 @@ async function renderChannel(container, serverId, channelId) {
   }
 
   function buildMsg(m) {
+    const meId = State.me && State.me.id;
+    const isMine = meId !== undefined && String(m.author_id) === String(meId);
     const node = messageRow(m, {
-      meId: State.me && State.me.id,
+      meId,
       onEdit: () => editMsg(m),
       onDelete: () => deleteMsg(m),
       onDownload: (e, att) => downloadAtt(e, att),
     });
     stampMsgNode(node, m);
+    node.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('a, button')) return;
+      e.preventDefault();
+      const authorName = m.author_display || m.author_name || m.user || 'Unknown';
+      showContextMenu(e.clientX, e.clientY, [
+        ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
+        { label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') },
+        ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { location.hash = '#/users/' + m.author_id; } }] : []),
+        ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
+        ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
+        ...((can('MANAGE_MESSAGES') || isMine) ? [{ label: 'Delete message', danger: true, onSelect: () => deleteMsg(m) }] : []),
+      ]);
+    });
     return node;
   }
 
@@ -383,10 +398,15 @@ async function renderChannel(container, serverId, channelId) {
   }
   ta.addEventListener('input', resize);
 
+  // In-flight send lock (F3): double-Enter while the POST is pending
+  // must not produce two real messages. Mirrors the DM sendLock.
+  let sending = false;
   async function send() {
+    if (sending) return;
     const content = ta.value.trim();
     if (!content && !pending.length) return;
     if (!content) { toast('Add a message or file', 'warn'); return; }
+    sending = true;
     sendBtn.setAttribute('aria-busy', 'true');
     try {
       await Api.sendMessage(channelId, { content, attachmentIds: pending.length ? pending : undefined });
@@ -397,6 +417,7 @@ async function renderChannel(container, serverId, channelId) {
     } catch (ex) {
       toast(ex.message || 'Cannot send', 'error');
     } finally {
+      sending = false;
       sendBtn.removeAttribute('aria-busy');
     }
   }
@@ -408,41 +429,54 @@ async function renderChannel(container, serverId, channelId) {
   await reload();
   Realtime.join(channelId);
 
-  // Live updates
-  const offMsg = Realtime.on('message', (m) => {
-    if (String(m.channel_id) === String(channelId)) {
-      const node = messageRow(m, { meId: State.me && State.me.id, onEdit: () => editMsg(m), onDelete: () => deleteMsg(m), onDownload: downloadAtt });
-      stampMsgNode(node, m);
+  // Live updates. Every insert/update is reconciled by authoritative
+  // message id: the sender's own POST already appears via reload(), and
+  // the server broadcast reaches the sender too — blind appends would
+  // render each own message twice (F2). Reconnect replays are also
+  // absorbed: an id already in the feed is replaced, never duplicated.
+  function upsertMessage(m) {
+    const sel = '[data-message-id="' + m.id + '"]';
+    const node = messageRow(m, { meId: State.me && State.me.id, onEdit: () => editMsg(m), onDelete: () => deleteMsg(m), onDownload: downloadAtt });
+    stampMsgNode(node, m);
+    const prev = feed.querySelector(sel);
+    if (prev) {
+      prev.replaceWith(node);
+    } else {
       feed.appendChild(node);
-      groupFeed(feed);
       thread.scrollTop = thread.scrollHeight;
     }
+    groupFeed(feed);
+  }
+  const offMsg = Realtime.on('message', (m) => {
+    if (String(m.channel_id) === String(channelId)) upsertMessage(m);
   });
   const offUpd = Realtime.on('message_updated', (m) => {
-    if (String(m.channel_id) === String(channelId)) {
-      const node = feed.querySelector('[data-message-id="' + m.id + '"]');
-      if (node) {
-        const t = node.querySelector('.msg-text');
-        if (t) t.textContent = m.content;
-        const head = node.querySelector('.msg-head');
-        if (head && !head.querySelector('.msg-edited')) head.appendChild(el('span', { class: 'msg-edited' }, 'edited'));
-      }
-    }
+    if (String(m.channel_id) === String(channelId)) upsertMessage(m);
   });
   const offDel = Realtime.on('message_deleted', (m) => {
     if (String(m.channel_id) === String(channelId)) {
       const node = feed.querySelector('[data-message-id="' + m.id + '"]');
       if (node) {
-        clear(node.querySelector('.msg-body') || node);
+        const body = node.querySelector('.msg-body');
+        if (!body) return;
+        clear(body);
         node.classList.add('deleted');
-        node.querySelector('.msg-body').appendChild(el('div', { class: 'msg-text' }, 'Message deleted'));
+        body.appendChild(el('div', { class: 'msg-text' }, 'Message deleted'));
       }
     }
   });
 
+  // Reconnect resync (F4): the gateway re-joins this channel on `open`,
+  // then reload() pulls everything missed while offline. reload() is
+  // authoritative (clear + refetch), and live events reconcile by id, so
+  // the resync cannot duplicate state.
+  const offOpen = Realtime.on('open', () => {
+    if (String(activeChannelId) === String(channelId)) reload().catch(() => {});
+  });
+
   // Clean up when the route changes
   const cleanup = () => {
-    offMsg(); offUpd(); offDel();
+    offMsg(); offUpd(); offDel(); offOpen();
     Realtime.leaveChannel();
     activeChannelId = null;
   };

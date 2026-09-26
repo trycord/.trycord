@@ -380,6 +380,12 @@ function createGateway(server) {
             const seen = await dms.visibleConversation(data.conversationId, user.id);
             if (!seen) return;
             ws.dmIds.add(String(data.conversationId));
+          } else if (data.type === 'dm:leave') {
+            // Leave a DM room (F3): without pruning, a long-lived socket
+            // accumulates every DM ever opened and keeps receiving them.
+            if (data.conversationId !== undefined && data.conversationId !== null) {
+              ws.dmIds.delete(String(data.conversationId));
+            }
           } else if (data.type === 'dm:typing') {
             // Ephemeral: never stored. Clients throttle before sending.
             const cid = String(data.conversationId || '');
