@@ -256,6 +256,29 @@ export function renderPlaceNavigation(region) {
 
   if (!channels.length) region.appendChild(el('div', { class: 'place-empty compact' }, 'No channels yet.'));
 
+  // Server management section (merged nav): the per-page button bars are
+  // gone — these links live in the Discord-style sidebar with an active
+  // state, so every management surface is one click away from anywhere.
+  const manage = el('section', { class: 'channel-section' });
+  manage.appendChild(el('div', { class: 'channel-section__title' }, el('span', {}, 'Server settings')));
+  const manageList = el('div', { class: 'channel-section__list' });
+  const manageLinks = [
+    { label: 'General', icon: '⚙', href: '#/server/' + sid + '/settings', path: '/server/' + sid + '/settings' },
+    { label: 'Members', icon: '👥', href: '#/server/' + sid + '/members', path: '/server/' + sid + '/members' },
+    { label: 'Roles', icon: '🏷', href: '#/server/' + sid + '/roles', path: '/server/' + sid + '/roles' },
+    { label: 'Categories', icon: '≡', href: '#/server/' + sid + '/categories', path: '/server/' + sid + '/categories' },
+    { label: 'Invites', icon: '✉', href: '#/server/' + sid + '/invites', path: '/server/' + sid + '/invites' },
+  ];
+  for (const m of manageLinks) {
+    manageList.appendChild(navRow({
+      label: m.label, icon: m.icon, href: m.href,
+      active: route === m.path || route.startsWith(m.path + '/'),
+      onClick: () => { location.hash = m.href; },
+    }));
+  }
+  manage.appendChild(manageList);
+  region.appendChild(manage);
+
   // Session footer (reference sidebar-user pattern): live identity with a
   // settings shortcut. Additive only — identity-region stays untouched.
   const me = State.me;
