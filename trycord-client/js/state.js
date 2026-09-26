@@ -21,6 +21,7 @@ const state = {
   friendsIn: [],       // incoming requests
   friendsOut: [],      // outgoing requests
   notifUnread: 0,
+  mutedChannels: new Set(), // channel ids with notifications suppressed
   activity: [],
   online: false,       // WS connected?
   lastServerId: null,
@@ -224,6 +225,23 @@ export async function refreshNotifications() {
     state.raw.notifications = (n && n.items) || [];
   } catch { /* non-fatal */ }
   return state.notifUnread;
+}
+
+export async function refreshMutes() {
+  try {
+    const ids = await Api.mutes();
+    state.mutedChannels = new Set((ids || []).map(String));
+  } catch { /* non-fatal: keep last known set */ }
+  return state.mutedChannels;
+}
+
+export function isMuted(channelId) {
+  return state.mutedChannels.has(String(channelId));
+}
+
+export function setMuted(channelId, muted) {
+  if (muted) state.mutedChannels.add(String(channelId));
+  else state.mutedChannels.delete(String(channelId));
 }
 
 export async function refreshActivity() {

@@ -27,7 +27,8 @@
     "test:regression": "node scripts/test-regression.js",
     "test:f1f2": "node scripts/test-f1f2.js",
     "test:phase2": "node scripts/test-phase2.js",
-    "test:trustsafety": "node scripts/test-trustsafety.js"
+    "test:trustsafety": "node scripts/test-trustsafety.js",
+    "test:engagement": "node scripts/test-engagement.js"
   },
   "license": "MIT",
   "dependencies": {

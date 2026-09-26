@@ -9,14 +9,41 @@ const { now, uuid, visibleChannel } = require('../util');
 const { hasPermission } = require('../services/permissions');
 const memberships = require('../services/memberships');
 const uploads = require('../services/uploads');
+const reactions = require('../services/reactions');
+const mentions = require('../services/mentions');
 
 let broadcast = () => {};
+let sendToUser = () => {};
 function setBroadcaster(fn) {
   broadcast = fn;
+}
+// Full gateway wiring (broadcast + per-user push for mention delivery).
+function setGateway(gw) {
+  if (gw && typeof gw.broadcast === 'function') broadcast = gw.broadcast;
+  if (gw && typeof gw.sendToUser === 'function') sendToUser = gw.sendToUser;
 }
 
 const router = express.Router({ mergeParams: true });
 router.use(auth);
+
+// Engagement enrichment: per-message reaction summaries (with the
+// reader's own state) and pin flags, batched to two queries per read.
+async function attachEngagement(rows, meId) {
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.id);
+  const [summaries, pins] = await Promise.all([
+    reactions.summary(ids, meId),
+    db.all(
+      `SELECT message_id FROM pinned_messages WHERE message_id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    ),
+  ]);
+  const pinnedSet = new Set(pins.map((p) => String(p.message_id)));
+  for (const r of rows) {
+    r.reactions = (summaries[r.id] || []);
+    r.pinned = pinnedSet.has(String(r.id));
+  }
+}
 
 router.get('/', async (req, res, next) => {
   try {
@@ -49,6 +76,7 @@ router.get('/', async (req, res, next) => {
     }
     const byId = await uploads.getForMessages(rows.map((r) => r.id));
     rows.reverse().forEach((r) => { r.attachments = byId[r.id] || []; });
+    await attachEngagement(rows, req.user.id);
     res.json(rows);
   } catch (e) { next(e); }
 });
@@ -80,7 +108,19 @@ router.post('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next)
     msg.attachments = ids.length
       ? await uploads.attachToMessage(ids, msg.id, req.user.id, ch.id)
       : [];
+    await attachEngagement([msg], req.user.id);
     broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
+    // @username mentions become durable notifications (+ realtime push),
+    // skipped for muted channels inside the helper. Never fails the post.
+    try {
+      const found = await mentions.notifyMentions({
+        serverId: ch.server_id, channelId: ch.id, messageId: msg.id,
+        authorId: req.user.id, content,
+      });
+      for (const f of found) {
+        try { sendToUser(f.userId, { type: 'notification', notification: f.notification }); } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
     res.json(msg);
   } catch (e) { next(e); }
 });
@@ -124,10 +164,59 @@ router.patch('/:messageId', rateLimit({ windowMs: 60000, max: 40 }), async (req,
       author_name: (author && author.username) || req.user.username,
       author_display: (author && author.display_name) || req.user.username,
     };
+    await attachEngagement([out], req.user.id);
     broadcast(ch.server_id, ch.id, { type: 'message_updated', ...out });
     res.json(out);
   } catch (e) { next(e); }
 });
 
+// ---- reactions ------------------------------------------------------
+// POST /api/channels/:channelId/messages/:messageId/reactions { emoji }
+router.post('/:messageId/reactions', rateLimit({ windowMs: 60000, max: 120 }), async (req, res, next) => {
+  try {
+    const ch = await visibleChannel(req.params.channelId, req.user.id);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    if (!(await hasPermission(req.user.id, ch.server_id, 'SEND_MESSAGES'))) {
+      return fail(res, 'PERMISSION_DENIED', 'you cannot react here');
+    }
+    if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
+      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
+    }
+    const msg = await db.get('SELECT id FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
+    if (!msg) return fail(res, 'NOT_FOUND', 'message not found in this channel');
+    let emoji;
+    try {
+      emoji = await reactions.add(req.user.id, msg.id, (req.body || {}).emoji);
+    } catch (e) {
+      if (e && e.code) return fail(res, e.code, e.message);
+      throw e;
+    }
+    const summaries = await reactions.summary([msg.id], req.user.id);
+    broadcast(ch.server_id, ch.id, { type: 'message_reaction', id: msg.id, channel_id: ch.id, reactions: summaries[msg.id] || [] });
+    res.json({ ok: true, emoji, reactions: summaries[msg.id] || [] });
+  } catch (e) { next(e); }
+});
+
+// DELETE .../reactions/:emoji — removes only the caller's own reaction.
+router.delete('/:messageId/reactions/:emoji', async (req, res, next) => {
+  try {
+    const ch = await visibleChannel(req.params.channelId, req.user.id);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    const msg = await db.get('SELECT id FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
+    if (!msg) return fail(res, 'NOT_FOUND', 'message not found in this channel');
+    let emoji;
+    try {
+      emoji = await reactions.remove(req.user.id, msg.id, req.params.emoji);
+    } catch (e) {
+      if (e && e.code) return fail(res, e.code, e.message);
+      throw e;
+    }
+    const summaries = await reactions.summary([msg.id], req.user.id);
+    broadcast(ch.server_id, ch.id, { type: 'message_reaction', id: msg.id, channel_id: ch.id, reactions: summaries[msg.id] || [] });
+    res.json({ ok: true, emoji, reactions: summaries[msg.id] || [] });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;
 module.exports.setBroadcaster = setBroadcaster;
+module.exports.setGateway = setGateway;

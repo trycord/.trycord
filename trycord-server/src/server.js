@@ -283,6 +283,7 @@ async function boot() {
   app.use('/api/dms', require('./routes/dms'));
   app.use('/api/friends', require('./routes/friends'));
   app.use('/api/notifications', require('./routes/notifications'));
+  app.use('/api/search', require('./routes/search'));
   app.use('/api/reports', require('./routes/reports'));
   app.use('/api/appeals', require('./routes/appeals'));
   app.use('/api/admin', require('./routes/admin'));
@@ -388,7 +389,9 @@ async function boot() {
 
   const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer } = createGateway(server);
   require('./routes/auth').setTicketIssuer(issueTicket);
-  require('./routes/messages').setBroadcaster(broadcast);
+  require('./routes/messages').setGateway({ broadcast, sendToUser });
+  require('./routes/channels').setGateway({ broadcast });
+  app.use('/api/mutes', require('./routes/mutes'));
   require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });
   require('./routes/friends').setGateway({ sendToUser });
   require('./routes/users').setGateway({ getPresence });

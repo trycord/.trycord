@@ -233,7 +233,7 @@ export function showContextMenu(clientX, clientY, items) {
 }
 
 export function closeContextMenu() {
-  for (const pop of Array.from(document.querySelectorAll('.popover.ctx-menu, .popover.user-card'))) {
+  for (const pop of Array.from(document.querySelectorAll('.popover.ctx-menu, .popover.user-card, .popover.emoji-picker'))) {
     try { if (pop._ctxCleanup) pop._ctxCleanup(); } catch { /* ignore */ }
     pop.remove();
   }
@@ -313,6 +313,66 @@ export async function copyText(text, label = 'Copied to clipboard.') {
     } catch { toast('Copy failed.', 'error'); return; }
   }
   toast(label, 'ok');
+}
+
+// ---- emoji picker ---------------------------------------------------------
+// Curated unicode palette that inserts at the caller's cursor. Pure
+// client-side: no backend, no contracts — the composer sends plain text.
+const EMOJI_SET = ('😀 😁 😂 🤣 😊 😍 😘 😎 🤔 😐 🙄 😴 🤯 🥳 😢 😭 😡 ' +
+  '👍 👎 👏 🙏 💪 🤝 ✌️ 🤞 👌 🫡 👀 🙈 🙉 🙊 ' +
+  '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💔 💯 ✨ 🔥 🎉 ⭐ 🌟 💡 ' +
+  '🎮 🎲 🎯 🏆 ⚽ 🎨 🎵 🎧 📚 ✈️ 🚀 🌙 ☀️ 🌈 🍕 ☕ 🍺 🎂').split(' ');
+
+export function showEmojiPicker(anchor, onPick) {
+  closeContextMenu();
+  const root = qs('#popover-root') || document.body;
+  const pop = el('div', { class: 'popover emoji-picker', role: 'dialog', 'aria-label': 'Choose an emoji' });
+  for (const e of EMOJI_SET) {
+    const b = el('button', { class: 'emoji-cell', type: 'button', title: e }, e);
+    b.addEventListener('click', () => {
+      closeContextMenu();
+      if (onPick) onPick(e);
+    });
+    pop.appendChild(b);
+  }
+  root.appendChild(pop);
+  const r = anchor.getBoundingClientRect();
+  const pr = pop.getBoundingClientRect();
+  let left = Math.min(Math.max(8, r.left), Math.max(8, innerWidth - pr.width - 8));
+  let top = r.top - pr.height - 8;
+  if (top < 8) top = Math.min(innerHeight - pr.height - 8, r.bottom + 8);
+  pop.style.left = left + 'px';
+  pop.style.top = Math.max(8, top) + 'px';
+  const onKey = (e) => { if (e.key === 'Escape') closeContextMenu(); };
+  const onDown = (e) => { if (!pop.contains(e.target)) closeContextMenu(); };
+  const onScroll = () => closeContextMenu();
+  setTimeout(() => {
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+  }, 0);
+  pop._ctxCleanup = () => {
+    document.removeEventListener('pointerdown', onDown);
+    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('scroll', onScroll, true);
+    window.removeEventListener('resize', onScroll);
+  };
+  return { pop, hide: closeContextMenu };
+}
+
+// Insert text at the cursor of a textarea/input, preserving undo + focus.
+export function insertAtCursor(field, text) {
+  try {
+    field.focus();
+    const s = field.selectionStart == null ? field.value.length : field.selectionStart;
+    const e = field.selectionEnd == null ? field.value.length : field.selectionEnd;
+    field.setRangeText(String(text), s, e, 'end');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  } catch {
+    field.value += text;
+  }
+  try { field.focus(); } catch { /* ignore */ }
 }
 
 // ---- time -----------------------------------------------------------------

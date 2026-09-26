@@ -6,7 +6,7 @@
 import { esc, el, clear, qs, toast, confirmDialog, showContextMenu, showUserCard, copyText } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, realmTitle } from './components.js';
 import Api from './api.js';
-import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext } from './state.js';
+import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted } from './state.js';
 import { closeMobileDrawer } from './presentation.js';
 
 // Shared context-menu builders (Checkpoint C). `contextmenu` fires on
@@ -81,6 +81,7 @@ function memberCard(e, m) {
 const DESTINATIONS = [
   { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
   { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
+  { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
   { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
   { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
 ];
@@ -120,7 +121,7 @@ export function renderGlobalNavigation(region) {
   region.appendChild(realmTitle('Navigate'));
   for (const d of DESTINATIONS) {
     const active = route.startsWith(d.href.replace('#', ''));
-    const count = d.id === 'dms' && State.notifUnread ? State.notifUnread : 0;
+    const count = (d.id === 'dms' || d.id === 'notifications') && State.notifUnread ? State.notifUnread : 0;
     region.appendChild(navRow({
       label: d.label, icon: d.icon, href: d.href, active, count,
       onClick: () => { location.hash = d.href; },
@@ -235,7 +236,7 @@ export function renderPlaceNavigation(region) {
     const listBox = el('div', { class: 'channel-section__list' });
     for (const ch of list) {
       const active = route === '/server/' + sid + '/channel/' + ch.id;
-      const row = channelRow(ch, { active, onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } });
+      const row = channelRow(ch, { active, muted: isMuted(ch.id), onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } });
       row.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -485,7 +486,7 @@ export function syncMobileNavigation(mobileNav) {
       const active = route.startsWith(d.href.replace('#', ''));
       const btn = el('button', { type: 'button', class: active ? 'active' : '' });
       btn.append(el('span', { class: 'mobile-nav-v3__global-icon' }, d.icon), el('span', {}, d.label));
-      if (d.id === 'dms' && State.notifUnread) btn.appendChild(el('span', { class: 'mobile-nav-v3__badge' }, String(State.notifUnread)));
+      if ((d.id === 'dms' || d.id === 'notifications') && State.notifUnread) btn.appendChild(el('span', { class: 'mobile-nav-v3__badge' }, String(State.notifUnread)));
       btn.addEventListener('click', () => { location.hash = d.href; closeMobileDrawer(); });
       grid.appendChild(btn);
     }

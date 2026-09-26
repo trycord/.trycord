@@ -9,10 +9,16 @@
 import Api from './api.js';
 import State, {
   enterServer, refreshServers, leaveServerContext, can, isAuthed, currentServerId, peerPresence,
-  refreshBans, setViewRefresh, refreshServerView,
+  refreshBans, setViewRefresh, refreshServerView, refreshMutes, isMuted, setMuted,
 } from './state.js';
-import { esc, el, clear, toast, relTime, confirmDialog, openModal, showContextMenu, copyText } from './ui.js';
-import { avatar, emptyState, messageRow, channelRow, initialOf } from './components.js';
+import { esc, el, clear, toast, relTime, confirmDialog, openModal, showContextMenu, showEmojiPicker, insertAtCursor, copyText } from './ui.js';
+function pickReaction(messageId) {
+  showEmojiPicker(document.body, async (emoji) => {
+    try { await Api.addReaction(activeChannelId, messageId, emoji); }
+    catch (ex) { toast(ex.message || 'Could not react.', 'error'); }
+  });
+}
+import { avatar, emptyState, messageRow, channelRow, paintReactions, initialOf } from './components.js';
 import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNavigation, toggleMembers, membersHidden } from './shell.js';
 import Realtime from './realtime.js';
 
@@ -237,7 +243,43 @@ async function renderChannel(container, serverId, channelId) {
       btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
     },
   }, '☰');
-  renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [memberToggle] });
+  // Mute state for the header bell (one cheap read per channel open).
+  let muted = isMuted(channelId);
+  try { await refreshMutes(); muted = isMuted(channelId); } catch { /* keep last known */ }
+  const bellBtn = el('button', {
+    class: 'btn icon', type: 'button',
+    title: muted ? 'Unmute this channel' : 'Mute this channel',
+    'aria-label': muted ? 'Unmute this channel' : 'Mute this channel',
+    'aria-pressed': muted ? 'true' : 'false',
+    onClick: async (e) => {
+      const btn = e.currentTarget;
+      try {
+        if (isMuted(channelId)) {
+          await Api.unmuteChannel(channelId);
+          setMuted(channelId, false);
+        } else {
+          await Api.muteChannel(channelId);
+          setMuted(channelId, true);
+        }
+        const now = isMuted(channelId);
+        renderAllChrome();
+        btn.textContent = now ? '🔕' : '🔔';
+        btn.title = now ? 'Unmute this channel' : 'Mute this channel';
+        btn.setAttribute('aria-label', btn.title);
+        btn.setAttribute('aria-pressed', now ? 'true' : 'false');
+        toast(now ? 'Channel muted.' : 'Channel unmuted.', 'ok');
+      } catch (ex) { toast(ex.message || 'Could not change mute.', 'error'); }
+    },
+  }, muted ? '🔕' : '🔔');
+  const searchBtn = el('button', {
+    class: 'btn icon', type: 'button', title: 'Search in this community', 'aria-label': 'Search messages',
+    onClick: () => toggleSearchPanel(),
+  }, '⌕');
+  const pinsBtn = el('button', {
+    class: 'btn icon', type: 'button', title: 'Pinned messages', 'aria-label': 'Pinned messages',
+    onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + channelId + '/pins'; },
+  }, '☆');
+  renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [searchBtn, pinsBtn, bellBtn, memberToggle] });
 
   const conv = el('div', { class: 'conversation' });
   const thread = el('div', { class: 'thread' });
@@ -272,26 +314,72 @@ async function renderChannel(container, serverId, channelId) {
     thread.scrollTop = thread.scrollHeight;
   }
 
+  // Per-view pin state (id -> bool), seeded from payloads and kept fresh
+  // by pin/unpin broadcasts so menus and badges never go stale.
+  const pinState = new Map();
+  async function toggleReaction(messageId, emoji, mine) {
+    try {
+      if (mine) await Api.removeReaction(channelId, messageId, emoji);
+      else await Api.addReaction(channelId, messageId, emoji);
+    } catch (ex) { toast(ex.message || 'Could not react.', 'error'); }
+  }
+  async function togglePin(m) {
+    const pinned = pinState.get(String(m.id)) ?? !!m.pinned;
+    try {
+      if (pinned) await Api.unpinMessage(serverId, channelId, m.id);
+      else await Api.pinMessage(serverId, channelId, m.id);
+    } catch (ex) { toast(ex.message || 'Could not change pin.', 'error'); }
+  }
+  // Patch a rendered row in place from pin/reaction events (which carry
+  // summaries, not full messages). Falls back to a no-op when the row is
+  // not on screen; reload() remains the authority on reconnect.
+  function patchEngagement(id, { reactions: list, pinned }) {
+    const node = feed.querySelector('[data-message-id="' + id + '"]');
+    if (!node) return;
+    if (pinned !== undefined) {
+      pinState.set(String(id), !!pinned);
+      const head = node.querySelector('.msg-head');
+      const badge = node.querySelector('.msg-pinned');
+      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, '📌'));
+      if (!pinned && badge) badge.remove();
+    }
+    if (list !== undefined) {
+      const bar = node.querySelector('.msg-reactions');
+      const meId = State.me && State.me.id;
+      if (bar) {
+        // Broadcast summaries are actor-relative: re-derive `mine` for us.
+        paintReactions(bar, (list || []).map((r) => ({
+          ...r,
+          mine: !!(r.users && meId && r.users.map(String).includes(String(meId))),
+        })), (emoji, mine) => toggleReaction(id, emoji, mine));
+      }
+    }
+  }
   function buildMsg(m) {
     const meId = State.me && State.me.id;
     const isMine = meId !== undefined && String(m.author_id) === String(meId);
+    if (m.pinned) pinState.set(String(m.id), true);
     const node = messageRow(m, {
       meId,
       onEdit: () => editMsg(m),
       onDelete: () => deleteMsg(m),
       onDownload: (e, att) => downloadAtt(e, att),
+      onReact: (emoji, mine) => toggleReaction(m.id, emoji, mine),
     });
     stampMsgNode(node, m);
     node.addEventListener('contextmenu', (e) => {
       if (e.target.closest('a, button')) return;
       e.preventDefault();
       const authorName = m.author_display || m.author_name || m.user || 'Unknown';
+      const pinned = pinState.get(String(m.id)) ?? !!m.pinned;
       showContextMenu(e.clientX, e.clientY, [
         ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
         { label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') },
         ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { location.hash = '#/users/' + m.author_id; } }] : []),
+        { label: 'Add reaction…', onSelect: () => pickReaction(m.id) },
         ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
         ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
+        ...(can('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
         ...((can('MANAGE_MESSAGES') || isMine) ? [{ label: 'Delete message', danger: true, onSelect: () => deleteMsg(m) }] : []),
       ]);
     });
@@ -370,10 +458,12 @@ async function renderChannel(container, serverId, channelId) {
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
+  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, '☺');
+  emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
   composer.appendChild(fileBtn);
   composer.appendChild(fileInput);
   composer.appendChild(ta);
-  composer.appendChild(el('div', { class: 'composer-actions' }, sendBtn));
+  composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
   conv.appendChild(composer);
 
   let pending = [];
@@ -436,7 +526,12 @@ async function renderChannel(container, serverId, channelId) {
   // absorbed: an id already in the feed is replaced, never duplicated.
   function upsertMessage(m) {
     const sel = '[data-message-id="' + m.id + '"]';
-    const node = messageRow(m, { meId: State.me && State.me.id, onEdit: () => editMsg(m), onDelete: () => deleteMsg(m), onDownload: downloadAtt });
+    if (m.pinned) pinState.set(String(m.id), true);
+    const node = messageRow(m, {
+      meId: State.me && State.me.id,
+      onEdit: () => editMsg(m), onDelete: () => deleteMsg(m), onDownload: downloadAtt,
+      onReact: (emoji, mine) => toggleReaction(m.id, emoji, mine),
+    });
     stampMsgNode(node, m);
     const prev = feed.querySelector(sel);
     if (prev) {
@@ -474,9 +569,87 @@ async function renderChannel(container, serverId, channelId) {
     if (String(activeChannelId) === String(channelId)) reload().catch(() => {});
   });
 
+  const offPin = Realtime.on('message_pinned', (m) => {
+    if (String(m.channel_id) === String(channelId)) patchEngagement(m.id, { pinned: true });
+  });
+  const offUnpin = Realtime.on('message_unpinned', (m) => {
+    if (String(m.channel_id) === String(channelId)) patchEngagement(m.id, { pinned: false });
+  });
+  const offReact = Realtime.on('message_reaction', (m) => {
+    if (String(m.channel_id) === String(channelId)) patchEngagement(m.id, { reactions: m.reactions });
+  });
+
+  // Search panel (reference ⌕ pattern): debounced community search with
+  // jump-to-message. Lives and dies with this view; Escape closes.
+  let searchPanel = null;
+  function toggleSearchPanel() {
+    if (searchPanel) { searchPanel.remove(); searchPanel = null; return; }
+    const panel = el('div', { class: 'search-panel', role: 'dialog', 'aria-label': 'Search messages' });
+    const input = el('input', { class: 'input', type: 'search', placeholder: 'Search in ' + (server.name || 'this community') + '…', 'aria-label': 'Search messages' });
+    const status = el('div', { class: 'muted small', 'aria-live': 'polite' }, 'Type at least 2 characters.');
+    const results = el('div', { class: 'search-results' });
+    const closeBtn = el('button', { class: 'btn ghost sm', type: 'button' }, 'Close');
+    closeBtn.addEventListener('click', () => { panel.remove(); searchPanel = null; });
+    panel.append(input, status, results, closeBtn);
+    conv.appendChild(panel);
+    searchPanel = panel;
+    input.focus();
+    let timer = null;
+    let seq = 0;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (q.length < 2) {
+        clear(results);
+        status.textContent = 'Type at least 2 characters.';
+        return;
+      }
+      status.textContent = 'Searching…';
+      timer = setTimeout(async () => {
+        const mine = ++seq;
+        try {
+          const hits = await Api.search(q, { serverId, limit: 25 });
+          if (mine !== seq || !searchPanel) return;
+          clear(results);
+          if (!hits.length) { status.textContent = 'No messages found.'; return; }
+          status.textContent = hits.length + ' result' + (hits.length === 1 ? '' : 's') + '.';
+          for (const h of hits) {
+            const row = el('button', { class: 'search-hit', type: 'button' });
+            row.appendChild(el('div', { class: 'search-hit__meta' },
+              '#' + (h.channel_name || 'channel') + ' · ' + (h.author_display || h.author_name || 'Unknown') + ' · ' + relTime(h.created_at)));
+            row.appendChild(el('div', { class: 'search-hit__text' }, String(h.content || '').slice(0, 160)));
+            row.addEventListener('click', () => {
+              panel.remove(); searchPanel = null;
+              const dest = '#/server/' + h.server_id + '/channel/' + h.channel_id;
+              const cur = '#/server/' + serverId + '/channel/' + channelId;
+              if (dest === cur) {
+                const node = feed.querySelector('[data-message-id="' + h.id + '"]');
+                if (node) {
+                  node.scrollIntoView({ block: 'center' });
+                  node.classList.add('flash');
+                  setTimeout(() => node.classList.remove('flash'), 1600);
+                  return;
+                }
+              }
+              location.hash = dest;
+            });
+            results.appendChild(row);
+          }
+        } catch (ex) {
+          if (mine !== seq || !searchPanel) return;
+          status.textContent = ex.message || 'Search failed.';
+        }
+      }, 300);
+    });
+    panel.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { panel.remove(); searchPanel = null; }
+    });
+  }
+
   // Clean up when the route changes
   const cleanup = () => {
-    offMsg(); offUpd(); offDel(); offOpen();
+    offMsg(); offUpd(); offDel(); offOpen(); offPin(); offUnpin(); offReact();
+    if (searchPanel) { searchPanel.remove(); searchPanel = null; }
     Realtime.leaveChannel();
     activeChannelId = null;
   };
@@ -1388,9 +1561,81 @@ async function renderNewServer(container, serverId) {
   container.appendChild(wrap);
 }
 
+// Pinned messages for one channel: static list with jump-to-message.
+// Live pin/unpin events refresh the list (cheap, rare events).
+async function renderChannelPins(container, serverId, channelId) {
+  clear(container);
+  let server = State.serverDetail;
+  try {
+    if (String(State.lastServerId) !== String(serverId) || !server) {
+      const { detail } = await ensureServer(serverId);
+      server = detail;
+    }
+  } catch (ex) {
+    renderContextHeader({ title: 'Unavailable' });
+    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this server'));
+    return;
+  }
+  const layout = State.channels;
+  const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
+  const back = el('button', { class: 'btn ghost sm', type: 'button' }, '← Back to #' + (channel ? channel.name : 'channel'));
+  back.addEventListener('click', () => { location.hash = '#/server/' + serverId + '/channel/' + channelId; });
+  renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: '☆', actions: [back] });
+  const wrap = el('div', { class: 'page atrium' });
+  const list = el('div', { class: 'stack' });
+  wrap.appendChild(list);
+  container.appendChild(wrap);
+  const paint = async () => {
+    clear(list);
+    let pins = [];
+    try {
+      pins = await Api.listPins(serverId, channelId);
+    } catch (ex) {
+      list.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load pins'));
+      return;
+    }
+    if (!pins.length) {
+      list.appendChild(emptyState('☆', 'No pinned messages', 'Pin important messages to find them here.'));
+      return;
+    }
+    for (const m of pins) {
+      const node = messageRow(m, {
+        meId: State.me && State.me.id,
+        onReact: (emoji, mine) => togglePinReaction(channelId, m.id, emoji, mine),
+      });
+      node.style.cursor = 'pointer';
+      node.title = 'Jump to message';
+      node.addEventListener('click', (e) => {
+        if (e.target.closest('a, button')) return;
+        location.hash = '#/server/' + serverId + '/channel/' + channelId;
+      });
+      list.appendChild(node);
+    }
+  };
+  const offPin = Realtime.on('message_pinned', (m) => {
+    if (String(m.channel_id) === String(channelId)) paint().catch(() => {});
+  });
+  const offUnpin = Realtime.on('message_unpinned', (m) => {
+    if (String(m.channel_id) === String(channelId)) paint().catch(() => {});
+  });
+  container._cleanup = () => { offPin(); offUnpin(); Realtime.leaveChannel(); };
+  Realtime.join(channelId);
+  setViewRefresh(() => { paint().catch(() => {}); });
+  await paint();
+  renderAllChrome();
+}
+
+async function togglePinReaction(channelId, messageId, emoji, mine) {
+  try {
+    if (mine) await Api.removeReaction(channelId, messageId, emoji);
+    else await Api.addReaction(channelId, messageId, emoji);
+  } catch (ex) { toast(ex.message || 'Could not react.', 'error'); }
+}
+
 export default {
   renderServerLanding,
   renderChannel,
+  renderChannelPins,
   renderNewChannel,
   renderInvites,
   renderServerSettings,

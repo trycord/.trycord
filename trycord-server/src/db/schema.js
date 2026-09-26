@@ -335,6 +335,34 @@ function tables(engine) {
       created_at VARCHAR(64) NOT NULL,
       FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
+
+    // Channel engagement (message search/pins/reactions/mutes): one pin per
+    // message, one reaction per (message, user, emoji), one mute per
+    // (user, channel). Message rows cascade so deletes clean these up.
+    `CREATE TABLE IF NOT EXISTS pinned_messages (
+      message_id VARCHAR(64) PRIMARY KEY,
+      channel_id VARCHAR(64) NOT NULL,
+      server_id  VARCHAR(64) NOT NULL,
+      pinned_by  VARCHAR(64) NOT NULL,
+      pinned_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS reactions (
+      message_id VARCHAR(64) NOT NULL,
+      user_id    VARCHAR(64) NOT NULL,
+      emoji      VARCHAR(32) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      PRIMARY KEY (message_id, user_id, emoji),
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+    )${engine}`,
+
+    `CREATE TABLE IF NOT EXISTS muted_channels (
+      user_id    VARCHAR(64) NOT NULL,
+      channel_id VARCHAR(64) NOT NULL,
+      muted_at   VARCHAR(64) NOT NULL,
+      PRIMARY KEY (user_id, channel_id)
+    )${engine}`,
   ];
 }
 
@@ -454,6 +482,9 @@ const INDEXES = [
   'CREATE INDEX idx_appeals_action ON appeals(action_id)',
   'CREATE INDEX idx_audit_created ON audit_logs(created_at)',
   'CREATE INDEX idx_audit_actor ON audit_logs(actor_id, created_at)',
+  'CREATE INDEX idx_pins_channel ON pinned_messages(channel_id, pinned_at)',
+  'CREATE INDEX idx_reactions_message ON reactions(message_id)',
+  'CREATE INDEX idx_muted_user ON muted_channels(user_id)',
 ];
 
 const MYSQL_COLUMN_SQL =

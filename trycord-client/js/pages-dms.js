@@ -3,7 +3,7 @@
 
 import Api from './api.js';
 import State, { refreshDms, refreshFriends, isAuthed } from './state.js';
-import { esc, el, clear, toast, relTime } from './ui.js';
+import { esc, el, clear, toast, relTime, showEmojiPicker, insertAtCursor } from './ui.js';
 import { avatar, emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
@@ -145,8 +145,10 @@ async function renderDmThread(container, dmId) {
   const composer = el('div', { class: 'composer' });
   const ta = el('textarea', { placeholder: 'Message ' + (peer.displayName || peer.username) + '…', rows: 1 });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
+  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, '☺');
+  emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
   composer.appendChild(ta);
-  composer.appendChild(el('div', { class: 'composer-actions' }, sendBtn));
+  composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
   conv.appendChild(composer);
 
   function send() {

@@ -11,6 +11,7 @@ import { renderAccount } from './pages-account.js';
 import { renderAdmin } from './pages-admin.js';
 import { renderProfile } from './pages-profile.js';
 import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support.js';
+import { renderNotifications } from './pages-notifications.js';
 import { presentationMode, closeMobileDrawer } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader, renderMobileHeader } from './shell.js';
 import Api from './api.js';
@@ -167,6 +168,11 @@ async function renderRoute() {
     renderAllChrome();
     return;
   }
+  if (path.startsWith('/notifications')) {
+    await renderNotifications(region);
+    renderAllChrome();
+    return;
+  }
 
   // --- settings (account hub; /account* kept as working aliases) ----------
   if (path.startsWith('/settings/updates')) { await renderAccount(region, { tab: 'updates' }); renderAllChrome(); return; }
@@ -233,6 +239,12 @@ async function renderRoute() {
   if (parts[0] === 'server' && parts[1]) {
     const serverId = parts[1];
     const what = parts[2];
+    if (what === 'channel' && parts[3] && parts[4] === 'pins') {
+      setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
+      await Workspace.renderChannelPins(region, serverId, parts[3]);
+      renderAllChrome();
+      return;
+    }
     if (what === 'channel' && parts[3]) {
       setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
       await Workspace.renderChannel(region, serverId, parts[3]);

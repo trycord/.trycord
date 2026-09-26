@@ -41,9 +41,30 @@ async function list(userId, limit) {
     'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL',
     [userId]
   );
+  // Mention deep links: batch-resolve the referenced message to its
+  // channel/server so the client can jump straight to it. Missing rows
+  // (deleted messages) simply carry no context.
+  const mentionIds = [...new Set(rows.filter((r) => r.type === 'mention' && r.reference_id).map((r) => String(r.reference_id)))];
+  const ctx = {};
+  if (mentionIds.length) {
+    const placeholders = mentionIds.map(() => '?').join(',');
+    const found = await db.all(
+      `SELECT m.id AS mid, m.channel_id, ch.server_id FROM messages m
+       JOIN channels ch ON ch.id = m.channel_id
+       WHERE m.id IN (${placeholders})`,
+      mentionIds
+    );
+    for (const f of found) {
+      ctx[String(f.mid)] = { serverId: String(f.server_id), channelId: String(f.channel_id), messageId: String(f.mid) };
+    }
+  }
   return {
     unreadCount: unread ? unread.n : 0,
-    items: rows.map((r) => shape(r, r.actor_name ? { id: r.actor_id, username: r.actor_name, display_name: r.actor_display } : null)),
+    items: rows.map((r) => {
+      const out = shape(r, r.actor_name ? { id: r.actor_id, username: r.actor_name, display_name: r.actor_display } : null);
+      if (r.type === 'mention' && ctx[String(r.reference_id)]) out.context = ctx[String(r.reference_id)];
+      return out;
+    }),
   };
 }
 
