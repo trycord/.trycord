@@ -1,7 +1,7 @@
 // Shared render helpers. Build real DOM nodes from real state objects;
 // never from mock data.
 
-import { esc, el, relTime, apiSrc, qs } from './ui.js';
+import { esc, el, clear, relTime, apiSrc, qs } from './ui.js';
 import { peerPresence, can } from './state.js';
 import Api from './api.js';
 
@@ -107,10 +107,11 @@ export function serverChip(server, { active = false, onClick } = {}) {
   return chip;
 }
 
-export function channelRow(channel, { active = false, onClick } = {}) {
+export function channelRow(channel, { active = false, muted = false, onClick } = {}) {
   const row = el('button', {
-    class: 'channel-row' + (active ? ' active' : ''),
+    class: 'channel-row' + (active ? ' active' : '') + (muted ? ' muted' : ''),
     type: 'button',
+    title: muted ? '#' + (channel.name || 'channel') + ' (muted)' : '#' + (channel.name || 'channel'),
     onClick,
     dataset: { channelId: channel.id },
   });
@@ -172,6 +173,11 @@ export function messageRow(msg, opts = {}) {
   const text = el('div', { class: 'msg-text', html: opts.renderText ? opts.renderText(msg.content) : esc(msg.content) });
   body.appendChild(text);
 
+  if (msg.pinned) {
+    const pin = el('span', { class: 'msg-pinned', title: 'Pinned message' }, '📌');
+    head.appendChild(pin);
+  }
+
   if (msg.attachments && msg.attachments.length) {
     const files = el('div', { class: 'msg-files' });
     for (const att of msg.attachments) {
@@ -214,8 +220,33 @@ export function messageRow(msg, opts = {}) {
     body.appendChild(files);
   }
 
+  const reactBar = el('div', { class: 'msg-reactions' });
+  paintReactions(reactBar, msg.reactions, opts.onReact);
+  body.appendChild(reactBar);
+
   row.appendChild(body);
   return row;
+}
+
+// Reaction pills under a message. Clicking toggles the caller's reaction:
+// own emoji removes, others add. Pure renderer — the caller supplies
+// onReact(emoji, mine) or nothing (static display, e.g. DMs/pins lists
+// without handlers... callers that want clicks pass the callback).
+export function paintReactions(bar, list, onReact) {
+  clear(bar);
+  for (const r of list || []) {
+    if (!r || !r.emoji) continue;
+    const pill = el('button', {
+      type: 'button',
+      class: 'react-pill' + (r.mine ? ' mine' : ''),
+      title: (r.count || 1) + ' reaction' + ((r.count || 1) === 1 ? '' : 's'),
+      'aria-pressed': r.mine ? 'true' : 'false',
+      onClick: onReact ? () => onReact(r.emoji, !!r.mine) : null,
+      disabled: onReact ? false : true,
+    }, r.emoji + ' ' + (r.count || 1));
+    bar.appendChild(pill);
+  }
+  bar.hidden = !(list && list.length);
 }
 
 // ---- compose helpers --------------------------------------------------------
@@ -225,4 +256,4 @@ export function avatarUploadPreview(file) {
   return { name: file.name, size: file.size, url: URL.createObjectURL(file) };
 }
 
-export default { avatar, avatar: avatar, presenceDot, realmTitle, navRow, serverChip, channelRow, emptyState, messageRow, initialOf, hashColor };
+export default { avatar, avatar: avatar, presenceDot, realmTitle, navRow, serverChip, channelRow, emptyState, messageRow, paintReactions, initialOf, hashColor };

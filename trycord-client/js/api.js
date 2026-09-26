@@ -183,6 +183,27 @@ const Api = {
   deleteMessage: (channelId, messageId) =>
     request('DELETE', '/api/channels/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId)),
 
+  // ---- engagement: search, pins, reactions, mutes -------------------------------
+  search: (q, { serverId, limit } = {}) => {
+    const p = new URLSearchParams({ q: String(q || '') });
+    if (serverId) p.set('serverId', serverId);
+    if (limit) p.set('limit', String(limit));
+    return request('GET', '/api/search?' + p.toString());
+  },
+  listPins: (serverId, channelId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId) + '/pins'),
+  pinMessage: (serverId, channelId, messageId) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId) + '/pins', { body: { messageId } }),
+  unpinMessage: (serverId, channelId, messageId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId) + '/pins/' + encodeURIComponent(messageId)),
+  addReaction: (channelId, messageId, emoji) =>
+    request('POST', '/api/channels/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId) + '/reactions', { body: { emoji } }),
+  removeReaction: (channelId, messageId, emoji) =>
+    request('DELETE', '/api/channels/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId) + '/reactions/' + encodeURIComponent(emoji)),
+  mutes: () => request('GET', '/api/mutes'),
+  muteChannel: (channelId) => request('POST', '/api/mutes', { body: { channelId } }),
+  unmuteChannel: (channelId) => request('DELETE', '/api/mutes/' + encodeURIComponent(channelId)),
+
   // ---- attachments -------------------------------------------------------------
   uploadAttachment: async (channelId, file) => {
     const fd = new FormData();
