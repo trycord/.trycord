@@ -209,7 +209,63 @@ export function messageRow(msg, opts = {}) {
   }
 
   const head = el('div', { class: 'msg-head' });
-  head.appendChild(el('span', { class: 'msg-author' }, disp));
+  // The author is a button, not a span: it has to be reachable by keyboard
+  // and announced as interactive. An <a href="#/users/id"> would be a lie
+  // because it navigates away from the message being read, so this opens a
+  // contextual card instead.
+  //
+  // user-actions is imported lazily inside the handler. It needs avatar()
+  // from this module, so a static import would be a cycle; deferring it means
+  // this module is fully evaluated before the other one asks for avatar.
+  const authorBtn = el('button', {
+    class: 'msg-author',
+    type: 'button',
+    title: 'View ' + disp,
+    'data-user-id': authorId ? String(authorId) : '',
+  }, disp);
+  if (authorId) {
+    const openCard = (e) => {
+      e.stopPropagation();
+      const r = authorBtn.getBoundingClientRect();
+      import('./user-actions.js').then(({ openUserCard }) => {
+        openUserCard({
+          user: {
+            id: authorId,
+            username: msg.user || msg.author_name,
+            displayName: disp,
+            avatarUrl: msg.author_avatar,
+          },
+          x: r.left,
+          y: r.bottom + 6,
+          serverId: opts.serverId,
+        });
+      }).catch(() => { /* the card is an enhancement; never break the message */ });
+    };
+    // Right-click gives the action list directly - ban, kick, roles, report -
+    // rather than making people open a card and then find the buttons.
+    const openMenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      import('./user-actions.js').then(({ openUserMenu }) => {
+        openUserMenu({
+          user: {
+            id: authorId,
+            username: msg.user || msg.author_name,
+            displayName: disp,
+            avatarUrl: msg.author_avatar,
+          },
+          x: e.clientX,
+          y: e.clientY,
+          serverId: opts.serverId,
+        });
+      }).catch(() => { /* same */ });
+    };
+    authorBtn.addEventListener('click', openCard);
+    authorBtn.addEventListener('contextmenu', openMenu);
+  } else {
+    authorBtn.disabled = true;
+  }
+  head.appendChild(authorBtn);
   head.appendChild(el('span', { class: 'msg-time' }, relTime(msg.created_at)));
   if (msg.edited_at) head.appendChild(el('span', { class: 'msg-edited' }, 'edited'));
   const actions = el('span', { class: 'msg-actions' });

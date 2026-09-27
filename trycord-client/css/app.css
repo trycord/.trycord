@@ -1731,7 +1731,49 @@ select.input { appearance: auto; }
 .msg:hover { background: color-mix(in srgb, var(--t-txt) 4%, transparent); }
 .msg .msg-body { flex: 1 1 auto; min-width: 0; }
 .msg .msg-head { display: flex; align-items: baseline; gap: var(--t-d-2); flex-wrap: wrap; }
-.msg .msg-author { font-weight: 700; font-size: var(--t-fs-m); color: var(--t-txt); letter-spacing: 0.002em; }
+/* A <button>, so it needs its chrome stripped and a real hover/focus state -
+   it must not read as a link by colour alone, and it must be visibly
+   focusable for keyboard users. */
+.msg .msg-author {
+  font-weight: 700;
+  font-size: var(--t-fs-m);
+  color: var(--t-txt);
+  letter-spacing: 0.002em;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.msg .msg-author:hover:not(:disabled) { text-decoration: underline; }
+.msg .msg-author:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.msg .msg-author:disabled { cursor: default; }
+
+/* A username rendered as a <button> must look exactly like the text it
+   replaced, while staying focusable and hoverable. Shared by the member
+   list, the message author and anywhere else a name is actionable. */
+.member-name-btn,
+.user-name-btn {
+  font: inherit;
+  font-weight: 700;
+  color: var(--t-txt);
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.member-name-btn:hover:not(:disabled),
+.user-name-btn:hover:not(:disabled) { text-decoration: underline; }
+.member-name-btn:focus-visible,
+.user-name-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.member-name-btn:disabled,
+.user-name-btn:disabled { cursor: default; }
 .msg .msg-time { color: var(--t-mut); font-size: var(--t-fs-xs); font-weight: 500; }
 /* Hover actions are absolutely positioned rather than sitting in the flex
    flow. They were `opacity: 0` but still laid out, so every message reserved
