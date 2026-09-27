@@ -138,6 +138,9 @@ const Api = {
   deleteServer: (id) => request('DELETE', '/api/servers/' + encodeURIComponent(id)),
   serverMembers: (id) => request('GET', '/api/servers/' + encodeURIComponent(id) + '/members'),
   leaveServer: (id) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/leave'),
+  // Hand the community to another member. Owner-only, server-authorised.
+  transferServer: (id, userId) =>
+    request('POST', '/api/servers/' + encodeURIComponent(id) + '/transfer', { body: { userId } }),
   kickMember: (id, userId) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/kick', { body: { userId } }),
   banMember: (id, userId, body) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/ban', { body: { userId, ...(body || {}) } }),
   unbanMember: (id, userId) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/unban', { body: { userId } }),

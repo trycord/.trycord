@@ -77,13 +77,36 @@ router.delete('/:id', resolveServer, auth.requireVerified, requireOwner, async (
 
 router.get('/:id/members', resolveServer, requireMember, async (req, res, next) => {
   try {
-    res.json(await memberships.list(req.server.id));
+    // Paged. This previously returned the entire roster for any member of
+    // the community with no LIMIT anywhere, and the paired role query read
+    // every role assignment in the community regardless. Both are now bounded
+    // and the role lookup is scoped to the page returned.
+    //
+    // The default is generous because the web client still derives member
+    // counts and role membership from the whole roster. A community larger
+    // than this will show a truncated list until the client moves to paged
+    // rendering with server-computed aggregates.
+    const hasPaging = req.query.limit !== undefined || req.query.offset !== undefined || req.query.q !== undefined;
+    res.json(await memberships.list(req.server.id, {
+      limit: hasPaging ? (req.query.limit === undefined ? 50 : req.query.limit) : 500,
+      offset: req.query.offset,
+      search: req.query.q,
+    }));
   } catch (e) { next(e); }
 });
 
 router.post('/:id/leave', resolveServer, async (req, res, next) => {
   try {
     res.json(await memberships.leave(req.server.id, req.user.id));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Ownership transfer. requireOwner is the authorisation gate, and the service
+// re-checks it inside the transaction rather than trusting middleware.
+router.post('/:id/transfer', resolveServer, auth.requireVerified, requireOwner, async (req, res, next) => {
+  try {
+    const { userId } = req.body || {};
+    res.json(await servers.transferOwnership(req.server.id, req.user.id, userId));
   } catch (e) { serviceError(res, e); }
 });
 

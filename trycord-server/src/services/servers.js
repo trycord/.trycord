@@ -154,4 +154,88 @@ async function remove(serverId) {
   return { ok: true };
 }
 
-module.exports = { create, detail, mine, update, remove };
+// Hand a community to a new owner.
+//
+// The whole point of this is that an owner could not leave: `leave` refuses
+// for the owner, and nothing could change owner_id, so the only exit was
+// deleting the community. Ownership is a single column, so the invariants are
+// enforced by doing all of it in one transaction:
+//
+//   - the new owner is a current member (otherwise a community could end up
+//     owned by someone who cannot even see it)
+//   - the caller is the current owner (authorisation, re-checked inside the
+//     transaction rather than trusted from middleware)
+//   - the new owner is granted a top role, because a community whose owner
+//     holds no roles would be unadministrable
+//   - the old owner stays a member, and is demoted to a normal role so the
+//     community is never left with two owners
+//   - exactly one owner exists before and after, and never none in between
+async function transferOwnership(serverId, actorId, targetUserId) {
+  const target = String(targetUserId || '').trim();
+  if (!target) throw { code: 'VALIDATION_ERROR', message: 'a new owner is required' };
+  if (target === String(actorId)) {
+    throw { code: 'VALIDATION_ERROR', message: 'you already own this community' };
+  }
+  return db.transaction(async (t) => {
+    const srv = await t.get('SELECT id, owner_id FROM servers WHERE id = ?', [serverId]);
+    if (!srv) throw { code: 'NOT_FOUND', message: 'community not found' };
+    if (String(srv.owner_id) !== String(actorId)) {
+      throw { code: 'PERMISSION_DENIED', message: 'only the owner can transfer ownership' };
+    }
+    const member = await t.get(
+      'SELECT 1 AS ok FROM server_members WHERE server_id = ? AND user_id = ?',
+      [serverId, target]
+    );
+    if (!member) {
+      throw { code: 'NOT_A_MEMBER', message: 'the new owner must already be a member of this community' };
+    }
+
+    // Promote the new owner above every existing role, then give the old
+    // owner a plain member role so they keep access without authority.
+    const top = await roles.topPosition(serverId, target, t);
+    const admin = await t.get(
+      "SELECT id FROM roles WHERE server_id = ? AND is_default = 0 ORDER BY position DESC LIMIT 1",
+      [serverId]
+    );
+    if (admin) {
+      await t.run(
+        'UPDATE roles SET position = ? WHERE id = ? AND position <= ?',
+        [Number(top) + 1, admin.id, Number(top)]
+      );
+      await t.run(
+        'INSERT ' + (t.dialect === 'mysql' ? 'IGNORE' : 'OR IGNORE') +
+        ' INTO member_roles (server_id, user_id, role_id) VALUES (?, ?, ?)',
+        [serverId, target, admin.id]
+      );
+    }
+    const fallback = await t.get(
+      'SELECT id FROM roles WHERE server_id = ? AND is_default = 1 LIMIT 1',
+      [serverId]
+    );
+    if (fallback) {
+      // Drop any elevated roles the outgoing owner held, then leave them with
+      // the default role only. Without this the "old owner" would keep
+      // whatever power they had, which is not what transferring means.
+      await t.run(
+        'DELETE FROM member_roles WHERE server_id = ? AND user_id = ? AND role_id <> ?',
+        [serverId, actorId, fallback.id]
+      );
+      await t.run(
+        'INSERT ' + (t.dialect === 'mysql' ? 'IGNORE' : 'OR IGNORE') +
+        ' INTO member_roles (server_id, user_id, role_id) VALUES (?, ?, ?)',
+        [serverId, actorId, fallback.id]
+      );
+    }
+
+    // Single statement: one owner before, one after, never zero.
+    await t.run('UPDATE servers SET owner_id = ? WHERE id = ? AND owner_id = ?',
+      [target, serverId, actorId]);
+    const after = await t.get('SELECT id, owner_id, name FROM servers WHERE id = ?', [serverId]);
+    if (!after || String(after.owner_id) !== target) {
+      throw { code: 'CONFLICT', message: 'ownership transfer did not apply' };
+    }
+    return { serverId: after.id, name: after.name, ownerId: target, previousOwnerId: String(actorId) };
+  });
+}
+
+module.exports = { create, detail, mine, update, remove, transferOwnership };
