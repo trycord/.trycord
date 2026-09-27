@@ -1,10 +1,11 @@
-// /api/servers/:serverId/categories — list (members), create/delete (MANAGE_CHANNELS).
+﻿// /api/servers/:serverId/categories â€” list (members), create/delete (MANAGE_CHANNELS).
 const express = require('express');
 const auth = require('../middleware/auth');
 const { resolveServer, requireMember, requirePerm } = require('../middleware/serverAccess');
 const { serviceError } = require('../errors');
 const channels = require('../services/channels');
 const events = require('../services/events');
+const permissions = require('../services/permissions');
 
 const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
@@ -47,6 +48,42 @@ router.delete('/:categoryId', auth.requireVerified, requirePerm('MANAGE_CHANNELS
     const out = await channels.deleteCategory(req.server.id, req.params.categoryId);
     events.emit(req.server.id, 'category_deleted', { categoryId: String(req.params.categoryId) });
     res.json(out);
+  } catch (e) { serviceError(res, e); }
+});
+
+// ---- category permission overrides ----
+// A category override applies to every channel inside it and is one level
+// below the channel. Same tri-state and same MANAGE_CHANNELS gate as the
+// channel editor: overrides adjust what roles grant, they are not a
+// parallel permission system.
+const findCategory = async (req) => {
+  const list = await channels.categories(req.server.id);
+  return (list || []).find((c) => String(c.id) === String(req.params.categoryId)) || null;
+};
+
+router.get('/:categoryId/overrides', requireMember, async (req, res, next) => {
+  try {
+    const cat = await findCategory(req);
+    if (!cat) return serviceError(res, { code: 'NOT_FOUND', message: 'category not found' });
+    res.json({
+      categoryId: String(cat.id),
+      overrides: await permissions.overridesFor('category_permission_overrides', cat.id),
+      all: Object.keys(permissions.PERMISSIONS),
+    });
+  } catch (e) { serviceError(res, e); }
+});
+
+router.put('/:categoryId/overrides/:permission', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
+  try {
+    const cat = await findCategory(req);
+    if (!cat) return serviceError(res, { code: 'NOT_FOUND', message: 'category not found' });
+    const { effect } = req.body || {};
+    await permissions.setOverride('category_permission_overrides', cat.id, req.params.permission, effect);
+    events.emit(req.server.id, 'category_updated', { categoryId: String(cat.id) });
+    res.json({
+      categoryId: String(cat.id),
+      overrides: await permissions.overridesFor('category_permission_overrides', cat.id),
+    });
   } catch (e) { serviceError(res, e); }
 });
 

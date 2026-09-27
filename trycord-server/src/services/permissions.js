@@ -47,9 +47,120 @@ async function effectivePermissionsFor(ownerId, userId, serverId, conn = db) {
   return out;
 }
 
+// Channel-scoped permissions.
+//
+// Precedence, most specific last so it overwrites:
+//
+//   1. roles           - the community-wide default (union of role grants)
+//   2. category        - overrides for the channel's category, if any
+//   3. channel         - overrides for this channel, if any
+//
+// Within one level an explicit 'deny' beats an explicit 'allow', so a
+// contradictory pair resolves to the safer answer rather than to whichever
+// row the database happened to return first. Absent rows mean "inherit" and
+// change nothing, which is what keeps existing communities behaving exactly
+// as they did before overrides existed.
+//
+// ownerId === userId still short-circuits to '*': ownership is absolute and
+// no override may lock an owner out of their own community.
+async function effectiveChannelPermissions(ownerId, userId, serverId, channelId, conn = db) {
+  const base = await effectivePermissionsFor(ownerId, userId, serverId, conn);
+  if (!channelId || base.has('*')) return base;
+
+  const ch = await conn.get('SELECT category_id FROM channels WHERE id = ? AND server_id = ?',
+    [channelId, serverId]);
+  if (!ch) return base;
+
+  const apply = (rows) => {
+    // Two passes so deny always wins regardless of row order.
+    for (const effect of ['allow', 'deny']) {
+      for (const r of rows) {
+        if (!isKnown(r.permission) || r.effect !== effect) continue;
+        if (effect === 'deny') base.delete(r.permission);
+        else base.add(r.permission);
+      }
+    }
+  };
+
+  if (ch.category_id) {
+    apply(await conn.all(
+      'SELECT permission, effect FROM category_permission_overrides WHERE category_id = ?',
+      [ch.category_id]
+    ));
+  }
+  apply(await conn.all(
+    'SELECT permission, effect FROM channel_permission_overrides WHERE channel_id = ?',
+    [channelId]
+  ));
+  return base;
+}
+
+// Channel-scoped gate. Without a channelId this is exactly hasPermission, so
+// every existing community-level call site keeps its current meaning.
+async function hasChannelPermission(userId, serverId, channelId, perm, conn = db) {
+  const perms = await effectiveChannelPermissions(
+    await getOwnerId(serverId, conn), userId, serverId, channelId, conn
+  );
+  return perms.has('*') || perms.has(perm);
+}
+
+// Community-level gate. Unchanged in meaning: this is what every existing
+// call site (MANAGE_ROLES, BAN_MEMBERS, ...) uses, and none of those are
+// channel-scoped. Channel-scoped checks use hasChannelPermission.
 async function hasPermission(userId, serverId, perm, conn = db) {
   const perms = await effectivePermissions(userId, serverId, conn);
   return perms.has('*') || perms.has(perm);
 }
 
-module.exports = { PERMISSIONS, isKnown, getOwnerId, effectivePermissions, effectivePermissionsFor, hasPermission };
+// Override table -> its id column. Explicit rather than derived: the tables
+// are plural ("..._overrides") while the columns are singular
+// ("channel_id"), so slicing the table name produces a column that does not
+// exist.
+const OVERRIDE_TABLES = {
+  channel_permission_overrides: 'channel_id',
+  category_permission_overrides: 'category_id',
+};
+
+// Read the override rows for an entity, shaped for a permission editor:
+// a full map of every known permission to inherit/allow/deny so the UI never
+// has to guess what "unset" looks like.
+async function overridesFor(table, id) {
+  const idCol = OVERRIDE_TABLES[table];
+  if (!idCol) throw { code: 'VALIDATION_ERROR', message: 'unknown override table' };
+  const rows = await db.all(`SELECT permission, effect FROM ${table} WHERE ${idCol} = ?`, [id]);
+  const out = {};
+  for (const p of Object.keys(PERMISSIONS)) out[p] = 'inherit';
+  for (const r of rows) if (isKnown(r.permission)) out[r.permission] = r.effect === 'deny' ? 'deny' : 'allow';
+  return out;
+}
+
+async function setOverride(table, id, permission, effect) {
+  const idCol = OVERRIDE_TABLES[table];
+  if (!idCol) throw { code: 'VALIDATION_ERROR', message: 'unknown override table' };
+  if (!isKnown(permission)) throw { code: 'VALIDATION_ERROR', message: 'unknown permission' };
+  if (effect === 'inherit') {
+    await db.run(`DELETE FROM ${table} WHERE ${idCol} = ? AND permission = ?`, [id, permission]);
+    return { permission, effect: 'inherit' };
+  }
+  if (effect !== 'allow' && effect !== 'deny') {
+    throw { code: 'VALIDATION_ERROR', message: 'effect must be allow, deny or inherit' };
+  }
+  // Upsert: the PK is (entity, permission) so a second write replaces rather
+  // than accumulating a contradictory pair.
+  await db.run(
+    `INSERT INTO ${table} (${idCol}, permission, effect) VALUES (?, ?, ?)
+     ON CONFLICT (${idCol}, permission) DO UPDATE SET effect = excluded.effect`,
+    [id, permission, effect]
+  ).catch(async (e) => {
+    // MySQL has no ON CONFLICT; do the same thing explicitly.
+    if (!/conflict|duplicate/i.test(String(e && e.message))) throw e;
+    await db.run(`UPDATE ${table} SET effect = ? WHERE ${idCol} = ? AND permission = ?`,
+      [effect, id, permission]);
+  });
+  return { permission, effect };
+}
+
+module.exports = {
+  PERMISSIONS, isKnown, getOwnerId, effectivePermissions, effectivePermissionsFor,
+  effectiveChannelPermissions, hasChannelPermission, hasPermission, overridesFor, setOverride,
+};
