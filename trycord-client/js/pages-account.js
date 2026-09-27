@@ -2,7 +2,7 @@
 // auth/session endpoints.
 
 import Api from './api.js';
-import State, { clearSession, refreshServers } from './state.js';
+import State, { clearSession, refreshServers, mustVerifyToPost } from './state.js';
 import { esc, el, clear, toast, confirmDialog } from './ui.js';
 import { avatar, loadAuthedImage } from './components.js';
 import { renderContextHeader, renderAllChrome } from './shell.js';
@@ -405,7 +405,7 @@ function renderProfileEditor(wrap) {
     }
   };
 
-  if (me && me.email && !me.emailVerified) {
+  if (me && me.email && mustVerifyToPost()) {
     const resend = el('button', { class: 'btn sm', type: 'button' }, 'Resend verification');
     resend.addEventListener('click', () => sendTo(me.email));
     emailActions.appendChild(resend);

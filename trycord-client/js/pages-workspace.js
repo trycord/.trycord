@@ -9,7 +9,7 @@
 import Api from './api.js';
 import State, {
   enterServer, refreshServers, leaveServerContext, can, isAuthed, currentServerId, peerPresence,
-  refreshBans, setViewRefresh, refreshServerView, refreshMutes, isMuted, setMuted,
+  refreshBans, setViewRefresh, refreshServerView, refreshMutes, isMuted, setMuted, mustVerifyToPost,
 } from './state.js';
 import { esc, el, clear, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, showEmojiPicker, insertAtCursor, copyText } from './ui.js';
 function pickReaction(messageId) {
@@ -516,7 +516,7 @@ async function renderChannel(container, serverId, channelId) {
   {
     const me = State.me;
     const locked = !can('SEND_MESSAGES') ? 'You do not have permission to send messages here.'
-      : (me && !me.emailVerified) ? 'Verify your email to send messages.' : null;
+      : mustVerifyToPost() ? 'Verify your email to send messages.' : null;
     if (locked) {
       ta.disabled = true;
       ta.placeholder = locked;

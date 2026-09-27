@@ -7,6 +7,10 @@ const LS_SERVER_ID = 'trycord.lastServerId';
 
 const state = {
   me: null,            // { id, username, displayName, email, emailVerified, createdAt }
+  // Whether this instance can actually deliver verification mail. When it
+  // cannot, an address can never be confirmed, so the client must not gate
+  // messaging or nag about verification.
+  verificationRequired: true,
   token: null,
   servers: [],         // serverCore rows the user belongs to
   serverDetail: null,  // detail for the current place, when in a server
@@ -81,6 +85,7 @@ export function hydrate() {
       return null;
     }
     state.me = me;
+    syncVerificationPolicy(me);
     return me;
   }).catch(() => {
     // token died server-side (revoked/expired)
@@ -106,7 +111,27 @@ export function applyAuth(payload) {
   setToken(payload.token);
   state.token = payload.token;
   state.me = payload.user;
+  // Login/register responses do not carry the policy flag, so treat the
+  // optimistic window as "verification expected" until /me confirms it.
+  // The first hydrate() call corrects it either way.
+  state.verificationRequired = payload.user.verificationRequired !== false;
   return state.me;
+}
+
+// Single place that decides whether verification is enforceable. The server is
+// the authority (it is what actually rejects writes); this mirrors it so the
+// UI never nags about an action the backend will not enforce.
+function syncVerificationPolicy(me) {
+  state.verificationRequired = !me || me.verificationRequired !== false;
+}
+
+export function verificationRequired() {
+  return state.verificationRequired !== false;
+}
+
+// True only when the user is genuinely blocked from messaging.
+export function mustVerifyToPost() {
+  return verificationRequired() && !!(state.me && state.me.emailVerified === false);
 }
 
 export function clearSession() {

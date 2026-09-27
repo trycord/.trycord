@@ -19,6 +19,7 @@ const SECTIONS = [
   { id: 'reports', label: 'Reports', href: '#/admin/reports' },
   { id: 'appeals', label: 'Appeals', href: '#/admin/appeals' },
   { id: 'audit', label: 'Audit log', href: '#/admin/audit' },
+  { id: 'announcements', label: 'Announcements', href: '#/admin/announcements' },
 ];
 
 // Stale-request guard: each route render bumps this; async work checks its
@@ -29,16 +30,6 @@ let adminSeq = 0;
 function debounced(fn, ms = 300) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
-
-function adminTabs(active) {
-  const tabs = el('div', { class: 'settings-nav' });
-  for (const s of SECTIONS) {
-    const b = el('button', { class: 'btn ' + (active === s.id ? 'active' : 'ghost'), type: 'button' }, s.label);
-    b.addEventListener('click', () => { location.hash = s.href; });
-    tabs.appendChild(b);
-  }
-  return tabs;
 }
 
 function denied(msg) {
@@ -78,12 +69,12 @@ function statTile(label, value) {
 function actionRow(a) {
   return el('div', { class: 'admin-history-row' },
     statusChip(a.actionType || 'ACTION'),
-    el('div', { class: 'grow', style: { overflow: 'hidden' } },
+    el('div', { class: 'grow' },
       el('div', {}, esc(a.reason || '(no reason)')),
       el('div', { class: 'muted small' },
         (a.actor_name ? esc(a.actor_name) + ' · ' : '') + relTime(a.createdAt),
         a.expiresAt ? ' · expires ' + fullTime(a.expiresAt) : '')),
-    el('div', { class: 'muted small', style: { whiteSpace: 'nowrap' } }, relTime(a.createdAt)));
+    el('div', { class: 'muted small admin-when' }, relTime(a.createdAt)));
 }
 
 // ---- overview -------------------------------------------------------------
@@ -106,15 +97,15 @@ async function renderOverview(body, show, seq) {
     for (const a of data.recentAudit || []) {
       recent.appendChild(el('div', { class: 'admin-history-row' },
         statusChip(a.action),
-        el('div', { class: 'grow', style: { overflow: 'hidden' } },
+        el('div', { class: 'grow' },
           el('div', {}, el('span', { class: 'muted small' }, esc(a.targetType || '') + ' '), esc(a.targetId || '')),
           el('div', { class: 'muted small' }, '…')),
-        el('div', { class: 'muted small', style: { whiteSpace: 'nowrap' } }, relTime(a.createdAt))));
+        el('div', { class: 'muted small admin-when' }, relTime(a.createdAt))));
     }
   }
-  recent.appendChild(el('div', { class: 'row-line', style: { marginTop: '10px' } },
+  recent.appendChild(el('div', { class: 'row-line admin-more' },
     el('button', { class: 'btn ghost sm', type: 'button', onClick: () => { location.hash = '#/admin/audit'; } }, 'Open audit log')));
-  show(el('div', {}, grid, recent));
+  show(el('div', { class: 'admin-block admin-block--sections' }, grid, recent));
 }
 
 // ---- users ----------------------------------------------------------------
@@ -122,18 +113,35 @@ async function renderOverview(body, show, seq) {
 function userRow(u, onChanged) {
   const row = el('div', { class: 'card card--list--row' });
   const who = el('div', { class: 'admin-avatar' }, initialOf(u.displayName || u.username));
-  const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
+  const idt = el('div', { class: 'grow' });
   idt.append(
     el('div', { class: 'admin-name' }, esc(u.displayName || u.username), ' ', el('span', { class: 'muted small' }, '@' + esc(u.username))),
     el('div', { class: 'muted small' }, 'Created ' + relTime(u.createdAt)));
+  // Enforcement state belongs with identity, not in the action column, so
+  // the row keeps a stable three-part shape.
+  if (u.enforced) {
+    idt.appendChild(el('div', { class: 'admin-row-state' }, statusChip(u.enforcement || 'ENFORCED')));
+  }
   row.append(who, idt);
-  if (u.enforced) row.appendChild(statusChip(u.enforcement || 'ENFORCED'));
 
-  const acts = el('div', { class: 'row-line', style: { gap: '6px', flexWrap: 'wrap' } });
-  acts.append(
-    el('button', { class: 'btn ghost sm', type: 'button', onClick: () => userEnforceModal(u, onChanged) }, u.enforced ? 'Re-enforce' : 'Enforce'),
-    el('button', { class: 'btn ghost sm', type: 'button', onClick: () => liftUserModal(u, onChanged) }, 'Lift'),
-    el('button', { class: 'btn ghost sm', type: 'button', onClick: toggleHistory }, 'History'));
+  // Actions carry their meaning: enforcement is destructive and reads as
+  // such, lifting is only offered when there is something to lift, and
+  // history is a quiet disclosure.
+  const acts = el('div', { class: 'card--list__actions' });
+  acts.appendChild(el('button', {
+    class: 'btn sm ' + (u.enforced ? 'ghost' : 'danger'),
+    type: 'button',
+    onClick: () => userEnforceModal(u, onChanged),
+  }, u.enforced ? 'Re-enforce' : 'Enforce'));
+  if (u.enforced) {
+    acts.appendChild(el('button', {
+      class: 'btn sm ghost', type: 'button',
+      onClick: () => liftUserModal(u, onChanged),
+    }, 'Lift'));
+  }
+  acts.appendChild(el('button', {
+    class: 'btn sm quiet', type: 'button', onClick: toggleHistory,
+  }, 'History'));
   row.appendChild(acts);
 
   function toggleHistory() {
@@ -157,7 +165,7 @@ async function renderUsers(body, show, seq) {
   const search = el('input', { class: 'input', type: 'search', placeholder: 'Search users by name…', 'aria-label': 'Search users' });
   toolbar.appendChild(search);
   const listWrap = el('div', { class: 'admin-list' });
-  show(el('div', {}, toolbar, listWrap));
+  show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (q) => {
     const found = await Api.adminUsers({ q });
     if (seq !== adminSeq) return;
@@ -184,7 +192,7 @@ function userEnforceModal(user, onDone) {
   const hours = el('input', { class: 'input', type: 'number', min: '1', step: '1', value: '24' });
   const hoursField = el('div', { class: 'field', hidden: true }, el('label', {}, 'Duration (hours)'), hours);
   const confirm = el('input', { type: 'checkbox' });
-  const confirmField = el('label', { class: 'field row-line', style: { gap: '8px', alignItems: 'center' }, hidden: true },
+  const confirmField = el('label', { class: 'field row-line admin-confirm', hidden: true },
     confirm, el('span', {}, 'I confirm a permanent account ban. It invalidates all sessions and closes live sockets.'));
   const reason = el('textarea', { class: 'input', rows: 3, required: true, placeholder: 'Reason — recorded and visible in the user\u2019s enforcement record' });
   typeSel.addEventListener('change', () => {
@@ -252,7 +260,7 @@ function liftUserModal(user, onDone) {
 function serverRow(s, onChanged) {
   const row = el('div', { class: 'card card--list--row' });
   const who = el('div', { class: 'admin-avatar' }, initialOf(s.name || s.id));
-  const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
+  const idt = el('div', { class: 'grow' });
   idt.append(
     el('div', { class: 'admin-name' }, esc(s.name || '(unnamed)'),
       s.owner_name ? el('span', { class: 'muted small' }, ' · @' + esc(s.owner_name)) : null),
@@ -262,7 +270,7 @@ function serverRow(s, onChanged) {
     row.appendChild(el('span', { class: 'admin-chip suspended', title: s.enforcement_reason || '' }, 'SUSPENDED'));
   }
 
-  const acts = el('div', { class: 'row-line', style: { gap: '6px', flexWrap: 'wrap' } });
+  const acts = el('div', { class: 'card--list__actions' });
   acts.append(
     el('button', { class: 'btn ghost sm', type: 'button', onClick: () => serverEnforceModal(s, onChanged) }, 'Suspend'),
     el('button', { class: 'btn ghost sm', type: 'button', onClick: () => serverLiftModal(s, onChanged) }, 'Lift'),
@@ -291,7 +299,7 @@ async function renderCommunities(body, show, seq) {
   const search = el('input', { class: 'input', type: 'search', placeholder: 'Search communities by name…', 'aria-label': 'Search communities' });
   toolbar.appendChild(search);
   const listWrap = el('div', { class: 'admin-list' });
-  show(el('div', {}, toolbar, listWrap));
+  show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (q) => {
     const found = await Api.adminServers({ q });
     if (seq !== adminSeq) return;
@@ -313,7 +321,7 @@ function serverEnforceModal(server, onDone) {
     el('option', { value: 'SERVER_SUSPENSION' }, 'Suspension'),
     el('option', { value: 'SERVER_REMOVAL' }, 'Removal (permanent)'));
   const confirm = el('input', { type: 'checkbox' });
-  const confirmField = el('label', { class: 'field row-line', style: { gap: '8px', alignItems: 'center' }, hidden: true },
+  const confirmField = el('label', { class: 'field row-line admin-confirm', hidden: true },
     confirm, el('span', {}, 'I confirm permanent removal of this community and its data.'));
   const reason = el('textarea', { class: 'input', rows: 3, required: true, placeholder: 'Reason — recorded and audited' });
   typeSel.addEventListener('change', () => { confirmField.hidden = typeSel.value !== 'SERVER_REMOVAL'; });
@@ -379,7 +387,7 @@ function serverRemoveModal(server, onDone) {
     title: 'Remove community — ' + server.name,
     body: el('div', { class: 'admin-form' }, err,
       el('div', { class: 'field' }, el('label', {}, 'Reason'), reason),
-      el('label', { class: 'field row-line', style: { gap: '8px', alignItems: 'center' } },
+      el('label', { class: 'field row-line admin-confirm' },
         confirm, el('span', {}, 'I confirm this removes the community and its content permanently.')),
       el('p', { class: 'muted small' }, 'This is irreversible. Members are removed and the server record is deleted.')),
     footer: [
@@ -407,7 +415,7 @@ function serverRemoveModal(server, onDone) {
 function reportRow(r, refresh) {
   const row = el('div', { class: 'card card--list--row' });
   row.appendChild(statusChip(r.status));
-  const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
+  const idt = el('div', { class: 'grow' });
   idt.append(
     el('div', { class: 'admin-name' }, esc(r.target_type), ' ', el('span', { class: 'muted small' }, '#' + esc(r.target_id))),
     el('div', { class: 'muted small' },
@@ -441,7 +449,7 @@ async function toggleReportDetail(row, r, refresh) {
     det.appendChild(el('div', { class: 'muted small' },
       'Reported ' + relTime(full.created_at) + ' · updated ' + relTime(full.updated_at) +
       (full.resolved_at ? ' · resolved ' + relTime(full.resolved_at) : '')));
-    const rowLine = el('div', { class: 'row-line', style: { gap: '6px', flexWrap: 'wrap' } });
+    const rowLine = el('div', { class: 'card--list__actions' });
     rowLine.append(sel, note, updateBtn);
     det.appendChild(rowLine);
     det.appendChild(targetBlock(full, refresh));
@@ -452,7 +460,7 @@ async function toggleReportDetail(row, r, refresh) {
 }
 
 function targetBlock(full, refresh) {
-  const wrap = el('div', { class: 'row-line', style: { gap: '6px', flexWrap: 'wrap', marginTop: '8px' } });
+  const wrap = el('div', { class: 'card--list__actions' });
   const t = full.target_type;
   if (t === 'user') {
     const u = full.targetUser || { id: full.target_id, username: full.target_id, display_name: full.target_id };
@@ -478,7 +486,7 @@ async function renderReports(body, show, seq) {
     REPORT_STATUSES.map((s) => el('option', { value: s }, s)));
   toolbar.append(sel, el('span', { class: 'muted small' }, 'Reports stay scoped: reviewers see actionable cases only.'));
   const listWrap = el('div', { class: 'admin-list' });
-  show(el('div', {}, toolbar, listWrap));
+  show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (status) => {
     const found = await Api.adminReports({ status });
     if (seq !== adminSeq) return;
@@ -495,16 +503,16 @@ async function renderReports(body, show, seq) {
 function appealRow(a, refresh) {
   const row = el('div', { class: 'card card--list--row' });
   row.appendChild(statusChip(a.status));
-  const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
+  const idt = el('div', { class: 'grow' });
   idt.append(
     el('div', { class: 'admin-name' }, esc(a.user_name || a.user_id), ' ', el('span', { class: 'muted small' }, '· ' + esc(a.action_type))),
     el('div', { class: 'muted small' }, 'Action: ' + esc(String(a.action_reason || '').slice(0, 90))),
     el('div', { class: 'muted small' }, 'Appeal: ' + esc(String(a.reason || '').slice(0, 90))));
   row.appendChild(idt);
-  row.appendChild(el('div', { class: 'muted small', style: { whiteSpace: 'nowrap' } }, relTime(a.created_at)));
+  row.appendChild(el('div', { class: 'muted small admin-when' }, relTime(a.created_at)));
   const decided = a.status === 'APPROVED' || a.status === 'DENIED';
   if (!decided) {
-    const acts = el('div', { class: 'row-line', style: { gap: '6px' } });
+    const acts = el('div', { class: 'card--list__actions' });
     acts.append(
       el('button', { class: 'btn primary sm', type: 'button', onClick: () => appealDecisionModal(a, 'APPROVED', refresh) }, 'Approve'),
       el('button', { class: 'btn danger sm', type: 'button', onClick: () => appealDecisionModal(a, 'DENIED', refresh) }, 'Deny'));
@@ -548,7 +556,7 @@ async function renderAppeals(body, show, seq) {
     APPEAL_STATUSES.map((s) => el('option', { value: s }, s)));
   toolbar.appendChild(sel);
   const listWrap = el('div', { class: 'admin-list' });
-  show(el('div', {}, toolbar, listWrap));
+  show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (status) => {
     const found = await Api.adminAppeals({ status });
     if (seq !== adminSeq) return;
@@ -565,13 +573,13 @@ async function renderAppeals(body, show, seq) {
 function auditRow(a) {
   const row = el('div', { class: 'card card--list--row' });
   row.appendChild(statusChip(a.action));
-  const idt = el('div', { class: 'grow', style: { overflow: 'hidden' } });
+  const idt = el('div', { class: 'grow' });
   idt.append(
     el('div', { class: 'admin-name' }, libChip(a.target_type), ' ', el('span', { class: 'muted small' }, '#' + esc(a.target_id))),
     el('div', { class: 'muted small' }, (a.actor_name ? 'by ' + esc(a.actor_name) : esc(a.actor_id || '')) + (a.target_name ? ' · ' + esc(a.target_name) : '')),
     a.reason ? el('div', { class: 'muted small' }, esc(String(a.reason).slice(0, 160))) : null);
   row.appendChild(idt);
-  row.appendChild(el('div', { class: 'muted small', style: { whiteSpace: 'nowrap' } }, relTime(a.created_at)));
+  row.appendChild(el('div', { class: 'muted small admin-when' }, relTime(a.created_at)));
   row.title = fullTime(a.created_at);
   return row;
 }
@@ -586,7 +594,7 @@ async function renderAudit(body, show, seq) {
   const info = el('span', { class: 'muted small' }, 'Server keeps the most recent entries per query.');
   toolbar.append(search, info);
   const listWrap = el('div', { class: 'admin-list' });
-  show(el('div', {}, toolbar, listWrap));
+  show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (action) => {
     const found = await Api.adminAudit({ action });
     if (seq !== adminSeq) return;
@@ -598,13 +606,127 @@ async function renderAudit(body, show, seq) {
   await render(search.value.trim().toUpperCase());
 }
 
+// ---- announcements ---------------------------------------------------------
+
+// Instance announcement management. Writes are admin-gated on the server; this
+// only drives the UI. Retired banners stay listed so an operator can see what
+// was shown and when it retired.
+async function renderAnnouncements(body, show, seq) {
+  const listWrap = el('div', { class: 'admin-list' });
+  const editor = el('div', { class: 'admin-block' });
+
+  const text = el('textarea', { class: 'input', rows: 3, maxlength: 500, placeholder: 'What should everyone on this instance know?' });
+  const level = el('select', { class: 'input' },
+    el('option', { value: 'info' }, 'Info'),
+    el('option', { value: 'warning' }, 'Warning'),
+    el('option', { value: 'critical' }, 'Critical'));
+  const linkLabel = el('input', { class: 'input', type: 'text', maxlength: 64, placeholder: 'Link text (optional)' });
+  const linkHref = el('input', { class: 'input', type: 'text', placeholder: '/#/support' });
+  const expires = el('input', { class: 'input', type: 'datetime-local' });
+  const err = el('div', { class: 'form-error', hidden: true });
+  const save = el('button', { class: 'btn primary', type: 'button' }, 'Publish banner');
+
+  const form = el('form', { class: 'settings-form' },
+    el('div', { class: 'field' }, el('label', {}, 'Message'), text,
+      el('span', { class: 'hint' }, 'Shown to every signed-in user on this instance until you retire it.')),
+    el('div', { class: 'field' }, el('label', {}, 'Level'), level),
+    el('div', { class: 'field' }, el('label', {}, 'Link label'), linkLabel),
+    el('div', { class: 'field' }, el('label', {}, 'Link'), linkHref,
+      el('span', { class: 'hint' }, 'Relative path only, e.g. /#/support. Leave empty for no link.')),
+    el('div', { class: 'field' }, el('label', {}, 'Expires'), expires,
+      el('span', { class: 'hint' }, 'Optional. Leave empty to run until you retire it.')),
+    err,
+    el('div', {}, save));
+
+  save.addEventListener('click', async () => {
+    err.hidden = true;
+    save.disabled = true;
+    try {
+      await Api.createAnnouncement({
+        body: text.value,
+        level: level.value,
+        linkLabel: linkLabel.value,
+        linkHref: linkHref.value,
+        // datetime-local has no timezone; send it as an ISO instant.
+        expiresAt: expires.value ? new Date(expires.value).toISOString() : null,
+      });
+      text.value = ''; linkLabel.value = ''; linkHref.value = ''; expires.value = '';
+      await loadList();
+    } catch (ex) {
+      err.hidden = false;
+      err.textContent = (ex && ex.message) || 'Could not publish the banner.';
+    } finally { save.disabled = false; }
+  });
+  form.addEventListener('submit', (e) => { e.preventDefault(); save.click(); });
+
+  editor.appendChild(el('div', { class: 'section-label' }, 'New banner'));
+  editor.appendChild(form);
+
+  const rowFor = (a) => {
+    const row = el('div', { class: 'card card--list--row' });
+    const main = el('div', { class: 'grow' });
+    main.appendChild(el('div', { class: 'admin-name' }, a.body));
+    const meta = [a.level, a.expiresAt ? 'expires ' + fullTime(a.expiresAt) : 'no expiry'];
+    main.appendChild(el('div', { class: 'muted small' }, meta.join(' · ') + (a.active ? '' : ' · retired')));
+    row.appendChild(main);
+
+    const acts = el('div', { class: 'card--list__actions' });
+    acts.appendChild(el('button', {
+      class: 'btn sm ' + (a.active ? 'ghost' : 'primary'), type: 'button',
+      onClick: async () => {
+        try { await Api.updateAnnouncement(a.id, { active: !a.active }); await loadList(); }
+        catch (ex) { toast(ex.message || 'Could not update.', 'error'); }
+      },
+    }, a.active ? 'Retire' : 'Republish'));
+    acts.appendChild(el('button', {
+      class: 'btn sm danger', type: 'button',
+      onClick: () => confirmDialog({
+        title: 'Delete this banner?', message: 'It disappears for everyone immediately.',
+        danger: true, confirmText: 'Delete',
+        onConfirm: async () => {
+          try { await Api.deleteAnnouncement(a.id); await loadList(); }
+          catch (ex) { toast(ex.message || 'Could not delete.', 'error'); }
+        },
+      }),
+    }, 'Delete'));
+    row.appendChild(acts);
+    return row;
+  };
+
+  const loadList = async () => {
+    let all = [];
+    try { all = await Api.allAnnouncements(); }
+    catch (ex) { listWrap.appendChild(emptyState('', 'Could not load banners.', (ex && ex.message) || '')); return; }
+    clear(listWrap);
+    if (!all || !all.length) {
+      listWrap.appendChild(emptyState('', 'No banners yet.', 'Publish one above to notify everyone on this instance.'));
+      return;
+    }
+    for (const a of all) listWrap.appendChild(rowFor(a));
+  };
+
+  show(el('div', { class: 'admin-block admin-block--sections' },
+    editor,
+    el('div', { class: 'admin-block' },
+      el('div', { class: 'section-label' }, 'Published banners'),
+      listWrap)));
+  await loadList();
+}
+
 // ---- entry -----------------------------------------------------------------
 
 export async function renderAdmin(container, { section = 'overview' } = {}) {
   clear(container);
+  const meta = SECTIONS.find((s) => s.id === section) || SECTIONS[0];
   renderContextHeader({ title: 'Admin', sub: 'Platform trust, safety, and enforcement' });
-  const wrap = el('div', { class: 'page atrium' });
-  wrap.appendChild(adminTabs(section));
+
+  // Section navigation lives in the context sidebar, not here. Repeating it
+  // as a tab bar in the content duplicated every destination on screen.
+  const wrap = el('div', { class: 'page admin' });
+  const head = el('header', { class: 'page-head' });
+  head.appendChild(el('div', { class: 'page-head__main' },
+    el('h1', {}, meta.label)));
+  wrap.appendChild(head);
   const body = el('div', { class: 'admin-page' });
   wrap.appendChild(body);
   container.appendChild(wrap);
@@ -634,6 +756,7 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
     else if (section === 'reports') await renderReports(sec, showSec, seq);
     else if (section === 'appeals') await renderAppeals(sec, showSec, seq);
     else if (section === 'audit') await renderAudit(sec, showSec, seq);
+    else if (section === 'announcements') await renderAnnouncements(sec, showSec, seq);
     else await renderOverview(sec, showSec, seq);
   } catch (ex) {
     if (seq !== adminSeq) return;

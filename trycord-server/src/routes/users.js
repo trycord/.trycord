@@ -58,6 +58,10 @@ router.get('/me', async (req, res, next) => {
     res.json(Object.assign(publicUser(row), {
       email: row.email || null,
       emailVerified: !!row.email_verified_at,
+      // When the instance cannot send mail, an address can never be
+      // confirmed. Clients use this to hide verification prompts and avoid
+      // locking messaging behind an action that is impossible here.
+      verificationRequired: auth.verificationEnforceable(),
       isAdmin,
     }));
   } catch (e) { next(e); }

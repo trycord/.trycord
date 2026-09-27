@@ -204,6 +204,15 @@ const Api = {
   muteChannel: (channelId) => request('POST', '/api/mutes', { body: { channelId } }),
   unmuteChannel: (channelId) => request('DELETE', '/api/mutes/' + encodeURIComponent(channelId)),
 
+  // ---- instance announcements ---------------------------------------------
+  // Read is open to any signed-in user; the write calls are admin-gated
+  // server-side (this client flag is never the authority).
+  announcements: () => request('GET', '/api/announcements'),
+  allAnnouncements: () => request('GET', '/api/announcements/all'),
+  createAnnouncement: (data) => request('POST', '/api/announcements', { body: data }),
+  updateAnnouncement: (id, data) => request('PATCH', '/api/announcements/' + encodeURIComponent(id), { body: data }),
+  deleteAnnouncement: (id) => request('DELETE', '/api/announcements/' + encodeURIComponent(id)),
+
   // ---- attachments -------------------------------------------------------------
   uploadAttachment: async (channelId, file) => {
     const fd = new FormData();
