@@ -2525,6 +2525,37 @@ html:is(
 }
 .role-pill.owner { color: var(--t-accent); border-color: color-mix(in srgb, var(--t-accent) 45%, var(--t-line)); }
 .role-pill.muted-role { color: var(--t-mut); border-color: var(--t-line); background: var(--t-base2); }
+/* ---- community settings hub ---------------------------------------------
+   Sectioned index over the pages that already do the work. Reuses
+   .settings-nav from account settings rather than introducing a second
+   navigation pattern. */
+.settings-body { display: flex; flex-direction: column; gap: var(--t-d-4); min-width: 0; }
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-3);
+  padding: var(--t-d-4);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-m);
+  background: var(--t-base);
+}
+.settings-panel--danger { border-color: color-mix(in srgb, var(--t-err) 32%, var(--t-line)); }
+.settings-panel__title {
+  margin: 0;
+  font-size: var(--t-fs-l);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.settings-panel__blurb { margin: 0; max-width: 68ch; line-height: 1.55; }
+/* A second heading inside one panel should not look like a peer section. */
+.settings-panel__title + .field { margin-top: 0; }
+.settings-panel form.field { margin: 0; }
+
+@media (max-width: 760px) {
+  .settings-body { gap: var(--t-d-3); }
+  .settings-panel { padding: var(--t-d-3); }
+}
+
 /* ---- role hierarchy ------------------------------------------------------
    The roles page is a two-column layout: the ordered role list, and the editor
    for whichever role is selected. Position is shown as an explicit rank

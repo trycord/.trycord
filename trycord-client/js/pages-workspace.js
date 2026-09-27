@@ -2009,98 +2009,356 @@ async function renderInvites(container, serverId) {
 
 // ---- server settings --------------------------------------------------------
 
-async function renderServerSettings(container, serverId) {
+// Community settings, as a sectioned hub rather than one long form.
+//
+// Structure follows the account settings (same .settings-nav, same
+// hash-routed sections) instead of inventing a second navigation pattern, and
+// the per-area pages that already exist - roles, members, invites, channels,
+// categories - are LINKED rather than reimplemented here. One settings page
+// that shows where everything lives, not a second copy of every editor.
+//
+// Sections are gated on the permission that already authorises the thing they
+// describe, so the nav never offers a destination that would immediately
+// refuse. MANAGE_SERVER is the entry requirement, matching the previous
+// behaviour of this page.
+
+const SETTINGS_SECTIONS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'structure', label: 'Channels' },
+  { id: 'members', label: 'Members' },
+  { id: 'roles', label: 'Roles' },
+  { id: 'invites', label: 'Invites' },
+  { id: 'moderation', label: 'Moderation' },
+  { id: 'ownership', label: 'Ownership' },
+];
+
+function settingsNav(serverId, active) {
+  const nav = el('div', { class: 'settings-nav' });
+  for (const s of SETTINGS_SECTIONS) {
+    const on = s.id === active;
+    const b = el('button', {
+      class: 'btn ' + (on ? 'active' : 'ghost'),
+      type: 'button',
+      'aria-current': on ? 'page' : null,
+    }, s.label);
+    b.addEventListener('click', () => { location.hash = '#/server/' + serverId + '/settings/' + s.id; });
+    nav.appendChild(b);
+  }
+  return nav;
+}
+
+// A short description of what a section is for, plus a jump to the page that
+// does the work. Used by every section that defers to a dedicated editor.
+function linkedSection({ serverId, title, blurb, href, cta, counts }) {
+  const box = el('div', { class: 'settings-panel' });
+  box.appendChild(el('h2', { class: 'settings-panel__title' }, title));
+  box.appendChild(el('p', { class: 'muted small settings-panel__blurb' }, blurb));
+  if (counts && counts.length) {
+    const row = el('div', { class: 'role-detail__summary' });
+    for (const c of counts) row.appendChild(el('span', {}, c));
+    box.appendChild(row);
+  }
+  const go = el('a', { class: 'btn primary', href: '#/server/' + serverId + href }, cta);
+  box.appendChild(el('div', { class: 'card-actions' }, go));
+  return box;
+}
+
+async function renderServerSettings(container, serverId, section = 'overview') {
   clear(container);
   let server;
   try { ({ detail: server } = await ensureServer(serverId)); }
-  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message)); return; }
+  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
   if (!can('MANAGE_SERVER')) {
     renderContextHeader({ title: 'Settings', sub: server.name });
-    container.appendChild(el('div', { class: 'form-error' }, 'You need permission to manage this community\'s settings.'));
+    container.appendChild(el('div', { class: 'form-error' },
+      "You need permission to manage this community's settings."));
     return;
   }
+  if (!SETTINGS_SECTIONS.some((s) => s.id === section)) section = 'overview';
   renderContextHeader({ title: 'Settings', sub: server.name });
-  const wrap = el('div', { class: 'page atrium community-manager' });
-  const card = el('div', { class: 'settings-form' });
-  const err = el('div', { class: 'form-error', hidden: true });
-  const ok = el('div', { class: 'form-success', hidden: true });
-  const name = el('input', { class: 'input', type: 'text', value: server.name || '', maxlength: 64 });
-  const desc = el('textarea', { class: 'textarea', maxlength: 400, placeholder: 'Description' }, server.description || '');
-  const isPublic = el('input', { type: 'checkbox', checked: !!server.is_public });
-  const isDisc = el('input', { type: 'checkbox', checked: !!server.is_discoverable });
-  const saveBtn = el('button', { class: 'btn primary', type: 'submit' }, 'Save changes');
 
-  const form = el('form', {}, err, ok,
-    el('div', { class: 'field' }, el('label', {}, 'Name'), name),
-    el('div', { class: 'field' }, el('label', {}, 'Description'), desc),
-    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public (joinable by link)')),
-    el('div', { class: 'field' }, el('label', { class: 'switch' }, isDisc, ' Discoverable in browse')),
-    saveBtn);
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    try {
-      await Api.updateServer(serverId, {
-        name: name.value.trim(),
-        description: desc.value.trim(),
-        isPublic: isPublic.checked,
-        isDiscoverable: isDisc.checked,
-      });
-      await refreshServers();
-      await ensureServer(serverId);
-      ok.hidden = false;
-      toast('Settings saved.', 'ok');
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
-  });
+  const wrap = el('div', { class: 'page roles-page' });
+  wrap.appendChild(settingsNav(serverId, section));
+  const panel = el('div', { class: 'settings-body' });
+  wrap.appendChild(panel);
+  container.appendChild(wrap);
 
-  card.appendChild(form);
+  const reload = async () => { await ensureServer(serverId); };
+  setViewRefresh(() => { reload().catch(() => {}); });
 
-  const danger = el('div', { class: 'hr' });
-  card.appendChild(danger);
-  const leaveBtn = el('button', { class: 'btn danger block', type: 'button' }, 'Leave server');
-  leaveBtn.addEventListener('click', async () => {
-    if (server.is_owner) { toast('You own this server. Transfer or delete it first.', 'warn'); return; }
-    confirmDialog({
-      title: 'Leave ' + server.name + '?', message: 'You can rejoin later with a new invite.', danger: true, confirmText: 'Leave',
-      onConfirm: async () => {
-        try {
-          await Api.leaveServer(serverId);
-          await refreshServers();
-          leaveServerContext();
-          location.hash = '#/home';
-        } catch (ex) { toast(ex.message || 'Failed', 'error'); }
-      },
+  const memberCount = (State.members || []).length;
+  const channelCount = ((State.channels && State.channels.channels) || []).length;
+  const categoryCount = ((State.channels && State.channels.categories) || []).length;
+  const roleCount = (State.roles || []).length;
+  const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
+
+  if (section === 'overview') {
+    // ---- identity + visibility -------------------------------------------
+    const err = el('div', { class: 'form-error', hidden: true });
+    const name = el('input', { class: 'input', type: 'text', value: server.name || '', maxlength: 64 });
+    const desc = el('textarea', { class: 'textarea', maxlength: 400, rows: 3, placeholder: 'What is this community about?' }, server.description || '');
+    const isPublic = el('input', { type: 'checkbox', checked: !!server.is_public });
+    const isDisc = el('input', { type: 'checkbox', checked: !!server.is_discoverable });
+    const saveBtn = el('button', { class: 'btn primary', type: 'submit' }, 'Save changes');
+
+    const form = el('form', { class: 'settings-panel' }, err,
+      el('h2', { class: 'settings-panel__title' }, 'Identity'),
+      el('div', { class: 'field' }, el('label', {}, 'Name'), name),
+      el('div', { class: 'field' }, el('label', {}, 'Description'), desc,
+        el('span', { class: 'hint' }, 'Shown on the community landing page and in browse.')),
+      el('h2', { class: 'settings-panel__title' }, 'Visibility'),
+      el('div', { class: 'field' },
+        el('label', { class: 'switch' }, isPublic, ' Public — anyone with a join code or invite can join'),
+        el('span', { class: 'hint' }, 'A private community can only be entered by invitation.')),
+      el('div', { class: 'field' },
+        el('label', { class: 'switch' }, isDisc, ' Discoverable — listed in the browse feed'),
+        el('span', { class: 'hint' }, 'Independent of Public: a private community can still be discoverable by name.')),
+      el('div', { class: 'card-actions' }, saveBtn));
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.hidden = true;
+      saveBtn.disabled = true;
+      try {
+        await Api.updateServer(serverId, {
+          name: name.value.trim(),
+          description: desc.value.trim(),
+          isPublic: isPublic.checked,
+          isDiscoverable: isDisc.checked,
+        });
+        await refreshServers();
+        await reload();
+        toast('Settings saved.', 'ok');
+      } catch (ex) {
+        err.hidden = false;
+        err.textContent = ex.message || 'Could not save settings.';
+      } finally { saveBtn.disabled = false; }
     });
-  });
-  card.appendChild(leaveBtn);
+    panel.appendChild(form);
 
-  if (server.is_owner) {
-    card.appendChild(el('div', { class: 'hr' }));
-    const delInput = el('input', { class: 'input', type: 'text', placeholder: 'Type server name to confirm' });
-    const delBtn = el('button', { class: 'btn danger block', type: 'button', style: { marginTop: 'var(--t-d-3)' } }, 'Delete server');
-    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone — delete server'), delInput, delBtn));
-    delBtn.addEventListener('click', async () => {
-      if (delInput.value.trim() !== server.name) { toast('Type the exact server name to confirm.', 'warn'); return; }
+    // A quick read on the state of the community, so the overview is an
+    // orientation page rather than only a form.
+    const facts = el('div', { class: 'settings-panel' });
+    facts.appendChild(el('h2', { class: 'settings-panel__title' }, 'At a glance'));
+    const summary = el('div', { class: 'role-detail__summary' });
+    summary.append(
+      el('span', {}, memberCount + ' member' + (memberCount === 1 ? '' : 's')),
+      el('span', {}, onlineCount + ' online'),
+      el('span', {}, channelCount + ' channel' + (channelCount === 1 ? '' : 's')),
+      el('span', {}, categoryCount + ' categor' + (categoryCount === 1 ? 'y' : 'ies')),
+      el('span', {}, roleCount + ' role' + (roleCount === 1 ? '' : 's')),
+      el('span', {}, server.join_code ? 'Join code ' + server.join_code : 'No join code'));
+    facts.appendChild(summary);
+    facts.appendChild(el('p', { class: 'muted small' },
+      'Created ' + relTime(server.created_at) + '. Every area has its own page — this is the index.'));
+    panel.appendChild(facts);
+    return;
+  }
+
+  if (section === 'structure') {
+    panel.appendChild(linkedSection({
+      serverId,
+      title: 'Channels',
+      blurb: 'Create and edit text channels, and reorder them within their categories.',
+      href: '/channels/new',
+      cta: 'Create a channel',
+      counts: [channelCount + ' channel' + (channelCount === 1 ? '' : 's'), categoryCount + ' categor' + (categoryCount === 1 ? 'y' : 'ies')],
+    }));
+    panel.appendChild(linkedSection({
+      serverId,
+      title: 'Categories',
+      blurb: 'Group channels so a busy community stays navigable. Categories can also carry their own permission overrides.',
+      href: '/categories',
+      cta: 'Manage categories',
+      counts: [categoryCount + ' categor' + (categoryCount === 1 ? 'y' : 'ies')],
+    }));
+    return;
+  }
+
+  if (section === 'members') {
+    panel.appendChild(linkedSection({
+      serverId,
+      title: 'Members',
+      blurb: 'Search the roster, assign roles, set nicknames, and remove or ban people. Role assignment respects the hierarchy — you can only hand out roles below your own highest role.',
+      href: '/members',
+      cta: 'Open members',
+      counts: [memberCount + ' member' + (memberCount === 1 ? '' : 's'), onlineCount + ' online'],
+    }));
+    return;
+  }
+
+  if (section === 'roles') {
+    panel.appendChild(linkedSection({
+      serverId,
+      title: 'Roles',
+      blurb: 'Roles are ordered, and position is what decides what each member may manage. Drag to reorder; permissions are grouped per role; self-assignable roles appear on each member\'s own row.',
+      href: '/roles',
+      cta: 'Open the role hierarchy',
+      counts: [roleCount + ' role' + (roleCount === 1 ? '' : 's')],
+    }));
+    return;
+  }
+
+  if (section === 'invites') {
+    panel.appendChild(linkedSection({
+      serverId,
+      title: 'Invites',
+      blurb: 'Create and revoke invite links, set use limits and expiry, and copy a link to share.',
+      href: '/invites',
+      cta: 'Manage invites',
+    }));
+    return;
+  }
+
+  if (section === 'moderation') {
+    // Bans are the one moderation list worth surfacing here, because "who is
+    // banned" is the question that gets asked at the settings level. Timeouts
+    // and message deletion stay on the member roster where they are applied.
+    const box = el('div', { class: 'settings-panel' });
+    box.appendChild(el('h2', { class: 'settings-panel__title' }, 'Bans'));
+    const bans = State.bans || [];
+    box.appendChild(el('p', { class: 'muted small' },
+      bans.length
+        ? bans.length + ' member' + (bans.length === 1 ? ' is' : 's are') + ' currently banned from this community.'
+        : 'Nobody is banned from this community.'));
+    if (bans.length) {
+      const list = el('div', { class: 'role-members' });
+      for (const b of bans.slice(0, 20)) {
+        list.appendChild(el('div', { class: 'role-holder' },
+          el('span', { class: 'role-holder__name' }, '@' + (b.username || b.user_id || 'Unknown')),
+          el('span', { class: 'muted small' },
+            b.expires_at ? 'until ' + relTime(b.expires_at) : 'permanent')));
+      }
+      box.appendChild(list);
+      if (bans.length > 20) box.appendChild(el('p', { class: 'muted small' }, '+ ' + (bans.length - 20) + ' more'));
+    }
+    const link = el('div', { class: 'card-actions' },
+      el('a', { class: 'btn', href: '#/server/' + serverId + '/members' }, 'Manage on the member roster'));
+    box.appendChild(link);
+    panel.appendChild(box);
+    return;
+  }
+
+  if (section === 'ownership') {
+    const isOwner = !!server.is_owner;
+
+    // ---- transfer ownership ----------------------------------------------
+    // The leave and delete flows both tell an owner to transfer first, and the
+    // API has always existed - this is the missing entry point, not a new
+    // capability.
+    const transfer = el('div', { class: 'settings-panel' });
+    transfer.appendChild(el('h2', { class: 'settings-panel__title' }, 'Transfer ownership'));
+    if (!isOwner) {
+      transfer.appendChild(el('p', { class: 'muted small' },
+        'Only the current owner can transfer this community. You are not the owner.'));
+    } else {
+      transfer.appendChild(el('p', { class: 'muted small' },
+        'Ownership moves to one member. You stay in the community as a member, and only the new owner can transfer it away or delete it.'));
+      const err = el('div', { class: 'form-error', hidden: true });
+      const select = el('select', { class: 'input', 'aria-label': 'New owner' });
+      select.appendChild(el('option', { value: '' }, 'Choose a member…'));
+      // Never offer yourself, and never offer the owner row.
+      for (const m of State.members || []) {
+        const id = m.user_id || m.id;
+        if (m.is_owner) continue;
+        if (String(id) === String(State.me && State.me.id)) continue;
+        select.appendChild(el('option', { value: id },
+          (m.nickname || m.display_name || m.username || 'Unknown') + ' (@' + (m.username || '?') + ')'));
+      }
+      const btn = el('button', { class: 'btn primary', type: 'button' }, 'Transfer ownership');
+      btn.addEventListener('click', () => {
+        err.hidden = true;
+        const target = select.value;
+        if (!target) { err.hidden = false; err.textContent = 'Choose who should take ownership.'; return; }
+        const label = select.options[select.selectedIndex].textContent;
+        confirmDialog({
+          title: 'Transfer ownership?',
+          message: label + ' becomes the owner of ' + (server.name || 'this community') +
+            '. You will remain a member without owner rights. This cannot be undone by you.',
+          danger: true,
+          confirmText: 'Transfer',
+          onConfirm: async () => {
+            btn.disabled = true;
+            try {
+              await Api.transferServer(serverId, target);
+              await refreshServers();
+              leaveServerContext();
+              toast('Ownership transferred.', 'ok');
+              location.hash = '#/home';
+            } catch (ex) {
+              err.hidden = false;
+              err.textContent = ex.message || 'Could not transfer ownership.';
+              btn.disabled = false;
+            }
+          },
+        });
+      });
+      transfer.append(err, el('div', { class: 'field' }, el('label', {}, 'New owner'), select),
+        el('div', { class: 'card-actions' }, btn));
+    }
+    panel.appendChild(transfer);
+
+    // ---- danger zone -------------------------------------------------------
+    const danger = el('div', { class: 'settings-panel settings-panel--danger' });
+    danger.appendChild(el('h2', { class: 'settings-panel__title' }, 'Danger zone'));
+
+    const leaveBtn = el('button', { class: 'btn danger', type: 'button' }, 'Leave community');
+    leaveBtn.addEventListener('click', () => {
+      if (isOwner) { toast('You own this community. Transfer or delete it first.', 'warn'); return; }
       confirmDialog({
-        title: 'Delete ' + server.name + '?',
-        message: 'This permanently deletes the server, its channels, messages and members. This cannot be undone.',
-        danger: true, confirmText: 'Delete forever',
+        title: 'Leave ' + (server.name || 'this community') + '?',
+        message: 'You can rejoin later with a new invite.',
+        danger: true,
+        confirmText: 'Leave',
         onConfirm: async () => {
           try {
-            await Api.deleteServer(serverId);
+            await Api.leaveServer(serverId);
             await refreshServers();
             leaveServerContext();
-            toast('Server deleted.', 'warn');
             location.hash = '#/home';
-          } catch (ex) { toast(ex.message || 'Failed', 'error'); }
+          } catch (ex) { toast(ex.message || 'Could not leave.', 'error'); }
         },
       });
     });
+    danger.appendChild(el('div', { class: 'field' },
+      el('label', {}, 'Leave this community'),
+      el('p', { class: 'muted small' }, 'Removes you from the roster. Other members are unaffected.'),
+      el('div', { class: 'card-actions' }, leaveBtn)));
+
+    if (isOwner) {
+      const delInput = el('input', { class: 'input', type: 'text', placeholder: 'Type ' + (server.name || 'the name') + ' to confirm' });
+      const delBtn = el('button', { class: 'btn danger', type: 'button' }, 'Delete community');
+      delBtn.addEventListener('click', async () => {
+        if (delInput.value.trim() !== (server.name || '')) {
+          toast('Type the exact community name to confirm.', 'warn');
+          return;
+        }
+        confirmDialog({
+          title: 'Delete ' + (server.name || 'this community') + '?',
+          message: 'This permanently deletes the community, its channels, messages, roles and memberships. This cannot be undone.',
+          danger: true,
+          confirmText: 'Delete forever',
+          onConfirm: async () => {
+            try {
+              await Api.deleteServer(serverId);
+              await refreshServers();
+              leaveServerContext();
+              toast('Community deleted.', 'warn');
+              location.hash = '#/home';
+            } catch (ex) { toast(ex.message || 'Could not delete.', 'error'); }
+          },
+        });
+      });
+      danger.appendChild(el('div', { class: 'field' },
+        el('label', {}, 'Delete this community'),
+        el('p', { class: 'muted small' }, 'Permanent. Everything in this community goes with it.'),
+        delInput,
+        el('div', { class: 'card-actions' }, delBtn)));
+    }
+    panel.appendChild(danger);
+    return;
   }
-
-  wrap.appendChild(card);
-  container.appendChild(wrap);
 }
-
 // ---- new server -------------------------------------------------------------
 
 async function renderNewServer(container, serverId) {
