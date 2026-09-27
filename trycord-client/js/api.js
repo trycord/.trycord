@@ -171,6 +171,19 @@ const Api = {
   reorderChannels: (serverId, orderedIds) =>
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels/reorder', { body: { orderedIds } }),
 
+  // ---- permission overrides: category -> channel tri-state --------------
+  // effect is 'inherit' | 'allow' | 'deny'. Absent rows mean inherit, so
+  // these calls only fire when someone actually changes something.
+  channelOverrides: (serverId, channelId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId) + '/overrides'),
+  setChannelOverride: (serverId, channelId, permission, effect) =>
+    request('PUT', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId) +
+      '/overrides/' + encodeURIComponent(permission), { body: { effect } }),
+  categoryOverrides: (serverId, categoryId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/categories/' + encodeURIComponent(categoryId) + '/overrides'),
+  setCategoryOverride: (serverId, categoryId, permission, effect) =>
+    request('PUT', '/api/servers/' + encodeURIComponent(serverId) + '/categories/' + encodeURIComponent(categoryId) +
+      '/overrides/' + encodeURIComponent(permission), { body: { effect } }),
   // ---- messages -------------------------------------------------------------
   // One page of history.
   //   before=<seq>  older page, newest-first server-side, reversed to oldest-first here

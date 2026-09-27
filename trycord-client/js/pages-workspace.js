@@ -19,6 +19,7 @@ function pickReaction(messageId) {
   });
 }
 import { avatar, emptyState, messageRow, channelRow, paintReactions, initialOf } from './components.js';
+import { permissionOverrideEditor } from './permission-overrides.js';
 import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNavigation, toggleMembers, membersHidden } from './shell.js';
 import Realtime from './realtime.js';
 
@@ -1376,6 +1377,38 @@ function openRoleEditor(serverId, role, allPerms, onDone) {
   });
 }
 
+// Permission overrides for one channel or category. Gated on
+// MANAGE_CHANNELS - the same permission that already authorises creating and
+// deleting the entity being edited - and rendered read-only for anyone who
+// lacks it, so the surface is visible rather than silently missing.
+function openOverrideEditor({ kind, serverId, entityId, entityName }) {
+  const readOnly = !can('MANAGE_CHANNELS');
+  const editor = permissionOverrideEditor({ kind, serverId, entityId, readOnly });
+
+  const body = el('div', {});
+  if (readOnly) {
+    body.appendChild(el('div', { class: 'form-error' },
+      'You need Manage Channels permission to change these.'));
+  }
+  body.appendChild(editor.el);
+
+  const label = (kind === 'channel' ? 'Channel' : 'Category') + ': ' + entityName;
+  // A Done button, not an empty footer array: `footer: []` is truthy, so it
+  // renders an empty action row, and without `closable` there is no X either
+  // - leaving Escape as the only way out of the dialog.
+  const done = el('button', { class: 'btn primary', type: 'button' }, 'Done');
+  const modal = openModal({
+    title: 'Permissions',
+    eyebrow: label,
+    closable: true,
+    body,
+    footer: [done],
+  });
+  done.addEventListener('click', () => modal.close());
+  editor.load().catch(() => {});
+  return modal;
+}
+
 async function renderServerCategories(container, serverId) {
   clear(container);
   let server;
@@ -1434,7 +1467,11 @@ async function renderServerCategories(container, serverId) {
           },
         });
       });
-      actions.append(rename, up, down, del);
+      const perms = el('button', { class: 'btn sm', type: 'button' }, 'Permissions');
+      perms.addEventListener('click', () => openOverrideEditor({
+        kind: 'category', serverId, entityId: cat.id, entityName: cat.name || 'Category',
+      }));
+      actions.append(perms, rename, up, down, del);
       row.appendChild(actions);
       list.appendChild(row);
       for (const ch of channels) {
@@ -1445,6 +1482,10 @@ async function renderServerCategories(container, serverId) {
         chRow.appendChild(el('span', { class: 'spacer' }));
         const edit = el('button', { class: 'btn sm', type: 'button' }, 'Edit');
         edit.addEventListener('click', () => openChannelEditor(serverId, ch, cats, reload));
+        const chPerms = el('button', { class: 'btn sm', type: 'button' }, 'Permissions');
+        chPerms.addEventListener('click', () => openOverrideEditor({
+          kind: 'channel', serverId, entityId: ch.id, entityName: '#' + (ch.name || 'channel'),
+        }));
         const chDel = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
         chDel.addEventListener('click', () => {
           confirmDialog({
@@ -1457,7 +1498,7 @@ async function renderServerCategories(container, serverId) {
             },
           });
         });
-        chRow.append(edit, chDel);
+        chRow.append(chPerms, edit, chDel);
         list.appendChild(chRow);
       }
     });
@@ -1472,6 +1513,10 @@ async function renderServerCategories(container, serverId) {
         chRow.appendChild(el('span', { class: 'spacer' }));
         const edit = el('button', { class: 'btn sm', type: 'button' }, 'Edit');
         edit.addEventListener('click', () => openChannelEditor(serverId, ch, cats, reload));
+        const chPerms = el('button', { class: 'btn sm', type: 'button' }, 'Permissions');
+        chPerms.addEventListener('click', () => openOverrideEditor({
+          kind: 'channel', serverId, entityId: ch.id, entityName: '#' + (ch.name || 'channel'),
+        }));
         const chDel = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
         chDel.addEventListener('click', () => {
           confirmDialog({
@@ -1484,7 +1529,7 @@ async function renderServerCategories(container, serverId) {
             },
           });
         });
-        chRow.append(edit, chDel);
+        chRow.append(chPerms, edit, chDel);
         list.appendChild(chRow);
       }
     }
