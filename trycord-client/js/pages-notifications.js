@@ -3,7 +3,7 @@
 // one marks it read.
 import Api from './api.js';
 import State, { refreshNotifications } from './state.js';
-import { el, clear, toast, relTime } from './ui.js';
+import { attachContextMenu, copyText, el, clear, toast, relTime } from './ui.js';
 import { emptyState, avatar } from './components.js';
 import { renderContextHeader, renderAllChrome } from './shell.js';
 
@@ -48,12 +48,54 @@ export async function renderNotifications(container) {
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
 
+  // The action list for one notification. Entries reflect current state
+  // rather than being rendered once and left stale: a notification that is
+  // already read offers no "mark as read".
+  const notifActions = (n, dest) => {
+    const items = [];
+    const markRead = async () => {
+      try {
+        await Api.readNotification(n.id);
+        await refreshNotifications();
+        renderAllChrome();
+        renderNotifications(container);
+        toast('Marked as read.', 'ok');
+      } catch (ex) { toast(ex.message || 'Could not mark as read.', 'error'); }
+    };
+
+    if (dest) {
+      items.push({ label: 'Go to', desc: 'Open where this happened', onSelect: async () => {
+        try { await Api.readNotification(n.id); } catch { /* non-fatal */ }
+        try { await refreshNotifications(); } catch { /* non-fatal */ }
+        renderAllChrome();
+        location.hash = dest;
+      } });
+    }
+    if (!n.readAt) {
+      items.push({ label: 'Mark as read', onSelect: markRead });
+    }
+    items.push({ sep: true });
+    items.push({ label: 'Mark all as read', onSelect: async () => {
+      try { await Api.readAllNotifications(); await refreshNotifications(); renderAllChrome(); renderNotifications(container); }
+      catch (ex) { toast(ex.message || 'Failed', 'error'); }
+    } });
+    items.push({ label: 'Copy notification ID', onSelect: () => copyText(String(n.id), 'Notification ID copied.') });
+    return items;
+  };
+
   // Row rendering, shared by the first page and every "load more" after it.
   const renderRow = (n) => {
     const dest = destination(n);
     const row = el(dest ? 'button' : 'div', {
       class: 'row notif-row' + (n.readAt ? '' : ' unread'),
       type: dest ? 'button' : undefined,
+    });
+    // Right click / long press for the actions, click to open. The row is the
+    // target so the menu knows which notification it belongs to, and the
+    // builder is re-read on open, so an entry that is no longer valid (it was
+    // just marked read) is simply not offered.
+    attachContextMenu(row, () => notifActions(n, dest), {
+      target: () => ({ type: 'notification', id: String(n.id) }),
     });
     if (n.actor) row.appendChild(avatar({ id: n.actor.id, username: n.actor.username, displayName: n.actor.displayName }, { size: 'sm', withPresence: false }));
     const main = el('div', { class: 'row-main' });
