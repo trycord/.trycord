@@ -1562,7 +1562,6 @@ async function renderServerSettings(container, serverId) {
 
 async function renderNewServer(container, serverId) {
   clear(container);
-  if (serverId) container.classList.add('hide-nav'); // not used by desktop chrome
   renderContextHeader({ title: 'Create a server' });
   const wrap = el('div', { class: 'auth-wrap' });
   const card = el('div', { class: 'card card--auth' });

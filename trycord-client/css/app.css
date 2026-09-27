@@ -503,7 +503,6 @@ img { max-width: 100%; }
 }
 
 /* Context sidebar: routes the rail selection to its own navigation. */
-.place-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 
 
 
@@ -670,7 +669,9 @@ img { max-width: 100%; }
   height: 1px;
   background: var(--t-line);
 }
-/* Profile editor: full-width settings panel */
+/* Profile editor. Only layout lives here — inputs, labels, hints and
+   dividers all come from the shared control primitives, so a field in
+   Settings looks identical to a field during registration. */
 .profile-editor {
   width: 100%;
   max-width: 100%;
@@ -678,54 +679,8 @@ img { max-width: 100%; }
   flex-direction: column;
   gap: var(--t-d-5);
 }
-.profile-editor .section-label {
-  font-size: var(--t-fs-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--t-mut);
-  margin-bottom: var(--t-d-2);
-}
-.profile-editor .field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--t-d-2);
-}
-.profile-editor .field label {
-  font-size: var(--t-fs-s);
-  font-weight: 600;
-  color: var(--t-txt2);
-}
-.profile-editor .input {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: var(--t-r-s);
-  border: 1px solid var(--t-line);
-  background: var(--t-pg);
-  color: var(--t-txt);
-  font-size: var(--t-fs-m);
-}
-.profile-editor .input:focus {
-  outline: none;
-  border-color: var(--t-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--t-accent) 20%, transparent);
-}
-.profile-editor .hr {
-  height: 1px;
-  background: var(--t-line);
-  margin: var(--t-d-4) 0;
-}
-.profile-editor .row-line {
-  display: flex;
-  align-items: center;
-  gap: var(--t-d-3);
-  flex-wrap: wrap;
-}
 
 /* Home/DM context sidebar: search, new message, conversation list. */
-.home-search { width: 100%; margin-bottom: var(--t-d-3); }
-.home-newdm { width: 100%; margin-bottom: var(--t-d-4); }
-.home-dm-list { display: flex; flex-direction: column; gap: 1px; }
 
 .main-content {
   grid-column: 3 !important;
@@ -1158,94 +1113,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .app-rail__items .community-actions { width: 100%; }
 .app-rail__items .community-action { width: 48px; }
 
-.place-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 58px;
-  margin: 0 0 8px;
-  padding: 0 6px 0 8px;
-  border-bottom: 1px solid var(--t-line);
-  position: relative;
-}
-.place-header__name { min-width: 0; flex: 1 1 auto; font-size: var(--t-fs-l); font-weight: 800; color: var(--t-txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.place-header__menu {
-  flex: 0 0 auto;
-  width: 30px; height: 30px;
-  border-radius: 8px;
-  color: var(--t-mut);
-  display: flex; align-items: center; justify-content: center;
-}
-.place-header__menu:hover { background: var(--t-base2); color: var(--t-txt); }
-.place-menu {
-  position: absolute;
-  top: 48px; right: 10px;
-  width: 210px;
-  padding: 6px;
-  border: 1px solid var(--t-line-hi);
-  border-radius: 10px;
-  background: var(--t-elev);
-  box-shadow: var(--t-sh-1);
-  z-index: 30;
-}
-.place-menu__item { width: 100%; padding: 8px 10px; text-align: left; border-radius: 7px; color: var(--t-txt2); }
-.place-menu__item:hover { background: color-mix(in srgb, var(--t-accent) 12%, transparent); color: var(--t-txt); }
-.place-actions { display: flex; gap: 6px; margin: 4px 0 12px; }
-.place-actions button {
-  flex: 1 1 auto;
-  min-height: 32px;
-  padding: 5px 8px;
-  border: 1px solid var(--t-line);
-  border-radius: 9px;
-  background: var(--t-base2);
-  color: var(--t-txt2);
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-.place-actions button:hover { border-color: var(--t-accent); color: var(--t-accent); }
-.channel-section { margin: 7px 0 12px; }
-.channel-section__title {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 28px;
-  padding: 3px 5px;
-  color: var(--t-mut);
-  font-size: var(--t-fs-xs);
-  letter-spacing: 0.11em;
-  font-weight: 800;
-  text-transform: uppercase;
-  cursor: pointer;
-  user-select: none;
-}
-.channel-section__title:hover { color: var(--t-txt2); }
-.channel-section.collapsed .channel-section__caret { transform: rotate(-90deg); }
-.channel-section.collapsed .channel-section__list { display: none; }
-.channel-section__title .section-action {
-  flex: 0 0 auto;
-  width: 22px; height: 22px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 6px;
-  color: var(--t-mut);
-  font-size: 1rem;
-  line-height: 1;
-}
-.channel-section__title .section-action:hover { background: var(--t-base2); color: var(--t-txt); }
-.place-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 130px;
-  padding: 18px;
-  text-align: center;
-  color: var(--t-mut);
-}
-.place-empty strong { color: var(--t-txt2); }
 
-.place-empty.compact { min-height: 70px; font-size: 0.78rem; }
 
 /* ============================================================
    6. OVERLAYS
@@ -1490,6 +1358,18 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 
 /* ============================================================
    7. CONTROLS
+
+   Button hierarchy. A screen should make its intent obvious, so the
+   levels are visually distinct rather than all being filled chips:
+
+     (default)  SECONDARY - neutral surface, neutral hover
+     .primary   PRIMARY   - solid accent. One per view; the main action.
+     .ghost     GHOST     - no surface until hovered. Cancel, dismiss.
+     .quiet     TERTIARY  - text only, no chrome at all.
+     .danger    DESTRUCTIVE - red outline, fills only on hover.
+
+   Sizing (.sm/.block/.icon) is orthogonal to emphasis, so the two
+   axes never fight each other.
    ============================================================ */
 
 .btn {
@@ -1497,29 +1377,74 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   align-items: center;
   justify-content: center;
   gap: var(--t-d-2);
-  padding: 8px var(--t-d-4);
+  min-height: 36px;
+  padding: 7px var(--t-d-4);
   border-radius: 10px;
   font-weight: 650;
   font-size: var(--t-fs-m);
+  line-height: 1.2;
+  white-space: nowrap;
   color: var(--t-txt);
   background: var(--t-base2);
   border: 1px solid var(--t-line-hi);
-  transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+  transition:
+    background var(--t-fast) var(--t-ease),
+    border-color var(--t-fast) var(--t-ease),
+    color var(--t-fast) var(--t-ease),
+    opacity var(--t-fast) var(--t-ease);
 }
-.btn:hover { background: var(--t-elev); border-color: var(--t-accent); }
+/* Secondary hover stays neutral. An accent border on every button was
+   flattening the hierarchy and spreading amber across the whole app. */
+.btn:hover { background: var(--t-elev); border-color: var(--t-txt); }
 .btn:active { transform: translateY(1px); }
-.btn.primary { background: var(--t-accent); border-color: var(--t-accent); color: var(--t-on-accent); }
-.btn.primary:hover { background: var(--t-accent-hi); border-color: var(--t-accent-hi); }
-.btn.ghost { background: transparent; border-color: var(--t-line); color: var(--t-txt2); }
-.btn.ghost:hover { background: var(--t-base2); color: var(--t-txt); }
-.btn.danger { background: transparent; border-color: color-mix(in srgb, var(--t-err) 55%, transparent); color: var(--t-err); }
-.btn.danger:hover { background: var(--t-err); color: var(--t-on-danger); }
-.btn.sm { padding: 4px var(--t-d-3); font-size: var(--t-fs-s); }
+
+.btn.primary {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+  color: var(--t-on-accent);
+  font-weight: 700;
+}
+.btn.primary:hover { background: var(--t-accent-hi); border-color: var(--t-accent-hi); color: var(--t-on-accent); }
+
+.btn.ghost { background: transparent; border-color: transparent; color: var(--t-txt2); }
+.btn.ghost:hover { background: color-mix(in srgb, var(--t-txt) 8%, transparent); color: var(--t-txt); }
+
+.btn.quiet { background: transparent; border-color: transparent; color: var(--t-mut); padding-inline: var(--t-d-2); }
+.btn.quiet:hover { background: color-mix(in srgb, var(--t-txt) 8%, transparent); color: var(--t-txt); }
+
+.btn.danger {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--t-err) 55%, transparent);
+  color: var(--t-err);
+}
+.btn.danger:hover { background: var(--t-err); border-color: var(--t-err); color: var(--t-on-danger); }
+.btn.danger.ghost { border-color: transparent; }
+
+/* Sizing (orthogonal to emphasis). */
+.btn.sm { min-height: 28px; padding: 4px var(--t-d-3); font-size: var(--t-fs-s); }
+.btn.lg { min-height: 42px; padding: 10px var(--t-d-5); font-size: var(--t-fs-l); }
 .btn.block { width: 100%; }
-.btn.icon { width: 34px; height: 34px; padding: 0; color: var(--t-txt2); }
-.btn.icon:hover { color: var(--t-txt); }
-.btn.active { border-color: var(--t-accent); color: var(--t-accent); }
-.btn:disabled { opacity: var(--t-op-fade); }
+.btn.icon { width: 36px; min-height: 36px; padding: 0; color: var(--t-txt2); }
+.btn.icon.sm { width: 28px; min-height: 28px; }
+
+/* Selected / pressed state for toggle-style buttons (update channel,
+   theme pickers). Communicates state by fill + border + weight, not
+   colour alone. */
+.btn.active,
+.btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--t-accent) 16%, transparent);
+  border-color: var(--t-accent);
+  color: var(--t-accent-hi);
+  font-weight: 700;
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn[aria-busy="true"] { pointer-events: none; }
 .btn[aria-busy="true"]::before {
   content: "";
   width: 12px; height: 12px;
@@ -2413,17 +2338,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   border-bottom: 1px solid var(--t-line);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
 }
-.place-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 8px;
-  right: 8px;
-  z-index: 30;
-}
-.channel-section__title { border-radius: 6px; }
-.channel-section__title:hover { background: color-mix(in srgb, var(--t-txt) 5%, transparent); }
-.channel-section.collapsed .channel-section__list { display: none; }
-.channel-section.collapsed .channel-section__caret { transform: rotate(-90deg); }
 
 /* --- Community landing hero --- */
 .community-hero {

@@ -143,7 +143,6 @@ function endGesture() {
   const dx = Math.max(-GESTURE.MAX_DRAG_DISTANCE, Math.min(GESTURE.MAX_DRAG_DISTANCE, g.lastX - g.startX));
   const dt = g.lastT - g.startT;
   const vx = dt > 0 ? (g.lastX - g.startX) / dt : 0;
-  d.classList.remove('dragging');
   d.style.transform = '';
   if (g.mode === 'open') {
     // Incomplete below the threshold: drawer stays closed (already restored).
@@ -189,10 +188,8 @@ function initMobileGestures() {
     const d = document.getElementById('mobile-navigation');
     if (!d) return;
     const width = drawerWidth();
-    d.classList.add('dragging');
     if (g.mode === 'open') {
       if (dx >= GESTURE.OPEN_THRESHOLD) {
-        d.classList.remove('dragging');
         d.style.transform = '';
         openMobileDrawer();
         activeGesture = null;
@@ -209,7 +206,7 @@ function initMobileGestures() {
     if (activeGesture.mode === 'open' && (e.clientX - activeGesture.startX) >= GESTURE.OPEN_THRESHOLD) {
       openMobileDrawer();
       const d = document.getElementById('mobile-navigation');
-      if (d) { d.classList.remove('dragging'); d.style.transform = ''; }
+      if (d) d.style.transform = '';
       activeGesture = null;
       return;
     }
