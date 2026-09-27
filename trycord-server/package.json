@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "trycord-server",
   "version": "0.1.0",
   "description": "Trycord chat server: REST API + realtime WebSocket gateway, serves the web client",
@@ -28,6 +28,7 @@
     "test:f1f2": "node scripts/test-f1f2.js",
     "test:phase2": "node scripts/test-phase2.js",
     "test:trustsafety": "node scripts/test-trustsafety.js",
+    "test:overrides": "node scripts/test-overrides.js",
     "test:engagement": "node scripts/test-engagement.js"
   },
   "license": "MIT",

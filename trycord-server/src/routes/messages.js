@@ -1,4 +1,4 @@
-// /api/channels/:channelId/messages — history + post (members with SEND_MESSAGES),
+﻿// /api/channels/:channelId/messages â€” history + post (members with SEND_MESSAGES),
 // delete (author or MANAGE_MESSAGES).
 const express = require('express');
 const db = require('../db');
@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const { now, uuid, visibleChannel } = require('../util');
-const { hasPermission } = require('../services/permissions');
+const { hasChannelPermission } = require('../services/permissions');
 const memberships = require('../services/memberships');
 const uploads = require('../services/uploads');
 const reactions = require('../services/reactions');
@@ -124,7 +124,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
-    if (!(await hasPermission(req.user.id, ch.server_id, 'SEND_MESSAGES'))) {
+    if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
       return fail(res, 'PERMISSION_DENIED', 'you cannot post in this server');
     }
     if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
@@ -132,7 +132,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     }
     const content = String((req.body || {}).content || '').trim().slice(0, 2000);
     // Attachments and text are independent: a message may carry files
-    // alone, text alone, or both — but must carry at least one.
+    // alone, text alone, or both â€” but must carry at least one.
     const ids = uploads.sanitizeIds((req.body || {}).attachmentIds);
     if (!content && !ids.length) return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
 
@@ -216,7 +216,7 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
     const msg = await db.get('SELECT * FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
     if (!msg) return fail(res, 'NOT_FOUND', 'message not found');
     const isAuthor = msg.author_id === req.user.id;
-    if (!isAuthor && !(await hasPermission(req.user.id, ch.server_id, 'MANAGE_MESSAGES'))) {
+    if (!isAuthor && !(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'MANAGE_MESSAGES'))) {
       return fail(res, 'PERMISSION_DENIED', 'cannot delete this message');
     }
     const fileRows = await db.all('SELECT id FROM attachments WHERE message_id = ?', [msg.id]);
@@ -227,7 +227,7 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// PATCH /:messageId — author-only edit. Moderators can delete but never
+// PATCH /:messageId â€” author-only edit. Moderators can delete but never
 // rewrite someone else's words. Broadcasts message_updated.
 router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
@@ -260,7 +260,7 @@ router.post('/:messageId/reactions', auth.requireVerified, rateLimit({ windowMs:
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
-    if (!(await hasPermission(req.user.id, ch.server_id, 'SEND_MESSAGES'))) {
+    if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
       return fail(res, 'PERMISSION_DENIED', 'you cannot react here');
     }
     if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
@@ -281,7 +281,7 @@ router.post('/:messageId/reactions', auth.requireVerified, rateLimit({ windowMs:
   } catch (e) { next(e); }
 });
 
-// DELETE .../reactions/:emoji — removes only the caller's own reaction.
+// DELETE .../reactions/:emoji â€” removes only the caller's own reaction.
 router.delete('/:messageId/reactions/:emoji', auth.requireVerified, async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);

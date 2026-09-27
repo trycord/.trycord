@@ -1,4 +1,4 @@
-// Realtime gateway: authenticated sockets join channels or DM conversations,
+﻿// Realtime gateway: authenticated sockets join channels or DM conversations,
 // post channel messages, send typing signals, and receive broadcasts.
 // Presence is derived from actual socket state: a user is online while at
 // least one of their sockets is open. Shares the HTTP server.
@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const WebSocket = require('ws');
 const db = require('./db');
 const { now, uuid, visibleChannel, isMember } = require('./util');
-const { hasPermission } = require('./services/permissions');
+const { hasChannelPermission } = require('./services/permissions');
 const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
 const dms = require('./services/dms');
 const uploads = require('./services/uploads');
@@ -238,7 +238,7 @@ function createGateway(server) {
     }
   }
 
-  // Cut every live socket for a user — used the instant enforcement lands,
+  // Cut every live socket for a user â€” used the instant enforcement lands,
   // so a banned/suspended account cannot keep an existing connection open.
   // A graceful close frame (1008) is sent; no hard terminate, so the peer
   // actually observes the reason. Stuck sockets are reaped by the heartbeat.
@@ -364,7 +364,7 @@ function createGateway(server) {
             const ch = await visibleChannel(ws.channelId, user.id);
             if (!ch) return;
             // Same gate as the HTTP post: membership alone is not enough.
-            if (!(await hasPermission(user.id, ch.server_id, 'SEND_MESSAGES'))) return;
+            if (!(await hasChannelPermission(user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) return;
             // Timed-out members stay connected (read-only) but cannot post.
             try {
               const t = await db.get(

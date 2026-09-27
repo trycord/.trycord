@@ -1,4 +1,4 @@
-// /api/servers/:serverId/channels — list (members), create/patch/delete (MANAGE_CHANNELS).
+﻿// /api/servers/:serverId/channels â€” list (members), create/patch/delete (MANAGE_CHANNELS).
 const express = require('express');
 const db = require('../db');
 const auth = require('../middleware/auth');
@@ -6,6 +6,7 @@ const { resolveServer, requireMember, requirePerm } = require('../middleware/ser
 const { fail, serviceError } = require('../errors');
 const channels = require('../services/channels');
 const events = require('../services/events');
+const permissions = require('../services/permissions');
 
 const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
@@ -129,6 +130,42 @@ router.delete('/:channelId/pins/:messageId', auth.requireVerified, requirePerm('
     broadcastChannel(ch.server_id, ch.id, { type: 'message_unpinned', id: req.params.messageId, channel_id: ch.id });
     res.json({ ok: true });
   } catch (e) { next(e); }
+});
+
+// ---- channel permission overrides ----
+// Tri-state per permission: inherit (no row), allow, or deny. Editing
+// overrides is a channel-administration action, so it takes MANAGE_CHANNELS
+// at the community level - the same gate that already authorises creating and
+// deleting the channel. Overrides narrow or widen what roles grant; they do
+// not create a second permission system.
+router.get('/:channelId/overrides', requireMember, async (req, res, next) => {
+  try {
+    const ch = await pinChannel(req);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    res.json({
+      channelId: ch.id,
+      categoryId: ch.category_id || null,
+      overrides: await permissions.overridesFor('channel_permission_overrides', ch.id),
+      categoryOverrides: ch.category_id
+        ? await permissions.overridesFor('category_permission_overrides', ch.category_id)
+        : {},
+      all: Object.keys(permissions.PERMISSIONS),
+    });
+  } catch (e) { serviceError(res, e); }
+});
+
+router.put('/:channelId/overrides/:permission', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
+  try {
+    const ch = await pinChannel(req);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    const { effect } = req.body || {};
+    await permissions.setOverride('channel_permission_overrides', ch.id, req.params.permission, effect);
+    events.emit(req.server.id, 'channel_updated', { channel: ch });
+    res.json({
+      channelId: ch.id,
+      overrides: await permissions.overridesFor('channel_permission_overrides', ch.id),
+    });
+  } catch (e) { serviceError(res, e); }
 });
 
 module.exports = router;

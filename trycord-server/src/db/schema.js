@@ -50,12 +50,35 @@ function tables(engine) {
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS categories (
-      id        VARCHAR(64) PRIMARY KEY,
-      server_id VARCHAR(64) NOT NULL,
-      name      VARCHAR(64) NOT NULL,
-      position  INTEGER NOT NULL DEFAULT 0,
+         id        VARCHAR(64) PRIMARY KEY,
+         server_id VARCHAR(64) NOT NULL,
+         name      VARCHAR(64) NOT NULL,
+         position  INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     )${engine}`,
+
+    // Per-category permission overrides. This is what makes a category more
+    // than a visual wrapper: a category can deny a permission for everyone,
+    // or grant it regardless of roles. Rows are sparse - an absent row means
+    // "inherit", never "deny".
+    `CREATE TABLE IF NOT EXISTS category_permission_overrides (
+         category_id VARCHAR(64) NOT NULL,
+         permission  VARCHAR(64) NOT NULL,
+         effect      VARCHAR(8) NOT NULL,
+         PRIMARY KEY (category_id, permission),
+         FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+       )${engine}`,
+
+    // Per-channel overrides. The most specific level, so it wins over both the
+    // category and the role-derived community default.
+    `CREATE TABLE IF NOT EXISTS channel_permission_overrides (
+         channel_id VARCHAR(64) NOT NULL,
+         permission VARCHAR(64) NOT NULL,
+         effect     VARCHAR(8) NOT NULL,
+         PRIMARY KEY (channel_id, permission),
+         FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
+       )${engine}`,
+
 
     `CREATE TABLE IF NOT EXISTS roles (
       id          VARCHAR(64) PRIMARY KEY,
