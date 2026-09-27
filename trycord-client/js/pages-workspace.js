@@ -1,4 +1,4 @@
-// Server workspace: the main Environment when inside a community.
+﻿// Server workspace: the main Environment when inside a community.
 //   /server/:id                 -> landing (channel list summary)
 //   /server/:id/channel/:cid    -> channel conversation
 //   /server/:id/channels/new    -> create channel
@@ -20,12 +20,13 @@ function pickReaction(messageId) {
 }
 import { avatar, emptyState, messageRow, channelRow, paintReactions, initialOf } from './components.js';
 import { permissionOverrideEditor } from './permission-overrides.js';
+import { userNameButton } from './user-actions.js';
 import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNavigation, toggleMembers, membersHidden } from './shell.js';
 import Realtime from './realtime.js';
 
 let activeChannelId = null;
 
-// Community realtime wiring (subscribed once — module evaluates once).
+// Community realtime wiring (subscribed once â€” module evaluates once).
 // Structural events arrive on the server room; the handler refreshes state
 // (serialized, so rapid events converge) and repaints the active view via
 // its refresh hook. If WE were removed, drop context and go home.
@@ -80,7 +81,7 @@ async function renderServerLanding(container, serverId) {
     container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this server'));
     return;
   }
-  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
+  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' Â· ' + (server.member_count || 0) + ' members' });
   const wrap = el('div', { class: 'page atrium' });
   const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
   const hero = el('div', { class: 'community-hero' });
@@ -89,7 +90,7 @@ async function renderServerLanding(container, serverId) {
   heroText.appendChild(el('h2', { class: 'community-hero__name' }, server.name || 'Community'));
   if (server.description) heroText.appendChild(el('p', { class: 'muted' }, server.description));
   const stats = el('div', { class: 'stat-inline' });
-  stats.appendChild(el('span', {}, String(server.member_count || 0) + ' members · ' + String(onlineCount) + ' online'));
+  stats.appendChild(el('span', {}, String(server.member_count || 0) + ' members Â· ' + String(onlineCount) + ' online'));
   stats.appendChild(el('span', {}, String(server.channel_count || 0) + ' channels'));
   stats.appendChild(el('span', {}, String(server.role_count || 0) + ' roles'));
   if (server.message_count != null) stats.appendChild(el('span', {}, String(server.message_count) + ' messages'));
@@ -101,7 +102,7 @@ async function renderServerLanding(container, serverId) {
   const categories = layout.categories || [];
   const channels = layout.channels || [];
   if (!channels.length) {
-    wrap.appendChild(emptyState('◌', 'No channels yet', 'Create a channel to get started.'));
+    wrap.appendChild(emptyState('â—Œ', 'No channels yet', 'Create a channel to get started.'));
   } else {
     for (const cat of categories) {
       const inCat = channels.filter((ch) => String(ch.category_id) === String(cat.id));
@@ -153,11 +154,20 @@ function renderMemberList(wrap, serverId) {
     avatarEl.addEventListener('click', () => { location.hash = '#/users/' + rid; });
     row.appendChild(avatarEl);
     const mm = el('div', { class: 'row-main' });
-    const nameEl = el('div', { class: 'row-title', style: { cursor: 'pointer' } }, m.nickname || m.display_name || m.username);
-    nameEl.addEventListener('click', () => { location.hash = '#/users/' + rid; });
+    const member = {
+      id: rid,
+      username: m.username,
+      displayName: m.display_name,
+      avatarUrl: m.avatar_url,
+      roles: m.roles,
+    };
+    // Name opens the contextual card; right-click gives the action list
+    // (roles, kick, ban, report) directly. Both come from one module so the
+    // member list and a message author cannot offer different actions.
+    const nameEl = userNameButton(member, { className: 'row-title', serverId });
     mm.appendChild(nameEl);
     const sub = m.nickname
-      ? '@' + (m.username || '') + (m.display_name && m.display_name !== m.username ? ' · ' + m.display_name : '')
+      ? '@' + (m.username || '') + (m.display_name && m.display_name !== m.username ? ' Â· ' + m.display_name : '')
       : '@' + (m.username || '');
     mm.appendChild(el('div', { class: 'row-sub' }, sub));
     row.appendChild(mm);
@@ -243,7 +253,7 @@ async function renderChannel(container, serverId, channelId) {
       btn.setAttribute('aria-label', btn.title);
       btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
     },
-  }, '☰');
+  }, 'â˜°');
   // Mute state for the header bell (one cheap read per channel open).
   let muted = isMuted(channelId);
   try { await refreshMutes(); muted = isMuted(channelId); } catch { /* keep last known */ }
@@ -264,30 +274,30 @@ async function renderChannel(container, serverId, channelId) {
         }
         const now = isMuted(channelId);
         renderAllChrome();
-        btn.textContent = now ? '🔕' : '🔔';
+        btn.textContent = now ? 'ðŸ”•' : 'ðŸ””';
         btn.title = now ? 'Unmute this channel' : 'Mute this channel';
         btn.setAttribute('aria-label', btn.title);
         btn.setAttribute('aria-pressed', now ? 'true' : 'false');
         toast(now ? 'Channel muted.' : 'Channel unmuted.', 'ok');
       } catch (ex) { toast(ex.message || 'Could not change mute.', 'error'); }
     },
-  }, muted ? '🔕' : '🔔');
+  }, muted ? 'ðŸ”•' : 'ðŸ””');
   const searchBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Search in this community', 'aria-label': 'Search messages',
     onClick: () => toggleSearchPanel(),
-  }, '⌕');
+  }, 'âŒ•');
   const pinsBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Pinned messages', 'aria-label': 'Pinned messages',
     onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + channelId + '/pins'; },
-  }, '☆');
+  }, 'â˜†');
   const moreBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Community actions', 'aria-label': 'Community actions',
     onClick: () => {
-      // Reuses the sidebar community menu — one menu, two entry points.
+      // Reuses the sidebar community menu â€” one menu, two entry points.
       const menu = document.querySelector('#place-navigation .place-header__menu');
       if (menu) menu.click();
     },
-  }, '⋯');
+  }, 'â‹¯');
   renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [searchBtn, pinsBtn, bellBtn, moreBtn, memberToggle] });
 
   const conv = el('div', { class: 'conversation' });
@@ -392,7 +402,7 @@ async function renderChannel(container, serverId, channelId) {
     loadingHistory = true;
     pendingLive.clear();
     clear(feed);
-    feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messages…'));
+    feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messagesâ€¦'));
     let msgs = [];
     try {
       msgs = await Api.messages(channelId, { limit: HISTORY_PAGE });
@@ -461,7 +471,7 @@ async function renderChannel(container, serverId, channelId) {
       pinState.set(String(id), !!pinned);
       const head = node.querySelector('.msg-head');
       const badge = node.querySelector('.msg-pinned');
-      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, '📌'));
+      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, 'ðŸ“Œ'));
       if (!pinned && badge) badge.remove();
     }
     if (list !== undefined) {
@@ -510,7 +520,7 @@ async function renderChannel(container, serverId, channelId) {
       ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
       { label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') },
       ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { location.hash = '#/users/' + m.author_id; } }] : []),
-      { label: 'Add reaction…', onSelect: () => pickReaction(m.id) },
+      { label: 'Add reactionâ€¦', onSelect: () => pickReaction(m.id) },
       ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
       ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
       ...(can('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
@@ -637,11 +647,11 @@ async function renderChannel(container, serverId, channelId) {
 
   // ---- composer ----
   const composer = el('div', { class: 'composer' });
-  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, '📎');
+  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, 'ðŸ“Ž');
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
-  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, '☺');
+  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, 'â˜º');
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
   composer.appendChild(fileBtn);
   composer.appendChild(fileInput);
@@ -737,7 +747,7 @@ async function renderChannel(container, serverId, channelId) {
 
   // Live updates. Every insert/update is reconciled by authoritative
   // message id: the sender's own POST already appears via reload(), and
-  // the server broadcast reaches the sender too — blind appends would
+  // the server broadcast reaches the sender too â€” blind appends would
   // render each own message twice (F2). Reconnect replays are also
   // absorbed: an id already in the feed is replaced, never duplicated.
   function upsertMessage(m, opts = {}) {
@@ -847,13 +857,13 @@ async function renderChannel(container, serverId, channelId) {
     if (String(m.channel_id) === String(channelId)) patchEngagement(m.id, { reactions: m.reactions });
   });
 
-  // Search panel (reference ⌕ pattern): debounced community search with
+  // Search panel (reference âŒ• pattern): debounced community search with
   // jump-to-message. Lives and dies with this view; Escape closes.
   let searchPanel = null;
   function toggleSearchPanel() {
     if (searchPanel) { searchPanel.remove(); searchPanel = null; return; }
     const panel = el('div', { class: 'search-panel', role: 'dialog', 'aria-label': 'Search messages' });
-    const input = el('input', { class: 'input', type: 'search', placeholder: 'Search in ' + (server.name || 'this community') + '…', 'aria-label': 'Search messages' });
+    const input = el('input', { class: 'input', type: 'search', placeholder: 'Search in ' + (server.name || 'this community') + 'â€¦', 'aria-label': 'Search messages' });
     const status = el('div', { class: 'muted small', 'aria-live': 'polite' }, 'Type at least 2 characters.');
     const results = el('div', { class: 'search-results' });
     const closeBtn = el('button', { class: 'btn ghost sm', type: 'button' }, 'Close');
@@ -872,7 +882,7 @@ async function renderChannel(container, serverId, channelId) {
         status.textContent = 'Type at least 2 characters.';
         return;
       }
-      status.textContent = 'Searching…';
+      status.textContent = 'Searchingâ€¦';
       timer = setTimeout(async () => {
         const mine = ++seq;
         try {
@@ -884,7 +894,7 @@ async function renderChannel(container, serverId, channelId) {
           for (const h of hits) {
             const row = el('button', { class: 'search-hit', type: 'button' });
             row.appendChild(el('div', { class: 'search-hit__meta' },
-              '#' + (h.channel_name || 'channel') + ' · ' + (h.author_display || h.author_name || 'Unknown') + ' · ' + relTime(h.created_at)));
+              '#' + (h.channel_name || 'channel') + ' Â· ' + (h.author_display || h.author_name || 'Unknown') + ' Â· ' + relTime(h.created_at)));
             row.appendChild(el('div', { class: 'search-hit__text' }, String(h.content || '').slice(0, 160)));
             row.addEventListener('click', () => {
               panel.remove(); searchPanel = null;
@@ -969,7 +979,7 @@ function rolePill(r, { removable = false, onRemove = null } = {}) {
     el('span', {}, r.name || 'Role'));
   if (r.color) { pill.style.color = r.color; pill.style.borderColor = r.color; }
   if (removable) {
-    const x = el('button', { class: 'role-unassign', type: 'button', title: 'Remove role', 'aria-label': 'Remove role ' + (r.name || '') }, '×');
+    const x = el('button', { class: 'role-unassign', type: 'button', title: 'Remove role', 'aria-label': 'Remove role ' + (r.name || '') }, 'Ã—');
     x.addEventListener('click', onRemove);
     const wrap = el('span', { class: 'role-pill-wrap' }, pill, x);
     return wrap;
@@ -1047,7 +1057,7 @@ async function renderServerMembers(container, serverId) {
   wrap.appendChild(counts);
 
   const toolbar = el('div', { class: 'community-manager__toolbar' });
-  const search = el('input', { class: 'input', type: 'search', placeholder: 'Search members…' });
+  const search = el('input', { class: 'input', type: 'search', placeholder: 'Search membersâ€¦' });
   const roleFilter = el('select', { class: 'input sm', title: 'Filter by role' });
   // Seeded before the first paint: paint() reads the value before it
   // rebuilds the live role options, and an empty value would filter all out.
@@ -1103,7 +1113,7 @@ async function renderServerMembers(container, serverId) {
     const total = (State.members || []).length;
     const onlineCount = (State.members || []).filter(online).length;
     clear(counts);
-    counts.appendChild(el('span', {}, String(total) + ' total · ' + String(onlineCount) + ' online'));
+    counts.appendChild(el('span', {}, String(total) + ' total Â· ' + String(onlineCount) + ' online'));
 
     // Role filter options follow live roles.
     const curRole = roleFilter.value;
@@ -1117,7 +1127,7 @@ async function renderServerMembers(container, serverId) {
     roleFilter.value = [...roleFilter.options].some((o) => o.value === curRole) ? curRole : 'all';
 
     if (!members.length) {
-      list.appendChild(emptyState('⌕', 'No members found', 'Try a different search or filter.'));
+      list.appendChild(emptyState('âŒ•', 'No members found', 'Try a different search or filter.'));
     }
     for (const m of members) {
       const id = m.user_id || m.id;
@@ -1126,15 +1136,21 @@ async function renderServerMembers(container, serverId) {
       row.appendChild(avatar({ id, username: m.username, displayName: m.nickname || m.display_name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }));
       const info = el('div', { class: 'card--list__info' });
       const nameLine = el('div', { class: 'member-name-line' },
-        el('strong', {}, dispName(m)),
+        // Click opens the contextual card, right-click gives the action list
+        // directly. Shares one action builder with message authors, so this
+        // page and a channel cannot offer different actions for one person.
+        userNameButton(
+          { id, username: m.username, displayName: m.nickname || m.display_name, avatarUrl: m.avatar_url, roles: m.roles },
+          { className: 'member-name-btn', serverId, label: dispName(m) }
+        ),
         m.is_bot ? el('span', { class: 'bot-tag' }, 'BOT') : null);
       info.appendChild(nameLine);
       const sub = '@' + (m.username || 'unknown') +
-        (m.joined_at ? ' · joined ' + relTime(m.joined_at) : '') +
-        (m.status_text ? ' · ' + m.status_text : '');
+        (m.joined_at ? ' Â· joined ' + relTime(m.joined_at) : '') +
+        (m.status_text ? ' Â· ' + m.status_text : '');
       info.appendChild(el('span', { class: 'muted small' }, sub));
       const to = timedOutUntil(m);
-      if (to) info.appendChild(el('span', { class: 'badge warn' }, 'Timed out · ' + relTime(to)));
+      if (to) info.appendChild(el('span', { class: 'badge warn' }, 'Timed out Â· ' + relTime(to)));
       const roles = Array.isArray(m.roles) ? m.roles : [];
       const roleBox = el('div', { class: 'role-pills' });
       if (m.is_owner) roleBox.appendChild(el('span', { class: 'role-pill owner' }, 'Owner'));
@@ -1158,7 +1174,7 @@ async function renderServerMembers(container, serverId) {
       if (can('MANAGE_ROLES') && !m.is_owner) {
         const assigned = new Set(roles.map((r) => String(r.id)));
         const roleSelect = el('select', { class: 'input sm', title: 'Assign role' });
-        roleSelect.appendChild(el('option', { value: '' }, 'Role…'));
+        roleSelect.appendChild(el('option', { value: '' }, 'Roleâ€¦'));
         for (const role of State.roles || []) {
           if (role.is_default || assigned.has(String(role.id))) continue;
           roleSelect.appendChild(el('option', { value: role.id }, role.name || 'Role'));
@@ -1204,9 +1220,9 @@ async function renderServerMembers(container, serverId) {
         info.appendChild(el('strong', {}, b.displayName || b.username || 'Unknown'));
         info.appendChild(el('span', { class: 'muted small' },
           '@' + (b.username || '?') +
-          (b.reason ? ' · ' + b.reason : '') +
-          (b.expiresAt ? ' · expires ' + relTime(b.expiresAt) : ' · permanent') +
-          (b.actorName ? ' · by ' + b.actorName : '')));
+          (b.reason ? ' Â· ' + b.reason : '') +
+          (b.expiresAt ? ' Â· expires ' + relTime(b.expiresAt) : ' Â· permanent') +
+          (b.actorName ? ' Â· by ' + b.actorName : '')));
         row.appendChild(info);
         const unban = el('button', { class: 'btn sm', type: 'button' }, 'Unban');
         unban.addEventListener('click', async () => {
@@ -1280,21 +1296,21 @@ async function renderServerRoles(container, serverId) {
       if (role.color) { pill.style.color = role.color; pill.style.borderColor = role.color; }
       main.appendChild(pill);
       main.appendChild(el('span', { class: 'muted small' },
-        memberCount(role.id) + ' members · ' + String((role.permissions || []).length) + ' permissions' +
-        (role.is_default ? ' · default' : '')));
+        memberCount(role.id) + ' members Â· ' + String((role.permissions || []).length) + ' permissions' +
+        (role.is_default ? ' Â· default' : '')));
       row.appendChild(main);
       if (!role.is_default) {
         const actions = el('div', { class: 'card--list__actions' });
         const edit = el('button', { class: 'btn sm', type: 'button' }, 'Edit');
         edit.addEventListener('click', () => openRoleEditor(serverId, role, allPerms, reload));
-        const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, '▲');
+        const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, 'â–²');
         up.addEventListener('click', async () => {
           const ids = ordered.map((r) => String(r.id));
           [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
           try { await Api.reorderRoles(serverId, ids); await reload(); }
           catch (ex) { toast(ex.message || 'Could not reorder roles.', 'error'); }
         });
-        const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === ordered.length - 1 }, '▼');
+        const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === ordered.length - 1 }, 'â–¼');
         down.addEventListener('click', async () => {
           const ids = ordered.map((r) => String(r.id));
           [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
@@ -1429,7 +1445,7 @@ async function renderServerCategories(container, serverId) {
     const cats = [...(State.channels.categories || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
     const allChannels = [...(State.channels.channels || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
     if (!cats.length && !allChannels.length) {
-      list.appendChild(emptyState('≡', 'No categories', 'Channels without a category appear under Text channels.'));
+      list.appendChild(emptyState('â‰¡', 'No categories', 'Channels without a category appear under Text channels.'));
     }
     cats.forEach((cat, idx) => {
       const channels = allChannels.filter((c) => String(c.category_id) === String(cat.id));
@@ -1441,14 +1457,14 @@ async function renderServerCategories(container, serverId) {
       const actions = el('div', { class: 'card--list__actions' });
       const rename = el('button', { class: 'btn sm', type: 'button' }, 'Rename');
       rename.addEventListener('click', () => openCategoryRename(serverId, cat, reload));
-      const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, '▲');
+      const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, 'â–²');
       up.addEventListener('click', async () => {
         const ids = cats.map((c) => String(c.id));
         [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
         try { await Api.reorderCategories(serverId, ids); await reload(); }
         catch (ex) { toast(ex.message || 'Could not reorder categories.', 'error'); }
       });
-      const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === cats.length - 1 }, '▼');
+      const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === cats.length - 1 }, 'â–¼');
       down.addEventListener('click', async () => {
         const ids = cats.map((c) => String(c.id));
         [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
@@ -1459,7 +1475,7 @@ async function renderServerCategories(container, serverId) {
       del.addEventListener('click', () => {
         confirmDialog({
           title: 'Delete category?',
-          message: (cat.name || 'Category') + ' will be removed. Its ' + channels.length + ' channel(s) become uncategorized — channels are never deleted with it.',
+          message: (cat.name || 'Category') + ' will be removed. Its ' + channels.length + ' channel(s) become uncategorized â€” channels are never deleted with it.',
           danger: true, confirmText: 'Delete',
           onConfirm: async () => {
             try { await Api.deleteCategory(serverId, cat.id); await reload(); toast('Category deleted.', 'ok'); }
@@ -1676,7 +1692,7 @@ async function renderInvites(container, serverId) {
     let invites = [];
     try { invites = await Api.invites(serverId); } catch { /* ignore */ }
     if (!invites.length) {
-      listPane.appendChild(emptyState('◇', 'No invites yet', 'Create one above to share a link.'));
+      listPane.appendChild(emptyState('â—‡', 'No invites yet', 'Create one above to share a link.'));
       return;
     }
     for (const inv of invites) {
@@ -1687,8 +1703,8 @@ async function renderInvites(container, serverId) {
       m.appendChild(el('div', { class: 'row-sub' },
         inv.uses + ' uses' +
         (inv.max_uses ? '/' + inv.max_uses : '') +
-        (inv.expires_at ? ' · expires ' + relTime(inv.expires_at) : '') +
-        (inv.revoked ? ' · REVOKED' : '')));
+        (inv.expires_at ? ' Â· expires ' + relTime(inv.expires_at) : '') +
+        (inv.revoked ? ' Â· REVOKED' : '')));
       row.appendChild(m);
       const copyBtn = el('button', { class: 'btn sm', type: 'button' }, 'Copy link');
       copyBtn.addEventListener('click', async () => {
@@ -1787,7 +1803,7 @@ async function renderServerSettings(container, serverId) {
     card.appendChild(el('div', { class: 'hr' }));
     const delInput = el('input', { class: 'input', type: 'text', placeholder: 'Type server name to confirm' });
     const delBtn = el('button', { class: 'btn danger block', type: 'button', style: { marginTop: 'var(--t-d-3)' } }, 'Delete server');
-    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone — delete server'), delInput, delBtn));
+    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone â€” delete server'), delInput, delBtn));
     delBtn.addEventListener('click', async () => {
       if (delInput.value.trim() !== server.name) { toast('Type the exact server name to confirm.', 'warn'); return; }
       confirmDialog({
@@ -1831,7 +1847,7 @@ async function renderNewServer(container, serverId) {
     el('div', { class: 'field' }, el('label', {}, 'Description'), desc),
     el('div', { class: 'field' }, el('label', {}, 'Join code'), joinCode,
       el('span', { class: 'hint' }, 'Leave blank to auto-generate one.')),
-    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public — joinable by code or invite link')),
+    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public â€” joinable by code or invite link')),
     el('div', { class: 'field' }, el('label', { class: 'switch' }, isDisc, ' Discoverable in the browse feed')),
     createBtn);
 
@@ -1882,9 +1898,9 @@ async function renderChannelPins(container, serverId, channelId) {
   }
   const layout = State.channels;
   const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
-  const back = el('button', { class: 'btn ghost sm', type: 'button' }, '← Back to #' + (channel ? channel.name : 'channel'));
+  const back = el('button', { class: 'btn ghost sm', type: 'button' }, 'â† Back to #' + (channel ? channel.name : 'channel'));
   back.addEventListener('click', () => { location.hash = '#/server/' + serverId + '/channel/' + channelId; });
-  renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: '☆', actions: [back] });
+  renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: 'â˜†', actions: [back] });
   const wrap = el('div', { class: 'page atrium' });
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
@@ -1899,7 +1915,7 @@ async function renderChannelPins(container, serverId, channelId) {
       return;
     }
     if (!pins.length) {
-      list.appendChild(emptyState('☆', 'No pinned messages', 'Pin important messages to find them here.'));
+      list.appendChild(emptyState('â˜†', 'No pinned messages', 'Pin important messages to find them here.'));
       return;
     }
     for (const m of pins) {
