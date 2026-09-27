@@ -59,7 +59,11 @@ function readInput(body) {
   const href = String((body && body.linkHref) || '').trim();
   // Only same-origin relative paths: an instance admin must not be able to
   // turn the global banner into an open redirect or a javascript: URL.
-  if (href && !href.startsWith('/')) return { err: 'link must be a relative path starting with /' };
+  // A bare startsWith('/') check is not enough: '//evil.example' also
+  // starts with '/', and browsers read that as a protocol-relative URL.
+  if (href && !(href.startsWith('/') && !href.startsWith('//'))) {
+    return { err: 'link must be a relative path starting with /' };
+  }
   const label = String((body && body.linkLabel) || '').trim();
   return {
     value: {
