@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "trycord-server",
   "version": "0.1.0",
   "description": "Trycord chat server: REST API + realtime WebSocket gateway, serves the web client",

@@ -218,13 +218,33 @@ export function refreshServerView() {
   return run.then(() => { repaintView(); return null; });
 }
 
-export async function refreshBans() {
-  const sid = state.lastServerId;
-  if (!sid) { state.bans = []; return state.bans; }
+// Ban list for the members page.
+//
+// Two things this deliberately does not do any more:
+//
+//  - it does not clear the list on error. It used to set state.bans = [] in
+//    the catch, so a single failed request made every ban vanish from the UI
+//    even though the rows were still in the database. A transient network
+//    blip looked exactly like data loss.
+//  - it does not rely solely on state.lastServerId. On a cold load that is
+//    still null when the members page asks, which produced an empty list; and
+//    switching communities could show the previous community's bans. The id
+//    is now passed in, with the old field only as a fallback.
+//
+// A late response for a previous community is also discarded rather than
+// being allowed to overwrite the current one.
+let bansSeq = 0;
+export async function refreshBans(serverId) {
+  const sid = serverId || state.lastServerId;
+  if (!sid) return state.bans;
+  const seq = ++bansSeq;
   try {
-    state.bans = (await Api.serverBans(sid)) || [];
+    const list = await Api.serverBans(sid);
+    if (seq !== bansSeq) return state.bans;          // superseded
+    state.bans = Array.isArray(list) ? list : [];
   } catch {
-    state.bans = [];
+    // Keep the last known list. The server is the source of truth; a failed
+    // read is not evidence that the bans are gone.
   }
   return state.bans;
 }

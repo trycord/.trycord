@@ -1,4 +1,4 @@
-﻿// Channel/category permission override coverage: inheritance, category and
+// Channel/category permission override coverage: inheritance, category and
 // channel precedence, deny-beats-allow, owner bypass, enforcement, and
 // authorisation on the override endpoints. Uses throwaway probe users.
 // Channel/category permission overrides: inheritance, precedence, deny-wins,

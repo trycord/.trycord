@@ -1,4 +1,4 @@
-﻿// Server workspace: the main Environment when inside a community.
+// Server workspace: the main Environment when inside a community.
 //   /server/:id                 -> landing (channel list summary)
 //   /server/:id/channel/:cid    -> channel conversation
 //   /server/:id/channels/new    -> create channel
@@ -20,13 +20,16 @@ function pickReaction(messageId) {
 }
 import { avatar, emptyState, messageRow, channelRow, paintReactions, initialOf } from './components.js';
 import { permissionOverrideEditor } from './permission-overrides.js';
+import { groupPermissions, humanizePerm } from './permission-groups.js';
+import { assignableRoleTest, myTopPosition, openRoleAssignModal, rolePill } from './role-assignment.js';
+import { TrycordConfig } from './config.js';
 import { userNameButton } from './user-actions.js';
 import { renderContextHeader, renderAllChrome, renderCommunities, renderPlaceNavigation, toggleMembers, membersHidden } from './shell.js';
 import Realtime from './realtime.js';
 
 let activeChannelId = null;
 
-// Community realtime wiring (subscribed once â€” module evaluates once).
+// Community realtime wiring (subscribed once — module evaluates once).
 // Structural events arrive on the server room; the handler refreshes state
 // (serialized, so rapid events converge) and repaints the active view via
 // its refresh hook. If WE were removed, drop context and go home.
@@ -81,7 +84,7 @@ async function renderServerLanding(container, serverId) {
     container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this server'));
     return;
   }
-  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' Â· ' + (server.member_count || 0) + ' members' });
+  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
   const wrap = el('div', { class: 'page atrium' });
   const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
   const hero = el('div', { class: 'community-hero' });
@@ -90,7 +93,7 @@ async function renderServerLanding(container, serverId) {
   heroText.appendChild(el('h2', { class: 'community-hero__name' }, server.name || 'Community'));
   if (server.description) heroText.appendChild(el('p', { class: 'muted' }, server.description));
   const stats = el('div', { class: 'stat-inline' });
-  stats.appendChild(el('span', {}, String(server.member_count || 0) + ' members Â· ' + String(onlineCount) + ' online'));
+  stats.appendChild(el('span', {}, String(server.member_count || 0) + ' members · ' + String(onlineCount) + ' online'));
   stats.appendChild(el('span', {}, String(server.channel_count || 0) + ' channels'));
   stats.appendChild(el('span', {}, String(server.role_count || 0) + ' roles'));
   if (server.message_count != null) stats.appendChild(el('span', {}, String(server.message_count) + ' messages'));
@@ -102,7 +105,7 @@ async function renderServerLanding(container, serverId) {
   const categories = layout.categories || [];
   const channels = layout.channels || [];
   if (!channels.length) {
-    wrap.appendChild(emptyState('â—Œ', 'No channels yet', 'Create a channel to get started.'));
+    wrap.appendChild(emptyState('◌', 'No channels yet', 'Create a channel to get started.'));
   } else {
     for (const cat of categories) {
       const inCat = channels.filter((ch) => String(ch.category_id) === String(cat.id));
@@ -167,7 +170,7 @@ function renderMemberList(wrap, serverId) {
     const nameEl = userNameButton(member, { className: 'row-title', serverId });
     mm.appendChild(nameEl);
     const sub = m.nickname
-      ? '@' + (m.username || '') + (m.display_name && m.display_name !== m.username ? ' Â· ' + m.display_name : '')
+      ? '@' + (m.username || '') + (m.display_name && m.display_name !== m.username ? ' · ' + m.display_name : '')
       : '@' + (m.username || '');
     mm.appendChild(el('div', { class: 'row-sub' }, sub));
     row.appendChild(mm);
@@ -253,7 +256,7 @@ async function renderChannel(container, serverId, channelId) {
       btn.setAttribute('aria-label', btn.title);
       btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
     },
-  }, 'â˜°');
+  }, '☰');
   // Mute state for the header bell (one cheap read per channel open).
   let muted = isMuted(channelId);
   try { await refreshMutes(); muted = isMuted(channelId); } catch { /* keep last known */ }
@@ -274,30 +277,30 @@ async function renderChannel(container, serverId, channelId) {
         }
         const now = isMuted(channelId);
         renderAllChrome();
-        btn.textContent = now ? 'ðŸ”•' : 'ðŸ””';
+        btn.textContent = now ? '🔕' : '🔔';
         btn.title = now ? 'Unmute this channel' : 'Mute this channel';
         btn.setAttribute('aria-label', btn.title);
         btn.setAttribute('aria-pressed', now ? 'true' : 'false');
         toast(now ? 'Channel muted.' : 'Channel unmuted.', 'ok');
       } catch (ex) { toast(ex.message || 'Could not change mute.', 'error'); }
     },
-  }, muted ? 'ðŸ”•' : 'ðŸ””');
+  }, muted ? '🔕' : '🔔');
   const searchBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Search in this community', 'aria-label': 'Search messages',
     onClick: () => toggleSearchPanel(),
-  }, 'âŒ•');
+  }, '⌕');
   const pinsBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Pinned messages', 'aria-label': 'Pinned messages',
     onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + channelId + '/pins'; },
-  }, 'â˜†');
+  }, '☆');
   const moreBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Community actions', 'aria-label': 'Community actions',
     onClick: () => {
-      // Reuses the sidebar community menu â€” one menu, two entry points.
+      // Reuses the sidebar community menu — one menu, two entry points.
       const menu = document.querySelector('#place-navigation .place-header__menu');
       if (menu) menu.click();
     },
-  }, 'â‹¯');
+  }, '⋯');
   renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [searchBtn, pinsBtn, bellBtn, moreBtn, memberToggle] });
 
   const conv = el('div', { class: 'conversation' });
@@ -402,7 +405,7 @@ async function renderChannel(container, serverId, channelId) {
     loadingHistory = true;
     pendingLive.clear();
     clear(feed);
-    feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messagesâ€¦'));
+    feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messages…'));
     let msgs = [];
     try {
       msgs = await Api.messages(channelId, { limit: HISTORY_PAGE });
@@ -471,7 +474,7 @@ async function renderChannel(container, serverId, channelId) {
       pinState.set(String(id), !!pinned);
       const head = node.querySelector('.msg-head');
       const badge = node.querySelector('.msg-pinned');
-      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, 'ðŸ“Œ'));
+      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, '📌'));
       if (!pinned && badge) badge.remove();
     }
     if (list !== undefined) {
@@ -520,7 +523,7 @@ async function renderChannel(container, serverId, channelId) {
       ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
       { label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') },
       ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { location.hash = '#/users/' + m.author_id; } }] : []),
-      { label: 'Add reactionâ€¦', onSelect: () => pickReaction(m.id) },
+      { label: 'Add reaction…', onSelect: () => pickReaction(m.id) },
       ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
       ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
       ...(can('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
@@ -647,11 +650,11 @@ async function renderChannel(container, serverId, channelId) {
 
   // ---- composer ----
   const composer = el('div', { class: 'composer' });
-  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, 'ðŸ“Ž');
+  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, '📎');
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
-  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, 'â˜º');
+  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, '☺');
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
   composer.appendChild(fileBtn);
   composer.appendChild(fileInput);
@@ -747,7 +750,7 @@ async function renderChannel(container, serverId, channelId) {
 
   // Live updates. Every insert/update is reconciled by authoritative
   // message id: the sender's own POST already appears via reload(), and
-  // the server broadcast reaches the sender too â€” blind appends would
+  // the server broadcast reaches the sender too — blind appends would
   // render each own message twice (F2). Reconnect replays are also
   // absorbed: an id already in the feed is replaced, never duplicated.
   function upsertMessage(m, opts = {}) {
@@ -857,13 +860,13 @@ async function renderChannel(container, serverId, channelId) {
     if (String(m.channel_id) === String(channelId)) patchEngagement(m.id, { reactions: m.reactions });
   });
 
-  // Search panel (reference âŒ• pattern): debounced community search with
+  // Search panel (reference ⌕ pattern): debounced community search with
   // jump-to-message. Lives and dies with this view; Escape closes.
   let searchPanel = null;
   function toggleSearchPanel() {
     if (searchPanel) { searchPanel.remove(); searchPanel = null; return; }
     const panel = el('div', { class: 'search-panel', role: 'dialog', 'aria-label': 'Search messages' });
-    const input = el('input', { class: 'input', type: 'search', placeholder: 'Search in ' + (server.name || 'this community') + 'â€¦', 'aria-label': 'Search messages' });
+    const input = el('input', { class: 'input', type: 'search', placeholder: 'Search in ' + (server.name || 'this community') + '…', 'aria-label': 'Search messages' });
     const status = el('div', { class: 'muted small', 'aria-live': 'polite' }, 'Type at least 2 characters.');
     const results = el('div', { class: 'search-results' });
     const closeBtn = el('button', { class: 'btn ghost sm', type: 'button' }, 'Close');
@@ -882,7 +885,7 @@ async function renderChannel(container, serverId, channelId) {
         status.textContent = 'Type at least 2 characters.';
         return;
       }
-      status.textContent = 'Searchingâ€¦';
+      status.textContent = 'Searching…';
       timer = setTimeout(async () => {
         const mine = ++seq;
         try {
@@ -894,7 +897,7 @@ async function renderChannel(container, serverId, channelId) {
           for (const h of hits) {
             const row = el('button', { class: 'search-hit', type: 'button' });
             row.appendChild(el('div', { class: 'search-hit__meta' },
-              '#' + (h.channel_name || 'channel') + ' Â· ' + (h.author_display || h.author_name || 'Unknown') + ' Â· ' + relTime(h.created_at)));
+              '#' + (h.channel_name || 'channel') + ' · ' + (h.author_display || h.author_name || 'Unknown') + ' · ' + relTime(h.created_at)));
             row.appendChild(el('div', { class: 'search-hit__text' }, String(h.content || '').slice(0, 160)));
             row.addEventListener('click', () => {
               panel.remove(); searchPanel = null;
@@ -973,19 +976,9 @@ function timedOutUntil(m) {
   return Number.isFinite(t) && t > Date.now() ? m.timeout_expires_at : null;
 }
 
-function rolePill(r, { removable = false, onRemove = null } = {}) {
-  const pill = el('span', { class: 'role-pill' + (removable ? '' : '') },
-    r.color ? el('span', { class: 'role-color-dot', style: { background: r.color } }) : null,
-    el('span', {}, r.name || 'Role'));
-  if (r.color) { pill.style.color = r.color; pill.style.borderColor = r.color; }
-  if (removable) {
-    const x = el('button', { class: 'role-unassign', type: 'button', title: 'Remove role', 'aria-label': 'Remove role ' + (r.name || '') }, 'Ã—');
-    x.addEventListener('click', onRemove);
-    const wrap = el('span', { class: 'role-pill-wrap' }, pill, x);
-    return wrap;
-  }
-  return pill;
-}
+// The role pill now lives in role-assignment.js, which the assignment dialog
+// also needs it for; keeping a second copy here meant the two surfaces could
+// drift apart on the removable affordance.
 
 function openBanModal(serverId, m, onDone) {
   const id = m.user_id || m.id;
@@ -1057,7 +1050,7 @@ async function renderServerMembers(container, serverId) {
   wrap.appendChild(counts);
 
   const toolbar = el('div', { class: 'community-manager__toolbar' });
-  const search = el('input', { class: 'input', type: 'search', placeholder: 'Search membersâ€¦' });
+  const search = el('input', { class: 'input', type: 'search', placeholder: 'Search members…' });
   const roleFilter = el('select', { class: 'input sm', title: 'Filter by role' });
   // Seeded before the first paint: paint() reads the value before it
   // rebuilds the live role options, and an empty value would filter all out.
@@ -1113,7 +1106,7 @@ async function renderServerMembers(container, serverId) {
     const total = (State.members || []).length;
     const onlineCount = (State.members || []).filter(online).length;
     clear(counts);
-    counts.appendChild(el('span', {}, String(total) + ' total Â· ' + String(onlineCount) + ' online'));
+    counts.appendChild(el('span', {}, String(total) + ' total · ' + String(onlineCount) + ' online'));
 
     // Role filter options follow live roles.
     const curRole = roleFilter.value;
@@ -1127,7 +1120,7 @@ async function renderServerMembers(container, serverId) {
     roleFilter.value = [...roleFilter.options].some((o) => o.value === curRole) ? curRole : 'all';
 
     if (!members.length) {
-      list.appendChild(emptyState('âŒ•', 'No members found', 'Try a different search or filter.'));
+      list.appendChild(emptyState('⌕', 'No members found', 'Try a different search or filter.'));
     }
     for (const m of members) {
       const id = m.user_id || m.id;
@@ -1146,11 +1139,11 @@ async function renderServerMembers(container, serverId) {
         m.is_bot ? el('span', { class: 'bot-tag' }, 'BOT') : null);
       info.appendChild(nameLine);
       const sub = '@' + (m.username || 'unknown') +
-        (m.joined_at ? ' Â· joined ' + relTime(m.joined_at) : '') +
-        (m.status_text ? ' Â· ' + m.status_text : '');
+        (m.joined_at ? ' · joined ' + relTime(m.joined_at) : '') +
+        (m.status_text ? ' · ' + m.status_text : '');
       info.appendChild(el('span', { class: 'muted small' }, sub));
       const to = timedOutUntil(m);
-      if (to) info.appendChild(el('span', { class: 'badge warn' }, 'Timed out Â· ' + relTime(to)));
+      if (to) info.appendChild(el('span', { class: 'badge warn' }, 'Timed out · ' + relTime(to)));
       const roles = Array.isArray(m.roles) ? m.roles : [];
       const roleBox = el('div', { class: 'role-pills' });
       if (m.is_owner) roleBox.appendChild(el('span', { class: 'role-pill owner' }, 'Owner'));
@@ -1174,7 +1167,7 @@ async function renderServerMembers(container, serverId) {
       if (can('MANAGE_ROLES') && !m.is_owner) {
         const assigned = new Set(roles.map((r) => String(r.id)));
         const roleSelect = el('select', { class: 'input sm', title: 'Assign role' });
-        roleSelect.appendChild(el('option', { value: '' }, 'Roleâ€¦'));
+        roleSelect.appendChild(el('option', { value: '' }, 'Role…'));
         for (const role of State.roles || []) {
           if (role.is_default || assigned.has(String(role.id))) continue;
           roleSelect.appendChild(el('option', { value: role.id }, role.name || 'Role'));
@@ -1220,9 +1213,9 @@ async function renderServerMembers(container, serverId) {
         info.appendChild(el('strong', {}, b.displayName || b.username || 'Unknown'));
         info.appendChild(el('span', { class: 'muted small' },
           '@' + (b.username || '?') +
-          (b.reason ? ' Â· ' + b.reason : '') +
-          (b.expiresAt ? ' Â· expires ' + relTime(b.expiresAt) : ' Â· permanent') +
-          (b.actorName ? ' Â· by ' + b.actorName : '')));
+          (b.reason ? ' · ' + b.reason : '') +
+          (b.expiresAt ? ' · expires ' + relTime(b.expiresAt) : ' · permanent') +
+          (b.actorName ? ' · by ' + b.actorName : '')));
         row.appendChild(info);
         const unban = el('button', { class: 'btn sm', type: 'button' }, 'Unban');
         unban.addEventListener('click', async () => {
@@ -1245,154 +1238,428 @@ async function renderServerMembers(container, serverId) {
   container.appendChild(wrap);
 }
 
+// Role management, as a hierarchy rather than a permission checklist.
+//
+// Two columns on wide screens: the ordered role list on the left, the editor
+// for the selected role on the right. Position is the property that decides
+// what a member is allowed to manage, so it is shown as the primary structure
+// rather than hidden behind up/down arrows on a card.
+//
+// Every restriction here mirrors a server rule that already exists - the UI
+// explains them instead of letting someone hit a wall:
+//   assertAssignable     - you may only manage roles strictly below your own
+//   assertCanReorderAll  - a reorder submits the WHOLE set, so one locked role
+//                          blocks the entire operation, not just its own row
+// The server still enforces both; nothing below grants anything.
 async function renderServerRoles(container, serverId) {
   clear(container);
   let server;
   try { ({ detail: server } = await ensureServer(serverId)); }
   catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
   renderContextHeader({ title: 'Roles', sub: server.name });
-  const wrap = el('div', { class: 'page atrium community-manager' });
-  if (!can('MANAGE_ROLES')) {
-    wrap.appendChild(el('div', { class: 'form-error' }, 'You need Manage Roles permission to edit roles.'));
-    const list = el('div', { class: 'community-list' });
-    for (const r of State.roles || []) list.appendChild(el('div', { class: 'community-role-card' }, el('strong', {}, r.name || 'Role'), el('span', { class: 'muted small' }, String((r.permissions || []).length) + ' permissions')));
-    wrap.appendChild(list); container.appendChild(wrap); return;
-  }
-  const permsInfo = await Api.serverPermissions(serverId).catch(() => ({ all: [] }));
+
+  const permsInfo = await Api.serverPermissions(serverId).catch(() => ({ all: [], descriptions: {} }));
   const allPerms = Array.isArray(permsInfo.all) ? permsInfo.all : [];
-  const list = el('div', { class: 'community-list' });
-  const formWrap = el('div', { class: 'community-role-editor' });
-  const name = el('input', { class: 'input', type: 'text', maxlength: 32, placeholder: 'Role name' });
-  const colorNew = el('input', { type: 'color', class: 'input', value: '#ff8a24', title: 'Role color' });
-  const permGrid = el('div', { class: 'permission-grid' });
-  const checks = new Map();
-  for (const perm of allPerms) {
-    const input = el('input', { type: 'checkbox' });
-    checks.set(perm, input);
-    permGrid.appendChild(el('label', { class: 'permission-item' }, input, el('span', {}, perm)));
+  const descriptions = permsInfo.descriptions || {};
+  const isOwner = !!permsInfo.is_owner;
+  const mayManage = can('MANAGE_ROLES');
+  const top = myTopPosition();
+  const test = assignableRoleTest(top);
+
+  const ordered = () => [...(State.roles || [])].sort((a, b) => Number(b.position || 0) - Number(a.position || 0));
+  const canManage = (role) => mayManage && test(String(role.id));
+  // Reorder sends every role id, so a single role at/above the actor fails the
+  // whole request server-side. Disable dragging outright rather than letting
+  // a drop bounce off an error.
+  const canReorder = () => mayManage && (isOwner || !ordered().some((r) => top <= Number(r.position || 0)));
+  const memberCount = (roleId) =>
+    (State.members || []).filter((m) => (m.roles || []).some((r) => String(r.id) === String(roleId))).length;
+
+  const wrap = el('div', { class: 'page roles-page' });
+
+  const head = el('div', { class: 'roles-head' });
+  const headText = el('div', { class: 'roles-head__text' });
+  headText.appendChild(el('h1', { class: 'page-title' }, 'Roles'));
+  headText.appendChild(el('p', { class: 'muted small' },
+    (State.roles || []).length + ' role' + ((State.roles || []).length === 1 ? '' : 's') +
+    ' · highest first. Position decides what each member can manage.'));
+  head.appendChild(headText);
+  if (mayManage) {
+    const newBtn = el('button', { class: 'btn primary', type: 'button' }, 'New role');
+    newBtn.addEventListener('click', () => { selectedId = NEW_ROLE; paint(); paintDetail(); });
+    head.appendChild(newBtn);
   }
-  const create = el('button', { class: 'btn primary', type: 'button' }, 'Create role');
-  formWrap.append(
-    el('div', { class: 'field' }, el('label', {}, 'Role name'), name),
-    el('div', { class: 'field' }, el('label', {}, 'Color'), colorNew),
-    el('div', { class: 'section-label' }, 'Permissions'), permGrid, create);
-  wrap.appendChild(formWrap); wrap.appendChild(el('div', { class: 'section-label' }, 'Existing roles (top first)')); wrap.appendChild(list);
+  wrap.appendChild(head);
 
-  const reload = async () => { await ensureServer(serverId); paint(); };
+  if (!mayManage) {
+    wrap.appendChild(el('div', { class: 'form-error' },
+      'You need Manage Roles permission to change roles. The hierarchy below is still shown.'));
+  } else {
+    wrap.appendChild(el('p', { class: 'roles-hint' }, isOwner
+      ? 'As the owner you can manage every role and set any order.'
+      : 'You can manage roles below your own highest role. Roles at or above it are locked.'));
+  }
+
+  const listCol = el('div', { class: 'roles-list-col' });
+  const detailCol = el('div', { class: 'roles-detail-col' });
+  wrap.appendChild(el('div', { class: 'roles-grid' }, listCol, detailCol));
+
+  const list = el('div', { class: 'role-hierarchy' });
+  listCol.appendChild(el('div', { class: 'section-label' }, 'Hierarchy'));
+  listCol.appendChild(list);
+
+  const detail = el('div', { class: 'role-detail' });
+  detailCol.appendChild(el('div', { class: 'section-label' }, 'Role details'));
+  detailCol.appendChild(detail);
+
+  const NEW_ROLE = '__new__';
+  let selectedId = null;
+  let dragId = null;
+
+  const reload = async () => { await ensureServer(serverId); };
   setViewRefresh(() => { reload().catch(() => {}); });
-
-  const sortedRoles = () => [...(State.roles || [])].sort((a, b) => Number(b.position || 0) - Number(a.position || 0));
-  const memberCount = (roleId) => (State.members || []).filter((m) => (m.roles || []).some((r) => String(r.id) === String(roleId))).length;
 
   const paint = () => {
     clear(list);
-    const ordered = sortedRoles();
-    ordered.forEach((role, idx) => {
-      const row = el('article', { class: 'community-role-card' });
-      const main = el('div', { class: 'community-role-card__main' });
-      const pill = el('span', { class: 'role-pill' },
-        role.color ? el('span', { class: 'role-color-dot', style: { background: role.color } }) : null,
-        el('span', {}, role.name || 'Role'));
-      if (role.color) { pill.style.color = role.color; pill.style.borderColor = role.color; }
-      main.appendChild(pill);
-      main.appendChild(el('span', { class: 'muted small' },
-        memberCount(role.id) + ' members Â· ' + String((role.permissions || []).length) + ' permissions' +
-        (role.is_default ? ' Â· default' : '')));
-      row.appendChild(main);
-      if (!role.is_default) {
-        const actions = el('div', { class: 'card--list__actions' });
-        const edit = el('button', { class: 'btn sm', type: 'button' }, 'Edit');
-        edit.addEventListener('click', () => openRoleEditor(serverId, role, allPerms, reload));
-        const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, 'â–²');
-        up.addEventListener('click', async () => {
-          const ids = ordered.map((r) => String(r.id));
-          [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-          try { await Api.reorderRoles(serverId, ids); await reload(); }
-          catch (ex) { toast(ex.message || 'Could not reorder roles.', 'error'); }
+    // The owner outranks every role and is not a role row, so it gets a
+    // fixed, undraggable row rather than pretending to be one.
+    const ownerName = (State.serverDetail && (State.serverDetail.owner_username || State.serverDetail.owner_name)) || 'Owner';
+    list.appendChild(el('div', { class: 'role-row role-row--owner' },
+      el('span', { class: 'role-row__handle' }),
+      el('span', { class: 'role-row__rank' }, 'OWNER'),
+      el('span', { class: 'role-row__name' }, ownerName),
+      el('span', { class: 'role-row__meta' }, 'Highest · not reorderable')));
+
+    const all = ordered();
+    all.forEach((role, idx) => {
+      const manageable = canManage(role);
+      const selected = String(role.id) === String(selectedId);
+      const row = el('div', {
+        class: 'role-row' + (selected ? ' is-selected' : '') + (manageable ? '' : ' is-locked'),
+        'data-role-id': String(role.id),
+        draggable: manageable && canReorder() ? 'true' : null,
+        tabindex: '0',
+        role: 'listitem',
+        'aria-label': (role.name || 'Role') + ', position ' + (all.length - idx) + ' of ' + all.length,
+      });
+
+      // A real handle rather than the whole row: text selection still works,
+      // and it is only draggable when the rules allow a reorder at all.
+      row.appendChild(el('span', {
+        class: 'role-row__handle',
+        title: manageable && canReorder() ? 'Drag to reorder' : 'Reordering unavailable',
+        'aria-hidden': 'true',
+      }, manageable && canReorder() ? '⠿' : ''));
+      row.appendChild(el('span', { class: 'role-row__rank' }, String(all.length - idx)));
+
+      const nameCell = el('span', { class: 'role-row__name' });
+      const colour = roleColor(role);
+      if (colour) nameCell.appendChild(el('span', { class: 'role-color-dot', style: { background: colour } }));
+      const nameEl = el('span', {}, role.name || 'Role');
+      if (colour) nameEl.style.color = colour;
+      nameCell.appendChild(nameEl);
+      if (role.is_default) nameCell.appendChild(el('span', { class: 'role-badge' }, 'default'));
+      if (role.self_assign) nameCell.appendChild(el('span', { class: 'role-badge role-badge--self' }, 'self-assign'));
+      row.appendChild(nameCell);
+
+      const n = memberCount(role.id);
+      const p = (role.permissions || []).length;
+      row.appendChild(el('span', { class: 'role-row__meta' },
+        n + ' member' + (n === 1 ? '' : 's') + ' · ' + p + ' perm' + (p === 1 ? '' : 's')));
+      if (!manageable) row.appendChild(el('span', { class: 'role-row__lock' }, 'locked'));
+
+      row.addEventListener('click', () => { selectedId = String(role.id); paint(); paintDetail(); });
+      row.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        selectedId = String(role.id);
+        paint();
+        paintDetail();
+      });
+
+      if (manageable && canReorder()) {
+        row.addEventListener('dragstart', (e) => {
+          dragId = String(role.id);
+          row.classList.add('is-dragging');
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            try { e.dataTransfer.setData('text/plain', dragId); } catch { /* older engines */ }
+          }
         });
-        const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === ordered.length - 1 }, 'â–¼');
-        down.addEventListener('click', async () => {
-          const ids = ordered.map((r) => String(r.id));
-          [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-          try { await Api.reorderRoles(serverId, ids); await reload(); }
-          catch (ex) { toast(ex.message || 'Could not reorder roles.', 'error'); }
+        row.addEventListener('dragend', () => {
+          dragId = null;
+          row.classList.remove('is-dragging');
+          list.querySelectorAll('.is-drop-target').forEach((n2) => n2.classList.remove('is-drop-target'));
         });
-        const del = el('button', { class: 'btn danger sm', type: 'button' }, 'Delete');
-        del.addEventListener('click', () => {
-          confirmDialog({
-            title: 'Delete role?', message: (role.name || 'Role') + ' will be removed. Members keep their other roles.',
-            danger: true, confirmText: 'Delete',
-            onConfirm: async () => {
-              try { await Api.deleteRole(serverId, role.id); await reload(); toast('Role deleted.', 'ok'); }
-              catch (ex) { toast(ex.message || 'Could not delete role.', 'error'); }
-            },
-          });
+        row.addEventListener('dragover', (e) => {
+          if (!dragId || dragId === String(role.id)) return;
+          e.preventDefault();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+          row.classList.add('is-drop-target');
         });
-        actions.append(edit, up, down, del);
-        row.appendChild(actions);
+        row.addEventListener('dragleave', () => row.classList.remove('is-drop-target'));
+        row.addEventListener('drop', async (e) => {
+          e.preventDefault();
+          row.classList.remove('is-drop-target');
+          const from = dragId;
+          const to = String(role.id);
+          dragId = null;
+          if (!from || from === to) return;
+          const ids = ordered().map((r) => String(r.id));
+          const a = ids.indexOf(from);
+          const b = ids.indexOf(to);
+          if (a < 0 || b < 0) return;
+          ids.splice(a, 1);
+          ids.splice(b, 0, from);
+          try {
+            await Api.reorderRoles(serverId, ids);
+            await reload();
+            paint();
+            toast('Roles reordered.', 'ok');
+          } catch (ex) {
+            toast(ex.message || 'Could not reorder roles.', 'error');
+            paint();
+          }
+        });
       }
       list.appendChild(row);
     });
+
+    if (!all.length) {
+      list.appendChild(el('div', { class: 'role-detail__empty' }, 'No roles yet.'));
+    }
   };
-  create.addEventListener('click', async () => {
-    const roleName = name.value.trim();
-    if (!roleName) { toast('Enter a role name.', 'warn'); return; }
-    const permissions = [...checks.entries()].filter(([, input]) => input.checked).map(([key]) => key);
-    try {
-      await Api.createRole(serverId, { name: roleName, permissions, color: colorNew.value });
-      name.value = ''; checks.forEach((i) => { i.checked = false; });
-      await reload(); toast('Role created.', 'ok');
-    } catch (ex) { toast(ex.message || 'Could not create role.', 'error'); }
-  });
-  paint(); container.appendChild(wrap);
-}
 
-function openRoleEditor(serverId, role, allPerms, onDone) {
-  const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: role.name || '' });
-  const colorRow = el('div', { class: 'row-line' });
-  const color = el('input', { type: 'color', class: 'input', value: /^#[0-9a-f]{6}$/i.test(role.color || '') ? role.color : '#ff8a24' });
-  const clearColor = el('button', { class: 'btn ghost sm', type: 'button' }, 'No color');
-  let useColor = !!role.color;
-  const paintColor = () => { color.disabled = !useColor; clearColor.textContent = useColor ? 'No color' : 'Use color'; };
-  clearColor.addEventListener('click', () => { useColor = !useColor; paintColor(); });
-  paintColor();
-  colorRow.append(color, clearColor);
-  const permGrid = el('div', { class: 'permission-grid' });
-  const checks = new Map();
-  const current = new Set(role.permissions || []);
-  for (const perm of allPerms) {
-    const input = el('input', { type: 'checkbox' });
-    input.checked = current.has(perm);
-    checks.set(perm, input);
-    permGrid.appendChild(el('label', { class: 'permission-item' }, input, el('span', {}, perm)));
-  }
-  const err = el('div', { class: 'form-error', hidden: true });
-  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
-  const save = el('button', { class: 'btn primary', type: 'button' }, 'Save role');
-  const modal = openModal({
-    title: 'Edit role',
-    body: el('div', {}, err,
-      el('div', { class: 'field' }, el('label', {}, 'Name'), name),
-      el('div', { class: 'field' }, el('label', {}, 'Color'), colorRow),
-      el('div', { class: 'section-label' }, 'Permissions'), permGrid),
-    footer: [cancel, save],
-  });
-  cancel.addEventListener('click', () => modal.close());
-  save.addEventListener('click', async () => {
-    err.hidden = true;
-    try {
-      await Api.updateRole(serverId, role.id, {
-        name: name.value.trim(),
-        permissions: [...checks.entries()].filter(([, i]) => i.checked).map(([k]) => k),
-        color: useColor ? color.value : null,
+  const paintDetail = () => {
+    clear(detail);
+    if (selectedId === NEW_ROLE) {
+      detail.appendChild(buildCreateForm());
+      return;
+    }
+    const role = (State.roles || []).find((r) => String(r.id) === String(selectedId));
+    if (!role) {
+      detail.appendChild(el('div', { class: 'role-detail__empty' },
+        el('p', { class: 'muted small' }, 'Select a role to edit it, or create a new one.')));
+      return;
+    }
+    detail.appendChild(buildRoleForm(role));
+  };
+
+  const selfAssignField = (checked) => {
+    const box = el('input', { type: 'checkbox' });
+    box.checked = !!checked;
+    const field = el('label', { class: 'role-selfassign' }, box,
+      el('span', { class: 'role-selfassign__text' },
+        el('strong', {}, 'Let members assign this role to themselves'),
+        el('small', {}, 'Shows up in a "Roles" button on their own member row. A role that grants a permission the member does not already have is refused on self-assign, so this cannot be used to hand out authority.')));
+    return { field, input: box };
+  };
+
+  const buildCreateForm = () => {
+    const box = el('div', { class: 'role-detail__form' });
+    if (!mayManage) {
+      box.appendChild(el('div', { class: 'muted small' }, 'You need Manage Roles permission to create roles.'));
+      return box;
+    }
+    const name = el('input', { class: 'input', type: 'text', maxlength: 32, placeholder: 'Role name' });
+    const colour = el('input', { type: 'color', class: 'input', value: '#ff8a24', title: 'Role color' });
+    const sa = selfAssignField(false);
+    const perms = permissionEditor(allPerms, descriptions, []);
+    const err = el('div', { class: 'form-error', hidden: true });
+    const create = el('button', { class: 'btn primary', type: 'button' }, 'Create role');
+    box.append(err,
+      el('div', { class: 'field' }, el('label', {}, 'Role name'), name),
+      el('div', { class: 'field' }, el('label', {}, 'Color'), colour),
+      sa.field,
+      el('div', { class: 'section-label' }, 'Permissions'), perms.node, create);
+    create.addEventListener('click', async () => {
+      err.hidden = true;
+      const value = name.value.trim();
+      if (!value) { err.hidden = false; err.textContent = 'Enter a role name.'; return; }
+      create.disabled = true;
+      try {
+        const made = await Api.createRole(serverId, {
+          name: value, color: colour.value, selfAssign: sa.input.checked, permissions: perms.selected(),
+        });
+        await reload();
+        selectedId = String(made.id);
+        paint();
+        paintDetail();
+        toast('Role created.', 'ok');
+      } catch (ex) {
+        err.hidden = false;
+        err.textContent = ex.message || 'Could not create role.';
+      } finally { create.disabled = false; }
+    });
+    return box;
+  };
+
+  const buildRoleForm = (role) => {
+    const box = el('div', { class: 'role-detail__form' });
+    const n = memberCount(role.id);
+    const p = (role.permissions || []).length;
+    const summary = el('div', { class: 'role-detail__summary' },
+      el('span', {}, 'Position ' + Number(role.position || 0)),
+      el('span', {}, n + ' member' + (n === 1 ? '' : 's')),
+      el('span', {}, p + ' permission' + (p === 1 ? '' : 's')));
+
+    if (!mayManage || !canManage(role)) {
+      box.append(
+        el('div', { class: 'form-error' }, mayManage
+          ? 'This role is at or above your own highest role, so you cannot change it.'
+          : 'You need Manage Roles permission to change this role.'),
+        el('div', { class: 'field' }, el('label', {}, 'Name'),
+          el('input', { class: 'input', type: 'text', value: role.name || '', disabled: true })),
+        summary);
+      if (!mayManage) {
+        const perms = permissionEditor(allPerms, descriptions, role.permissions || []);
+        perms.checks.forEach((i) => { i.disabled = true; });
+        box.appendChild(el('div', { class: 'section-label' }, 'Permissions'), perms.node);
+      }
+      return box;
+    }
+
+    const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: role.name || '' });
+    const colourRow = el('div', { class: 'row-line' });
+    const colour = el('input', { type: 'color', class: 'input', value: roleColor(role) || '#ff8a24' });
+    const clearColour = el('button', { class: 'btn ghost sm', type: 'button' }, 'No color');
+    let useColour = !!roleColor(role);
+    const paintColour = () => { colour.disabled = !useColour; clearColour.textContent = useColour ? 'No color' : 'Use color'; };
+    clearColour.addEventListener('click', () => { useColour = !useColour; paintColour(); });
+    paintColour();
+    colourRow.append(colour, clearColour);
+
+    const sa = selfAssignField(role.self_assign);
+    const perms = permissionEditor(allPerms, descriptions, role.permissions || []);
+    const err = el('div', { class: 'form-error', hidden: true });
+
+    // "Who has this" is the other half of the role object, so it lives here
+    // rather than only on the members page.
+    const holders = (State.members || []).filter((m) => (m.roles || []).some((r) => String(r.id) === String(role.id)));
+    const memberSection = el('div', { class: 'role-members' });
+    memberSection.appendChild(el('div', { class: 'section-label' }, 'Members with this role (' + holders.length + ')'));
+    if (!holders.length) {
+      memberSection.appendChild(el('div', { class: 'muted small' }, 'Nobody has this role yet.'));
+    }
+    for (const m of holders.slice(0, 12)) {
+      const rowEl = el('div', { class: 'role-holder' },
+        el('span', { class: 'role-holder__name' }, m.nickname || m.display_name || m.username || 'Unknown'),
+        el('span', { class: 'muted small' }, '@' + (m.username || '')));
+      const manage = el('button', { class: 'btn ghost sm', type: 'button' }, 'Manage');
+      manage.addEventListener('click', () => {
+        openRoleAssignModal({ serverId, member: m, onChanged: async () => { await reload(); paint(); } });
       });
-      modal.close();
-      toast('Role updated.', 'ok');
-      await onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not update role.'; }
-  });
+      rowEl.appendChild(manage);
+      memberSection.appendChild(rowEl);
+    }
+    if (holders.length > 12) {
+      memberSection.appendChild(el('div', { class: 'muted small' }, '+ ' + (holders.length - 12) + ' more'));
+    }
+
+    const actions = el('div', { class: 'card-actions' });
+    const save = el('button', { class: 'btn primary', type: 'button' }, 'Save changes');
+    save.addEventListener('click', async () => {
+      err.hidden = true;
+      save.disabled = true;
+      try {
+        await Api.updateRole(serverId, role.id, {
+          name: name.value.trim(),
+          color: useColour ? colour.value : null,
+          selfAssign: sa.input.checked,
+          permissions: perms.selected(),
+        });
+        await reload();
+        paint();
+        paintDetail();
+        toast('Role updated.', 'ok');
+      } catch (ex) {
+        err.hidden = false;
+        err.textContent = ex.message || 'Could not update role.';
+      } finally { save.disabled = false; }
+    });
+    actions.appendChild(save);
+
+    if (!role.is_default) {
+      const del = el('button', { class: 'btn danger', type: 'button' }, 'Delete role');
+      del.addEventListener('click', () => {
+        confirmDialog({
+          title: 'Delete role?',
+          message: (role.name || 'Role') + ' will be removed. Members keep their other roles.',
+          danger: true,
+          confirmText: 'Delete',
+          onConfirm: async () => {
+            try {
+              await Api.deleteRole(serverId, role.id);
+              selectedId = null;
+              await reload();
+              paint();
+              paintDetail();
+              toast('Role deleted.', 'ok');
+            } catch (ex) { toast(ex.message || 'Could not delete role.', 'error'); }
+          },
+        });
+      });
+      actions.appendChild(del);
+    }
+
+    box.append(err, summary,
+      el('div', { class: 'field' }, el('label', {}, 'Name'), name),
+      el('div', { class: 'field' }, el('label', {}, 'Color'), colourRow),
+      sa.field,
+      el('div', { class: 'section-label' }, 'Permissions'), perms.node,
+      memberSection, actions);
+    return box;
+  };
+
+  paint();
+  paintDetail();
+  container.appendChild(wrap);
 }
 
+function roleColor(role) {
+  return /^#[0-9a-f]{6}$/i.test((role && role.color) || '') ? role.color : null;
+}
+
+// Grouped permission toggles, built from whatever the server reports.
+//
+// Presentation only: `all` decides which permissions exist and `descriptions`
+// supplies their text, so the client never keeps its own copy of either. A
+// permission the server adds later lands in the "Other" group automatically
+// instead of disappearing from the editor.
+function permissionEditor(allPerms, descriptions, initial) {
+  const current = new Set(initial || []);
+  const checks = new Map();
+  const node = el('div', { class: 'perm-groups' });
+  for (const g of groupPermissions(allPerms, descriptions)) {
+    const box = el('div', { class: 'perm-group' });
+    box.appendChild(el('div', { class: 'perm-group__head' },
+      el('span', { class: 'perm-group__title' }, g.title),
+      el('span', { class: 'muted small' }, g.blurb)));
+    const grid = el('div', { class: 'permission-grid' });
+    for (const item of g.items) {
+      const input = el('input', { type: 'checkbox' });
+      input.checked = current.has(item.key);
+      input.dataset.perm = item.key;
+      checks.set(item.key, input);
+      grid.appendChild(el('label', {
+        class: 'permission-item',
+        title: item.key + (item.description ? ' - ' + item.description : ''),
+      }, input, el('span', { class: 'permission-item__text' },
+        el('span', { class: 'permission-item__name' }, humanizePerm(item.key)),
+        item.description ? el('span', { class: 'permission-item__desc' }, item.description) : null)));
+    }
+    box.appendChild(grid);
+    node.appendChild(box);
+  }
+  if (!allPerms.length) {
+    node.appendChild(el('div', { class: 'muted small' }, 'This server did not report any permissions.'));
+  }
+  return {
+    node,
+    checks,
+    selected: () => [...checks.entries()].filter(([, i]) => i.checked).map(([k]) => k),
+  };
+}
 // Permission overrides for one channel or category. Gated on
 // MANAGE_CHANNELS - the same permission that already authorises creating and
 // deleting the entity being edited - and rendered read-only for anyone who
@@ -1445,7 +1712,7 @@ async function renderServerCategories(container, serverId) {
     const cats = [...(State.channels.categories || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
     const allChannels = [...(State.channels.channels || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
     if (!cats.length && !allChannels.length) {
-      list.appendChild(emptyState('â‰¡', 'No categories', 'Channels without a category appear under Text channels.'));
+      list.appendChild(emptyState('≡', 'No categories', 'Channels without a category appear under Text channels.'));
     }
     cats.forEach((cat, idx) => {
       const channels = allChannels.filter((c) => String(c.category_id) === String(cat.id));
@@ -1457,14 +1724,14 @@ async function renderServerCategories(container, serverId) {
       const actions = el('div', { class: 'card--list__actions' });
       const rename = el('button', { class: 'btn sm', type: 'button' }, 'Rename');
       rename.addEventListener('click', () => openCategoryRename(serverId, cat, reload));
-      const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, 'â–²');
+      const up = el('button', { class: 'btn sm', type: 'button', title: 'Move up', disabled: idx === 0 }, '▲');
       up.addEventListener('click', async () => {
         const ids = cats.map((c) => String(c.id));
         [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
         try { await Api.reorderCategories(serverId, ids); await reload(); }
         catch (ex) { toast(ex.message || 'Could not reorder categories.', 'error'); }
       });
-      const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === cats.length - 1 }, 'â–¼');
+      const down = el('button', { class: 'btn sm', type: 'button', title: 'Move down', disabled: idx === cats.length - 1 }, '▼');
       down.addEventListener('click', async () => {
         const ids = cats.map((c) => String(c.id));
         [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
@@ -1475,7 +1742,7 @@ async function renderServerCategories(container, serverId) {
       del.addEventListener('click', () => {
         confirmDialog({
           title: 'Delete category?',
-          message: (cat.name || 'Category') + ' will be removed. Its ' + channels.length + ' channel(s) become uncategorized â€” channels are never deleted with it.',
+          message: (cat.name || 'Category') + ' will be removed. Its ' + channels.length + ' channel(s) become uncategorized — channels are never deleted with it.',
           danger: true, confirmText: 'Delete',
           onConfirm: async () => {
             try { await Api.deleteCategory(serverId, cat.id); await reload(); toast('Category deleted.', 'ok'); }
@@ -1692,19 +1959,26 @@ async function renderInvites(container, serverId) {
     let invites = [];
     try { invites = await Api.invites(serverId); } catch { /* ignore */ }
     if (!invites.length) {
-      listPane.appendChild(emptyState('â—‡', 'No invites yet', 'Create one above to share a link.'));
+      listPane.appendChild(emptyState('◇', 'No invites yet', 'Create one above to share a link.'));
       return;
     }
     for (const inv of invites) {
       const row = el('div', { class: 'row' });
       const m = el('div', { class: 'row-main' });
-      const link = location.origin + '/#/invite/' + inv.code;
+      // An invite is shared with other PEOPLE, so the link has to point at the
+      // instance, not at whatever is rendering this screen. location.origin is
+      // correct only when the app is served over http(s); in the packaged
+      // desktop app it is the app scheme (or "null" under the old file://
+      // load), which produces a link nobody else can open. Resolve it from the
+      // configured backend instead, so the same code produces a shareable link
+      // in the browser, on a self-hosted instance, and on the desktop.
+      const link = TrycordConfig.backendUrl().replace(/\/+$/, '') + '/#/invite/' + inv.code;
       m.appendChild(el('div', { class: 'row-title mono' }, inv.code));
       m.appendChild(el('div', { class: 'row-sub' },
         inv.uses + ' uses' +
         (inv.max_uses ? '/' + inv.max_uses : '') +
-        (inv.expires_at ? ' Â· expires ' + relTime(inv.expires_at) : '') +
-        (inv.revoked ? ' Â· REVOKED' : '')));
+        (inv.expires_at ? ' · expires ' + relTime(inv.expires_at) : '') +
+        (inv.revoked ? ' · REVOKED' : '')));
       row.appendChild(m);
       const copyBtn = el('button', { class: 'btn sm', type: 'button' }, 'Copy link');
       copyBtn.addEventListener('click', async () => {
@@ -1803,7 +2077,7 @@ async function renderServerSettings(container, serverId) {
     card.appendChild(el('div', { class: 'hr' }));
     const delInput = el('input', { class: 'input', type: 'text', placeholder: 'Type server name to confirm' });
     const delBtn = el('button', { class: 'btn danger block', type: 'button', style: { marginTop: 'var(--t-d-3)' } }, 'Delete server');
-    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone â€” delete server'), delInput, delBtn));
+    card.appendChild(el('div', { class: 'field' }, el('label', {}, 'Danger zone — delete server'), delInput, delBtn));
     delBtn.addEventListener('click', async () => {
       if (delInput.value.trim() !== server.name) { toast('Type the exact server name to confirm.', 'warn'); return; }
       confirmDialog({
@@ -1847,7 +2121,7 @@ async function renderNewServer(container, serverId) {
     el('div', { class: 'field' }, el('label', {}, 'Description'), desc),
     el('div', { class: 'field' }, el('label', {}, 'Join code'), joinCode,
       el('span', { class: 'hint' }, 'Leave blank to auto-generate one.')),
-    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public â€” joinable by code or invite link')),
+    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public — joinable by code or invite link')),
     el('div', { class: 'field' }, el('label', { class: 'switch' }, isDisc, ' Discoverable in the browse feed')),
     createBtn);
 
@@ -1898,9 +2172,9 @@ async function renderChannelPins(container, serverId, channelId) {
   }
   const layout = State.channels;
   const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
-  const back = el('button', { class: 'btn ghost sm', type: 'button' }, 'â† Back to #' + (channel ? channel.name : 'channel'));
+  const back = el('button', { class: 'btn ghost sm', type: 'button' }, '← Back to #' + (channel ? channel.name : 'channel'));
   back.addEventListener('click', () => { location.hash = '#/server/' + serverId + '/channel/' + channelId; });
-  renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: 'â˜†', actions: [back] });
+  renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: '☆', actions: [back] });
   const wrap = el('div', { class: 'page atrium' });
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
@@ -1915,7 +2189,7 @@ async function renderChannelPins(container, serverId, channelId) {
       return;
     }
     if (!pins.length) {
-      list.appendChild(emptyState('â˜†', 'No pinned messages', 'Pin important messages to find them here.'));
+      list.appendChild(emptyState('☆', 'No pinned messages', 'Pin important messages to find them here.'));
       return;
     }
     for (const m of pins) {

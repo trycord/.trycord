@@ -1,4 +1,4 @@
-﻿// Realtime gateway: authenticated sockets join channels or DM conversations,
+// Realtime gateway: authenticated sockets join channels or DM conversations,
 // post channel messages, send typing signals, and receive broadcasts.
 // Presence is derived from actual socket state: a user is online while at
 // least one of their sockets is open. Shares the HTTP server.
@@ -238,7 +238,7 @@ function createGateway(server) {
     }
   }
 
-  // Cut every live socket for a user â€” used the instant enforcement lands,
+  // Cut every live socket for a user — used the instant enforcement lands,
   // so a banned/suspended account cannot keep an existing connection open.
   // A graceful close frame (1008) is sent; no hard terminate, so the peer
   // actually observes the reason. Stuck sockets are reaped by the heartbeat.

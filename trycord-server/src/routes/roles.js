@@ -6,7 +6,7 @@ const { fail, serviceError } = require('../errors');
 const roles = require('../services/roles');
 const memberships = require('../services/memberships');
 const events = require('../services/events');
-const { PERMISSIONS } = require('../services/permissions');
+const { PERMISSIONS, effectivePermissions } = require('../services/permissions');
 
 // Role hierarchy: you may only act on roles ranked strictly below your own
 // top role (the owner bypasses). The service owns persistence; the server
@@ -46,19 +46,34 @@ const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
 
 router.get('/permissions', requireMember, (req, res) => {
-  res.json({ is_owner: req.access.isOwner, permissions: req.access.permissions, all: Object.keys(PERMISSIONS) });
+  res.json({
+    is_owner: req.access.isOwner,
+    permissions: req.access.permissions,
+    all: Object.keys(PERMISSIONS),
+    // The human-readable text lives here, with the permission that it describes,
+    // so the client's grouped editor can label the toggles without keeping a
+    // second copy of these strings that could drift out of sync.
+    descriptions: PERMISSIONS,
+  });
 });
 
+// The role list is the one place a client needs both "what roles exist" and
+// "which of them do I already have" - the self-assign picker is useless
+// without the second half, and making it a separate call would be a round trip
+// on every surface that shows a role list. Annotation is strictly about the
+// caller: per-member roles still come from the roster endpoint.
 router.get('/', requireMember, async (req, res, next) => {
   try {
-    res.json(await roles.list(req.server.id));
+    const list = await roles.list(req.server.id);
+    const mine = new Set((await roles.userRoles(req.user.id, req.server.id)).map((r) => String(r.id)));
+    res.json(list.map((r) => ({ ...r, selfAssigned: mine.has(String(r.id)) })));
   } catch (e) { next(e); }
 });
 
 router.post('/', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
-    const { name, permissions, color } = req.body || {};
-    const role = await roles.create(req.server.id, { name, permissions, color });
+    const { name, permissions, color, selfAssign } = req.body || {};
+    const role = await roles.create(req.server.id, { name, permissions, color, selfAssign });
     events.emit(req.server.id, 'role_created', { role });
     res.json(role);
   } catch (e) { serviceError(res, e); }
@@ -71,8 +86,8 @@ router.patch('/:roleId', auth.requireVerified, requirePerm('MANAGE_ROLES'), asyn
     try {
       await assertAssignable(req, role);
     } catch (e) { return serviceError(res, e); }
-    const { name, permissions, color } = req.body || {};
-    const updated = await roles.update(role, { name, permissions, color });
+    const { name, permissions, color, selfAssign } = req.body || {};
+    const updated = await roles.update(role, { name, permissions, color, selfAssign });
     events.emit(req.server.id, 'role_updated', { role: updated });
     res.json(updated);
   } catch (e) { serviceError(res, e); }
@@ -136,6 +151,49 @@ router.delete('/:roleId/assign/:userId', auth.requireVerified, requirePerm('MANA
     events.emit(req.server.id, 'member_roles_updated', { userId: String(req.params.userId) });
     res.json(out);
   } catch (e) { next(e); }
+});
+
+// Self-assignable roles. Deliberately NOT gated on MANAGE_ROLES - that is the
+// entire point, a plain member needs to be able to pick up a colour or a
+// notification role for themselves. Only the caller's own membership row is
+// ever touched; there is no userId in the request and none is read from the
+// body, so this cannot be pointed at somebody else.
+router.post('/:roleId/self', requireMember, async (req, res, next) => {
+  try {
+    const role = await roles.get(req.params.roleId);
+    if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+    if (!role.self_assign) {
+      return fail(res, 'PERMISSION_DENIED', 'that role is not available for self-assignment');
+    }
+
+    const already = await roles.userHasRole(req.server.id, req.user.id, role.id);
+    // Explicit when the caller sends one, otherwise toggle. The client sends
+    // the target state so a retry cannot flip a role the other way.
+    const want = (req.body && req.body.on !== undefined) ? !!req.body.on : !already;
+
+    if (want && !already) {
+      // Turning a role ON is the only direction that can ever grant access, so
+      // that is the only direction that needs checking. A self-assignable
+      // role must not carry a permission the member does not already hold
+      // through their own roles: otherwise one misconfigured flag hands every
+      // member on the server an escalation, and "self-assign" quietly becomes
+      // "self-promote". Colour/notification roles grant nothing and are
+      // unaffected. effectivePermissions returns a Set, and the literal Set
+      // ['*'] for the owner, which already holds everything.
+      const held = await effectivePermissions(req.user.id, req.server.id);
+      const gained = held.has('*') ? [] : (role.permissions || []).filter((p) => !held.has(p));
+      if (gained.length) {
+        return fail(res, 'PERMISSION_DENIED', 'that role grants permissions you do not have',
+          undefined, { detail: { permissions: gained } });
+      }
+    }
+
+    if (want) await roles.assign(req.server.id, req.user.id, role.id);
+    else await roles.unassign(req.server.id, req.user.id, role.id);
+
+    events.emit(req.server.id, 'member_roles_updated', { userId: String(req.user.id) });
+    res.json({ ok: true, roleId: String(role.id), on: want });
+  } catch (e) { serviceError(res, e); }
 });
 
 module.exports = router;

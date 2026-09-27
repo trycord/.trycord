@@ -31,7 +31,12 @@ function tables(engine) {
       bio TEXT,
       avatar_url VARCHAR(512),
       banner_url VARCHAR(512),
-      status_text VARCHAR(128)
+      status_text VARCHAR(128),
+      -- Server-controlled bot identity. Was reachable only through the
+      -- migration lists, so a freshly created database had the column added by
+      -- the first boot's ALTER rather than by the schema itself. publicUser()
+      -- reads it unconditionally, so it belongs in the canonical DDL.
+      is_bot INTEGER NOT NULL DEFAULT 0
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS servers (
@@ -88,6 +93,7 @@ function tables(engine) {
       position    INTEGER NOT NULL DEFAULT 0,
       permissions TEXT NOT NULL,
       is_default  INTEGER NOT NULL DEFAULT 0,
+      self_assign INTEGER NOT NULL DEFAULT 0,
       UNIQUE (server_id, name),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     )${engine}`,
@@ -428,6 +434,10 @@ const LEGACY_ALTERS = [
   ['users', 'terms_accepted_at', 'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64)'],
   ['users', 'password_changed_at', 'ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64)'],
   ['users', 'sessions_invalidated_at', 'ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64)'],
+  // Self-assignable roles. A member may add/remove one of these on themselves
+  // from the member list without holding MANAGE_ROLES. Default 0 so every role
+  // that exists today keeps its current meaning: opt-in, never opt-out.
+  ['roles', 'self_assign', 'ALTER TABLE roles ADD COLUMN self_assign INTEGER NOT NULL DEFAULT 0'],
   // SQLite cannot ADD COLUMN ... UNIQUE. The email column is created without
   // the constraint here; uniqueness is enforced by a UNIQUE index below.
   ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255)'],
@@ -498,6 +508,32 @@ const MYSQL_ADD = [
   ['users', 'is_bot', 'ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0'],
   ['roles', 'color', 'ALTER TABLE roles ADD COLUMN color VARCHAR(16)'],
   ['server_members', 'timeout_expires_at', 'ALTER TABLE server_members ADD COLUMN timeout_expires_at VARCHAR(64)'],
+  // --- parity block ---------------------------------------------------------
+  // Every column below is ALSO declared in LEGACY_ALTERS, which only runs on
+  // SQLite. They were missing here, so on an existing MySQL/MariaDB database
+  // `CREATE TABLE IF NOT EXISTS` was a no-op, these columns were never
+  // created, and startup then died in backfillSequence() on
+  // `WHERE seq IS NULL` with "Unknown column 'seq' in 'where clause'".
+  //
+  // scripts/test-schema-parity.js asserts that anything added to
+  // LEGACY_ALTERS is also reachable from the MySQL path, so the two lists
+  // cannot silently drift apart again.
+  ['servers', 'is_public', 'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0'],
+  ['servers', 'is_discoverable', 'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1'],
+  // Declared without the foreign key, matching every other entry in this
+  // list: the column is nullable (categories are optional) and the app already
+  // treats a NULL category as "no category". The constraint exists on
+  // databases created from the base DDL.
+  ['channels', 'category_id', 'ALTER TABLE channels ADD COLUMN category_id VARCHAR(64)'],
+  ['roles', 'self_assign', 'ALTER TABLE roles ADD COLUMN self_assign INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
+  // Canonical ordering + idempotency. Types must match the base DDL exactly,
+  // or the unique indexes built afterwards would index a different type than
+  // the INSERTs write.
+  ['messages', 'seq', 'ALTER TABLE messages ADD COLUMN seq INTEGER'],
+  ['messages', 'client_nonce', 'ALTER TABLE messages ADD COLUMN client_nonce VARCHAR(64)'],
+  ['dm_messages', 'seq', 'ALTER TABLE dm_messages ADD COLUMN seq INTEGER'],
+  ['dm_messages', 'client_nonce', 'ALTER TABLE dm_messages ADD COLUMN client_nonce VARCHAR(64)'],
 ];
 
 const INDEXES = [
@@ -715,4 +751,9 @@ async function backfillSequence(conn, table, scope) {
 module.exports = {
   tables,
   applySchema,
+  // Exported for scripts/test-schema-parity.js. The SQLite and MySQL migration
+  // lists describe the same schema changes and have to agree; the test needs to
+  // read both to prove that, and exporting them keeps the check honest rather
+  // than re-parsing this file.
+  MIGRATIONS: { LEGACY_ALTERS, MYSQL_MODIFY, MYSQL_ADD },
 };

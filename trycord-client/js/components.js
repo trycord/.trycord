@@ -22,24 +22,82 @@ export function initialOf(name) {
   return (s[0] || '?').toUpperCase();
 }
 
-// Load a Bearer-authenticated image (channel attachment or profile media)
-// into an object URL. Resolves null on any failure so callers can keep a
-// colored-initial fallback instead of a broken <img>.
-export async function loadAuthedImage(path) {
-  if (!path) return null;
-  try {
-    const res = await Api.fetchProfileImage(path);
-    let mime = 'application/octet-stream';
+// Media keys arrive in two shapes depending on which endpoint produced the
+// object: publicUser() emits camelCase (avatarUrl/bannerUrl), while raw member
+// and message rows come from queries that select avatar_url/banner_url. Call
+// sites were reading one or the other, so the same person showed a picture in
+// one surface and coloured initials in another. Read both, always.
+export function avatarUrlOf(user) {
+  if (!user) return null;
+  return user.avatarUrl || user.avatar_url || null;
+}
+export function bannerUrlOf(user) {
+  if (!user) return null;
+  return user.bannerUrl || user.banner_url || null;
+}
+
+// Object URLs for authenticated media, keyed by path and shared for the
+// session. Previously every render fetched the bytes again and revoked the URL
+// 60s later, so a member list re-rendered per presence tick and refetched
+// every avatar - which is both why avatars flickered between states and a
+// large reason the client did unnecessary work. A blob URL is immutable, so it
+// is safe to keep for the life of the page.
+const mediaUrls = new Map();   // path -> Promise<string|null>
+
+// Cap the cache. Keys are profile-media paths, which are unique per upload, so
+// a user cycling through avatars, or a large member list being paged, would
+// otherwise add an entry (and a live blob URL) for every path ever seen and
+// never release any of them. Oldest insertion is evicted first: an avatar is
+// only cached so re-renders do not refetch it, and the least recently *added*
+// entry is the least likely to be re-rendered.
+const MEDIA_CACHE_MAX = 300;
+
+function cacheMedia(path, promise) {
+  mediaUrls.set(path, promise);
+  while (mediaUrls.size > MEDIA_CACHE_MAX) {
+    const oldest = mediaUrls.keys().next().value;
+    if (oldest === undefined) break;
+    evictMedia(oldest);
+  }
+  return promise;
+}
+
+function evictMedia(path) {
+  const p = mediaUrls.get(path);
+  if (p === undefined) return;
+  mediaUrls.delete(path);
+  if (p) p.then((u) => { if (u) URL.revokeObjectURL(u); }).catch(() => {});
+}
+
+export function loadAuthedImage(path) {
+  if (!path) return Promise.resolve(null);
+  const hit = mediaUrls.get(path);
+  if (hit) return hit;
+  const p = (async () => {
     try {
-      const h = res.headers && res.headers.get ? res.headers.get('content-type') : null;
-      if (h) mime = h;
-    } catch { /* keep declared mime */ }
-    return URL.createObjectURL(new Blob([res.buffer], { type: mime }));
-  } catch { return null; }
+      const res = await Api.fetchProfileImage(path);
+      let mime = 'application/octet-stream';
+      try {
+        const h = res.headers && res.headers.get ? res.headers.get('content-type') : null;
+        if (h) mime = h;
+      } catch { /* keep declared mime */ }
+      return URL.createObjectURL(new Blob([res.buffer], { type: mime }));
+    } catch { return null; }
+  })();
+  return cacheMedia(path, p);
+}
+
+// Called after an upload replaces the image, so the next render shows the new
+// picture instead of the cached old one. Also called with the *previous* path
+// when a profile image is replaced or removed, otherwise the superseded blob
+// URL would sit in the cache holding bytes the server has already deleted.
+export function invalidateAuthedImage(path) {
+  if (!path) return;
+  evictMedia(path);
 }
 
 export function avatar(user, { size = 'sm', withPresence = true } = {}) {
-  const name = (user && (user.displayName || user.username)) || '?';
+  const name = (user && (user.displayName || user.display_name || user.username)) || '?';
   const a = el('span', {
     class: 'avatar ' + size,
     style: { background: hashColor(name) },
@@ -49,14 +107,13 @@ export function avatar(user, { size = 'sm', withPresence = true } = {}) {
   // Upgrade to the user's image when present. The bytes live behind the
   // Bearer-authenticated route, so a bare <img src> would 401; fetch with
   // the real session and swap in a blob URL.
-  if (user && user.avatarUrl) {
-    const path = user.avatarUrl;
-    loadAuthedImage(path).then((url) => {
+  const src = avatarUrlOf(user);
+  if (src) {
+    loadAuthedImage(src).then((url) => {
       if (!url || !a.isConnected) return;
       a.classList.add('has-img');
       a.textContent = '';
       a.appendChild(el('img', { class: 'avatar-img', src: url, alt: '', loading: 'lazy' }));
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
     });
   }
   if (withPresence && user && user.id) {
@@ -196,7 +253,16 @@ export function messageRow(msg, opts = {}) {
   const isMine = opts.meId !== undefined && String(authorId) === String(opts.meId);
 
   const row = el('div', { class: 'msg', dataset: { messageId: msg.id } });
-  const avatarBox = avatar({ id: authorId, username: msg.user || msg.author_name, displayName: disp }, { withPresence: false });
+  // author_avatar comes from the message queries. Without it every message
+  // author fell back to coloured initials while the same person's profile and
+  // member row showed their picture, which is what made avatars look
+  // inconsistent across surfaces.
+  const avatarBox = avatar({
+    id: authorId,
+    username: msg.user || msg.author_name,
+    displayName: disp,
+    avatarUrl: msg.author_avatar,
+  }, { withPresence: false });
   row.appendChild(avatarBox);
 
   const body = el('div', { class: 'msg-body' });
@@ -233,7 +299,7 @@ export function messageRow(msg, opts = {}) {
             id: authorId,
             username: msg.user || msg.author_name,
             displayName: disp,
-            avatarUrl: msg.author_avatar,
+            avatarUrl: msg.author_avatar, bannerUrl: msg.author_banner,
           },
           x: r.left,
           y: r.bottom + 6,
@@ -252,7 +318,7 @@ export function messageRow(msg, opts = {}) {
             id: authorId,
             username: msg.user || msg.author_name,
             displayName: disp,
-            avatarUrl: msg.author_avatar,
+            avatarUrl: msg.author_avatar, bannerUrl: msg.author_banner,
           },
           x: e.clientX,
           y: e.clientY,

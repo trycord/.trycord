@@ -13,7 +13,8 @@
 import Api from './api.js';
 import State, { can, currentServerId, isAuthed } from './state.js';
 import { el, toast, confirmDialog, showUserCard, showContextMenu, closeContextMenu } from './ui.js';
-import { avatar } from './components.js';
+import { avatar, avatarUrlOf, bannerUrlOf } from './components.js';
+import { openRoleAssignModal } from './role-assignment.js';
 
 /**
  * A clickable username.
@@ -88,7 +89,7 @@ export function openUserCard({ user, x, y, serverId, self = false, onCard = null
   const isSelf = self || String(id) === String(State.me && State.me.id);
 
   const av = avatar(
-    { id, username: user.username, displayName: user.display_name || user.displayName, avatarUrl: user.avatarUrl || user.avatar_url },
+    { id, username: user.username, displayName: user.display_name || user.displayName, avatarUrl: avatarUrlOf(user) },
     { size: 'lg' }
   );
 
@@ -100,7 +101,12 @@ export function openUserCard({ user, x, y, serverId, self = false, onCard = null
     : null;
   const statusLine = roles || (user.status_text ? user.status_text : null);
 
-  const card = showUserCard(x, y, { avatarEl: av, title: name, sub, statusLine, actions });
+  // Banner comes from the same normalised accessor as the avatar, so a
+  // member row (snake_case) and a /me payload (camelCase) both show it.
+  const card = showUserCard(x, y, {
+    avatarEl: av, title: name, sub, statusLine, actions,
+    bannerUrl: bannerUrlOf(user),
+  });
   if (onCard) {
     try { onCard(card); } catch { /* customisation must not break the card */ }
   }
@@ -138,12 +144,25 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
     });
   }
 
-  // Roles live on the member list; link there rather than duplicating the
-  // whole editor inside a popover.
+  // Role assignment opens the real assignment dialog for this member. It used
+  // to only link to the member list, which meant the only way to give someone a
+  // role was to find them in a list of everyone - and the list carried no way
+  // to remove a role at all.
   if (sid && !isSelf && can('MANAGE_ROLES')) {
     out.push({
       label: 'Manage roles',
-      onSelect: () => { location.hash = '#/server/' + sid + '/members'; },
+      onSelect: async () => {
+        try {
+          // The roster is the only place a member's roles are known, so read
+          // the current row rather than trusting whatever the caller had.
+          const roster = await Api.serverMembers(sid);
+          const row = (Array.isArray(roster) ? roster : [])
+            .find((m) => String(m.user_id || m.id) === String(id));
+          openRoleAssignModal({ serverId: sid, member: row || { id, username: user.username } });
+        } catch (ex) {
+          toast(ex.message || 'Could not open role management.', 'error');
+        }
+      },
     });
   }
 

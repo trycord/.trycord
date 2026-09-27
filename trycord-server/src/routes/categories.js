@@ -1,4 +1,4 @@
-﻿// /api/servers/:serverId/categories â€” list (members), create/delete (MANAGE_CHANNELS).
+// /api/servers/:serverId/categories — list (members), create/delete (MANAGE_CHANNELS).
 const express = require('express');
 const auth = require('../middleware/auth');
 const { resolveServer, requireMember, requirePerm } = require('../middleware/serverAccess');

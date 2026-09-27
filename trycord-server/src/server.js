@@ -47,11 +47,73 @@ function instanceConfig() {
 // CORS: explicit allowlist when CLIENT_ORIGIN is set; otherwise a restricted
 // dev profile (same-origin/non-browser requests, localhost, file://).
 // Never unrestricted cors() in production.
+// Does a configured CLIENT_ORIGIN entry cover a request origin?
+//
+// Exact string equality is the whole rule, which is why this exists at all:
+// the documented configuration has always been
+//   CLIENT_ORIGIN=https://trycord.dev,http://*.trycord.dev
+// but with `clientOrigins.includes(origin)` the wildcard entry was compared
+// LITERALLY, so no subdomain ever matched and CORS was silently broken for
+// every self-hosted subdomain. Verified: with that exact value,
+// `http://beta.trycord.dev` received no Access-Control-Allow-Origin header.
+//
+// Only a single leading "*." label is treated as a wildcard, and only for
+// http(s). Everything else - including the desktop app's custom scheme, e.g.
+// "trycord://app" - is matched exactly, so a non-web origin still has to be
+// listed deliberately. A bare "*" is never accepted: it would be equivalent to
+// Access-Control-Allow-Origin: *.
+function originCovers(pattern, origin) {
+  if (pattern === origin) return true;
+  if (!pattern.includes('*')) return false;
+  // A bare "*" would be Access-Control-Allow-Origin: *. Never honour it.
+  if (pattern === '*') return false;
+
+  // The only wildcard form supported is a "*." label at the start of the HOST:
+  //   https://*.trycord.dev
+  // Written with string operations rather than a regex on purpose - the
+  // pattern is not a valid URL (that is the whole point of the wildcard), and
+  // an escaped-delimiter regex for it is easy to get subtly wrong.
+  const schemeEnd = pattern.indexOf('://');
+  if (schemeEnd < 0) return false;
+  const scheme = pattern.slice(0, schemeEnd);
+  if (!/^[a-z][a-z0-9+.-]*$/i.test(scheme)) return false;  // literal scheme only
+  const hostPart = pattern.slice(schemeEnd + 3);
+  if (!hostPart.startsWith('*.')) return false;
+  // No second wildcard anywhere else in the host or port.
+  if (hostPart.slice(1).includes('*')) return false;
+
+  let p, o;
+  try {
+    // Replace the "*" label only, keeping the dot that separates it from the
+    // base host: "*.trycord.dev" -> "wildcard-label.trycord.dev".
+    p = new URL(scheme + '://wildcard-label' + hostPart.slice(1));
+    o = new URL(origin);
+  } catch {
+    return false;
+  }
+  // Wildcards only ever cover subdomains of an http(s) site. A custom-scheme
+  // origin such as the desktop app's "trycord://app" is always matched exactly.
+  if (p.protocol !== 'http:' && p.protocol !== 'https:') return false;
+  if (p.protocol !== o.protocol) return false;
+  if (p.port !== o.port) return false;
+  // Hostnames are case-insensitive. Strip the label we just substituted back
+  // off, leaving the base domain the wildcard actually covers.
+  const base = p.hostname.toLowerCase().slice('wildcard-label.'.length);
+  const host = o.hostname.toLowerCase();
+  if (!base || !host.endsWith('.' + base)) return false;
+  // Exactly one label: "a.trycord.dev" matches, "a.b.trycord.dev" does not, and
+  // the bare apex is not covered by a "*." pattern.
+  const label = host.slice(0, host.length - base.length - 1);
+  return label.length > 0 && !label.includes('.');
+}
+
 function corsOptions(clientOrigins) {
   return {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true); // curl, same-origin navigations, health probes
-      if (clientOrigins.length) return cb(null, clientOrigins.includes(origin));
+      if (clientOrigins.length) {
+        return cb(null, clientOrigins.some((p) => originCovers(p, origin)));
+      }
       try {
         const u = new URL(origin);
         const host = u.hostname;

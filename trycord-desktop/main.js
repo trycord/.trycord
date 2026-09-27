@@ -16,9 +16,10 @@
 // The desktop app is an access point only: no database, no server state,
 // no backend authority. Auto-updates touch only the desktop application
 // itself and never server configuration or user data.
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, protocol, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
 const { initUpdater } = require('./updater');
 
 const API = 'http://localhost:9971';
@@ -70,10 +71,76 @@ if (process.argv.includes('--smoke-test')) {
   app.setPath('userData', path.join(os.tmpdir(), 'trycord-smoke-' + process.pid));
 }
 
+// The renderer is served from a custom application scheme rather than file://.
+//
+// Why this matters: a file:// document has an opaque origin. Measured against
+// a real endpoint, the renderer sends NO Origin header at all, and the server
+// then emits no Access-Control-Allow-Origin - so the browser discards every
+// cross-origin API response. The desktop app simply could not talk to a server
+// that had CLIENT_ORIGIN configured, no matter which instance it pointed at.
+//
+// trycord://app is a deliberate, fixed identity for the application. It is
+// completely independent of the backend URL: one renderer origin connects to
+// any number of instances (official, self-hosted, localhost), each of which
+// just has to list this one origin in its own CLIENT_ORIGIN.
+//
+// This is NOT webSecurity:false. Security stays fully on; only the document's
+// origin changes from opaque to a real, allowlistable one.
+const APP_SCHEME = 'trycord';
+const APP_HOST = 'app';
+const APP_ORIGIN = APP_SCHEME + '://' + APP_HOST;
+
+// Must run before the app is ready, or the scheme is already fixed by then.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: APP_SCHEME,
+    privileges: {
+      // standard: gives the scheme a real origin (trycord://app) instead of an
+      // opaque one, and makes URL parsing behave like http(s).
+      standard: true,
+      // secure: a trustworthy origin, so localStorage, crypto.subtle and
+      // service workers behave the way they do on https.
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
+
+function clientDir() {
+  const bundled = path.join(__dirname, 'client');
+  if (fs.existsSync(path.join(bundled, 'index.html'))) return bundled;
+  return path.join(__dirname, '..', 'trycord-client');
+}
+
 function clientEntry() {
-  const bundled = path.join(__dirname, 'client', 'index.html');
-  if (fs.existsSync(bundled)) return bundled;
-  return path.join(__dirname, '..', 'trycord-client', 'index.html');
+  return path.join(clientDir(), 'index.html');
+}
+
+// Map trycord://app/<path> onto a file inside the client directory.
+function resolveClientFile(requestUrl) {
+  const url = new URL(requestUrl);
+  if (url.hostname !== APP_HOST) return null;
+  let rel = decodeURIComponent(url.pathname);
+  if (!rel || rel === '/') rel = '/index.html';
+  // Normalise before joining, then confirm the result is still inside the
+  // client directory. Without this, a request for trycord://app/../../.env
+  // would read outside the bundle.
+  const root = path.resolve(clientDir());
+  const target = path.resolve(path.join(root, rel));
+  if (target !== root && !target.startsWith(root + path.sep)) return null;
+  return target;
+}
+
+function registerAppProtocol() {
+  protocol.handle(APP_SCHEME, async (request) => {
+    const file = resolveClientFile(request.url);
+    if (!file) return new Response('Not found', { status: 404 });
+    // net.fetch understands file:// and sets the correct Content-Type from the
+    // extension, which the client relies on for its ES modules and CSS.
+    return net.fetch(pathToFileURL(file).toString());
+  });
 }
 
 let mainWin = null;
@@ -98,8 +165,10 @@ function createWindow() {
   });
   mainWin = win;
   // The ?api= parameter is the client's top-precedence backend source,
-  // so the exe never permanently hardcodes localhost.
-  win.loadFile(clientEntry(), launchApiUrl ? { query: { api: launchApiUrl } } : {});
+  // so the exe never permanently hardcodes localhost. It rides along as a
+  // query on the app-scheme URL, exactly as it did on the old file:// URL.
+  const target = APP_ORIGIN + '/index.html' + (launchApiUrl ? '?api=' + encodeURIComponent(launchApiUrl) : '');
+  win.loadURL(target);
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -117,7 +186,7 @@ function createWindow() {
         const reg = await win.webContents.executeJavaScript(`(async () => {
           try {
             const api = new URLSearchParams(location.search).get('api') ||
-              (location.protocol === 'file:' ? '${API}' : location.origin);
+              (location.protocol === 'file:' || location.protocol === 'trycord:' ? '${API}' : location.origin);
             const u = 'smoke' + Date.now().toString(36);
             const legalRes = await fetch(api + '/api/legal');
             const legal = await legalRes.json();
@@ -190,6 +259,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  registerAppProtocol();
   createWindow();
   // Auto-updater: packaged builds only; dev never contacts an update server.
   // All failures are logged and swallowed — the app always launches.

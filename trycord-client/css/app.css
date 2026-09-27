@@ -508,15 +508,21 @@ img { max-width: 100%; }
 
 /* User bar pinned to the bottom of the context sidebar. One component for
    every context: identity left, session controls right. */
+/* Pinned session bar at the foot of the context sidebar.
+   The margins must not be negative. The sidebar is `overflow: hidden` and has
+   no padding of its own (the padding lives on .ctx-scroll), so a negative
+   bottom margin did not bleed the card to the edge - it pushed it past the
+   sidebar's bottom border and the overflow clipped the name and status. */
 .user-controls {
   display: flex;
   align-items: center;
   gap: var(--t-d-2);
   flex: 0 0 auto;
-  margin: var(--t-d-3) -10px -18px;
-  padding: var(--t-d-3) 10px;
+  margin: 0;
+  padding: var(--t-d-3);
   border-top: 1px solid var(--t-line);
   background: color-mix(in srgb, var(--t-base2) 70%, var(--t-base));
+  min-width: 0;
 }
 .user-controls__identity {
   display: flex;
@@ -842,6 +848,64 @@ img { max-width: 100%; }
 .row--member .member-item__role { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t-mut); font-size: var(--t-fs-xs); }
 .member-sidebar__empty { color: var(--t-mut); padding: 20px 8px; font-size: 0.8rem; }
 .member-list { display: flex; flex-direction: column; gap: 2px; }
+
+/* Self-assignable roles on the member list.
+   The row itself is a <button> that navigates to the profile, so the "Roles"
+   pill is a SIBLING inside a wrapper rather than a child of it: nesting a
+   button in a button is invalid and every click would also fire the row's
+   navigation. Revealed on hover/focus like the rest of the row affordances,
+   but never display:none - a keyboard user must be able to tab to it. */
+.member-row-wrap { position: relative; display: flex; align-items: center; gap: 4px; }
+.member-row-wrap > .row--member { flex: 1 1 auto; min-width: 0; }
+.member-roles-pill {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border: 1px solid var(--t-line-hi);
+  border-radius: 999px;
+  background: var(--t-base2);
+  color: var(--t-txt2);
+  font-size: var(--t-fs-xs);
+  font-weight: 600;
+  line-height: 1.6;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.member-row-wrap:hover .member-roles-pill,
+.member-row-wrap:focus-within .member-roles-pill { opacity: 1; }
+.member-roles-pill:hover { border-color: var(--t-accent); color: var(--t-txt); }
+.member-roles-pill:focus-visible { opacity: 1; outline: 2px solid var(--t-accent); outline-offset: 1px; }
+/* Touch and narrow sidebars have no hover, so keep it permanently visible
+   rather than leaving the only self-assign entry point unreachable. */
+@media (hover: none), (max-width: 900px) { .member-roles-pill { opacity: 1; } }
+
+.self-role-list { display: flex; flex-direction: column; gap: 2px; margin-top: var(--t-d-3); }
+.self-role {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--t-r-s);
+  cursor: pointer;
+}
+.self-role:hover { background: var(--t-base2); }
+.self-role input { flex: 0 0 auto; }
+.self-role__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.self-role input:disabled { cursor: progress; }
+
+.role-selfassign {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-s);
+  background: var(--t-base2);
+  cursor: pointer;
+}
+.role-selfassign input { flex: 0 0 auto; margin-top: 3px; }
+.role-selfassign__text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.role-selfassign__text small { color: var(--t-mut); font-size: var(--t-fs-xs); line-height: 1.45; }
 
 /* The UA hides [hidden]; layout rules must never override it. */
 .shell[hidden],
@@ -2184,8 +2248,135 @@ html:is(
 }
 
 /* ============================================================
-   13. ACCOUNT / PROFILES / COMMUNITY MANAGEMENT / ADMIN
+   12c. DEDICATED AUTH PAGES
+   ------------------------------------------------------------
+   Login, signup, recovery, reset and verification share one shell:
+   the supplied background image baked in behind a centred card with
+   an optional side panel.
+
+   This is a fixed full-viewport surface rather than a normal view
+   region child on purpose. These routes render inside the app shell,
+   and every "just hide the chrome" approach still leaves the shell's
+   grid tracks behind - the card ends up ~152px off centre on a wide
+   window, and any shell element that paints above the overlay shows
+   through. Taking the viewport outright is what makes it a dedicated
+   auth page instead of a themed app screen.
    ============================================================ */
+
+.auth-page {
+  position: fixed;
+  inset: 0;
+  z-index: 70;                 /* above rail/sidebar (60) and popovers (55) */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #16151a;         /* charcoal base, matches the image's own tone */
+  color: var(--t-txt);
+}
+.auth-background {
+  position: fixed;
+  inset: 0;
+  /* The real asset from the repo root, copied to trycord-client/assets/.
+     Not a gradient or generated artwork - it is the supplied image. */
+  background-image: url('/assets/trycord-login-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Keep a touch of the image legible under text without hiding it. */
+  box-shadow: inset 0 0 0 100vmax rgba(18, 17, 21, 0.62);
+}
+.auth-page__inner {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: clamp(20px, 5vh, 48px) 20px;
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--t-txt);
+}
+.auth-brand:hover { text-decoration: none; }
+.auth-brand__mark { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; }
+.auth-brand__word { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em; }
+
+.auth-card {
+  width: min(880px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--t-base);
+  border: 1px solid var(--t-line-hi);
+  border-radius: var(--t-r-l);
+  box-shadow: var(--t-sh-2);
+  overflow: hidden;
+}
+/* Two-panel only when there is actually a side panel to show. */
+.auth-card:has(> .auth-secondary) { grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); }
+
+.auth-main { padding: clamp(22px, 3.4vw, 34px); min-width: 0; }
+.auth-title {
+  margin: 0 0 6px;
+  font-size: clamp(1.5rem, 2.4vw, 1.85rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.auth-lede { margin: 0 0 var(--t-d-5); color: var(--t-txt2); font-size: var(--t-fs-s); line-height: 1.55; }
+.auth-form { display: flex; flex-direction: column; gap: var(--t-d-4); }
+
+.auth-secondary {
+  padding: clamp(22px, 3.4vw, 34px);
+  min-width: 0;
+  background: var(--t-base2);
+  border-left: 1px solid var(--t-line-hi);
+}
+.auth-secondary__title { margin: 0 0 6px; font-size: 1.02rem; font-weight: 700; }
+.auth-secondary__lede { margin: 0 0 var(--t-d-4); color: var(--t-txt2); font-size: var(--t-fs-xs); line-height: 1.5; }
+.auth-secondary__body .section-label { margin-top: 0; }
+
+.auth-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  margin-top: var(--t-d-5);
+  padding-top: var(--t-d-4);
+  border-top: 1px solid var(--t-line);
+  color: var(--t-mut);
+  font-size: var(--t-fs-xs);
+}
+
+/* Below the two-panel breakpoint the side panel stacks under the form
+   instead of squeezing it, so the fields never get narrower than the
+   card. */
+@media (max-width: 760px) {
+  .auth-card:has(> .auth-secondary) { grid-template-columns: minmax(0, 1fr); }
+  .auth-secondary { border-left: 0; border-top: 1px solid var(--t-line-hi); }
+  .auth-footer { flex-direction: column; align-items: center; text-align: center; }
+  .auth-page__inner { gap: 16px; padding: 18px 14px 28px; }
+}
+
+/* Keep the auth page visible on phones. Under 600px the app swaps to the
+   mobile shell and sets .shell--desktop to display:none - which also hides this
+   page, because it renders inside the desktop view region. A position:fixed
+   element escapes the grid but NOT an ancestor's display:none, so the sign-in
+   screen would simply not exist on a phone. Show the desktop shell instead:
+   the page is a fixed full-viewport overlay, so the shell's own chrome,
+   columns and height are all underneath it and never seen. */
+@media (max-width: 599px) {
+  html[data-auth-page] .shell--mobile { display: none !important; }
+  html[data-auth-page] .shell--desktop { display: grid !important; }
+  /* Nothing to tap back to from a sign-in screen. */
+  html[data-auth-page] .mobile-tab-navigation,
+  html[data-auth-page] .mobile-header { display: none !important; }
+}
+
+
 
 .settings-nav { display: flex; gap: var(--t-d-2); flex-wrap: wrap; margin-bottom: var(--t-d-5); padding: 4px; background: var(--t-base); border: 1px solid var(--t-line); border-radius: 9px; width: max-content; max-width: 100%; }
 .settings-nav .btn { border: 0; background: transparent; }
@@ -2334,6 +2525,138 @@ html:is(
 }
 .role-pill.owner { color: var(--t-accent); border-color: color-mix(in srgb, var(--t-accent) 45%, var(--t-line)); }
 .role-pill.muted-role { color: var(--t-mut); border-color: var(--t-line); background: var(--t-base2); }
+/* ---- role hierarchy ------------------------------------------------------
+   The roles page is a two-column layout: the ordered role list, and the editor
+   for whichever role is selected. Position is shown as an explicit rank
+   because it is the property that decides what a member may manage - burying
+   it in up/down arrows made the hierarchy invisible. */
+.roles-page { display: flex; flex-direction: column; gap: var(--t-d-4); }
+.roles-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--t-d-4); flex-wrap: wrap; }
+.roles-head__text { min-width: 0; }
+.roles-head .page-title { margin: 0 0 4px; }
+.roles-hint {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--t-line);
+  border-left: 3px solid var(--t-accent);
+  border-radius: var(--t-r-s);
+  background: var(--t-base);
+  color: var(--t-txt2);
+  font-size: var(--t-fs-xs);
+  line-height: 1.5;
+}
+.roles-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--t-d-5); align-items: start; }
+@media (min-width: 1000px) { .roles-grid { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); } }
+.roles-list-col, .roles-detail-col { min-width: 0; }
+
+.role-hierarchy {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-m);
+  background: var(--t-base);
+  overflow: hidden;
+}
+.role-row {
+  display: grid;
+  grid-template-columns: 18px 30px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--t-line);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.role-row:last-child { border-bottom: 0; }
+.role-row:hover { background: var(--t-base2); }
+.role-row:focus-visible { outline: 2px solid var(--t-accent); outline-offset: -2px; }
+.role-row.is-selected { background: color-mix(in srgb, var(--t-accent) 12%, var(--t-base)); box-shadow: inset 3px 0 0 var(--t-accent); }
+.role-row.is-locked { opacity: 0.62; }
+.role-row.is-locked:hover { background: transparent; }
+.role-row.is-dragging { opacity: 0.4; }
+.role-row.is-drop-target { box-shadow: inset 0 -2px 0 var(--t-accent); background: color-mix(in srgb, var(--t-accent) 8%, var(--t-base)); }
+.role-row--owner { background: var(--t-base2); cursor: default; }
+.role-row--owner:hover { background: var(--t-base2); }
+
+.role-row__handle { color: var(--t-mut); font-size: 0.9rem; line-height: 1; cursor: grab; text-align: center; user-select: none; }
+.role-row__handle:active { cursor: grabbing; }
+.role-row__rank { color: var(--t-mut); font-size: var(--t-fs-xs); font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+.role-row__name { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-row__name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-row__meta { color: var(--t-mut); font-size: var(--t-fs-xs); white-space: nowrap; }
+.role-row__lock { color: var(--t-mut); font-size: var(--t-fs-xs); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.role-badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--t-line-hi);
+  background: var(--t-base2);
+  color: var(--t-mut);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.role-badge--self { border-color: color-mix(in srgb, var(--t-accent) 40%, var(--t-line)); color: var(--t-accent-hi); }
+
+/* ---- role detail pane ---------------------------------------------------- */
+.role-detail {
+  min-height: 160px;
+  padding: var(--t-d-4);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-m);
+  background: var(--t-base);
+}
+.role-detail__empty { padding: var(--t-d-5) 0; text-align: center; }
+.role-detail__form { display: flex; flex-direction: column; gap: var(--t-d-3); }
+.role-detail__summary { display: flex; flex-wrap: wrap; gap: 6px; }
+.role-detail__summary > span {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--t-base2);
+  border: 1px solid var(--t-line);
+  color: var(--t-txt2);
+  font-size: var(--t-fs-xs);
+  font-weight: 600;
+}
+.role-members { display: flex; flex-direction: column; gap: 4px; }
+.role-holder { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--t-line); border-radius: var(--t-r-s); background: var(--t-base2); }
+.role-holder__name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+
+/* ---- grouped permissions ------------------------------------------------ */
+.perm-groups { display: flex; flex-direction: column; gap: var(--t-d-4); }
+.perm-group { border: 1px solid var(--t-line); border-radius: var(--t-r-s); background: var(--t-base2); padding: 10px 12px; }
+.perm-group__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.perm-group__title { font-weight: 800; font-size: var(--t-fs-s); letter-spacing: 0.01em; }
+.perm-group .permission-grid { margin-bottom: 0; }
+.permission-item__text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.permission-item__name { font-weight: 650; color: var(--t-txt); }
+.permission-item__desc { color: var(--t-mut); font-size: 0.7rem; line-height: 1.35; }
+
+/* ---- role pills + assignment -------------------------------------------- */
+.role-pill--sm { min-height: 20px; }
+.role-pill__remove {
+  margin-left: 4px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.role-pill__remove:hover { opacity: 1; }
+.role-pill__remove:disabled { cursor: progress; opacity: 0.4; }
+
+.role-assign { display: flex; flex-direction: column; gap: var(--t-d-3); }
+.role-assign__head { display: flex; flex-direction: column; gap: 2px; }
+.role-assign__member strong { font-size: 1.05rem; }
+.role-add-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; }
+.role-add-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border: 1px solid var(--t-line); border-radius: var(--t-r-s); background: var(--t-base2); }
+.role-add-row__name { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; font-weight: 600; }
+
 .permission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; margin: 8px 0 14px; }
 .permission-item { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid var(--t-line); border-radius: 8px; color: var(--t-txt2); background: var(--t-base2); font-size: 0.76rem; }
 .permission-item:hover { border-color: var(--t-line-hi); color: var(--t-txt); }
