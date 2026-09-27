@@ -1,0 +1,10 @@
+# Large binaries live in Git LFS.
+#
+# trycord-desktop/release/Trycord.exe and TrycordPTB.exe are ~109 MB each.
+# GitHub rejects any ordinary git blob over 100 MB outright, so tracking them
+# as normal files is not an option - the push simply fails. LFS stores the
+# content out of line and keeps only a pointer in the tree.
+#
+# The staging tree (win-unpacked, ~372 MB) stays a normal ignored build output.
+trycord-desktop/release/*.exe filter=lfs diff=lfs merge=lfs -text
+trycord-desktop/release/*.blockmap filter=lfs diff=lfs merge=lfs -text
