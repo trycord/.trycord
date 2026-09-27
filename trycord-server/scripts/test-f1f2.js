@@ -201,6 +201,63 @@ async function J(method, p, body, tok) {
     'got=' + JSON.stringify(seen.map((m) => m.type)).slice(0, 120));
   try { wsB.close(); } catch { /* ignore */ }
 
+  // ---- ownership transfer ----
+  // The audit found owners were locked in: `leave` refuses for the owner and
+  // nothing could change owner_id, so deleting the community was the only exit.
+  // This covers the invariants: owner-only, member-only target, exactly one
+  // owner before and after, old owner stays a member, and no duplicate owner.
+  {
+    // A is the owner; B and C are members. Use a fresh community so the rest
+    // of this suite is unaffected by the ownership moving.
+    const own = await J('POST', '/api/servers', { name: 'Transfer Test' }, A.token);
+    const osid = own.json.serverId;
+    const ocode = own.json.joinCode || (await J('GET', '/api/servers/' + osid, null, A.token)).json.join_code;
+    ok('transferServerCreated', !!osid && !!ocode, JSON.stringify(own.json).slice(0, 100));
+    await J('POST', '/api/servers/join/' + ocode, null, B.token);
+    await J('POST', '/api/servers/join/' + ocode, null, C.token);
+
+    const ownerOf = async () => (await J('GET', '/api/servers/' + osid, null, A.token)).json.owner_id;
+    ok('ownerInitiallyA', String(await ownerOf()) === String(A.id), String(await ownerOf()));
+
+    // Non-owners cannot transfer.
+    ok('transferDeniedNonOwner', (await J('POST', '/api/servers/' + osid + '/transfer', { userId: C.id }, B.token)).status === 403);
+    ok('transferDeniedNonMemberCaller', (await J('POST', '/api/servers/' + osid + '/transfer', { userId: C.id }, C.token)).status === 403);
+    // Target must be a real member of THIS community.
+    const D = await mkuser('xferd');
+    const nonMember = await J('POST', '/api/servers/' + osid + '/transfer', { userId: D.id }, A.token);
+    // NOT_A_MEMBER maps to 403, not 400: the target is simply not eligible.
+    ok('transferRejectedNonMember', nonMember.status === 403, 'status=' + nonMember.status);
+    ok('ownerUnchangedAfterNonMember', String(await ownerOf()) === String(A.id), String(await ownerOf()));
+    ok('transferRejectedSelf', (await J('POST', '/api/servers/' + osid + '/transfer', { userId: A.id }, A.token)).status === 400);
+    ok('transferRejectedMissing', (await J('POST', '/api/servers/' + osid + '/transfer', {}, A.token)).status === 400);
+    ok('ownerUnchangedAfterFailures', String(await ownerOf()) === String(A.id), String(await ownerOf()));
+
+    // The happy path.
+    const done = await J('POST', '/api/servers/' + osid + '/transfer', { userId: B.id }, A.token);
+    ok('transferOk', done.status === 200 && String(done.json.ownerId) === String(B.id), JSON.stringify(done.json).slice(0, 120));
+    ok('ownerNowB', String(await ownerOf()) === String(B.id), String(await ownerOf()));
+
+    // Exactly one owner, and B is a full owner afterwards.
+    const bView = (await J('GET', '/api/servers/' + osid, null, B.token));
+    ok('newOwnerCanRead', bView.status === 200 && bView.json.is_owner === true, JSON.stringify(bView.json).slice(0, 90));
+    ok('newOwnerCanDelete', (await J('DELETE', '/api/servers/' + osid, null, B.token)).status === 200);
+    ok('serverGoneAfterDelete', (await J('GET', '/api/servers/' + osid, null, A.token)).status === 404
+      || (await J('GET', '/api/servers/' + osid, null, A.token)).status === 400, '');
+
+    // Old owner stays a member and can still read, but is no longer owner.
+    const own2 = await J('POST', '/api/servers', { name: 'Transfer Test 2' }, A.token);
+    const osid2 = own2.json.serverId;
+    const ocode2 = own2.json.joinCode || (await J('GET', '/api/servers/' + osid2, null, A.token)).json.join_code;
+    await J('POST', '/api/servers/join/' + ocode2, null, B.token);
+    await J('POST', '/api/servers/' + osid2 + '/transfer', { userId: B.id }, A.token);
+    const stillMember = await J('GET', '/api/servers/' + osid2, null, A.token);
+    ok('oldOwnerStillMember', stillMember.status === 200, 'status=' + stillMember.status);
+    ok('oldOwnerNotOwner', stillMember.json && stillMember.json.is_owner === false, JSON.stringify(stillMember.json).slice(0, 90));
+    ok('oldOwnerCannotDelete', (await J('DELETE', '/api/servers/' + osid2, null, A.token)).status === 403);
+    ok('oldOwnerCanNowLeave', (await J('POST', '/api/servers/' + osid2 + '/leave', null, A.token)).status === 200);
+    ok('cleanupTransfer2', (await J('DELETE', '/api/servers/' + osid2, null, B.token)).status === 200);
+  }
+
   // cleanup
   ok('deleteServer', (await J('DELETE', '/api/servers/' + sid, null, A.token)).status === 200);
   console.log('F1F2 pass=' + pass + ' fail=' + fail);

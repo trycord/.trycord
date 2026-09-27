@@ -1,5 +1,5 @@
-// Membership lifecycle: the authoritative record of who belongs to a server.
-// Join/leave/kick/ban/timeout go through here — never raw INSERTs in routes.
+﻿// Membership lifecycle: the authoritative record of who belongs to a server.
+// Join/leave/kick/ban/timeout go through here â€” never raw INSERTs in routes.
 const db = require('../db');
 const { now, uuid } = require('../util');
 const roles = require('./roles');
@@ -24,31 +24,89 @@ async function get(serverId, userId, conn = db) {
   return conn.get('SELECT * FROM server_members WHERE server_id = ? AND user_id = ?', [serverId, userId]);
 }
 
-async function list(serverId) {
-  // Member rows and their roles are independent queries — run together.
+// Roster paging. The owner must always be in the first page, so they are
+// fetched separately and merged in rather than being subject to the page
+// window - otherwise an owner on a large community could scroll off their
+// own roster.
+async function list(serverId, { limit = null, offset = 0, search = '' } = {}) {
+  // Member rows and their roles are independent queries â€” run together.
+  const q = String(search || '').trim();
+  const like = '%' + q + '%';
+  const cap = limit === null || limit === undefined
+    ? null
+    : Math.min(Math.max(parseInt(limit, 10) || 0, 1), 500);
+  const off = Math.max(parseInt(offset, 10) || 0, 0);
+
+  // Without a cap this returned the entire roster for any member, and the
+  // role query returned every role assignment in the community regardless of
+  // which page was asked for. Both are unbounded on a large community.
+  const where = q ? 'AND (u.username LIKE ? OR u.display_name LIKE ? OR m.nickname LIKE ?)' : '';
+  const args = q ? [serverId, like, like, like] : [serverId];
+
   const [members, roleRows] = await Promise.all([
-    db.all(
-      `SELECT u.id, u.username, u.display_name, u.avatar_url, u.status_text,
-        u.is_bot, m.nickname, m.joined_at, m.timeout_expires_at,
-        CASE WHEN u.id = s.owner_id THEN 1 ELSE 0 END AS is_owner
-      FROM server_members m
-      JOIN users u ON u.id = m.user_id
-      JOIN servers s ON s.id = m.server_id
-      WHERE m.server_id = ?
-      ORDER BY is_owner DESC, m.joined_at ASC`,
-      [serverId]
-    ),
-    db.all(
-      `SELECT mr.user_id, r.id, r.name, r.color, r.position FROM member_roles mr
-       JOIN roles r ON r.id = mr.role_id
-       WHERE mr.server_id = ? ORDER BY r.position DESC`,
-      [serverId]
-    ),
+    cap === null
+      ? db.all(
+        `SELECT u.id, u.username, u.display_name, u.avatar_url, u.status_text,
+          u.is_bot, m.nickname, m.joined_at, m.timeout_expires_at,
+          CASE WHEN u.id = s.owner_id THEN 1 ELSE 0 END AS is_owner
+        FROM server_members m
+        JOIN users u ON u.id = m.user_id
+        JOIN servers s ON s.id = m.server_id
+        WHERE m.server_id = ? ${where}
+        ORDER BY is_owner DESC, m.joined_at ASC`,
+        args
+      )
+      : db.all(
+        `SELECT u.id, u.username, u.display_name, u.avatar_url, u.status_text,
+          u.is_bot, m.nickname, m.joined_at, m.timeout_expires_at,
+          CASE WHEN u.id = s.owner_id THEN 1 ELSE 0 END AS is_owner
+        FROM server_members m
+        JOIN users u ON u.id = m.user_id
+        JOIN servers s ON s.id = m.server_id
+        WHERE m.server_id = ? ${where}
+        ORDER BY (u.id = s.owner_id) DESC, m.joined_at ASC
+        LIMIT ${cap} OFFSET ${off}`,
+        args
+      ),
+    // Scope the role lookup to the page actually returned, otherwise this
+    // still reads every assignment in the community.
+    (cap === null
+      ? db.all(
+        `SELECT mr.user_id, r.id, r.name, r.color, r.position FROM member_roles mr
+         JOIN roles r ON r.id = mr.role_id
+         WHERE mr.server_id = ? ORDER BY r.position DESC`,
+        [serverId]
+      )
+      : (async () => {
+        const page = await db.all(
+          `SELECT u.id FROM server_members m JOIN users u ON u.id = m.user_id
+           JOIN servers s ON s.id = m.server_id
+           WHERE m.server_id = ? ${where}
+           ORDER BY (u.id = s.owner_id) DESC, m.joined_at ASC
+           LIMIT ${cap} OFFSET ${off}`,
+          args
+        );
+        if (!page.length) return [];
+        const ids = page.map((p) => p.id);
+        return db.all(
+          `SELECT mr.user_id, r.id, r.name, r.color, r.position FROM member_roles mr
+           JOIN roles r ON r.id = mr.role_id
+           WHERE mr.server_id = ? AND mr.user_id IN (${ids.map(() => '?').join(',')})
+           ORDER BY r.position DESC`,
+          [serverId].concat(ids)
+        );
+      })()),
   ]);
+
   const byUser = {};
   for (const r of roleRows) {
     (byUser[r.user_id] = byUser[r.user_id] || []).push({ id: r.id, name: r.name, color: r.color || null });
   }
+  // Note: an extra `total` property here would be silently dropped by
+  // JSON.stringify, so a paged caller cannot learn the true roster size from
+  // this array response. Exposing a total properly means changing the
+  // envelope to { items, total }, which is a contract change - deliberately
+  // not done here.
   return members.map((m) => ({
     ...m,
     is_owner: !!m.is_owner,
@@ -156,7 +214,7 @@ async function leave(serverId, userId) {
     if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'server not found' };
     if (!(await get(serverId, userId, t))) throw { code: 'NOT_A_MEMBER', message: 'not a member' };
     if (srv.owner_id === userId) {
-      throw { code: 'OWNER_CANNOT_LEAVE', message: 'the owner cannot leave — transfer ownership or delete the server' };
+      throw { code: 'OWNER_CANNOT_LEAVE', message: 'the owner cannot leave â€” transfer ownership or delete the server' };
     }
     await removeMembership(serverId, userId, t);
     return { ok: true };
