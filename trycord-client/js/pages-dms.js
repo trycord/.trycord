@@ -3,7 +3,7 @@
 
 import Api from './api.js';
 import State, { refreshDms, refreshFriends, isAuthed, mustVerifyToPost } from './state.js';
-import { esc, el, clear, toast, relTime, showEmojiPicker, insertAtCursor, openModal } from './ui.js';
+import { attachContextMenu, copyText, esc, el, clear, toast, relTime, showEmojiPicker, insertAtCursor, openModal } from './ui.js';
 import { avatar, emptyState, messageRow } from './components.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
@@ -395,6 +395,36 @@ async function renderFriends(container) {
 }
 
 async function renderFriendsList(wrap) {
+  // The action list for one friend or request row. The inline buttons stay for
+  // discoverability; this is the same set of actions reachable by right click
+  // or long press, plus the per-person actions that have no button.
+  const friendActions = (kind, person) => {
+    const act = async (fn, okMsg, errMsg, level) => {
+      try { await fn(); if (okMsg) toast(okMsg, level || 'ok'); await refreshFriends(); renderFriendsList(wrap); }
+      catch (ex) { toast(ex.message || errMsg, 'error'); }
+    };
+    const items = [];
+    if (kind === 'incoming') {
+      items.push({ label: 'Accept request', onSelect: () => act(() => Api.acceptFriendRequest(person.reqId), 'Request accepted.', 'Failed') });
+      items.push({ label: 'Decline request', danger: true, onSelect: () => act(() => Api.declineFriendRequest(person.reqId), 'Request declined.', 'Failed', 'warn') });
+    } else if (kind === 'outgoing') {
+      items.push({ label: 'Cancel request', onSelect: () => act(() => Api.cancelFriendRequest(person.reqId), 'Request cancelled.', 'Failed', 'warn') });
+    } else {
+      items.push({ label: 'Message', onSelect: async () => {
+        try { const { id } = await Api.openDm(person.id); location.hash = '#/dms/' + id; }
+        catch (ex) { toast(ex.message || 'Cannot open', 'error'); }
+      } });
+      items.push({ label: 'View profile', onSelect: () => { location.hash = '#/users/' + person.id; } });
+      items.push({ sep: true });
+      items.push({ label: 'Remove friend', danger: true, onSelect: () => act(() => Api.removeFriend(person.id), 'Friend removed.', 'Failed', 'warn') });
+    }
+    if (person.username) {
+      items.push({ sep: true });
+      items.push({ label: 'Copy user ID', onSelect: () => copyText(String(person.id), 'User ID copied.') });
+    }
+    return items;
+  };
+
   const reqsBox = wrap.querySelector('[data-region="requests"]');
   if (!reqsBox) return;
   clear(reqsBox);
@@ -402,6 +432,9 @@ async function renderFriendsList(wrap) {
     reqsBox.appendChild(el('div', { class: 'section-label' }, 'Incoming requests'));
     for (const r of State.friendsIn) {
       const row = el('div', { class: 'row row--surface' });
+      attachContextMenu(row, () => friendActions('incoming', { id: r.from.id, username: r.from.username, reqId: r.id }), {
+        target: () => ({ type: 'friend-request', id: String(r.id) }),
+      });
       row.appendChild(avatar(r.from, { withPresence: false }));
       const m = el('div', { class: 'row-main' });
       m.appendChild(el('div', { class: 'row-title' }, r.from.displayName || r.from.username));
@@ -423,6 +456,9 @@ async function renderFriendsList(wrap) {
     reqsBox.appendChild(el('div', { class: 'section-label' }, 'Outgoing requests'));
     for (const r of State.friendsOut) {
       const row = el('div', { class: 'row row--surface' });
+      attachContextMenu(row, () => friendActions('outgoing', { id: r.to.id, username: r.to.username, reqId: r.id }), {
+        target: () => ({ type: 'friend-request', id: String(r.id) }),
+      });
       row.appendChild(avatar(r.to, { withPresence: false }));
       const m = el('div', { class: 'row-main' });
       m.appendChild(el('div', { class: 'row-title' }, r.to.displayName || r.to.username));
@@ -439,6 +475,9 @@ async function renderFriendsList(wrap) {
     reqsBox.appendChild(el('div', { class: 'section-label' }, 'Friends'));
     for (const f of State.friends) {
       const row = el('div', { class: 'row row--surface' });
+      attachContextMenu(row, () => friendActions('friend', { id: f.id, username: f.username }), {
+        target: () => ({ type: 'friend', id: String(f.id) }),
+      });
       row.appendChild(avatar(f, { withPresence: true }));
       const m = el('div', { class: 'row-main' });
       m.appendChild(el('div', { class: 'row-title' }, f.displayName || f.username));

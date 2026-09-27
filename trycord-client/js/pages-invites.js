@@ -2,7 +2,7 @@
 import Api from './api.js';
 
 import { can } from './state.js';
-import { clear, el, relTime, toast } from './ui.js';
+import { attachContextMenu, clear, copyText, el, relTime, toast } from './ui.js';
 import { emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
 import { TrycordConfig } from './config.js';
@@ -41,7 +41,22 @@ async function renderInvites(container, serverId) {
       return;
     }
     for (const inv of invites) {
+      const link = TrycordConfig.backendUrl().replace(/\/+$/, '') + '/#/invite/' + inv.code;
       const row = el('div', { class: 'row' });
+      // A revoked invite is already spent, so it offers no actions. Saying so
+      // beats a menu of things that will fail.
+      attachContextMenu(row, () => (inv.revoked ? [
+        { label: 'Revoked invite', disabled: true, desc: 'This link can no longer be used' },
+        { label: 'Copy invite code', onSelect: () => copyText(String(inv.code), 'Invite code copied.') },
+      ] : [
+        { label: 'Copy invite link', onSelect: () => copyText(link, 'Invite link copied.') },
+        { label: 'Copy invite code', onSelect: () => copyText(String(inv.code), 'Invite code copied.') },
+        { sep: true },
+        { label: 'Revoke invite', danger: true, onSelect: async () => {
+          try { await Api.deleteInvite(serverId, inv.id); await reload(); }
+          catch (ex) { toast(ex.message || 'Failed', 'error'); }
+        } },
+      ]), { target: () => ({ type: 'invite', id: String(inv.id) }) });
       const m = el('div', { class: 'row-main' });
       // An invite is shared with other PEOPLE, so the link has to point at the
       // instance, not at whatever is rendering this screen. location.origin is
@@ -50,7 +65,6 @@ async function renderInvites(container, serverId) {
       // load), which produces a link nobody else can open. Resolve it from the
       // configured backend instead, so the same code produces a shareable link
       // in the browser, on a self-hosted instance, and on the desktop.
-      const link = TrycordConfig.backendUrl().replace(/\/+$/, '') + '/#/invite/' + inv.code;
       m.appendChild(el('div', { class: 'row-title mono' }, inv.code));
       m.appendChild(el('div', { class: 'row-sub' },
         inv.uses + ' uses' +

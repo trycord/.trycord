@@ -11,6 +11,7 @@ import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDial
 import { emptyState, messageRow, paintReactions } from './components.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
+import { TrycordConfig } from './config.js';
 
 async function renderChannel(container, serverId, channelId) {
   clear(container);
@@ -710,13 +711,11 @@ async function renderChannel(container, serverId, channelId) {
           if (!hits.length) { status.textContent = 'No messages found.'; return; }
           status.textContent = hits.length + ' result' + (hits.length === 1 ? '' : 's') + '.';
           for (const h of hits) {
-            const row = el('button', { class: 'search-hit', type: 'button' });
-            row.appendChild(el('div', { class: 'search-hit__meta' },
-              '#' + (h.channel_name || 'channel') + ' · ' + (h.author_display || h.author_name || 'Unknown') + ' · ' + relTime(h.created_at)));
-            row.appendChild(el('div', { class: 'search-hit__text' }, String(h.content || '').slice(0, 160)));
-            row.addEventListener('click', () => {
+            const dest = '#/server/' + h.server_id + '/channel/' + h.channel_id;
+            // One jump routine, used by both the click and the menu, so the two
+            // can never disagree about where a result goes.
+            const jump = () => {
               panel.remove(); searchPanel = null;
-              const dest = '#/server/' + h.server_id + '/channel/' + h.channel_id;
               const cur = '#/server/' + serverId + '/channel/' + channelId;
               if (dest === cur) {
                 const node = feed.querySelector('[data-message-id="' + h.id + '"]');
@@ -728,7 +727,27 @@ async function renderChannel(container, serverId, channelId) {
                 }
               }
               location.hash = dest;
-            });
+            };
+            const row = el('button', { class: 'search-hit', type: 'button' });
+            // A hit is a message, so it gets the same per-message actions the
+            // message row itself offers, plus the ones that only make sense for
+            // a result you have not navigated to yet: copy the text or the link
+            // without leaving the search.
+            attachContextMenu(row, () => [
+              { label: 'Jump to message', onSelect: jump },
+              { sep: true },
+              { label: 'Copy message text', onSelect: () => copyText(String(h.content || ''), 'Message copied.') },
+              { label: 'Copy message link', onSelect: () => copyText(
+                TrycordConfig.backendUrl().replace(/\/+$/, '') + '/' + dest.replace(/^#\//, ''), 'Message link copied.') },
+              { sep: true },
+              { label: 'Report message', danger: true, onSelect: () => openReportDialog({
+                kind: 'message', messageId: h.id, reason: 'Other',
+              }) },
+            ], { target: () => ({ type: 'message', id: String(h.id) }) });
+            row.appendChild(el('div', { class: 'search-hit__meta' },
+              '#' + (h.channel_name || 'channel') + ' · ' + (h.author_display || h.author_name || 'Unknown') + ' · ' + relTime(h.created_at)));
+            row.appendChild(el('div', { class: 'search-hit__text' }, String(h.content || '').slice(0, 160)));
+            row.addEventListener('click', jump);
             results.appendChild(row);
           }
         } catch (ex) {
