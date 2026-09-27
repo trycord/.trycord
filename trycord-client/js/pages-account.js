@@ -5,7 +5,7 @@ import Api from './api.js';
 import State, { clearSession, refreshServers, mustVerifyToPost } from './state.js';
 import { esc, el, clear, toast, confirmDialog } from './ui.js';
 import { avatar, loadAuthedImage } from './components.js';
-import { renderContextHeader, renderAllChrome } from './shell.js';
+import { renderContextHeader, renderAllChrome, clearAnnouncements } from './shell.js';
 import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';
 import { renderBackendSelector } from './pages-public.js';
 import Realtime from './realtime.js';
@@ -34,6 +34,7 @@ function accountTabs(active) {
       onConfirm: async () => {
         try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
         try { Realtime.disconnect(); } catch { /* ignore */ }
+        clearAnnouncements();
         clearSession();
         location.hash = '#/login';
       },
@@ -594,6 +595,7 @@ function renderDangerZone(wrap) {
     // Shut the gateway down first: a lingering socket would keep
     // reconnecting (and reusing a dead token) after sign-out.
     try { Realtime.disconnect(); } catch { /* ignore */ }
+    clearAnnouncements();
     clearSession();
     location.hash = '#/login';
   });

@@ -1036,8 +1036,27 @@ function scheduleAnnouncementRefresh() {
   annState.timer = setInterval(() => { loadAnnouncements({ force: true }); }, 120000);
 }
 
+// Announcements are session-scoped chrome. Without this the refresh timer
+// outlives sign-out, keeps firing against a dead session, and carries the
+// previous user's banners into the next session.
+//
+// This only tears down. It must not go back through renderAnnouncementBanner(),
+// which reschedules whenever a session still looks live: sign-out clears the
+// token *after* calling this, so the old token is still present here and the
+// banner would immediately start a brand-new interval.
+export function clearAnnouncements() {
+  if (annState.timer) { clearInterval(annState.timer); }
+  annState = { items: [], loaded: false, timer: null };
+  paintAnnouncementBanners();
+}
+
 export function renderAnnouncementBanner() {
   if (isAuthed()) scheduleAnnouncementRefresh();
+  paintAnnouncementBanners();
+}
+
+// Paint only - no scheduling, no fetching. Safe to call from teardown.
+function paintAnnouncementBanners() {
   const items = annState.items || [];
   for (const shell of [qs('#trycord-main'), qs('#mobile-shell')]) {
     if (!shell) continue;
