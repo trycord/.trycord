@@ -1733,7 +1733,23 @@ select.input { appearance: auto; }
 .msg .msg-head { display: flex; align-items: baseline; gap: var(--t-d-2); flex-wrap: wrap; }
 .msg .msg-author { font-weight: 700; font-size: var(--t-fs-m); color: var(--t-txt); letter-spacing: 0.002em; }
 .msg .msg-time { color: var(--t-mut); font-size: var(--t-fs-xs); font-weight: 500; }
-.msg .msg-actions { margin-left: auto; opacity: 0; transition: opacity var(--t-fast); display: flex; gap: 2px; }
+/* Hover actions are absolutely positioned rather than sitting in the flex
+   flow. They were `opacity: 0` but still laid out, so every message reserved
+   a ~19px row for buttons nobody could see - which is most of the vertical
+   gap between consecutive grouped messages. .msg is already position:relative,
+   so this costs nothing and stops reserving space. */
+.msg .msg-actions {
+  position: absolute;
+  top: 2px;
+  right: 8px;
+  margin-left: 0;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+  display: flex;
+  gap: 2px;
+  background: var(--t-base);
+  border-radius: var(--t-r-s);
+}
 .msg:hover .msg-actions,
 .msg:focus-within .msg-actions { opacity: 1; }
 .msg .msg-actions button { color: var(--t-mut); font-size: var(--t-fs-xs); padding: 2px 6px; border-radius: var(--t-r-s); }
@@ -1772,7 +1788,12 @@ select.input { appearance: auto; }
 }
 .msg .msg-text { color: var(--t-txt2); white-space: pre-wrap; word-break: break-word; margin: 2px 0 0; font-size: 0.92rem; line-height: 1.52; }
 .msg.grouped { padding-top: 2px; padding-bottom: 2px; }
-.msg.grouped > .avatar { visibility: hidden; }
+/* A grouped message keeps the avatar column so its text stays aligned with the
+   message above, but the avatar itself must not set the row height. The
+   placeholder is padding rather than a visibility:hidden element, because a
+   hidden element still occupies 28px and was the other half of the gap. */
+.msg.grouped > .avatar { display: none; }
+.msg.grouped { padding-left: calc(var(--t-avatar-sm) + 12px + 8px); }
 .msg.grouped .msg-author,
 .msg.grouped .msg-time,
 .msg.grouped .msg-edited { display: none; }
