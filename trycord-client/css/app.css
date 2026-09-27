@@ -2296,6 +2296,54 @@ html:is(
 .permission-item { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid var(--t-line); border-radius: 8px; color: var(--t-txt2); background: var(--t-base2); font-size: 0.76rem; }
 .permission-item:hover { border-color: var(--t-line-hi); color: var(--t-txt); }
 
+/* ---- permission override editor (inherit / allow / deny) ----------------
+   A row per permission with an explicit three-way choice. A checkbox grid
+   cannot express this: "not granted by any role" and "explicitly denied"
+   look identical in a checkbox, and they are not the same decision. */
+.perm-overrides { display: block; }
+.perm-overrides__list {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+.perm-override-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 10px;
+  border: 1px solid var(--t-line);
+  border-radius: 8px;
+  background: var(--t-base2);
+}
+.perm-override-row__label {
+  flex: 1 1 220px;
+  min-width: 0;
+  color: var(--t-txt2);
+  font-size: 0.82rem;
+}
+.perm-override-row__opts { display: flex; gap: 4px; flex: 0 0 auto; }
+.perm-override-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--t-line);
+  border-radius: 999px;
+  font-size: 0.74rem;
+  color: var(--t-mut);
+  cursor: pointer;
+  user-select: none;
+}
+.perm-override-opt:hover { border-color: var(--t-line-hi); color: var(--t-txt); }
+.perm-override-opt:has(input:checked) {
+  border-color: var(--t-accent);
+  color: var(--t-txt);
+  background: color-mix(in srgb, var(--t-accent) 12%, transparent);
+}
+.perm-override-opt:has(input:disabled) { opacity: 0.55; cursor: default; }
+.perm-override-opt input { margin: 0; accent-color: var(--t-accent); }
+
 /* ============================================================
    Instance announcement banner
    Sits above the context header in both shells. Restrained by
