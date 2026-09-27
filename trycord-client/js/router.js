@@ -57,8 +57,14 @@ function requireAuth() {
 }
 
 async function renderRoute() {
-  const { path, parts } = parseHash();
-  document.documentElement.dataset.route = path || '/';
+    const { path, parts } = parseHash();
+    document.documentElement.dataset.route = path || '/';
+    // Cleared here and set only by the auth shell. A dedicated auth page is
+    // fixed-position and escapes the desktop shell's grid, but it still has to
+    // live inside a shell that is actually displayed - and below 600px the
+    // mobile shell replaces the desktop one entirely. So the styling hook
+    // follows the page that renders rather than a repeated list of routes.
+    delete document.documentElement.dataset.authPage;
   // Session state as a styling hook. Without a session there is no rail and
   // no context sidebar to render, but the desktop shell is still a fixed
   // three-column grid - so a signed-out visitor on any non-static route

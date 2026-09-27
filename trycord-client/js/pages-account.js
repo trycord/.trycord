@@ -4,8 +4,8 @@
 import Api from './api.js';
 import State, { clearSession, refreshServers, mustVerifyToPost } from './state.js';
 import { esc, el, clear, toast, confirmDialog } from './ui.js';
-import { avatar, loadAuthedImage } from './components.js';
-import { renderContextHeader, renderAllChrome, clearAnnouncements } from './shell.js';
+import { avatar, loadAuthedImage, invalidateAuthedImage } from './components.js';
+import { renderContextHeader, renderAllChrome, clearAnnouncements, refreshSessionBar } from './shell.js';
 import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';
 import { renderBackendSelector } from './pages-public.js';
 import Realtime from './realtime.js';
@@ -304,9 +304,15 @@ function renderProfileEditor(wrap) {
     if (!file) return;
     if (!/^image\//.test(file.type || '')) { toast('Only images can be used.', 'error'); return; }
     mediaStatus.textContent = 'Uploading ' + kind + '…';
+    // The server hands back a new path per upload and deletes the old file, but
+    // drop our cached blob for the outgoing path anyway: keeping bytes the
+    // server has already unlinked can only ever serve something wrong.
+    const prev = kind === 'avatar' ? State.me?.avatarUrl : State.me?.bannerUrl;
     try {
       const updated = await Api.uploadProfileImage(kind, file);
+      invalidateAuthedImage(prev);
       State.me = { ...State.me, ...updated };
+      refreshSessionBar();
       okBox.hidden = false;
       if (kind === 'avatar') avatarRm.hidden = !updated.avatarUrl;
       else bannerRm.hidden = !updated.bannerUrl;
@@ -324,8 +330,11 @@ function renderProfileEditor(wrap) {
   bannerInput.addEventListener('change', () => upload('banner', bannerInput.files[0]));
   avatarRm.addEventListener('click', async () => {
     try {
+      const prev = State.me?.avatarUrl;
       const updated = await Api.removeProfileImage('avatar');
+      invalidateAuthedImage(prev);
       State.me = { ...State.me, ...updated };
+      refreshSessionBar();
       avatarRm.hidden = true;
       paintMedia();
       toast('Avatar removed.', 'ok');
@@ -333,8 +342,11 @@ function renderProfileEditor(wrap) {
   });
   bannerRm.addEventListener('click', async () => {
     try {
+      const prev = State.me?.bannerUrl;
       const updated = await Api.removeProfileImage('banner');
+      invalidateAuthedImage(prev);
       State.me = { ...State.me, ...updated };
+      refreshSessionBar();
       bannerRm.hidden = true;
       paintMedia();
       toast('Banner removed.', 'ok');

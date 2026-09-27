@@ -1,5 +1,5 @@
-﻿// Membership lifecycle: the authoritative record of who belongs to a server.
-// Join/leave/kick/ban/timeout go through here â€” never raw INSERTs in routes.
+// Membership lifecycle: the authoritative record of who belongs to a server.
+// Join/leave/kick/ban/timeout go through here — never raw INSERTs in routes.
 const db = require('../db');
 const { now, uuid } = require('../util');
 const roles = require('./roles');
@@ -29,7 +29,7 @@ async function get(serverId, userId, conn = db) {
 // window - otherwise an owner on a large community could scroll off their
 // own roster.
 async function list(serverId, { limit = null, offset = 0, search = '' } = {}) {
-  // Member rows and their roles are independent queries â€” run together.
+  // Member rows and their roles are independent queries — run together.
   const q = String(search || '').trim();
   const like = '%' + q + '%';
   const cap = limit === null || limit === undefined
@@ -214,7 +214,7 @@ async function leave(serverId, userId) {
     if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'server not found' };
     if (!(await get(serverId, userId, t))) throw { code: 'NOT_A_MEMBER', message: 'not a member' };
     if (srv.owner_id === userId) {
-      throw { code: 'OWNER_CANNOT_LEAVE', message: 'the owner cannot leave â€” transfer ownership or delete the server' };
+      throw { code: 'OWNER_CANNOT_LEAVE', message: 'the owner cannot leave — transfer ownership or delete the server' };
     }
     await removeMembership(serverId, userId, t);
     return { ok: true };

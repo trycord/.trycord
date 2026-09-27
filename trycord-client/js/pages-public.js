@@ -10,20 +10,86 @@ import Realtime from './realtime.js';
 let legal = { termsVersion: '1.0', privacyVersion: '1.0' };
 Api.legal().then((l) => { if (l) legal = l; }).catch(() => {});
 
+// The supplied Trycord login background, baked in as an asset rather than
+// redrawn in CSS. Referenced absolutely because app.css lives in /css, so a
+// document-relative url() would resolve to /css/assets and 404.
+const AUTH_BG = '/assets/trycord-login-bg.png';
+const AUTH_LOGO = '/assets/trycord-logo.png';
+
+// Dedicated authentication page shell, shared by login, register, recovery,
+// password reset and email verification.
+//
+// This is intentionally NOT the application with its navigation hidden. Those
+// routes still render into the app's view region, so the page is laid out as a
+// fixed, full-viewport surface with the background image behind it and the card
+// centred on top - no rail, no sidebar, and none of the shell's leftover grid
+// tracks pushing the card off-centre.
+//
+// `secondary` is the right-hand panel. It is optional: pages with nothing
+// meaningful to put there render a single-column card rather than an empty
+// box. There is deliberately NO QR/device-login panel here, because the server
+// exposes no such endpoint - a decorative code scanner would promise a feature
+// that does not exist.
+function authShell({ title, lede, secondary, contextTitle }) {
+  if (contextTitle) renderContextHeader({ title: contextTitle });
+  // Styling hook: the auth page renders into the desktop view region, and the
+  // mobile shell replaces that region below 600px. See the note in router.js.
+  document.documentElement.dataset.authPage = '1';
+  const page = el('div', { class: 'auth-page' });
+  page.appendChild(el('div', { class: 'auth-background', 'aria-hidden': 'true' }));
+
+  const inner = el('div', { class: 'auth-page__inner' });
+
+  const brand = el('a', { class: 'auth-brand', href: '#/home', 'aria-label': 'Trycord' });
+  brand.appendChild(el('img', { class: 'auth-brand__mark', src: AUTH_LOGO, alt: '' }));
+  brand.appendChild(el('span', { class: 'auth-brand__word' }, 'Trycord'));
+  inner.appendChild(brand);
+
+  const card = el('div', { class: 'auth-card' });
+  const main = el('div', { class: 'auth-main' });
+  const heading = el('h1', { class: 'auth-title' }, title);
+  main.appendChild(heading);
+  if (lede) main.appendChild(el('p', { class: 'auth-lede' }, lede));
+  card.appendChild(main);
+  if (secondary) card.appendChild(secondary);
+
+  inner.appendChild(card);
+  page.appendChild(inner);
+  return { page, main, card };
+}
+
+// The "already have an account / forgot password / support" strip that used to
+// be a stack of .auth-alt paragraphs under the form.
+function authFooter(...nodes) {
+  return el('div', { class: 'auth-footer' }, ...nodes);
+}
+
 function loginForm(container) {
   clear(container);
-  renderContextHeader({ title: 'Welcome back' });
-  const box = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'card card--auth' });
-  card.appendChild(el('h1', {}, 'Sign in'));
-  card.appendChild(el('p', { class: 'auth-sub' }, 'Back to your communities, conversations and presence.'));
+  // The backend picker is the one genuinely secondary concern on a sign-in
+  // page - it matters before you have an account and is irrelevant after - so
+  // it takes the side panel rather than being stacked under the form.
+  const backendBox = el('div', { class: 'auth-secondary__body' });
+  renderBackendSelector(backendBox);
+  const secondary = el('div', { class: 'auth-secondary' },
+    el('h2', { class: 'auth-secondary__title' }, 'Connect to an instance'),
+    el('p', { class: 'auth-secondary__lede' },
+      'Running your own? Point Trycord at your server instead of the default.'),
+    backendBox);
+
+  const { page, main } = authShell({
+    title: 'Sign in',
+    lede: 'Back to your communities, conversations and presence.',
+    secondary,
+    contextTitle: 'Welcome back',
+  });
 
   const err = el('div', { class: 'form-error', hidden: true });
   const username = el('input', { class: 'input', type: 'text', autocomplete: 'username', placeholder: 'Username', required: true });
   const password = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', placeholder: 'Password', required: true });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Sign in');
 
-  const form = el('form', {}, err,
+  const form = el('form', { class: 'auth-form' }, err,
     el('div', { class: 'field' }, el('label', { for: 'login-username' }, 'Username'), username),
     el('div', { class: 'field' }, el('label', { for: 'login-password' }, 'Password'), password),
     submit);
@@ -62,27 +128,31 @@ function loginForm(container) {
     }
   });
 
-  card.appendChild(form);
-  const backendBox = el('div', { style: { marginTop: 'var(--t-d-5)' } });
-  renderBackendSelector(backendBox);
-  card.appendChild(backendBox);
-  card.appendChild(el('p', { class: 'auth-alt' },
-    'New here? ', el('a', { href: '#/register' }, 'Create an account')));
-  card.appendChild(el('p', { class: 'auth-alt' },
-    el('a', { href: '#/forgot' }, 'Forgot password?'), ' · ', el('a', { href: '#/support' }, 'Support')));
-  box.appendChild(card);
-  container.appendChild(box);
+  main.appendChild(form);
+  main.appendChild(authFooter(
+    el('span', {}, 'New here? ', el('a', { href: '#/register' }, 'Create an account')),
+    el('span', {}, el('a', { href: '#/forgot' }, 'Forgot password?'), ' · ', el('a', { href: '#/support' }, 'Support')),
+  ));
+  container.appendChild(page);
   username.focus();
 }
 
 function registerForm(container) {
   clear(container);
-  renderContextHeader({ title: 'Create an account' });
-  const box = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'card card--auth' });
-  card.appendChild(el('h1', {}, 'Join Trycord'));
-  card.appendChild(el('p', { class: 'auth-sub' },
-    'A self-hosted community chat. Pick a name and agree to the policies to continue.'));
+  const backendBox = el('div', { class: 'auth-secondary__body' });
+  renderBackendSelector(backendBox);
+  const secondary = el('div', { class: 'auth-secondary' },
+    el('h2', { class: 'auth-secondary__title' }, 'Connect to an instance'),
+    el('p', { class: 'auth-secondary__lede' },
+      'Already running your own? Point Trycord at your server before you sign up.'),
+    backendBox);
+
+  const { page, main } = authShell({
+    title: 'Join Trycord',
+    lede: 'A self-hosted community chat. Pick a name and agree to the policies to continue.',
+    secondary,
+    contextTitle: 'Create an account',
+  });
 
   const err = el('div', { class: 'form-error', hidden: true });
   const username = el('input', { class: 'input', type: 'text', autocomplete: 'username', placeholder: 'username', minlength: 2, maxlength: 32, required: true });
@@ -106,7 +176,7 @@ function registerForm(container) {
     emailField.classList.add('is-disabled');
   });
 
-  const form = el('form', {}, err,
+  const form = el('form', { class: 'auth-form' }, err,
     el('div', { class: 'field' },
       el('label', { for: 'reg-username' }, 'Username'),
       username,
@@ -153,32 +223,30 @@ function registerForm(container) {
     }
   });
 
-  card.appendChild(form);
-  const backendBox = el('div', { style: { marginTop: 'var(--t-d-5)' } });
-  renderBackendSelector(backendBox);
-  card.appendChild(backendBox);
-  card.appendChild(el('p', { class: 'auth-alt' },
-    'Already registered? ', el('a', { href: '#/login' }, 'Sign in'), ' · ', el('a', { href: '#/support' }, 'Support')));
-  box.appendChild(card);
-  container.appendChild(box);
+  main.appendChild(form);
+  main.appendChild(authFooter(
+    el('span', {}, 'Already registered? ', el('a', { href: '#/login' }, 'Sign in'), ' · ', el('a', { href: '#/support' }, 'Support')),
+  ));
+  container.appendChild(page);
   username.focus();
 }
 
 function forgotForm(container) {
   clear(container);
-  renderContextHeader({ title: 'Reset password' });
-  const box = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'card card--auth' });
-  card.appendChild(el('h1', {}, 'Forgot password'));
-  card.appendChild(el('p', { class: 'auth-sub' },
-    "Tell us the email on your account and we'll send a reset link if it exists."));
+  // Nothing belongs in a side panel here, so this one renders single-column
+  // rather than an empty box.
+  const { page, main } = authShell({
+    title: 'Forgot password',
+    lede: "Tell us the email on your account and we'll send a reset link if it exists.",
+    contextTitle: 'Reset password',
+  });
 
   const ok = el('div', { class: 'form-success', hidden: true });
   const err = el('div', { class: 'form-error', hidden: true });
-  const email = el('input', { class: 'input', type: 'email', placeholder: 'you@example.com', required: true });
+  const email = el('input', { class: 'input', type: 'email', autocomplete: 'email', placeholder: 'you@example.com', required: true });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Send reset link');
 
-  const form = el('form', {}, ok, err,
+  const form = el('form', { class: 'auth-form' }, ok, err,
     el('div', { class: 'field' }, el('label', { for: 'forgot-email' }, 'Email'), email),
     submit);
 
@@ -196,25 +264,26 @@ function forgotForm(container) {
     }
   });
 
-  card.appendChild(form);
-  card.appendChild(el('p', { class: 'auth-alt' }, el('a', { href: '#/login' }, 'Back to sign in')));
-  box.appendChild(card);
-  container.appendChild(box);
+  main.appendChild(form);
+  main.appendChild(authFooter(
+    el('span', {}, el('a', { href: '#/login' }, 'Back to sign in'), ' · ', el('a', { href: '#/support' }, 'Support')),
+  ));
+  container.appendChild(page);
 }
 
 function resetPasswordPage(container, token) {
   clear(container);
-  renderContextHeader({ title: 'Reset password' });
-  const box = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'card card--auth' });
-  card.appendChild(el('h1', {}, 'Choose a new password'));
-  card.appendChild(el('p', { class: 'auth-sub' }, 'Set a new password for your Trycord account.'));
+  const { page, main } = authShell({
+    title: 'Choose a new password',
+    lede: 'Set a new password for your Trycord account.',
+    contextTitle: 'Reset password',
+  });
   const err = el('div', { class: 'form-error', hidden: true });
   const ok = el('div', { class: 'form-success', hidden: true });
   const password = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true, placeholder: 'New password' });
   const confirm = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true, placeholder: 'Repeat new password' });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Reset password');
-  const form = el('form', {}, ok, err,
+  const form = el('form', { class: 'auth-form' }, ok, err,
     el('div', { class: 'field' }, el('label', {}, 'New password'), password),
     el('div', { class: 'field' }, el('label', {}, 'Confirm password'), confirm),
     submit);
@@ -230,15 +299,15 @@ function resetPasswordPage(container, token) {
       ok.textContent = 'Password reset successfully. You can now sign in.';
       form.reset();
       submit.hidden = true;
-      card.appendChild(el('a', { class: 'btn primary', href: '#/login' }, 'Continue to sign in'));
+      main.appendChild(el('a', { class: 'btn primary block', href: '#/login' }, 'Continue to sign in'));
     } catch (ex) {
       err.hidden = false;
       err.textContent = ex.message || 'This reset link is no longer valid.';
     } finally { submit.removeAttribute('aria-busy'); }
   });
-  card.appendChild(form);
-  card.appendChild(el('p', { class: 'auth-alt' }, el('a', { href: '#/login' }, 'Back to sign in')));
-  box.appendChild(card); container.appendChild(box);
+  main.appendChild(form);
+  main.appendChild(authFooter(el('span', {}, el('a', { href: '#/login' }, 'Back to sign in'))));
+  container.appendChild(page);
 }
 
 function legalPage(container, kind) {
@@ -270,19 +339,18 @@ function legalPage(container, kind) {
 // given address exists ahead of the attempt.
 function verifyEmailPage(container, token) {
   clear(container);
-  renderContextHeader({ title: 'Verify email' });
-  const wrap = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'card card--auth' });
-  card.appendChild(el('h1', {}, 'Confirm your email'));
-  card.appendChild(el('p', { class: 'auth-sub' }, 'Confirming your recovery address…'));
+  const { page, main } = authShell({
+    title: 'Confirm your email',
+    lede: 'Confirming your recovery address…',
+    contextTitle: 'Verify email',
+  });
   const msg = el('div', { class: 'muted small', 'aria-live': 'polite' });
   const err = el('div', { class: 'form-error', hidden: true });
   const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)' } });
-  card.appendChild(err);
-  card.appendChild(msg);
-  card.appendChild(actions);
-  wrap.appendChild(card);
-  container.appendChild(wrap);
+  main.appendChild(err);
+  main.appendChild(msg);
+  main.appendChild(actions);
+  container.appendChild(page);
 
   (async () => {
     try {

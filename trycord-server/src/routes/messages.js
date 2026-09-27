@@ -1,4 +1,4 @@
-﻿// /api/channels/:channelId/messages â€” history + post (members with SEND_MESSAGES),
+// /api/channels/:channelId/messages — history + post (members with SEND_MESSAGES),
 // delete (author or MANAGE_MESSAGES).
 const express = require('express');
 const db = require('../db');
@@ -51,7 +51,7 @@ router.get('/', async (req, res, next) => {
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     // Integer embedded after validation (keeps LIMIT working on every database).
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 200);
-    const select = `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+    const select = `SELECT m.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
          FROM messages m JOIN users u ON u.id = m.author_id`;
     let rows;
     if (req.query.after !== undefined && req.query.after !== '') {
@@ -132,7 +132,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     }
     const content = String((req.body || {}).content || '').trim().slice(0, 2000);
     // Attachments and text are independent: a message may carry files
-    // alone, text alone, or both â€” but must carry at least one.
+    // alone, text alone, or both — but must carry at least one.
     const ids = uploads.sanitizeIds((req.body || {}).attachmentIds);
     if (!content && !ids.length) return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
 
@@ -145,7 +145,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     const nonce = String((req.body || {}).clientNonce || '').trim().slice(0, 64) || null;
     if (nonce) {
       const existing = await db.get(
-        `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+        `SELECT m.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
          FROM messages m JOIN users u ON u.id = m.author_id
          WHERE m.channel_id = ? AND m.client_nonce = ?`,
         [ch.id, nonce]
@@ -227,7 +227,7 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// PATCH /:messageId â€” author-only edit. Moderators can delete but never
+// PATCH /:messageId — author-only edit. Moderators can delete but never
 // rewrite someone else's words. Broadcasts message_updated.
 router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
@@ -281,7 +281,7 @@ router.post('/:messageId/reactions', auth.requireVerified, rateLimit({ windowMs:
   } catch (e) { next(e); }
 });
 
-// DELETE .../reactions/:emoji â€” removes only the caller's own reaction.
+// DELETE .../reactions/:emoji — removes only the caller's own reaction.
 router.delete('/:messageId/reactions/:emoji', auth.requireVerified, async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);

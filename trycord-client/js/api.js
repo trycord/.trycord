@@ -259,6 +259,11 @@ const Api = {
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId) + '/assign/' + encodeURIComponent(userId)),
   reorderRoles: (serverId, orderedIds) =>
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles/reorder', { body: { orderedIds } }),
+  // Add/remove one of the CALLER's own self-assignable roles. There is no
+  // userId parameter on purpose: the server only ever touches the caller's own
+  // membership row, so this cannot be aimed at another member.
+  selfAssignRole: (serverId, roleId, on) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId) + '/self', { body: { on: !!on } }),
 
   // ---- invites ---------------------------------------------------------------------
   invites: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/invites'),

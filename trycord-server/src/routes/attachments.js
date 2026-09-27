@@ -1,4 +1,4 @@
-﻿// Attachment upload + authenticated download.
+// Attachment upload + authenticated download.
 //   POST /api/channels/:channelId/attachments  (multipart field "file")
 //   GET  /api/attachments/:id                  (member of the server only)
 // Uploads require membership + SEND_MESSAGES; downloads the same membership
@@ -16,7 +16,7 @@ const uploads = require('../services/uploads');
 const router = express.Router();
 // Auth is applied per-route, not via router.use(auth): this router is
 // mounted at /api (a prefix of every API path), so router-level auth
-// would run â€” and bill two DB lookups â€” on every API request that merely
+// would run — and bill two DB lookups — on every API request that merely
 // passes through on its way to another router. The two attachment
 // endpoints keep the exact same auth behavior via route-level middleware.
 const memory = multer({
@@ -79,7 +79,7 @@ router.get('/attachments/:id', auth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Profile media (avatars / banners) are public identity by design â€” any
+// Profile media (avatars / banners) are public identity by design — any
 // authenticated user may load them. The file id must carry the pf- prefix
 // (enforced by storeProfileMedia), so this route cannot serve a message
 // attachment.

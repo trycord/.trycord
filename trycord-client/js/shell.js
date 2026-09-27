@@ -6,7 +6,7 @@
 import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, showUserCard, copyText } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, communityMark, navGroup } from './components.js';
 import Api from './api.js';
-import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost } from './state.js';
+import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
 import { closeMobileDrawer, toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 
 // Shared context-menu builders (Checkpoint C). `contextmenu` fires on
@@ -225,20 +225,12 @@ export function renderCommunities(region) {
   region.appendChild(el('div', { class: 'rail-divider' }));
   region.appendChild(create);
 
+  // The rail used to carry its own account button - an avatar in a circle with
+  // an expand chevron - which duplicated the profile card at the foot of the
+  // context sidebar. Two representations of "you" in two places, with the rail
+  // one disappearing entirely when a context had no sidebar. There is now one:
+  // the pinned profile card, always visible, in every context.
   const foot = el('div', { class: 'rail-foot' });
-  const me = State.me;
-  if (me) {
-    foot.appendChild(railButton({
-      label: 'Your account',
-      icon: '',
-      href: '#/settings',
-      active: route.startsWith('/settings') || route.startsWith('/account'),
-    }));
-    // Swap the icon slot for the real avatar.
-    const accountBtn = foot.lastElementChild;
-    clear(accountBtn);
-    accountBtn.appendChild(avatar(me, { size: 'sm', withPresence: true }));
-  }
   foot.appendChild(sidebarToggleButton());
   region.appendChild(foot);
 }
@@ -419,11 +411,15 @@ function sessionBar() {
     title: 'Your account', 'aria-label': 'Your account',
     onClick: () => { location.hash = '#/settings'; },
   });
-  idBox.appendChild(el('span', { class: 'user-controls__avatar' }, avatar(
-    { id: me.id, username: me.username, displayName: me.display_name, avatarUrl: me.avatar_url },
-    { size: 'sm', withPresence: true })));
+  // Pass State.me through untouched. This used to hand-build a literal with
+  // `displayName: me.display_name, avatarUrl: me.avatar_url`, but /api/auth/me
+  // returns publicUser() which is camelCase, so both were always undefined and
+  // the bar rendered coloured initials ("A") with the username as the name no
+  // matter what the member had uploaded. avatar() and the display name below
+  // both normalise casing themselves, so never rebuild the user object here.
+  idBox.appendChild(el('span', { class: 'user-controls__avatar' }, avatar(me, { size: 'sm', withPresence: true })));
   const info = el('span', { class: 'user-controls__info' });
-  info.appendChild(el('span', { class: 'user-controls__name' }, me.display_name || me.username || 'You'));
+  info.appendChild(el('span', { class: 'user-controls__name' }, me.displayName || me.display_name || me.username || 'You'));
   info.appendChild(el('span', { class: 'user-controls__status' }, 'Online'));
   idBox.appendChild(info);
   bar.appendChild(idBox);
@@ -435,6 +431,21 @@ function sessionBar() {
   }, '⚙'));
   bar.appendChild(buttons);
   return bar;
+}
+
+// Re-render every mounted session bar in place.
+//
+// The bar is built once per view render, so a change to the signed-in user's
+// own profile (a new avatar, a new display name) was invisible in the rail
+// until the next navigation happened to rebuild it. Queried by class rather
+// than by holding a reference, because the bar is appended into five different
+// region builders depending on which surface is mounted.
+export function refreshSessionBar() {
+  if (!State.me) return;
+  document.querySelectorAll('.user-controls').forEach((old) => {
+    const next = sessionBar();
+    if (next) old.replaceWith(next);
+  });
 }
 
 // ---- community context ----------------------------------------------------
@@ -869,6 +880,60 @@ function sidebarToggleButton() {
   return btn;
 }
 
+// Self-assignable role picker for the signed-in member.
+//
+// Each toggle is its own request against the server's self-assign endpoint, and
+// the checkbox is put back the way it was if the server refuses. The server is
+// the only thing that decides: a role carrying a permission this member does
+// not already hold is rejected there, and the refusal is surfaced verbatim
+// rather than swallowed into a generic failure.
+function openSelfRolePicker(serverId, roles, onChanged) {
+  const err = el('div', { class: 'form-error', hidden: true });
+  const status = el('div', { class: 'muted small', 'aria-live': 'polite' },
+    'Tick a role to put it on, untick to take it off.');
+  const list = el('div', { class: 'self-role-list' });
+
+  const done = el('button', { class: 'btn primary', type: 'button' }, 'Done');
+  const modal = openModal({
+    title: 'Your roles',
+    eyebrow: 'Self-assignable',
+    closable: true,
+    body: el('div', {}, err, status, list),
+    footer: [done],
+  });
+  done.addEventListener('click', () => modal.close());
+
+  for (const r of roles) {
+    const name = r.name || 'Role';
+    const input = el('input', { type: 'checkbox' });
+    input.checked = !!r.selfAssigned;
+    const nameEl = el('span', { class: 'self-role__name' }, name);
+    if (r.color) nameEl.style.color = r.color;
+    const label = el('label', { class: 'self-role' }, input, nameEl);
+    input.addEventListener('change', async () => {
+      const want = input.checked;
+      input.disabled = true;
+      err.hidden = true;
+      status.textContent = (want ? 'Adding ' : 'Removing ') + name + '…';
+      try {
+        await Api.selfAssignRole(serverId, r.id, want);
+        status.textContent = name + (want ? ' added.' : ' removed.');
+        await onChanged();
+      } catch (ex) {
+        // Never leave the box showing a state the server did not accept.
+        input.checked = !want;
+        err.hidden = false;
+        err.textContent = ex.message || 'Could not change that role.';
+        status.textContent = 'Tick a role to put it on, untick to take it off.';
+      } finally {
+        input.disabled = false;
+      }
+    });
+    list.appendChild(label);
+  }
+  return modal;
+}
+
 export function renderMemberSidebar(region) {
   clear(region);
   // The member panel belongs to community surfaces only. On home, DMs,
@@ -930,6 +995,7 @@ export function renderMemberSidebar(region) {
       const top = m.is_owner ? null
         : rolesForMember.map((r) => roleById.get(String(r.id)) || r)
           .sort((a, b) => Number(b.position || 0) - Number(a.position || 0))[0] || null;
+      const rowWrap = el('div', { class: 'member-row-wrap' });
       const row = el('button', { class: 'row row--member', type: 'button', title: '@' + (m.username || '') });
       row.appendChild(avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }));
       const info = el('span', { class: 'member-item__info' });
@@ -944,7 +1010,30 @@ export function renderMemberSidebar(region) {
       row.appendChild(info);
       row.addEventListener('click', () => { location.hash = '#/users/' + id; });
       row.addEventListener('contextmenu', (e) => memberCard(e, m));
-      group.appendChild(row);
+      rowWrap.appendChild(row);
+
+      // "Roles" pill, on my own row only. Self-assignment has to be reachable
+      // without hunting through settings, and this is the one place the client
+      // already knows the signed-in member's roles. Deliberately not offered
+      // for other members: that already has a flow (member card -> Manage
+      // roles), and a second one here would be a second source of truth.
+      const isSelf = !!State.me && String(id) === String(State.me.id);
+      const selfAssignable = isSelf ? roles.filter((r) => r.self_assign) : [];
+      if (selfAssignable.length) {
+        const pill = el('button', {
+          class: 'member-roles-pill', type: 'button',
+          title: 'Change the roles you have', 'aria-haspopup': 'dialog',
+        }, 'Roles');
+        pill.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openSelfRolePicker(currentServerId(), selfAssignable, async () => {
+            await refreshServerView();
+            renderMemberSidebar(qs('#member-sidebar'));
+          });
+        });
+        rowWrap.appendChild(pill);
+      }
+      group.appendChild(rowWrap);
     }
     region.appendChild(group);
   }

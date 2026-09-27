@@ -15,7 +15,7 @@ function parseRow(r) {
   if (!r) return null;
   let permissions = [];
   try { permissions = JSON.parse(r.permissions); } catch { /* keep empty */ }
-  return { ...r, color: r.color || null, permissions, is_default: !!r.is_default };
+  return { ...r, color: r.color || null, permissions, is_default: !!r.is_default, self_assign: !!r.self_assign };
 }
 
 // Role colors are persisted display hints only — validated hex, never free
@@ -58,7 +58,7 @@ function isUniqueViolation(e) {
   return /UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) || e.code === 'ER_DUP_ENTRY' || e.code === 'SQLITE_CONSTRAINT_UNIQUE';
 }
 
-async function create(serverId, { name, permissions, color }) {
+async function create(serverId, { name, permissions, color, selfAssign }) {
   const clean = String(name || '').trim().slice(0, 32);
   if (!clean) throw { code: 'VALIDATION_ERROR', message: 'role name required' };
   const perms = Array.isArray(permissions) ? permissions.filter(isKnown) : [];
@@ -67,8 +67,8 @@ async function create(serverId, { name, permissions, color }) {
   try {
     const id = uuid();
     await db.run(
-      'INSERT INTO roles (id, server_id, name, color, position, permissions, is_default) VALUES (?, ?, ?, ?, ?, ?, 0)',
-      [id, serverId, clean, cleanColor(color), posRow.p, JSON.stringify(perms)]
+      'INSERT INTO roles (id, server_id, name, color, position, permissions, is_default, self_assign) VALUES (?, ?, ?, ?, ?, ?, 0, ?)',
+      [id, serverId, clean, cleanColor(color), posRow.p, JSON.stringify(perms), selfAssign ? 1 : 0]
     );
     return get(id);
   } catch (e) {
@@ -77,7 +77,7 @@ async function create(serverId, { name, permissions, color }) {
   }
 }
 
-async function update(role, { name, permissions, color }) {
+async function update(role, { name, permissions, color, selfAssign }) {
   const sets = [];
   const vals = [];
   if (name !== undefined) {
@@ -94,6 +94,10 @@ async function update(role, { name, permissions, color }) {
   if (color !== undefined) {
     sets.push('color = ?');
     vals.push(cleanColor(color));
+  }
+  if (selfAssign !== undefined) {
+    sets.push('self_assign = ?');
+    vals.push(selfAssign ? 1 : 0);
   }
   if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'nothing to update' };
   vals.push(role.id);
@@ -177,7 +181,27 @@ async function ensureDefault(serverId, userId, conn = db) {
   if (d) await assign(serverId, userId, d.id, conn);
 }
 
+// Roles a member is allowed to grant themselves, highest rank first. This is
+// the whole "self-assign" surface: the client renders exactly this list, and
+// `self` (below) only ever accepts a role that came out of it.
+async function selfAssignable(serverId) {
+  const rows = await db.all(
+    'SELECT * FROM roles WHERE server_id = ? AND self_assign = 1 ORDER BY position DESC, name ASC',
+    [serverId]
+  );
+  return rows.map(parseRow);
+}
+
+async function userHasRole(serverId, userId, roleId, conn = db) {
+  const row = await conn.get(
+    'SELECT 1 AS ok FROM member_roles WHERE server_id = ? AND user_id = ? AND role_id = ?',
+    [serverId, userId, roleId]
+  );
+  return !!row;
+}
+
 module.exports = {
   DEFAULT_ROLES, createDefaults, list, get, defaultRole, byName,
   create, update, remove, reorder, topPosition, userRoles, assign, unassign, ensureDefault,
+  selfAssignable, userHasRole,
 };

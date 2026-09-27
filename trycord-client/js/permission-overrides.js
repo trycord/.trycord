@@ -1,4 +1,4 @@
-﻿// Permission override editor.
+// Permission override editor.
 //
 // One component serves both channels and categories: the difference is only
 // which API pair it calls, and the shape of the data is identical

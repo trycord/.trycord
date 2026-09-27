@@ -257,11 +257,21 @@ export function closeContextMenu() {
 // Mini profile card anchored at a cursor point. The caller supplies the
 // rendered avatar node (avatar lives in components.js; ui.js stays
 // dependency-free) plus plain action descriptors.
-export function showUserCard(clientX, clientY, { avatarEl, title, sub, statusLine, actions } = {}) {
+export function showUserCard(clientX, clientY, { avatarEl, title, sub, statusLine, actions, bannerUrl = null } = {}) {
   closeContextMenu();
   const root = qs('#popover-root') || document.body;
   const pop = el('div', { class: 'popover user-card', role: 'dialog', 'aria-label': title || 'User' });
-  pop.appendChild(el('div', { class: 'user-card__banner' }));
+  // Banner is optional and loads through the authenticated media route, so
+  // it is filled in asynchronously and simply stays empty when absent.
+  const banner = el('div', { class: 'user-card__banner' });
+  if (bannerUrl) {
+    import('./components.js').then(({ loadAuthedImage }) => loadAuthedImage(bannerUrl)).then((url) => {
+      if (!url || !pop.isConnected) return;
+      banner.style.backgroundImage = 'url("' + url + '")';
+      banner.classList.add('has-img');
+    }).catch(() => {});
+  }
+  pop.appendChild(banner);
   const head = el('div', { class: 'user-card__head' });
   if (avatarEl) head.appendChild(avatarEl);
   pop.appendChild(head);

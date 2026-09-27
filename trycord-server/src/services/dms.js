@@ -124,7 +124,7 @@ async function listMine(userId) {
       : [],
     lastIds.length
       ? db.all(
-        `SELECT dm.*, u.username AS author_name, u.display_name AS author_display
+        `SELECT dm.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
          FROM dm_messages dm JOIN users u ON u.id = dm.author_id
          WHERE dm.id IN (${lastIds.map(() => '?').join(',')})`,
         lastIds
@@ -167,7 +167,7 @@ async function history(userId, conversationId, { before = null, limit = 50 } = {
     );
     if (!anchor) throw { code: 'NOT_FOUND', message: 'message not found' };
     rows = await db.all(
-      `SELECT dm.*, u.username AS author_name, u.display_name AS author_display
+      `SELECT dm.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
        FROM dm_messages dm JOIN users u ON u.id = dm.author_id
        WHERE dm.conversation_id = ? AND (dm.created_at < ? OR (dm.created_at = ? AND dm.id < ?))
        ORDER BY dm.created_at DESC, dm.id DESC LIMIT ${lim}`,
@@ -175,7 +175,7 @@ async function history(userId, conversationId, { before = null, limit = 50 } = {
     );
   } else {
     rows = await db.all(
-      `SELECT dm.*, u.username AS author_name, u.display_name AS author_display
+      `SELECT dm.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
        FROM dm_messages dm JOIN users u ON u.id = dm.author_id
        WHERE dm.conversation_id = ? ORDER BY dm.created_at DESC, dm.id DESC LIMIT ${lim}`,
       [conversationId]

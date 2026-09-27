@@ -198,8 +198,15 @@ async function J(method, p, body, tok, form) {
   ok('activity', act.status === 200 && act.json.some((m) => m.content === 'reg second'));
   const pres = await J('GET', '/api/users/presence?ids=' + A.id + ',' + B.id, null, A.token);
   ok('presence', pres.status === 200);
-  const search = await J('GET', '/api/users/search?q=' + B.name.slice(0, 6), null, A.token);
-  ok('user-search', search.status === 200 && search.json.some((x) => x.id === B.id));
+  // Search the FULL username, not a 6-character prefix. /api/users/search is
+  // prefix-first with LIMIT 20, so once enough runs have accumulated dozens of
+  // users sharing the same generated prefix ("rgBmu*"), a 6-char query matches
+  // all of them and the specific user being looked for can fall outside the
+  // limit depending on its random suffix. The full name is unique, so this
+  // tests the same search behaviour deterministically.
+  const search = await J('GET', '/api/users/search?q=' + B.name, null, A.token);
+  ok('user-search', search.status === 200 && search.json.some((x) => x.id === B.id),
+    'status=' + search.status + ' q=' + B.name + ' hits=' + (search.json || []).length);
 
   // DMs
   const dm = await J('POST', '/api/dms', { userId: B.id }, A.token);

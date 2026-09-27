@@ -1,4 +1,4 @@
-﻿// /api/servers/:serverId/channels â€” list (members), create/patch/delete (MANAGE_CHANNELS).
+// /api/servers/:serverId/channels — list (members), create/patch/delete (MANAGE_CHANNELS).
 const express = require('express');
 const db = require('../db');
 const auth = require('../middleware/auth');
