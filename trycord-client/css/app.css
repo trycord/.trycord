@@ -1884,50 +1884,241 @@ select.input { appearance: auto; }
 }
 .card--auth { width: min(var(--ui-auth-width), 100%); }
 .card--profile { width: 100%; max-width: 860px; }
+/* Card heading + action row. Shared by every card surface so a card never
+   has to hand-roll a font-size or stack its own button row.
+   --t-fs-l, not --t-fs-xl/-2xl: those are page-title sizes and reach ~46px
+   at ultrawide, which turns a short card heading into three wrapped lines. */
+.card-title { margin: 0 0 var(--t-d-2); font-size: var(--t-fs-l); line-height: 1.3; }
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-d-2);
+  margin-top: var(--t-d-4);
+}
+.card-actions > .btn { flex: 0 0 auto; }
+/* Content-card grid for hub/support-style pages: a few equal cards that fill
+   the available page width. Deliberately NOT .theme-grid, which is a
+   theme-picker grid (minmax 220px) and squeezes text cards too narrow.
+   The 420px ceiling matters: with only a minmax() the tracks grow to fill
+   whatever width they are given, so on an ultrawide main column a short
+   "Community rules" card stretched to 644px and read as mostly emptiness. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 420px));
+  gap: var(--t-d-4);
+  align-items: stretch;
+  justify-content: start;
+}
+.card-grid > .card { width: 100%; display: flex; flex-direction: column; }
+.card-grid > .card > .card-actions { margin-top: auto; padding-top: var(--t-d-4); }
 .card--list { padding: 12px; }
 .card--auth h1 { margin: 0 0 4px; font-size: var(--t-fs-2xl); letter-spacing: -0.025em; }
 .card--auth .auth-sub { color: var(--t-mut); margin: 0 0 var(--t-d-5); font-size: var(--t-fs-s); }
 .auth-alt { text-align: center; margin-top: var(--t-d-4); color: var(--t-mut); font-size: var(--t-fs-s); }
 
 
-/* Auth is deliberately isolated from application navigation. */
-html[data-route="/login"] .app-rail,
-html[data-route="/register"] .app-rail,
-html[data-route="/forgot"] .app-rail,
-html[data-route^="/reset-password/"] .app-rail,
-html[data-route^="/verify-email/"] .app-rail { display: none !important; }
-html[data-route="/login"] .context-header,
-html[data-route="/register"] .context-header,
-html[data-route="/forgot"] .context-header,
-html[data-route^="/reset-password/"] .context-header,
-html[data-route^="/verify-email/"] .context-header { display: none !important; }
-html[data-route="/login"] .main-content,
-html[data-route="/register"] .main-content,
-html[data-route="/forgot"] .main-content,
-html[data-route^="/reset-password/"] .main-content,
-html[data-route^="/verify-email/"] .main-content { width: 100% !important; }
-html[data-route="/login"] .chat-environment,
-html[data-route="/register"] .chat-environment,
-html[data-route="/forgot"] .chat-environment,
-html[data-route^="/reset-password/"] .chat-environment,
-html[data-route^="/verify-email/"] .chat-environment { display: block !important; }
-html[data-route="/login"] .view-root,
-html[data-route="/register"] .view-root,
-html[data-route="/forgot"] .view-root,
-html[data-route^="/reset-password/"] .view-root,
-html[data-route^="/verify-email/"] .view-root {
-  display: grid !important;
-  align-content: center !important;
-  justify-items: center !important;
+/* ============================================================
+   12b. PUBLIC / STATIC PAGES
+   ------------------------------------------------------------
+   Login, signup, password recovery, Support, Appeals, Terms and
+   Privacy are public-facing pages, not application views. The reference
+   for how they should look is the server-served marketing site in
+   public/ (site.css) - a constrained, left-aligned column with
+   generous vertical rhythm on the page background.
+
+   They are explicitly NOT "the client with the navigation hidden".
+   Hiding the rail still leaves the shell's 304px of grid tracks, its
+   vertical dividers and its context header, which reads as an empty
+   application rather than a page of a website. So below the chrome is
+   removed *and* the content is restyled onto the public-site metrics.
+
+   Metrics mirrored from public/css/site.css:
+     --content-w: 1080px   (site .wrap / .page)
+     --header-h: 64px
+     prose column 760px, h1 at --fs-xl, vertical padding clamp(32px,6vw,72px)
+   ============================================================ */
+
+:root {
+  --pub-content-w: 1080px;
+  --pub-prose-w: 760px;
+  --pub-pad-y: clamp(32px, 6vw, 72px);
+  --pub-pad-x: 20px;
+}
+
+/* The route list. :is() keeps this to one place - the previous version
+   repeated the same five-route list on six rules, which is how the appeal
+   form and legal pages were missed while looking identical in intent. */
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) {
+  --is-public-page: 1;
+}
+
+/* No application navigation on a public page. */
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) .app-rail,
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) .context-sidebar,
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) .context-header,
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) #member-sidebar { display: none !important; }
+
+/* Collapse the desktop shell to one column.
+   Hiding the rail and sidebar is NOT enough: a display:none grid item does
+   not collapse its track. The shell is still
+   `var(--ui-rail) var(--ui-sidebar) minmax(0,1fr)` with .main-content
+   pinned to grid-column 3, so it began 64px + 240px = 304px in from the
+   left and every centred element sat ~152px right of the true viewport
+   centre. `width: 100%` on .main-content cannot fix this - it fills
+   column 3 rather than moving to column 1. */
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) .shell--desktop { grid-template-columns: minmax(0, 1fr) !important; }
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) .shell--desktop > .main-content {
+  grid-column: 1 !important;
+  width: 100% !important;
+  background: var(--pg) !important;
+}
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) .chat-environment { display: block !important; }
+
+/* Public content sits in a constrained, top-aligned column with the
+   marketing site's rhythm - not vertically centred in a void. Centring was
+   the other half of the "floating form" problem: a short form pinned to the
+   middle of a tall viewport reads as a mistake, whereas a real page starts
+   near the top with the title leading. */
+html:is(
+  [data-route="/login"],
+  [data-route="/register"],
+  [data-route="/forgot"],
+  [data-route^="/reset-password"],
+  [data-route^="/verify-email"],
+  [data-route^="/legal"],
+  [data-route^="/support"]
+) .view-root {
+  display: block !important;
+  align-content: normal !important;
+  justify-items: normal !important;
   min-height: 100% !important;
   margin: 0 !important;
-  padding: 32px 18px !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
 }
-html[data-route="/login"] #member-sidebar,
-html[data-route="/register"] #member-sidebar,
-html[data-route="/forgot"] #member-sidebar,
-html[data-route^="/reset-password/"] #member-sidebar,
-html[data-route^="/verify-email/"] #member-sidebar { display: none !important; }
+
+/* The public column. Same max-width and vertical rhythm as site.css .page. */
+.pub-page {
+  width: 100%;
+  max-width: var(--pub-content-w);
+  margin: 0 auto;
+  padding: var(--pub-pad-y) var(--pub-pad-x) clamp(40px, 6vw, 80px);
+}
+.pub-page--narrow { max-width: calc(var(--pub-prose-w) + 2 * var(--pub-pad-x)); }
+
+/* Left-aligned page title at the site's display scale, not an auth-card
+   heading. */
+.pub-title {
+  margin: 0 0 8px;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--t-txt);
+}
+.pub-lede {
+  margin: 0 0 var(--t-d-5);
+  color: var(--t-txt2);
+  font-size: var(--t-fs-l);
+  line-height: 1.5;
+}
+.pub-section {
+  margin-top: clamp(40px, 6vw, 64px);
+  padding-top: 20px;
+  border-top: 1px solid var(--t-line);
+}
+.pub-section:first-of-type { border-top: 0; padding-top: 0; margin-top: var(--t-d-5); }
+.pub-section__title { margin: 0 0 10px; font-size: var(--t-fs-l); color: var(--t-txt); }
+.pub-prose { max-width: var(--pub-prose-w); }
+.pub-prose p, .pub-prose li { color: var(--t-txt2); }
+.pub-prose h2 { font-size: var(--t-fs-l); margin: 40px 0 10px; padding-top: 20px; border-top: 1px solid var(--t-line); }
+.pub-prose h3 { font-size: var(--t-fs-m); margin: 24px 0 6px; color: var(--t-txt); }
+.pub-prose ul, .pub-prose ol { padding-left: 22px; }
+
+/* Link groups (Support, legal index) use the site's flat bordered rows
+   rather than app cards, so the page reads as a page. */
+.pub-links { display: grid; gap: 12px; margin-top: var(--t-d-4); }
+.pub-link {
+  display: block;
+  padding: 18px 20px;
+  border: 1px solid var(--t-line-hi);
+  border-radius: var(--t-r-m);
+  background: var(--t-base);
+  color: var(--t-txt);
+  text-decoration: none;
+}
+.pub-link:hover { border-color: var(--t-accent); text-decoration: none; }
+.pub-link__title { font-weight: 600; margin-bottom: 4px; }
+.pub-link__desc { color: var(--t-txt2); font-size: var(--t-fs-s); }
+
+@media (max-width: 760px) {
+  .pub-page { padding-top: 28px; }
+  .pub-title { font-size: 1.9rem; }
+  .pub-lede { font-size: var(--t-fs-m); }
+}
 
 /* ============================================================
    13. ACCOUNT / PROFILES / COMMUNITY MANAGEMENT / ADMIN

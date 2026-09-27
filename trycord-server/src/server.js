@@ -382,7 +382,10 @@ async function boot() {
     app.get('/terms', publicPage('terms.html'));
     app.get('/privacy', publicPage('privacy.html'));
     app.get('/about', publicPage('about.html'));
-    app.get('/contact', publicPage('contact.html'));
+    // Contact was merged into Support: /contact redirects rather than 404ing,
+    // so existing inbound links and bookmarks keep working.
+    app.get('/contact', (req, res) => res.redirect(301, '/support'));
+    app.get('/support', publicPage('support.html'));
     app.get('/features', publicPage('features.html'));
     app.get('/docs', publicPage('documentation.html'));
     app.get('/download', publicPage('download.html'));

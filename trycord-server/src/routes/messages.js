@@ -51,35 +51,74 @@ router.get('/', async (req, res, next) => {
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     // Integer embedded after validation (keeps LIMIT working on every database).
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 200);
+    const select = `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+         FROM messages m JOIN users u ON u.id = m.author_id`;
     let rows;
-    if (req.query.before) {
-      // Cursor page: messages strictly older than the anchor, newest first.
-      const anchor = await db.get(
-        'SELECT created_at FROM messages WHERE id = ? AND channel_id = ?',
-        [req.query.before, ch.id]
-      );
-      if (!anchor) return fail(res, 'NOT_FOUND', 'message not found');
+    if (req.query.after !== undefined && req.query.after !== '') {
+      // Forward cursor: everything strictly newer than the anchor, oldest
+      // first. This is what a reconnecting client uses to fill the hole
+      // between its last known message and now. Previously there was no
+      // forward cursor at all, so anything missed while offline was simply
+      // unrecoverable in the UI.
+      const after = Math.max(parseInt(req.query.after, 10) || 0, 0);
       rows = await db.all(
-        `SELECT m.*, u.username AS author_name, u.display_name AS author_display
-         FROM messages m JOIN users u ON u.id = m.author_id
-         WHERE m.channel_id = ? AND (m.created_at < ? OR (m.created_at = ? AND m.id < ?))
-         ORDER BY m.created_at DESC, m.id DESC LIMIT ${limit}`,
-        [ch.id, anchor.created_at, anchor.created_at, req.query.before]
+        `${select} WHERE m.channel_id = ? AND m.seq > ? ORDER BY m.seq ASC LIMIT ${limit}`,
+        [ch.id, after]
+      );
+    } else if (req.query.before) {
+      // Backward cursor: older than the anchor, newest first.
+      //
+      // The anchor may be a seq (preferred: a single indexed integer) or a
+      // message id (the original contract). Supporting both matters because
+      // changing this parameter's meaning would silently break any existing
+      // client: an id parsed as an integer is NaN, which would quietly turn
+      // "page backwards" into "return nothing".
+      const raw = String(req.query.before);
+      const anchorSeq = /^\d+$/.test(raw)
+        ? Number(raw)
+        : await resolveSeq('messages', 'channel_id', ch.id, raw);
+      if (anchorSeq === null) return fail(res, 'NOT_FOUND', 'message not found');
+      rows = await db.all(
+        `${select} WHERE m.channel_id = ? AND m.seq < ? ORDER BY m.seq DESC LIMIT ${limit}`,
+        [ch.id, anchorSeq]
       );
     } else {
       rows = await db.all(
-        `SELECT m.*, u.username AS author_name, u.display_name AS author_display
-         FROM messages m JOIN users u ON u.id = m.author_id
-         WHERE m.channel_id = ? ORDER BY m.created_at DESC, m.id DESC LIMIT ${limit}`,
+        `${select} WHERE m.channel_id = ? ORDER BY m.seq DESC LIMIT ${limit}`,
         [req.params.channelId]
       );
     }
     const byId = await uploads.getForMessages(rows.map((r) => r.id));
-    rows.reverse().forEach((r) => { r.attachments = byId[r.id] || []; });
+    // Normalise to oldest-first for the client. The default and forward
+    // reads are already ascending, so reverse() is only meaningful for the
+    // backward page.
+    if (req.query.after === undefined || req.query.after === '') rows.reverse();
+    rows.forEach((r) => { r.attachments = byId[r.id] || []; });
     await attachEngagement(rows, req.user.id);
     res.json(rows);
   } catch (e) { next(e); }
 });
+
+// Assign the next seq for a channel. The unique index on (channel_id, seq)
+// is the authority: if two writers race and pick the same value, one insert
+// fails with a constraint violation and retries against the new maximum.
+// Without the index this read-then-write would silently produce two rows
+// with the same order.
+async function nextSeq(channelId) {
+  const row = await db.get('SELECT COALESCE(MAX(seq), 0) AS m FROM messages WHERE channel_id = ?', [channelId]);
+  return (row ? Number(row.m) : 0) + 1;
+}
+
+// Resolve a legacy cursor (message id) to its seq, scoped so an id from
+// another channel cannot be used as an anchor here.
+async function resolveSeq(table, scope, scopeId, id) {
+  const row = await db.get(
+    `SELECT seq FROM ${table} WHERE id = ? AND ${scope} = ?`,
+    [id, scopeId]
+  );
+  if (!row || row.seq === null || row.seq === undefined) return null;
+  return Number(row.seq);
+}
 
 router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
@@ -96,15 +135,60 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     // alone, text alone, or both — but must carry at least one.
     const ids = uploads.sanitizeIds((req.body || {}).attachmentIds);
     if (!content && !ids.length) return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
+
+    // Idempotency. A caller that retries the same submission (because the
+    // response was lost, not because the write failed) sends the same
+    // clientNonce and gets the already-persisted message back instead of a
+    // second copy. The nonce is scoped to the channel and is never compared
+    // against message text or timestamps, so two genuinely different
+    // messages that happen to be identical are still two messages.
+    const nonce = String((req.body || {}).clientNonce || '').trim().slice(0, 64) || null;
+    if (nonce) {
+      const existing = await db.get(
+        `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+         FROM messages m JOIN users u ON u.id = m.author_id
+         WHERE m.channel_id = ? AND m.client_nonce = ?`,
+        [ch.id, nonce]
+      );
+      if (existing) {
+        const byId = await uploads.getForMessages([existing.id]);
+        existing.attachments = byId[existing.id] || [];
+        await attachEngagement([existing], req.user.id);
+        // 200, not 201: nothing new was created.
+        return res.json({ ...existing, server_id: ch.server_id, deduped: true });
+      }
+    }
+
     const msg = {
       id: uuid(), channel_id: ch.id, server_id: ch.server_id,
       author_id: req.user.id, user: req.user.username, content, created_at: now(),
       edited_at: null,
     };
-    await db.run(
-      'INSERT INTO messages (id, channel_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)',
-      [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at]
-    );
+
+    // Insert with the canonical sequence, retrying on the (rare) race.
+    let inserted = false;
+    for (let attempt = 0; attempt < 5 && !inserted; attempt++) {
+      const seq = await nextSeq(ch.id);
+      try {
+        await db.run(
+          'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq, client_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at, seq, nonce]
+        );
+        msg.seq = seq;
+        inserted = true;
+      } catch (e) {
+        // A unique violation on (channel_id, seq) means another writer took
+        // this value between our read and our write. Re-read and retry.
+        const dupSeq = /unique/i.test(String(e && e.message)) || e && e.code === 'SQLITE_CONSTRAINT';
+        if (!dupSeq || attempt === 4) throw e;
+        // A unique violation on the nonce means a concurrent duplicate won.
+        if (nonce) {
+          const again = await db.get('SELECT id FROM messages WHERE channel_id = ? AND client_nonce = ?', [ch.id, nonce]);
+          if (again) { msg.id = again.id; inserted = true; break; }
+        }
+      }
+    }
+    if (!inserted) return fail(res, 'CONFLICT', 'could not assign a message position, please retry');
     msg.attachments = ids.length
       ? await uploads.attachToMessage(ids, msg.id, req.user.id, ch.id)
       : [];

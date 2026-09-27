@@ -20,6 +20,7 @@ let reconnectDelay = 1000;
 let reconnectTimer = null;
 let order = 0;
 let joinedChannel = null;
+let joinedServer = null;
 let joinedDm = null;
 let typingTimer = null;
 let closedIntentionally = false;
@@ -53,10 +54,15 @@ async function connect() {
   ws.addEventListener('open', () => {
     reconnectDelay = 1000;
     setOnline(true);
-    emit('open', {});
-    // Re-join whichever surface the user is on right now.
+    // Restore subscriptions BEFORE announcing the reopen. Listeners on
+    // 'open' kick off a resync fetch; if the joins are still in flight
+    // when that fetch is issued, a message committed in the gap is missed
+    // live *and* is not in the snapshot the fetch returns, so it is lost
+    // until the next reload.
+    if (joinedServer) send({ type: 'join-server', serverId: joinedServer });
     if (joinedChannel) send({ type: 'join', channelId: joinedChannel });
     if (joinedDm) send({ type: 'dm:join', conversationId: joinedDm });
+    emit('open', {});
   });
 
   ws.addEventListener('message', (ev) => {
@@ -109,8 +115,14 @@ const TrycordRealtime = {
   },
   join(channelId) { joinedChannel = channelId; send({ type: 'join', channelId }); },
   leaveChannel() { joinedChannel = null; },
-  joinServer(serverId) { send({ type: 'join-server', serverId }); },
-  leaveServer() { send({ type: 'leave-server' }); },
+  // Track the community room locally as well as on the wire. It used to
+  // be sent but never remembered, so after any reconnect the socket was in
+  // no community room and every structural event (member joined/left,
+  // channel created, role changed, server updated, kick/ban) became
+  // undeliverable - with no way to self-heal, because the only thing that
+  // re-ran the community load was one of those very events.
+  joinServer(serverId) { joinedServer = serverId; send({ type: 'join-server', serverId }); },
+  leaveServer() { joinedServer = null; send({ type: 'leave-server' }); },
   sendMessageToChannel(content, attachments) {
     const body = {};
     if (content) body.content = content;

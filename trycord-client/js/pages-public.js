@@ -244,9 +244,24 @@ function resetPasswordPage(container, token) {
 function legalPage(container, kind) {
   clear(container);
   const titles = { terms: 'Terms of Service', privacy: 'Privacy Policy' };
-  renderContextHeader({ title: titles[kind] || 'Legal' });
-  const wrap = el('div', { class: 'page' });
-  wrap.appendChild(el('p', {}, 'This instance manages its own legal documents. Login or registration records your acceptance of the versions this server exposes (v' + esc(legal.termsVersion) + '/v' + esc(legal.privacyVersion) + ').'));
+  const isTerms = kind === 'terms';
+  const docPath = isTerms ? '/terms' : '/privacy';
+  // Public page composition, same as the rest of the public site: a
+  // constrained column with a left-aligned title leading from the top.
+  const wrap = el('div', { class: 'pub-page pub-page--narrow' });
+  wrap.appendChild(el('h1', { class: 'pub-title' }, titles[kind] || 'Legal'));
+  const body = el('div', { class: 'pub-prose' });
+  body.appendChild(el('p', {},
+    'This instance manages its own legal documents. Signing in or registering records your acceptance of the versions this server exposes (v'
+    + esc(legal.termsVersion) + ' terms, v' + esc(legal.privacyVersion) + ' privacy).'));
+  // The full document is server-rendered from public/ and is the real
+  // artefact; this route is only the in-app pointer to it.
+  const cta = el('div', { class: 'pub-links' });
+  cta.appendChild(el('a', { class: 'pub-link', href: docPath },
+    el('div', { class: 'pub-link__title' }, 'Read the full ' + (titles[kind] || 'document')),
+    el('div', { class: 'pub-link__desc' }, 'Opens the complete ' + (isTerms ? 'terms' : 'privacy policy') + ' published by this instance.')));
+  body.appendChild(cta);
+  wrap.appendChild(body);
   container.appendChild(wrap);
 }
 

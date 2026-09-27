@@ -1,0 +1,113 @@
+# Publish the Trycord server image to GitHub Container Registry (GHCR).
+#
+# The image is self-contained: it serves the web client, the public/legal
+# site, the REST API and the WebSocket gateway from one process, so
+# self-hosting is `docker run` with two volumes and no other services.
+#
+# Tags published:
+#   latest              - newest build of the default branch
+#   <major>.<minor>     - moving tag for the matching release series
+#   v1.6.3, v1.6.3-rc1  - exact tag builds (plus a `sha-<commit>` tag)
+#
+# Nothing here is published on a pull request from a fork, because that
+# would expose the registry write token.
+name: Publish Docker image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    name: Build and publish
+    # A tag build and a branch build never need to run twice.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required to push to GHCR.
+      packages: write
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          # Do not push a multi-arch manifest from a pull request.
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the built image
+        # Proves the image can actually boot and reach its database, which
+        # catches a broken native build or a missing asset directory - the
+        # two failure modes a plain build would not reveal.
+        run: |
+          set -euo pipefail
+          tag="$(echo '${{ steps.meta.outputs.tags }}' | awk '{print $1}')"
+          echo "Smoke testing $tag"
+          docker run -d --name trycord-smoke \
+            -e JWT_SECRET=smoke-test-secret-not-for-production \
+            -e DB_FILE=/data/trycord.db \
+            -p 9971:9971 "$tag"
+
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:9971/api/health > /tmp/health.json 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+
+          cat /tmp/health.json
+          curl -fsS http://127.0.0.1:9971/api/health | grep -q '"ok":true'
+          # The bundled client and the legal pages must be present, or the
+          # container would come up looking healthy but serve nothing.
+          curl -fsS http://127.0.0.1:9971/            > /dev/null
+          curl -fsS http://127.0.0.1:9971/terms       > /dev/null
+          curl -fsS http://127.0.0.1:9971/privacy     > /dev/null
+          echo "smoke test passed"
+
+      - name: Smoke test logs
+        if: always()
+        run: docker logs trycord-smoke || true
+
+      - name: Remove smoke container
+        if: always()
+        run: docker rm -f trycord-smoke || true

@@ -1,0 +1,45 @@
+# Keep the build context small and never bake host state or secrets in.
+.git
+.github
+.gitignore
+.dockerignore
+
+# Secrets and local config - the image must be configured at runtime.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Host databases and their WAL sidecars. A published image must never carry
+# someone's data; /data is a volume for that.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+perf-baseline.db
+server.db
+data/
+
+# User uploads - runtime volume, never image content.
+uploads/
+
+# Desktop build output. The desktop app is distributed via releases, not
+# baked into the server image.
+trycord-desktop/client/
+trycord-desktop/release/
+trycord-desktop/dist/
+trycord-desktop/node_modules/
+*.zip
+*.asar
+
+# Per-package dependencies. Reinstalled in the builder stage.
+trycord-server/node_modules/
+trycord-client/node_modules/
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.log

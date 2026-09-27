@@ -59,6 +59,14 @@ function requireAuth() {
 async function renderRoute() {
   const { path, parts } = parseHash();
   document.documentElement.dataset.route = path || '/';
+  // Session state as a styling hook. Without a session there is no rail and
+  // no context sidebar to render, but the desktop shell is still a fixed
+  // three-column grid - so a signed-out visitor on any non-static route
+  // (Support, Discover) got a 304px phantom gutter and every centred element
+  // sat ~152px right of the viewport centre. Keying the collapse off the
+  // session rather than the route fixes every such page at once, instead of
+  // needing each one added to a route list.
+  document.documentElement.dataset.session = isAuthed() ? 'in' : 'out';
   const region = viewRegion();
   if (!region) return;
 
