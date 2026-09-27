@@ -49,7 +49,10 @@ export function can(perm) {
 }
 
 export function peerPresence(id) {
-  return state.presence.get(String(id)) || state.presence.get(id) || 'offline';
+  // Canonical key only. Presence used to be written twice per user (once
+  // stringified, once raw) and read with a two-key fallback, which held 2N
+  // entries instead of N and made the "which key" question load-bearing.
+  return state.presence.get(String(id)) || 'offline';
 }
 
 // Server-room hooks (join/leave the community realtime room). Set once by
@@ -149,6 +152,11 @@ export function clearSession() {
   state.friendsIn = [];
   state.friendsOut = [];
   state.activity = [];
+  // Presence was the one unbounded structure that survived sign-out, so
+  // a shared browser carried the previous session's peer list into the
+  // next one. Mutes are rebuilt wholesale by refreshMutes().
+  state.presence.clear();
+  state.mutedChannels.clear();
 }
 
 // ---- data -----------------------------------------------------------------
@@ -192,7 +200,6 @@ export async function enterServer(serverId) {
       if (snap && typeof snap === 'object') {
         for (const [id, p] of Object.entries(snap)) {
           state.presence.set(String(id), p);
-          state.presence.set(id, p);
         }
       }
     }
@@ -231,6 +238,10 @@ export function leaveServerContext() {
   state.roles = [];
   state.bans = [];
   state.lastServerId = null;
+  // Presence is scoped to a community's roster. Carrying it across
+  // community switches is what let the map grow without bound over a long
+  // session; the next enterServer() repopulates it from a fresh snapshot.
+  state.presence.clear();
   try { localStorage.removeItem(LS_SERVER_ID); } catch { /* ignore */ }
 }
 
@@ -248,13 +259,25 @@ export async function refreshFriends() {
   return state;
 }
 
-export async function refreshNotifications() {
-  try {
-    const n = await Api.notifications({ limit: 30 });
-    state.notifUnread = (n && n.unreadCount) || 0;
-    state.raw.notifications = (n && n.items) || [];
-  } catch { /* non-fatal */ }
-  return state.notifUnread;
+// Single-flight. A single notification frame currently fans out to two
+// independent refresh callers (the socket handler and the app-level
+// listener), and they fire in the same tick, so every notification used to
+// cost two identical GET /api/notifications requests. Coalescing here
+// fixes it for all callers rather than for one call site, and also stops a
+// burst of N notifications from becoming N parallel fetches of the same
+// unread count.
+let notifInFlight = null;
+export function refreshNotifications() {
+  if (notifInFlight) return notifInFlight;
+  notifInFlight = (async () => {
+    try {
+      const n = await Api.notifications({ limit: 30 });
+      state.notifUnread = (n && n.unreadCount) || 0;
+      state.raw.notifications = (n && n.items) || [];
+    } catch { /* non-fatal */ }
+    return state.notifUnread;
+  })().finally(() => { notifInFlight = null; });
+  return notifInFlight;
 }
 
 export async function refreshMutes() {

@@ -1,0 +1,56 @@
+# Trycord - the easy self-hosting path.
+#
+#   cp .env.docker.example .env      # then edit JWT_SECRET at minimum
+#   docker compose up -d
+#
+# Data lives in two named volumes, so `docker compose down` and image
+# upgrades never touch your database or uploads.
+
+services:
+  trycord:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # To run a published image instead of building locally, comment out
+    # `build` above and uncomment this:
+    # image: ghcr.io/trycord/trycord:latest
+    container_name: trycord
+    restart: unless-stopped
+    ports:
+      - "${TRYCORD_PORT:-9971}:9971"
+    env_file:
+      - .env
+    environment:
+      # Bind address and port are fixed by the port mapping above.
+      HOST: 0.0.0.0
+      PORT: "9971"
+      # Keep the SQLite file on the volume, not inside the container layer.
+      DB_CLIENT: sqlite
+      DB_FILE: /data/trycord.db
+      SERVER_HOST_TYPE: express
+    volumes:
+      - trycord-data:/data
+      - trycord-uploads:/app/uploads
+    # The image declares these too, but naming them keeps `compose down`
+    # from silently creating anonymous volumes.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:9971/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # Log rotation is the most common way a self-hosted container fills a
+    # disk. Cap it in the daemon config or here.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  trycord-data:
+  trycord-uploads:

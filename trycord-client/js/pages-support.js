@@ -6,7 +6,6 @@
 import Api from './api.js';
 import { esc, el, clear, toast } from './ui.js';
 import { isAuthed } from './state.js';
-import { renderContextHeader } from './shell.js';
 
 function actionIdFromHash() {
   try {
@@ -24,11 +23,13 @@ export function appealLink(actionId) {
 
 export async function renderSupport(container) {
   clear(container);
-  renderContextHeader({ title: 'Support', sub: 'Help and moderation appeals' });
-  const wrap = el('div', { class: 'page atrium' });
-  wrap.appendChild(el('h2', {}, 'Support'));
-  wrap.appendChild(el('p', { class: 'muted' },
-    'Get help with your account, report problems, or appeal a moderation decision. Appeals go directly to the people who run this instance.'));
+  // Public page: composed like the rest of the public Trycord site - a
+  // constrained column, a left-aligned title leading the page, and flat
+  // link rows. Not an app card grid inside leftover application chrome.
+  const wrap = el('div', { class: 'pub-page' });
+  wrap.appendChild(el('h1', { class: 'pub-title' }, 'Support'));
+  wrap.appendChild(el('p', { class: 'pub-lede' },
+    'Get help with your account, report a problem, or appeal a moderation decision. Appeals go directly to the people who run this instance.'));
 
   let instanceName = '';
   try {
@@ -36,30 +37,41 @@ export async function renderSupport(container) {
     if (info && info.name) instanceName = info.name;
   } catch { /* offline: hub still renders */ }
 
-  const grid = el('div', { class: 'theme-grid' });
-  const card = (title, text, href, label) => {
-    const box = el('div', { class: 'card card--auth' });
-    box.appendChild(el('h1', { style: { fontSize: '1.15rem' } }, title));
-    box.appendChild(el('p', { class: 'auth-sub' }, text));
-    box.appendChild(el('a', { class: 'btn primary', href }, label));
-    grid.appendChild(box);
+  const section = (heading) => {
+    const s = el('div', { class: 'pub-section' });
+    s.appendChild(el('h2', { class: 'pub-section__title' }, heading));
+    const links = el('div', { class: 'pub-links' });
+    s.appendChild(links);
+    wrap.appendChild(s);
+    return links;
   };
-  card('Appeal a decision',
-    'If your account or community was moderated, you can appeal with the action ID you received. No sign-in needed to submit.',
-    '#/support/appeals/new', 'Start an appeal');
+  // A flat link row carries its own destination as the whole row, so the
+  // description and the action can never disagree.
+  const link = (parent, title, desc, href) => {
+    const a = el('a', { class: 'pub-link', href });
+    a.appendChild(el('div', { class: 'pub-link__title' }, title));
+    a.appendChild(el('div', { class: 'pub-link__desc' }, desc));
+    parent.appendChild(a);
+  };
+
+  const help = section('Get help');
+  link(help, 'Appeal a decision',
+    'If your account or community was moderated, appeal with the action ID you received. No sign-in needed to submit.',
+    '#/support/appeals/new');
   if (isAuthed()) {
-    card('My appeals',
-      'Track appeals you have submitted and see their decisions.',
-      '#/support/appeals', 'View my appeals');
+    link(help, 'My appeals', 'Track appeals you have submitted and see their decisions.', '#/support/appeals');
   } else {
-    card('My appeals',
-      'Sign in to see appeals linked to your account.',
-      '#/login', 'Sign in');
+    link(help, 'My appeals', 'Sign in to see appeals linked to your account.', '#/login');
   }
-  card('Community rules',
-    'Review the terms and privacy policy that apply on this instance.',
-    '#/discover', 'Discover communities');
-  wrap.appendChild(grid);
+
+  // The real documents are server-served on this origin at /terms and
+  // /privacy - the same targets the registration form already links to.
+  // There is also an in-app #/legal/* route, but its renderer only prints
+  // the version numbers and no document text, so it is not a real target.
+  // Nothing here should point at community discovery.
+  const rules = section('Community rules');
+  link(rules, 'Terms of Service', 'The terms that apply on this instance.', '/terms');
+  link(rules, 'Privacy Policy', 'What this instance stores, and why.', '/privacy');
 
   if (instanceName) {
     wrap.appendChild(el('p', { class: 'muted small', style: { marginTop: 'var(--t-d-5)' } },
@@ -72,12 +84,13 @@ const APPEAL_STATUS_LABEL = { OPEN: 'Open', UNDER_REVIEW: 'Under review', APPROV
 
 export async function renderMyAppeals(container) {
   clear(container);
-  renderContextHeader({ title: 'My appeals', sub: 'Your moderation appeals' });
-  const wrap = el('div', { class: 'page atrium community-manager' });
-  wrap.appendChild(el('div', { class: 'community-manager__head' },
-    el('div', {}, el('h1', {}, 'My appeals'), el('p', { class: 'muted' }, 'Decisions appear here once reviewed.')),
-    el('a', { class: 'btn primary', href: '#/support/appeals/new' }, 'New appeal')));
-  const list = el('div', { class: 'community-list' });
+  const wrap = el('div', { class: 'pub-page pub-page--narrow' });
+  const head = el('div', { class: 'pub-section' });
+  head.appendChild(el('h1', { class: 'pub-title' }, 'My appeals'));
+  head.appendChild(el('p', { class: 'pub-lede' }, 'Decisions appear here once reviewed.'));
+  head.appendChild(el('a', { class: 'btn primary', href: '#/support/appeals/new' }, 'New appeal'));
+  wrap.appendChild(head);
+  const list = el('div', { class: 'pub-links' });
   wrap.appendChild(list);
   container.appendChild(wrap);
   let items = null;
@@ -105,12 +118,18 @@ export async function renderMyAppeals(container) {
 
 export function renderNewAppeal(container) {
   clear(container);
-  renderContextHeader({ title: 'Appeal a decision', sub: 'Ask for a second look' });
-  const wrap = el('div', { class: 'auth-wrap' });
-  const card = el('div', { class: 'card card--auth' });
-  card.appendChild(el('h1', {}, 'Appeal a moderation decision'));
-  card.appendChild(el('p', { class: 'auth-sub' },
+  // Public page composition: title and lede lead the page from the top left
+  // of a constrained column, and the form sits below in its own section.
+  // The auth-card idiom was the other half of the "floating form" problem.
+  const wrap = el('div', { class: 'pub-page pub-page--narrow' });
+  wrap.appendChild(el('h1', { class: 'pub-title' }, 'Appeal a moderation decision'));
+  wrap.appendChild(el('p', { class: 'pub-lede' },
     'Enter the action ID from your enforcement notice and explain why it should be reconsidered. You do not need to be signed in.'));
+
+  const section = el('div', { class: 'pub-section' });
+  const card = el('div', { class: 'card' });
+  section.appendChild(card);
+  wrap.appendChild(section);
 
   const err = el('div', { class: 'form-error', hidden: true });
   const ok = el('div', { class: 'form-success', hidden: true });
@@ -164,7 +183,7 @@ export function renderNewAppeal(container) {
   } else {
     card.appendChild(el('p', { class: 'auth-alt' }, 'Signed in? ', el('a', { href: '#/support/appeals' }, 'Track your appeals')));
   }
-  wrap.appendChild(card);
+  section.appendChild(card);
   container.appendChild(wrap);
   actionInput.focus();
 }

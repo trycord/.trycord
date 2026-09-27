@@ -169,13 +169,19 @@ const Api = {
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels/reorder', { body: { orderedIds } }),
 
   // ---- messages -------------------------------------------------------------
-  messages: (channelId, { before, limit } = {}) => {
+  // One page of history.
+  //   before=<seq>  older page, newest-first server-side, reversed to oldest-first here
+  //   after=<seq>   forward page (reconnect gap fill), oldest-first
+  messages: (channelId, { before, after, limit } = {}) => {
     const q = new URLSearchParams();
-    if (before) q.set('before', before);
+    if (before !== undefined && before !== null) q.set('before', String(before));
+    if (after !== undefined && after !== null) q.set('after', String(after));
     if (limit) q.set('limit', String(limit));
     const qs = q.toString();
     return request('GET', '/api/channels/' + encodeURIComponent(channelId) + '/messages' + (qs ? '?' + qs : ''));
   },
+  // body.clientNonce makes the POST idempotent: a retry after a lost response
+  // resolves to the message the first attempt already wrote.
   sendMessage: (channelId, body) =>
     request('POST', '/api/channels/' + encodeURIComponent(channelId) + '/messages', { body }),
   updateMessage: (channelId, messageId, body) =>

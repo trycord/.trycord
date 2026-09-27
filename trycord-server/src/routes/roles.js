@@ -8,14 +8,37 @@ const memberships = require('../services/memberships');
 const events = require('../services/events');
 const { PERMISSIONS } = require('../services/permissions');
 
-// Role hierarchy for assignment: you may only grant/revoke roles ranked
-// strictly below your own top role (the owner bypasses). The service owns
-// persistence; the server owns this authorization.
+// Role hierarchy: you may only act on roles ranked strictly below your own
+// top role (the owner bypasses). The service owns persistence; the server
+// owns this authorization.
+//
+// This guard must be applied to EVERY mutation that targets an existing
+// role - edit, delete and reorder included. Gating only on MANAGE_ROLES
+// leaves a real escalation: a Moderator (position 2) who cannot grant
+// Admin (position 3) could still blank Admin's permission array, recolour
+// or rename it, reorder it to the bottom, or delete it outright. "You may
+// not give this away" has to mean "you may not hand it out, reshape it, or
+// remove it" - otherwise the hierarchy is decorative.
 async function assertAssignable(req, role) {
   if (req.access && req.access.isOwner) return;
   const top = await roles.topPosition(req.server.id, req.user.id);
   if (top <= role.position) {
     throw { code: 'PERMISSION_DENIED', message: 'you can only manage roles below your own' };
+  }
+}
+
+// Reorder rewrites the position of the whole role set, so every role it
+// touches must clear the same bar as a single-role edit.
+async function assertCanReorderAll(req, list) {
+  if (req.access && req.access.isOwner) return;
+  const top = await roles.topPosition(req.server.id, req.user.id);
+  const blocked = list.filter((r) => top <= r.position);
+  if (blocked.length) {
+    throw {
+      code: 'PERMISSION_DENIED',
+      message: 'you can only reorder roles below your own',
+      detail: { blocked: blocked.map((r) => r.name) },
+    };
   }
 }
 
@@ -45,6 +68,9 @@ router.patch('/:roleId', auth.requireVerified, requirePerm('MANAGE_ROLES'), asyn
   try {
     const role = await roles.get(req.params.roleId);
     if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+    try {
+      await assertAssignable(req, role);
+    } catch (e) { return serviceError(res, e); }
     const { name, permissions, color } = req.body || {};
     const updated = await roles.update(role, { name, permissions, color });
     events.emit(req.server.id, 'role_updated', { role: updated });
@@ -52,11 +78,17 @@ router.patch('/:roleId', auth.requireVerified, requirePerm('MANAGE_ROLES'), asyn
   } catch (e) { serviceError(res, e); }
 });
 
-// Atomic hierarchy reorder. MANAGE_ROLES gates the endpoint; the service
-// validates the id set. Reordering never changes anyone's membership.
+// Atomic hierarchy reorder. MANAGE_ROLES gates the endpoint, the service
+// validates the id set, and the hierarchy guard keeps the actor from
+// reshuffling roles at or above their own rank. Reordering never changes
+// anyone's membership.
 router.post('/reorder', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
     const { orderedIds } = req.body || {};
+    const existing = await roles.list(req.server.id);
+    try {
+      await assertCanReorderAll(req, existing);
+    } catch (e) { return serviceError(res, e); }
     const list = await roles.reorder(req.server.id, orderedIds);
     events.emit(req.server.id, 'roles_reordered', { roles: list.map((r) => r.id) });
     res.json(list);
@@ -67,6 +99,9 @@ router.delete('/:roleId', auth.requireVerified, requirePerm('MANAGE_ROLES'), asy
   try {
     const role = await roles.get(req.params.roleId);
     if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+    try {
+      await assertAssignable(req, role);
+    } catch (e) { return serviceError(res, e); }
     const out = await roles.remove(role);
     events.emit(req.server.id, 'role_deleted', { roleId: String(role.id) });
     res.json(out);

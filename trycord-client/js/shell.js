@@ -142,6 +142,7 @@ const DESTINATIONS = [
   { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
   { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
   { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
+  { id: 'support', label: 'Support', icon: '?', href: '#/support' },
   { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
 ];
 
@@ -689,6 +690,23 @@ function discoverContext(region) {
   });
 }
 
+// Support context. Only in-app destinations belong here: Terms and the
+// Privacy Policy are full document loads at /terms and /privacy, not hash
+// routes, and a sidebar row that reloads the page would be a lie about
+// what it is. The Support page itself carries the policy links.
+function supportContext(region) {
+  simpleListContext(region, {
+    title: 'Support',
+    sub: 'Help and appeals',
+    groups: [{ label: 'Support', items: [
+      { label: 'Support home', path: '/support', exact: true },
+      { label: 'Appeal a decision', path: '/support/appeals/new', exact: true },
+    ] }, { label: 'Your appeals', items: [
+      { label: 'My appeals', path: '/support/appeals', exact: true },
+    ] }],
+  });
+}
+
 function profileContext(region, userId) {
   simpleListContext(region, {
     title: 'Profile',
@@ -742,6 +760,10 @@ export function sidebarContext() {
   if (path.startsWith('/notifications')) return { type: 'notifications' };
   if (path.startsWith('/friends')) return { type: 'friends' };
   if (path.startsWith('/discover')) return { type: 'discover' };
+  // Support and legal are not DM surfaces. Without an explicit case they
+  // fall through to the default and the user gets a "Direct messages"
+  // sidebar next to a page that has nothing to do with messages.
+  if (path.startsWith('/support') || path.startsWith('/legal')) return { type: 'support' };
   if (path.startsWith('/users/')) return { type: 'profile', userId: path.split('/')[2] };
   return { type: 'dms' };
 }
@@ -757,6 +779,7 @@ export function renderPlaceNavigation(region) {
     case 'friends': return friendsContext(region);
     case 'notifications': return notificationsContext(region);
     case 'discover': return discoverContext(region);
+    case 'support': return supportContext(region);
     case 'profile': return profileContext(region, ctx.userId);
     default: return dmsContext(region);
   }

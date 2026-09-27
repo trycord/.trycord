@@ -295,6 +295,11 @@ async function renderChannel(container, serverId, channelId) {
   thread.appendChild(feed);
   conv.appendChild(thread);
 
+  // How many messages one page of history is. The initial load takes one
+  // page; older pages are fetched on demand (see loadOlder). Must match the
+  // server's clamp in trycord-server/src/routes/messages.js.
+  const HISTORY_PAGE = 50;
+
   // Channel intro block: always tops the feed (scrolls away with
   // history), doubled as the empty state when there is nothing yet.
   function channelIntro(withCta) {
@@ -308,22 +313,91 @@ async function renderChannel(container, serverId, channelId) {
   }
 
   // ---- history ----
-  async function loadOlder(anchor) {
-    let msgs = [];
-    try { msgs = await Api.messages(channelId, { before: anchor, limit: 50 }); } catch { /* offline */ }
-    if (!msgs.length) return;
-    const frag = document.createDocumentFragment();
-    for (const m of msgs) frag.appendChild(buildMsg(m));
-    // prepend in order, below the intro block (never above it)
-    const at = feed.querySelector('[data-intro]')?.nextSibling || feed.firstChild;
-    while (frag.firstChild) feed.insertBefore(frag.firstChild, at);
+  // Highest and lowest seq currently painted. These are the cursors for
+  // both directions: `after` fills a reconnect gap, `before` pages back.
+  let highSeq = 0;
+  let lowSeq = 0;
+  let historyExhausted = false;
+  let loadingOlder = false;
+
+  const noteSeq = (m) => {
+    if (!m || typeof m.seq !== 'number') return;
+    if (m.seq > highSeq) highSeq = m.seq;
+    if (!lowSeq || m.seq < lowSeq) lowSeq = m.seq;
+  };
+
+  // Prepend one older page. Anchor-based: capture the scroll height before
+  // inserting, then restore the offset afterwards, so the message the user
+  // was reading stays put instead of the viewport jumping.
+  async function loadOlder() {
+    if (loadingOlder || historyExhausted) return;
+    if (!lowSeq) return;
+    loadingOlder = true;
+    const threadEl = thread;
+    const prevHeight = threadEl.scrollHeight;
+    const prevTop = threadEl.scrollTop;
+    try {
+      const msgs = await Api.messages(channelId, { before: lowSeq, limit: HISTORY_PAGE });
+      if (!Array.isArray(msgs) || !msgs.length) {
+        // A short page means we have reached the beginning of the channel.
+        historyExhausted = true;
+        return;
+      }
+      const existing = new Set(
+        [...feed.querySelectorAll('.msg')].map((n) => n.dataset.messageId)
+      );
+      const fresh = msgs.filter((m) => m.id && !existing.has(m.id));
+      if (fresh.length) {
+        const frag = document.createDocumentFragment();
+        for (const m of fresh) { noteSeq(m); frag.appendChild(buildMsg(m)); }
+        // Below the intro block, never above it.
+        const at = feed.querySelector('[data-intro]')?.nextSibling || feed.firstChild;
+        while (frag.firstChild) feed.insertBefore(frag.firstChild, at);
+        groupFeed(feed);
+        // Keep the reader anchored to the same message.
+        threadEl.scrollTop = prevTop + (threadEl.scrollHeight - prevHeight);
+      }
+      if (fresh.length < HISTORY_PAGE) historyExhausted = true;
+    } catch {
+      /* offline: keep what we have, allow a retry on the next scroll */
+    } finally {
+      loadingOlder = false;
+    }
   }
 
+  // Fill a gap after a reconnect: ask only for what is newer than the highest
+  // message we have. This is the difference between "recovered" and
+  // "silently missing N messages" after any network interruption.
+  async function catchUp() {
+    if (!highSeq) return;
+    try {
+      const missed = await Api.messages(channelId, { after: highSeq, limit: HISTORY_PAGE });
+      if (!Array.isArray(missed) || !missed.length) return;
+      for (const m of missed) upsertMessage(m, { scroll: false });
+    } catch { /* offline: the next reconnect will try again */ }
+  }
+
+  // Live messages that arrive while a reload is in flight. The reload
+  // clears the feed after its fetch resolves, and the snapshot was taken
+  // before those messages were committed, so anything that arrived during
+  // the await used to be appended and then wiped - a permanent hole in the
+  // conversation. Buffer them here and replay after the snapshot paints.
+  let loadingHistory = false;
+  const pendingLive = new Map();
+  let reloadSeq = 0;
+
   async function reload() {
+    const seq = ++reloadSeq;
+    loadingHistory = true;
+    pendingLive.clear();
     clear(feed);
     feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messages…'));
     let msgs = [];
-    try { msgs = await Api.messages(channelId, { limit: 50 }); } catch (ex) {
+    try {
+      msgs = await Api.messages(channelId, { limit: HISTORY_PAGE });
+    } catch (ex) {
+      if (seq !== reloadSeq) return;
+      loadingHistory = false;
       clear(feed);
       feed.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load messages'));
       const retry = el('button', { class: 'btn sm', type: 'button' }, 'Try again');
@@ -331,10 +405,22 @@ async function renderChannel(container, serverId, channelId) {
       feed.appendChild(retry);
       return;
     }
+    // A newer reload started while this one was fetching: let it win, or the
+    // two would paint in whatever order the network happened to answer.
+    if (seq !== reloadSeq) return;
+    loadingHistory = false;
+    highSeq = 0;
+    lowSeq = 0;
+    historyExhausted = false;
     clear(feed);
     feed.appendChild(channelIntro(msgs.length === 0));
-    for (const m of msgs) feed.appendChild(buildMsg(m));
+    for (const m of msgs) { noteSeq(m); feed.appendChild(buildMsg(m)); }
     groupFeed(feed);
+    // Replay whatever streamed in behind the snapshot, so no message that
+    // arrived during the fetch is lost.
+    const late = [...pendingLive.values()];
+    pendingLive.clear();
+    for (const m of late) upsertMessage(m, { scroll: false });
     thread.scrollTop = thread.scrollHeight;
   }
 
@@ -435,22 +521,72 @@ async function renderChannel(container, serverId, channelId) {
   // Continuous-conversation grouping: same author, <5 min apart, later
   // message collapses to avatar-space + body. Pure CSS class on top of
   // the existing rows; actions stay reachable via :hover/:focus-within.
+  // Idempotency key for a send attempt. crypto.randomUUID is available in
+  // every context this app runs in (https and the packaged file:// app);
+  // the fallback keeps it working if that ever stops being true.
+  function newNonce() {
+    try {
+      if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+        return globalThis.crypto.randomUUID();
+      }
+    } catch { /* fall through */ }
+    return 'n-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
   function stampMsgNode(node, m) {
     try {
       if (m && m.author_id) node.dataset.author = String(m.author_id);
       if (m && m.created_at) node.dataset.ts = String(m.created_at);
+      // Canonical order, read back by findInsertionPoint() so a message
+      // that arrives out of order is placed correctly instead of appended.
+      if (m && typeof m.seq === 'number') node.dataset.seq = String(m.seq);
     } catch { /* grouping metadata is decorative */ }
   }
 
+  // Grouping is a whole-feed sweep that used to run on every single
+  // incoming message: N nodes, two Date.parse() string conversions per
+  // node, one classList.toggle per node. That made the cost of receiving
+  // one message grow linearly with how long you had been sitting in the
+  // channel, and Date.parse is roughly an order of magnitude more
+  // expensive than the arithmetic comparison it feeds.
+  //
+  // Grouping is purely local: a message's group state depends only on it
+  // and on its immediate neighbours. So after an insert or replace we
+  // recompute the touched node and the two adjacent to it, which is
+  // O(1) and produces byte-identical classes to the full sweep.
+  const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+  function groupState(node, prev) {
+    if (!node || !prev) return false;
+    const a = node.dataset.author || '';
+    if (!a) return false;
+    const pa = prev.dataset.author || '';
+    if (a !== pa) return false;
+    const ts = Date.parse(node.dataset.ts || '') || 0;
+    const pts = Date.parse(prev.dataset.ts || '') || 0;
+    return ts >= pts && (ts - pts) < GROUP_WINDOW_MS;
+  }
+
+  function applyGrouping(node) {
+    if (!node) return;
+    const prev = node.previousElementSibling;
+    node.classList.toggle('grouped', groupState(node, prev));
+  }
+
+  // Recompute a node plus its immediate neighbours. Used after any insert
+  // or replace, where only the local window can have changed.
+  function regroupAround(node) {
+    applyGrouping(node);
+    if (node && node.previousElementSibling) applyGrouping(node.previousElementSibling);
+    const next = node && node.nextElementSibling;
+    if (next) applyGrouping(next);
+  }
+
+  // Full sweep, for initial render and pagination only.
   function groupFeed(feedEl) {
     let prev = null;
     for (const node of feedEl.querySelectorAll(':scope > .msg')) {
-      const a = node.dataset.author || '';
-      const ts = Date.parse(node.dataset.ts || '') || 0;
-      const pa = prev ? (prev.dataset.author || '') : '';
-      const pts = prev ? (Date.parse(prev.dataset.ts || '') || 0) : 0;
-      const grouped = !!(prev && a && pa === a && ts >= pts && (ts - pts) < 5 * 60 * 1000);
-      node.classList.toggle('grouped', grouped);
+      node.classList.toggle('grouped', groupState(node, prev));
       prev = node;
     }
   }
@@ -552,6 +688,7 @@ async function renderChannel(container, serverId, channelId) {
   // In-flight send lock (F3): double-Enter while the POST is pending
   // must not produce two real messages. Mirrors the DM sendLock.
   let sending = false;
+  let pendingNonce = null;
   async function send() {
     if (sending) return;
     const content = ta.value.trim();
@@ -559,13 +696,30 @@ async function renderChannel(container, serverId, channelId) {
     if (!content) { toast('Add a message or file', 'warn'); return; }
     sending = true;
     sendBtn.setAttribute('aria-busy', 'true');
+    // One nonce per submission attempt, held until the send definitively
+    // succeeds. If the POST times out we do not know whether the server
+    // committed it, so the user's next attempt reuses this key and the server
+    // resolves it to the original message instead of writing a second one.
+    // A fresh nonce is minted only after a confirmed success.
+    const clientNonce = pendingNonce || newNonce();
+    pendingNonce = clientNonce;
+    const attachmentIds = pending.length ? pending.slice() : undefined;
     try {
-      await Api.sendMessage(channelId, { content, attachmentIds: pending.length ? pending : undefined });
+      const saved = await Api.sendMessage(channelId, { content, attachmentIds, clientNonce });
+      pendingNonce = null;
       ta.value = '';
       pending = [];
       resize();
-      await reload();
+      // Paint the confirmed message directly instead of refetching the whole
+      // page: the server already returned the authoritative row, including
+      // its seq. reload() was a full clear+refetch after every send.
+      if (saved && saved.id) {
+        upsertMessage(saved, { scroll: true });
+      } else {
+        await reload();
+      }
     } catch (ex) {
+      // Keep the nonce and the composer text: retrying must be safe.
       toast(ex.message || 'Cannot send', 'error');
     } finally {
       sending = false;
@@ -585,7 +739,14 @@ async function renderChannel(container, serverId, channelId) {
   // the server broadcast reaches the sender too — blind appends would
   // render each own message twice (F2). Reconnect replays are also
   // absorbed: an id already in the feed is replaced, never duplicated.
-  function upsertMessage(m) {
+  function upsertMessage(m, opts = {}) {
+    // A history load is mid-flight. Painting now would be undone by its
+    // clear(), so hold the message and let reload() replay it against the
+    // fresh snapshot instead of losing it.
+    if (loadingHistory) {
+      if (m && m.id) pendingLive.set(String(m.id), m);
+      return;
+    }
     const sel = '[data-message-id="' + m.id + '"]';
     if (m.pinned) pinState.set(String(m.id), true);
     const node = messageRow(m, {
@@ -606,10 +767,42 @@ async function renderChannel(container, serverId, channelId) {
     if (prev) {
       prev.replaceWith(node);
     } else {
-      feed.appendChild(node);
-      thread.scrollTop = thread.scrollHeight;
+      // Insert at the position the server's sequence dictates, not blindly
+      // at the bottom. Broadcast order is not message order: two writers can
+      // commit out of order (especially on MySQL, where the pool does real
+      // I/O between the write and the broadcast), and a reconnect catch-up
+      // deliberately delivers strictly-newer messages that may have been
+      // authored before something already on screen. Appending those would
+      // permanently show the conversation out of order until the next
+      // full reload.
+      const seq = typeof m.seq === 'number' ? m.seq : null;
+      const anchor = seq === null ? null : findInsertionPoint(seq);
+      if (anchor) feed.insertBefore(node, anchor);
+      else feed.appendChild(node);
+      if (opts.scroll !== false && isNearBottom(thread)) {
+        thread.scrollTop = thread.scrollHeight;
+      }
     }
-    groupFeed(feed);
+    noteSeq(m);
+    // Local regroup only - see regroupAround. This used to be
+    // groupFeed(feed), an O(N) sweep per received message.
+    regroupAround(prev ? node : (node.previousElementSibling || node));
+  }
+
+  // First painted message whose seq is greater than the one being inserted.
+  // The feed is kept in ascending seq order, so this is a short walk from the
+  // end rather than a scan of the whole conversation.
+  function findInsertionPoint(seq) {
+    const nodes = feed.querySelectorAll(':scope > .msg');
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const s = Number(nodes[i].dataset.seq);
+      if (Number.isFinite(s) && s > seq) return nodes[i];
+    }
+    return null;
+  }
+
+  function isNearBottom(el, slack = 120) {
+    return el.scrollHeight - el.scrollTop - el.clientHeight <= slack;
   }
   const offMsg = Realtime.on('message', (m) => {
     if (String(m.channel_id) === String(channelId)) upsertMessage(m);
@@ -634,8 +827,13 @@ async function renderChannel(container, serverId, channelId) {
   // then reload() pulls everything missed while offline. reload() is
   // authoritative (clear + refetch), and live events reconcile by id, so
   // the resync cannot duplicate state.
+  // On reconnect: refresh the page of history, then fill anything newer than
+  // what we already hold. The refresh alone is not enough - it re-fetches the
+  // newest page, so a burst larger than one page that arrived while offline
+  // would still leave a hole at the top of the conversation.
   const offOpen = Realtime.on('open', () => {
-    if (String(activeChannelId) === String(channelId)) reload().catch(() => {});
+    if (String(activeChannelId) !== String(channelId)) return;
+    reload().then(() => catchUp()).catch(() => {});
   });
 
   const offPin = Realtime.on('message_pinned', (m) => {
@@ -716,8 +914,18 @@ async function renderChannel(container, serverId, channelId) {
   }
 
   // Clean up when the route changes
+  // Page in older history when the reader reaches the top of the thread.
+  // Guarded so a fast scroll cannot fire a burst of overlapping requests, and
+  // removed in cleanup() so a closed view leaves nothing attached to the
+  // document.
+  const onScroll = () => {
+    if (thread.scrollTop <= 80) loadOlder().catch(() => {});
+  };
+  thread.addEventListener('scroll', onScroll, { passive: true });
+
   const cleanup = () => {
     offMsg(); offUpd(); offDel(); offOpen(); offPin(); offUnpin(); offReact();
+    thread.removeEventListener('scroll', onScroll);
     if (searchPanel) { searchPanel.remove(); searchPanel = null; }
     Realtime.leaveChannel();
     activeChannelId = null;
@@ -1707,6 +1915,7 @@ async function renderMenu(container) {
     { label: 'Friends', href: '#/friends', path: '/friends' },
     { label: 'Notifications', href: '#/notifications', path: '/notifications', badge: State.notifUnread },
     { label: 'Discover', href: '#/discover', path: '/discover' },
+    { label: 'Support', href: '#/support', path: '/support' },
   ];
   if (me && me.isAdmin) links.push({ label: 'Admin', href: '#/admin', path: '/admin', badge: 0 });
   for (const l of links) {

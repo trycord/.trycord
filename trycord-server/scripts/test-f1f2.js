@@ -68,6 +68,62 @@ async function J(method, p, body, tok) {
   ok('assignByOwner', (await J('POST', '/api/servers/' + sid + '/roles/' + rc.json.id + '/assign', { userId: B.id }, A.token)).status === 200);
   ok('unassignByOwner', (await J('DELETE', '/api/servers/' + sid + '/roles/' + rc.json.id + '/assign/' + B.id, null, A.token)).status === 200);
 
+  // ---- role hierarchy must guard EVERY mutation, not just assignment ----
+  // A manager below the Admin rank cannot be allowed to grant Admin away,
+  // but "grant" is not the only way to abuse a higher role: blanking its
+  // permission array, recolouring/renaming it, reordering it downward, or
+  // deleting it all strip authority just as effectively. Each of these
+  // endpoints used to be gated on MANAGE_ROLES alone, which let a
+  // Moderator dismantle the Admin role they were forbidden to hand out.
+  {
+    const modRole = await J('POST', '/api/servers/' + sid + '/roles',
+      { name: 'ModForTest', permissions: ['MANAGE_ROLES', 'KICK_MEMBERS'] }, A.token);
+    ok('modRoleCreated', modRole.status === 200 && !!modRole.json.id, 'status=' + modRole.status);
+    // Seat it STRICTLY BELOW Admin. The reorder input is ordered
+    // LOWEST-first: the service assigns descending positions, so the LAST
+    // id in the submitted list ends up at the top (list() returns position
+    // DESC, i.e. the reverse of what was submitted). Admin must therefore
+    // be submitted last.
+    const rest = roles0.filter((r) => r.id !== adminRole.id).map((r) => r.id).reverse();
+    const belowAdmin = [...rest, modRole.json.id, adminRole.id];
+    const lift = await J('POST', '/api/servers/' + sid + '/roles/reorder', { orderedIds: belowAdmin }, A.token);
+    ok('modRoleLifted', lift.status === 200, 'status=' + lift.status);
+    const ranked = (await J('GET', '/api/servers/' + sid + '/roles', null, A.token)).json;
+    const rankOf = (id) => ranked.findIndex((r) => r.id === id);
+    ok('modRoleBelowAdmin', rankOf(modRole.json.id) > rankOf(adminRole.id) && rankOf(modRole.json.id) >= 0,
+      'admin#' + rankOf(adminRole.id) + ' mod#' + rankOf(modRole.json.id));
+    ok('modRoleAssigned', (await J('POST', '/api/servers/' + sid + '/roles/' + modRole.json.id + '/assign',
+      { userId: C.id }, A.token)).status === 200);
+
+    // C is now a manager, but still below Admin.
+    const asMod = (m, p, b) => J(m, '/api/servers/' + sid + p, b, C.token);
+
+    const escPatch = await asMod('PATCH', '/roles/' + adminRole.id, { permissions: [] });
+    ok('rolePatchAboveDenied', escPatch.status === 403,
+      'status=' + escPatch.status + ' ' + JSON.stringify(escPatch.json).slice(0, 90));
+    const escRename = await asMod('PATCH', '/roles/' + adminRole.id, { name: 'Pwned' });
+    ok('roleRenameAboveDenied', escRename.status === 403, 'status=' + escRename.status);
+    const escDelete = await asMod('DELETE', '/roles/' + adminRole.id);
+    ok('roleDeleteAboveDenied', escDelete.status === 403, 'status=' + escDelete.status);
+    const allRoles = (await J('GET', '/api/servers/' + sid + '/roles', null, A.token)).json;
+    const escReorder = await asMod('POST', '/roles/reorder', {
+      orderedIds: allRoles.map((r) => r.id).reverse(),
+    });
+    ok('roleReorderAboveDenied', escReorder.status === 403, 'status=' + escReorder.status);
+
+    // The Admin role must be intact, and C must still be unable to grant it.
+    const after = (await J('GET', '/api/servers/' + sid + '/roles', null, A.token)).json;
+    const adminAfter = after.find((r) => r.id === adminRole.id);
+    ok('adminRoleIntact',
+      adminAfter && adminAfter.name === 'Admin' && (adminAfter.permissions || []).length > 0,
+      JSON.stringify(adminAfter).slice(0, 120));
+    ok('assignStillDenied', (await asMod('POST', '/roles/' + adminRole.id + '/assign',
+      { userId: B.id })).status === 403);
+    // But C may still manage roles strictly below itself.
+    ok('manageBelowAllowed', (await asMod('POST', '/roles',
+      { name: 'ModMadeRole', permissions: ['SEND_MESSAGES'] })).status === 200);
+  }
+
   // ---- categories: rename + reorder ----
   const cats = (await J('GET', '/api/servers/' + sid + '/categories', null, A.token)).json;
   ok('categoriesSeeded', Array.isArray(cats) && cats.length >= 1);

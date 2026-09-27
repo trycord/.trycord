@@ -82,6 +82,82 @@ async function J(method, p, body, tok, form) {
   ok('history', hist.status === 200 && hist.json.length >= 2 && hist.json[0].author_name === A.name);
   const page = await J('GET', '/api/channels/' + cid + '/messages?limit=1&before=' + m2.json.id, null, A.token);
   ok('pagination', page.status === 200 && page.json.length === 1 && page.json[0].id === m1.json.id);
+
+  // Canonical ordering. `seq` is the authoritative per-channel order; the
+  // old (created_at, id) tie-break used a random UUIDv4, so two messages
+  // written in the same millisecond could page in either order.
+  ok('seqAssigned', typeof m1.json.seq === 'number' && typeof m2.json.seq === 'number',
+    JSON.stringify([m1.json.seq, m2.json.seq]));
+  ok('seqAscending', m2.json.seq > m1.json.seq, m1.json.seq + ' -> ' + m2.json.seq);
+  const bySeq = await J('GET', '/api/channels/' + cid + '/messages?limit=200', null, A.token);
+  const seqs = bySeq.json.map((m) => m.seq);
+  ok('seqNoDuplicates', new Set(seqs).size === seqs.length, JSON.stringify(seqs));
+  ok('seqNoGaps', seqs.every((v, i) => i === 0 || v === seqs[i - 1] + 1), JSON.stringify(seqs));
+  // The backward cursor accepts a seq as well as the original message id.
+  const bySeqCursor = await J('GET', '/api/channels/' + cid + '/messages?limit=1&before=' + m2.json.seq, null, A.token);
+  ok('paginationBySeq', bySeqCursor.status === 200 && bySeqCursor.json.length === 1
+    && bySeqCursor.json[0].id === m1.json.id, JSON.stringify(bySeqCursor.json).slice(0, 90));
+  // A cursor pointing at a message in another channel must not resolve.
+  const otherCh = await J('POST', '/api/servers/' + sid + '/channels', { name: 'cursorprobe', type: 'text' }, A.token);
+  if (otherCh.status === 200) {
+    const foreign = await J('POST', '/api/channels/' + otherCh.json.id + '/messages', { content: 'elsewhere' }, A.token);
+    const badCursor = await J('GET', '/api/channels/' + cid + '/messages?before=' + foreign.json.id, null, A.token);
+    ok('cursorScopedToChannel', badCursor.status === 404, 'status=' + badCursor.status);
+  }
+
+  // Idempotency. A retried POST carrying the same clientNonce must resolve
+  // to the row the first attempt wrote, never a second copy.
+  const nonce = 'rg-' + Date.now().toString(36);
+  const i1 = await J('POST', '/api/channels/' + cid + '/messages', { content: 'idem', clientNonce: nonce }, A.token);
+  const i2 = await J('POST', '/api/channels/' + cid + '/messages', { content: 'idem', clientNonce: nonce }, A.token);
+  ok('idempotentSameId', i1.status === 200 && i2.status === 200 && i1.json.id === i2.json.id,
+    i1.json.id + ' vs ' + i2.json.id);
+  ok('idempotentFlagged', i2.json.deduped === true, JSON.stringify(i2.json).slice(0, 90));
+  const afterIdem = await J('GET', '/api/channels/' + cid + '/messages?limit=200', null, A.token);
+  ok('idempotentSingleRow', afterIdem.json.filter((m) => m.content === 'idem').length === 1,
+    'rows=' + afterIdem.json.filter((m) => m.content === 'idem').length);
+  // Same text, different nonce is a real second message - dedupe must never
+  // be content-based.
+  const i3 = await J('POST', '/api/channels/' + cid + '/messages', { content: 'idem', clientNonce: nonce + 'x' }, A.token);
+  ok('distinctNonceDistinctMessage', i3.json.id !== i1.json.id, '');
+  const afterIdem2 = await J('GET', '/api/channels/' + cid + '/messages?limit=200', null, A.token);
+  ok('identicalTextBothStored', afterIdem2.json.filter((m) => m.content === 'idem').length === 2,
+    'rows=' + afterIdem2.json.filter((m) => m.content === 'idem').length);
+  // No nonce at all must never collide with anything.
+  const n1 = await J('POST', '/api/channels/' + cid + '/messages', { content: 'nononce' }, A.token);
+  const n2 = await J('POST', '/api/channels/' + cid + '/messages', { content: 'nononce' }, A.token);
+  ok('noNonceNeverDedupes', n1.json.id !== n2.json.id, '');
+
+  // Forward cursor: this is what a reconnecting client uses to fill the gap
+  // between its last known message and now. It did not exist before.
+  // Take the high-water mark from a read taken immediately before the gap
+  // sends, otherwise anything posted in between is legitimately returned.
+  const beforeGap = await J('GET', '/api/channels/' + cid + '/messages?limit=200', null, A.token);
+  const highWater = Math.max(...beforeGap.json.map((m) => m.seq));
+  for (let i = 0; i < 3; i++) {
+    await J('POST', '/api/channels/' + cid + '/messages', { content: 'gap' + i }, A.token);
+  }
+  const fwd = await J('GET', '/api/channels/' + cid + '/messages?after=' + highWater + '&limit=200', null, A.token);
+  ok('forwardCursorCount', fwd.status === 200 && fwd.json.length === 3, 'n=' + (fwd.json || []).length);
+  ok('forwardCursorAscending', fwd.json.map((m) => m.seq).every((v, i, a) => i === 0 || v > a[i - 1]),
+    JSON.stringify(fwd.json.map((m) => m.seq)));
+  ok('forwardCursorContent', fwd.json.map((m) => m.content).join(',') === 'gap0,gap1,gap2',
+    fwd.json.map((m) => m.content).join(','));
+  const fwdNone = await J('GET', '/api/channels/' + cid + '/messages?after=999999999&limit=200', null, A.token);
+  ok('forwardCursorEmptyPastEnd', fwdNone.status === 200 && fwdNone.json.length === 0, 'n=' + (fwdNone.json || []).length);
+
+  // Concurrent sends must still receive distinct positions.
+  const conc = await Promise.all([0, 1, 2, 3, 4].map((i) =>
+    J('POST', '/api/channels/' + cid + '/messages', { content: 'conc' + i }, A.token)));
+  const concSeqs = conc.map((r) => r.json && r.json.seq);
+  ok('concurrentSeqsUnique', concSeqs.every((v) => typeof v === 'number') && new Set(concSeqs).size === 5,
+    JSON.stringify(concSeqs));
+  const concAll = await J('GET', '/api/channels/' + cid + '/messages?limit=200', null, A.token);
+  ok('concurrentAllPersisted', concAll.json.filter((m) => /^conc\d$/.test(m.content)).length === 5,
+    'rows=' + concAll.json.filter((m) => /^conc\d$/.test(m.content)).length);
+  const concSeqList = concAll.json.map((m) => m.seq);
+  ok('seqUniqueAfterConcurrency', new Set(concSeqList).size === concSeqList.length, '');
+
   const edit = await J('PATCH', '/api/channels/' + cid + '/messages/' + m1.json.id, { content: 'reg edited' }, A.token);
   ok('edit-own', edit.status === 200);
   const editOther = await J('PATCH', '/api/channels/' + cid + '/messages/' + m1.json.id, { content: 'hijack' }, B.token);

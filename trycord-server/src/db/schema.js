@@ -121,15 +121,17 @@ function tables(engine) {
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS messages (
-      id         VARCHAR(64) PRIMARY KEY,
-      channel_id VARCHAR(64) NOT NULL,
-      author_id  VARCHAR(64) NOT NULL,
-      content    TEXT NOT NULL,
-      created_at VARCHAR(64) NOT NULL,
-      edited_at  VARCHAR(64),
-      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
-      FOREIGN KEY (author_id) REFERENCES users(id)
-    )${engine}`,
+         id         VARCHAR(64) PRIMARY KEY,
+         channel_id VARCHAR(64) NOT NULL,
+         author_id  VARCHAR(64) NOT NULL,
+         content    TEXT NOT NULL,
+         created_at VARCHAR(64) NOT NULL,
+         edited_at  VARCHAR(64),
+         seq        INTEGER,
+         client_nonce VARCHAR(64),
+         FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
+         FOREIGN KEY (author_id) REFERENCES users(id)
+       )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS invites (
       id         VARCHAR(64) PRIMARY KEY,
@@ -188,15 +190,17 @@ function tables(engine) {
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS dm_messages (
-      id              VARCHAR(64) PRIMARY KEY,
-      conversation_id VARCHAR(64) NOT NULL,
-      author_id       VARCHAR(64) NOT NULL,
-      content         TEXT NOT NULL,
-      created_at      VARCHAR(64) NOT NULL,
-      edited_at       VARCHAR(64),
-      FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
-      FOREIGN KEY (author_id) REFERENCES users(id)
-    )${engine}`,
+         id              VARCHAR(64) PRIMARY KEY,
+         conversation_id VARCHAR(64) NOT NULL,
+         author_id       VARCHAR(64) NOT NULL,
+         content         TEXT NOT NULL,
+         created_at      VARCHAR(64) NOT NULL,
+         edited_at       VARCHAR(64),
+         seq             INTEGER,
+         client_nonce    VARCHAR(64),
+         FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+         FOREIGN KEY (author_id) REFERENCES users(id)
+       )${engine}`,
 
     // --- Friendships (Phase 2) ---
     `CREATE TABLE IF NOT EXISTS friend_requests (
@@ -407,6 +411,14 @@ const LEGACY_ALTERS = [
   ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
   ['messages', 'edited_at', 'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64)'],
   ['dm_messages', 'edited_at', 'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64)'],
+  // Canonical ordering + idempotency. `seq` is a per-channel (per-conversation
+  // for DMs) monotonic counter and is the authoritative order. `client_nonce`
+  // is a caller-supplied key that makes a retried POST collapse onto the
+  // message the first attempt already persisted.
+  ['messages', 'seq', 'ALTER TABLE messages ADD COLUMN seq INTEGER'],
+  ['messages', 'client_nonce', 'ALTER TABLE messages ADD COLUMN client_nonce VARCHAR(64)'],
+  ['dm_messages', 'seq', 'ALTER TABLE dm_messages ADD COLUMN seq INTEGER'],
+  ['dm_messages', 'client_nonce', 'ALTER TABLE dm_messages ADD COLUMN client_nonce VARCHAR(64)'],
   // Trust & Safety: enforcement state mirrors the authoritative
   // moderation_actions records so the hot auth path is one users read.
   ['users', 'enforcement_state', 'ALTER TABLE users ADD COLUMN enforcement_state VARCHAR(16)'],
@@ -504,6 +516,54 @@ const INDEXES = [
   'CREATE INDEX idx_pins_channel ON pinned_messages(channel_id, pinned_at)',
   'CREATE INDEX idx_reactions_message ON reactions(message_id)',
   'CREATE INDEX idx_muted_user ON muted_channels(user_id)',
+  // ---- Access patterns that were measured as full table scans ----------
+  // `categories` was the only table in the schema with no index at all,
+  // and its read (by community) runs on every server entry and on every
+  // structural realtime event, so this was a whole-instance scan of the
+  // category table to read one community's channels.
+  'CREATE INDEX idx_categories_server ON categories(server_id, position)',
+  // roles.remove() counts holders of a role before deleting it.
+  // member_roles' primary key leads with (server_id, user_id), so
+  // filtering by role_id alone could not use any index.
+  'CREATE INDEX idx_member_roles_role ON member_roles(role_id)',
+  // The reporter's own report list orders by created_at, and no existing
+  // index has reporter_id as a leading column.
+  'CREATE INDEX idx_reports_reporter ON reports(reporter_id, created_at)',
+  // Unfiltered appeal queues order by created_at DESC.
+  'CREATE INDEX idx_appeals_created ON appeals(created_at)',
+  // The live announcement banner is fetched by every signed-in client on a
+  // poll; the table had no indexes, so each poll sorted the whole table.
+  'CREATE INDEX idx_announcements_active ON announcements(active, created_at)',
+  // Messages are read as ORDER BY created_at DESC, id DESC. The existing
+  // (channel_id, created_at) index cannot supply the id tiebreaker, so
+  // every page of history ended in a temp sort. This makes the ordering
+  // total, which also removes the possibility of two messages sharing a
+  // created_at being ordered by a random UUID.
+  'CREATE INDEX idx_messages_channel_order ON messages(channel_id, created_at, id)',
+  // Same for direct messages.
+  'CREATE INDEX idx_dm_messages_order ON dm_messages(conversation_id, created_at, id)',
+  // Roster ordering: the member list sorts by joined_at within a server.
+  'CREATE INDEX idx_members_server_joined ON server_members(server_id, joined_at)',
+  // Role lists sort by position within a server.
+  'CREATE INDEX idx_roles_server_position ON roles(server_id, position)',
+  // Channel lists sort by position then name within a server.
+  'CREATE INDEX idx_channels_server_order ON channels(server_id, position, name)',
+  // ---- Canonical message ordering -----------------------------------------
+  // seq is the authoritative order within a channel. The UNIQUE constraint is
+  // what makes it trustworthy: two concurrent inserts cannot both claim the
+  // same value, so the loser gets a constraint violation and retries rather
+  // than silently writing an ambiguous order. It also lets history be walked
+  // with a single-column cursor instead of a (created_at, id) tuple, which is
+  // what removed the random-UUIDv4 tie-break.
+  'CREATE UNIQUE INDEX idx_messages_channel_seq ON messages(channel_id, seq)',
+  'CREATE UNIQUE INDEX idx_dm_messages_conv_seq ON dm_messages(conversation_id, seq)',
+  // Idempotency. A retried POST carrying the same nonce resolves to the row
+  // the first attempt wrote, so a lost response cannot produce a duplicate.
+  // Partial-unique is not portable, so NULLs are excluded explicitly: SQLite
+  // and MySQL both treat NULL as distinct in a unique index, which is
+  // exactly the behaviour we want for callers that send no nonce.
+  'CREATE UNIQUE INDEX idx_messages_nonce ON messages(channel_id, client_nonce)',
+  'CREATE UNIQUE INDEX idx_dm_messages_nonce ON dm_messages(conversation_id, client_nonce)',
 ];
 
 const MYSQL_COLUMN_SQL =
@@ -571,16 +631,61 @@ async function applySchema(conn) {
     }
   }
 
+  // Backfill canonical ordering before the unique index is created, so the
+  // index only ever sees a complete, duplicate-free column.
+  //
+  // Ordering for the backfill is (created_at, id) - the same tuple the old
+  // read path used. That is deliberate: existing history keeps exactly the
+  // order it already displayed, rather than being reshuffled by whatever
+  // order rows happen to come back from the storage engine. The random-UUID
+  // tie-break is a property of the *old* order; it stops mattering the
+  // moment every row has an explicit seq.
+  await backfillSequence(conn, 'messages', 'channel_id');
+  await backfillSequence(conn, 'dm_messages', 'conversation_id');
+
   // Create indexes after all column types have been normalized.
   for (const idx of INDEXES) {
     if (dialect === 'sqlite') {
-      await conn.exec(idx.replace('CREATE INDEX', 'CREATE INDEX IF NOT EXISTS'));
+      // Must handle "CREATE UNIQUE INDEX" as well as "CREATE INDEX" - a plain
+      // string replace of 'CREATE INDEX' silently does nothing to the former,
+      // so the statement re-runs on every boot and startup fails with
+      // "index already exists". The pattern is anchored so only a leading
+      // CREATE [UNIQUE] INDEX is rewritten.
+      await conn.exec(idx.replace(
+        /^CREATE\s+(UNIQUE\s+)?INDEX/i,
+        (_m, u) => 'CREATE ' + (u || '') + 'INDEX IF NOT EXISTS'
+      ));
       continue;
     }
     const m = /INDEX (\w+) ON (\w+)/.exec(idx);
     if (!m || !(await mysqlIndexExists(conn, m[2], m[1]))) {
       await conn.exec(idx);
     }
+  }
+}
+
+// Assign seq = 1..N per scope for any row that does not have one yet.
+// Re-runnable: rows that already carry a seq are skipped, and scopes with
+// nothing to do are never touched.
+async function backfillSequence(conn, table, scope) {
+  const scopes = await conn.all(
+    `SELECT DISTINCT ${scope} AS s FROM ${table} WHERE seq IS NULL`
+  );
+  if (!scopes.length) return;
+  let total = 0;
+  for (const { s } of scopes) {
+    const rows = await conn.all(
+      `SELECT id FROM ${table} WHERE ${scope} = ? AND seq IS NULL ORDER BY created_at ASC, id ASC`,
+      [s]
+    );
+    for (let i = 0; i < rows.length; i++) {
+      await conn.run(`UPDATE ${table} SET seq = ? WHERE id = ?`, [i + 1, rows[i].id]);
+    }
+    total += rows.length;
+  }
+  if (total) {
+    // eslint-disable-next-line no-console
+    console.log(`[schema] backfilled ${total} ${table}.seq values`);
   }
 }
 
