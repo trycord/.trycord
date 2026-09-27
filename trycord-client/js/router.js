@@ -296,7 +296,12 @@ async function renderRoute() {
       return;
     }
     if (what === 'settings') {
-      await Workspace.renderServerSettings(region, serverId);
+      // Sections live under /server/:id/settings/<section> so each one is
+      // linkable and the back button behaves. An unknown section falls back to
+      // the overview rather than rendering a blank page.
+      const known = ['overview', 'structure', 'members', 'roles', 'invites', 'moderation', 'ownership'];
+      const section = parts[3] && known.includes(parts[3]) ? parts[3] : 'overview';
+      await Workspace.renderServerSettings(region, serverId, section);
       renderAllChrome();
       return;
     }
