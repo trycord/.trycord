@@ -7,7 +7,7 @@ import { updateFromViewport, closeMobileDrawer, openMobileDrawer, onPresentation
 import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends, refreshMutes, setServerRoomHooks } from './state.js';
 import Realtime from './realtime.js';
 import Router from './router.js';
-import { renderAllChrome } from './shell.js';
+import { renderAllChrome, loadAnnouncements } from './shell.js';
 import { qs } from './ui.js';
 import TrycordPresentation from './presentation.js';
 
@@ -68,6 +68,8 @@ async function boot() {
     refreshDms().catch(() => {});
     refreshFriends().catch(() => {});
     refreshMutes().catch(() => {});
+    // Instance announcement banners: one fetch now, slow refresh after.
+    loadAnnouncements().catch(() => {});
   } else if (!isAuthed()) {
     // No session: show the public/auth flow on the active shell.
     renderAllChrome();

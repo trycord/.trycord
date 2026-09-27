@@ -363,6 +363,25 @@ function tables(engine) {
       muted_at   VARCHAR(64) NOT NULL,
       PRIMARY KEY (user_id, channel_id)
     )${engine}`,
+
+    // Instance-wide announcements. Deliberately NOT global/cross-instance:
+    // these belong to this deployment only and are authored by platform
+    // admins. `level` drives client emphasis; `active_at` is when it went
+    // live; `expires_at` is an optional end (NULL = runs until retired), so
+    // banners persist across restarts rather than living in memory.
+    `CREATE TABLE IF NOT EXISTS announcements (
+      id          VARCHAR(64) PRIMARY KEY,
+      body        TEXT NOT NULL,
+      level       VARCHAR(16) NOT NULL DEFAULT 'info',
+      link_label  VARCHAR(64),
+      link_href   VARCHAR(512),
+      active      INTEGER NOT NULL DEFAULT 1,
+      created_by  VARCHAR(64) NOT NULL,
+      created_at  VARCHAR(64) NOT NULL,
+      updated_at  VARCHAR(64),
+      expires_at  VARCHAR(64),
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
   ];
 }
 

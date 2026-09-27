@@ -405,6 +405,8 @@ async function boot() {
   require('./routes/messages').setGateway({ broadcast, sendToUser });
   require('./routes/channels').setGateway({ broadcast });
   app.use('/api/mutes', require('./routes/mutes'));
+  // Instance-wide announcement banners (per-deployment, not global).
+  app.use('/api/announcements', require('./routes/announcements'));
   require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });
   require('./routes/friends').setGateway({ sendToUser });
   require('./routes/users').setGateway({ getPresence });

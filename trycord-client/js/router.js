@@ -198,8 +198,7 @@ async function renderRoute() {
 
   // --- platform admin ------------------------------------------------------
   if (path.startsWith('/admin/')) {
-    const adminSection = parts[1] === 'servers' ? 'communities' : (parts[1] || 'overview');
-    await renderAdmin(region, { section: adminSection });
+    const adminSection = parts[1] === 'servers' ? 'communities' : (parts[1] || 'overview');    await renderAdmin(region, { section: adminSection });
     renderAllChrome();
     return;
   }

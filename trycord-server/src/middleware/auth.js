@@ -74,7 +74,22 @@ function auth(req, res, next) {
 // reactions, community management, social writes). Reads, auth flows,
 // account maintenance, safety flows (reports/appeals) and platform admin
 // routes intentionally do NOT use this — see each router for its list.
+//
+// Verification is only enforceable when the instance can actually deliver a
+// verification email. With MAIL_MODE unset/log there is no way for anyone to
+// confirm an address, so gating on it would lock messaging off permanently on
+// self-hosted instances that never configure SMTP. In that case the guard is a
+// no-op and clients should not prompt for verification either.
+function verificationEnforceable() {
+  try {
+    return require('../auth/mail').mode() === 'smtp';
+  } catch (e) {
+    return false;
+  }
+}
+
 function requireVerified(req, res, next) {
+  if (!verificationEnforceable()) return next();
   if (req.verified) return next();
   return fail(res, 'EMAIL_NOT_VERIFIED', 'verify your email to use this', 403);
 }
@@ -83,3 +98,4 @@ module.exports = auth;
 module.exports.tokenStale = tokenStale;
 module.exports.enforced = enforced;
 module.exports.requireVerified = requireVerified;
+module.exports.verificationEnforceable = verificationEnforceable;

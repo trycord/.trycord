@@ -1406,8 +1406,10 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .btn.primary:hover { background: var(--t-accent-hi); border-color: var(--t-accent-hi); color: var(--t-on-accent); }
 
-.btn.ghost { background: transparent; border-color: transparent; color: var(--t-txt2); }
-.btn.ghost:hover { background: color-mix(in srgb, var(--t-txt) 8%, transparent); color: var(--t-txt); }
+/* Ghost keeps a hairline border: without it these read as plain text links
+   rather than controls. `.quiet` is the genuinely borderless tier. */
+.btn.ghost { background: transparent; border-color: var(--t-line); color: var(--t-txt2); }
+.btn.ghost:hover { background: color-mix(in srgb, var(--t-txt) 8%, transparent); border-color: var(--t-line-hi); color: var(--t-txt); }
 
 .btn.quiet { background: transparent; border-color: transparent; color: var(--t-mut); padding-inline: var(--t-d-2); }
 .btn.quiet:hover { background: color-mix(in srgb, var(--t-txt) 8%, transparent); color: var(--t-txt); }
@@ -2082,19 +2084,151 @@ html[data-route^="/verify-email/"] #member-sidebar { display: none !important; }
 .permission-item { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid var(--t-line); border-radius: 8px; color: var(--t-txt2); background: var(--t-base2); font-size: 0.76rem; }
 .permission-item:hover { border-color: var(--t-line-hi); color: var(--t-txt); }
 
-.admin-page { max-width: var(--ui-page-width); margin: 0 auto; padding-bottom: 24px; }
-.admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; padding: 12px 14px 0; }
-.admin-stat { background: var(--t-base); border: 1px solid var(--t-line); border-radius: 10px; padding: 12px 14px; }
-.admin-stat b { font-size: 1.4rem; display: block; line-height: 1.2; }
-.admin-stat span { color: var(--t-mut); font-size: 0.78rem; }
-.admin-block { padding: 0 14px; margin-top: 16px; }
-.admin-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 14px 4px; }
-.admin-toolbar .input { flex: 1 1 260px; max-width: 420px; }
-.admin-list { padding: 8px 14px 20px; }
-.card--list--row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--t-line); border-radius: 10px; }
-.card--list--row > .grow { flex: 1 1 220px; min-width: 0; }
-.admin-avatar { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; display: grid; place-items: center; background: var(--t-accent); color: var(--t-on-accent); font-weight: 700; text-transform: uppercase; }
-.admin-name { font-weight: 600; overflow-wrap: anywhere; }
+/* ============================================================
+   Instance announcement banner
+   Sits above the context header in both shells. Restrained by
+   default: `info` is a low-key strip, and only `warning`/`critical`
+   earn stronger emphasis, so a routine notice never competes with
+   the app for attention.
+   ============================================================ */
+.announce-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--t-d-3);
+  flex-wrap: wrap;
+  padding: var(--t-d-3) var(--t-d-4);
+  border-bottom: 1px solid var(--t-line);
+  background: color-mix(in srgb, var(--t-elev) 80%, var(--t-base));
+  color: var(--t-txt2);
+  font-size: var(--t-fs-s);
+  line-height: 1.45;
+}
+.announce-banner__text { min-width: 0; overflow-wrap: anywhere; }
+.announce-banner__link {
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--t-accent-hi);
+  text-decoration: none;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--t-accent) 40%, transparent);
+  border-radius: 999px;
+}
+.announce-banner__link:hover { background: color-mix(in srgb, var(--t-accent) 14%, transparent); text-decoration: none; }
+
+.announce-banner--warning {
+  background: color-mix(in srgb, var(--t-warn) 12%, var(--t-base));
+  border-bottom-color: color-mix(in srgb, var(--t-warn) 38%, var(--t-line));
+  color: var(--t-warn-fg);
+}
+.announce-banner--critical {
+  background: color-mix(in srgb, var(--t-err) 16%, var(--t-base));
+  border-bottom-color: color-mix(in srgb, var(--t-err) 45%, var(--t-line));
+  color: var(--t-err-fg);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Administration
+   A moderation console is a dense, table-like surface, so it uses the
+   full content width rather than the reading measure, and it carries
+   exactly one padding system (the page's own). Rows are a fixed
+   three-part grid so identity, state and actions never reflow into a
+   second line.
+   ============================================================ */
+.page.admin {
+  max-width: var(--ui-content-max, none);
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-4);
+}
+.page.admin .page-head { margin-bottom: 0; }
+.page-head__main { min-width: 0; }
+.page-head__main h1 {
+  margin: 0;
+  font-size: var(--t-fs-xl);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.admin-page { display: flex; flex-direction: column; gap: var(--t-d-5); }
+
+/* A labelled group of console content. Owns its internal rhythm so the
+   page container only has to space whole blocks. */
+.admin-block { display: flex; flex-direction: column; gap: var(--t-d-3); }
+/* Wider rhythm between whole console sections (stats -> activity, etc). */
+.admin-block--sections { gap: var(--t-d-5); }
+.admin-block > .section-label:first-child { margin-top: 0; }
+.admin-block > .section-label { margin-bottom: 0; }
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--t-d-3);
+}
+.admin-stat {
+  background: var(--t-base);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-m);
+  padding: var(--t-d-4);
+}
+.admin-stat b { display: block; font-size: var(--t-fs-xl); line-height: 1.15; color: var(--t-txt); }
+.admin-stat span { color: var(--t-mut); font-size: var(--t-fs-s); }
+
+/* One toolbar row: search grows, filters sit right. */
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--t-d-3);
+  flex-wrap: wrap;
+}
+.admin-toolbar .input { flex: 1 1 240px; min-width: 0; }
+/* Filters keep their natural width; only the search field grows. */
+.admin-toolbar select.input,
+.admin-toolbar .select { flex: 0 1 auto; width: auto; min-width: 150px; max-width: 220px; }
+
+.admin-list { display: flex; flex-direction: column; gap: var(--t-d-2); }
+
+/* Row = identity | state | actions. Actions never wrap to their own line. */
+.card--list--row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--t-d-4);
+  padding: var(--t-d-3) var(--t-d-4);
+  background: var(--t-base);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-m);
+}
+.card--list--row:hover { background: var(--t-base2); border-color: var(--t-line-hi); }
+.card--list--row > .grow { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* Action cluster: right-aligned, self-contained, never stretches the row. */
+.card--list--row > .row-line,
+.card--list__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--t-d-2);
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin: 0;
+}
+.admin-avatar {
+  width: var(--t-avatar-md);
+  height: var(--t-avatar-md);
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--t-accent);
+  color: var(--t-on-accent);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.admin-name { font-weight: 650; color: var(--t-txt); overflow-wrap: anywhere; }
+.admin-row-state { display: flex; gap: var(--t-d-2); margin-top: 2px; }
+.admin-when { white-space: nowrap; }
+.admin-confirm { gap: var(--t-d-3); align-items: center; }
+.admin-more { margin-top: var(--t-d-3); }
 
 .admin-chip { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--t-mut); color: var(--t-txt); }
 .admin-chip.open, .admin-chip.under-review, .admin-chip.investigating { background: var(--t-warn-bg); color: var(--t-warn-fg); }

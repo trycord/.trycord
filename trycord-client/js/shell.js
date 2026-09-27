@@ -6,7 +6,7 @@
 import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, showUserCard, copyText } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, communityMark, navGroup } from './components.js';
 import Api from './api.js';
-import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications } from './state.js';
+import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost } from './state.js';
 import { closeMobileDrawer, toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 
 // Shared context-menu builders (Checkpoint C). `contextmenu` fires on
@@ -347,13 +347,26 @@ function communityHeader(sid, server) {
   // Community-level actions live here, not scattered through the channel
   // list. Every entry is permission-gated by the existing role system.
   const panel = dropdownPanel(trigger, () => {
+    const go = (path) => () => { location.hash = path; };
+    const base = '#/server/' + sid;
     const items = [];
-    items.push({ label: 'Community overview', icon: '⌂', onSelect: () => { location.hash = '#/server/' + sid; } });
-    if (can('MANAGE_INVITES')) {
-      items.push({ label: 'Invite people', icon: '✉', onSelect: () => { location.hash = '#/server/' + sid + '/invites'; } });
+
+    // Navigation: where am I in this community, and what can I reach.
+    items.push({ label: 'Community overview', icon: '⌂', onSelect: go(base) });
+    items.push({ label: 'Members', icon: '👥', onSelect: go(base + '/members') });
+    if (can('MANAGE_ROLES') || can('MANAGE_SERVER')) {
+      items.push({ label: 'Roles', icon: '🏷', onSelect: go(base + '/roles') });
     }
     if (can('MANAGE_CHANNELS')) {
-      items.push({ label: 'Create channel', icon: '＋', onSelect: () => { location.hash = '#/server/' + sid + '/channels/new'; } });
+      items.push({ label: 'Categories', icon: '≡', onSelect: go(base + '/categories') });
+      items.push({ label: 'Create channel', icon: '＋', onSelect: go(base + '/channels/new') });
+    }
+    if (can('MANAGE_INVITES')) {
+      items.push({ label: 'Invites', icon: '✉', onSelect: go(base + '/invites') });
+    }
+    if (can('MANAGE_SERVER')) {
+      items.push({ sep: true });
+      items.push({ label: 'Community settings', icon: '⚙', onSelect: go(base + '/settings') });
     }
     items.push({ sep: true });
     items.push({ label: 'Leave community', icon: '⤶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
@@ -502,31 +515,10 @@ function communityContext(region, sid) {
     scroll.appendChild(el('div', { class: 'ctx-empty' }, 'No channels yet.'));
   }
 
-  // Community management. Semantically distinct from channels: different
-  // group treatment, and only destinations this user may actually open.
-  const manage = navGroup({ label: 'Community', collapsible: true, collapsed: collapsed.has('manage:' + sid), id: 'manage' });
-  manage.onToggleChange((isCollapsed) => {
-    const set = collapsedGroups();
-    if (isCollapsed) set.add('manage:' + sid); else set.delete('manage:' + sid);
-    persistCollapsedGroups(set);
-  });
-  const manageLinks = [
-    { label: 'Overview', href: '#/server/' + sid, path: '/server/' + sid, exact: true, show: true },
-    { label: 'Members', href: '#/server/' + sid + '/members', path: '/server/' + sid + '/members', show: true },
-    { label: 'Roles', href: '#/server/' + sid + '/roles', path: '/server/' + sid + '/roles', show: can('MANAGE_ROLES') || can('MANAGE_SERVER') },
-    { label: 'Categories', href: '#/server/' + sid + '/categories', path: '/server/' + sid + '/categories', show: can('MANAGE_CHANNELS') },
-    { label: 'Invites', href: '#/server/' + sid + '/invites', path: '/server/' + sid + '/invites', show: can('MANAGE_INVITES') },
-    { label: 'Community settings', href: '#/server/' + sid + '/settings', path: '/server/' + sid + '/settings', show: can('MANAGE_SERVER') },
-  ];
-  for (const m of manageLinks) {
-    if (!m.show) continue;
-    const active = m.exact ? route === m.path : (route === m.path || route.startsWith(m.path + '/'));
-    manage.list.appendChild(navRow({
-      label: m.label, href: m.href, active,
-      onClick: () => { location.hash = m.href; },
-    }));
-  }
-  if (manage.list.children.length) scroll.appendChild(manage);
+  // Community-level navigation lives in the community header dropdown, not
+  // here. The sidebar is deliberately channels-only: mixing destinations
+  // in with #channels made the two read as the same kind of thing.
+
 
   const bar = sessionBar();
   if (bar) region.appendChild(bar);
@@ -709,12 +701,13 @@ function profileContext(region, userId) {
 }
 
 const ADMIN_SECTIONS = [
-  { label: 'Overview', path: '/admin' },
+  { label: 'Overview', path: '/admin', exact: true },
   { label: 'Users', path: '/admin/users' },
   { label: 'Communities', path: '/admin/communities' },
   { label: 'Reports', path: '/admin/reports' },
   { label: 'Appeals', path: '/admin/appeals' },
   { label: 'Audit log', path: '/admin/audit' },
+  { label: 'Announcements', path: '/admin/announcements' },
 ];
 
 function adminContext(region) {
@@ -724,7 +717,9 @@ function adminContext(region) {
   region.appendChild(scroll);
   const group = navGroup({ label: 'Console' });
   for (const s of ADMIN_SECTIONS) {
-    const active = route === s.path || route.startsWith(s.path + '/');
+    // Overview is the /admin parent, so it must match exactly or every
+    // sub-section would light it up alongside its own entry.
+    const active = s.exact ? route === s.path : (route === s.path || route.startsWith(s.path + '/'));
     group.list.appendChild(navRow({
       label: s.label, href: '#' + s.path, active,
       onClick: () => { location.hash = '#' + s.path; },
@@ -1013,7 +1008,54 @@ export function renderAllChrome() {
   renderPlaceNavigation(qs('#place-navigation'));
   renderMobileTabs(qs('#mobile-tab-navigation'));
   renderMemberSidebar(qs('#member-sidebar'));
+  renderAnnouncementBanner();
   renderVerifyBanner();
+}
+
+// Instance announcement banners. These are per-deployment chrome, persisted
+// server-side, and shown above the context header in both shells. They are
+// fetched once per session and then refreshed on a slow interval, so an admin
+// publishing a banner reaches other clients without a reload.
+let annState = { items: [], loaded: false, timer: null };
+
+export function loadAnnouncements({ force = false } = {}) {
+  if (!isAuthed()) return Promise.resolve([]);
+  if (annState.loaded && !force) return Promise.resolve(annState.items);
+  return Api.announcements()
+    .then((list) => {
+      annState = { items: Array.isArray(list) ? list : [], loaded: true, timer: annState.timer };
+      renderAnnouncementBanner();
+      return annState.items;
+    })
+    .catch(() => { annState = { items: [], loaded: true, timer: annState.timer }; return []; });
+}
+
+function scheduleAnnouncementRefresh() {
+  if (annState.timer) return;
+  // Deliberately slow: this is instance chrome, not live data.
+  annState.timer = setInterval(() => { loadAnnouncements({ force: true }); }, 120000);
+}
+
+export function renderAnnouncementBanner() {
+  if (isAuthed()) scheduleAnnouncementRefresh();
+  const items = annState.items || [];
+  for (const shell of [qs('#trycord-main'), qs('#mobile-shell')]) {
+    if (!shell) continue;
+    for (const old of Array.from(shell.querySelectorAll(':scope > .announce-banner'))) old.remove();
+    // Newest first, at most two, so a stale pile-up cannot take over the UI.
+    for (const a of items.slice(0, 2)) {
+      const level = ['info', 'warning', 'critical'].includes(a.level) ? a.level : 'info';
+      const bar = el('div', {
+        class: 'announce-banner announce-banner--' + level,
+        role: level === 'critical' ? 'alert' : 'status',
+      });
+      if (a.linkHref) {
+        bar.appendChild(el('a', { class: 'announce-banner__link', href: a.linkHref }, a.linkLabel || 'Open'));
+      }
+      bar.appendChild(el('span', { class: 'announce-banner__text' }, a.body));
+      shell.prepend(bar);
+    }
+  }
 }
 
 // Email-verification notice (UX only — the backend is the authority).
@@ -1021,7 +1063,7 @@ export function renderAllChrome() {
 // add-email paths. Disappears on the next chrome paint after verify.
 export function renderVerifyBanner() {
   const me = State.me;
-  const show = !!(isAuthed() && me && !me.emailVerified);
+  const show = !!(isAuthed() && mustVerifyToPost());
   for (const shell of [qs('#trycord-main'), qs('#mobile-shell')]) {
     if (!shell) continue;
     let bar = shell.querySelector(':scope > .verify-banner');

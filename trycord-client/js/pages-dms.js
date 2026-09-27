@@ -2,7 +2,7 @@
 // WS dm events; friends uses the friends routes.
 
 import Api from './api.js';
-import State, { refreshDms, refreshFriends, isAuthed } from './state.js';
+import State, { refreshDms, refreshFriends, isAuthed, mustVerifyToPost } from './state.js';
 import { esc, el, clear, toast, relTime, showEmojiPicker, insertAtCursor, openModal } from './ui.js';
 import { avatar, emptyState, messageRow } from './components.js';
 import { renderContextHeader } from './shell.js';
@@ -158,7 +158,7 @@ async function renderDmThread(container, dmId) {
   conv.appendChild(composer);
   {
     const me = State.me;
-    if (me && !me.emailVerified) {
+    if (mustVerifyToPost()) {
       ta.disabled = true;
       ta.placeholder = 'Verify your email to send messages.';
       sendBtn.disabled = true;
