@@ -20,9 +20,37 @@ if (start < 0) {
   console.error('FATAL: originCovers not found in src/server.js - the test cannot verify anything.');
   process.exit(1);
 }
-const end = source.indexOf('\nfunction corsOptions', start);
-if (end < 0) { console.error('FATAL: could not find the end of originCovers'); process.exit(1); }
-const originCovers = eval('(' + source.slice(start, end).trim() + ')');
+
+// Extract the one function by brace matching rather than by slicing up to the
+// next top-level declaration. Slicing to a sentinel silently swallows whatever
+// gets inserted between the two - which is exactly what happened when the
+// desktop-origin warning helpers were added, and it broke this test with a
+// syntax error that looked nothing like a CORS problem.
+function extractFunction(src, from) {
+  let depth = 0, i = src.indexOf('{', from);
+  if (i < 0) return null;
+  for (let p = i; p < src.length; p++) {
+    const c = src[p];
+    if (c === '/' && src[p + 1] === '/') { p = src.indexOf('\n', p); if (p < 0) break; continue; }
+    if (c === '/' && src[p + 1] === '*') { p = src.indexOf('*/', p) + 1; continue; }
+    if (c === '"' || c === "'" || c === '`') {
+      const q = c; p++;
+      while (p < src.length) {
+        if (src[p] === '\\') { p += 2; continue; }
+        if (src[p] === q) break;
+        p++;
+      }
+      continue;
+    }
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) return src.slice(from, p + 1); }
+  }
+  return null;
+}
+
+const fnSrc = extractFunction(source, start);
+if (!fnSrc) { console.error('FATAL: could not delimit originCovers'); process.exit(1); }
+const originCovers = eval('(' + fnSrc + ')');
 
 let pass = 0, fail = 0;
 const ok = (n, c, d) => { c ? pass++ : fail++; console.log((c ? '  ok   ' : ' FAIL  ') + n + (c ? '' : '  -> ' + d)); };

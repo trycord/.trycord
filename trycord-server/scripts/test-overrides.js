@@ -38,8 +38,6 @@ const ok = (n, c, d) => { c ? pass++ : fail++; console.log((c ? '  ok   ' : ' FA
   for (const m of [mod, plain]) await req('POST', '/api/servers/join/' + code, null, m.token);
 
   // Grant mod MANAGE_CHANNELS so it can edit overrides.
-  const roles = (await req('GET', '/api/servers/' + sid + '/roles', null, owner.token)).body;
-  const adminRole = roles.find((r) => r.name === 'Admin');
   const modRole = (await req('POST', '/api/servers/' + sid + '/roles',
     { name: 'ChanMod', permissions: ['SEND_MESSAGES', 'MANAGE_CHANNELS'] }, owner.token)).body;
   await req('POST', '/api/servers/' + sid + '/roles/' + modRole.id + '/assign', { userId: mod.id }, owner.token);

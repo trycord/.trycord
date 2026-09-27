@@ -3,64 +3,87 @@
 // navigation, communities, current-place navigation), the in-environment
 // context header, and the MobileShell drawer + bottom tabs.
 
-import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, showUserCard, copyText } from './ui.js';
-import { avatar, navRow, serverChip, channelRow, communityMark, navGroup } from './components.js';
+import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, attachContextMenu, showUserCard, copyText } from './ui.js';
+import { avatar, navRow, serverChip, channelRow, communityMark, communityBannerUrl, loadAuthedImage, navGroup } from './components.js';
 import Api from './api.js';
-import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
+import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, setMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
 import { closeMobileDrawer, toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 
-// Shared context-menu builders (Checkpoint C). `contextmenu` fires on
-// right-click (desktop) and long-press (mobile browsers), so one wiring
-// covers both shells.
+// Shared context-menu builders. Every entity routes through attachContextMenu,
+// which covers right-click, long-press and the keyboard equivalent from one
+// wiring, so a menu can never exist on one input method and be missing on
+// another. Menus are permission-shaped here: an action the viewer cannot perform
+// is not rendered at all. That is presentation only - the server re-checks
+// every one of these on the request.
 
-function serverChipMenu(e, s) {
-  e.preventDefault();
-  e.stopPropagation();
-  const sid = String(s.id);
-  const isCurrent = sid === String(currentServerId());
-  showContextMenu(e.clientX, e.clientY, [
-    { label: 'Open community', desc: s.name || '', onSelect: () => { location.hash = '#/server/' + sid; closeMobileDrawer(); } },
-    ...(isCurrent && can('MANAGE_SERVER')
-      ? [{ label: 'Community settings', onSelect: () => { location.hash = '#/server/' + sid + '/settings'; } }]
-      : (s.is_owner && !isCurrent
-        ? [{ label: 'Community settings', onSelect: () => { location.hash = '#/server/' + sid + '/settings'; } }]
-        : [])),
-    { label: 'Copy server ID', onSelect: () => copyText(sid, 'Server ID copied.') },
-    { sep: true },
-    {
-      label: 'Leave community', danger: true,
-      onSelect: () => {
-        if (s.is_owner) { toast('You own this community. Transfer or delete it first.', 'warn'); return; }
-        confirmDialog({
-          title: 'Leave ' + (s.name || 'community') + '?',
-          message: 'You can rejoin later with a new invite.',
-          danger: true, confirmText: 'Leave',
-          onConfirm: async () => {
-            try {
-              await Api.leaveServer(sid);
-              await refreshServers();
-              if (isCurrent) leaveServerContext();
-              location.hash = '#/home';
-            } catch (ex) { toast(ex.message || 'Failed', 'error'); }
-          },
-        });
+// Right-click / long-press / keyboard on a community chip. The settings entry
+// lives here rather than only inside the settings shell, because the chip is
+// where you are when you want to administer a community.
+function serverChipMenuFor(s) {
+  return () => {
+    const sid = String(s.id);
+    const isCurrent = sid === String(currentServerId());
+    const mayManage = (isCurrent && can('MANAGE_SERVER')) || (s.is_owner && !isCurrent);
+    return [
+      { label: 'Open community', desc: s.name || '', onSelect: () => { location.hash = '#/server/' + sid; closeMobileDrawer(); } },
+      {
+        label: 'Community settings', desc: mayManage ? undefined : 'Requires Manage Community',
+        disabled: !mayManage,
+        onSelect: () => { location.hash = '#/server/' + sid + '/settings'; },
       },
-    },
-  ]);
+      { label: 'Copy community link', onSelect: () => copyText(sid, 'Community ID copied.') },
+      { label: 'Copy community ID', onSelect: () => copyText(sid, 'Community ID copied.') },
+      { sep: true },
+      {
+        label: 'Leave community', danger: true,
+        onSelect: () => {
+          if (s.is_owner) { toast('You own this community. Transfer or delete it first.', 'warn'); return; }
+          confirmDialog({
+            title: 'Leave ' + (s.name || 'community') + '?',
+            message: 'You can rejoin later with a new invite.',
+            danger: true, confirmText: 'Leave',
+            onConfirm: async () => {
+              try {
+                await Api.leaveServer(sid);
+                await refreshServers();
+                if (isCurrent) leaveServerContext();
+                location.hash = '#/home';
+              } catch (ex) { toast(ex.message || 'Failed', 'error'); }
+            },
+          });
+        },
+      },
+    ];
+  };
 }
 
-async function messageMember(userId) {
-  try {
-    const dm = await Api.openDm(userId);
-    const id = (dm && (dm.id || dm.dm_id)) || dm;
-    location.hash = '#/dms/' + id;
-    closeMobileDrawer();
-  } catch (ex) { toast(ex.message || 'Could not open conversation.', 'error'); }
+function roleAssignable(roleId) {
+  if (!can('MANAGE_ROLES')) return false;
+  if ((State.permissions || []).includes('*')) return true;
+  const role = (State.roles || []).find((r) => String(r.id) === String(roleId));
+  if (!role) return false;
+  return myTopPosition() > Number(role.position || 0);
 }
 
-function memberCard(e, m) {
-  e.preventDefault();
-  e.stopPropagation();
+// Highest position the signed-in member holds; -1 when they hold nothing.
+function myTopPosition() {
+  const me = State.me;
+  if (!me) return -1;
+  const row = (State.members || []).find((m) => String(m.user_id || m.id) === String(me.id));
+  const mine = (row && row.roles) || [];
+  return mine.length ? Math.max(...mine.map((r) => Number(r.position || 0))) : -1;
+}
+
+// Right-click / long-press / keyboard on a member row opens the member menu.
+function memberMenu(m) {
+  return () => memberActions(m);
+}
+
+// The action list for one member, permission-shaped. Exported so the member
+// management page and the member sidebar share it: one list, one set of rules,
+// and no way for the two surfaces to drift into offering different actions for
+// the same person.
+export function memberActions(m) {
   const id = m.user_id || m.id;
   const sid = currentServerId();
   const name = m.nickname || m.display_name || m.username || 'Unknown';
@@ -89,30 +112,62 @@ function memberCard(e, m) {
       } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not time out.'; }
     });
   };
-  showUserCard(e.clientX, e.clientY, {
-    avatarEl: avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'lg', withPresence: true }),
-    title: name,
-    sub: '@' + (m.username || 'unknown'),
-    statusLine: m.status_text || null,
-    actions: [
-      { label: 'View profile', onSelect: () => { location.hash = '#/users/' + id; } },
-      ...(mine ? [] : [{ label: 'Message', primary: true, onSelect: () => messageMember(id) }]),
-      ...(!mine ? [{
-        label: 'Add friend', onSelect: async () => {
-          try { await Api.sendFriendRequest(id); toast('Friend request sent.', 'ok'); }
-          catch (ex) { toast(ex.message || 'Could not send request.', 'error'); }
-        },
-      }] : []),
-      ...(!mine ? [{
-        label: 'Report user', onSelect: () => openReportDialog({
-          targetType: 'user', targetId: id, title: 'Report user', subtitle: '@' + (m.username || 'unknown'),
-          onSubmit: ({ category, extra }) => Api.reportContent('user', id, category, extra || undefined),
-        }),
-      }] : []),
-      ...(canMod && can('BAN_MEMBERS') ? [{
-        label: 'Timeout', onSelect: modTimeout,
-      }] : []),
-      ...(canMod && can('KICK_MEMBERS') ? [{
+
+  // Roles this viewer may hand out, and this member does not already hold.
+  // The server re-checks the hierarchy on the request; this only decides what is
+  // offered. There is deliberately no "assign to yourself" path anywhere.
+  const held = new Set(((m.roles) || []).map((r) => String(r.id)));
+  const assignable = (State.roles || []).filter((r) => !held.has(String(r.id)) && roleAssignable(String(r.id)));
+  const removable = ((m.roles) || []).filter((r) => roleAssignable(String(r.id)));
+
+  const rolesSubmenu = () => {
+    if (!sid || mine) return null;
+    if (!can('MANAGE_ROLES')) return null;
+    const items = [];
+    if (assignable.length) {
+      items.push({ heading: 'Add role' });
+      for (const r of assignable) {
+        items.push({
+          label: r.name || 'Role',
+          desc: r.color ? 'Coloured' : undefined,
+          onSelect: async () => {
+            try {
+              await Api.assignRole(sid, r.id, id);
+              toast('Added ' + (r.name || 'role') + '.', 'ok');
+              await refreshServerView();
+              renderAllChrome();
+            } catch (ex) { toast(ex.message || 'Could not add that role.', 'error'); }
+          },
+        });
+      }
+    }
+    if (removable.length) {
+      if (items.length) items.push({ sep: true });
+      items.push({ heading: 'Remove role' });
+      for (const r of removable) {
+        items.push({
+          label: r.name || 'Role',
+          onSelect: async () => {
+            try {
+              await Api.unassignRole(sid, r.id, id);
+              toast('Removed ' + (r.name || 'role') + '.', 'ok');
+              await refreshServerView();
+              renderAllChrome();
+            } catch (ex) { toast(ex.message || 'Could not remove that role.', 'error'); }
+          },
+        });
+      }
+    }
+    if (!items.length) return null;
+    return { label: 'Roles', desc: 'Assign or remove', items };
+  };
+
+  const modSubmenu = () => {
+    if (!canMod) return null;
+    const items = [];
+    if (can('BAN_MEMBERS')) items.push({ label: 'Timeout', onSelect: modTimeout });
+    if (can('KICK_MEMBERS')) {
+      items.push({
         label: 'Kick', danger: true, onSelect: () => confirmDialog({
           title: 'Remove member?', message: '@' + (m.username || '') + ' will leave this community immediately.',
           danger: true, confirmText: 'Remove',
@@ -121,8 +176,10 @@ function memberCard(e, m) {
             catch (ex) { toast(ex.message || 'Could not remove member.', 'error'); }
           },
         }),
-      }] : []),
-      ...(canMod && can('BAN_MEMBERS') ? [{
+      });
+    }
+    if (can('BAN_MEMBERS')) {
+      items.push({
         label: 'Ban', danger: true, onSelect: () => confirmDialog({
           title: 'Ban @' + (m.username || '') + '?', message: 'They will be removed and blocked from rejoining.',
           danger: true, confirmText: 'Ban',
@@ -131,10 +188,37 @@ function memberCard(e, m) {
             catch (ex) { toast(ex.message || 'Could not ban member.', 'error'); }
           },
         }),
-      }] : []),
-      { label: 'Copy user ID', onSelect: () => copyText(String(id), 'User ID copied.') },
-    ],
-  });
+      });
+    }
+    if (!items.length) return null;
+    return { label: 'Moderation', items };
+  };
+
+  const actions = [
+    { label: 'View profile', onSelect: () => { location.hash = '#/users/' + id; } },
+    ...(mine ? [] : [{ label: 'Message', onSelect: () => messageMember(id) }]),
+    { label: 'Copy user ID', onSelect: () => copyText(String(id), 'User ID copied.') },
+  ];
+  const roles = rolesSubmenu();
+  if (roles) actions.push(roles);
+  const mod = modSubmenu();
+  if (mod) actions.push(mod);
+  if (!mine) {
+    actions.push({ sep: true });
+    actions.push({
+      label: 'Add friend', onSelect: async () => {
+        try { await Api.sendFriendRequest(id); toast('Friend request sent.', 'ok'); }
+        catch (ex) { toast(ex.message || 'Could not send request.', 'error'); }
+      },
+    });
+    actions.push({
+      label: 'Report user', onSelect: () => openReportDialog({
+        targetType: 'user', targetId: id, title: 'Report user', subtitle: '@' + (m.username || 'unknown'),
+        onSubmit: ({ category, extra }) => Api.reportContent('user', id, category, extra || undefined),
+      }),
+    });
+  }
+  return actions;
 }
 
 const DESTINATIONS = [
@@ -207,7 +291,9 @@ export function renderCommunities(region) {
         onClick: () => { location.hash = '#/server/' + s.id; },
       });
       chip.dataset.label = s.name || 'Community';
-      chip.addEventListener('contextmenu', (e) => serverChipMenu(e, s));
+      attachContextMenu(chip, serverChipMenuFor(s), {
+        target: (node) => ({ type: 'community', id: String(s.id) }),
+      });
       region.appendChild(chip);
     }
   }
@@ -317,14 +403,23 @@ function dropdownPanel(anchor, buildItems) {
   return panel;
 }
 
-// Community header. Communities have no stored banner, so identity is built
-// from the derived community mark plus a restrained accent wash. If a banner
-// ever exists it is layered behind the mark without changing the geometry.
+// Community header. Identity is the community's own icon when it has one and
+// the derived coloured mark otherwise, over its banner when set - the
+// geometry is unchanged either way, so adding media never moves the controls.
 function communityHeader(sid, server) {
   const name = (server && server.name) || (State.serverDetail && State.serverDetail.name) || 'Community';
-  const head = el('header', { class: 'ctx-head ctx-head--community' });
+  const identity = server || State.serverDetail;
+  const head = el('header', { class: 'ctx-head ctx-head--community' + (communityBannerUrl(identity) ? ' has-banner' : '') });
   const bar = el('div', { class: 'ctx-head__bar' });
-  bar.appendChild(el('span', { class: 'ctx-head__mark' }, communityMark(name)));
+  const banner = communityBannerUrl(identity);
+  if (banner) {
+    const layer = el('div', { class: 'ctx-head__banner' });
+    loadAuthedImage(banner).then((url) => {
+      if (url) layer.style.backgroundImage = 'url("' + url + '")';
+    });
+    head.appendChild(layer);
+  }
+  bar.appendChild(el('span', { class: 'ctx-head__mark' }, communityMark(name, { server: identity })));
   const text = el('div', { class: 'ctx-head__text' });
   text.appendChild(el('div', { class: 'ctx-head__title' }, name));
   text.appendChild(el('div', { class: 'ctx-head__sub' }, (server && server.is_owner) ? 'Your community' : 'Community'));
@@ -475,25 +570,35 @@ function communityContext(region, sid) {
     grouped.get(key).push(ch);
   }
 
+  // Channel actions, permission-shaped. Editing a channel lives in Community
+  // Settings rather than a separate editor here, so the menu entry point and
+  // the settings shell are the same place - the spec is explicit that channel
+  // administration must not become a disconnected second system.
+  const channelActions = (ch) => {
+    const cid = String(ch.id);
+    const items = [
+      { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = '#/server/' + sid + '/channel/' + cid; } },
+      { label: isMuted(ch.id) ? 'Unmute channel' : 'Mute channel', onSelect: () => setMuted(ch.id, !isMuted(ch.id)) },
+      { label: 'Copy channel link', onSelect: () => copyText(location.origin + '/#/server/' + sid + '/channel/' + cid, 'Channel link copied.') },
+      { label: 'Copy channel ID', onSelect: () => copyText(cid, 'Channel ID copied.') },
+    ];
+    if (can('MANAGE_CHANNELS')) {
+      items.push({ sep: true });
+      items.push({
+        label: 'Edit channel', onSelect: () => { location.hash = '#/server/' + sid + '/settings/structure'; },
+      });
+    }
+    return items;
+  };
+
   const channelRowEl = (ch) => {
     const active = route === '/server/' + sid + '/channel/' + ch.id;
-    const muted = isMuted(ch.id);
     const row = channelRow(ch, {
-      active, muted,
+      active, muted: isMuted(ch.id),
       onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; },
     });
-    row.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const items = [
-        { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; } },
-        { label: 'Copy channel ID', onSelect: () => copyText(String(ch.id), 'Channel ID copied.') },
-      ];
-      if (can('MANAGE_CHANNELS')) {
-        items.push({ sep: true });
-        items.push({ label: 'Edit channel', icon: '✎', onSelect: () => { location.hash = '#/server/' + sid + '/channels/new'; } });
-      }
-      showContextMenu(e.clientX, e.clientY, items);
+    attachContextMenu(row, () => channelActions(ch), {
+      target: () => ({ type: 'channel', id: String(ch.id) }),
     });
     return row;
   };
@@ -530,7 +635,6 @@ function communityContext(region, sid) {
   // Community-level navigation lives in the community header dropdown, not
   // here. The sidebar is deliberately channels-only: mixing destinations
   // in with #channels made the two read as the same kind of thing.
-
 
   const bar = sessionBar();
   if (bar) region.appendChild(bar);
@@ -729,6 +833,12 @@ function profileContext(region, userId) {
   });
 }
 
+// The console is used most often for Overview/Users/Reports, so those stay on
+// the surface. Announcements is a publishing tool rather than a moderation
+// queue - an admin reaches it deliberately, not while triaging - so it lives
+// behind a disclosure instead of taking a permanent slot in a seven-item list.
+// The disclosure adopts the active section's name and opens itself, so the
+// current destination is never hidden behind a collapsed control.
 const ADMIN_SECTIONS = [
   { label: 'Overview', path: '/admin', exact: true },
   { label: 'Users', path: '/admin/users' },
@@ -736,8 +846,13 @@ const ADMIN_SECTIONS = [
   { label: 'Reports', path: '/admin/reports' },
   { label: 'Appeals', path: '/admin/appeals' },
   { label: 'Audit log', path: '/admin/audit' },
+];
+
+const ADMIN_OVERFLOW = [
   { label: 'Announcements', path: '/admin/announcements' },
 ];
+
+const adminSectionActive = (s, route) => (s.exact ? route === s.path : (route === s.path || route.startsWith(s.path + '/')));
 
 function adminContext(region) {
   const route = currentRoute();
@@ -748,13 +863,28 @@ function adminContext(region) {
   for (const s of ADMIN_SECTIONS) {
     // Overview is the /admin parent, so it must match exactly or every
     // sub-section would light it up alongside its own entry.
-    const active = s.exact ? route === s.path : (route === s.path || route.startsWith(s.path + '/'));
     group.list.appendChild(navRow({
-      label: s.label, href: '#' + s.path, active,
+      label: s.label, href: '#' + s.path, active: adminSectionActive(s, route),
       onClick: () => { location.hash = '#' + s.path; },
     }));
   }
   scroll.appendChild(group);
+
+  const activeOverflow = ADMIN_OVERFLOW.find((s) => adminSectionActive(s, route));
+  const more = navGroup({
+    label: activeOverflow ? activeOverflow.label : 'More',
+    collapsible: true,
+    collapsed: !activeOverflow,
+    id: 'admin-overflow',
+  });
+  for (const s of ADMIN_OVERFLOW) {
+    more.list.appendChild(navRow({
+      label: s.label, href: '#' + s.path, active: adminSectionActive(s, route),
+      onClick: () => { location.hash = '#' + s.path; },
+    }));
+  }
+  scroll.appendChild(more);
+
   const bar = sessionBar();
   if (bar) region.appendChild(bar);
 }
@@ -880,60 +1010,6 @@ function sidebarToggleButton() {
   return btn;
 }
 
-// Self-assignable role picker for the signed-in member.
-//
-// Each toggle is its own request against the server's self-assign endpoint, and
-// the checkbox is put back the way it was if the server refuses. The server is
-// the only thing that decides: a role carrying a permission this member does
-// not already hold is rejected there, and the refusal is surfaced verbatim
-// rather than swallowed into a generic failure.
-function openSelfRolePicker(serverId, roles, onChanged) {
-  const err = el('div', { class: 'form-error', hidden: true });
-  const status = el('div', { class: 'muted small', 'aria-live': 'polite' },
-    'Tick a role to put it on, untick to take it off.');
-  const list = el('div', { class: 'self-role-list' });
-
-  const done = el('button', { class: 'btn primary', type: 'button' }, 'Done');
-  const modal = openModal({
-    title: 'Your roles',
-    eyebrow: 'Self-assignable',
-    closable: true,
-    body: el('div', {}, err, status, list),
-    footer: [done],
-  });
-  done.addEventListener('click', () => modal.close());
-
-  for (const r of roles) {
-    const name = r.name || 'Role';
-    const input = el('input', { type: 'checkbox' });
-    input.checked = !!r.selfAssigned;
-    const nameEl = el('span', { class: 'self-role__name' }, name);
-    if (r.color) nameEl.style.color = r.color;
-    const label = el('label', { class: 'self-role' }, input, nameEl);
-    input.addEventListener('change', async () => {
-      const want = input.checked;
-      input.disabled = true;
-      err.hidden = true;
-      status.textContent = (want ? 'Adding ' : 'Removing ') + name + '…';
-      try {
-        await Api.selfAssignRole(serverId, r.id, want);
-        status.textContent = name + (want ? ' added.' : ' removed.');
-        await onChanged();
-      } catch (ex) {
-        // Never leave the box showing a state the server did not accept.
-        input.checked = !want;
-        err.hidden = false;
-        err.textContent = ex.message || 'Could not change that role.';
-        status.textContent = 'Tick a role to put it on, untick to take it off.';
-      } finally {
-        input.disabled = false;
-      }
-    });
-    list.appendChild(label);
-  }
-  return modal;
-}
-
 export function renderMemberSidebar(region) {
   clear(region);
   // The member panel belongs to community surfaces only. On home, DMs,
@@ -1009,30 +1085,35 @@ export function renderMemberSidebar(region) {
       info.appendChild(roleLine);
       row.appendChild(info);
       row.addEventListener('click', () => { location.hash = '#/users/' + id; });
-      row.addEventListener('contextmenu', (e) => memberCard(e, m));
-      rowWrap.appendChild(row);
-
-      // "Roles" pill, on my own row only. Self-assignment has to be reachable
-      // without hunting through settings, and this is the one place the client
-      // already knows the signed-in member's roles. Deliberately not offered
-      // for other members: that already has a flow (member card -> Manage
-      // roles), and a second one here would be a second source of truth.
-      const isSelf = !!State.me && String(id) === String(State.me.id);
-      const selfAssignable = isSelf ? roles.filter((r) => r.self_assign) : [];
-      if (selfAssignable.length) {
-        const pill = el('button', {
-          class: 'member-roles-pill', type: 'button',
-          title: 'Change the roles you have', 'aria-haspopup': 'dialog',
-        }, 'Roles');
-        pill.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openSelfRolePicker(currentServerId(), selfAssignable, async () => {
-            await refreshServerView();
-            renderMemberSidebar(qs('#member-sidebar'));
+      attachContextMenu(row, memberMenu(m), {
+        target: (node) => ({ type: 'member', id: String(m.user_id || m.id) }),
+      });
+      // Hover still shows the profile card. The two live on different inputs on
+      // purpose: the card is the preview, the menu is the set of actions, and
+      // merging them made right-click open something you could only read.
+      // Pointer-only, and delayed, so sweeping the mouse down the list does not
+      // strobe a card per row.
+      let hoverTimer = null;
+      const hoverCapable = () => {
+        try { return matchMedia('(hover: hover) and (pointer: fine)').matches; } catch { return true; }
+      };
+      row.addEventListener('mouseenter', () => {
+        if (!hoverCapable()) return;
+        hoverTimer = setTimeout(() => {
+          const r = row.getBoundingClientRect();
+          showUserCard(r.right + 8, r.top, {
+            avatarEl: avatar({ id, username: m.username, displayName: name, avatarUrl: m.avatar_url }, { size: 'lg', withPresence: true }),
+            title: name,
+            sub: '@' + (m.username || 'unknown'),
+            statusLine: m.status_text || null,
+            actions: [],
           });
-        });
-        rowWrap.appendChild(pill);
-      }
+        }, 420);
+      });
+      const clearHover = () => { clearTimeout(hoverTimer); hoverTimer = null; };
+      row.addEventListener('mouseleave', clearHover);
+      row.addEventListener('click', clearHover);
+      rowWrap.appendChild(row);
       group.appendChild(rowWrap);
     }
     region.appendChild(group);

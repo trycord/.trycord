@@ -154,10 +154,12 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
       onSelect: async () => {
         try {
           // The roster is the only place a member's roles are known, so read
-          // the current row rather than trusting whatever the caller had.
-          const roster = await Api.serverMembers(sid);
-          const row = (Array.isArray(roster) ? roster : [])
-            .find((m) => String(m.user_id || m.id) === String(id));
+          // the current row rather than trusting whatever the caller had. The
+          // endpoint returns the { items, total, ... } envelope; the page size
+          // is generous because this is a lookup, not a listing.
+          const roster = await Api.serverMembers(sid, { limit: 500 });
+          const rows = roster && Array.isArray(roster.items) ? roster.items : [];
+          const row = rows.find((m) => String(m.user_id || m.id) === String(id));
           openRoleAssignModal({ serverId: sid, member: row || { id, username: user.username } });
         } catch (ex) {
           toast(ex.message || 'Could not open role management.', 'error');

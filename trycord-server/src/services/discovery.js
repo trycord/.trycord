@@ -24,12 +24,12 @@ async function search({ q, page, limit }) {
   // Integers are validated above, so embedding them is injection-safe
   // (and keeps LIMIT/OFFSET working on every supported database).
   const items = await db.all(
-    `SELECT s.id, s.name, s.description, s.created_at,
-      (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count,
-      (SELECT COUNT(*) FROM channels c WHERE c.server_id = s.id) AS channel_count
-    FROM servers s ${whereSql}
-    ORDER BY member_count DESC, s.created_at DESC
-    LIMIT ${lim} OFFSET ${offset}`,
+    `SELECT s.id, s.name, s.description, s.icon_url, s.banner_url, s.created_at,
+     (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count,
+     (SELECT COUNT(*) FROM channels c WHERE c.server_id = s.id) AS channel_count
+     FROM servers s ${whereSql}
+     ORDER BY member_count DESC, s.created_at DESC
+     LIMIT ${lim} OFFSET ${offset}`,
     vals
   );
   return { items, page: pg, limit: lim, total: totalRow.n, pages: Math.max(1, Math.ceil(totalRow.n / lim)) };
@@ -38,10 +38,10 @@ async function search({ q, page, limit }) {
 // Safe public representation — no join codes, members, messages, or settings.
 async function preview(serverId) {
   const srv = await db.get(
-    `SELECT s.id, s.name, s.description, s.created_at,
-      (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count
-    FROM servers s
-    WHERE s.id = ? AND s.is_public = 1 AND s.is_discoverable = 1 AND s.enforcement_state IS NULL`,
+    `SELECT s.id, s.name, s.description, s.icon_url, s.banner_url, s.created_at,
+     (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count
+     FROM servers s
+     WHERE s.id = ? AND s.is_public = 1 AND s.is_discoverable = 1 AND s.enforcement_state IS NULL`,
     [serverId]
   );
   if (!srv) return null;

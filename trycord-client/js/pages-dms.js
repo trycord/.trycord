@@ -83,6 +83,57 @@ async function renderDmThread(container, dmId) {
     return box;
   }
 
+  // Highest canonical position currently rendered. seq is the server's
+  // authoritative order, so it is the only thing a catch-up cursor needs - an
+  // id or a timestamp would both be ambiguous at a boundary.
+  let highSeq = 0;
+  // Lowest rendered position, used as the anchor for loading older history.
+  let lowSeq = 0;
+  let loadingOlder = false;
+  const noteSeq = (m) => {
+    const s = m && m.seq;
+    if (s === null || s === undefined) return;
+    const n = Number(s);
+    if (!Number.isFinite(n)) return;
+    if (n > highSeq) highSeq = n;
+    if (!lowSeq || n < lowSeq) lowSeq = n;
+  };
+
+  // Older history. Anchored on the lowest seq currently rendered, so a page
+  // boundary can never skip or repeat a message the way an id/timestamp tuple
+  // can when two rows share a created_at.
+  async function loadOlder() {
+    if (loadingOlder) return;
+    if (!lowSeq) return;   // no anchor yet: nothing older is reachable
+    loadingOlder = true;
+    const btn = feed.querySelector('.dm-load-older');
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+    try {
+      const older = await Api.dmMessages(dmId, { before: lowSeq, limit: 50 });
+      if (!Array.isArray(older) || !older.length) {
+        if (btn) btn.remove();
+        return;
+      }
+      // Build into a fragment and splice it in ABOVE the current history.
+      // appendDmMessage inserts into the fragment, so nothing is appended to
+      // the live feed twice and nothing renders out of order.
+      const first = feed.querySelector('.msg');
+      const heightBefore = thread.scrollHeight;
+      const frag = document.createDocumentFragment();
+      for (const m of older) appendDmMessage(m, frag, dmId);
+      if (first) feed.insertBefore(frag, first);
+      else feed.appendChild(frag);
+      // Keep the reader's place: adding rows above shifts content down.
+      thread.scrollTop += thread.scrollHeight - heightBefore;
+      if (btn) btn.remove();
+    } catch (ex) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Load older messages'; }
+      toast((ex && ex.message) || 'Could not load older messages', 'error');
+    } finally {
+      loadingOlder = false;
+    }
+  }
+
   // load history
   async function reload() {
     clear(feed);
@@ -98,10 +149,44 @@ async function renderDmThread(container, dmId) {
     }
     clear(feed);
     feed.appendChild(dmIntro(msgs.length === 0));
+    highSeq = 0;
+    lowSeq = 0;
+    // Offer older history only when there is an anchor to page from and the
+    // first page came back full - a short page means the conversation starts
+    // here.
+    if (lowSeqAnchorable(msgs)) {
+      const olderBtn = el('button', { class: 'btn sm dm-load-older', type: 'button' }, 'Load older messages');
+      olderBtn.addEventListener('click', () => { loadOlder().catch(() => {}); });
+      feed.appendChild(olderBtn);
+    }
     for (const m of msgs) {
       appendDmMessage(m, feed, dmId);
     }
     thread.scrollTop = thread.scrollHeight;
+  }
+
+  // True when the first page is full AND every row carries a seq, so a
+  // `before` cursor is both available and worth offering.
+  function lowSeqAnchorable(msgs) {
+    return Array.isArray(msgs) && msgs.length >= 50 && msgs.every((m) => m && m.seq !== null && m.seq !== undefined);
+  }
+
+  // Forward catch-up after a reconnect. Anything that arrived while the socket
+  // was down is fetched by seq rather than by reloading the whole page, so the
+  // scroll position survives and a long conversation is not refetched to show
+  // three new lines. Falls back to a full reload when there is no cursor yet.
+  async function catchUp() {
+    if (!highSeq) return reload();
+    try {
+      const missed = await Api.dmMessages(dmId, { after: highSeq, limit: 50 });
+      if (!Array.isArray(missed) || !missed.length) return;
+      const stick = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120;
+      for (const m of missed) appendDmMessage(m, feed, dmId);
+      if (stick) thread.scrollTop = thread.scrollHeight;
+    } catch {
+      // Offline, or the cursor was rejected: a full reload is the safe answer.
+      await reload();
+    }
   }
 
   function appendDmMessage(m, toFeed) {
@@ -120,6 +205,7 @@ async function renderDmThread(container, dmId) {
       onEdit: mine ? () => editDm(dmId, m) : null,
     });
     target.appendChild(row);
+    noteSeq(m);
     return row;
   }
 
@@ -174,11 +260,25 @@ async function renderDmThread(container, dmId) {
     threadedSend(content);
   }
   let sendLock = false;
+  // One nonce per submission attempt, held until the send definitively
+  // succeeds. A retry after a lost response reuses it, so the server collapses
+  // the retry onto the message the first attempt already wrote instead of
+  // posting the same text twice. A fresh nonce is minted only after a
+  // confirmed success, and the composer text is deliberately left in place on
+  // failure so nothing is lost.
+  let pendingNonce = null;
+  function newNonce() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
   async function threadedSend(content) {
     if (sendLock) return;
     sendLock = true;
+    const nonce = pendingNonce || newNonce();
+    pendingNonce = nonce;
     try {
-      await Api.sendDm(dmId, content);
+      await Api.sendDm(dmId, content, nonce);
+      pendingNonce = null;
       ta.value = '';
       ta.style.height = 'auto';
       await reload();
@@ -221,10 +321,11 @@ async function renderDmThread(container, dmId) {
         }
       }
     }),
-    // Reconnect resync (F4): reload() is authoritative (clear + refetch),
-    // so catching up after offline time cannot duplicate state.
+    // Reconnect resync. A seq cursor is used when one is known, so a reconnect
+    // fetches only what was missed; a full reload remains the fallback for the
+    // first connect and for a rejected cursor.
     Realtime.on('open', () => {
-      if (String(activeDmId) === String(dmId)) reload().catch(() => {});
+      if (String(activeDmId) === String(dmId)) catchUp().catch(() => {});
     }),
   ];
   Api.dmRead(dmId).catch(() => {});

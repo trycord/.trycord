@@ -10,6 +10,8 @@ const servers = require('../services/servers');
 const memberships = require('../services/memberships');
 const events = require('../services/events');
 const permissions = require('../services/permissions');
+const uploads = require('../services/uploads');
+const { singleImage } = require('../middleware/upload');
 
 const router = express.Router();
 router.use(auth);
@@ -75,6 +77,73 @@ router.delete('/:id', resolveServer, auth.requireVerified, requireOwner, async (
   } catch (e) { next(e); }
 });
 
+// Community identity media. Uploading replaces whatever was there and frees
+// the old file, exactly like a profile image - a community has one icon and one
+// banner, not a history of them.
+const SERVER_MEDIA_KINDS = ['icon', 'banner'];
+
+// NOT async: this is a factory that returns the handler. Declaring it async
+// would make it return a Promise, and Express would reject the route with
+// "argument handler must be a function".
+function serverMediaRoute(kind) {
+  return async (req, res, next) => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return fail(res, 'VALIDATION_ERROR', 'send the image as a multipart field named "file"');
+      }
+      const out = await uploads.storeServerMedia({
+        serverId: req.server.id, kind,
+        buffer: req.file.buffer,
+        originalName: req.file.originalname || '',
+      });
+      if (out.error) return fail(res, out.error, out.message);
+      const column = kind === 'icon' ? 'icon_url' : 'banner_url';
+      const prev = await db.get(`SELECT ${column} AS v FROM servers WHERE id = ?`, [req.server.id]);
+      await db.run(`UPDATE servers SET ${column} = ? WHERE id = ?`, [out.url, req.server.id]);
+      if (prev && prev.v && prev.v !== out.url) await uploads.removeServerFile(prev.v).catch(() => {});
+      res.status(201).json({ kind, url: out.url, mime: out.mime, size: out.size });
+    } catch (e) { serviceError(res, e); }
+  };
+}
+
+function serverMediaDelete(kind) {
+  return async (req, res, next) => {
+    try {
+      const column = kind === 'icon' ? 'icon_url' : 'banner_url';
+      const prev = await db.get(`SELECT ${column} AS v FROM servers WHERE id = ?`, [req.server.id]);
+      await db.run(`UPDATE servers SET ${column} = NULL WHERE id = ?`, [req.server.id]);
+      if (prev && prev.v) await uploads.removeServerFile(prev.v).catch(() => {});
+      res.json({ ok: true, kind });
+    } catch (e) { serviceError(res, e); }
+  };
+}
+
+// Mounted at /api/servers (no :serverId) because a community icon is public
+// identity shown in browse, where the viewer is not a member and cannot resolve
+// the community first. Any authenticated user may load one; the id must carry
+// the sv- prefix enforced by storeServerMedia, so this cannot serve a message
+// attachment.
+router.get('/media/:id', auth, async (req, res, next) => {
+  try {
+    const row = await uploads.serverMedia(req.params.id);
+    if (!row) return fail(res, 'NOT_FOUND', 'image not found');
+    res.setHeader('Content-Type', row.mime);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.sendFile(uploads.filePath(row.id), { dotfiles: 'allow' }, (err) => {
+      if (err && !res.headersSent) return fail(res, 'NOT_FOUND', 'image not found');
+    });
+  } catch (e) { next(e); }
+});
+
+// ---- community identity media (per-community routes) ----------------------
+// MANAGE_SERVER, matching every other settings mutation, and declared BEFORE
+// the '/:id' handlers so these paths are not captured as an id.
+for (const kind of SERVER_MEDIA_KINDS) {
+  router.post('/:id/' + kind, resolveServer, requirePerm('MANAGE_SERVER'), singleImage, serverMediaRoute(kind));
+  router.delete('/:id/' + kind, resolveServer, requirePerm('MANAGE_SERVER'), serverMediaDelete(kind));
+}
+
 router.get('/:id/members', resolveServer, requireMember, async (req, res, next) => {
   try {
     // Paged. This previously returned the entire roster for any member of
@@ -82,13 +151,14 @@ router.get('/:id/members', resolveServer, requireMember, async (req, res, next) 
     // every role assignment in the community regardless. Both are now bounded
     // and the role lookup is scoped to the page returned.
     //
-    // The default is generous because the web client still derives member
-    // counts and role membership from the whole roster. A community larger
-    // than this will show a truncated list until the client moves to paged
-    // rendering with server-computed aggregates.
+    // The response is an envelope - { items, total, hasMore, limit, offset } -
+    // so a client can render "showing N of TOTAL" and offer a further page
+    // without downloading the whole roster to count it. The default page is
+    // generous because the desktop client still derives some role membership
+    // from what it holds, but it is a page, not the whole roster.
     const hasPaging = req.query.limit !== undefined || req.query.offset !== undefined || req.query.q !== undefined;
     res.json(await memberships.list(req.server.id, {
-      limit: hasPaging ? (req.query.limit === undefined ? 50 : req.query.limit) : 500,
+      limit: hasPaging ? (req.query.limit === undefined ? 50 : req.query.limit) : 200,
       offset: req.query.offset,
       search: req.query.q,
     }));

@@ -15,7 +15,9 @@ const state = {
   servers: [],         // serverCore rows the user belongs to
   serverDetail: null,  // detail for the current place, when in a server
   channels: { categories: [], channels: [] }, // current server layout
-  members: [],         // current server member rows
+  members: [],         // current server member rows (one page, or all when small)
+  memberTotal: 0,      // total members in the community, server-computed
+  memberHasMore: false,// whether the roster has a further page
   permissions: [],     // current server permission strings (+is_owner via all)
   roles: [],           // current server roles
   bans: [],            // current server bans (staff only, refreshed on demand)
@@ -145,6 +147,8 @@ export function clearSession() {
   state.serverDetail = null;
   state.channels = { categories: [], channels: [] };
   state.members = [];
+  state.memberTotal = 0;
+  state.memberHasMore = false;
   state.permissions = [];
   state.roles = [];
   state.dms = [];
@@ -185,7 +189,15 @@ export async function enterServer(serverId) {
   ]);
   state.serverDetail = detail;
   state.channels = (layout && typeof layout === 'object') ? layout : { categories: [], channels: [] };
-  state.members = Array.isArray(members) ? members : [];
+  // The roster endpoint returns an envelope. `members` stays a plain array
+  // because a dozen surfaces (the member sidebar, the roles page, the
+  // assignment dialog) read it directly, and the aggregates live beside it.
+  state.members = Array.isArray(members) ? members : (members && Array.isArray(members.items) ? members.items : []);
+  state.memberTotal = members && typeof members.total === 'number' ? members.total : state.members.length;
+  state.memberHasMore = !!(members && members.hasMore);
+  // Easy to drop while editing the lines above, and every permission gate in
+  // the app reads this - with it unset, can() is false for everyone including
+  // the owner.
   state.permissions = (perms && perms.permissions) || [];
   state.roles = roles || [];
   state.lastServerId = serverId;
@@ -254,6 +266,8 @@ export function leaveServerContext() {
   state.serverDetail = null;
   state.channels = { categories: [], channels: [] };
   state.members = [];
+  state.memberTotal = 0;
+  state.memberHasMore = false;
   state.permissions = [];
   state.roles = [];
   state.bans = [];

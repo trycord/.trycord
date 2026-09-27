@@ -504,8 +504,6 @@ img { max-width: 100%; }
 
 /* Context sidebar: routes the rail selection to its own navigation. */
 
-
-
 /* User bar pinned to the bottom of the context sidebar. One component for
    every context: identity left, session controls right. */
 /* Pinned session bar at the foot of the context sidebar.
@@ -849,63 +847,8 @@ img { max-width: 100%; }
 .member-sidebar__empty { color: var(--t-mut); padding: 20px 8px; font-size: 0.8rem; }
 .member-list { display: flex; flex-direction: column; gap: 2px; }
 
-/* Self-assignable roles on the member list.
-   The row itself is a <button> that navigates to the profile, so the "Roles"
-   pill is a SIBLING inside a wrapper rather than a child of it: nesting a
-   button in a button is invalid and every click would also fire the row's
-   navigation. Revealed on hover/focus like the rest of the row affordances,
-   but never display:none - a keyboard user must be able to tab to it. */
 .member-row-wrap { position: relative; display: flex; align-items: center; gap: 4px; }
 .member-row-wrap > .row--member { flex: 1 1 auto; min-width: 0; }
-.member-roles-pill {
-  flex: 0 0 auto;
-  padding: 2px 9px;
-  border: 1px solid var(--t-line-hi);
-  border-radius: 999px;
-  background: var(--t-base2);
-  color: var(--t-txt2);
-  font-size: var(--t-fs-xs);
-  font-weight: 600;
-  line-height: 1.6;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-.member-row-wrap:hover .member-roles-pill,
-.member-row-wrap:focus-within .member-roles-pill { opacity: 1; }
-.member-roles-pill:hover { border-color: var(--t-accent); color: var(--t-txt); }
-.member-roles-pill:focus-visible { opacity: 1; outline: 2px solid var(--t-accent); outline-offset: 1px; }
-/* Touch and narrow sidebars have no hover, so keep it permanently visible
-   rather than leaving the only self-assign entry point unreachable. */
-@media (hover: none), (max-width: 900px) { .member-roles-pill { opacity: 1; } }
-
-.self-role-list { display: flex; flex-direction: column; gap: 2px; margin-top: var(--t-d-3); }
-.self-role {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border-radius: var(--t-r-s);
-  cursor: pointer;
-}
-.self-role:hover { background: var(--t-base2); }
-.self-role input { flex: 0 0 auto; }
-.self-role__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-.self-role input:disabled { cursor: progress; }
-
-.role-selfassign {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--t-line);
-  border-radius: var(--t-r-s);
-  background: var(--t-base2);
-  cursor: pointer;
-}
-.role-selfassign input { flex: 0 0 auto; margin-top: 3px; }
-.role-selfassign__text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.role-selfassign__text small { color: var(--t-mut); font-size: var(--t-fs-xs); line-height: 1.45; }
 
 /* The UA hides [hidden]; layout rules must never override it. */
 .shell[hidden],
@@ -975,7 +918,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   text-align: center;
 }
 
-
 .server-chip {
   display: flex;
   align-items: center;
@@ -992,13 +934,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   color: var(--t-txt);
   box-shadow: inset 2px 0 0 var(--t-accent);
 }
-.server-chip .chip-badge {
+/* The rail chip's community mark. Sizing and radius match the letter badge it
+   replaced exactly, so an icon and an initial occupy the same box and the rail
+   does not reflow when a community uploads an icon. */
+.server-chip .community-mark--chip {
   flex: 0 0 auto;
   width: 36px; height: 36px;
   border-radius: 11px;
-  background: linear-gradient(145deg, var(--t-accent), var(--t-accent-2));
-  color: var(--t-on-accent);
-  display: flex; align-items: center; justify-content: center;
   font-weight: 800;
 }
 .server-chip .chip-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
@@ -1163,8 +1105,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .row--channel.active .ch-prefix { color: var(--t-accent); }
 .row--channel .ch-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-
-
 .presence-dot {
   flex: 0 0 auto;
   width: 9px; height: 9px;
@@ -1176,8 +1116,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .community-action { justify-content: center; border: 1px dashed var(--t-line); }
 .app-rail__items .community-actions { width: 100%; }
 .app-rail__items .community-action { width: 48px; }
-
-
 
 /* ============================================================
    6. OVERLAYS
@@ -1227,8 +1165,24 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   animation: rise var(--t-fast) var(--t-ease);
 }
 /* Context menu: a popover carrying menu semantics. Items align in a single
-   column and support keyboard focus traversal. */
-.popover.ctx-menu { min-width: 190px; padding: 5px; }
+   column and support keyboard focus traversal.
+   No entry animation: the shared `rise` translates the popover, which both
+   looked wrong for a native-feeling menu and made the viewport fit check see a
+   phantom overflow mid-animation. */
+/* The protected @everyone role: stated, not merely implied by a missing button. */
+.role-protected {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--t-d-3);
+  padding: 10px 12px;
+  border: 1px solid var(--t-line);
+  border-left: 3px solid var(--t-accent);
+  border-radius: var(--t-r-s);
+  background: var(--t-base2);
+}
+
+.popover.ctx-menu { min-width: 190px; padding: 5px; animation: none; }
 .popover.ctx-menu .pop-item {
   width: 100%;
   text-align: left;
@@ -1251,10 +1205,64 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   font-size: var(--t-fs-m);
 }
 .pop-item:hover { background: var(--t-base2); }
+.pop-item:focus-visible { background: var(--t-base2); outline: 2px solid var(--t-accent); outline-offset: -2px; }
 .pop-item .pop-desc { display: block; font-size: var(--t-fs-xs); color: var(--t-mut); }
 .pop-item.danger { color: var(--t-err); }
 .pop-item.danger:hover { background: color-mix(in srgb, var(--t-err) 14%, transparent); }
 .pop-sep { height: 1px; background: var(--t-line); margin: 6px 0; }
+
+/* Context menu: submenus, group headings, and the touch presentation. */
+.popover.ctx-menu .pop-item__text { flex: 1 1 auto; min-width: 0; }
+.popover.ctx-menu .pop-item__caret {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: 10px;
+  color: var(--t-mut);
+  font-size: var(--t-fs-s);
+}
+.popover.ctx-menu .pop-item.has-sub:hover,
+.popover.ctx-menu .pop-item.has-sub[aria-expanded="true"] { background: var(--t-base2); }
+.popover.ctx-menu .pop-heading {
+  padding: 6px var(--t-d-3) 3px;
+  color: var(--t-mut);
+  font-size: var(--t-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* A submenu is anchored beside its parent, not at the pointer, so it carries no
+   shadow of its own - the stack reads as one object. */
+.popover.ctx-menu--sub { min-width: 176px; }
+/* Touch / narrow: the same action list as a thumb-reachable bottom sheet. */
+.ctx-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-popover) - 1);
+  background: rgb(0 0 0 / 0.45);
+}
+.popover.ctx-menu--sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 76dvh;
+  overflow-y: auto;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  border-bottom: 0;
+  animation: ctx-sheet-in 0.14s ease-out;
+}
+.popover.ctx-menu--sheet .pop-item { padding: 12px var(--t-d-3); font-size: var(--t-fs-m); }
+.popover.ctx-menu--sheet .pop-sep { margin: 8px 0; }
+@keyframes ctx-sheet-in {
+  from { transform: translateY(14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .popover.ctx-menu--sheet { animation: none; }
+}
 .pop-item[disabled] { opacity: 0.45; cursor: default; }
 .pop-item[disabled]:hover { background: transparent; }
 /* Session footer pinned to the bottom of the place navigation
@@ -1298,16 +1306,63 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .row--channel.muted .ch-name { text-decoration: line-through; text-decoration-thickness: 1px; }
 .emoji-btn { color: var(--t-mut); font-size: 1.15rem; padding: 6px 8px; border-radius: var(--t-r-s); background: transparent; }
 .emoji-btn:hover { color: var(--t-txt); background: var(--t-base2); }
+/* Emoji palette. Wider than the old 8-column strip, scrollable, with a sticky
+   search field and per-category headings. */
 .popover.emoji-picker {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
-  padding: 8px;
-  width: 300px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  width: 344px;
   max-width: calc(100vw - 32px);
+  max-height: min(420px, calc(100vh - 32px));
+  overflow: hidden;
 }
-.emoji-cell { font-size: 1.3rem; padding: 4px; border-radius: 6px; background: transparent; line-height: 1.2; }
-.emoji-cell:hover { background: var(--t-base2); }
+.emoji-search {
+  flex: 0 0 auto;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--t-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--t-txt);
+  font: inherit;
+  font-size: var(--t-fs-s);
+  padding: 9px 12px;
+}
+.emoji-search:focus { outline: none; box-shadow: inset 0 -2px 0 var(--t-accent); }
+.emoji-results { flex: 1 1 auto; overflow-y: auto; padding: 6px; overscroll-behavior: contain; }
+.emoji-group + .emoji-group { margin-top: 8px; }
+.emoji-group__label {
+  position: sticky;
+  top: -6px;
+  z-index: 1;
+  padding: 4px 6px 5px;
+  background: var(--t-base);
+  color: var(--t-mut);
+  font-size: var(--t-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.emoji-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px; }
+.emoji-empty { padding: 18px 8px; text-align: center; color: var(--t-mut); font-size: var(--t-fs-s); }
+.emoji-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  font-size: 1.3rem;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  line-height: 1.2;
+}
+.emoji-cell:hover, .emoji-cell:focus-visible { background: var(--t-base2); outline: none; }
+.emoji-cell:focus-visible { box-shadow: inset 0 0 0 2px var(--t-accent); }
+@media (max-width: 420px) {
+  .popover.emoji-picker { width: min(320px, calc(100vw - 24px)); }
+  .emoji-grid { grid-template-columns: repeat(8, 1fr); }
+}
 .search-panel {
   position: fixed;
   top: 64px;
@@ -1418,7 +1473,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   gap: var(--t-d-2);
 }
 .connection-status.show { display: flex !important; animation: rise var(--t-fast); }
-
 
 /* ============================================================
    7. CONTROLS
@@ -1579,7 +1633,6 @@ select.input { appearance: auto; }
 
 .page { width: 100%; max-width: var(--ui-page-width); margin: 0 auto; padding: 24px clamp(16px, 3vw, 42px) 40px; }
 .page.atrium { display: flex; flex-direction: column; gap: var(--t-d-4); }
-
 
 .section-label {
   font-size: var(--t-fs-xs);
@@ -1753,7 +1806,11 @@ select.input { appearance: auto; }
 .conversation .feed {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  /* No gap here. Spacing between messages is owned by .msg's vertical margin
+     alone, and a container gap here silently ADDED to it - which is why asking
+     for 0.5px produced a measured 1.5px. One owner for the spacing, one place
+     to change it. */
+  gap: 0;
   max-width: 100%;
   /* Bottom-anchored feed: short conversations rest on the composer
      instead of dangling from the top with a void below. When content
@@ -1786,7 +1843,11 @@ select.input { appearance: auto; }
   display: flex;
   gap: 12px;
   padding: 8px;
-  margin: 2px 0;
+  /* Vertical margin is the gap BETWEEN rows. The list is a flex column, so
+     adjacent margins add rather than collapse: 0.25px per side gives the
+     0.5px between consecutive messages. The 8px padding above is inside the
+     row, which is what keeps each message's own text off its neighbour's. */
+  margin: 0.25px 0;
   border-radius: 6px;
   width: 100%;
   text-align: left;
@@ -1913,7 +1974,6 @@ select.input { appearance: auto; }
 .msg.deleted { opacity: var(--t-op-fade); }
 .msg.deleted .msg-text { font-style: italic; color: var(--t-mut); }
 .msg.system { color: var(--t-mut); font-size: var(--t-fs-s); justify-content: center; padding: var(--t-d-2); }
-
 
 .msg-files { display: flex; flex-wrap: wrap; gap: var(--t-d-2); margin-top: var(--t-d-2); }
 .msg-file {
@@ -2042,7 +2102,6 @@ select.input { appearance: auto; }
 .card--auth h1 { margin: 0 0 4px; font-size: var(--t-fs-2xl); letter-spacing: -0.025em; }
 .card--auth .auth-sub { color: var(--t-mut); margin: 0 0 var(--t-d-5); font-size: var(--t-fs-s); }
 .auth-alt { text-align: center; margin-top: var(--t-d-4); color: var(--t-mut); font-size: var(--t-fs-s); }
-
 
 /* ============================================================
    12b. PUBLIC / STATIC PAGES
@@ -2376,8 +2435,6 @@ html:is(
   html[data-auth-page] .mobile-header { display: none !important; }
 }
 
-
-
 .settings-nav { display: flex; gap: var(--t-d-2); flex-wrap: wrap; margin-bottom: var(--t-d-5); padding: 4px; background: var(--t-base); border: 1px solid var(--t-line); border-radius: 9px; width: max-content; max-width: 100%; }
 .settings-nav .btn { border: 0; background: transparent; }
 .settings-nav .btn.active { background: var(--t-accent); color: var(--t-on-accent); }
@@ -2482,7 +2539,6 @@ html:is(
 .prof-bio { color: var(--t-txt2); white-space: pre-wrap; overflow-wrap: anywhere; }
 .prof-presence { font-size: var(--t-fs-xs); color: var(--t-mut); }
 
-
 .community-manager { width: min(var(--ui-page-width), calc(100% - 32px)); margin: 0 auto; padding: 24px 0 40px; }
 .settings-form { display: flex; flex-direction: column; gap: var(--t-d-4); max-width: 720px; }
 .settings-form .btn.block { width: 100%; }
@@ -2525,6 +2581,18 @@ html:is(
 }
 .role-pill.owner { color: var(--t-accent); border-color: color-mix(in srgb, var(--t-accent) 45%, var(--t-line)); }
 .role-pill.muted-role { color: var(--t-mut); border-color: var(--t-line); background: var(--t-base2); }
+/* Paging control for a notification list. Hidden entirely once the list is
+   exhausted - a permanently disabled button reads as a broken feature. */
+.notif-load-more { margin-top: var(--t-d-2); }
+
+/* Paging control for a direct-message conversation. Sits above the oldest
+   rendered row and is removed once a page comes back short. */
+.dm-load-older {
+  align-self: center;
+  margin: 0 auto var(--t-d-3);
+  display: block;
+}
+
 /* ---- community settings hub ---------------------------------------------
    Sectioned index over the pages that already do the work. Reuses
    .settings-nav from account settings rather than introducing a second
@@ -2629,7 +2697,6 @@ html:is(
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.role-badge--self { border-color: color-mix(in srgb, var(--t-accent) 40%, var(--t-line)); color: var(--t-accent-hi); }
 
 /* ---- role detail pane ---------------------------------------------------- */
 .role-detail {
@@ -2991,7 +3058,6 @@ html:is(
   background: color-mix(in srgb, var(--t-accent) 8%, transparent);
 }
 
-
 /* Authentication stays deliberately chrome-free on mobile. */
 html[data-route="/login"] .mobile-header,
 html[data-route="/register"] .mobile-header,
@@ -3143,17 +3209,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
     var(--t-base);
   box-shadow: var(--t-sh-1);
 }
-.community-hero__mark {
-  flex: 0 0 auto;
-  width: 72px; height: 72px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 22px;
-  background: linear-gradient(145deg, var(--t-accent), var(--t-accent-2));
-  color: var(--t-on-accent);
-  font-size: 1.9rem;
-  font-weight: 800;
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--t-accent) 30%, transparent);
-}
 .community-hero__text { min-width: 0; flex: 1 1 auto; }
 .community-hero__name { margin: 0 0 4px; font-size: var(--t-fs-xl); letter-spacing: -0.02em; }
 .community-hero__text .muted { margin: 0 0 8px; }
@@ -3172,8 +3227,7 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 }
 @media (max-width: 640px) {
   .community-hero { flex-direction: column; align-items: flex-start; padding: 18px; }
-  .community-hero__mark { width: 56px; height: 56px; border-radius: 17px; font-size: 1.5rem; }
-  .card--profile { padding: 0 16px 18px; }
+    .card--profile { padding: 0 16px 18px; }
 }
 
 /* ============================================================
@@ -3229,11 +3283,31 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
    wash keyed to the community mark instead of an empty image well. */
 .ctx-head--community {
   background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--t-accent) 12%, var(--t-base)),
-      var(--t-base) 78%);
+  linear-gradient(180deg,
+  color-mix(in srgb, var(--t-accent) 12%, var(--t-base)),
+  var(--t-base) 78%);
   border-bottom-color: color-mix(in srgb, var(--t-accent) 22%, var(--t-line));
 }
+/* With a banner set, the image replaces the accent wash. The bar keeps its
+   height and the controls keep their position - adding media must never move
+   anything. A scrim keeps the title legible over an arbitrary image. */
+.ctx-head__banner {
+  position: absolute;
+  inset: 0;
+  background: var(--t-base2) center/cover no-repeat;
+  pointer-events: none;
+}
+.ctx-head__banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--t-base) 88%, transparent) 0%,
+    color-mix(in srgb, var(--t-base) 70%, transparent) 55%,
+    color-mix(in srgb, var(--t-base) 88%, transparent) 100%);
+}
+.ctx-head--community.has-banner .ctx-head__bar { position: relative; }
+.ctx-head--community.has-banner .ctx-head__mark { position: relative; }
 .ctx-head__mark { display: flex; flex: 0 0 auto; }
 .community-mark {
   display: grid;
@@ -3245,7 +3319,49 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   font-weight: 800;
   font-size: 0.95rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
 }
+/* An uploaded community icon replaces the coloured initial. The text-shadow is
+   dropped with the initial, and the image is clipped by the parent's radius. */
+.community-mark.has-img { background: transparent; text-shadow: none; }
+.community-mark.lg { width: 72px; height: 72px; border-radius: 22px; font-size: 1.9rem; }
+.community-mark__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Community banner. Falls back to a flat surface when the community has not
+   set one, so a header never collapses to nothing. */
+.community-banner {
+  position: relative;
+  min-height: 132px;
+  background: var(--t-base2);
+  overflow: hidden;
+}
+.community-banner__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* Keeps the name legible over an arbitrary uploaded image. */
+.community-banner__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.55) 100%);
+}
+.community-banner__body { position: relative; padding: var(--t-d-4); }
+.community-banner__title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.community-banner__title h1 { margin: 0; font-size: var(--t-fs-xl); font-weight: 800; }
+.community-banner__title p { margin: 2px 0 0; color: var(--t-txt2); font-size: var(--t-fs-s); }
+
+/* Icon + banner editor in community settings. */
+.community-media { display: flex; flex-direction: column; gap: var(--t-d-3); }
+.community-media__preview { display: flex; align-items: center; gap: var(--t-d-3); flex-wrap: wrap; }
+.community-media__banner {
+  width: 100%;
+  height: 110px;
+  border-radius: var(--t-r-m);
+  border: 1px solid var(--t-line);
+  background: var(--t-base2) center/cover no-repeat;
+  display: grid;
+  place-items: center;
+  color: var(--t-mut);
+  font-size: var(--t-fs-xs);
+}
+.community-media__actions { display: flex; gap: var(--t-d-2); flex-wrap: wrap; }
 .ctx-head__text { min-width: 0; flex: 1 1 auto; }
 .ctx-head__title {
   font-size: var(--t-fs-m);

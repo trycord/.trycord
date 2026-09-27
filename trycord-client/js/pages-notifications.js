@@ -47,21 +47,9 @@ export async function renderNotifications(container) {
   wrap.appendChild(toolbar);
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
-  container.appendChild(wrap);
 
-  let items = State.raw.notifications || [];
-  try {
-    const res = await Api.notifications({ limit: 30 });
-    items = res.items || [];
-  } catch (ex) {
-    list.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load notifications'));
-    return;
-  }
-  if (!items.length) {
-    list.appendChild(emptyState('♧', 'All caught up', 'Mentions, messages and friend activity land here.'));
-    return;
-  }
-  for (const n of items) {
+  // Row rendering, shared by the first page and every "load more" after it.
+  const renderRow = (n) => {
     const dest = destination(n);
     const row = el(dest ? 'button' : 'div', {
       class: 'row notif-row' + (n.readAt ? '' : ' unread'),
@@ -81,8 +69,68 @@ export async function renderNotifications(container) {
         location.hash = dest;
       });
     }
-    list.appendChild(row);
+    return row;
+  };
+
+  const PAGE = 30;
+  // Cursor for the next older page, owned by the server. Null means the list
+  // is exhausted, which is why the control is removed rather than disabled -
+  // a permanently greyed-out button reads as a broken feature.
+  let nextCursor = null;
+  let loadingMore = false;
+
+  const loadMoreBtn = el('button', { class: 'btn block notif-load-more', type: 'button', hidden: true }, 'Load older');
+  loadMoreBtn.addEventListener('click', async () => {
+    if (loadingMore || !nextCursor) return;
+    loadingMore = true;
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = 'Loading…';
+    try {
+      const res = await Api.notifications({ limit: PAGE, before: nextCursor });
+      const older = res.items || [];
+      for (const n of older) list.appendChild(renderRow(n));
+      nextCursor = res.nextCursor || null;
+      if (!nextCursor || !older.length) {
+        loadMoreBtn.hidden = true;
+      } else {
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = 'Load older';
+      }
+    } catch (ex) {
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.textContent = 'Try again';
+      toast(ex.message || 'Could not load older notifications', 'error');
+    } finally {
+      loadingMore = false;
+    }
+  });
+  list.appendChild(loadMoreBtn);
+
+  container.appendChild(wrap);
+
+  let items = State.raw.notifications || [];
+  let cursor = null;
+  let hasMore = false;
+  try {
+    const res = await Api.notifications({ limit: PAGE });
+    items = res.items || [];
+    cursor = res.nextCursor || null;
+    hasMore = !!res.hasMore;
+  } catch (ex) {
+    list.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load notifications'));
+    loadMoreBtn.hidden = true;
+    return;
   }
+  if (!items.length) {
+    list.appendChild(emptyState('♧', 'All caught up', 'Mentions, messages and friend activity land here.'));
+    loadMoreBtn.hidden = true;
+    return;
+  }
+  for (const n of items) {
+    list.appendChild(renderRow(n));
+  }
+  nextCursor = cursor;
+  loadMoreBtn.hidden = !hasMore || !nextCursor;
 }
 
 export default { renderNotifications };

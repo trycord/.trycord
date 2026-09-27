@@ -5,7 +5,7 @@
 
 import Api from './api.js';
 import State from './state.js';
-import { esc, el, clear, toast, openModal, relTime, fullTime } from './ui.js';
+import { esc, el, clear, toast, openModal, confirmDialog, relTime, fullTime } from './ui.js';
 import { initialOf, emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
 

@@ -30,10 +30,26 @@ const AUTH_LOGO = '/assets/trycord-logo.png';
 // box. There is deliberately NO QR/device-login panel here, because the server
 // exposes no such endpoint - a decorative code scanner would promise a feature
 // that does not exist.
+// The auth overlay is mounted straight on <body> rather than into the view
+// region it was handed.
+//
+// It is `position: fixed; inset: 0`, so it does not need a container to size
+// itself - but it does need one that is actually displayed. At 600px and below
+// the mobile shell replaces the desktop one, and the `data-auth-page` styling
+// that hides the mobile shell (so a signed-in visitor's chrome does not frame
+// the sign-in card) also hid the region the overlay had been rendered into.
+// The card then measured 0x0 and the whole auth page vanished on a phone.
+// Mounting on <body> makes the overlay independent of which shell is active.
+// router.js removes a stray overlay on every route render, which is the
+// counterpart to this.
+function mountAuthPage(page) {
+  for (const stray of document.querySelectorAll('body > .auth-page')) stray.remove();
+  document.body.appendChild(page);
+}
+
 function authShell({ title, lede, secondary, contextTitle }) {
   if (contextTitle) renderContextHeader({ title: contextTitle });
-  // Styling hook: the auth page renders into the desktop view region, and the
-  // mobile shell replaces that region below 600px. See the note in router.js.
+  // Styling hook consumed by app.css. See the note in router.js.
   document.documentElement.dataset.authPage = '1';
   const page = el('div', { class: 'auth-page' });
   page.appendChild(el('div', { class: 'auth-background', 'aria-hidden': 'true' }));
@@ -133,7 +149,7 @@ function loginForm(container) {
     el('span', {}, 'New here? ', el('a', { href: '#/register' }, 'Create an account')),
     el('span', {}, el('a', { href: '#/forgot' }, 'Forgot password?'), ' · ', el('a', { href: '#/support' }, 'Support')),
   ));
-  container.appendChild(page);
+  mountAuthPage(page);
   username.focus();
 }
 
@@ -227,7 +243,7 @@ function registerForm(container) {
   main.appendChild(authFooter(
     el('span', {}, 'Already registered? ', el('a', { href: '#/login' }, 'Sign in'), ' · ', el('a', { href: '#/support' }, 'Support')),
   ));
-  container.appendChild(page);
+  mountAuthPage(page);
   username.focus();
 }
 
@@ -268,7 +284,7 @@ function forgotForm(container) {
   main.appendChild(authFooter(
     el('span', {}, el('a', { href: '#/login' }, 'Back to sign in'), ' · ', el('a', { href: '#/support' }, 'Support')),
   ));
-  container.appendChild(page);
+  mountAuthPage(page);
 }
 
 function resetPasswordPage(container, token) {
@@ -307,7 +323,7 @@ function resetPasswordPage(container, token) {
   });
   main.appendChild(form);
   main.appendChild(authFooter(el('span', {}, el('a', { href: '#/login' }, 'Back to sign in'))));
-  container.appendChild(page);
+  mountAuthPage(page);
 }
 
 function legalPage(container, kind) {
@@ -350,7 +366,7 @@ function verifyEmailPage(container, token) {
   main.appendChild(err);
   main.appendChild(msg);
   main.appendChild(actions);
-  container.appendChild(page);
+  mountAuthPage(page);
 
   (async () => {
     try {

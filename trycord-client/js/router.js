@@ -6,7 +6,18 @@ import PagesPublic from './pages-public.js';
 import { renderHome } from './pages-home.js';
 import { renderBrowse } from './pages-browse.js';
 import HelloDms from './pages-dms.js';
-import Workspace from './pages-workspace.js';
+// Community surfaces are imported from the feature module that owns each one.
+// There is deliberately no `Workspace.*` facade any more: the old single
+// pages-workspace.js mixed a conversation view, a member roster, the role
+// hierarchy and community settings behind one default export, so every route
+// reached every feature through the same namespace.
+import { renderMenu, renderNewServer, renderServerLanding } from './pages-community.js';
+import { renderChannel, renderChannelPins } from './pages-conversation.js';
+import { renderServerMembers } from './pages-members.js';
+import { renderServerRoles } from './pages-roles.js';
+import { renderNewChannel, renderServerCategories } from './pages-channels.js';
+import { renderInvites } from './pages-invites.js';
+import { renderServerSettings } from './pages-settings.js';
 import { renderAccount } from './pages-account.js';
 import { renderAdmin } from './pages-admin.js';
 import { renderProfile } from './pages-profile.js';
@@ -65,6 +76,12 @@ async function renderRoute() {
     // mobile shell replaces the desktop one entirely. So the styling hook
     // follows the page that renders rather than a repeated list of routes.
     delete document.documentElement.dataset.authPage;
+  // The auth overlay is mounted on <body> so that shell visibility rules cannot
+  // collapse it (see the note in pages-public.js). Clearing the view region
+  // therefore no longer removes it, so drop a leftover overlay here. Every
+  // render passes through this point, which covers both re-rendering another
+  // auth route and navigating away from one.
+  for (const stray of document.querySelectorAll('body > .auth-page')) stray.remove();
   // Session state as a styling hook. Without a session there is no rail and
   // no context sidebar to render, but the desktop shell is still a fixed
   // three-column grid - so a signed-out visitor on any non-static route
@@ -189,7 +206,7 @@ async function renderRoute() {
     return;
   }
   if (path.startsWith('/menu')) {
-    await Workspace.renderMenu(region);
+    await renderMenu(region);
     renderAllChrome();
     return;
   }
@@ -251,7 +268,7 @@ async function renderRoute() {
 
   // --- servers -----------------------------------------------------
   if (path.startsWith('/servers/new')) {
-    await Workspace.renderNewServer(region);
+    await renderNewServer(region);
     renderAllChrome();
     return;
   }
@@ -260,38 +277,38 @@ async function renderRoute() {
     const what = parts[2];
     if (what === 'channel' && parts[3] && parts[4] === 'pins') {
       setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
-      await Workspace.renderChannelPins(region, serverId, parts[3]);
+      await renderChannelPins(region, serverId, parts[3]);
       renderAllChrome();
       return;
     }
     if (what === 'channel' && parts[3]) {
       setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
-      await Workspace.renderChannel(region, serverId, parts[3]);
+      await renderChannel(region, serverId, parts[3]);
       renderAllChrome();
       return;
     }
     if (what === 'channels') { // /server/:id/channels/new
-      await Workspace.renderNewChannel(region, serverId);
+      await renderNewChannel(region, serverId);
       renderAllChrome();
       return;
     }
     if (what === 'invites') {
-      await Workspace.renderInvites(region, serverId);
+      await renderInvites(region, serverId);
       renderAllChrome();
       return;
     }
     if (what === 'members') {
-      await Workspace.renderServerMembers(region, serverId);
+      await renderServerMembers(region, serverId);
       renderAllChrome();
       return;
     }
     if (what === 'roles') {
-      await Workspace.renderServerRoles(region, serverId);
+      await renderServerRoles(region, serverId);
       renderAllChrome();
       return;
     }
     if (what === 'categories') {
-      await Workspace.renderServerCategories(region, serverId);
+      await renderServerCategories(region, serverId);
       renderAllChrome();
       return;
     }
@@ -299,18 +316,18 @@ async function renderRoute() {
       // Sections live under /server/:id/settings/<section> so each one is
       // linkable and the back button behaves. An unknown section falls back to
       // the overview rather than rendering a blank page.
-      const known = ['overview', 'structure', 'members', 'roles', 'invites', 'moderation', 'ownership'];
+      const known = ['overview', 'appearance', 'structure', 'members', 'roles', 'invites', 'moderation', 'ownership'];
       const section = parts[3] && known.includes(parts[3]) ? parts[3] : 'overview';
-      await Workspace.renderServerSettings(region, serverId, section);
+      await renderServerSettings(region, serverId, section);
       renderAllChrome();
       return;
     }
     if (parts.length === 2) {
-      await Workspace.renderServerLanding(region, serverId);
+      await renderServerLanding(region, serverId);
       renderAllChrome();
       return;
     }
-    await Workspace.renderServerLanding(region, serverId);
+    await renderServerLanding(region, serverId);
     renderAllChrome();
     return;
   }

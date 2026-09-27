@@ -47,6 +47,10 @@ function tables(engine) {
       join_code       VARCHAR(64) UNIQUE NOT NULL,
       is_public       INTEGER NOT NULL DEFAULT 0,
       is_discoverable INTEGER NOT NULL DEFAULT 1,
+      -- Community identity media, served from the authenticated media route
+      -- like a user avatar. Nullable: most communities never set one.
+      icon_url        VARCHAR(512),
+      banner_url      VARCHAR(512),
       created_at      VARCHAR(64) NOT NULL,
       enforcement_state VARCHAR(16),
       enforcement_reason TEXT,
@@ -93,7 +97,6 @@ function tables(engine) {
       position    INTEGER NOT NULL DEFAULT 0,
       permissions TEXT NOT NULL,
       is_default  INTEGER NOT NULL DEFAULT 0,
-      self_assign INTEGER NOT NULL DEFAULT 0,
       UNIQUE (server_id, name),
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     )${engine}`,
@@ -311,6 +314,17 @@ function tables(engine) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
 
+    `CREATE TABLE IF NOT EXISTS server_media (
+      id         VARCHAR(64) PRIMARY KEY,
+      server_id  VARCHAR(64) NOT NULL,
+      kind       VARCHAR(16) NOT NULL,
+      filename   VARCHAR(255) NOT NULL,
+      mime       VARCHAR(64) NOT NULL,
+      size       INTEGER NOT NULL DEFAULT 0,
+      created_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+
     `CREATE TABLE IF NOT EXISTS reports (
       id         VARCHAR(64) PRIMARY KEY,
       reporter_id VARCHAR(64) NOT NULL,
@@ -429,15 +443,22 @@ const LEGACY_ALTERS = [
   ['servers', 'is_public', 'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0'],
   ['servers', 'is_discoverable', 'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1'],
   ['channels', 'category_id', 'ALTER TABLE channels ADD COLUMN category_id VARCHAR(64) REFERENCES categories(id) ON DELETE SET NULL'],
+  // Community identity media. Mirrored in MYSQL_ADD - an ADDED column is
+  // needed on BOTH engines, because CREATE TABLE IF NOT EXISTS is a no-op on
+  // an existing database either way. Only the type-normalisation entries in
+  // MYSQL_MODIFY are engine-specific.
+  ['servers', 'icon_url', 'ALTER TABLE servers ADD COLUMN icon_url VARCHAR(512)'],
+  ['servers', 'banner_url', 'ALTER TABLE servers ADD COLUMN banner_url VARCHAR(512)'],
   ['users', 'terms_version', 'ALTER TABLE users ADD COLUMN terms_version VARCHAR(16)'],
   ['users', 'privacy_version', 'ALTER TABLE users ADD COLUMN privacy_version VARCHAR(16)'],
   ['users', 'terms_accepted_at', 'ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64)'],
   ['users', 'password_changed_at', 'ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64)'],
   ['users', 'sessions_invalidated_at', 'ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64)'],
-  // Self-assignable roles. A member may add/remove one of these on themselves
-  // from the member list without holding MANAGE_ROLES. Default 0 so every role
-  // that exists today keeps its current meaning: opt-in, never opt-out.
-  ['roles', 'self_assign', 'ALTER TABLE roles ADD COLUMN self_assign INTEGER NOT NULL DEFAULT 0'],
+  // Self-assignable roles are gone: there is no self_assign column, no
+  // self-role endpoint, and no role picker. Roles are assigned by authorised
+  // community staff and nothing else. A database created before this still has
+  // the column, so it is dropped below rather than left as dead state that a
+  // future reader could mistake for a supported feature.
   // SQLite cannot ADD COLUMN ... UNIQUE. The email column is created without
   // the constraint here; uniqueness is enforced by a UNIQUE index below.
   ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255)'],
@@ -475,6 +496,18 @@ const LEGACY_ALTERS = [
 // Existing MySQL databases may already have these stored as TEXT. Convert
 // before creating the indexes. MODIFY only runs while DATA_TYPE is still
 // 'text'; once VARCHAR it is skipped, so this is naturally idempotent.
+// Columns that used to exist and must not. Removing a feature is not complete
+// while its column survives in an existing database: a reader of that schema
+// would reasonably assume the feature is still supported.
+//
+// SQLite only learned ALTER TABLE ... DROP COLUMN in 3.35 (2021). Where the
+// bundled SQLite is older the drop is skipped and the column is simply unused -
+// it is never read or written, so this is inert, not a second code path. Both
+// engines therefore treat a failure here as "already gone".
+const LEGACY_DROPS = [
+  ['roles', 'self_assign'],
+];
+
 const MYSQL_MODIFY = [
   ['users', 'created_at', 'ALTER TABLE users MODIFY COLUMN created_at VARCHAR(64) NOT NULL'],
   ['servers', 'created_at', 'ALTER TABLE servers MODIFY COLUMN created_at VARCHAR(64) NOT NULL'],
@@ -520,12 +553,14 @@ const MYSQL_ADD = [
   // cannot silently drift apart again.
   ['servers', 'is_public', 'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0'],
   ['servers', 'is_discoverable', 'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1'],
+  // Community identity media. Mirrored in LEGACY_ALTERS.
+  ['servers', 'icon_url', 'ALTER TABLE servers ADD COLUMN icon_url VARCHAR(512)'],
+  ['servers', 'banner_url', 'ALTER TABLE servers ADD COLUMN banner_url VARCHAR(512)'],
   // Declared without the foreign key, matching every other entry in this
   // list: the column is nullable (categories are optional) and the app already
   // treats a NULL category as "no category". The constraint exists on
   // databases created from the base DDL.
   ['channels', 'category_id', 'ALTER TABLE channels ADD COLUMN category_id VARCHAR(64)'],
-  ['roles', 'self_assign', 'ALTER TABLE roles ADD COLUMN self_assign INTEGER NOT NULL DEFAULT 0'],
   ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
   // Canonical ordering + idempotency. Types must match the base DDL exactly,
   // or the unique indexes built afterwards would index a different type than
@@ -659,6 +694,19 @@ async function applySchema(conn) {
     await conn.exec(ddl);
   }
 
+  // Retire columns that belong to removed features. After the base DDL, so the
+  // table is guaranteed to exist: on a fresh database there is nothing to drop,
+  // and on an existing one the column goes. Best effort, because a column that
+  // is already gone - or a SQLite older than 3.35, which cannot drop one - is
+  // not an error. The code never reads or writes it either way.
+  for (const [table, column] of LEGACY_DROPS) {
+    try {
+      await conn.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+    } catch {
+      // Already absent, or unsupported here. Inert either way.
+    }
+  }
+
   // SQLite legacy migrations: run only when the column does not exist.
   if (dialect === 'sqlite') {
     for (const [table, column, ddl] of LEGACY_ALTERS) {
@@ -755,5 +803,5 @@ module.exports = {
   // lists describe the same schema changes and have to agree; the test needs to
   // read both to prove that, and exporting them keeps the check honest rather
   // than re-parsing this file.
-  MIGRATIONS: { LEGACY_ALTERS, MYSQL_MODIFY, MYSQL_ADD },
+  MIGRATIONS: { LEGACY_ALTERS, LEGACY_DROPS, MYSQL_MODIFY, MYSQL_ADD },
 };

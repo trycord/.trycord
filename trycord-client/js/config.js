@@ -33,6 +33,22 @@ function plausibleUrl(u) {
   return /^https?:\/\//i.test(t) ? t : null;
 }
 
+// Is this page served from the desktop app's own custom scheme?
+//
+// The distinction matters for error reporting. From trycord://app every backend
+// call is cross-origin, and the backend has to allowlist that scheme explicitly
+// — a browser or a static host never has to. So a failed probe from here is far
+// more likely to be a missing CLIENT_ORIGIN entry than a dead host, and saying
+// so saves the reader a debugging session.
+function looksLikeAppOrigin() {
+  try {
+    const p = String(location.protocol || '').toLowerCase();
+    return p.length > 1 && p !== 'http:' && p !== 'https:' && p !== 'file:';
+  } catch {
+    return false;
+  }
+}
+
 function readRuntimeConfig() {
   try {
     return window.TRYCORD_CONFIG && typeof window.TRYCORD_CONFIG === 'object' ? window.TRYCORD_CONFIG : {};
@@ -162,6 +178,12 @@ export const TrycordConfig = {
   // Probe a backend candidate: must be http(s), reachable, and speak the
   // Trycord API (answers /api/instance with JSON). Never throws — returns
   // { ok, name } or { ok: false, error } for the selector UI.
+  //
+  // A cross-origin fetch that fails is ambiguous from inside the browser: DNS,
+  // TLS, a dead host, a firewall and a CORS refusal all surface as the same
+  // TypeError. The one case worth naming is the desktop app talking to a
+  // backend that has not allowlisted trycord://app, because the fix is a single
+  // env var and the generic "network error or CORS refusal" hides it.
   async testBackend(url, timeoutMs = 10000) {
     const v = plausibleUrl(url);
     if (!v) return { ok: false, error: 'Enter a valid http(s) URL, e.g. https://api.example.com' };
@@ -175,6 +197,13 @@ export const TrycordConfig = {
       return { ok: true, name: info.name || info.instanceId || 'Trycord backend' };
     } catch (e) {
       if (e && e.name === 'AbortError') return { ok: false, error: 'Connection timed out — check the URL and your network.' };
+      if (looksLikeAppOrigin()) {
+        return {
+          ok: false,
+          error: 'The backend refused this app’s origin. Add trycord://app to CLIENT_ORIGIN '
+            + 'on that server (and restart it), then test again.',
+        };
+      }
       return { ok: false, error: 'Cannot reach that backend (network error or CORS refusal).' };
     } finally {
       clearTimeout(timer);

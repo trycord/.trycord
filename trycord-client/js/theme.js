@@ -336,9 +336,6 @@ const PROTECTED_CLASSES = new Set([
   'server-chip', 'channel-category', 'place-header',
   'place-menu', 'place-actions', 'community-actions',
   'member-group', 'msg', 'msg-actions', 'composer',
-  // Self-assignable roles: the member-row pill, its picker rows, and the
-  // toggle in the role editor.
-  'member-roles-pill', 'self-role', 'role-selfassign',
   // Overlays + controls.
   'auth-wrap', 'card', 'card--auth', 'form-error', 'form-success', 'btn',
   // Dedicated auth pages: the full-viewport shell, its card and the two panels.

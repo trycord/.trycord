@@ -57,23 +57,51 @@ router.get('/permissions', requireMember, (req, res) => {
   });
 });
 
-// The role list is the one place a client needs both "what roles exist" and
-// "which of them do I already have" - the self-assign picker is useless
-// without the second half, and making it a separate call would be a round trip
-// on every surface that shows a role list. Annotation is strictly about the
-// caller: per-member roles still come from the roster endpoint.
+// The role list is the one place a client needs every role that exists, with
+// the caller's own memberships marked. Annotation is strictly about the caller:
+// per-member roles still come from the roster endpoint.
+//
+// There is no self-assign concept here. `mine` exists so the assignment
+// surfaces can show what the caller already holds; it is not a grant path.
 router.get('/', requireMember, async (req, res, next) => {
   try {
     const list = await roles.list(req.server.id);
     const mine = new Set((await roles.userRoles(req.user.id, req.server.id)).map((r) => String(r.id)));
-    res.json(list.map((r) => ({ ...r, selfAssigned: mine.has(String(r.id)) })));
+    res.json(list.map((r) => ({ ...r, heldByCaller: mine.has(String(r.id)) })));
   } catch (e) { next(e); }
 });
 
+// Permission delegation is bounded by what the actor already holds.
+//
+// MANAGE_ROLES answers "may you administer roles at all", not "may you hand out
+// anything". Without this a moderator with a narrow grant creates a role
+// carrying MANAGE_SERVER - or the literal '*' - and promotes themselves in one
+// step. The owner holds '*' and is therefore unrestricted; everyone else may
+// only build from permissions they already have.
+function assertDelegable(req, requested) {
+  const perms = Array.isArray(requested) ? requested : [];
+  if (!perms.length) return;
+  if (req.access && req.access.isOwner) return;
+  return effectivePermissions(req.user.id, req.server.id).then((held) => {
+    if (held.has('*')) return;
+    // '*' is the owner's wildcard and is never delegable by anyone else.
+    const forbidden = perms.filter((p) => p === '*' || !held.has(p));
+    if (forbidden.length) {
+      throw {
+        code: 'PERMISSION_DENIED',
+        message: 'you cannot grant permissions you do not have',
+        detail: { permissions: forbidden },
+      };
+    }
+  });
+}
+
 router.post('/', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, res, next) => {
   try {
-    const { name, permissions, color, selfAssign } = req.body || {};
-    const role = await roles.create(req.server.id, { name, permissions, color, selfAssign });
+    const { name, permissions, color } = req.body || {};
+    try { await assertDelegable(req, permissions); }
+    catch (e) { return serviceError(res, e); }
+    const role = await roles.create(req.server.id, { name, permissions, color });
     events.emit(req.server.id, 'role_created', { role });
     res.json(role);
   } catch (e) { serviceError(res, e); }
@@ -86,8 +114,13 @@ router.patch('/:roleId', auth.requireVerified, requirePerm('MANAGE_ROLES'), asyn
     try {
       await assertAssignable(req, role);
     } catch (e) { return serviceError(res, e); }
-    const { name, permissions, color, selfAssign } = req.body || {};
-    const updated = await roles.update(role, { name, permissions, color, selfAssign });
+    const { name, permissions, color } = req.body || {};
+    // Check the permissions being ADDED, not the final set: widening a role
+    // into authority the actor lacks is the escalation, and comparing against
+    // the role's existing permissions would miss exactly that case.
+    try { await assertDelegable(req, permissions); }
+    catch (e) { return serviceError(res, e); }
+    const updated = await roles.update(role, { name, permissions, color });
     events.emit(req.server.id, 'role_updated', { role: updated });
     res.json(updated);
   } catch (e) { serviceError(res, e); }
@@ -151,49 +184,6 @@ router.delete('/:roleId/assign/:userId', auth.requireVerified, requirePerm('MANA
     events.emit(req.server.id, 'member_roles_updated', { userId: String(req.params.userId) });
     res.json(out);
   } catch (e) { next(e); }
-});
-
-// Self-assignable roles. Deliberately NOT gated on MANAGE_ROLES - that is the
-// entire point, a plain member needs to be able to pick up a colour or a
-// notification role for themselves. Only the caller's own membership row is
-// ever touched; there is no userId in the request and none is read from the
-// body, so this cannot be pointed at somebody else.
-router.post('/:roleId/self', requireMember, async (req, res, next) => {
-  try {
-    const role = await roles.get(req.params.roleId);
-    if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
-    if (!role.self_assign) {
-      return fail(res, 'PERMISSION_DENIED', 'that role is not available for self-assignment');
-    }
-
-    const already = await roles.userHasRole(req.server.id, req.user.id, role.id);
-    // Explicit when the caller sends one, otherwise toggle. The client sends
-    // the target state so a retry cannot flip a role the other way.
-    const want = (req.body && req.body.on !== undefined) ? !!req.body.on : !already;
-
-    if (want && !already) {
-      // Turning a role ON is the only direction that can ever grant access, so
-      // that is the only direction that needs checking. A self-assignable
-      // role must not carry a permission the member does not already hold
-      // through their own roles: otherwise one misconfigured flag hands every
-      // member on the server an escalation, and "self-assign" quietly becomes
-      // "self-promote". Colour/notification roles grant nothing and are
-      // unaffected. effectivePermissions returns a Set, and the literal Set
-      // ['*'] for the owner, which already holds everything.
-      const held = await effectivePermissions(req.user.id, req.server.id);
-      const gained = held.has('*') ? [] : (role.permissions || []).filter((p) => !held.has(p));
-      if (gained.length) {
-        return fail(res, 'PERMISSION_DENIED', 'that role grants permissions you do not have',
-          undefined, { detail: { permissions: gained } });
-      }
-    }
-
-    if (want) await roles.assign(req.server.id, req.user.id, role.id);
-    else await roles.unassign(req.server.id, req.user.id, role.id);
-
-    events.emit(req.server.id, 'member_roles_updated', { userId: String(req.user.id) });
-    res.json({ ok: true, roleId: String(role.id), on: want });
-  } catch (e) { serviceError(res, e); }
 });
 
 module.exports = router;

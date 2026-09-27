@@ -102,17 +102,33 @@ async function list(serverId, { limit = null, offset = 0, search = '' } = {}) {
   for (const r of roleRows) {
     (byUser[r.user_id] = byUser[r.user_id] || []).push({ id: r.id, name: r.name, color: r.color || null });
   }
-  // Note: an extra `total` property here would be silently dropped by
-  // JSON.stringify, so a paged caller cannot learn the true roster size from
-  // this array response. Exposing a total properly means changing the
-  // envelope to { items, total }, which is a contract change - deliberately
-  // not done here.
-  return members.map((m) => ({
-    ...m,
-    is_owner: !!m.is_owner,
-    is_bot: !!m.is_bot,
-    roles: byUser[m.id] || [],
-  }));
+
+  // The roster is paged, so a bare array cannot answer "how many members are
+  // there" or "is there another page" - and a `total` property hung off an
+  // array would be dropped by JSON.stringify, which is precisely the bug that
+  // made the count unknowable to a client. The response is an envelope:
+  //   { items, total, hasMore, limit, offset }
+  // `total` counts everything matching the same filter, not just the page, so
+  // a filtered roster reports the filtered total.
+  const totalRow = await db.get(
+    `SELECT COUNT(*) AS n FROM server_members m JOIN users u ON u.id = m.user_id
+     WHERE m.server_id = ? ${q ? 'AND (u.username LIKE ? OR u.display_name LIKE ? OR m.nickname LIKE ?)' : ''}`,
+    q ? [serverId, like, like, like] : [serverId]
+  );
+  const total = totalRow ? parseInt(totalRow.n, 10) : members.length;
+
+  return {
+    items: members.map((m) => ({
+      ...m,
+      is_owner: !!m.is_owner,
+      is_bot: !!m.is_bot,
+      roles: byUser[m.id] || [],
+    })),
+    total,
+    hasMore: cap === null ? false : (off + members.length) < total,
+    limit: cap,
+    offset: off,
+  };
 }
 
 async function joinInner(serverId, userId, username, conn) {
@@ -131,7 +147,7 @@ async function joinInner(serverId, userId, username, conn) {
     'INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)',
     [uuid(), userId, serverId, username, now()]
   );
-  await roles.ensureDefault(serverId, userId, conn);
+  await roles.ensureBaseline(serverId, userId, conn);
   return { serverId };
 }
 
