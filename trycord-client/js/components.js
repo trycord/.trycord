@@ -75,7 +75,10 @@ export function loadAuthedImage(path) {
   if (hit) return hit;
   const p = (async () => {
     try {
-      const res = await Api.fetchProfileImage(path);
+      // Generic: profile media and community media are both "GET this
+      // authenticated path, get bytes". One loader and one cache for both,
+      // keyed by the path the server handed us.
+      const res = await Api.fetchAuthedImage(path);
       let mime = 'application/octet-stream';
       try {
         const h = res.headers && res.headers.get ? res.headers.get('content-type') : null;
@@ -134,12 +137,38 @@ export function realmTitle(text) {
 // Community mark. Communities have no stored icon, so identity is derived
 // deterministically from the name (same palette as avatars) and the initial
 // is shown. Used by the rail and the community header.
-export function communityMark(name, { size = '' } = {}) {
-  return el('span', {
+// The community's identity mark: its icon when it has one, otherwise a
+// coloured initial. Reads both casings of the url because the roster and
+// server-detail shapes differ, exactly as avatar() does.
+//
+// The bytes are behind the authenticated media route, so the upgrade path is
+// the same fetch-with-session-then-blob-URL as an avatar.
+export function communityIconUrl(server) {
+  if (!server) return null;
+  return server.iconUrl || server.icon_url || null;
+}
+
+export function communityBannerUrl(server) {
+  if (!server) return null;
+  return server.bannerUrl || server.banner_url || null;
+}
+
+export function communityMark(name, { size = '', server = null } = {}) {
+  const mark = el('span', {
     class: 'community-mark' + (size ? ' ' + size : ''),
     style: { background: hashColor(name) },
     'aria-hidden': 'true',
   }, initialOf(name));
+  const src = communityIconUrl(server || (name && typeof name === 'object' ? name : null));
+  if (src) {
+    loadAuthedImage(src).then((url) => {
+      if (!url || !mark.isConnected) return;
+      mark.classList.add('has-img');
+      mark.textContent = '';
+      mark.appendChild(el('img', { class: 'community-mark__img', src: url, alt: '', loading: 'lazy' }));
+    });
+  }
+  return mark;
 }
 
 // Sidebar group: a labelled, optionally collapsible section. Collapsed state
@@ -216,7 +245,12 @@ export function serverChip(server, { active = false, onClick } = {}) {
     onClick,
     dataset: { serverId: server.id },
   });
-  chip.appendChild(el('span', { class: 'chip-badge' }, initialOf(server.name)));
+  // The rail is the one surface that most needs the community's own icon, and
+  // it was the one surface that ignored it: it rendered `initialOf(name)` and
+  // nothing else, so an uploaded icon appeared in the community header and
+  // discover but never here. communityMark already resolves icon_url through
+  // the authenticated loader, so use it rather than a second implementation.
+  chip.appendChild(communityMark(server.name || '?', { size: 'community-mark--chip', server }));
   chip.appendChild(el('span', { class: 'chip-name' }, server.name));
   if (server.is_owner) chip.appendChild(el('span', { class: 'chip-live', title: 'You own this server' }, '★'));
   return chip;

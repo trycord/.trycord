@@ -7,7 +7,7 @@ const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const enforcement = require('../services/enforcement');
 const uploads = require('../services/uploads');
-const multer = require('multer');
+const { singleImage } = require('../middleware/upload');
 
 let gateway = { getPresence: null };
 function setGateway(gw) {
@@ -16,11 +16,6 @@ function setGateway(gw) {
 
 const router = express.Router();
 router.use(auth);
-
-const memory = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: uploads.MAX_SIZE, files: 1 },
-});
 
 function publicUser(row) {
   return {
@@ -100,16 +95,8 @@ router.patch('/me', async (req, res, next) => {
 });
 
 // --- profile media (avatars / banners) -------------------------------------
-
-function singleImage(req, res, next) {
-  memory.single('file')(req, res, (err) => {
-    if (err && err.code === 'LIMIT_FILE_SIZE') {
-      return fail(res, 'VALIDATION_ERROR', 'file is too large (max 8 MB)');
-    }
-    if (err) return next(err);
-    next();
-  });
-}
+// singleImage now lives in middleware/upload so the profile and community
+// image routes share one definition of the field name and the size limit.
 
 function profileImageRoute(kind) {
   return async (req, res, next) => {

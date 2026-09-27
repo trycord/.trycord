@@ -210,7 +210,14 @@ function createWindow() {
             && !document.getElementById('desktop-shell').hidden;
           const mobile = !!document.getElementById('mobile-shell')
             && !document.getElementById('mobile-shell').hidden;
-          const rail = document.querySelectorAll('#global-navigation .nav-row[data-nav]').length;
+          // The rail renders into #community-navigation; #global-navigation is
+          // a landmark kept empty for assistive tech. Count the five global
+          // destinations by name rather than by index, so adding a rail entry
+          // (the community-creation action already lives here) does not break it.
+          const wanted = ['Home', 'Direct messages', 'Notifications', 'Discover', 'Friends'];
+          const labels = [...document.querySelectorAll('#community-navigation .rail-nav-item')]
+            .map(b => b.getAttribute('data-label'));
+          const rail = wanted.filter(w => labels.includes(w)).length;
           const title = (document.getElementById('context-title') || {}).textContent || '';
           const homeEnvironment = !!document.querySelector('#view-root .home-environment');
           const pres = (typeof window.TrycordPresentation !== 'undefined')
@@ -219,8 +226,10 @@ function createWindow() {
           // plain text even though the DOM looks right.
           const rules = document.styleSheets.length ? document.styleSheets[0].cssRules.length : -1;
           const bodyBg = getComputedStyle(document.body).backgroundColor;
-          const spinePos = getComputedStyle(document.getElementById('presence-spine')).position;
-          return 'desk-shell-visible=' + desk + ' mobile-shell-visible=' + mobile + ' rail-tabs=' + rail + ' title=' + title + ' home-environment=' + (homeEnvironment ? 'yes' : 'no') + ' presentation=' + pres + ' hash=' + location.hash + ' cssRules=' + rules + ' body-bg=' + bodyBg + ' spine-pos=' + spinePos;
+          // The rail must actually be laid out by the stylesheet, not collapsed
+          // to nothing by a broken grid.
+          const railW = Math.round(document.getElementById('community-navigation').getBoundingClientRect().width);
+          return 'desk-shell-visible=' + desk + ' mobile-shell-visible=' + mobile + ' rail-tabs=' + rail + ' title=' + title + ' home-environment=' + (homeEnvironment ? 'yes' : 'no') + ' presentation=' + pres + ' hash=' + location.hash + ' cssRules=' + rules + ' body-bg=' + bodyBg + ' rail-width=' + railW;
         })()`);
         console.log('[smoke] home: ' + out);
         // rail-tabs counts the global destinations (Home/DMs/Notifications/Discover/Friends).
@@ -238,8 +247,15 @@ function createWindow() {
           console.log('[smoke] FAIL design tokens did not apply');
           process.exitCode = 1;
         }
+        const railWidth = String(out).match(/rail-width=(\d+)/);
+        if (!railWidth || parseInt(railWidth[1], 10) < 40) {
+          console.log('[smoke] FAIL the rail has no width (styles did not lay the shell out)');
+          process.exitCode = 1;
+        }
         const navOut = await win.webContents.executeJavaScript(`(async () => {
-          const btn = document.querySelector('#global-navigation [data-href="#/discover"]');
+          // Rail buttons carry data-label and route on click; there is no
+          // data-href on them.
+          const btn = document.querySelector('#community-navigation .rail-nav-item[data-label="Discover"]');
           if (!btn) return 'NAV-BUTTON-MISSING';
           btn.click();
           await new Promise((res) => setTimeout(res, 1500));

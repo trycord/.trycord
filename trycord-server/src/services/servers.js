@@ -9,7 +9,8 @@ const { effectivePermissions, isKnown } = require('./permissions');
 
 const LIST_COLS = `
   s.id, s.name, s.description, s.owner_id, s.join_code,
-  s.is_public, s.is_discoverable, s.created_at, s.enforcement_state,
+  s.is_public, s.is_discoverable, s.icon_url, s.banner_url, s.created_at,
+  s.enforcement_state,
   (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count,
   (SELECT COUNT(*) FROM channels c WHERE c.server_id = s.id) AS channel_count,
   (SELECT MAX(m2.created_at) FROM messages m2
@@ -76,9 +77,10 @@ async function create({ name, description, joinCode, isPublic, isDiscoverable },
         'INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)',
         [uuid(), owner.id, serverId, owner.username, now()]
       );
+      // Seeds the single @everyone baseline. The owner is NOT given a role:
+      // ownership itself grants every permission, so an extra role would be
+      // redundant at best and misleading at worst.
       await roles.createDefaults(serverId, t);
-      const admin = await roles.byName(serverId, 'Admin');
-      if (admin) await roles.assign(serverId, owner.id, admin.id, t);
       const catId = uuid();
       await t.run('INSERT INTO categories (id, server_id, name, position) VALUES (?, ?, ?, ?)', [catId, serverId, 'Text Channels', 0]);
       const channelId = uuid();
@@ -190,40 +192,26 @@ async function transferOwnership(serverId, actorId, targetUserId) {
       throw { code: 'NOT_A_MEMBER', message: 'the new owner must already be a member of this community' };
     }
 
-    // Promote the new owner above every existing role, then give the old
-    // owner a plain member role so they keep access without authority.
-    const top = await roles.topPosition(serverId, target, t);
-    const admin = await t.get(
-      "SELECT id FROM roles WHERE server_id = ? AND is_default = 0 ORDER BY position DESC LIMIT 1",
-      [serverId]
-    );
-    if (admin) {
-      await t.run(
-        'UPDATE roles SET position = ? WHERE id = ? AND position <= ?',
-        [Number(top) + 1, admin.id, Number(top)]
-      );
-      await t.run(
-        'INSERT ' + (t.dialect === 'mysql' ? 'IGNORE' : 'OR IGNORE') +
-        ' INTO member_roles (server_id, user_id, role_id) VALUES (?, ?, ?)',
-        [serverId, target, admin.id]
-      );
-    }
-    const fallback = await t.get(
+    // The new owner inherits every permission from ownership alone, so there
+    // is no role to hand them: granting the top custom role would only give
+    // away power they already have and would make it look revocable.
+    //
+    // The outgoing owner keeps the community baseline and nothing else.
+    // Without this they would retain whatever authority they had been holding,
+    // which is not what transferring means.
+    const baseline = await t.get(
       'SELECT id FROM roles WHERE server_id = ? AND is_default = 1 LIMIT 1',
       [serverId]
     );
-    if (fallback) {
-      // Drop any elevated roles the outgoing owner held, then leave them with
-      // the default role only. Without this the "old owner" would keep
-      // whatever power they had, which is not what transferring means.
+    if (baseline) {
       await t.run(
         'DELETE FROM member_roles WHERE server_id = ? AND user_id = ? AND role_id <> ?',
-        [serverId, actorId, fallback.id]
+        [serverId, actorId, baseline.id]
       );
       await t.run(
         'INSERT ' + (t.dialect === 'mysql' ? 'IGNORE' : 'OR IGNORE') +
         ' INTO member_roles (server_id, user_id, role_id) VALUES (?, ?, ?)',
-        [serverId, actorId, fallback.id]
+        [serverId, actorId, baseline.id]
       );
     }
 

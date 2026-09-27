@@ -107,20 +107,50 @@ function originCovers(pattern, origin) {
   return label.length > 0 && !label.includes('.');
 }
 
+// The desktop app's own origin. Registered as a privileged scheme in the
+// Electron main process, so it has a real, non-opaque origin — which means the
+// backend must allowlist it by name like any other client.
+const DESKTOP_ORIGIN = 'trycord://app';
+
+// Origins already explained, so a misconfiguration is logged once rather than
+// on every request.
+const refusedOrigins = new Set();
+
+function warnRefusedOrigin(origin, clientOrigins) {
+  if (refusedOrigins.has(origin)) return;
+  refusedOrigins.add(origin);
+  // The desktop app is the case that actually bites: it is a custom scheme, so
+  // it can never be inferred the way localhost or file: can.
+  if (origin.startsWith('trycord:')) {
+    console.warn(
+      '[warn] refused origin ' + origin + ' - this is the desktop app scheme. '
+      + 'Add it to CLIENT_ORIGIN, e.g. CLIENT_ORIGIN='
+      + (clientOrigins.length ? clientOrigins.join(',') + ',' : '')
+      + DESKTOP_ORIGIN
+    );
+    return;
+  }
+  console.warn('[warn] refused origin ' + origin + ' (not matched by CLIENT_ORIGIN)');
+}
+
 function corsOptions(clientOrigins) {
   return {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true); // curl, same-origin navigations, health probes
       if (clientOrigins.length) {
-        return cb(null, clientOrigins.some((p) => originCovers(p, origin)));
+        if (clientOrigins.some((p) => originCovers(p, origin))) return cb(null, true);
+        warnRefusedOrigin(origin, clientOrigins);
+        return cb(null, false);
       }
       try {
         const u = new URL(origin);
         const host = u.hostname;
         if (u.protocol === 'file:' || origin === 'null') return cb(null, true);
         if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return cb(null, true);
+        warnRefusedOrigin(origin, clientOrigins);
         return cb(new Error('CORS: origin not allowed'));
       } catch {
+        warnRefusedOrigin(origin, clientOrigins);
         return cb(new Error('CORS: origin not allowed'));
       }
     },
@@ -164,6 +194,21 @@ async function boot() {
       }
     } catch { /* publicUrl invalid; other paths handle it */ }
   }
+
+  // The desktop app cannot be inferred the way a browser origin can: it is a
+  // custom scheme, so it has to be allowlisted explicitly, and a backend that
+  // omits it answers every desktop request with a headerless 200 that the
+  // browser reports as an opaque network/CORS error. That is indistinguishable
+  // from a dead host at the client, which is why it survives to a bug report
+  // instead of being caught here. Say it at boot, once, for every deployment.
+  if (inst.clientOrigins.length && !inst.clientOrigins.some((p) => originCovers(p, DESKTOP_ORIGIN))) {
+    console.warn(
+      '[warn] CLIENT_ORIGIN does not include ' + DESKTOP_ORIGIN + ' — the Trycord desktop app '
+      + '(both the installer and the portable build) will NOT be able to reach this backend. '
+      + 'Add it, e.g. CLIENT_ORIGIN=' + inst.clientOrigins.join(',') + ',' + DESKTOP_ORIGIN
+    );
+  }
+
   await db.connect();
   console.log(`[info] database connected (${db.dialect})`);
 

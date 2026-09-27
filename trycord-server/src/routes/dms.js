@@ -56,31 +56,42 @@ router.get('/:id', async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
-// GET /api/dms/:id/messages?before=&limit= — older pages.
+// GET /api/dms/:id/messages?before=|after=&limit= — older pages, or forward
+// catch-up after a reconnect. `after` takes the highest seq the client holds;
+// `before` accepts a seq or a legacy message id.
 router.get('/:id/messages', async (req, res, next) => {
   try {
     res.json(await dms.history(req.user.id, req.params.id, {
       before: req.query.before || null,
+      after: req.query.after || null,
       limit: req.query.limit,
     }));
   } catch (e) { serviceError(res, e); }
 });
 
-// POST /api/dms/:id/messages { content } — persist, broadcast, notify.
+// POST /api/dms/:id/messages { content, clientNonce } — persist, broadcast,
+// notify. The nonce makes a retried submission collapse onto the row the
+// first attempt already wrote, so a lost response cannot duplicate a message.
 router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
-    const msg = await dms.send(req.user.id, req.user.username, req.params.id, (req.body || {}).content);
+    const msg = await dms.send(
+      req.user.id, req.user.username, req.params.id,
+      (req.body || {}).content, (req.body || {}).clientNonce
+    );
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(members, { type: 'dm:message', ...msg, conversationId: req.params.id });
     // Notify members who aren't connected right now (persisted; delivered
     // on reconnect). Online members already got the realtime event.
-    for (const id of members) {
-      if (String(id) === String(req.user.id)) continue;
-      try {
-        if (gateway.isOnline && gateway.isOnline(id)) continue;
-        const note = await notifications.create(id, 'dm', req.user.id, req.params.id);
-        gateway.sendToUser(id, { type: 'notification', notification: note });
-      } catch { /* notification failure must not fail the send */ }
+    // A deduped retry must not produce a second notification.
+    if (!msg.deduped) {
+      for (const id of members) {
+        if (String(id) === String(req.user.id)) continue;
+        try {
+          if (gateway.isOnline && gateway.isOnline(id)) continue;
+          const note = await notifications.create(id, 'dm', req.user.id, req.params.id);
+          gateway.sendToUser(id, { type: 'notification', notification: note });
+        } catch { /* notification failure must not fail the send */ }
+      }
     }
     res.json(msg);
   } catch (e) { serviceError(res, e); }

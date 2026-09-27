@@ -9,10 +9,15 @@ const notifications = require('../services/notifications');
 const router = express.Router();
 router.use(auth);
 
-// GET /api/notifications?limit= — newest first, with unread count.
+// GET /api/notifications?limit=&before= — newest first, with unread count.
+//
+// `before` is the opaque cursor returned as `nextCursor` by the previous page.
+// Passing it back walks one page further back; omitting it starts at the newest
+// notification. The unread count is the whole-account badge total, so it does
+// not shrink as the caller pages.
 router.get('/', async (req, res, next) => {
   try {
-    res.json(await notifications.list(req.user.id, req.query.limit));
+    res.json(await notifications.list(req.user.id, req.query.limit, req.query.before));
   } catch (e) { next(e); }
 });
 

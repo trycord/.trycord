@@ -5,6 +5,7 @@ import Api from './api.js';
 import { esc, el, clear, toast } from './ui.js';
 import State, { refreshServers, isAuthed } from './state.js';
 import { renderContextHeader } from './shell.js';
+import { communityMark } from './components.js';
 
 let page = 1;
 let pages = 1;
@@ -25,7 +26,7 @@ function serverCard(s, onClick) {
     class: 'row row--surface', type: 'button',
     onClick,
   });
-  const b = el('span', { class: 'chip-badge' }, (s.name || '?')[0].toUpperCase());
+  const b = communityMark(s.name || '?', { server: s });
   btn.appendChild(b);
   const m = el('div', { class: 'row-main' });
   m.appendChild(el('div', { class: 'row-title' }, s.name));

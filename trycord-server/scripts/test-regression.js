@@ -62,7 +62,7 @@ async function J(method, p, body, tok, form) {
   const ch2 = await J('POST', '/api/servers/' + sid + '/channels', { name: 'nope' }, B.token);
   ok('nonowner-create-channel-denied', ch2.status === 403);
   const memB = await J('GET', '/api/servers/' + sid + '/members', null, B.token);
-  ok('members-list', memB.status === 200 && memB.json.length === 2);
+  ok('members-list', memB.status === 200 && memB.json.items.length === 2 && memB.json.total === 2);
 
   // channels CRUD as owner
   const ch = await J('POST', '/api/servers/' + sid + '/channels', { name: 'regchan', topic: 't' }, A.token);

@@ -155,34 +155,69 @@ async function listMine(userId) {
 
 // Latest N messages, then older pages via before=<messageId>.
 // Deterministic order: (created_at, id), ascending for the client.
-async function history(userId, conversationId, { before = null, limit = 50 } = {}) {
+// Next canonical position within a conversation. The unique index on
+// (conversation_id, seq) is the authority: if two writers race onto the same
+// value, one insert loses with a constraint violation and retries against the
+// new maximum, so an ambiguous order can never be written.
+async function nextSeq(conversationId) {
+  const row = await db.get('SELECT COALESCE(MAX(seq), 0) AS m FROM dm_messages WHERE conversation_id = ?', [conversationId]);
+  return (row ? Number(row.m) : 0) + 1;
+}
+
+// Resolve a legacy cursor (message id) to its seq, scoped so an id from
+// another conversation cannot be used as an anchor here.
+async function resolveSeq(conversationId, id) {
+  const row = await db.get(
+    'SELECT seq FROM dm_messages WHERE id = ? AND conversation_id = ?',
+    [id, conversationId]
+  );
+  if (!row || row.seq === null || row.seq === undefined) return null;
+  return Number(row.seq);
+}
+
+// GET history. Mirrors the channel contract exactly: seq is the authoritative
+// order, `after` walks forward for reconnect catch-up, `before` walks back and
+// accepts either a seq or a legacy message id.
+//
+// The `before` anchor is resolved through resolveSeq rather than compared on
+// the (created_at, id) tuple, because the tuple is exactly the thing seq
+// replaced: two rows can share a created_at, and the old comparison made the
+// boundary depend on which one the storage engine returned first.
+async function history(userId, conversationId, { before = null, after = null, limit = 50 } = {}) {
   const seen = await visibleConversation(conversationId, userId);
   if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
   const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
+  const select = `SELECT dm.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
+       FROM dm_messages dm JOIN users u ON u.id = dm.author_id`;
   let rows;
-  if (before) {
-    const anchor = await db.get(
-      'SELECT created_at FROM dm_messages WHERE id = ? AND conversation_id = ?',
-      [before, conversationId]
-    );
-    if (!anchor) throw { code: 'NOT_FOUND', message: 'message not found' };
+  let forward = false;
+  if (after !== null && after !== undefined && after !== '') {
+    const from = Math.max(parseInt(after, 10) || 0, 0);
+    forward = true;
     rows = await db.all(
-      `SELECT dm.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
-       FROM dm_messages dm JOIN users u ON u.id = dm.author_id
-       WHERE dm.conversation_id = ? AND (dm.created_at < ? OR (dm.created_at = ? AND dm.id < ?))
-       ORDER BY dm.created_at DESC, dm.id DESC LIMIT ${lim}`,
-      [conversationId, anchor.created_at, anchor.created_at, before]
+      `${select} WHERE dm.conversation_id = ? AND dm.seq > ? ORDER BY dm.seq ASC LIMIT ${lim}`,
+      [conversationId, from]
+    );
+  } else if (before) {
+    const raw = String(before);
+    const anchorSeq = /^\d+$/.test(raw) ? Number(raw) : await resolveSeq(conversationId, raw);
+    if (anchorSeq === null) throw { code: 'NOT_FOUND', message: 'message not found' };
+    rows = await db.all(
+      `${select} WHERE dm.conversation_id = ? AND dm.seq < ? ORDER BY dm.seq DESC LIMIT ${lim}`,
+      [conversationId, anchorSeq]
     );
   } else {
     rows = await db.all(
-      `SELECT dm.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
-       FROM dm_messages dm JOIN users u ON u.id = dm.author_id
-       WHERE dm.conversation_id = ? ORDER BY dm.created_at DESC, dm.id DESC LIMIT ${lim}`,
+      `${select} WHERE dm.conversation_id = ? ORDER BY dm.seq DESC LIMIT ${lim}`,
       [conversationId]
     );
   }
-  return rows.reverse().map((m) => ({
+  // Normalise to oldest-first for the client. Only the backward page arrives
+  // newest-first.
+  if (!forward) rows.reverse();
+  return rows.map((m) => ({
     id: m.id,
+    seq: m.seq === null || m.seq === undefined ? null : Number(m.seq),
     conversationId: m.conversation_id,
     content: m.content,
     createdAt: m.created_at,
@@ -192,7 +227,7 @@ async function history(userId, conversationId, { before = null, limit = 50 } = {
   }));
 }
 
-async function send(userId, username, conversationId, content) {
+async function send(userId, username, conversationId, content, clientNonce = null) {
   const seen = await visibleConversation(conversationId, userId);
   if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
   const text = String((content === null || content === undefined) ? '' : content).trim();
@@ -200,16 +235,70 @@ async function send(userId, username, conversationId, content) {
   if (text.length > MAX_CONTENT) {
     throw { code: 'VALIDATION_ERROR', message: `message too long (max ${MAX_CONTENT} characters)` };
   }
-  const msg = { id: uuid(), conversation_id: conversationId, author_id: userId, content: text.slice(0, MAX_CONTENT), created_at: now() };
-  await db.transaction(async (t) => {
-    await t.run(
-      'INSERT INTO dm_messages (id, conversation_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)',
-      [msg.id, msg.conversation_id, msg.author_id, msg.content, msg.created_at]
+  const nonce = String(clientNonce || '').trim().slice(0, 64) || null;
+  const body = text.slice(0, MAX_CONTENT);
+
+  // Idempotency, same contract as channels: a retried submission carries the
+  // same nonce and gets the row the first attempt already wrote. Scoped to the
+  // conversation and never compared against content, so two genuinely
+  // identical messages are still two messages.
+  if (nonce) {
+    const existing = await db.get(
+      `SELECT dm.*, u.username AS author_name, u.display_name AS author_display
+       FROM dm_messages dm JOIN users u ON u.id = dm.author_id
+       WHERE dm.conversation_id = ? AND dm.client_nonce = ?`,
+      [conversationId, nonce]
     );
-    await t.run('UPDATE dm_conversations SET updated_at = ? WHERE id = ?', [msg.created_at, conversationId]);
-  });
+    if (existing) {
+      return {
+        id: existing.id,
+        seq: existing.seq === null || existing.seq === undefined ? null : Number(existing.seq),
+        conversationId: existing.conversation_id,
+        content: existing.content,
+        createdAt: existing.created_at,
+        editedAt: null,
+        authorId: existing.author_id,
+        authorName: username,
+        deduped: true,
+      };
+    }
+  }
+
+  const msg = { id: uuid(), conversation_id: conversationId, author_id: userId, content: body, created_at: now() };
+
+  // Insert with the canonical position, retrying on the (rare) race where a
+  // concurrent writer claimed the same seq first.
+  let inserted = false;
+  for (let attempt = 0; attempt < 5 && !inserted; attempt++) {
+    const seq = await nextSeq(conversationId);
+    try {
+      await db.transaction(async (t) => {
+        await t.run(
+          'INSERT INTO dm_messages (id, conversation_id, author_id, content, created_at, seq, client_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversation_id, msg.author_id, msg.content, msg.created_at, seq, nonce]
+        );
+        await t.run('UPDATE dm_conversations SET updated_at = ? WHERE id = ?', [msg.created_at, conversationId]);
+      });
+      msg.seq = seq;
+      inserted = true;
+    } catch (e) {
+      const dup = /unique/i.test(String(e && e.message)) || (e && e.code === 'SQLITE_CONSTRAINT');
+      if (!dup || attempt === 4) throw e;
+      // A unique violation on the nonce means a concurrent duplicate won.
+      if (nonce) {
+        const again = await db.get(
+          'SELECT id, seq FROM dm_messages WHERE conversation_id = ? AND client_nonce = ?',
+          [conversationId, nonce]
+        );
+        if (again) { msg.id = again.id; msg.seq = again.seq; inserted = true; }
+      }
+    }
+  }
+  if (!inserted) throw { code: 'CONFLICT', message: 'could not assign a message position, please retry' };
+
   return {
     id: msg.id,
+    seq: msg.seq,
     conversationId: msg.conversation_id,
     content: msg.content,
     createdAt: msg.created_at,

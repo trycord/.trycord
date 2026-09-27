@@ -12,8 +12,8 @@
 // checkboxes that silently lies.
 
 import Api from './api.js';
-import { el, clear, toast } from './ui.js';
-
+import { el, clear, toast, openModal } from './ui.js';
+import { can } from './state.js';
 const EFFECTS = [
   { id: 'inherit', label: 'Inherit', hint: 'Use what roles grant' },
   { id: 'allow', label: 'Allow', hint: 'Always allow here' },
@@ -135,4 +135,37 @@ export function permissionOverrideEditor(opts) {
     },
     get value() { return current; },
   };
+}
+
+// Open the override editor for one channel or category in a modal. Gated on
+// MANAGE_CHANNELS - the same permission that already authorises creating and
+// deleting the entity being edited - and rendered read-only for anyone who
+// lacks it, so the surface is visible rather than silently missing.
+
+export function openOverrideEditor({ kind, serverId, entityId, entityName }) {
+  const readOnly = !can('MANAGE_CHANNELS');
+  const editor = permissionOverrideEditor({ kind, serverId, entityId, readOnly });
+
+  const body = el('div', {});
+  if (readOnly) {
+    body.appendChild(el('div', { class: 'form-error' },
+      'You need Manage Channels permission to change these.'));
+  }
+  body.appendChild(editor.el);
+
+  const label = (kind === 'channel' ? 'Channel' : 'Category') + ': ' + entityName;
+  // A Done button, not an empty footer array: `footer: []` is truthy, so it
+  // renders an empty action row, and without `closable` there is no X either
+  // - leaving Escape as the only way out of the dialog.
+  const done = el('button', { class: 'btn primary', type: 'button' }, 'Done');
+  const modal = openModal({
+    title: 'Permissions',
+    eyebrow: label,
+    closable: true,
+    body,
+    footer: [done],
+  });
+  done.addEventListener('click', () => modal.close());
+  editor.load().catch(() => {});
+  return modal;
 }

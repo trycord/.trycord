@@ -231,6 +231,57 @@ async function removeProfileFile(urlOrId) {
   try { await db.run('DELETE FROM profile_media WHERE id = ?', [id]); } catch { /* row already gone */ }
 }
 
+// Community identity media (icon / banner). Same disk store and magic-byte
+// sniffing as profile media, with its own table and its own id prefix. The
+// prefix is load-bearing: the fetch route is authenticated, so a file id
+// arriving from the wire must not be able to name a message attachment.
+//
+// Any authenticated user may LOAD a community's icon or banner - it is public
+// identity, exactly like a user avatar, and the discover feed shows it to
+// people who are not members.
+const SERVER_MEDIA_KINDS = ['icon', 'banner'];
+
+async function storeServerMedia({ serverId, kind, buffer, originalName }) {
+  if (SERVER_MEDIA_KINDS.indexOf(kind) === -1) {
+    return { error: 'VALIDATION_ERROR', message: 'unknown community media kind' };
+  }
+  if (!buffer || buffer.length === 0) {
+    return { error: 'VALIDATION_ERROR', message: 'empty file' };
+  }
+  const mime = sniffBinary(buffer);
+  if (!mime) {
+    return { error: 'VALIDATION_ERROR', message: 'images must be PNG, JPEG, GIF, or WebP' };
+  }
+  const id = 'sv-' + uuid();
+  fs.writeFileSync(filePath(id), buffer);
+  try {
+    await db.run(
+      'INSERT INTO server_media (id, server_id, kind, filename, mime, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, serverId, kind, cleanFilename(originalName) || kind, mime, buffer.length, now()]
+    );
+  } catch (e) {
+    try { fs.unlinkSync(filePath(id)); } catch { /* nothing to clean */ }
+    throw e;
+  }
+  return { id, url: '/api/servers/media/' + id, mime, size: buffer.length, kind };
+}
+
+async function serverMedia(id) {
+  if (!/^sv-[a-f0-9-]{1,64}$/i.test(String(id || ''))) return null;
+  return db.get('SELECT * FROM server_media WHERE id = ?', [id]);
+}
+
+// Best-effort removal of a superseded community image. Accepts only sv- paths
+// so a malformed servers row can never delete a message attachment.
+async function removeServerFile(urlOrId) {
+  const s = String(urlOrId || '');
+  const idMatch = s.match(/^(?:.*\/)+?(sv-[a-f0-9-]{1,64})$/);
+  const id = idMatch ? idMatch[1] : (/^sv-[a-f0-9-]{1,64}$/i.test(s) ? s : null);
+  if (!id) return;
+  try { fs.unlinkSync(filePath(id)); } catch { /* already gone */ }
+  try { await db.run('DELETE FROM server_media WHERE id = ?', [id]); } catch { /* row already gone */ }
+}
+
 function ensureDir() {
   fs.mkdirSync(uploadsDir(), { recursive: true });
 }
@@ -244,6 +295,9 @@ module.exports = {
   storeProfileMedia,
   profileMedia,
   removeProfileFile,
+  storeServerMedia,
+  serverMedia,
+  removeServerFile,
   attachToMessage,
   getForMessage,
   getForMessages,

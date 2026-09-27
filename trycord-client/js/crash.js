@@ -41,8 +41,26 @@
       paintError('The app files changed while this window was open. Reload to pick up the latest build.');
     }
   });
+  // "Has the app painted anything?"
+  //
+  // This must name every root a view can legitimately render into, or a working
+  // app gets declared dead. The auth overlay is a third one: it is a
+  // position-fixed layer mounted straight on <body>, deliberately outside the
+  // view regions so the mobile/desktop shell cannot collapse it. Forgetting it
+  // here meant a perfectly good sign-in screen was covered by a crash panel
+  // nine seconds after load - in the desktop app and in the browser alike.
+  function hasRendered() {
+    try {
+      return !!document.querySelector(
+        '#view-root > *, #mobile-main > *, body > .auth-page, body > .popover'
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+
   setTimeout(function () {
-    if (!document.querySelector('#view-root > *, #mobile-main > *') &&
+    if (!hasRendered() &&
         !document.getElementById('trycord-crash') &&
         document.readyState === 'complete') {
       paintError('The page loaded but rendered nothing. Reload to retry.');
@@ -54,7 +72,7 @@
   // MutationObserver: zero polling cost, lives as long as the page.
   function heal() {
     try {
-      if (document.querySelector('#view-root > *, #mobile-main > *')) {
+      if (hasRendered()) {
         var e = document.getElementById('trycord-crash');
         if (e && e.parentNode) e.parentNode.removeChild(e);
       }

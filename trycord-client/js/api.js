@@ -129,6 +129,10 @@ const Api = {
   removeProfileImage: (kind) =>
     request('DELETE', kind === 'banner' ? '/api/users/me/banner' : '/api/users/me/avatar'),
   fetchProfileImage: (path) => request('GET', path, { raw: true }),
+  // Generic authenticated image fetch. Profile avatars/banners and community
+  // icons/banners are both "GET this path with the session, get bytes back", so
+  // one method serves both and the shared media cache can stay keyed by path.
+  fetchAuthedImage: (path) => request('GET', path, { raw: true }),
 
   // ---- servers -----------------------------------------------------------
   servers: () => request('GET', '/api/servers'),
@@ -136,7 +140,27 @@ const Api = {
   server: (id) => request('GET', '/api/servers/' + encodeURIComponent(id)),
   updateServer: (id, body) => request('PATCH', '/api/servers/' + encodeURIComponent(id), { body }),
   deleteServer: (id) => request('DELETE', '/api/servers/' + encodeURIComponent(id)),
-  serverMembers: (id) => request('GET', '/api/servers/' + encodeURIComponent(id) + '/members'),
+  // Paged. Returns the { items, total, hasMore, limit, offset } envelope.
+  serverMembers: (id, { limit, offset, q } = {}) => {
+    const p = new URLSearchParams();
+    if (limit !== undefined && limit !== null) p.set('limit', String(limit));
+    if (offset) p.set('offset', String(offset));
+    if (q) p.set('q', q);
+    const qs = p.toString();
+    return request('GET', '/api/servers/' + encodeURIComponent(id) + '/members' + (qs ? '?' + qs : ''));
+  },
+  // Community identity media. The bytes live behind the authenticated media
+  // route, so the client fetches them with the session and swaps in a blob URL
+  // - a bare <img src> would 401. Reading one uses the generic
+  // fetchAuthedImage, which is what the media cache calls.
+  setServerImage: (id, kind, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request('POST', '/api/servers/' + encodeURIComponent(id) + '/' + encodeURIComponent(kind),
+      { body: fd, form: true });
+  },
+  removeServerImage: (id, kind) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(id) + '/' + encodeURIComponent(kind)),
   leaveServer: (id) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/leave'),
   // Hand the community to another member. Owner-only, server-authorised.
   transferServer: (id, userId) =>
@@ -259,11 +283,9 @@ const Api = {
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId) + '/assign/' + encodeURIComponent(userId)),
   reorderRoles: (serverId, orderedIds) =>
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles/reorder', { body: { orderedIds } }),
-  // Add/remove one of the CALLER's own self-assignable roles. There is no
-  // userId parameter on purpose: the server only ever touches the caller's own
-  // membership row, so this cannot be aimed at another member.
-  selfAssignRole: (serverId, roleId, on) =>
-    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles/' + encodeURIComponent(roleId) + '/self', { body: { on: !!on } }),
+  // There is deliberately no self-assign call. Roles reach members only through
+  // assignRole/unassignRole below, which the server gates on MANAGE_ROLES and
+  // on the actor's own rank.
 
   // ---- invites ---------------------------------------------------------------------
   invites: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/invites'),
@@ -317,14 +339,21 @@ joinDiscover: (id) =>
   dms: () => request('GET', '/api/dms'),
   dm: (id) => request('GET', '/api/dms/' + encodeURIComponent(id)),
   openDm: (userId) => request('POST', '/api/dms', { body: { userId } }),
-  dmMessages: (id, { before, limit } = {}) => {
+  dmMessages: (id, { before, after, limit } = {}) => {
     const q = new URLSearchParams();
+    // `after` walks forward from a seq for reconnect catch-up; `before` walks
+    // back and accepts a seq or a legacy message id.
+    if (after !== undefined && after !== null && after !== '') q.set('after', String(after));
     if (before) q.set('before', before);
     if (limit) q.set('limit', String(limit));
     const qs = q.toString();
     return request('GET', '/api/dms/' + encodeURIComponent(id) + '/messages' + (qs ? '?' + qs : ''));
   },
-  sendDm: (id, content) => request('POST', '/api/dms/' + encodeURIComponent(id) + '/messages', { body: { content } }),
+  // clientNonce makes a retried send collapse onto the message the first
+  // attempt already wrote, so a lost response cannot duplicate it.
+  sendDm: (id, content, clientNonce) =>
+    request('POST', '/api/dms/' + encodeURIComponent(id) + '/messages',
+      { body: clientNonce ? { content, clientNonce } : { content } }),
   deleteDm: (id, messageId) =>
     request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId)),
   updateDm: (id, messageId, content) =>
@@ -341,7 +370,14 @@ joinDiscover: (id) =>
   removeFriend: (userId) => request('DELETE', '/api/friends/' + encodeURIComponent(userId)),
 
   // ---- notifications ----------------------------------------------------------------------
-  notifications: ({ limit = 30 } = {}) => request('GET', '/api/notifications?limit=' + limit),
+  // `before` is the opaque nextCursor from the previous page; omit it to start
+  // at the newest notification.
+  notifications: ({ limit = 30, before = null } = {}) => {
+    const q = new URLSearchParams();
+    q.set('limit', String(limit));
+    if (before) q.set('before', before);
+    return request('GET', '/api/notifications?' + q.toString());
+  },
   readAllNotifications: () => request('POST', '/api/notifications/read-all'),
   readNotification: (id) => request('POST', '/api/notifications/' + encodeURIComponent(id) + '/read'),
 

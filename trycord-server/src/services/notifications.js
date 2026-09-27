@@ -29,14 +29,59 @@ function shape(n, actor) {
   };
 }
 
-async function list(userId, limit) {
+// Keyset cursor for the notification list.
+//
+// Encoded as "<created_at>|<id>". created_at alone is not a usable anchor: it
+// is a timestamp with a resolution finer than a busy minute, so several
+// notifications can share it and an anchor on that value alone would either
+// skip the rest of the tie or loop forever. Pairing it with the primary key
+// makes the order total and the boundary exact, which is the same reason the
+// message tables moved to seq - the difference here is that notifications have
+// no existing counter, and adding one would mean a migration for a list that
+// is already ordered by an indexed column.
+function encodeCursor(row) {
+  return row ? row.created_at + '|' + row.id : null;
+}
+
+function decodeCursor(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  const s = String(raw);
+  const at = s.lastIndexOf('|');
+  if (at <= 0) return null;
+  const createdAt = s.slice(0, at);
+  const id = s.slice(at + 1);
+  if (!createdAt || !id) return null;
+  return { createdAt, id };
+}
+
+async function list(userId, limit, cursor) {
   const lim = Math.min(Math.max(parseInt(limit, 10) || 30, 1), 100);
-  const rows = await db.all(
-    `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display
-     FROM notifications n LEFT JOIN users u ON u.id = n.actor_id
-     WHERE n.user_id = ? ORDER BY n.created_at DESC LIMIT ${lim}`,
-    [userId]
-  );
+  const anchor = decodeCursor(cursor);
+
+  // One extra row tells us whether another page exists without a second count
+  // query.
+  let rows;
+  if (anchor) {
+    rows = await db.all(
+      `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display
+       FROM notifications n LEFT JOIN users u ON u.id = n.actor_id
+       WHERE n.user_id = ?
+         AND (n.created_at < ? OR (n.created_at = ? AND n.id < ?))
+       ORDER BY n.created_at DESC, n.id DESC LIMIT ${lim + 1}`,
+      [userId, anchor.createdAt, anchor.createdAt, anchor.id]
+    );
+  } else {
+    rows = await db.all(
+      `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display
+       FROM notifications n LEFT JOIN users u ON u.id = n.actor_id
+       WHERE n.user_id = ? ORDER BY n.created_at DESC, n.id DESC LIMIT ${lim + 1}`,
+      [userId]
+    );
+  }
+
+  const hasMore = rows.length > lim;
+  if (hasMore) rows = rows.slice(0, lim);
+
   const unread = await db.get(
     'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL',
     [userId]
@@ -59,12 +104,17 @@ async function list(userId, limit) {
     }
   }
   return {
+    // Unread is a whole-account badge count, not a per-page count, so it must
+    // not shrink just because the caller paged.
     unreadCount: unread ? unread.n : 0,
     items: rows.map((r) => {
       const out = shape(r, r.actor_name ? { id: r.actor_id, username: r.actor_name, display_name: r.actor_display } : null);
       if (r.type === 'mention' && ctx[String(r.reference_id)]) out.context = ctx[String(r.reference_id)];
       return out;
     }),
+    // Cursor for the next older page, or null at the end of the list.
+    nextCursor: hasMore && rows.length ? encodeCursor(rows[rows.length - 1]) : null,
+    hasMore,
   };
 }
 

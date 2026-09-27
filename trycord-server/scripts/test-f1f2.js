@@ -45,6 +45,12 @@ async function J(method, p, body, tok) {
   ok('joinC', (await J('POST', '/api/servers/join/' + code, null, C.token)).status === 200);
 
   // ---- roles: color, reorder, hierarchy ----
+  // A senior role to test escalation against. Nothing is seeded above the
+  // @everyone baseline any more - the owner inherits every permission from
+  // ownership - so the test creates the role it needs to attack.
+  const rSenior = await J('POST', '/api/servers/' + sid + '/roles',
+    { name: 'Senior', permissions: ['MANAGE_ROLES', 'MANAGE_MESSAGES', 'SEND_MESSAGES'] }, A.token);
+  ok('seniorRoleCreate', rSenior.status === 200, 'status=' + rSenior.status);
   const rc = await J('POST', '/api/servers/' + sid + '/roles', { name: 'Tint', permissions: ['SEND_MESSAGES'], color: '#ff0000' }, A.token);
   ok('roleColorCreate', rc.status === 200 && rc.json.color === '#ff0000', JSON.stringify(rc.json).slice(0, 100));
   const badColor = await J('POST', '/api/servers/' + sid + '/roles', { name: 'Bad', color: 'red' }, A.token);
@@ -54,14 +60,19 @@ async function J(method, p, body, tok) {
   const roles0 = (await J('GET', '/api/servers/' + sid + '/roles', null, A.token)).json;
   const reversed = roles0.map((r) => r.id).reverse();
   const ro = await J('POST', '/api/servers/' + sid + '/roles/reorder', { orderedIds: reversed }, A.token);
-  // list() orders position DESC, so the reversed input comes back flipped.
-  const expectOrder = [...reversed].reverse();
+  // reorder() keeps the submitted order for custom roles but pins the @everyone
+  // baseline last whatever was sent, and assigns descending positions. So the
+  // result is "the submission, minus the baseline, then the baseline".
+  const baseId = (roles0.find((r) => r.is_default) || {}).id;
+  const expectOrder = [...reversed.filter((id) => id !== baseId), baseId].filter(Boolean);
   ok('roleReorder', ro.status === 200 && JSON.stringify(ro.json.map((r) => r.id)) === JSON.stringify(expectOrder),
-    'status=' + ro.status + ' ' + JSON.stringify((ro.json || []).map((r) => r.id)).slice(0, 80));
+    'status=' + ro.status + ' got=' + JSON.stringify((ro.json || []).map((r) => r.id))
+    + ' want=' + JSON.stringify(expectOrder));
   const badOrder = await J('POST', '/api/servers/' + sid + '/roles/reorder', { orderedIds: ['nope'] }, A.token);
   ok('roleReorderValidated', badOrder.status === 400, 'status=' + badOrder.status);
-  // hierarchy: C (plain member) must not grant the Admin role to B
-  const adminRole = roles0.find((r) => r.name === 'Admin');
+  // hierarchy: C (plain member) must not grant the senior role to B
+  const adminRole = roles0.find((r) => r.name === 'Senior');
+  ok('seniorRolePresent', !!adminRole, JSON.stringify(roles0.map((r) => r.name)));
   const hijack = await J('POST', '/api/servers/' + sid + '/roles/' + adminRole.id + '/assign', { userId: B.id }, C.token);
   ok('assignHierarchyDenied', hijack.status === 403, 'status=' + hijack.status);
   // owner can assign
@@ -69,29 +80,32 @@ async function J(method, p, body, tok) {
   ok('unassignByOwner', (await J('DELETE', '/api/servers/' + sid + '/roles/' + rc.json.id + '/assign/' + B.id, null, A.token)).status === 200);
 
   // ---- role hierarchy must guard EVERY mutation, not just assignment ----
-  // A manager below the Admin rank cannot be allowed to grant Admin away,
-  // but "grant" is not the only way to abuse a higher role: blanking its
+  // A manager below a senior role cannot be allowed to grant it away, but
+  // "grant" is not the only way to abuse a higher role: blanking its
   // permission array, recolouring/renaming it, reordering it downward, or
   // deleting it all strip authority just as effectively. Each of these
-  // endpoints used to be gated on MANAGE_ROLES alone, which let a
-  // Moderator dismantle the Admin role they were forbidden to hand out.
+  // endpoints used to be gated on MANAGE_ROLES alone, which let a manager
+  // dismantle a role they were forbidden to hand out.
   {
     const modRole = await J('POST', '/api/servers/' + sid + '/roles',
       { name: 'ModForTest', permissions: ['MANAGE_ROLES', 'KICK_MEMBERS'] }, A.token);
     ok('modRoleCreated', modRole.status === 200 && !!modRole.json.id, 'status=' + modRole.status);
-    // Seat it STRICTLY BELOW Admin. The reorder input is ordered
-    // LOWEST-first: the service assigns descending positions, so the LAST
-    // id in the submitted list ends up at the top (list() returns position
-    // DESC, i.e. the reverse of what was submitted). Admin must therefore
-    // be submitted last.
-    const rest = roles0.filter((r) => r.id !== adminRole.id).map((r) => r.id).reverse();
-    const belowAdmin = [...rest, modRole.json.id, adminRole.id];
+    // Seat modRole STRICTLY BELOW the senior role.
+    //
+    // reorder() requires the submission to contain every role in the community
+    // - including the baseline - and then pins the baseline last, assigning
+    // descending positions to the custom roles. So the FIRST custom id listed
+    // ends up highest, and the baseline's position in the request is irrelevant.
+    const others = roles0.filter((r) => r.id !== adminRole.id && !r.is_default).map((r) => r.id);
+    const baseline = roles0.filter((r) => r.is_default).map((r) => r.id);
+    const belowAdmin = [adminRole.id, modRole.json.id, ...others, ...baseline];
     const lift = await J('POST', '/api/servers/' + sid + '/roles/reorder', { orderedIds: belowAdmin }, A.token);
-    ok('modRoleLifted', lift.status === 200, 'status=' + lift.status);
+    ok('modRoleLifted', lift.status === 200, 'status=' + lift.status + ' ' + JSON.stringify(lift.json).slice(0, 90));
     const ranked = (await J('GET', '/api/servers/' + sid + '/roles', null, A.token)).json;
     const rankOf = (id) => ranked.findIndex((r) => r.id === id);
-    ok('modRoleBelowAdmin', rankOf(modRole.json.id) > rankOf(adminRole.id) && rankOf(modRole.json.id) >= 0,
-      'admin#' + rankOf(adminRole.id) + ' mod#' + rankOf(modRole.json.id));
+    ok('modRoleBelowSenior', rankOf(modRole.json.id) > rankOf(adminRole.id) && rankOf(modRole.json.id) >= 0,
+      'senior#' + rankOf(adminRole.id) + ' mod#' + rankOf(modRole.json.id)
+      + ' order=' + JSON.stringify(ranked.map((r) => r.name + ':' + r.position)));
     ok('modRoleAssigned', (await J('POST', '/api/servers/' + sid + '/roles/' + modRole.json.id + '/assign',
       { userId: C.id }, A.token)).status === 200);
 
@@ -111,12 +125,12 @@ async function J(method, p, body, tok) {
     });
     ok('roleReorderAboveDenied', escReorder.status === 403, 'status=' + escReorder.status);
 
-    // The Admin role must be intact, and C must still be unable to grant it.
+    // The senior role must be intact, and C must still be unable to grant it.
     const after = (await J('GET', '/api/servers/' + sid + '/roles', null, A.token)).json;
     const adminAfter = after.find((r) => r.id === adminRole.id);
-    ok('adminRoleIntact',
-      adminAfter && adminAfter.name === 'Admin' && (adminAfter.permissions || []).length > 0,
-      JSON.stringify(adminAfter).slice(0, 120));
+    ok('seniorRoleIntact',
+      !!adminAfter && adminAfter.name === 'Senior' && (adminAfter.permissions || []).length > 0,
+      JSON.stringify(adminAfter || null).slice(0, 120));
     ok('assignStillDenied', (await asMod('POST', '/roles/' + adminRole.id + '/assign',
       { userId: B.id })).status === 403);
     // But C may still manage roles strictly below itself.
@@ -144,7 +158,9 @@ async function J(method, p, body, tok) {
 
   // ---- member payload shape ----
   const mems = await J('GET', '/api/servers/' + sid + '/members', null, A.token);
-  const mb = mems.json.find((m) => m.id === B.id);
+  // The roster endpoint returns the { items, total, hasMore } envelope, not a
+  // bare array - that is what lets a paged caller know the true size.
+  const mb = mems.json.items.find((m) => m.id === B.id);
   ok('memberPayload', mems.status === 200 && mb && 'is_bot' in mb && 'joined_at' in mb && Array.isArray(mb.roles) && 'status_text' in mb,
     JSON.stringify(mb).slice(0, 160));
   const pres = await J('GET', '/api/users/presence?ids=' + A.id + ',' + B.id, null, A.token);
