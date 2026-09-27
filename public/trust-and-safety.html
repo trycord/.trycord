@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>About — Trycord</title>
-  <meta name="description" content="What Trycord is: an original client and server for private, self-hostable community messaging, with a desktop app, published on GitHub.">
+  <title>Trust &amp; Safety — Trycord</title>
+  <meta name="description" content="How Trycord handles abuse reports, enforcement, and appeals across an instance.">
   <link rel="icon" href="/assets/trycord-logo.ico" type="image/x-icon">
   <link rel="icon" href="/assets/trycord-logo.png" type="image/png">
   <link rel="stylesheet" href="/css/site.css">
@@ -32,50 +32,52 @@
 
   <main id="main" class="page tight">
     <div class="prose">
-      <h1>About Trycord</h1>
+      <h1>Trust &amp; Safety</h1>
       <p class="lede">
-        Trycord is a messaging platform with an original client and server,
-        built around one idea: communities should run themselves.
+        How Trycord handles abuse, reports, and the people who get hurt by
+        it. Each instance sets its own rules; this is the baseline the
+        software is built to support.
       </p>
 
-      <h2>What it is</h2>
+      <h2>Reporting</h2>
       <p>
-        Trycord is not a hosted service that holds anyone's conversations for
-        them. It is software you run. The server is a self-contained Node.js
-        application you configure from environment variables and point at the
-        database of your choice. It serves the web client itself, and it powers
-        a desktop app that wraps the same client with automatic updates.
-      </p>
-      <p>
-        Because the people who run an instance own it, the defaults lean toward
-        privacy and control: nothing is created implicitly, sensible limits are
-        on by default, and pages are served with a restrictive security policy.
+        Report from inside the app. A report reaches the moderators of the
+        community it happened in, and on an official instance it also
+        escalates to the project. Reports are not anonymous to moderators:
+        they include who filed them, because that is usually needed to act.
       </p>
 
-      <h2>The pieces</h2>
+      <h2>What the software enforces</h2>
       <ul>
-        <li><strong>trycord-server</strong> — the Node.js server: HTTP API, WebSocket gateway, auth, and static file serving.</li>
-        <li><strong>trycord-client</strong> — the web application: communities, channels, direct messages, profiles, and settings.</li>
-        <li><strong>trycord-desktop</strong> — an Electron wrapper around the client for Windows, with installers and portable builds published from the repository.</li>
-        <li><strong>public</strong> — this static website: plain, editable HTML documents shared by every instance's server.</li>
+        <li>Permission checks on every request, not only in the interface.</li>
+        <li>A role hierarchy, so a moderator cannot act on someone who outranks them.</li>
+        <li>File type and size limits on uploads.</li>
+        <li>Rate limits on registration and messaging.</li>
       </ul>
-
-      <h2>Principles</h2>
-      <ul>
-        <li><strong>Direct and dependable</strong> — a focused feature set that works, rather than a sprawling one that demands attention.</li>
-        <li><strong>Complete by default</strong> — the client and server ship together and are tested against each other.</li>
-        <li><strong>Honest by design</strong> — if a capability (like sending recovery email) is not configured, the app says so instead of pretending.</li>
-        <li><strong>Yours to run</strong> — no managed service, no account-vendor lock-in, no implicit data stores.</li>
-      </ul>
-
-      <h2>Source and license</h2>
       <p>
-        The project is developed in the open and published to
-        <a href="https://github.com/trycord/.trycord" rel="external">github.com/trycord/.trycord</a>.
-        The desktop package is MIT-licensed; see the repository for details.
+        Enforcement decisions are made by people, not only by software. That
+        is deliberate, and it is also why every instance must offer an appeal
+        route &mdash; see <a href="/support">Support</a>.
+      </p>
+
+      <h2>Appeals</h2>
+      <p>
+        Anyone actioned can appeal at the
+        <a href="/app/#/support/appeals/new">appeal form</a>, signed in or not.
+        On official instances appeals are reviewed centrally, so a community
+        you were removed from cannot refuse to hear you.
+      </p>
+
+      <h2>What we ask of you</h2>
+      <p>
+        Report in good faith, and say what you actually saw. Do not report
+        someone to settle a disagreement, and do not coordinate reports to
+        pressure an instance. Both make a moderation system worse for
+        everyone living inside it.
       </p>
     </div>
   </main>
+</main>
 
   <footer class="site-footer">
     <div class="wrap footer-grid">

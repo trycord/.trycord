@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Support &mdash; Trycord</title>
-  <meta name="description" content="Get help with a Trycord instance, contact the project, appeal a moderation decision, or read the terms and privacy policy.">
+  <meta name="description" content="Get help with a Trycord instance: find the right route for bugs, moderation appeals, data questions, and legal requests.">
   <link rel="icon" href="/assets/trycord-logo.ico" type="image/x-icon">
   <link rel="icon" href="/assets/trycord-logo.png" type="image/png">
   <link rel="stylesheet" href="/css/site.css">
@@ -14,19 +14,19 @@
 
   <header class="site-header">
     <div class="wrap nav-wrap">
-      <a class="brand" href="/welcome">
+      <a class="brand" href="/">
         <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
         <span class="brand-name">Trycord</span>
       </a>
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
       <nav class="site-nav" id="site-nav" aria-label="Primary">
-        <a href="/welcome">Home</a>
+        <a href="/">Home</a>
         <a href="/features">Features</a>
         <a href="/docs">Docs</a>
         <a href="/download">Download</a>
         <a href="/about">About</a>
         <a href="/support">Support</a><a href="/security">Security</a><a href="/status">Status</a>
-        <a class="btn-open" href="/">Open the app</a>
+        <a class="btn-open" href="/app/">Open the app</a>
       </nav>
     </div>
   </header>
@@ -35,62 +35,117 @@
     <div class="prose">
       <h1>Support</h1>
       <p class="lede">
-        Trycord has no central operator &mdash; each instance is run by the people
-        who host it. Here is how to reach the right people for the right
-        question.
+        Most support problems have one obvious home, and it is usually not us.
+        Trycord is self-hostable, so the instance you are on is run by someone.
+        Start there, and escalate only if they cannot help.
       </p>
 
-      <h2>For people on this instance</h2>
+      <h2>Start here: which kind of instance are you on?</h2>
+      <p>This decides who can actually fix your problem.</p>
+      <ul>
+        <li>
+          <strong>An official instance</strong> &mdash; run by the project or a
+          partner, and listed in the app. One organisation operates all of them,
+          so you can escalate straight to us. See the
+          <a href="/instances-terms">official instance terms</a>.
+        </li>
+        <li>
+          <strong>Your own, or a community&rsquo;s</strong> &mdash; run by
+          whoever set it up. They are the operator, they control the data, and
+          they are the only ones who can change anything.
+        </li>
+      </ul>
       <p>
-        If you have an account on this server and something goes wrong &mdash;
-        a moderation decision, a data question, a report &mdash; the maintainers
-        of this instance are the first place to ask. Report problems from
-        inside the app or raise them with your instance&rsquo;s administrator.
-      </p>
-      <p>
-        The in-app <a href="/#/support">Support page</a> collects the same
-        things in one place: start or track an appeal, and jump to the
-        policies that apply here.
-      </p>
-
-      <h2>Appeals</h2>
-      <p>
-        If an account or community was moderated, appeal it from the
-        <a href="/#/support/appeals/new">appeal form</a>. You need the action
-        ID from your enforcement notice; you do not need to be signed in to
-        submit. Signed-in users can review previous decisions on the
-        <a href="/#/support/appeals">My appeals</a> page.
+        Not sure? The instance&rsquo;s name and owner are shown in the app, and
+        self-hosted instances usually name their own admin contact.
       </p>
 
-      <h2>For the project itself</h2>
+      <h2>Account, community, or content problem</h2>
       <p>
-        Bugs, feature requests, and general questions about the software belong
-        on the GitHub repository:
-        <a href="https://github.com/trycord/.trycord/issues" rel="external">github.com/trycord/.trycord/issues</a>.
+        A ban, a timeout, a deleted message, a role you think you should have,
+        a channel you cannot see. This is moderation, and it is the
+        <strong>instance operator or the community moderators</strong> &mdash;
+        not the project. They can undo what they did; we cannot.
+      </p>
+      <p>
+        Report it in the app where you can, or contact the operator directly.
+        <code>[operator contact &mdash; instance specific]</code>
       </p>
 
-      <h2>Legal or privacy questions</h2>
+      <h2>Appealing a moderation decision</h2>
       <p>
-        See the placeholder notices on the
-        <a href="/terms">Terms of Service</a> and
-        <a href="/privacy">Privacy Policy</a> pages. On this instance those
-        documents have not been finalized, so for anything legally significant,
-        contact this instance&rsquo;s operator directly rather than relying on
-        the drafts.
+        If an account, community, or message was actioned, you can appeal. Start
+        at the <a href="/app/#/support/appeals/new">appeal form</a>.
+      </p>
+      <ul>
+        <li>You need the action ID from the enforcement notice.</li>
+        <li>You do <strong>not</strong> need to be signed in to submit an appeal &mdash; being banned should not stop you appealing.</li>
+        <li>Signed-in users can review past decisions under <a href="/app/#/support/appeals">My appeals</a>.</li>
+        <li>On an official instance, appeals are reviewed centrally, so a community you were removed from cannot refuse to hear you.</li>
+      <li>Appeals are reviewed by a person. Expect a real answer, not an autoresponder.</li>
+      </ul>
+
+      <h2>Something is broken</h2>
+      <p>Work down this list; it finds the cause most of the time.</p>
+      <ol>
+        <li>
+          Check the <a href="/status">status page</a>. If the instance is
+          degraded, nothing you do locally will help.
+        </li>
+        <li>
+          Reload, and try a private window. A stale cached build or a stuck
+          service worker causes a surprising share of &ldquo;the app is
+          broken&rdquo; reports.
+        </li>
+        <li>
+          If the desktop app misbehaves, update it. The desktop app does not
+          auto-update mid-session, so an old build against a new server is a
+          common cause of odd failures.
+        </li>
+        <li>
+          Still stuck? Report it on
+          <a href="https://github.com/trycord/.trycord/issues" rel="external">GitHub</a>.
+          Include the instance URL, what you expected, what happened, and your
+          app version &mdash; from <a href="/app/#/settings/updates">Settings,
+          Updates</a>.
+        </li>
+      </ol>
+
+      <h2>Privacy, your data, or a legal request</h2>
+      <p>
+        Access, export, correction, and deletion are handled by the
+        <strong>operator of your instance</strong>, because they are the data
+        controller. If you are self-hosting, that is you. See the
+        <a href="/privacy">Privacy Policy</a> for what is held and for how long.
+      </p>
+      <p>
+        A request about an official instance can go to
+        <code>[privacy contact &mdash; official operator]</code>. Formal legal
+        notices go to <code>[&nbsp;&nbsp;]</code>.
       </p>
 
-      <h2>Service status</h2>
+      <h2>Security report</h2>
       <p>
-        If this instance looks broken rather than a specific page, check the
-        <a href="/status">status page</a> and the
-        <a href="/security">security page</a> before reporting anything.
+        Found a vulnerability? Read the <a href="/security">security page</a>
+        first, then follow its reporting route. Please do not test against
+        instances that have not agreed to it.
+      </p>
+
+      <h2>Still stuck?</h2>
+      <p>
+        Tell us what you tried and what happened. The most useful reports are
+        short and specific: which instance, which action, what you expected,
+        what you saw instead. &ldquo;It doesn&rsquo;t work&rdquo; is much harder
+        to act on than &ldquo;scrolling the member list freezes the tab after
+        about 200 rows&rdquo;.
       </p>
 
       <div class="draft-note" role="note">
-        <strong>Operator placeholder.</strong> The person running this instance
-        can edit <code>public/support.html</code> to add their own contact
-        details &mdash; for example an address or an operator email &mdash;
-        before the site goes live.
+        <strong>Operator note.</strong> This page is deliberately
+        operator-agnostic, because it is served by every instance. Anyone
+        running an instance can edit
+        <code>public/support.html</code> to add their own address, email, or
+        support hours where the placeholders appear.
       </div>
     </div>
   </main>
@@ -98,7 +153,7 @@
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div class="footer-brand">
-        <a class="brand" href="/welcome">
+        <a class="brand" href="/">
           <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
           <span class="brand-name">Trycord</span>
         </a>
@@ -118,6 +173,8 @@
       <div class="footer-col">
         <h2 class="footer-heading">Legal</h2>
         <a href="/terms">Terms of Service</a>
+        <a href="/instances-terms">Official instance terms</a>
+        <a href="/instances-terms">Official instance terms</a>
         <a href="/privacy">Privacy Policy</a>
       </div>
     </div>
