@@ -16,6 +16,9 @@ release/
 release-fresh/
 dist/
 trycord-desktop/client/
+# Staged from trycord-client/assets by scripts/copy-client.js on every build.
+trycord-desktop/build/icon.png
+trycord-desktop/build/icon.ico
 *.zip
 
 # runtime logs
