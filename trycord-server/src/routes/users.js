@@ -8,6 +8,7 @@ const { fail, serviceError } = require('../errors');
 const enforcement = require('../services/enforcement');
 const uploads = require('../services/uploads');
 const { singleImage } = require('../middleware/upload');
+const { escapeLike } = require('../util');
 
 let gateway = { getPresence: null };
 function setGateway(gw) {
@@ -134,17 +135,6 @@ router.post('/me/avatar', rateLimit({ windowMs: 60000, max: 10 }), singleImage, 
 router.delete('/me/avatar', profileImageDelete('avatar'));
 router.post('/me/banner', rateLimit({ windowMs: 60000, max: 10 }), singleImage, profileImageRoute('banner'));
 router.delete('/me/banner', profileImageDelete('banner'));
-
-// LIKE metacharacters (%, _) plus the escape character itself must match
-// literally, never as wildcards. The escape character is '!' deliberately:
-// unlike backslash it needs no escaping of its own in JS string syntax NOR
-// in SQL string syntax, so the statement text sent to MariaDB/MySQL contains
-// a plain, valid ESCAPE '!' clause (a JS '\\' became SQL '\', which MariaDB
-// parses as an unterminated string — the production 500). User input stays
-// in bound parameters; only the static clause changed.
-function escapeLike(s) {
-  return String(s).replace(/[%_!]/g, (c) => '!' + c);
-}
 
 // GET /api/users/search?q=alice — prefix-first directory, public fields only.
 router.get('/search', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {

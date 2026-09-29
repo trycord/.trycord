@@ -37,4 +37,13 @@ async function visibleChannel(channelId, userId) {
   return ch;
 }
 
-module.exports = { secret, now, uuid, sign, isMember, isOwner, visibleChannel };
+// LIKE metacharacters must match literally, never as wildcards. The escape
+// character is '!' rather than backslash because MySQL and MariaDB parse a
+// lone backslash inside a SQL string literal as an escape, which terminates
+// the literal and turns the statement into a syntax error. '!' needs no
+// escaping in either JS or SQL string syntax.
+function escapeLike(s) {
+  return String(s).replace(/[%_!]/g, (c) => '!' + c);
+}
+
+module.exports = { secret, now, uuid, sign, isMember, isOwner, visibleChannel, escapeLike };

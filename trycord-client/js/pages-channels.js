@@ -1,5 +1,3 @@
-// Channel and category structure: creating and editing channels, and
-// managing the categories that group them.
 import Api from './api.js';
 import State from './state.js';
 
@@ -45,7 +43,6 @@ function openChannelEditor(serverId, ch, cats, onDone) {
   });
 }
 
-// ---- create channel ---------------------------------------------------------
 
 async function renderNewChannel(container, serverId) {
   clear(container);
@@ -91,7 +88,6 @@ async function renderNewChannel(container, serverId) {
   container.appendChild(wrap);
 }
 
-// ---- invites ----------------------------------------------------------------
 
 function openCategoryRename(serverId, cat, onDone) {
   const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: cat.name || '' });

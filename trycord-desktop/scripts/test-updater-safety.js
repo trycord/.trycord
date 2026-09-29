@@ -39,7 +39,7 @@ const app = {
   assert.strictEqual(await handled['trycord:get-version'](), '9.9.9-test');
   const provider = await handled['trycord:updater-provider']();
   assert.strictEqual(provider.provider, 'github');
-  assert.strictEqual(provider.owner, 'LanxTheShowmaker');
+  assert.strictEqual(provider.owner, 'trycord');
   assert.strictEqual(provider.repo, '.trycord');
 
   // Dev check must resolve without contacting any server.

@@ -4,7 +4,7 @@
 // Channel/category permission overrides: inheritance, precedence, deny-wins,
 // owner bypass, and that the server actually enforces them.
 const http = require('http');
-const API = 'http://localhost:9971';
+const API = (process.env.TRYCORD_TEST_URL || 'http://localhost:9971').replace(/\/+$/, '');
 function req(m, p, b, t) {
   return new Promise((res) => {
     const d = b ? JSON.stringify(b) : null; const u = new URL(p, API);

@@ -2,7 +2,7 @@
 // cover the whole list without gaps or repeats, and the unread badge must not
 // shrink just because the caller paged.
 const http = require('http');
-const API = 'http://localhost:9971';
+const API = (process.env.TRYCORD_TEST_URL || 'http://localhost:9971').replace(/\/+$/, '');
 function req(m, p, b, t) {
   return new Promise((res) => {
     const d = b ? JSON.stringify(b) : null; const u = new URL(p, API);

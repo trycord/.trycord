@@ -1,5 +1,3 @@
-// Direct messages + friends. DM chat uses the dm conversation API with
-// WS dm events; friends uses the friends routes.
 
 import Api from './api.js';
 import State, { refreshDms, refreshFriends, isAuthed, mustVerifyToPost } from './state.js';
@@ -9,9 +7,6 @@ import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
 
 let activeDmId = null;
-// Live DM subscriptions for the open thread. Dropped on every thread
-// switch/unmount (F3): without this each render stacked 3 permanent
-// handlers that all consumed every later dm event.
 let dmSubs = [];
 function dropDmSubs() {
   for (const off of dmSubs) { try { off(); } catch { /* ignore */ } }
@@ -52,7 +47,6 @@ async function renderDmList(container) {
 }
 
 async function renderDmThread(container, dmId) {
-  // Tear down the previous thread first: its handlers close over a
   // detached feed and must never consume another event.
   leaveDm();
   activeDmId = dmId;
@@ -83,11 +77,8 @@ async function renderDmThread(container, dmId) {
     return box;
   }
 
-  // Highest canonical position currently rendered. seq is the server's
-  // authoritative order, so it is the only thing a catch-up cursor needs - an
   // id or a timestamp would both be ambiguous at a boundary.
   let highSeq = 0;
-  // Lowest rendered position, used as the anchor for loading older history.
   let lowSeq = 0;
   let loadingOlder = false;
   const noteSeq = (m) => {
@@ -99,9 +90,7 @@ async function renderDmThread(container, dmId) {
     if (!lowSeq || n < lowSeq) lowSeq = n;
   };
 
-  // Older history. Anchored on the lowest seq currently rendered, so a page
   // boundary can never skip or repeat a message the way an id/timestamp tuple
-  // can when two rows share a created_at.
   async function loadOlder() {
     if (loadingOlder) return;
     if (!lowSeq) return;   // no anchor yet: nothing older is reachable
@@ -114,16 +103,12 @@ async function renderDmThread(container, dmId) {
         if (btn) btn.remove();
         return;
       }
-      // Build into a fragment and splice it in ABOVE the current history.
-      // appendDmMessage inserts into the fragment, so nothing is appended to
-      // the live feed twice and nothing renders out of order.
       const first = feed.querySelector('.msg');
       const heightBefore = thread.scrollHeight;
       const frag = document.createDocumentFragment();
       for (const m of older) appendDmMessage(m, frag, dmId);
       if (first) feed.insertBefore(frag, first);
       else feed.appendChild(frag);
-      // Keep the reader's place: adding rows above shifts content down.
       thread.scrollTop += thread.scrollHeight - heightBefore;
       if (btn) btn.remove();
     } catch (ex) {
@@ -134,7 +119,6 @@ async function renderDmThread(container, dmId) {
     }
   }
 
-  // load history
   async function reload() {
     clear(feed);
     feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messages…'));
@@ -151,9 +135,6 @@ async function renderDmThread(container, dmId) {
     feed.appendChild(dmIntro(msgs.length === 0));
     highSeq = 0;
     lowSeq = 0;
-    // Offer older history only when there is an anchor to page from and the
-    // first page came back full - a short page means the conversation starts
-    // here.
     if (lowSeqAnchorable(msgs)) {
       const olderBtn = el('button', { class: 'btn sm dm-load-older', type: 'button' }, 'Load older messages');
       olderBtn.addEventListener('click', () => { loadOlder().catch(() => {}); });
@@ -165,16 +146,10 @@ async function renderDmThread(container, dmId) {
     thread.scrollTop = thread.scrollHeight;
   }
 
-  // True when the first page is full AND every row carries a seq, so a
-  // `before` cursor is both available and worth offering.
   function lowSeqAnchorable(msgs) {
     return Array.isArray(msgs) && msgs.length >= 50 && msgs.every((m) => m && m.seq !== null && m.seq !== undefined);
   }
 
-  // Forward catch-up after a reconnect. Anything that arrived while the socket
-  // was down is fetched by seq rather than by reloading the whole page, so the
-  // scroll position survives and a long conversation is not refetched to show
-  // three new lines. Falls back to a full reload when there is no cursor yet.
   async function catchUp() {
     if (!highSeq) return reload();
     try {
@@ -184,7 +159,6 @@ async function renderDmThread(container, dmId) {
       for (const m of missed) appendDmMessage(m, feed, dmId);
       if (stick) thread.scrollTop = thread.scrollHeight;
     } catch {
-      // Offline, or the cursor was rejected: a full reload is the safe answer.
       await reload();
     }
   }
@@ -200,8 +174,9 @@ async function renderDmThread(container, dmId) {
       content: m.content,
       created_at: m.createdAt,
       edited_at: m.editedAt,
+    }, {
       meId: State.me && State.me.id,
-      onDelete: mine ? () => removeDm(dmId, m.id, m) : null,
+      onDelete: mine ? () => removeDm(dmId, m.id) : null,
       onEdit: mine ? () => editDm(dmId, m) : null,
     });
     target.appendChild(row);
@@ -233,7 +208,6 @@ async function renderDmThread(container, dmId) {
     });
   }
 
-  // composer
   const composer = el('div', { class: 'composer' });
   const ta = el('textarea', { placeholder: 'Message ' + (peer.displayName || peer.username) + '…', rows: 1 });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
@@ -260,12 +234,7 @@ async function renderDmThread(container, dmId) {
     threadedSend(content);
   }
   let sendLock = false;
-  // One nonce per submission attempt, held until the send definitively
-  // succeeds. A retry after a lost response reuses it, so the server collapses
-  // the retry onto the message the first attempt already wrote instead of
-  // posting the same text twice. A fresh nonce is minted only after a
   // confirmed success, and the composer text is deliberately left in place on
-  // failure so nothing is lost.
   let pendingNonce = null;
   function newNonce() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
@@ -321,9 +290,6 @@ async function renderDmThread(container, dmId) {
         }
       }
     }),
-    // Reconnect resync. A seq cursor is used when one is known, so a reconnect
-    // fetches only what was missed; a full reload remains the fallback for the
-    // first connect and for a rejected cursor.
     Realtime.on('open', () => {
       if (String(activeDmId) === String(dmId)) catchUp().catch(() => {});
     }),
@@ -337,7 +303,6 @@ export function leaveDm() {
   activeDmId = null;
 }
 
-// ---- friends ---------------------------------------------------------------
 
 async function renderFriends(container) {
   clear(container);
@@ -395,9 +360,6 @@ async function renderFriends(container) {
 }
 
 async function renderFriendsList(wrap) {
-  // The action list for one friend or request row. The inline buttons stay for
-  // discoverability; this is the same set of actions reachable by right click
-  // or long press, plus the per-person actions that have no button.
   const friendActions = (kind, person) => {
     const act = async (fn, okMsg, errMsg, level) => {
       try { await fn(); if (okMsg) toast(okMsg, level || 'ok'); await refreshFriends(); renderFriendsList(wrap); }

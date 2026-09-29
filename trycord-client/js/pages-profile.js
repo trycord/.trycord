@@ -1,5 +1,3 @@
-// Public profile page (#/users/:id). Renders a real user's profile from
-// GET /api/users/:id plus the shell chrome — no mock data.
 
 import Api from './api.js';
 import State, { refreshFriends, currentServerId } from './state.js';
@@ -15,7 +13,6 @@ export async function renderProfile(container, { id } = {}) {
 
   let profile;
   try {
-    // Community-aware when opened from a server context: the backend only
     // attaches membership both viewer and target share — nothing else leaks.
     profile = await Api.user(id, currentServerId());
   } catch (ex) {
@@ -74,7 +71,6 @@ export async function renderProfile(container, { id } = {}) {
     card.appendChild(mbox);
   }
 
-  // ---- actions -----------------------------------------------------------
   const isSelf = profile.relation === 'self';
   if (!isSelf && State.me) {
     const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)' } });

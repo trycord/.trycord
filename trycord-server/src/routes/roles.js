@@ -177,11 +177,27 @@ router.delete('/:roleId/assign/:userId', auth.requireVerified, requirePerm('MANA
   try {
     const role = await roles.get(req.params.roleId);
     if (!role || role.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'role not found');
+    const { userId } = req.params;
+    if (!(await memberships.get(req.server.id, userId))) {
+      return fail(res, 'NOT_A_MEMBER', 'user is not a member');
+    }
     try {
       await assertAssignable(req, role);
     } catch (e) { return serviceError(res, e); }
-    const out = await roles.unassign(req.server.id, req.params.userId, role.id);
-    events.emit(req.server.id, 'member_roles_updated', { userId: String(req.params.userId) });
+    // Stripping a role is as much an escalation as granting one: without this
+    // a Moderator could de-role an Admin ranked above them. Self-removal is
+    // allowed because it can only ever lower the actor's own privileges.
+    if (!req.access.isOwner && String(userId) !== String(req.user.id)) {
+      const [actorTop, targetTop] = await Promise.all([
+        roles.topPosition(req.server.id, req.user.id),
+        roles.topPosition(req.server.id, userId),
+      ]);
+      if (actorTop <= targetTop) {
+        return fail(res, 'PERMISSION_DENIED', 'target outranks you');
+      }
+    }
+    const out = await roles.unassign(req.server.id, userId, role.id);
+    events.emit(req.server.id, 'member_roles_updated', { userId: String(userId) });
     res.json(out);
   } catch (e) { next(e); }
 });

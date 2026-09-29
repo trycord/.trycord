@@ -1,4 +1,3 @@
-// Community settings: a sectioned hub over the pages that do the work,
 // plus the ownership-transfer and danger-zone controls.
 const SETTINGS_SECTIONS = [
   { id: 'overview', label: 'Overview' },
@@ -35,8 +34,6 @@ function settingsNav(serverId, active) {
   return nav;
 }
 
-// A short description of what a section is for, plus a jump to the page that
-// does the work. Used by every section that defers to a dedicated editor.
 
 function linkedSection({ serverId, title, blurb, href, cta, counts }) {
   const box = el('div', { class: 'settings-panel' });
@@ -82,7 +79,6 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
 
   if (section === 'overview') {
-    // ---- identity + visibility -------------------------------------------
     const err = el('div', { class: 'form-error', hidden: true });
     const name = el('input', { class: 'input', type: 'text', value: server.name || '', maxlength: 64 });
     const desc = el('textarea', { class: 'textarea', maxlength: 400, rows: 3, placeholder: 'What is this community about?' }, server.description || '');
@@ -125,8 +121,6 @@ async function renderServerSettings(container, serverId, section = 'overview') {
     });
     panel.appendChild(form);
 
-    // A quick read on the state of the community, so the overview is an
-    // orientation page rather than only a form.
     const facts = el('div', { class: 'settings-panel' });
     facts.appendChild(el('h2', { class: 'settings-panel__title' }, 'At a glance'));
     const summary = el('div', { class: 'role-detail__summary' });
@@ -145,8 +139,6 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   }
 
   if (section === 'appearance') {
-    // Identity media: one icon and one banner, replaced in place. This is the
-    // same upload shape a user avatar uses, and the bytes live behind the
     // authenticated media route, so the preview reads them with the session.
     const box = el('div', { class: 'settings-panel' });
     box.appendChild(el('h2', { class: 'settings-panel__title' }, 'Community icon'));
@@ -188,8 +180,6 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       if (!file) return;
       if (!/^image\//.test(file.type || '')) { toast('Only images can be used.', 'error'); return; }
       status.textContent = 'Uploading ' + kind + '…';
-      // The superseded file is freed server-side, so drop our cached blob for
-      // the old path too or the next render could still show it.
       const prev = kind === 'icon' ? server.icon_url : server.banner_url;
       try {
         const out = await Api.setServerImage(serverId, kind, file);
@@ -295,9 +285,6 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   }
 
   if (section === 'moderation') {
-    // Bans are the one moderation list worth surfacing here, because "who is
-    // banned" is the question that gets asked at the settings level. Timeouts
-    // and message deletion stay on the member roster where they are applied.
     const box = el('div', { class: 'settings-panel' });
     box.appendChild(el('h2', { class: 'settings-panel__title' }, 'Bans'));
     const bans = State.bans || [];
@@ -328,7 +315,6 @@ async function renderServerSettings(container, serverId, section = 'overview') {
 
     // ---- transfer ownership ----------------------------------------------
     // The leave and delete flows both tell an owner to transfer first, and the
-    // API has always existed - this is the missing entry point, not a new
     // capability.
     const transfer = el('div', { class: 'settings-panel' });
     transfer.appendChild(el('h2', { class: 'settings-panel__title' }, 'Transfer ownership'));
@@ -382,7 +368,6 @@ async function renderServerSettings(container, serverId, section = 'overview') {
     }
     panel.appendChild(transfer);
 
-    // ---- danger zone -------------------------------------------------------
     const danger = el('div', { class: 'settings-panel settings-panel--danger' });
     danger.appendChild(el('h2', { class: 'settings-panel__title' }, 'Danger zone'));
 
@@ -443,6 +428,5 @@ async function renderServerSettings(container, serverId, section = 'overview') {
     return;
   }
 }
-// ---- new server -------------------------------------------------------------
 
 export { renderServerSettings };

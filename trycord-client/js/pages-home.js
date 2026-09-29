@@ -1,5 +1,3 @@
-// Home is an activity environment, not a dashboard. The persistent presence
-// spine owns navigation; this surface only shows real, recent conversation.
 
 import State, { refreshServers, refreshActivity, refreshDms } from './state.js';
 import { esc, el, clear, relTime } from './ui.js';

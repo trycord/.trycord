@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const db = require('../db');
 const { now, uuid, sign } = require('../util');
-const { checkPassword } = require('./passwords');
+const { checkPassword, BCRYPT_COST } = require('./passwords');
 const mail = require('./mail');
 const templates = require('./emailTemplates');
 
@@ -77,7 +77,7 @@ async function resetPassword(token, newPassword) {
   if (!user) throw { code: 'AUTH_REQUIRED', message: 'This reset link is no longer valid. Request a new one.' };
   const reuse = await bcrypt.compare(String(newPassword), user.password_hash);
   if (reuse) throw { code: 'VALIDATION_ERROR', message: 'new password must be different from the current one' };
-  const hash = await bcrypt.hash(String(newPassword), 10);
+  const hash = await bcrypt.hash(String(newPassword), BCRYPT_COST);
   const ts = now();
   await db.transaction(async (t) => {
     await t.run('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?', [hash, ts, user.id]);

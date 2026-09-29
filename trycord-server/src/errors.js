@@ -19,6 +19,9 @@ const Codes = {
   BANNED: 403,
   TIMED_OUT: 403,
   RATE_LIMITED: 429,
+  // Storage is full for this account. 413 so a client can tell a quota refusal
+  // apart from a rejected file: the file itself was valid.
+  QUOTA_EXCEEDED: 413,
   SERVER_PRIVATE: 403,
   SERVER_SUSPENDED: 403,
   SERVER_NOT_FOUND: 404,

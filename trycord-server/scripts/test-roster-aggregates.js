@@ -5,7 +5,7 @@
 // roster size - it either downloaded everyone to count them or lied. The
 // response is now an envelope: { items, total, hasMore, limit, offset }.
 const http = require('http');
-const API = 'http://localhost:9971';
+const API = (process.env.TRYCORD_TEST_URL || 'http://localhost:9971').replace(/\/+$/, '');
 function req(m, p, b, t) {
   return new Promise((res) => {
     const d = b ? JSON.stringify(b) : null; const u = new URL(p, API);

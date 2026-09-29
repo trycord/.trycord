@@ -1,4 +1,3 @@
-// Public + authentication surfaces. Rendered into the current view region.
 
 import Api from './api.js';
 import { esc, el, clear, toast, qs } from './ui.js';
@@ -10,38 +9,11 @@ import Realtime from './realtime.js';
 let legal = { termsVersion: '1.0', privacyVersion: '1.0' };
 Api.legal().then((l) => { if (l) legal = l; }).catch(() => {});
 
-// The supplied Trycord login background, baked in as an asset rather than
-// redrawn in CSS. Referenced absolutely because app.css lives in /css, so a
-// document-relative url() would resolve to /css/assets and 404.
 const AUTH_BG = '/assets/trycord-login-bg.png';
 const AUTH_LOGO = '/assets/trycord-logo.png';
 
-// Dedicated authentication page shell, shared by login, register, recovery,
-// password reset and email verification.
-//
-// This is intentionally NOT the application with its navigation hidden. Those
-// routes still render into the app's view region, so the page is laid out as a
-// fixed, full-viewport surface with the background image behind it and the card
-// centred on top - no rail, no sidebar, and none of the shell's leftover grid
-// tracks pushing the card off-centre.
-//
-// `secondary` is the right-hand panel. It is optional: pages with nothing
-// meaningful to put there render a single-column card rather than an empty
 // box. There is deliberately NO QR/device-login panel here, because the server
 // exposes no such endpoint - a decorative code scanner would promise a feature
-// that does not exist.
-// The auth overlay is mounted straight on <body> rather than into the view
-// region it was handed.
-//
-// It is `position: fixed; inset: 0`, so it does not need a container to size
-// itself - but it does need one that is actually displayed. At 600px and below
-// the mobile shell replaces the desktop one, and the `data-auth-page` styling
-// that hides the mobile shell (so a signed-in visitor's chrome does not frame
-// the sign-in card) also hid the region the overlay had been rendered into.
-// The card then measured 0x0 and the whole auth page vanished on a phone.
-// Mounting on <body> makes the overlay independent of which shell is active.
-// router.js removes a stray overlay on every route render, which is the
-// counterpart to this.
 function mountAuthPage(page) {
   for (const stray of document.querySelectorAll('body > .auth-page')) stray.remove();
   document.body.appendChild(page);
@@ -49,7 +21,6 @@ function mountAuthPage(page) {
 
 function authShell({ title, lede, secondary, contextTitle }) {
   if (contextTitle) renderContextHeader({ title: contextTitle });
-  // Styling hook consumed by app.css. See the note in router.js.
   document.documentElement.dataset.authPage = '1';
   const page = el('div', { class: 'auth-page' });
   page.appendChild(el('div', { class: 'auth-background', 'aria-hidden': 'true' }));
@@ -74,17 +45,12 @@ function authShell({ title, lede, secondary, contextTitle }) {
   return { page, main, card };
 }
 
-// The "already have an account / forgot password / support" strip that used to
-// be a stack of .auth-alt paragraphs under the form.
 function authFooter(...nodes) {
   return el('div', { class: 'auth-footer' }, ...nodes);
 }
 
 function loginForm(container) {
   clear(container);
-  // The backend picker is the one genuinely secondary concern on a sign-in
-  // page - it matters before you have an account and is irrelevant after - so
-  // it takes the side panel rather than being stacked under the form.
   const backendBox = el('div', { class: 'auth-secondary__body' });
   renderBackendSelector(backendBox);
   const secondary = el('div', { class: 'auth-secondary' },
@@ -101,8 +67,8 @@ function loginForm(container) {
   });
 
   const err = el('div', { class: 'form-error', hidden: true });
-  const username = el('input', { class: 'input', type: 'text', autocomplete: 'username', placeholder: 'Username', required: true });
-  const password = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', placeholder: 'Password', required: true });
+  const username = el('input', { class: 'input', id: 'login-username', type: 'text', autocomplete: 'username', placeholder: 'Username', required: true });
+  const password = el('input', { class: 'input', id: 'login-password', type: 'password', autocomplete: 'current-password', placeholder: 'Password', required: true });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Sign in');
 
   const form = el('form', { class: 'auth-form' }, err,
@@ -123,15 +89,11 @@ function loginForm(container) {
       applyAuth(res);
       toast('Signed in.', 'ok');
       location.hash = '#/home';
-      // Fresh sign-in (not a boot restore): bring the realtime gateway up
-      // now instead of waiting for the next reload.
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
       clear(err);
       err.appendChild(el('span', {}, ex.message || 'Sign in failed'));
-      // Enforced accounts get their action id back from the server: link
-      // straight to the appeal form with it prefilled.
       const actionId = ex && ex.details && ex.details.actionId;
       if (ex && ex.code === 'ACCOUNT_ENFORCED' && actionId) {
         err.appendChild(el('div', { style: { marginTop: 'var(--t-d-2)' } },
@@ -171,12 +133,12 @@ function registerForm(container) {
   });
 
   const err = el('div', { class: 'form-error', hidden: true });
-  const username = el('input', { class: 'input', type: 'text', autocomplete: 'username', placeholder: 'username', minlength: 2, maxlength: 32, required: true });
-  const display = el('input', { class: 'input', type: 'text', autocomplete: 'nickname', placeholder: 'Display name (optional)', maxlength: 32 });
-  const password = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', placeholder: 'Password (8+ characters)', minlength: 8, required: true });
-  const email = el('input', { class: 'input', type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
+  const username = el('input', { class: 'input', id: 'reg-username', type: 'text', autocomplete: 'username', placeholder: 'username', minlength: 2, maxlength: 32, required: true });
+  const display = el('input', { class: 'input', id: 'reg-display', type: 'text', autocomplete: 'nickname', placeholder: 'Display name (optional)', maxlength: 32 });
+  const password = el('input', { class: 'input', id: 'reg-password', type: 'password', autocomplete: 'new-password', placeholder: 'Password (8+ characters)', minlength: 8, required: true });
+  const email = el('input', { class: 'input', id: 'reg-email', type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
   const emailHint = el('span', { class: 'hint' }, 'Optional. Verification and recovery require email delivery on this instance.');
-  const emailField = el('div', { class: 'field' }, el('label', {}, 'Email', el('span', { class: 'badge' }, 'optional')), email, emailHint);
+  const emailField = el('div', { class: 'field' }, el('label', { for: 'reg-email' }, 'Email', el('span', { class: 'badge' }, 'optional')), email, emailHint);
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Create account');
 
   // The server exposes only a boolean capability. SMTP credentials never leave the server.
@@ -227,7 +189,6 @@ function registerForm(container) {
       applyAuth(res);
       toast('Account created.', 'ok');
       location.hash = '#/home';
-      // Fresh registration: bring the realtime gateway up now.
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -249,8 +210,6 @@ function registerForm(container) {
 
 function forgotForm(container) {
   clear(container);
-  // Nothing belongs in a side panel here, so this one renders single-column
-  // rather than an empty box.
   const { page, main } = authShell({
     title: 'Forgot password',
     lede: "Tell us the email on your account and we'll send a reset link if it exists.",
@@ -259,7 +218,7 @@ function forgotForm(container) {
 
   const ok = el('div', { class: 'form-success', hidden: true });
   const err = el('div', { class: 'form-error', hidden: true });
-  const email = el('input', { class: 'input', type: 'email', autocomplete: 'email', placeholder: 'you@example.com', required: true });
+  const email = el('input', { class: 'input', id: 'forgot-email', type: 'email', autocomplete: 'email', placeholder: 'you@example.com', required: true });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Send reset link');
 
   const form = el('form', { class: 'auth-form' }, ok, err,
@@ -331,16 +290,12 @@ function legalPage(container, kind) {
   const titles = { terms: 'Terms of Service', privacy: 'Privacy Policy' };
   const isTerms = kind === 'terms';
   const docPath = isTerms ? '/terms' : '/privacy';
-  // Public page composition, same as the rest of the public site: a
-  // constrained column with a left-aligned title leading from the top.
   const wrap = el('div', { class: 'pub-page pub-page--narrow' });
   wrap.appendChild(el('h1', { class: 'pub-title' }, titles[kind] || 'Legal'));
   const body = el('div', { class: 'pub-prose' });
   body.appendChild(el('p', {},
     'This instance manages its own legal documents. Signing in or registering records your acceptance of the versions this server exposes (v'
     + esc(legal.termsVersion) + ' terms, v' + esc(legal.privacyVersion) + ' privacy).'));
-  // The full document is server-rendered from public/ and is the real
-  // artefact; this route is only the in-app pointer to it.
   const cta = el('div', { class: 'pub-links' });
   cta.appendChild(el('a', { class: 'pub-link', href: docPath },
     el('div', { class: 'pub-link__title' }, 'Read the full ' + (titles[kind] || 'document')),
@@ -350,9 +305,7 @@ function legalPage(container, kind) {
   container.appendChild(wrap);
 }
 
-// Consumes the single-use link mailed by the recovery service. Public route:
 // verification happens with or without a session and never reveals whether a
-// given address exists ahead of the attempt.
 function verifyEmailPage(container, token) {
   clear(container);
   const { page, main } = authShell({
@@ -403,10 +356,6 @@ const PagesPublic = {
   currentLegal: () => legal,
 };
 
-// Backend selector: which Trycord server this client talks to. Rendered on
-// auth cards (pre-login, where it matters most) and reused by settings.
-// Shows the resolved BACKEND_URL + its source, validates input, tests the
-// connection against /api/instance, persists the choice, and resets to the
 // configured default. Switching backends while signed in drops the session
 // (tokens belong to one backend) and reloads.
 export function renderBackendSelector(mount) {
@@ -454,12 +403,10 @@ export function renderBackendSelector(mount) {
     }
     if (isAuthed()) {
       // Sessions belong to one backend: sign out everywhere in this client
-      // and reboot against the new backend.
       try { Realtime.disconnect(); } catch { /* ignore */ }
       clearSession();
     }
     toast('Backend switched. Reloading…', 'ok');
-    // Reload WITH ?api=: the serving server reflects the configured backend
     // into its CSP connect-src, so the rebooted page may actually reach it.
     // Hash routing is preserved.
     try {

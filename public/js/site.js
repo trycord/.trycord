@@ -1,12 +1,8 @@
-// Trycord public website — small enhancement script.
 // Loaded as an external file (the server CSP forbids inline scripts).
-// No dependencies. Handles: mobile navigation, current page marker,
-// and the footer year.
 
 (function () {
   'use strict';
 
-  // --- mobile nav toggle ---
   var toggle = document.querySelector('[data-nav-toggle]');
   var nav = document.getElementById('site-nav');
   if (toggle && nav) {
@@ -37,17 +33,20 @@
     });
   }
 
-  // --- current page marker ---
-  var here = window.location.pathname.replace(/\/(index\.html)?$/, '/');
+  function toRoute(pathname) {
+    var p = String(pathname || '').split('?')[0].split('#')[0];
+    p = p.replace(/\.html$/i, '');
+    if (p.length > 1) p = p.replace(/\/+$/, '');
+    return p || '/';
+  }
+
+  var here = toRoute(window.location.pathname);
   document.querySelectorAll('.site-nav a').forEach(function (link) {
-    var href = link.getAttribute('href') || '';
-    var route = href.replace(/\/(index\.html)?$/, '/');
-    if (route === here && here !== '/') {
+    if (toRoute(link.getAttribute('href')) === here) {
       link.setAttribute('aria-current', 'page');
     }
   });
 
-  // --- footer year ---
   var yearEl = document.querySelector('[data-year]');
   if (yearEl) {
     yearEl.textContent = String(new Date().getFullYear());

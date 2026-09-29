@@ -1,12 +1,7 @@
 // Presentation grouping for the role permission editor.
-//
 // This is deliberately NOT a second permission system. The authority for which
 // permissions exist is the backend: `GET /roles/permissions` returns `all`
-// (the keys) and `descriptions` (their text), and every key in `all` must
 // appear here or fall into "Other". Adding a permission server-side therefore
-// makes it show up automatically instead of silently vanishing from the editor.
-//
-// What lives here is only the order and the section headings, which is a UI
 // decision, not an authorization one.
 
 const GROUPS = [
@@ -37,7 +32,6 @@ const GROUPS = [
 ];
 
 // Split the backend's permission list into display groups. Unknown keys are
-// collected into a trailing group rather than dropped.
 export function groupPermissions(allPerms, descriptions) {
   const known = new Set();
   const groups = [];
@@ -57,8 +51,6 @@ export function groupPermissions(allPerms, descriptions) {
   return groups;
 }
 
-// "SEND_MESSAGES" -> "Send messages". Used for compact display next to a role
-// name; the full sentence from `descriptions` is the accessible title.
 export function humanizePerm(key) {
   const words = String(key || '').toLowerCase().split('_').filter(Boolean);
   if (!words.length) return '';

@@ -1,9 +1,5 @@
 // The role hierarchy: ordering, permissions, and the per-channel /
 // per-category permission override editor.
-//
-// Roles are assigned by people with Manage Roles - from Community Settings or
-// from a member's context menu. There is no self-assign path here or anywhere
-// else in the client.
 import Api from './api.js';
 import State from './state.js';
 
@@ -19,11 +15,9 @@ function roleColor(role) {
 }
 
 // Grouped permission toggles, built from whatever the server reports.
-//
 // Presentation only: `all` decides which permissions exist and `descriptions`
 // supplies their text, so the client never keeps its own copy of either. A
 // permission the server adds later lands in the "Other" group automatically
-// instead of disappearing from the editor.
 
 function permissionEditor(allPerms, descriptions, initial) {
   const current = new Set(initial || []);
@@ -76,19 +70,12 @@ async function renderServerRoles(container, serverId) {
 
   const ordered = () => [...(State.roles || [])].sort((a, b) => Number(b.position || 0) - Number(a.position || 0));
   const canManage = (role) => mayManage && test(String(role.id));
-  // Reorder sends every role id, so a single role at/above the actor fails the
-  // whole request server-side. Disable dragging outright rather than letting
-  // a drop bounce off an error.
   const canReorder = () => mayManage && (isOwner || !ordered().some((r) => top <= Number(r.position || 0)));
   const memberCount = (roleId) =>
     (State.members || []).filter((m) => (m.roles || []).some((r) => String(r.id) === String(roleId))).length;
 
   const wrap = el('div', { class: 'page roles-page' });
 
-  // The action list for one role. @everyone is a protected system role: it
-  // always exists, cannot be deleted and cannot be renamed, so those entries are
-  // not rendered for it at all. Everything else follows the hierarchy - a role
-  // at or above the viewer's own rank is visible but not actionable.
   const roleActions = (role, { manageable, mayManage: canManageAny }) => {
     const items = [];
     const pick = () => { selectedId = String(role.id); paint(); paintDetail(); };
@@ -128,7 +115,6 @@ async function renderServerRoles(container, serverId) {
   const n_for = (role) => (State.members || [])
     .filter((m) => (m.roles || []).some((r) => String(r.id) === String(role.id))).length;
 
-  // Deleting a role strips it from everyone who holds it, so say how many.
   const confirmDeleteRole = (role, holders) => {
     confirmDialog({
       title: 'Delete ' + (role.name || 'role') + '?',
@@ -197,7 +183,6 @@ async function renderServerRoles(container, serverId) {
   const paint = () => {
     clear(list);
     // The owner outranks every role and is not a role row, so it gets a
-    // fixed, undraggable row rather than pretending to be one.
     const ownerName = (State.serverDetail && (State.serverDetail.owner_username || State.serverDetail.owner_name)) || 'Owner';
     list.appendChild(el('div', { class: 'role-row role-row--owner' },
       el('span', { class: 'role-row__handle' }),
@@ -218,8 +203,6 @@ async function renderServerRoles(container, serverId) {
         'aria-label': (role.name || 'Role') + ', position ' + (all.length - idx) + ' of ' + all.length,
       });
 
-      // A real handle rather than the whole row: text selection still works,
-      // and it is only draggable when the rules allow a reorder at all.
       row.appendChild(el('span', {
         class: 'role-row__handle',
         title: manageable && canReorder() ? 'Drag to reorder' : 'Reordering unavailable',
@@ -243,11 +226,6 @@ async function renderServerRoles(container, serverId) {
       if (!manageable) row.appendChild(el('span', { class: 'role-row__lock' }, 'locked'));
 
       row.addEventListener('click', () => { selectedId = String(role.id); paint(); paintDetail(); });
-      // Right-click / long-press / keyboard on a role row. One menu, built from
-      // the same rules the detail pane uses, so the two cannot drift.
-      // @everyone is selectable and visible; its destructive entries are absent
-      // rather than greyed out, because the server refuses them regardless and a
-      // permanently disabled row just reads as a broken control.
       attachContextMenu(row, () => roleActions(role, { manageable, mayManage }), {
         target: () => ({ type: 'role', id: String(role.id) }),
       });
@@ -402,8 +380,6 @@ async function renderServerRoles(container, serverId) {
     const perms = permissionEditor(allPerms, descriptions, role.permissions || []);
     const err = el('div', { class: 'form-error', hidden: true });
 
-    // "Who has this" is the other half of the role object, so it lives here
-    // rather than only on the members page.
     const holders = (State.members || []).filter((m) => (m.roles || []).some((r) => String(r.id) === String(role.id)));
     const memberSection = el('div', { class: 'role-members' });
     memberSection.appendChild(el('div', { class: 'section-label' }, 'Members with this role (' + holders.length + ')'));
@@ -430,9 +406,6 @@ async function renderServerRoles(container, serverId) {
     save.addEventListener('click', async () => {
       err.hidden = true;
       save.disabled = true;
-      // Only send what actually changed. The baseline role's name is fixed, and
-      // posting it back unchanged would be a rename attempt the server has to
-      // special-case; not sending it keeps the payload honest.
       const patch = { color: useColour ? colour.value : null, permissions: perms.selected() };
       if (name.value.trim() !== String(role.name || '')) patch.name = name.value.trim();
       try {
@@ -449,17 +422,12 @@ async function renderServerRoles(container, serverId) {
     actions.appendChild(save);
 
     if (role.is_default) {
-      // Say why, rather than just hiding the button. @everyone is the role every
-      // member holds; a user looking for a delete button should be told the
-      // role is protected instead of left wondering where it went.
       box.appendChild(el('div', { class: 'role-protected' },
         el('strong', {}, '@everyone is protected'),
         el('span', { class: 'muted small' },
           'Every member has this role, so it always exists. Its permissions and colour can be edited, but it cannot be renamed or deleted.')));
     } else {
       const del = el('button', { class: 'btn danger', type: 'button' }, 'Delete role');
-      // One delete path, shared with the role context menu, so the confirmation
-      // always states the real number of affected members.
       del.addEventListener('click', () => confirmDeleteRole(role, n_for(role)));
       actions.appendChild(del);
     }

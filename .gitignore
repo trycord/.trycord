@@ -3,34 +3,26 @@ node_modules/
 
 # secrets / local state
 .env
+.env.local
+.env.*.local
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
 uploads/
 
-# build outputs (never commit binaries)
+# build output
 release/
 release-fresh/
 dist/
 trycord-desktop/client/
 *.zip
 
-# Exception: the shipped desktop artifacts, so a build can be handed over
-# without a release upload. Stored in Git LFS, because Trycord.exe is ~109 MB
-# and GitHub rejects ordinary blobs over 100 MB.
-#
-# Only the distributables are tracked. The staging tree they are built from
-# (win-unpacked, ~372 MB) stays ignored - it is an intermediate, not an output.
-!trycord-desktop/release/
-trycord-desktop/release/*
-!trycord-desktop/release/Trycord.exe
-!trycord-desktop/release/TrycordPTB.exe
-!trycord-desktop/release/latest.yml
-!trycord-desktop/release/*.blockmap
-
 # runtime logs
 *.log
 
-# documentation is model-instruction only — never commit markdown
-*.md
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

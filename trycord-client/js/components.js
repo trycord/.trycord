@@ -1,4 +1,3 @@
-// Shared render helpers. Build real DOM nodes from real state objects;
 // never from mock data.
 
 import { esc, el, clear, relTime, apiSrc, qs } from './ui.js';
@@ -22,11 +21,6 @@ export function initialOf(name) {
   return (s[0] || '?').toUpperCase();
 }
 
-// Media keys arrive in two shapes depending on which endpoint produced the
-// object: publicUser() emits camelCase (avatarUrl/bannerUrl), while raw member
-// and message rows come from queries that select avatar_url/banner_url. Call
-// sites were reading one or the other, so the same person showed a picture in
-// one surface and coloured initials in another. Read both, always.
 export function avatarUrlOf(user) {
   if (!user) return null;
   return user.avatarUrl || user.avatar_url || null;
@@ -38,18 +32,10 @@ export function bannerUrlOf(user) {
 
 // Object URLs for authenticated media, keyed by path and shared for the
 // session. Previously every render fetched the bytes again and revoked the URL
-// 60s later, so a member list re-rendered per presence tick and refetched
-// every avatar - which is both why avatars flickered between states and a
-// large reason the client did unnecessary work. A blob URL is immutable, so it
-// is safe to keep for the life of the page.
 const mediaUrls = new Map();   // path -> Promise<string|null>
 
-// Cap the cache. Keys are profile-media paths, which are unique per upload, so
-// a user cycling through avatars, or a large member list being paged, would
-// otherwise add an entry (and a live blob URL) for every path ever seen and
 // never release any of them. Oldest insertion is evicted first: an avatar is
 // only cached so re-renders do not refetch it, and the least recently *added*
-// entry is the least likely to be re-rendered.
 const MEDIA_CACHE_MAX = 300;
 
 function cacheMedia(path, promise) {
@@ -75,9 +61,7 @@ export function loadAuthedImage(path) {
   if (hit) return hit;
   const p = (async () => {
     try {
-      // Generic: profile media and community media are both "GET this
       // authenticated path, get bytes". One loader and one cache for both,
-      // keyed by the path the server handed us.
       const res = await Api.fetchAuthedImage(path);
       let mime = 'application/octet-stream';
       try {
@@ -90,10 +74,6 @@ export function loadAuthedImage(path) {
   return cacheMedia(path, p);
 }
 
-// Called after an upload replaces the image, so the next render shows the new
-// picture instead of the cached old one. Also called with the *previous* path
-// when a profile image is replaced or removed, otherwise the superseded blob
-// URL would sit in the cache holding bytes the server has already deleted.
 export function invalidateAuthedImage(path) {
   if (!path) return;
   evictMedia(path);
@@ -107,7 +87,6 @@ export function avatar(user, { size = 'sm', withPresence = true } = {}) {
     title: name,
     'aria-hidden': 'true',
   }, initialOf(name));
-  // Upgrade to the user's image when present. The bytes live behind the
   // Bearer-authenticated route, so a bare <img src> would 401; fetch with
   // the real session and swap in a blob URL.
   const src = avatarUrlOf(user);
@@ -126,21 +105,6 @@ export function avatar(user, { size = 'sm', withPresence = true } = {}) {
   return a;
 }
 
-export function presenceDot(id) {
-  return el('span', { class: 'presence-dot ' + (peerPresence(id) === 'online' ? 'online' : '') });
-}
-
-export function realmTitle(text) {
-  return el('div', { class: 'realm-title' }, text);
-}
-
-// Community mark. Communities have no stored icon, so identity is derived
-// deterministically from the name (same palette as avatars) and the initial
-// is shown. Used by the rail and the community header.
-// The community's identity mark: its icon when it has one, otherwise a
-// coloured initial. Reads both casings of the url because the roster and
-// server-detail shapes differ, exactly as avatar() does.
-//
 // The bytes are behind the authenticated media route, so the upgrade path is
 // the same fetch-with-session-then-blob-URL as an avatar.
 export function communityIconUrl(server) {
@@ -171,9 +135,6 @@ export function communityMark(name, { size = '', server = null } = {}) {
   return mark;
 }
 
-// Sidebar group: a labelled, optionally collapsible section. Collapsed state
-// is owned by the caller (it persists per community), so this is a pure
-// renderer.
 export function navGroup({ label, collapsible = false, collapsed = false, action = null, id = null }) {
   const group = el('section', { class: 'nav-group' + (collapsible ? ' nav-group--collapsible' : ''), dataset: id ? { group: id } : {} });
   if (label) {
@@ -214,7 +175,6 @@ export function navGroup({ label, collapsible = false, collapsed = false, action
   return group;
 }
 
-// ---- navigation rows -----------------------------------------------------
 
 export function navRow({ label, sub, icon, href, active, count, onClick }) {
   const row = el('button', {
@@ -245,9 +205,6 @@ export function serverChip(server, { active = false, onClick } = {}) {
     onClick,
     dataset: { serverId: server.id },
   });
-  // The rail is the one surface that most needs the community's own icon, and
-  // it was the one surface that ignored it: it rendered `initialOf(name)` and
-  // nothing else, so an uploaded icon appeared in the community header and
   // discover but never here. communityMark already resolves icon_url through
   // the authenticated loader, so use it rather than a second implementation.
   chip.appendChild(communityMark(server.name || '?', { size: 'community-mark--chip', server }));
@@ -277,20 +234,14 @@ export function emptyState(icon, title, sub) {
   return box;
 }
 
-// ---- message row -----------------------------------------------------------
 
 export function messageRow(msg, opts = {}) {
-  // msg follows the channel GET/POST shape: item per endpoint.
   const authorName = msg.user || msg.author_name || msg.author_display || 'Unknown';
   const disp = msg.author_display || msg.author_name || msg.user || 'Unknown';
   const authorId = msg.author_id;
   const isMine = opts.meId !== undefined && String(authorId) === String(opts.meId);
 
   const row = el('div', { class: 'msg', dataset: { messageId: msg.id } });
-  // author_avatar comes from the message queries. Without it every message
-  // author fell back to coloured initials while the same person's profile and
-  // member row showed their picture, which is what made avatars look
-  // inconsistent across surfaces.
   const avatarBox = avatar({
     id: authorId,
     username: msg.user || msg.author_name,
@@ -309,14 +260,6 @@ export function messageRow(msg, opts = {}) {
   }
 
   const head = el('div', { class: 'msg-head' });
-  // The author is a button, not a span: it has to be reachable by keyboard
-  // and announced as interactive. An <a href="#/users/id"> would be a lie
-  // because it navigates away from the message being read, so this opens a
-  // contextual card instead.
-  //
-  // user-actions is imported lazily inside the handler. It needs avatar()
-  // from this module, so a static import would be a cycle; deferring it means
-  // this module is fully evaluated before the other one asks for avatar.
   const authorBtn = el('button', {
     class: 'msg-author',
     type: 'button',
@@ -341,8 +284,6 @@ export function messageRow(msg, opts = {}) {
         });
       }).catch(() => { /* the card is an enhancement; never break the message */ });
     };
-    // Right-click gives the action list directly - ban, kick, roles, report -
-    // rather than making people open a card and then find the buttons.
     const openMenu = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -407,11 +348,8 @@ export function messageRow(msg, opts = {}) {
       const isImg = /^image\//.test(String(att.mime || ''));
       if (isImg) {
         // Image bytes live behind the Bearer-authenticated
-        // GET /api/attachments/:id endpoint, which a plain <img src>
         // can never satisfy (no Authorization header -> 401 -> broken
         // image). Load the bytes with the real session and swap in a
-        // blob URL; on failure fall back to the file row + authed
-        // download instead of a broken tile.
         const holder = el('span', { class: 'msg-file image is-loading' }, 'Loading ' + (att.filename || 'image') + '…');
         files.appendChild(holder);
         const fallbackRow = () => {
@@ -451,10 +389,6 @@ export function messageRow(msg, opts = {}) {
   return row;
 }
 
-// Reaction pills under a message. Clicking toggles the caller's reaction:
-// own emoji removes, others add. Pure renderer — the caller supplies
-// onReact(emoji, mine) or nothing (static display, e.g. DMs/pins lists
-// without handlers... callers that want clicks pass the callback).
 export function paintReactions(bar, list, onReact) {
   clear(bar);
   for (const r of list || []) {
@@ -472,11 +406,4 @@ export function paintReactions(bar, list, onReact) {
   bar.hidden = !(list && list.length);
 }
 
-// ---- compose helpers --------------------------------------------------------
-
-export function avatarUploadPreview(file) {
-  if (!file) return null;
-  return { name: file.name, size: file.size, url: URL.createObjectURL(file) };
-}
-
-export default { avatar, avatar: avatar, presenceDot, realmTitle, navRow, serverChip, channelRow, emptyState, messageRow, paintReactions, initialOf, hashColor };
+export default { avatar, navRow, serverChip, channelRow, emptyState, messageRow, paintReactions, initialOf, hashColor };

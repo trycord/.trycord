@@ -1,14 +1,4 @@
-// Clickable usernames and contextual user actions.
-//
-// One module owns "what can I do about this person, here", because the answer
-// is the same in a channel, a DM and the member list and previously existed
 // in three places that disagreed. Every action is gated on a real permission
-// check, and the client gate is only ever a mirror - the server re-checks
-// each one.
-//
-// Rendering: a username is a <button>, not a <span>. It has to be reachable
-// by keyboard and announced as interactive, and an <a href="#/users/id"> would
-// be a lie because it navigates away from the message you were reading.
 
 import Api from './api.js';
 import State, { can, currentServerId, isAuthed } from './state.js';
@@ -16,16 +6,6 @@ import { el, toast, confirmDialog, showUserCard, showContextMenu, closeContextMe
 import { avatar, avatarUrlOf, bannerUrlOf } from './components.js';
 import { openRoleAssignModal } from './role-assignment.js';
 
-/**
- * A clickable username.
- *
- * @param {object} user  needs at least { id, username, displayName?, avatarUrl? }
- * @param {object} opts
- *  - serverId   community context, for role/moderation actions
- *  - className  extra classes on the button
- *  - self       true for "this is you", which suppresses self-targeted actions
- *  - onCard     called with the card position if you want to customise
- */
 export function userNameButton(user, opts = {}) {
   const { serverId, className = 'msg-author', self = false, onCard, label } = opts;
   const id = user && (user.id || user.user_id);
@@ -43,8 +23,6 @@ export function userNameButton(user, opts = {}) {
     const r = btn.getBoundingClientRect();
     openUserCard({ ...ctx, x: r.left, y: r.bottom + 6, onCard });
   });
-  // Right-click is the shortcut to the actions themselves, not a detour
-  // through the card.
   btn.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -78,9 +56,6 @@ export function openUserMenu({ user, x, y, serverId, self = false }) {
   })));
 }
 
-/**
- * Build and open the contextual card for a user.
- */
 export function openUserCard({ user, x, y, serverId, self = false, onCard = null }) {
   const id = user && (user.id || user.user_id);
   if (!id) return;
@@ -101,8 +76,6 @@ export function openUserCard({ user, x, y, serverId, self = false, onCard = null
     : null;
   const statusLine = roles || (user.status_text ? user.status_text : null);
 
-  // Banner comes from the same normalised accessor as the avatar, so a
-  // member row (snake_case) and a /me payload (camelCase) both show it.
   const card = showUserCard(x, y, {
     avatarEl: av, title: name, sub, statusLine, actions,
     bannerUrl: bannerUrlOf(user),
@@ -113,10 +86,6 @@ export function openUserCard({ user, x, y, serverId, self = false, onCard = null
   return card;
 }
 
-/**
- * The action list. Split out so other surfaces (member rows, message context
- * menus) can reuse the exact same set instead of inventing their own.
- */
 export function buildUserActions({ user, id, name, sid, isSelf }) {
   const out = [];
   const authed = isAuthed();
@@ -126,7 +95,6 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
     return out;
   }
 
-  // Profile is always safe and always first.
   out.push({ label: 'View profile', onSelect: () => { location.hash = '#/users/' + id; } });
 
   // Direct message. Never offer this to yourself.
@@ -144,19 +112,12 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
     });
   }
 
-  // Role assignment opens the real assignment dialog for this member. It used
-  // to only link to the member list, which meant the only way to give someone a
-  // role was to find them in a list of everyone - and the list carried no way
-  // to remove a role at all.
   if (sid && !isSelf && can('MANAGE_ROLES')) {
     out.push({
       label: 'Manage roles',
       onSelect: async () => {
         try {
-          // The roster is the only place a member's roles are known, so read
           // the current row rather than trusting whatever the caller had. The
-          // endpoint returns the { items, total, ... } envelope; the page size
-          // is generous because this is a lookup, not a listing.
           const roster = await Api.serverMembers(sid, { limit: 500 });
           const rows = roster && Array.isArray(roster.items) ? roster.items : [];
           const row = rows.find((m) => String(m.user_id || m.id) === String(id));
@@ -204,21 +165,22 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
     }
   }
 
-  // Reporting is available to any member and is the only action here that
   // does not need a permission.
   out.push({
     label: 'Report',
     danger: true,
     onSelect: () => {
       closeContextMenu();
+      // that was never sent.
       import('./ui.js').then(({ openReportDialog }) => {
         openReportDialog({
           targetType: 'user',
           targetId: id,
           title: 'Report ' + name,
           subtitle: 'Reports go to this instance’s moderators.',
+          onSubmit: ({ category, extra }) => Api.reportContent('user', id, category, extra || undefined),
         });
-      }).catch(() => { /* ui module always available in practice */ });
+      }).catch(() => { toast('Could not open the report form.', 'error'); });
     },
   });
 

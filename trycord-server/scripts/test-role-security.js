@@ -13,7 +13,7 @@
 //
 // Also re-checks the hierarchy on every mutating verb.
 const http = require('http');
-const API = 'http://localhost:9971';
+const API = (process.env.TRYCORD_TEST_URL || 'http://localhost:9971').replace(/\/+$/, '');
 
 function req(m, p, b, t) {
   return new Promise((res) => {

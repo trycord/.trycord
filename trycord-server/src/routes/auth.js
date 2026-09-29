@@ -9,9 +9,14 @@ const { now, uuid, sign } = require('../util');
 const router = express.Router();
 const rateLimit = require('../middleware/ratelimit');
 const { TERMS_VERSION, PRIVACY_VERSION } = require('../legal');
-const { checkPassword } = require('../auth/passwords');
+const { checkPassword, BCRYPT_COST } = require('../auth/passwords');
 const enforcement = require('../services/enforcement');
 const recovery = require('../auth/recovery');
+
+let disconnectUser = () => {};
+function setGateway(gw) {
+  if (gw && typeof gw.disconnectUser === 'function') disconnectUser = gw.disconnectUser;
+}
 
 function isUniqueViolation(e) {
   const msg = String((e && e.message) || '');
@@ -40,7 +45,7 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
       if (taken) return fail(res, 'CONFLICT', 'that email is already in use');
     }
     const id = uuid();
-    const hash = await bcrypt.hash(String(password), 10);
+    const hash = await bcrypt.hash(String(password), BCRYPT_COST);
     try {
       await db.run(
         'INSERT INTO users (id, username, display_name, password_hash, created_at, terms_version, privacy_version, terms_accepted_at, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -96,6 +101,7 @@ router.post('/logout', auth, async (req, res, next) => {
       const expiresAt = new Date(req.user.exp * 1000).toISOString();
       await db.run(`INSERT ${db.ignoreKeyword} INTO revoked_tokens (jti, expires_at) VALUES (?, ?)`, [req.user.jti, expiresAt]);
     }
+    try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -117,7 +123,7 @@ router.post('/change-password', auth, rateLimit({ windowMs: 60000, max: 20 }), a
     if (!ok) return fail(res, 'BAD_PASSWORD', 'current password is incorrect');
     const reuse = await bcrypt.compare(String(newPassword), row.password_hash);
     if (reuse) return fail(res, 'VALIDATION_ERROR', 'new password must be different from the current one');
-    const hash = await bcrypt.hash(String(newPassword), 10);
+    const hash = await bcrypt.hash(String(newPassword), BCRYPT_COST);
     const ts = now();
     await db.run(
       'UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?',
@@ -125,6 +131,10 @@ router.post('/change-password', auth, rateLimit({ windowMs: 60000, max: 20 }), a
     );
     console.log(`[security] password_changed user=${req.user.id}`);
     const token = sign({ id: row.id, username: row.username });
+    // Every token issued before now is stale, the caller's included. Sockets
+    // are authorized only at upgrade time, so live ones are dropped here or a
+    // stolen session stays interactive for the life of the connection.
+    try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
     res.json({
       token,
       user: { id: row.id, username: row.username, displayName: row.display_name, createdAt: row.created_at },
@@ -138,6 +148,7 @@ router.post('/sessions/revoke-all', auth, async (req, res, next) => {
   try {
     await db.run('UPDATE users SET sessions_invalidated_at = ? WHERE id = ?', [now(), req.user.id]);
     console.log(`[security] all_sessions_revoked user=${req.user.id}`);
+    try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -150,6 +161,7 @@ router.post('/sessions/revoke-others', auth, async (req, res, next) => {
     await db.run('UPDATE users SET sessions_invalidated_at = ? WHERE id = ?', [ts, req.user.id]);
     const row = await db.get('SELECT id, username, display_name, created_at FROM users WHERE id = ?', [req.user.id]);
     console.log(`[security] other_sessions_revoked user=${req.user.id}`);
+    try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
     res.json({
       token: sign({ id: row.id, username: row.username }),
       user: { id: row.id, username: row.username, displayName: row.display_name, createdAt: row.created_at },
@@ -222,4 +234,5 @@ router.post('/ws/ticket', auth, rateLimit({ windowMs: 60000, max: 60 }), (req, r
 });
 
 module.exports = router;
+module.exports.setGateway = setGateway;
 module.exports.setTicketIssuer = setTicketIssuer;

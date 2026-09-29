@@ -1,6 +1,3 @@
-// Notification center: durable notification inbox (mentions, DMs via
-// realtime, friend requests). Rows deep-link to their context; opening
-// one marks it read.
 import Api from './api.js';
 import State, { refreshNotifications } from './state.js';
 import { attachContextMenu, copyText, el, clear, toast, relTime } from './ui.js';
@@ -48,9 +45,6 @@ export async function renderNotifications(container) {
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
 
-  // The action list for one notification. Entries reflect current state
-  // rather than being rendered once and left stale: a notification that is
-  // already read offers no "mark as read".
   const notifActions = (n, dest) => {
     const items = [];
     const markRead = async () => {
@@ -83,17 +77,12 @@ export async function renderNotifications(container) {
     return items;
   };
 
-  // Row rendering, shared by the first page and every "load more" after it.
   const renderRow = (n) => {
     const dest = destination(n);
     const row = el(dest ? 'button' : 'div', {
       class: 'row notif-row' + (n.readAt ? '' : ' unread'),
       type: dest ? 'button' : undefined,
     });
-    // Right click / long press for the actions, click to open. The row is the
-    // target so the menu knows which notification it belongs to, and the
-    // builder is re-read on open, so an entry that is no longer valid (it was
-    // just marked read) is simply not offered.
     attachContextMenu(row, () => notifActions(n, dest), {
       target: () => ({ type: 'notification', id: String(n.id) }),
     });
@@ -115,9 +104,6 @@ export async function renderNotifications(container) {
   };
 
   const PAGE = 30;
-  // Cursor for the next older page, owned by the server. Null means the list
-  // is exhausted, which is why the control is removed rather than disabled -
-  // a permanently greyed-out button reads as a broken feature.
   let nextCursor = null;
   let loadingMore = false;
 

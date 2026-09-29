@@ -13,4 +13,12 @@ function checkPassword(pw) {
   return null;
 }
 
-module.exports = { MIN_LENGTH, MAX_LENGTH, checkPassword };
+// bcrypt work factor. The default is the OWASP minimum for bcrypt; operators on
+// slow hardware can lower it via BCRYPT_COST. Raising it does not invalidate
+// existing hashes, since the cost is stored inside each hash.
+const BCRYPT_COST = Math.min(
+  Math.max(parseInt(process.env.BCRYPT_COST || '', 10) || 12, 10),
+  15
+);
+
+module.exports = { MIN_LENGTH, MAX_LENGTH, BCRYPT_COST, checkPassword };

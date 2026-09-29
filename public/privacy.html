@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Privacy Policy — Trycord</title>
-  <meta name="description" content="Privacy Policy for Trycord. Draft placeholder for review — not a finalized or legally reviewed document.">
+  <title>Privacy Policy â€” Trycord</title>
+  <meta name="description" content="How a Trycord instance handles personal data: what the software stores, the retention it enforces, and how to request account deletion.">
   <link rel="icon" href="/assets/trycord-logo.ico" type="image/x-icon">
   <link rel="icon" href="/assets/trycord-logo.png" type="image/png">
   <link rel="stylesheet" href="/css/site.css">
@@ -16,7 +16,8 @@
     <div class="wrap nav-wrap">
       <a class="brand" href="/">
         <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
-        <span class="brand-name">Trycord</spanhref="/"
+        <span class="brand-name">Trycord</span>
+      </a>
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
       <nav class="site-nav" id="site-nav" aria-label="Primary">
         <a href="/">Home</a>
@@ -31,100 +32,163 @@
   </header>
 
   <main id="main" class="page tight">
+    <!-- page:begin -->
+    <!-- Everything between the two markers below is the editable region. The page editor replaces it on publish; until a page is published this file is served as-is. Remove the markers only if you never intend to use the editor. -->
     <div class="prose">
       <h1>Privacy Policy</h1>
       <div class="draft-note" role="note">
-        <strong>DRAFT — not in effect.</strong> This is a placeholder template,
-        not a finalized document and not legal advice. It has not been reviewed
-        by counsel for the operator of this instance. Items marked
-        <code>[&#8202;&#8202;]</code> are placeholders to be completed before
-        this Policy is presented to users. It describes how this instance
-        intends to handle personal information; confirm it matches the software's
-        actual behavior before publishing.
+        <strong>Template for self-hosters.</strong> This page is a starting
+        point, not a legal document, and it is not legal advice. The sections
+        describing <em>what the software does</em> are accurate as written and
+        identical on every instance. The fields marked
+        <code>OPERATOR</code> are the ones only you can fill in, because they
+        depend on your instance: your identity, your jurisdiction, your
+        subprocessors, your age threshold, and any retention period longer than
+        the built-in ones. If you run an instance, you are the controller of the
+        data on it and you should publish your own policy.
       </div>
-      <p class="small muted">Effective date: <code>[date to be set]</code> &middot; Version: <code>[version to be set]</code></p>
+      <p class="small muted">Template version <code>1.0</code> &middot; Edit before publishing</p>
 
-      <h2>1. What we process</h2>
-      <p>This instance is supplied with the information you give it and what the software needs to run:</p>
+      <h2>1. What the software processes</h2>
+      <p>An instance stores what you give it and what the service needs to run:</p>
       <ul>
-        <li><strong>Account data</strong> — email address, username, display name, password (stored as a salted hash), and registration metadata.</li>
-        <li><strong>Profile data</strong> — status, bio, avatar, and banner images you upload.</li>
-        <li><strong>Content</strong> — messages, edited and deleted messages, and attached files you send.</li>
-        <li><strong>Technical data</strong> — IP address, standard server access logs, and transport metadata needed to operate the service.</li>
+        <li><strong>Account data</strong> &mdash; username, display name, optional email address, and a bcrypt hash of your password. The password itself is never stored. The version of the Terms and Privacy Policy you accepted, and when, is recorded against your account.</li>
+        <li><strong>Profile data</strong> &mdash; status text, bio, avatar and banner images, community icon and banner images, and the files you attach to messages.</li>
+        <li><strong>Content</strong> &mdash; the messages you send, in communities and in direct messages, plus their edit and deletion history, and your reactions, pins and mutes.</li>
+        <li><strong>Social graph</strong> &mdash; which communities you joined, which roles you hold there, and your friendships and friend requests.</li>
+        <li><strong>Moderation records</strong> &mdash; reports you file, appeals you submit, moderation actions taken against accounts or communities, and an audit log of administrative actions.</li>
+        <li><strong>Short-lived tokens</strong> &mdash; password reset and email verification tokens, stored only as a SHA-256 hash, and a denylist of revoked session tokens.</li>
       </ul>
-
-      <h2>2. Legal basis</h2>
       <p>
-        [State the legal basis under the law that applies to your instance —
-        for example, performance of a contract (your acceptance of the Terms),
-        legitimate interest in operating and securing the service, or consent.]
+        The application server does not keep a request log of its own. If this
+        instance sits behind a reverse proxy such as nginx or Caddy, that proxy
+        may record IP addresses and request paths; what it keeps, and for how
+        long, is the operator's configuration, not the software's.
       </p>
 
-      <h2>3. How we use it</h2>
+      <h2>2. Why it is processed</h2>
       <ul>
-        <li>To provide, secure, and improve the messaging service.</li>
-        <li>To discharge your account — including recovery email verification and password resets.</li>
-        <li>To enforce our Terms and respond to reports and appeals.</li>
+        <li><strong>To provide the service</strong> &mdash; running the software requires storing your account and the content you send. This rests on your acceptance of the Terms.</li>
+        <li><strong>To keep the service secure</strong> &mdash; revoking sessions, rate limiting, enforcing role permissions, and investigating abuse.</li>
+        <li><strong>To meet your requests</strong> &mdash; delivering password reset and email verification mail, and answering a data subject request.</li>
+        <li><strong>Consent</strong> &mdash; where you supply an email address, so that we can contact you about that account.</li>
       </ul>
-
-      <h2>4. Sharing</h2>
       <p>
-        We do not sell personal information. [List any processors or services
-        this instance relies on — for example the email provider used for
-        recovery messages, or the hosting provider — and what they may access.]
+        The specific lawful basis under the law that applies to your instance is
+        <span class="op-field" data-op="legal-basis">OPERATOR: state the lawful basis under your jurisdiction &mdash; for example performance of a contract, legitimate interest, or consent</span>.
+      </p>
+
+      <h2>3. Who else sees it</h2>
+      <p>
+        Personal information is not sold, and it is not used to train models.
+        It is visible to other people only where the product requires it: other
+        members of a community can read the messages you post there and see your
+        display name, avatar and roles; the recipient of a direct message sees
+        what you send them. A community's moderators can act on its members and
+        see its message history.
+      </p>
+      <p>
+        Outside that, an operator may rely on processors &mdash; for example an
+        email provider, if SMTP is configured for password resets, and a hosting
+        provider.
+        <span class="op-field" data-op="processors">OPERATOR: list your processors here, and what each may access. A self-hosted instance with no SMTP configured sends no email at all.</span>
+      </p>
+
+      <h2>4. Storage, including off the host</h2>
+      <p>
+        By default, files are written to a directory on the machine running the
+        server. An operator may instead configure an S3-compatible object store
+        &mdash; Amazon S3, Cloudflare R2, MinIO, or another provider. Either
+        way the bucket or directory is the operator's to secure, and the software
+        expects it to be private: every file is served through an authenticated
+        route that checks the viewer's access first, so a publicly readable
+        bucket would expose attachments that the software would otherwise gate.
       </p>
 
       <h2>5. Retention</h2>
+      <p>These periods are built into the software and apply on every instance:</p>
+      <ul>
+        <li><strong>Revoked session tokens</strong> &mdash; purged hourly, once past the session's own expiry.</li>
+        <li><strong>Password reset and email verification tokens</strong> &mdash; purged hourly, once used or expired.</li>
+        <li><strong>Uploaded files not yet attached to a message</strong> &mdash; deleted after 24 hours, along with their database record.</li>
+      </ul>
       <p>
-        [Set your retention periods. Example: content remains until you delete
-        it or close your account; server logs may be kept for
-        <code>[N]</code> months; backups may temporarily retain data.]
+        Everything else &mdash; messages, communities, roles, moderation and audit
+        records &mdash; is kept until it is deleted or until the account is
+        erased. The software implements no other automatic expiry.
+        <span class="op-field" data-op="retention">OPERATOR: state any retention period longer than these, and your backup retention. Trycord does not manage backups, and a backup taken before an erasure will still contain the data until that backup is discarded.</span>
       </p>
 
-      <h2>6. Security</h2>
+      <h2>6. Erasure</h2>
       <p>
-        [Summarize the actual measures in place, for example: passwords hashed
-        with a secure algorithm, JWT sessions with server-side management,
-        rate limiting, transport encryption where deployed, and a strict
-        Content-Security-Policy.] No method of transmission is perfect;
-        you acknowledge that the operator will take reasonable measures but
-        cannot guarantee absolute security.
+        You can ask for your account to be deleted from
+        <em>Settings &rarr; Account &rarr; Delete my account</em>. The request
+        requires your password and is reviewed by an administrator before it
+        runs. When it runs:
+      </p>
+      <ul>
+        <li>Erased: your username, email address, display name, bio, avatar and banner, every file you uploaded, your sessions, friendships, friend requests and notifications. Your username is replaced with a placeholder, so it stays unique and cannot be reassigned to someone else.</li>
+        <li>Kept: the messages you posted, and any moderation or audit record that names you. These are kept so that other people's conversations remain intact and so that action taken against your account, or by your account, stays on the record. They resolve to a deleted account rather than to you.</li>
+        <li>Transferred: a community you owned is handed to its longest-standing remaining member, so the people still using it are not left without an owner.</li>
+      </ul>
+      <p>
+        You can withdraw a request before it is processed, from the same screen.
+        Every request and decision is written to the audit log.
       </p>
 
-      <h2>7. Your rights</h2>
+      <h2>7. Security measures in the software</h2>
+      <ul>
+        <li>Passwords are hashed with bcrypt at a work factor of 12, configurable per instance.</li>
+        <li>Sessions are signed tokens with a per-token identifier, so an individual session can be revoked and all sessions can be revoked at once. Revoking sessions also disconnects any live connection opened by the old session.</li>
+        <li>Permissions are enforced on the server for every request, not in the client. Role hierarchy limits who may grant, edit, reorder or remove which role.</li>
+        <li>Uploads are identified by their contents, not by the file name the sender supplied, and are rejected unless they are a supported image, PDF or text type.</li>
+        <li>A Content-Security-Policy is sent with client resources, inline scripts are not permitted, and the origin allowed to call the API is configurable.</li>
+        <li>Administrative actions, moderation actions and erasure decisions are written to an audit log.</li>
+      </ul>
       <p>
-        Depending on your jurisdiction, you may be entitled to access, correct,
-        delete, or export your personal information, and to object to or restrict
-        certain processing. [Describe how to ask — for example the in-app
-        deletion tools or contacting <code>[operator contact]</code>.]
+        Transport encryption is the operator's responsibility: Trycord speaks
+        plain HTTP and expects to sit behind a proxy that terminates TLS, except
+        in local development. No method of transmission is perfect, and the
+        operator cannot guarantee absolute security.
       </p>
 
-      <h2>8. Children</h2>
+      <h2>8. Your rights</h2>
       <p>
-        [Insert the age threshold for this instance — the software itself does
-        not enforce one. If you do not offer the service to children, state that
-        it is not directed at them and that you will delete accounts created in
-        violation.]
+        Depending on your jurisdiction you may be entitled to access, correct,
+        delete, export or restrict processing of your personal information, and
+        to object to it. In the app you can read and change your own profile,
+        revoke sessions, and request deletion as described above. For anything
+        else, contact
+        <span class="op-field" data-op="contact">OPERATOR: your privacy contact address</span>.
       </p>
 
-      <h2>9. International transfers</h2>
+      <h2>9. Children</h2>
       <p>
-        [If data crosses borders, state where and on what basis.]
+        The software does not enforce an age threshold; it has no age check and
+        no mechanism for verifying a user's age. Operators who serve children are
+        responsible for the threshold they apply and for enforcing it.
+        <span class="op-field" data-op="age-threshold">OPERATOR: state your age threshold, or state that the service is not directed at children.</span>
       </p>
 
-      <h2>10. Changes</h2>
+      <h2>10. International transfers</h2>
       <p>
-        We will update this Policy as practices change. In line with the
-        app's versioned acceptance, users will be asked to accept updated
-        versions before they take effect.
+        <span class="op-field" data-op="transfers">OPERATOR: state where this instance is hosted, and where any processor named in section 3 is located, if data is transferred outside your jurisdiction.</span>
       </p>
 
-      <h2>11. Contact</h2>
+      <h2>11. Changes</h2>
       <p>
-        Privacy questions should be directed to your instance's operator at
-        <code>[operator contact]</code>.
+        The software versions this policy, and records on your account the
+        version you accepted and when. When a new version is published, users
+        are asked to accept it before it takes effect.
+      </p>
+
+      <h2>12. Contact</h2>
+      <p>
+        Privacy questions about this instance go to
+        <span class="op-field" data-op="contact-operator">OPERATOR: your privacy contact address</span>.
       </p>
     </div>
+    <!-- page:end -->
   </main>
 
   <footer class="site-footer">
@@ -132,7 +196,8 @@
       <div class="footer-brand">
         <a class="brand" href="/">
           <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
-          <span class="brand-name">Trycord</spanhref="/"
+          <span class="brand-name">Trycord</span>
+        </a>
         <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>
       </div>
       <div class="footer-col">
@@ -151,6 +216,7 @@
         <a href="/terms">Terms of Service</a>
         <a href="/instances-terms">Official instance terms</a>
         <a href="/privacy">Privacy Policy</a>
+        <a href="/trust-and-safety">Trust &amp; Safety</a>
       </div>
     </div>
     <div class="wrap footer-bottom">

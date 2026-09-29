@@ -5,13 +5,13 @@
   "main": "src/server.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/LanxTheShowmaker/.trycord.git",
+    "url": "https://github.com/trycord/.trycord.git",
     "directory": "trycord-server"
   },
   "bugs": {
-    "url": "https://github.com/LanxTheShowmaker/.trycord/issues"
+    "url": "https://github.com/trycord/.trycord/issues"
   },
-  "homepage": "https://github.com/LanxTheShowmaker/.trycord#readme",
+  "homepage": "https://github.com/trycord/.trycord#readme",
   "keywords": [
     "chat",
     "self-hosted",
@@ -24,6 +24,7 @@
     "seed": "node scripts/seed.js",
     "migrate": "node scripts/migrate.js",
     "check": "node scripts/check.js",
+    "test": "node scripts/test-all.js",
     "test:regression": "node scripts/test-regression.js",
     "test:f1f2": "node scripts/test-f1f2.js",
     "test:phase2": "node scripts/test-phase2.js",

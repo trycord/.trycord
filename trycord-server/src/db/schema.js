@@ -78,17 +78,6 @@ function tables(engine) {
          FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
        )${engine}`,
 
-    // Per-channel overrides. The most specific level, so it wins over both the
-    // category and the role-derived community default.
-    `CREATE TABLE IF NOT EXISTS channel_permission_overrides (
-         channel_id VARCHAR(64) NOT NULL,
-         permission VARCHAR(64) NOT NULL,
-         effect     VARCHAR(8) NOT NULL,
-         PRIMARY KEY (channel_id, permission),
-         FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
-       )${engine}`,
-
-
     `CREATE TABLE IF NOT EXISTS roles (
       id          VARCHAR(64) PRIMARY KEY,
       server_id   VARCHAR(64) NOT NULL,
@@ -151,6 +140,17 @@ function tables(engine) {
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     )${engine}`,
+
+    // Per-channel overrides. Declared after channels: InnoDB resolves foreign
+    // keys at CREATE time, so a table that references channels before channels
+    // exists fails with errno 150 on a fresh MySQL database.
+    `CREATE TABLE IF NOT EXISTS channel_permission_overrides (
+         channel_id VARCHAR(64) NOT NULL,
+         permission VARCHAR(64) NOT NULL,
+         effect     VARCHAR(8) NOT NULL,
+         PRIMARY KEY (channel_id, permission),
+         FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
+       )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS messages (
          id         VARCHAR(64) PRIMARY KEY,
@@ -371,6 +371,46 @@ function tables(engine) {
       FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE SET NULL
     )${engine}`,
 
+    // Static page editor. One row per editable page, holding structured content
+    // rather than HTML: an array of typed blocks, so an administrator cannot
+    // inject script or arbitrary markup into a legal page. The original file in
+    // public/ stays the fallback until a page is published, so an instance that
+    // never uses the editor behaves exactly as before.
+    `CREATE TABLE IF NOT EXISTS pages (
+      id          VARCHAR(64) PRIMARY KEY,
+      route       VARCHAR(64) NOT NULL UNIQUE,
+      title       VARCHAR(128) NOT NULL,
+      description VARCHAR(255),
+      status      VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+      draft_body  TEXT,
+      draft_author VARCHAR(64),
+      draft_at    VARCHAR(64),
+      published_body TEXT,
+      published_author VARCHAR(64),
+      published_at VARCHAR(64),
+      legal       INTEGER NOT NULL DEFAULT 0,
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (draft_author) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (published_author) REFERENCES users(id) ON DELETE SET NULL
+    )${engine}`,
+
+    // Every save is kept, publish or not. Restoring a revision creates a new
+    // revision rather than rewriting history, so an accidental publish is
+    // recoverable and the sequence of decisions stays auditable.
+    `CREATE TABLE IF NOT EXISTS page_revisions (
+      id          VARCHAR(64) PRIMARY KEY,
+      page_id     VARCHAR(64) NOT NULL,
+      revision    INTEGER NOT NULL,
+      body        TEXT NOT NULL,
+      title       VARCHAR(128) NOT NULL,
+      state       VARCHAR(16) NOT NULL,
+      author_id   VARCHAR(64),
+      created_at  VARCHAR(64) NOT NULL,
+      UNIQUE (page_id, revision),
+      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE,
+      FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+    )${engine}`,
+
     `CREATE TABLE IF NOT EXISTS audit_logs (
       id         VARCHAR(64) PRIMARY KEY,
       actor_id   VARCHAR(64) NOT NULL,
@@ -381,6 +421,30 @@ function tables(engine) {
       report_id  VARCHAR(64),
       created_at VARCHAR(64) NOT NULL,
       FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
+    // Account deletion requests. The account is anonymised, not hard-deleted:
+    // moderation and audit rows reference the actor and have to outlive them,
+    // so the user row survives with the identity columns cleared. Deleting the
+    // row instead would cascade the evidence away.
+    `CREATE TABLE IF NOT EXISTS account_deletion_requests (
+      id              VARCHAR(64) PRIMARY KEY,
+      user_id         VARCHAR(64) NOT NULL,
+      status          VARCHAR(32) NOT NULL,
+      -- Always 'GDPR'. Set by the server when the user asks, never chosen by
+      -- an administrator, so the queue cannot be padded with ordinary
+      -- moderation work.
+      request_type    VARCHAR(32) NOT NULL DEFAULT 'GDPR',
+      reason          TEXT,
+      requested_at    VARCHAR(64) NOT NULL,
+      reviewed_at     VARCHAR(64),
+      reviewed_by     VARCHAR(64),
+      processed_at    VARCHAR(64),
+      cancelled_at    VARCHAR(64),
+      anonymised_at   VARCHAR(64),
+      UNIQUE (user_id, status),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
     )${engine}`,
 
     // Channel engagement (message search/pins/reactions/mutes): one pin per
@@ -607,6 +671,16 @@ const INDEXES = [
   'CREATE INDEX idx_appeals_action ON appeals(action_id)',
   'CREATE INDEX idx_audit_created ON audit_logs(created_at)',
   'CREATE INDEX idx_audit_actor ON audit_logs(actor_id, created_at)',
+  'CREATE INDEX idx_audit_target ON audit_logs(target_type, target_id)',
+  'CREATE INDEX idx_audit_action ON audit_logs(action)',
+  'CREATE INDEX idx_deletion_status ON account_deletion_requests(status, requested_at)',
+  'CREATE INDEX idx_pages_status ON pages(status)',
+  'CREATE INDEX idx_page_revisions_page ON page_revisions(page_id, revision)',
+  // servers had no indexes at all. Discovery is reachable without
+  // authentication and filters on these columns, so it was a full scan
+  // (twice: once to count, once to page).
+  'CREATE INDEX idx_servers_discovery ON servers(is_public, is_discoverable, enforcement_state)',
+  'CREATE INDEX idx_servers_owner ON servers(owner_id)',
   'CREATE INDEX idx_pins_channel ON pinned_messages(channel_id, pinned_at)',
   'CREATE INDEX idx_reactions_message ON reactions(message_id)',
   'CREATE INDEX idx_muted_user ON muted_channels(user_id)',
@@ -750,6 +824,30 @@ async function applySchema(conn) {
   await backfillSequence(conn, 'messages', 'channel_id');
   await backfillSequence(conn, 'dm_messages', 'conversation_id');
 
+  // users.email must be unique on every dialect, including a MySQL database
+  // created by an older build. CREATE TABLE IF NOT EXISTS is a no-op on an
+  // existing table and ALTER TABLE ADD COLUMN UNIQUE is not portable, so the
+  // guarantee is expressed as a unique index instead. MySQL has no
+  // CREATE INDEX IF NOT EXISTS, hence the existence check.
+  if (dialect === 'mysql') {
+    if (!(await mysqlIndexExists(conn, 'users', 'idx_users_email_unique'))) {
+      const dupes = await conn.all(
+        "SELECT email FROM users WHERE email IS NOT NULL AND email <> '' GROUP BY email HAVING COUNT(*) > 1 LIMIT 5"
+      );
+      if (dupes.length) {
+        // Refusing is the only safe answer: building the index over duplicate
+        // values fails, and silently allowing duplicates breaks the assumption
+        // that an email identifies exactly one account.
+        throw new Error(
+          'schema: users.email has duplicate values, so the unique index cannot be built. ' +
+          'Resolve the duplicates listed below, then restart: ' +
+          JSON.stringify(dupes.map((d) => d.email))
+        );
+      }
+      await conn.exec('CREATE UNIQUE INDEX idx_users_email_unique ON users(email)');
+    }
+  }
+
   // Create indexes after all column types have been normalized.
   for (const idx of INDEXES) {
     if (dialect === 'sqlite') {
@@ -796,8 +894,22 @@ async function backfillSequence(conn, table, scope) {
   }
 }
 
+// Table names in creation order, which is also foreign-key order: every table
+// is declared after the tables it references. Anything that needs to walk every
+// table (data import, parity checks) reads this instead of keeping its own list,
+// so a new table cannot be silently left out.
+function tableNames() {
+  return tables('')
+    .map((ddl) => {
+      const m = /CREATE TABLE IF NOT EXISTS (\w+)/.exec(ddl);
+      return m ? m[1] : null;
+    })
+    .filter(Boolean);
+}
+
 module.exports = {
   tables,
+  tableNames,
   applySchema,
   // Exported for scripts/test-schema-parity.js. The SQLite and MySQL migration
   // lists describe the same schema changes and have to agree; the test needs to

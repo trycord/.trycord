@@ -1,6 +1,3 @@
-// Crash surface. Runs before the ES-module graph (plain script, no imports)
-// so a failed module load paints an actionable panel instead of a blank
-// window. Pure defensive UI: no app state, no network.
 (function () {
   function paintError(msg) {
     if (document.getElementById('trycord-crash')) return;
@@ -41,14 +38,7 @@
       paintError('The app files changed while this window was open. Reload to pick up the latest build.');
     }
   });
-  // "Has the app painted anything?"
-  //
-  // This must name every root a view can legitimately render into, or a working
-  // app gets declared dead. The auth overlay is a third one: it is a
   // position-fixed layer mounted straight on <body>, deliberately outside the
-  // view regions so the mobile/desktop shell cannot collapse it. Forgetting it
-  // here meant a perfectly good sign-in screen was covered by a crash panel
-  // nine seconds after load - in the desktop app and in the browser alike.
   function hasRendered() {
     try {
       return !!document.querySelector(
@@ -66,10 +56,7 @@
       paintError('The page loaded but rendered nothing. Reload to retry.');
     }
   }, 9000);
-  // Self-healing: if the app finishes rendering AFTER the watchdog fired
   // (slow boot, rate-limited boot, long debug session), remove the false
-  // alarm instead of covering a working app forever. Event-driven via
-  // MutationObserver: zero polling cost, lives as long as the page.
   function heal() {
     try {
       if (hasRendered()) {

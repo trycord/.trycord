@@ -11,6 +11,7 @@ const rateLimit = require('../middleware/ratelimit');
 const { fail } = require('../errors');
 const { visibleChannel } = require('../util');
 const { hasChannelPermission } = require('../services/permissions');
+const memberships = require('../services/memberships');
 const uploads = require('../services/uploads');
 
 const router = express.Router();
@@ -49,6 +50,11 @@ router.post(
       if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
         return fail(res, 'PERMISSION_DENIED', 'you cannot post in this server');
       }
+      // Uploading is a write. Without this a timed-out member fills the host
+      // disk with files they can never attach to a message.
+      if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
+        return fail(res, 'TIMED_OUT', 'you are timed out in this server');
+      }
       if (!req.file || !req.file.buffer) {
         return fail(res, 'VALIDATION_ERROR', 'send the file as a multipart field named "file"');
       }
@@ -64,6 +70,14 @@ router.post(
   }
 );
 
+// Current usage for the caller. The client needs this to show a meter and to
+// explain a 413 before the user has burned an upload on finding out.
+router.get('/attachments/quota', auth, async (req, res, next) => {
+  try {
+    res.json(await uploads.quota(req.user.id));
+  } catch (e) { next(e); }
+});
+
 router.get('/attachments/:id', auth, async (req, res, next) => {
   try {
     const a = await uploads.authorized(req.user.id, req.params.id);
@@ -73,16 +87,16 @@ router.get('/attachments/:id', auth, async (req, res, next) => {
     res.setHeader('Content-Disposition', "inline; filename*=UTF-8''" + disp);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    res.sendFile(uploads.filePath(a.id), { dotfiles: 'allow' }, (err) => {
-      if (err && !res.headersSent) return fail(res, 'NOT_FOUND', 'attachment not found');
-    });
+    const stream = uploads.openAttachment(a);
+    stream.on('error', () => { if (!res.headersSent) fail(res, 'NOT_FOUND', 'attachment not found'); });
+    stream.pipe(res);
   } catch (e) { next(e); }
 });
 
 // Profile media (avatars / banners) are public identity by design — any
-// authenticated user may load them. The file id must carry the pf- prefix
-// (enforced by storeProfileMedia), so this route cannot serve a message
-// attachment.
+// authenticated user may load them. Class isolation is now a property of the
+// object key, which is rebuilt from the owning row: a message attachment id
+// cannot resolve to a profile object.
 router.get('/attachments/profile/:id', auth, async (req, res, next) => {
   try {
     const row = await uploads.profileMedia(req.params.id);
@@ -90,9 +104,9 @@ router.get('/attachments/profile/:id', auth, async (req, res, next) => {
     res.setHeader('Content-Type', row.mime);
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.sendFile(uploads.filePath(row.id), { dotfiles: 'allow' }, (err) => {
-      if (err && !res.headersSent) return fail(res, 'NOT_FOUND', 'attachment not found');
-    });
+    const stream = uploads.openProfileMedia(row);
+    stream.on('error', () => { if (!res.headersSent) fail(res, 'NOT_FOUND', 'attachment not found'); });
+    stream.pipe(res);
   } catch (e) { next(e); }
 });
 

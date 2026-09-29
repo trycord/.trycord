@@ -44,7 +44,6 @@ async function renderInvites(container, serverId) {
       const link = TrycordConfig.backendUrl().replace(/\/+$/, '') + '/#/invite/' + inv.code;
       const row = el('div', { class: 'row' });
       // A revoked invite is already spent, so it offers no actions. Saying so
-      // beats a menu of things that will fail.
       attachContextMenu(row, () => (inv.revoked ? [
         { label: 'Revoked invite', disabled: true, desc: 'This link can no longer be used' },
         { label: 'Copy invite code', onSelect: () => copyText(String(inv.code), 'Invite code copied.') },
@@ -58,13 +57,7 @@ async function renderInvites(container, serverId) {
         } },
       ]), { target: () => ({ type: 'invite', id: String(inv.id) }) });
       const m = el('div', { class: 'row-main' });
-      // An invite is shared with other PEOPLE, so the link has to point at the
       // instance, not at whatever is rendering this screen. location.origin is
-      // correct only when the app is served over http(s); in the packaged
-      // desktop app it is the app scheme (or "null" under the old file://
-      // load), which produces a link nobody else can open. Resolve it from the
-      // configured backend instead, so the same code produces a shareable link
-      // in the browser, on a self-hosted instance, and on the desktop.
       m.appendChild(el('div', { class: 'row-title mono' }, inv.code));
       m.appendChild(el('div', { class: 'row-sub' },
         inv.uses + ' uses' +
@@ -99,19 +92,9 @@ async function renderInvites(container, serverId) {
   await reload();
 }
 
-// ---- server settings --------------------------------------------------------
 
-// Community settings, as a sectioned hub rather than one long form.
-//
-// Structure follows the account settings (same .settings-nav, same
 // hash-routed sections) instead of inventing a second navigation pattern, and
-// the per-area pages that already exist - roles, members, invites, channels,
-// categories - are LINKED rather than reimplemented here. One settings page
-// that shows where everything lives, not a second copy of every editor.
-//
 // Sections are gated on the permission that already authorises the thing they
 // describe, so the nav never offers a destination that would immediately
-// refuse. MANAGE_SERVER is the entry requirement, matching the previous
-// behaviour of this page.
 
 export { renderInvites };

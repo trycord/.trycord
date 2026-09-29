@@ -1,7 +1,3 @@
-// A text channel: history, composer, attachments, reactions, pins.
-//
-// Split out of the former pages-workspace.js. This is the single largest view
-// in the client and it owns only the conversation surface.
 import Api from './api.js';
 import State from './state.js';
 import Realtime from './realtime.js';
@@ -13,7 +9,7 @@ import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } fr
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
 import { TrycordConfig } from './config.js';
 
-async function renderChannel(container, serverId, channelId) {
+async function renderChannel(container, serverId, channelId, opts = {}) {
   clear(container);
   let server;
   try {
@@ -49,7 +45,6 @@ async function renderChannel(container, serverId, channelId) {
       btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
     },
   }, '☰');
-  // Mute state for the header bell (one cheap read per channel open).
   let muted = isMuted(channelId);
   try { await refreshMutes(); muted = isMuted(channelId); } catch { /* keep last known */ }
   const bellBtn = el('button', {
@@ -88,7 +83,6 @@ async function renderChannel(container, serverId, channelId) {
   const moreBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Community actions', 'aria-label': 'Community actions',
     onClick: () => {
-      // Reuses the sidebar community menu — one menu, two entry points.
       const menu = document.querySelector('#place-navigation .place-header__menu');
       if (menu) menu.click();
     },
@@ -101,13 +95,8 @@ async function renderChannel(container, serverId, channelId) {
   thread.appendChild(feed);
   conv.appendChild(thread);
 
-  // How many messages one page of history is. The initial load takes one
-  // page; older pages are fetched on demand (see loadOlder). Must match the
-  // server's clamp in trycord-server/src/routes/messages.js.
   const HISTORY_PAGE = 50;
 
-  // Channel intro block: always tops the feed (scrolls away with
-  // history), doubled as the empty state when there is nothing yet.
   function channelIntro(withCta) {
     const box = el('div', { class: 'channel-intro' }, el('div', { class: 'channel-intro__mark' }, '#'));
     box.setAttribute('data-intro', '1');
@@ -118,9 +107,6 @@ async function renderChannel(container, serverId, channelId) {
     return box;
   }
 
-  // ---- history ----
-  // Highest and lowest seq currently painted. These are the cursors for
-  // both directions: `after` fills a reconnect gap, `before` pages back.
   let highSeq = 0;
   let lowSeq = 0;
   let historyExhausted = false;
@@ -132,9 +118,6 @@ async function renderChannel(container, serverId, channelId) {
     if (!lowSeq || m.seq < lowSeq) lowSeq = m.seq;
   };
 
-  // Prepend one older page. Anchor-based: capture the scroll height before
-  // inserting, then restore the offset afterwards, so the message the user
-  // was reading stays put instead of the viewport jumping.
   async function loadOlder() {
     if (loadingOlder || historyExhausted) return;
     if (!lowSeq) return;
@@ -145,7 +128,6 @@ async function renderChannel(container, serverId, channelId) {
     try {
       const msgs = await Api.messages(channelId, { before: lowSeq, limit: HISTORY_PAGE });
       if (!Array.isArray(msgs) || !msgs.length) {
-        // A short page means we have reached the beginning of the channel.
         historyExhausted = true;
         return;
       }
@@ -160,20 +142,15 @@ async function renderChannel(container, serverId, channelId) {
         const at = feed.querySelector('[data-intro]')?.nextSibling || feed.firstChild;
         while (frag.firstChild) feed.insertBefore(frag.firstChild, at);
         groupFeed(feed);
-        // Keep the reader anchored to the same message.
         threadEl.scrollTop = prevTop + (threadEl.scrollHeight - prevHeight);
       }
       if (fresh.length < HISTORY_PAGE) historyExhausted = true;
     } catch {
-      /* offline: keep what we have, allow a retry on the next scroll */
     } finally {
       loadingOlder = false;
     }
   }
 
-  // Fill a gap after a reconnect: ask only for what is newer than the highest
-  // message we have. This is the difference between "recovered" and
-  // "silently missing N messages" after any network interruption.
   async function catchUp() {
     if (!highSeq) return;
     try {
@@ -183,11 +160,6 @@ async function renderChannel(container, serverId, channelId) {
     } catch { /* offline: the next reconnect will try again */ }
   }
 
-  // Live messages that arrive while a reload is in flight. The reload
-  // clears the feed after its fetch resolves, and the snapshot was taken
-  // before those messages were committed, so anything that arrived during
-  // the await used to be appended and then wiped - a permanent hole in the
-  // conversation. Buffer them here and replay after the snapshot paints.
   let loadingHistory = false;
   const pendingLive = new Map();
   let reloadSeq = 0;
@@ -211,8 +183,6 @@ async function renderChannel(container, serverId, channelId) {
       feed.appendChild(retry);
       return;
     }
-    // A newer reload started while this one was fetching: let it win, or the
-    // two would paint in whatever order the network happened to answer.
     if (seq !== reloadSeq) return;
     loadingHistory = false;
     highSeq = 0;
@@ -222,12 +192,26 @@ async function renderChannel(container, serverId, channelId) {
     feed.appendChild(channelIntro(msgs.length === 0));
     for (const m of msgs) { noteSeq(m); feed.appendChild(buildMsg(m)); }
     groupFeed(feed);
-    // Replay whatever streamed in behind the snapshot, so no message that
-    // arrived during the fetch is lost.
     const late = [...pendingLive.values()];
     pendingLive.clear();
     for (const m of late) upsertMessage(m, { scroll: false });
-    thread.scrollTop = thread.scrollHeight;
+    if (opts.focusMessage) {
+      focusMessage(opts.focusMessage);
+    } else {
+      thread.scrollTop = thread.scrollHeight;
+    }
+  }
+
+  function focusMessage(id) {
+    const target = feed.querySelector('[data-message-id="' + CSS.escape(String(id)) + '"]');
+    if (!target) {
+      toast('That message is older than the loaded history.', 'warn');
+      thread.scrollTop = thread.scrollHeight;
+      return;
+    }
+    target.scrollIntoView({ block: 'center' });
+    target.classList.add('msg--linked');
+    setTimeout(() => target.classList.remove('msg--linked'), 2400);
   }
 
   function openReportModal(m) {
@@ -240,7 +224,6 @@ async function renderChannel(container, serverId, channelId) {
       onSubmit: ({ category, extra }) => Api.reportContent('message', m.id, category, extra || undefined),
     });
   }
-  // Per-view pin state (id -> bool), seeded from payloads and kept fresh
   // by pin/unpin broadcasts so menus and badges never go stale.
   const pinState = new Map();
   async function toggleReaction(messageId, emoji, mine) {
@@ -256,9 +239,6 @@ async function renderChannel(container, serverId, channelId) {
       else await Api.pinMessage(serverId, channelId, m.id);
     } catch (ex) { toast(ex.message || 'Could not change pin.', 'error'); }
   }
-  // Patch a rendered row in place from pin/reaction events (which carry
-  // summaries, not full messages). Falls back to a no-op when the row is
-  // not on screen; reload() remains the authority on reconnect.
   function patchEngagement(id, { reactions: list, pinned }) {
     const node = feed.querySelector('[data-message-id="' + id + '"]');
     if (!node) return;
@@ -273,7 +253,6 @@ async function renderChannel(container, serverId, channelId) {
       const bar = node.querySelector('.msg-reactions');
       const meId = State.me && State.me.id;
       if (bar) {
-        // Broadcast summaries are actor-relative: re-derive `mine` for us.
         paintReactions(bar, (list || []).map((r) => ({
           ...r,
           mine: !!(r.users && meId && r.users.map(String).includes(String(meId))),
@@ -301,23 +280,13 @@ async function renderChannel(container, serverId, channelId) {
       },
     });
     stampMsgNode(node, m);
-    // The menu is built from `m` alone and bound to this node, so it cannot act
-    // on a different message: the action closures capture this exact object, and
-    // the node guard refuses to fire at all if the message has been removed from
-    // the list between opening the menu and clicking it.
     attachContextMenu(node, () => msgActions(m, isMine), {
       target: () => ({ type: 'message', id: String(m.id) }),
     });
     return node;
   }
 
-  // Every message action, in one place, so the right-click menu, the hover bar
   // and a touch sheet can never drift apart. Permission-shaped: an action the
-  // viewer cannot perform is not offered. The server re-checks on the request.
-  //
-  // No "Reply" entry: messages have no parent reference anywhere in the schema,
-  // so offering it would be a button that cannot work. Replies are a real
-  // feature to build, not a menu row to invent.
   function msgActions(m, isMine) {
     const authorName = m.author_display || m.author_name || m.user || 'Unknown';
     const pinned = pinState.get(String(m.id)) ?? !!m.pinned;
@@ -336,7 +305,6 @@ async function renderChannel(container, serverId, channelId) {
     ];
   }
 
-  // A link that reopens this exact message. The id is the only part that
   // identifies it - never the text, the author or the timestamp.
   function msgLink(m) {
     return location.origin + '/#/server/' + currentServerId() + '/channel/' + channelId + '?m=' + encodeURIComponent(m.id);
@@ -348,12 +316,6 @@ async function renderChannel(container, serverId, channelId) {
     });
   }
 
-  // Continuous-conversation grouping: same author, <5 min apart, later
-  // message collapses to avatar-space + body. Pure CSS class on top of
-  // the existing rows; actions stay reachable via :hover/:focus-within.
-  // Idempotency key for a send attempt. crypto.randomUUID is available in
-  // every context this app runs in (https and the packaged file:// app);
-  // the fallback keeps it working if that ever stops being true.
   function newNonce() {
     try {
       if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
@@ -367,23 +329,10 @@ async function renderChannel(container, serverId, channelId) {
     try {
       if (m && m.author_id) node.dataset.author = String(m.author_id);
       if (m && m.created_at) node.dataset.ts = String(m.created_at);
-      // Canonical order, read back by findInsertionPoint() so a message
-      // that arrives out of order is placed correctly instead of appended.
       if (m && typeof m.seq === 'number') node.dataset.seq = String(m.seq);
     } catch { /* grouping metadata is decorative */ }
   }
 
-  // Grouping is a whole-feed sweep that used to run on every single
-  // incoming message: N nodes, two Date.parse() string conversions per
-  // node, one classList.toggle per node. That made the cost of receiving
-  // one message grow linearly with how long you had been sitting in the
-  // channel, and Date.parse is roughly an order of magnitude more
-  // expensive than the arithmetic comparison it feeds.
-  //
-  // Grouping is purely local: a message's group state depends only on it
-  // and on its immediate neighbours. So after an insert or replace we
-  // recompute the touched node and the two adjacent to it, which is
-  // O(1) and produces byte-identical classes to the full sweep.
   const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
   function groupState(node, prev) {
@@ -403,8 +352,6 @@ async function renderChannel(container, serverId, channelId) {
     node.classList.toggle('grouped', groupState(node, prev));
   }
 
-  // Recompute a node plus its immediate neighbours. Used after any insert
-  // or replace, where only the local window can have changed.
   function regroupAround(node) {
     applyGrouping(node);
     if (node && node.previousElementSibling) applyGrouping(node.previousElementSibling);
@@ -412,7 +359,6 @@ async function renderChannel(container, serverId, channelId) {
     if (next) applyGrouping(next);
   }
 
-  // Full sweep, for initial render and pagination only.
   function groupFeed(feedEl) {
     let prev = null;
     for (const node of feedEl.querySelectorAll(':scope > .msg')) {
@@ -464,7 +410,6 @@ async function renderChannel(container, serverId, channelId) {
     } catch (ex) { toast(ex.message || 'Cannot download', 'error'); }
   }
 
-  // ---- composer ----
   const composer = el('div', { class: 'composer' });
   const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, '📎');
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
@@ -477,8 +422,6 @@ async function renderChannel(container, serverId, channelId) {
   composer.appendChild(ta);
   composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
   conv.appendChild(composer);
-  // Locked composer states mirror the server gates (which remain
-  // authoritative): no SEND_MESSAGES, or unverified email.
   {
     const me = State.me;
     const locked = !can('SEND_MESSAGES') ? 'You do not have permission to send messages here.'
@@ -515,7 +458,6 @@ async function renderChannel(container, serverId, channelId) {
   }
   ta.addEventListener('input', resize);
 
-  // In-flight send lock (F3): double-Enter while the POST is pending
   // must not produce two real messages. Mirrors the DM sendLock.
   let sending = false;
   let pendingNonce = null;
@@ -526,11 +468,8 @@ async function renderChannel(container, serverId, channelId) {
     if (!content) { toast('Add a message or file', 'warn'); return; }
     sending = true;
     sendBtn.setAttribute('aria-busy', 'true');
-    // One nonce per submission attempt, held until the send definitively
     // succeeds. If the POST times out we do not know whether the server
-    // committed it, so the user's next attempt reuses this key and the server
     // resolves it to the original message instead of writing a second one.
-    // A fresh nonce is minted only after a confirmed success.
     const clientNonce = pendingNonce || newNonce();
     pendingNonce = clientNonce;
     const attachmentIds = pending.length ? pending.slice() : undefined;
@@ -540,16 +479,12 @@ async function renderChannel(container, serverId, channelId) {
       ta.value = '';
       pending = [];
       resize();
-      // Paint the confirmed message directly instead of refetching the whole
-      // page: the server already returned the authoritative row, including
-      // its seq. reload() was a full clear+refetch after every send.
       if (saved && saved.id) {
         upsertMessage(saved, { scroll: true });
       } else {
         await reload();
       }
     } catch (ex) {
-      // Keep the nonce and the composer text: retrying must be safe.
       toast(ex.message || 'Cannot send', 'error');
     } finally {
       sending = false;
@@ -564,15 +499,8 @@ async function renderChannel(container, serverId, channelId) {
   await reload();
   Realtime.join(channelId);
 
-  // Live updates. Every insert/update is reconciled by authoritative
-  // message id: the sender's own POST already appears via reload(), and
-  // the server broadcast reaches the sender too — blind appends would
-  // render each own message twice (F2). Reconnect replays are also
   // absorbed: an id already in the feed is replaced, never duplicated.
   function upsertMessage(m, opts = {}) {
-    // A history load is mid-flight. Painting now would be undone by its
-    // clear(), so hold the message and let reload() replay it against the
-    // fresh snapshot instead of losing it.
     if (loadingHistory) {
       if (m && m.id) pendingLive.set(String(m.id), m);
       return;
@@ -597,14 +525,8 @@ async function renderChannel(container, serverId, channelId) {
     if (prev) {
       prev.replaceWith(node);
     } else {
-      // Insert at the position the server's sequence dictates, not blindly
-      // at the bottom. Broadcast order is not message order: two writers can
       // commit out of order (especially on MySQL, where the pool does real
-      // I/O between the write and the broadcast), and a reconnect catch-up
       // deliberately delivers strictly-newer messages that may have been
-      // authored before something already on screen. Appending those would
-      // permanently show the conversation out of order until the next
-      // full reload.
       const seq = typeof m.seq === 'number' ? m.seq : null;
       const anchor = seq === null ? null : findInsertionPoint(seq);
       if (anchor) feed.insertBefore(node, anchor);
@@ -614,14 +536,9 @@ async function renderChannel(container, serverId, channelId) {
       }
     }
     noteSeq(m);
-    // Local regroup only - see regroupAround. This used to be
-    // groupFeed(feed), an O(N) sweep per received message.
     regroupAround(prev ? node : (node.previousElementSibling || node));
   }
 
-  // First painted message whose seq is greater than the one being inserted.
-  // The feed is kept in ascending seq order, so this is a short walk from the
-  // end rather than a scan of the whole conversation.
   function findInsertionPoint(seq) {
     const nodes = feed.querySelectorAll(':scope > .msg');
     for (let i = nodes.length - 1; i >= 0; i--) {
@@ -653,14 +570,6 @@ async function renderChannel(container, serverId, channelId) {
     }
   });
 
-  // Reconnect resync (F4): the gateway re-joins this channel on `open`,
-  // then reload() pulls everything missed while offline. reload() is
-  // authoritative (clear + refetch), and live events reconcile by id, so
-  // the resync cannot duplicate state.
-  // On reconnect: refresh the page of history, then fill anything newer than
-  // what we already hold. The refresh alone is not enough - it re-fetches the
-  // newest page, so a burst larger than one page that arrived while offline
-  // would still leave a hole at the top of the conversation.
   const offOpen = Realtime.on('open', () => {
     if (String(currentActiveChannel()) !== String(channelId)) return;
     reload().then(() => catchUp()).catch(() => {});
@@ -676,7 +585,6 @@ async function renderChannel(container, serverId, channelId) {
     if (String(m.channel_id) === String(channelId)) patchEngagement(m.id, { reactions: m.reactions });
   });
 
-  // Search panel (reference ⌕ pattern): debounced community search with
   // jump-to-message. Lives and dies with this view; Escape closes.
   let searchPanel = null;
   function toggleSearchPanel() {
@@ -712,7 +620,6 @@ async function renderChannel(container, serverId, channelId) {
           status.textContent = hits.length + ' result' + (hits.length === 1 ? '' : 's') + '.';
           for (const h of hits) {
             const dest = '#/server/' + h.server_id + '/channel/' + h.channel_id;
-            // One jump routine, used by both the click and the menu, so the two
             // can never disagree about where a result goes.
             const jump = () => {
               panel.remove(); searchPanel = null;
@@ -729,10 +636,6 @@ async function renderChannel(container, serverId, channelId) {
               location.hash = dest;
             };
             const row = el('button', { class: 'search-hit', type: 'button' });
-            // A hit is a message, so it gets the same per-message actions the
-            // message row itself offers, plus the ones that only make sense for
-            // a result you have not navigated to yet: copy the text or the link
-            // without leaving the search.
             attachContextMenu(row, () => [
               { label: 'Jump to message', onSelect: jump },
               { sep: true },
@@ -741,7 +644,10 @@ async function renderChannel(container, serverId, channelId) {
                 TrycordConfig.backendUrl().replace(/\/+$/, '') + '/' + dest.replace(/^#\//, ''), 'Message link copied.') },
               { sep: true },
               { label: 'Report message', danger: true, onSelect: () => openReportDialog({
-                kind: 'message', messageId: h.id, reason: 'Other',
+                targetType: 'message',
+                targetId: h.id,
+                title: 'Report message',
+                onSubmit: ({ category, extra }) => Api.reportContent('message', h.id, category, extra || undefined),
               }) },
             ], { target: () => ({ type: 'message', id: String(h.id) }) });
             row.appendChild(el('div', { class: 'search-hit__meta' },
@@ -761,11 +667,6 @@ async function renderChannel(container, serverId, channelId) {
     });
   }
 
-  // Clean up when the route changes
-  // Page in older history when the reader reaches the top of the thread.
-  // Guarded so a fast scroll cannot fire a burst of overlapping requests, and
-  // removed in cleanup() so a closed view leaves nothing attached to the
-  // document.
   const onScroll = () => {
     if (thread.scrollTop <= 80) loadOlder().catch(() => {});
   };
@@ -779,9 +680,6 @@ async function renderChannel(container, serverId, channelId) {
     setActiveChannel(null);
   };
   container._cleanup = cleanup;
-  // Structural realtime events refresh state first (refreshServerView);
-  // this hook then reconciles the open conversation: retitle on rename,
-  // leave the view if the channel is gone.
   setViewRefresh(() => {
     const layout = State.channels || { channels: [] };
     const ch = (layout.channels || []).find((c) => String(c.id) === String(channelId));
@@ -791,7 +689,6 @@ async function renderChannel(container, serverId, channelId) {
   renderAllChrome();
 }
 
-// ---- community management surfaces ----------------------------------------
 
 async function renderChannelPins(container, serverId, channelId) {
   clear(container);
@@ -862,9 +759,5 @@ async function togglePinReaction(channelId, messageId, emoji, mine) {
   } catch (ex) { toast(ex.message || 'Could not react.', 'error'); }
 }
 
-// Interim menu page: with the mobile drawer removed, small screens need
-// a single surface reaching servers, channels, friends, notifications
-// and admin. Plain list reusing existing rows; replaced wholesale when
-// the new drawer lands.
 
 export { renderChannel, renderChannelPins };

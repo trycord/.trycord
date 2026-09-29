@@ -1,7 +1,3 @@
-// Support hub + user appeals. Backed by the real appeals backend:
-// anonymous submission keyed on the moderation action id
-// (POST /api/appeals) and a signed-in listing of your own appeals
-// (GET /api/appeals/mine). No mock data.
 
 import Api from './api.js';
 import { esc, el, clear, toast } from './ui.js';
@@ -17,15 +13,8 @@ function actionIdFromHash() {
   }
 }
 
-export function appealLink(actionId) {
-  return '#/support/appeals/new' + (actionId ? '?action=' + encodeURIComponent(actionId) : '');
-}
-
 export async function renderSupport(container) {
   clear(container);
-  // Public page: composed like the rest of the public Trycord site - a
-  // constrained column, a left-aligned title leading the page, and flat
-  // link rows. Not an app card grid inside leftover application chrome.
   const wrap = el('div', { class: 'pub-page' });
   wrap.appendChild(el('h1', { class: 'pub-title' }, 'Support'));
   wrap.appendChild(el('p', { class: 'pub-lede' },
@@ -45,7 +34,6 @@ export async function renderSupport(container) {
     wrap.appendChild(s);
     return links;
   };
-  // A flat link row carries its own destination as the whole row, so the
   // description and the action can never disagree.
   const link = (parent, title, desc, href) => {
     const a = el('a', { class: 'pub-link', href });
@@ -65,10 +53,6 @@ export async function renderSupport(container) {
   }
 
   // The real documents are server-served on this origin at /terms and
-  // /privacy - the same targets the registration form already links to.
-  // There is also an in-app #/legal/* route, but its renderer only prints
-  // the version numbers and no document text, so it is not a real target.
-  // Nothing here should point at community discovery.
   const rules = section('Community rules');
   link(rules, 'Terms of Service', 'The terms that apply on this instance.', '/terms');
   link(rules, 'Privacy Policy', 'What this instance stores, and why.', '/privacy');
@@ -107,9 +91,9 @@ export async function renderMyAppeals(container) {
   for (const a of items) {
     const row = el('article', { class: 'card card--list' });
     const info = el('div', { class: 'card--list__info' });
-    info.appendChild(el('strong', {}, (a.action_type || 'Moderation action') + ' · ' + (APPEAL_STATUS_LABEL[a.status] || a.status || '')));
+    info.appendChild(el('strong', {}, (a.action_type || 'Moderation action') + ' Â· ' + (APPEAL_STATUS_LABEL[a.status] || a.status || '')));
     info.appendChild(el('span', { class: 'muted small' },
-      'Submitted ' + esc(a.created_at || '') + (a.updated_at && a.updated_at !== a.created_at ? ' · updated ' + esc(a.updated_at) : '')));
+      'Submitted ' + esc(a.created_at || '') + (a.updated_at && a.updated_at !== a.created_at ? ' Â· updated ' + esc(a.updated_at) : '')));
     if (a.decision) info.appendChild(el('span', { class: 'muted small' }, 'Decision: ' + esc(a.decision)));
     row.appendChild(info);
     list.appendChild(row);
@@ -118,9 +102,6 @@ export async function renderMyAppeals(container) {
 
 export function renderNewAppeal(container) {
   clear(container);
-  // Public page composition: title and lede lead the page from the top left
-  // of a constrained column, and the form sits below in its own section.
-  // The auth-card idiom was the other half of the "floating form" problem.
   const wrap = el('div', { class: 'pub-page pub-page--narrow' });
   wrap.appendChild(el('h1', { class: 'pub-title' }, 'Appeal a moderation decision'));
   wrap.appendChild(el('p', { class: 'pub-lede' },
@@ -139,7 +120,7 @@ export function renderNewAppeal(container) {
   });
   const reason = el('textarea', {
     class: 'input', rows: 5, maxlength: 4000,
-    placeholder: 'What happened, in your own words? Be specific — this goes to a human reviewer.',
+    placeholder: 'What happened, in your own words? Be specific â€” this goes to a human reviewer.',
   });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Submit appeal');
   const form = el('form', {}, err, ok,
@@ -159,7 +140,7 @@ export function renderNewAppeal(container) {
     if (!reason.value.trim()) { err.hidden = false; err.textContent = 'Tell the reviewer why this should be reconsidered.'; return; }
     busy = true;
     submit.setAttribute('aria-busy', 'true');
-    submit.textContent = 'Submitting…';
+    submit.textContent = 'Submittingâ€¦';
     try {
       const res = await Api.submitAppeal({ actionId, reason: reason.value.trim() });
       ok.hidden = false;
@@ -188,4 +169,4 @@ export function renderNewAppeal(container) {
   actionInput.focus();
 }
 
-export default { renderSupport, renderMyAppeals, renderNewAppeal, appealLink };
+export default { renderSupport, renderMyAppeals, renderNewAppeal };
