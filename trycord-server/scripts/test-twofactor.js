@@ -124,8 +124,14 @@ ok('secret is not in the otpauth uri in plaintext form', !TOTP.otpauthUri('bob',
   ok('the new session works', (await req('GET', '/api/auth/2fa/status', null, session)).status === 200, 'no');
 
   // Replay: the same code must not work twice.
+  // Replay: the same code must not work twice. The code that was just spent is
+  // reused verbatim rather than recomputed - recomputing calls currentCode()
+  // again, and if the 30 second step rolls over between the two requests the
+  // "replay" is a different, still-valid code and the assertion fails for the
+  // right reason and the wrong one at once.
+  const spentCode = currentCode();
   const ch2 = (await req('POST', '/api/auth/login', { username: uname, password: PASSWORD })).body.challengeToken;
-  const replay = await req('POST', '/api/auth/2fa/verify', { challengeToken: ch2, code: currentCode() });
+  const replay = await req('POST', '/api/auth/2fa/verify', { challengeToken: ch2, code: spentCode });
   ok('a used code cannot be replayed', replay.status === 401, 'status ' + replay.status);
 
   // Recovery codes work once.
