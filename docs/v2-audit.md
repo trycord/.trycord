@@ -1,244 +1,174 @@
-# V2 audit and status
+# V2 state
 
-Work done on 2026-09-29. Verified with `npm test` in `trycord-server`:
-**20 suites, 660 assertions, all passing.**
+What this document is: a record of the current architecture and of the problems
+found and fixed while working on it. It is not a plan.
+
+Anything listed under **Still open** is a real, known gap. Anything not listed
+there is either implemented or was never broken. Where a fix was subtle enough
+that the obvious implementation would reintroduce the bug, the reason is
+recorded next to it, because the code alone does not say it.
+
+Last full verification: 27/27 suites, 38 tables.
+
+## Architecture
 
 ```
-cd trycord-server
-npm install
-npm test
+Trycord
+├── trycord-server    authoritative backend: API, WebSocket, auth, storage
+├── trycord-client    WAC, the web client
+├── trycord-desktop   DAC, an Electron shell that bundles the same client
+└── public            the public site, separate from the authenticated app
 ```
 
-The runner boots a throwaway server and database, runs every suite, and removes
-both afterwards. It never touches a real instance. `npm run check` is the faster
-schema-only smoke test.
+The server is the only authoritative backend. The WAC and the DAC are two
+packagings of one client; the DAC has no client logic of its own. The public
+site is a separate static tree served by the same process on different routes,
+and is never merged into the app shell.
 
-## What was fixed
+Cloudflare deployment is isolated in its own repository,
+[trycord/.trycord-cloudflare](https://github.com/trycord/.trycord-cloudflare).
+It fetches this repository at a pinned ref and builds `dist/` from it, so there
+is no deployment-specific code, configuration or assumptions in the product
+repository. Self-hosting requires no Cloudflare account, Workers, R2, Tunnel or
+Access.
 
-### Data loss
+## Public identifiers
 
-`uploads.js` resolved the upload directory two levels up from `src/services/`,
-which is `/app/trycord-server/uploads` in the image, while the Dockerfile and
-compose file declared the volume at `/app/uploads`. Every avatar and attachment
-on a Docker deploy was written outside the volume and destroyed on image
-upgrade, while both the compose file and the docs promised the opposite. The
-directory is now `UPLOAD_DIR`, set to `/app/uploads` in the image, so existing
-volume mounts keep working.
+All primary keys are UUIDs generated in the application. No table uses an
+auto-increment primary key, so no internal sequence is exposed in a URL, an API
+response or a log line.
 
-### Supply chain
+Human-readable routes are separate from identifiers and are additive:
 
-`trycord-desktop/updater.js` fetched release binaries from
-`github.com/LanxTheShowmaker`, not `github.com/trycord`, and
-`test-updater-safety.js` asserted that wrong owner, so the mismatch passed CI.
-Anyone who installed the Windows build was one update away from pulling binaries
-from an account this project does not control. Fixed in the updater, the test,
-and the `repository`/`bugs`/`homepage` fields of both package manifests.
+| Entity | Identifier | Readable form |
+|---|---|---|
+| User | UUID | username |
+| Community | UUID | `slug`, unique globally |
+| Channel | UUID | `slug`, unique within its community |
 
-### Fresh MySQL could not start
+`GET /api/servers/:token` and every other server-scoped route accept either
+form. A rename re-slugs and releases the old value rather than retaining it as an
+alias, and the UUID route keeps working, so a shared link degrades to the
+identifier form instead of 404ing. Message endpoints are mounted without a
+community in the path and therefore accept identifiers only; that is deliberate,
+because a channel slug is unique per community and resolving one without that
+context would be a guess.
 
-`channel_permission_overrides` declared a foreign key to `channels` nine
-statements before `channels` was created. InnoDB resolves keys at `CREATE` time,
-so a new MySQL database failed with errno 150. Now declared after `channels`.
+Reserved words are escaped, so a community named `settings` cannot take the URL
+the settings page owns.
 
-### `/api/search` was a 500 on MySQL
+## Security decisions worth knowing
 
-The `LIKE` clause used `ESCAPE '\'`; MySQL and MariaDB read the backslash as an
-escape, terminating the string literal. The escaper now lives in `util.js` and
-uses `ESCAPE '!'` everywhere, so `search.js` and `users.js` share one
-implementation instead of two that disagreed. A rate limit was added, since
-`LIKE '%q%'` is a full scan.
+These are the places where the obvious implementation reintroduces the bug.
 
-### Privilege escalation
+**Session invalidation is a counter, not a timestamp.** `sign()` stamps `sv`
+from `users.session_version`, and the auth middleware compares it on every
+request. JWT `iat` has one-second resolution, so a token issued in the same
+second as a password change or a 2FA enable is otherwise indistinguishable from
+one issued after it and the invalidation silently does nothing. Every path that
+ends a session - password change, password reset, revoke-all, revoke-others, 2FA
+enable and disable - goes through one helper that bumps the version and returns
+it, because a token signed with the previous version is rejected on its next
+request. That presents as a successful call followed by a mysterious sign-out.
 
-`DELETE /roles/:roleId/assign/:userId` checked that the actor outranked the
-*role* but never the *target*, so a Moderator could strip roles from an Admin.
-It now requires membership and a target below the actor's rank. Self-removal
-stays allowed, since it can only lower privilege.
+**A community timeout gates every write, not just posting.** The client hides
+the composer as a courtesy, so the server cannot rely on it. Editing, deleting,
+reacting and uploading each check `timeout_expires_at`. Moderators holding
+`MANAGE_MESSAGES` are exempt, so moderation is not collateral damage.
 
-### WebSocket
+**The TOTP secret is encrypted at rest, not hashed.** Verification needs the
+original secret, so bcrypt does not apply; a plaintext column would make a
+database backup a 2FA bypass for every account in it. AES-256-GCM under a key
+derived from `JWT_SECRET`, so tampering is detected rather than silently
+producing wrong codes.
 
-Three separate defects. The socket insert omitted `seq`, which is the column the
-history cursor pages on, so anything posted over the socket was invisible to
-later reads. `bufferedAmount` was never checked, so one non-reading socket grew
-its buffer without bound and stalled delivery for its whole room. And sockets are
-authorized only at upgrade, so a session revoked by password change,
-`revoke-all`, `revoke-others` or logout stayed fully interactive. All three are
-fixed; there is now one `deliver` helper and an 8 MB ceiling.
+**A channel slug is never resolved without its community.** Two communities may
+each have a `#general`, so a bare channel slug is ambiguous and resolving one
+alone could land on somebody else's channel.
 
-### Other
+**Deletion anonymises rather than cascades.** Message history and moderation
+evidence stay coherent, and `audit_logs` deliberately keeps its foreign key:
+erasing the actor would destroy the record of who did what.
 
-- Anonymous appeals were recorded against a user that might not exist, behind a
-  comment describing a check the code did not perform.
-- `/servers/by-code/:code` returned name, description and member count for
-  private communities to any authenticated caller, unthrottled, against a
-  32-bit code. Both it and `join/:code` are now rate limited.
-- bcrypt cost 10, hard-coded in three places, below the current floor. Now
-  `BCRYNC_COST`, default 12.
-- `scripts/migrate.js` kept its own table list, which had fallen behind the
-  schema by eight tables: bans, pins, reactions, mutes, announcements, both
-  permission-override tables and community media were silently dropped. It now
-  reads the list from the schema, runs in one transaction, and rolls back rather
-  than leaving a half-populated target.
+**Client modules are parsed as modules.** `node --check some.js` reports success
+for a `.js` file containing `import` statements, even with a duplicate
+declaration in the body. A duplicate `const serverId` shipped to `main` through
+it, in `44e1ba8`, and the app would not start. `check-client-modules.js` parses
+each module as a module and resolves its imports; CI runs it.
 
-## What was added
+## Storage
 
-### Testing
+Provider-neutral, chosen by `STORAGE_DRIVER`:
 
-The E2E scripts could not be run as a suite. Seven of them hardcoded
-`http://localhost:9971` and ignored `TRYCORD_TEST_URL`; one hardcoded the
-WebSocket URL as well. All scripts share one in-process rate-limit bucket per
-client address, so the 20/min registration limit was reached partway through any
-run. Two suites also failed on a database that already held test users.
-
-`scripts/test-all.js` now boots a throwaway server and database per run, runs
-`test-dm-reliability` first against a server without `RATE_LIMIT_MAX` because it
-is the one suite that asserts a limit throttles, and the rest against a second
-server with the ceiling lifted. `test-trustsafety` creates and promotes its own
-admin instead of requiring a hand-made one. CI runs `npm test`, and the client
-and desktop jobs moved from Node 20 to 22 to match `engines`.
-
-New suites: `test-migration`, `test-storage`, `test-storage-migrate`,
-`test-client-dom`, `test-gdpr-deletion`, `test-page-editor`.
-
-### Storage
-
-`src/services/storage/` is a driver interface with two drivers. `local` is the
-default and needs nothing; `s3` works with any S3-compatible endpoint, with
-SigV4 implemented against `node:crypto` so a self-hosted instance does not
-install an AWS SDK. A bad `STORAGE_DRIVER` or a missing S3 credential stops the
-server at boot instead of failing on someone's first upload.
-
-Object keys encode the owner: `user/<userId>/<kind>/<id>`,
-`community/<serverId>/<kind>/<id>`, `channel/<channelId>/attachment/<id>`. This
-replaces the `pf-` and `sv-` filename prefixes, which did class isolation by
-string match.
-
-`scripts/storage-migrate.js` copies objects between drivers with `--dry-run`,
-`--verify` and retry. It never modifies or deletes the source, and refuses to
-copy a tree onto itself.
-
-**Verification status:** the local driver and the migration tool are covered
-end to end. The SigV4 signature is covered for determinism and for sensitivity
-to region, object and expiry, but has **not** been run against a live endpoint.
-Run `node scripts/storage-migrate.js --dry-run` against the target bucket before
-switching a live instance over.
-
-### GDPR account deletion
-
-`Settings → Account → Delete my account` opens a request; an administrator
-reviews it under `Admin → GDPR requests`, where it is always labelled
-`REQUESTED BY GDPR`. The type is written by the server when the user asks, so an
-administrator cannot create one or relabel one.
-
-The account is **anonymised, not hard-deleted**: identity columns are cleared
-and the row survives, because `audit_logs`, `moderation_actions` and
-`appeals` reference the actor and `ON DELETE CASCADE` would destroy evidence of
-what was done. Messages stay, attributed to a `deleted-…` account. An owned
-community is transferred to its longest-standing member. Owned objects are
-deleted through the storage service, so it works the same on disk and in a
-bucket. Every transition is audited.
-
-### Static page editor
-
-`Admin → Pages` edits the six approved pages. The body is **structured blocks**,
-not HTML: heading, paragraph, standfirst, list, callout, link, divider. There is
-no HTML box and the server escapes every value, so an administrator cannot
-inject a script into a legal page. `javascript:` and `data:` link targets are
-rejected on save.
-
-Drafts, preview, publish, unpublish, revision history and restore are all
-supported. Restoring a revision creates a new one. Publishing a legal page
-requires a typed confirmation. Until a page is published it is served from the
-file in `public/`, so an instance that never uses the editor is unaffected.
-
-### Accessibility
-
-- `#view-root` was `aria-live="polite"`, so every route change and every one of
-  the 76 chrome repaints re-read the whole page. Removed; a dedicated announcer
-  region is set from `renderContextHeader`, the one place every screen already
-  passes its title.
-- 60 labels had no `for`, so they announced as unlabelled. The DOM factory now
-  associates a label with the next control in its parent, and a test checks it.
-- Six `for=` attributes pointed at ids that did not exist.
-- Toasts were announced twice, by a live region and by `role="status"`.
-- The Light theme's muted text was 3.77:1 on the page background and 2.78:1 on
-  a card. Fixing it needed a change to the surfaces, not just the text: the
-  elevated surface was too dark to carry three text tiers at AA. **Orthocord
-  and Midnight also failed**, and were fixed. All six themes now pass, and
-  `test-client-dom` checks every tier against every surface so it cannot regress.
-- The mobile stylesheet raised nothing to a 44 px hit area and let three layouts
-  overflow at 320–430 px. Fixed, with a guard.
-- The skip link pointed at a landmark that is `display:none` on mobile. There is
-  now one per shell, and CSS picks the live one.
-
-### Public site
-
-- `/instances-terms` was linked from all 13 footers and 404'd. So did
-  `/trust-and-safety`, which was also linked from nowhere. Both now serve, and
-  every page links all four legal pages.
-- 20 occurrences of a malformed `</spanhref="/"` across 10 pages, a duplicated
-  `</main>`, and a duplicated footer link.
-- `site.css` had an appended block that overrode the entire palette, leaving the
-  original dead. Folded into one palette. All 15 hex values are now tokens, and
-  `--accent-2` was removed as unused.
-- The status page conveyed state by text only; `--ok` and `--err` were dead
-  tokens. It now sets a state, so it is announced and coloured.
-- `site.js` never marked a nav item current on the homepage, and never matched
-  when a page was served as a file.
-
-The legal pages remain **templates**, deliberately: the parts describing the
-software are accurate, and the parts that depend on the operator are marked
-`OPERATOR` and highlighted on the page. There are no bracket placeholders left
-anywhere in `public/`, and `test-client-dom` fails if one reappears.
-
-## Repo and branches
-
-| Branch | Verdict |
+| Driver | Notes |
 |---|---|
-| `main` | authoritative |
-| `cloudflare-branch` | **keep.** Holds the only unmerged work that matters: `wrangler.jsonc`, `cloudflare/worker.js`, a non-mutating `build-pages.sh`, the `home.html` → `welcome.html` rename, the missing `/instances-terms` and `/trust-and-safety` routes, and corrected public HTML. Its 12 unmerged commits are not superseded by main. |
-| `client` | stale, divergent fork. Its client tree predates the per-page split on main (`pages-workspace.js` where main has 8 files). 40 unmerged commits, all superseded. Safe to delete after confirming nothing private is on it. |
-| `server` | stale subset of main, 27 unmerged commits, every hunk a removal. Safe to delete. |
+| `local` | default, files under `UPLOAD_DIR`, no dependencies |
+| `s3` | any S3-compatible endpoint: Amazon S3, Cloudflare R2, MinIO, Backblaze B2, SeaweedFS |
 
-`.gitignore` had a bare `*.md` rule, which silently untracked
-`docs/selfhosting.md` — the only operator deployment guide. Removed. The two
-~109 MB release binaries were untracked: they were most of a 656 MB `.git`, and
-`release-desktop.yml` already publishes them to GitHub Releases. `trycordlogo.png`
-(980 KB, referenced by nothing) and a third copy of the login background were
-deleted. No secret was ever committed; all of history was checked.
+Object keys are generated from validated ids and never from a user-supplied
+filename, so no input can influence a key. Attachments are scoped by channel
+rather than message, because an upload happens before the message exists and
+re-keying on attach would lose the object if the attach failed.
+
+Uploads are bounded three ways: `MAX_SIZE` per file, a route rate limit, and a
+per-account total quota (`STORAGE_QUOTA_MB`, default 512 MB). The first two bound
+a single request, not the total.
+
+The S3 signer is pinned against the AWS `aws-sig-v4-test-suite` vectors. The unit
+tests cannot prove a real server accepts a signature - a signer that is wrong in
+the same way the test is wrong still verifies against itself - so the vectors
+decide whether the algorithm is correct, and only a live endpoint can say
+whether the credentials are.
+
+`test-s3-live.js` is the live check. It is opt-in (`S3_LIVE=1`), reads
+credentials from the environment only, and is not run by CI.
+
+SeaweedFS topology, for reference: the S3 gateway listens on **8333**. Port
+**18333 is the gRPC master port** and answers with `content-type:
+application/grpc`; an HTTP client pointed at it sees raw HTTP/2 frames and a
+connection error.
+
+## Tests
+
+27 suites, run by `npm test`, which boots a throwaway server and database.
+
+| Area | Suite |
+|---|---|
+| migrations, schema parity | `test-migration`, `test-schema-parity` |
+| storage, S3 signing, storage migration | `test-storage`, `test-sigv4`, `test-storage-migrate` |
+| authentication, sessions, 2FA | `test-twofactor`, `test-sessions` |
+| authorization, roles, timeouts | `test-role-security`, `test-no-self-assign`, `test-timeout-gates` |
+| moderation, trust and safety, GDPR | `test-trustsafety`, `test-gdpr-deletion` |
+| page editor, public site template | `test-page-editor`, `test-template`, `test-client-dom` |
+| routing and identifiers | `test-routing` |
+| realtime, messages, DMs | `test-dm-reliability`, `test-regression`, `test-f1f2` |
+
+Two lessons are encoded in the suite itself. A failing suite prints its
+failing assertions rather than its last twelve lines, because the failure is
+rarely near the end and a red run that reports only passing lines is worse than
+no output. And `test-sessions` asserts that a credential an endpoint hands back
+still *works*, not that the endpoint returned 200, and exercises a second change
+on an already-bumped account because a fresh account cannot expose a stale-version
+token at all.
 
 ## Still open
 
-- **Routing V2.** Every client URL carries a raw server UUID. Public slugs
-  separate from internal ids are not implemented.
-- **Client design system.** Four menu/overlay implementations, two modals (one
-  hand-rolled with no focus trap), four avatar renderers, two user-action lists
-  that have already drifted apart, and ~230 inline `btn` literals with no
-  factory. `.btn` is one system and works, so this is consolidation, not a
-  rewrite.
-- **Client dead code.** About 30 unused symbols, including the entire mobile
-  drawer in `presentation.js` (its target element ids do not exist in
-  `index.html`), `showPopover` (148 lines, zero callers) and `mentionify`.
-  About 13% of CSS rules are dead.
-- **Message links are broken.** `msgLink()` produces a URL the router cannot
-  parse, so "Copy message link" yields a link that does not load.
-- **Reporting has a false success path.** `openReportDialog` is called with the
-  wrong argument shape in two places, so the API call is skipped and the user
-  is told the report was filed.
-- **DM messages cannot be edited or deleted** from the UI: the callbacks are
-  passed inside the message object rather than through `opts`.
-- **No storage quota.** One member with `SEND_MESSAGES` can write 8 MB × 30/min
-  to the disk.
-- **`users.email` uniqueness** is only guaranteed on a freshly created MySQL
-  table; a database created by an older build can lack the constraint.
-- **`servers` has no indexes** and discovery runs a full scan with two
-  correlated counts per row.
-- **A timed-out member** can still edit and delete their own messages, and remove
-  their own reactions, because those three routes do not check the timeout.
-- **No 2FA and no login lockout.** Login is rate limited per IP but has no
-  per-account counter.
-- **`broadcastServer` runs one membership query per online member per event**,
-  which is the main realtime scalability hazard.
-- **Asset duplication.** Three byte-identical copies each of the logo PNG, the
-  ICO and the login background across `public/assets`, `trycord-client/assets`
-  and `trycord-desktop/build` — about 4 MB of redundancy.
+Real, known gaps. None blocks ordinary use.
+
+- **The S3 driver has never completed a live round trip.** The signer is proven
+  correct against AWS's vectors. The endpoint returns `SignatureDoesNotMatch`,
+  which is ambiguous between that and credentials the server does not recognise;
+  a key known to work against the target would settle it in one run.
+- **Uploads are bounded but not scanned.** Size, type and extension are checked;
+  contents are not inspected, so a file that passes those checks is stored
+  unexamined.
+- **Email verification and password reset need a working SMTP transport.** The
+  flows are implemented and rate limited, and the token handling is tested
+  directly, but no end-to-end mail delivery is exercised in CI.
+- **No session management UI listing individual devices.** All sessions can be
+  revoked at once; they cannot be revoked one at a time.
+- **Full-text search is prefix-based.** There is no index and no ranking, so
+  search quality degrades as history grows.
+- **`docs/selfhosting.md` covers the variables that matter most, but
+  `.env.example` lists only 11 of the roughly 40 the server reads.** The rest
+  have working defaults; they are simply not in the example file.
