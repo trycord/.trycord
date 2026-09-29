@@ -65,14 +65,14 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
         }
         const now = isMuted(channelId);
         renderAllChrome();
-        btn.textContent = now ? '🔕' : '🔔';
+        btn.textContent = now ? '⊘' : '◉';
         btn.title = now ? 'Unmute this channel' : 'Mute this channel';
         btn.setAttribute('aria-label', btn.title);
         btn.setAttribute('aria-pressed', now ? 'true' : 'false');
         toast(now ? 'Channel muted.' : 'Channel unmuted.', 'ok');
       } catch (ex) { toast(ex.message || 'Could not change mute.', 'error'); }
     },
-  }, muted ? '🔕' : '🔔');
+  }, muted ? '⊘' : '◉');
   const searchBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Search in this community', 'aria-label': 'Search messages',
     onClick: () => toggleSearchPanel(),
@@ -247,7 +247,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       pinState.set(String(id), !!pinned);
       const head = node.querySelector('.msg-head');
       const badge = node.querySelector('.msg-pinned');
-      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, '📌'));
+      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, '⚑'));
       if (!pinned && badge) badge.remove();
     }
     if (list !== undefined) {
@@ -412,7 +412,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }
 
   const composer = el('div', { class: 'composer' });
-  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, '📎');
+  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, '⊕');
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');

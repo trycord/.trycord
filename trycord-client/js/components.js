@@ -314,7 +314,7 @@ export function messageRow(msg, opts = {}) {
     actions.appendChild(el('button', {
       type: 'button', title: 'Delete', 'aria-label': 'Delete message',
       onClick: opts.onDelete,
-    }, '🗑'));
+    }, '✕'));
   }
   if (isMine) {
     actions.appendChild(el('button', {
@@ -329,12 +329,12 @@ export function messageRow(msg, opts = {}) {
   body.appendChild(text);
 
   if (msg.pinned) {
-    const pin = el('span', { class: 'msg-pinned', title: 'Pinned message' }, '📌');
+    const pin = el('span', { class: 'msg-pinned', title: 'Pinned message' }, '⚑');
     head.appendChild(pin);
   }
   if (opts.onHover) {
     const bar = el('div', { class: 'msg-hoverbar' });
-    const react = el('button', { type: 'button', title: 'Add reaction', 'aria-label': 'Add reaction' }, '😊');
+    const react = el('button', { type: 'button', title: 'Add reaction', 'aria-label': 'Add reaction' }, '☺');
     react.addEventListener('click', (e) => { e.stopPropagation(); opts.onHover('react', react); });
     const more = el('button', { type: 'button', title: 'More actions', 'aria-label': 'More actions' }, '⋯');
     more.addEventListener('click', (e) => { e.stopPropagation(); opts.onHover('more', more); });
