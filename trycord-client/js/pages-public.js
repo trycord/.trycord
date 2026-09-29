@@ -49,6 +49,50 @@ function authFooter(...nodes) {
   return el('div', { class: 'auth-footer' }, ...nodes);
 }
 
+function secondFactorStep(challengeToken, err) {
+  // Replaces the password form in place rather than navigating: the challenge
+  // lives in this closure, so there is nothing to pass to another route and no
+  // way for the token to end up in a URL or in history.
+  const code = el('input', {
+    class: 'input', type: 'text', inputmode: 'numeric', autocomplete: 'one-time-code',
+    maxlength: 6, pattern: '[0-9]*', required: true,
+  });
+  const submit = el('button', { class: 'btn primary', type: 'submit' }, 'Verify');
+  const form = el('form', { class: 'card card--auth' },
+    el('div', { class: 'field' }, el('label', {}, 'Two-factor code'),
+      code,
+      el('span', { class: 'hint' }, 'The 6-digit code from your authenticator app, or a recovery code.')),
+    el('div', {}, submit));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.hidden = true;
+    submit.setAttribute('aria-busy', 'true');
+    try {
+      const res = await Api.twoFactorVerify({ challengeToken, code: code.value.trim() });
+      applyAuth(res);
+      if (res.usedRecoveryCode) {
+        // A recovery code is spent. Saying so once, here, is the difference
+        // between a member who re-provisions and one who is quietly down to
+        // their last one.
+        toast('Signed in with a recovery code. That code is now used up.', 'ok');
+      } else {
+        toast('Signed in.', 'ok');
+      }
+      location.hash = '#/home';
+      Realtime.connect();
+    } catch (ex) {
+      err.hidden = false;
+      clear(err);
+      err.appendChild(el('span', {}, ex.message || 'That code is not correct'));
+      code.select();
+    } finally {
+      submit.removeAttribute('aria-busy');
+    }
+  });
+  setTimeout(() => code.focus(), 0);
+  return form;
+}
+
 function loginForm(container) {
   clear(container);
   const backendBox = el('div', { class: 'auth-secondary__body' });
@@ -86,6 +130,15 @@ function loginForm(container) {
     submit.textContent = 'Signing in…';
     try {
       const res = await Api.login({ username: username.value.trim(), password: password.value });
+      // A correct password is not a session. When the account has a second
+      // factor the response carries a challenge instead of a token, and calling
+      // applyAuth on it would store undefined and leave the member looking at a
+      // signed-out app with no explanation.
+      if (res && res.mfaRequired) {
+        clear(form);
+        main.appendChild(secondFactorStep(res.challengeToken, err));
+        return;
+      }
       applyAuth(res);
       toast('Signed in.', 'ok');
       location.hash = '#/home';

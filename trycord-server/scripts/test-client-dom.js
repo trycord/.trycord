@@ -172,6 +172,21 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client');
   ok('the router understands the slug form',
     fs.readFileSync(path.join(jsDir, 'router.js'), 'utf8').includes("parts[0] === 'c'"), 'no /c/ branch');
 
+  console.log('two-factor is reachable from the UI');
+  // The server returns a challenge instead of a token when the factor is on.
+  // If the login form does not branch on that it stores undefined and leaves the
+  // member signed out with no explanation, and the account is unreachable
+  // through the app at all.
+  const publicSrc = fs.readFileSync(path.join(jsDir, 'pages-public.js'), 'utf8');
+  ok('login branches on the second factor', /mfaRequired/.test(publicSrc), 'no branch');
+  ok('a code step is rendered', /secondFactorStep/.test(publicSrc), 'no step');
+  ok('the code is submitted to the verify endpoint', /twoFactorVerify/.test(publicSrc), 'no verify call');
+  ok('a recovery code is acknowledged as single-use', /usedRecoveryCode/.test(publicSrc), 'not surfaced');
+  const acctSrc = fs.readFileSync(path.join(jsDir, 'pages-account.js'), 'utf8');
+  ok('security settings offer setup and disable', /twoFactorSetup/.test(acctSrc) && /twoFactorDisable/.test(acctSrc), 'missing');
+  ok('recovery codes can be re-issued', /twoFactorRecoveryCodes/.test(acctSrc), 'missing');
+  ok('the security tab renders the 2FA section', /renderTwoFactorSection\(body\)/.test(acctSrc), 'not mounted');
+
   console.log('a11y contract in the markup');
   const html = fs.readFileSync(path.join(CLIENT, 'index.html'), 'utf8');
   ok('the view region is not a live region', !/id="view-root"[\s\S]{0,80}aria-live/.test(html));
