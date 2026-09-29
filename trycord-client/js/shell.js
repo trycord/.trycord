@@ -1,5 +1,5 @@
 
-import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
+import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, attachMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, communityMark, communityBannerUrl, loadAuthedImage, navGroup } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, setMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
@@ -324,46 +324,6 @@ function persistCollapsedGroups(set) {
   try { localStorage.setItem(LS_COLLAPSED_GROUPS, JSON.stringify([...set])); } catch { /* ignore */ }
 }
 
-// sidebar's stacking context; closes on outside click and Escape.
-function dropdownPanel(anchor, buildItems) {
-  const panel = el('div', { class: 'ctx-dropdown', role: 'menu', hidden: true });
-  const close = () => {
-    panel.hidden = true;
-    anchor.setAttribute('aria-expanded', 'false');
-    document.removeEventListener('click', onAway, true);
-    document.removeEventListener('keydown', onKey, true);
-  };
-  const onAway = (e) => { if (!panel.contains(e.target) && !anchor.contains(e.target)) close(); };
-  const onKey = (e) => { if (e.key === 'Escape') { close(); anchor.focus(); } };
-  anchor.setAttribute('aria-haspopup', 'menu');
-  anchor.setAttribute('aria-expanded', 'false');
-  anchor.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const open = panel.hidden;
-    if (open) {
-      clear(panel);
-      for (const item of buildItems()) {
-        if (!item) continue;
-        if (item.sep) { panel.appendChild(el('div', { class: 'ctx-dropdown__sep' })); continue; }
-        const b = el('button', {
-          class: 'ctx-dropdown__item' + (item.danger ? ' is-danger' : ''),
-          type: 'button', role: 'menuitem',
-        }, el('span', { class: 'ctx-dropdown__icon' }, item.icon || ''), el('span', {}, item.label));
-        b.addEventListener('click', () => { close(); item.onSelect(); });
-        panel.appendChild(b);
-      }
-    }
-    panel.hidden = !open;
-    anchor.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) {
-      setTimeout(() => {
-        document.addEventListener('click', onAway, true);
-        document.addEventListener('keydown', onKey, true);
-      }, 0);
-    }
-  });
-  return panel;
-}
 
 // geometry is unchanged either way, so adding media never moves the controls.
 function communityHeader(sid, server) {
@@ -393,7 +353,10 @@ function communityHeader(sid, server) {
   head.appendChild(bar);
 
   // list. Every entry is permission-gated by the existing role system.
-  const panel = dropdownPanel(trigger, () => {
+  // attachMenu, not a second dropdown implementation: this is the same menu as
+  // right-click and long-press, so submenus, disabled items, Escape, arrow keys
+  // and outside-click dismissal behave identically whichever menu is opened.
+  attachMenu(trigger, () => {
     const go = (path) => () => { location.hash = path; };
     const base = serverPath(sid);
     const items = [];
@@ -418,7 +381,6 @@ function communityHeader(sid, server) {
     items.push({ label: 'Leave community', icon: 'â¤¶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
     return items;
   });
-  head.appendChild(panel);
   return head;
 }
 

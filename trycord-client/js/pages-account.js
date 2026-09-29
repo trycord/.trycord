@@ -269,19 +269,17 @@ function renderProfileEditor(wrap) {
         }
       });
     }
-    if (cur && cur.avatarUrl) {
-      loadAuthedImage(cur.avatarUrl).then((url) => {
-        if (!url) return;
-        clear(avatarHolder);
-        const a = el('span', { class: 'avatar lg has-img', style: { background: 'var(--t-sur2, #333)' } });
-        a.appendChild(el('img', { class: 'avatar-img', src: url, alt: '' }));
-        avatarHolder.appendChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-      });
-    } else {
-      clear(avatarHolder);
-      avatarHolder.appendChild(avatar(State.me, { size: 'lg', withPresence: false }));
-    }
+    // The unsaved pick is a bare URL rather than a user row, so it is handed to
+    // the shared primitive as a user-shaped object. The previous version built
+    // the span and the <img> here, which is why this file was a second avatar
+    // renderer: it had to re-do the authenticated fetch and the blob revoke
+    // that avatar() already owns, and a change to either would have applied to
+    // the profile preview and not to every other avatar in the app.
+    const shown = cur && cur.avatarUrl
+      ? { ...State.me, avatar_url: cur.avatarUrl }
+      : State.me;
+    clear(avatarHolder);
+    avatarHolder.appendChild(avatar(shown, { size: 'lg', withPresence: false }));
   };
   paintMedia();
 
