@@ -14,6 +14,7 @@ const db = require('./db');
 const createGateway = require('./ws');
 const inviteRoutes = require('./routes/invites');
 const enforcement = require('./services/enforcement');
+const pages = require('./services/pages');
 
 const PORT = parseInt(process.env.PORT || '9971', 10);
 // §11 host type is validated strictly: exactly "express" (direct exposure)
@@ -313,10 +314,13 @@ async function boot() {
     next();
   });
 
-  // Attachment storage exists on disk but is NEVER mounted as a public
-  // static directory: every read goes through the authenticated
-  // /api/attachments/:id route (see routes/attachments.js).
-  require('./services/uploads');
+  // Attachments are never mounted as a public static directory, whether they
+  // live on local disk or in an object store: every read goes through the
+  // authenticated /api/attachments/:id route (see routes/attachments.js).
+  // Resolve the driver now so a bad STORAGE_DRIVER or a missing S3 credential
+  // stops the server at boot instead of failing on someone's first upload.
+  const storageDriver = require('./services/storage').init();
+  console.log('[info] storage driver: ' + storageDriver.name);
 
   app.get('/health', (req, res) => res.json({ ok: true }));
   // Readiness: process alive AND database answering. Load balancers and
@@ -393,7 +397,9 @@ async function boot() {
   app.use('/api/search', require('./routes/search'));
   app.use('/api/reports', require('./routes/reports'));
   app.use('/api/appeals', require('./routes/appeals'));
+  app.use('/api/account', require('./routes/accountDeletion'));
   app.use('/api/admin', require('./routes/admin'));
+  app.use('/api/admin/pages', require('./routes/adminPages'));
   // Test hooks for automated suites (email verification without an inbox).
   // Strictly opt-in: unmounted in every other boot, where the paths 404.
   if (process.env.ALLOW_TEST_HOOKS === 'true') {
@@ -478,6 +484,31 @@ async function boot() {
         }
       });
     };
+    // A page an administrator has published through the page editor is served
+    // from the database. Until then the file on disk is served unchanged, so an
+    // instance that never uses the editor behaves exactly as it did before.
+    // The file provides the shell, so only the content is replaced.
+    const editablePage = (name, route) => {
+      return async (req, res) => {
+        const exists = fs.existsSync(path.join(publicDir, name));
+        const body = exists ? await pages.publishedHtml(route) : null;
+        if (!body) {
+          return sendPublic(res, exists ? name : '404.html', exists ? 200 : 404);
+        }
+        const file = fs.readFileSync(path.join(publicDir, name), 'utf8');
+        const marked = '<!-- page:begin -->';
+        const markedEnd = '<!-- page:end -->';
+        if (!file.includes(marked) || !file.includes(markedEnd)) {
+          // The file has no editable region, so there is nowhere safe to
+          // substitute content. Serving the file is better than guessing.
+          return sendPublic(res, name, 200);
+        }
+        const start = file.indexOf(marked) + marked.length;
+        const end = file.indexOf(markedEnd);
+        const html = file.slice(0, start) + '\n' + body + '\n' + file.slice(end);
+        res.status(200).set('Cache-Control', 'no-cache').type('html').send(html);
+      };
+    };
     // Map one public HTML file to one clean URL. Missing files fall back to the
     // site's own 404 page instead of a bare Express "Cannot GET".
     const publicPage = (name) => {
@@ -486,8 +517,12 @@ async function boot() {
         sendPublic(res, exists ? name : '404.html', exists ? 200 : 404);
       };
     };
-    app.get('/terms', publicPage('terms.html'));
-    app.get('/privacy', publicPage('privacy.html'));
+    app.get('/terms', editablePage('terms.html', 'terms'));
+    app.get('/privacy', editablePage('privacy.html', 'privacy'));
+    app.get('/instances-terms', editablePage('instances-terms.html', 'instances-terms'));
+    app.get('/trust-and-safety', editablePage('trust-and-safety.html', 'trust-and-safety'));
+    app.get('/support', editablePage('support.html', 'support'));
+    app.get('/security', editablePage('security.html', 'security'));
     app.get('/about', publicPage('about.html'));
     // Contact was merged into Support: /contact redirects rather than 404ing,
     // so existing inbound links and bookmarks keep working.
@@ -512,6 +547,7 @@ async function boot() {
 
   const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer } = createGateway(server);
   require('./routes/auth').setTicketIssuer(issueTicket);
+  require('./routes/auth').setGateway({ disconnectUser });
   require('./routes/messages').setGateway({ broadcast, sendToUser });
   require('./routes/channels').setGateway({ broadcast });
   app.use('/api/mutes', require('./routes/mutes'));

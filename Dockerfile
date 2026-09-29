@@ -7,14 +7,13 @@
 # WebSocket gateway on one port. There is no separate frontend container to
 # wire up, which is the whole point of the "easy" path.
 #
-# Layout inside the image mirrors the repository layout on purpose, because
-# the server resolves its assets by walking up two directories from
-# src/ (see trycord-server/src/server.js and src/services/uploads.js):
+# Layout inside the image mirrors the repository layout on purpose:
 #
 #   /app/trycord-server   application code, node_modules, dev.db
 #   /app/trycord-client   static web client
 #   /app/public           public site, terms.html, privacy.html
-#   /app/uploads          user uploads  <- volume
+#   /data                 SQLite database + WAL sidecars      <- volume
+#   /app/uploads          user uploads                        <- volume
 #
 # glibc base, not alpine: better-sqlite3 and bcrypt are native modules and
 # musl prebuilds are not reliably available.
@@ -47,6 +46,7 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     DB_CLIENT=sqlite \
     DB_FILE=/data/trycord.db \
+    UPLOAD_DIR=/app/uploads \
     SERVER_HOST_TYPE=express
 
 # tini reaps zombies and forwards SIGTERM so the container stops promptly

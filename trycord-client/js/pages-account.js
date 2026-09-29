@@ -1,4 +1,3 @@
-// Account profile + settings. Real user data from /api/users/me and the
 // auth/session endpoints.
 
 import Api from './api.js';
@@ -8,6 +7,7 @@ import { avatar, loadAuthedImage, invalidateAuthedImage } from './components.js'
 import { renderContextHeader, renderAllChrome, clearAnnouncements, refreshSessionBar } from './shell.js';
 import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';
 import { renderBackendSelector } from './pages-public.js';
+import { statusChip } from './pages-admin.js';
 import Realtime from './realtime.js';
 
 function accountTabs(active) {
@@ -242,7 +242,6 @@ function renderProfileEditor(wrap) {
 
   const profileCard = el('div', { class: 'profile-editor' });
 
-  // ---- live preview card (banner + avatar + name + bio + status) -------
   const bannerBox = el('div', { class: 'prof-banner' });
   const avatarHolder = el('div', { class: 'prof-avatar' }, avatar(me, { size: 'lg', withPresence: false }));
   const previewName = el('strong', {}, me ? (me.displayName || me.username) : '');
@@ -291,7 +290,6 @@ function renderProfileEditor(wrap) {
   profileCard.appendChild(preview);
   profileCard.appendChild(el('div', { class: 'hr' }));
 
-  // ---- media pickers ----
   const avatarInput = el('input', { type: 'file', accept: 'image/*', hidden: true });
   const bannerInput = el('input', { type: 'file', accept: 'image/*', hidden: true });
   const avatarBtn = el('button', { class: 'btn', type: 'button' }, 'Change avatar');
@@ -304,9 +302,6 @@ function renderProfileEditor(wrap) {
     if (!file) return;
     if (!/^image\//.test(file.type || '')) { toast('Only images can be used.', 'error'); return; }
     mediaStatus.textContent = 'Uploading ' + kind + '…';
-    // The server hands back a new path per upload and deletes the old file, but
-    // drop our cached blob for the outgoing path anyway: keeping bytes the
-    // server has already unlinked can only ever serve something wrong.
     const prev = kind === 'avatar' ? State.me?.avatarUrl : State.me?.bannerUrl;
     try {
       const updated = await Api.uploadProfileImage(kind, file);
@@ -388,7 +383,6 @@ function renderProfileEditor(wrap) {
   });
   profileCard.appendChild(form);
 
-  // ---- email + verification status ----
   profileCard.appendChild(el('div', { class: 'section-label' }, 'Account email'));
   const emailBox = el('div', { class: 'field' });
   emailBox.appendChild(el('label', {}, 'Email'));
@@ -599,12 +593,110 @@ function renderSessionsSection(wrap) {
   wrap.appendChild(el('p', { class: 'muted small' }, 'Token-based sessions expire after 7 days or when revoked.'));
 }
 
+const DELETION_STATUS_TEXT = {
+  DELETION_REQUESTED: 'Requested. An administrator will review it.',
+  UNDER_REVIEW: 'Approved and queued for processing.',
+  DELETION_PROCESSING: 'Being processed now.',
+  DELETED: 'Completed. This account can no longer sign in.',
+  CANCELLED: 'Withdrawn.',
+  REJECTED: 'Declined. You can submit a new request.',
+};
+
+function renderDeletionSection(wrap) {
+  wrap.appendChild(el('div', { class: 'section-label danger' }, 'Delete my account'));
+  const panel = el('div', { class: 'card' });
+  wrap.appendChild(panel);
+
+  const paint = (req) => {
+    clear(panel);
+    if (req && DELETION_STATUS_TEXT[req.status]) {
+      panel.appendChild(el('div', { class: 'row-line' },
+        el('strong', {}, 'Erasure request'),
+        statusChip(req.status),
+        // The type is rendered from the server's value, never inferred by the
+        req.requestType === 'GDPR' ? statusChip('GDPR', 'REQUESTED BY GDPR') : null,
+      ));
+      panel.appendChild(el('p', { class: 'muted small' }, DELETION_STATUS_TEXT[req.status]));
+      panel.appendChild(el('p', { class: 'muted small' },
+        'Requested ' + new Date(req.requestedAt).toLocaleString()));
+
+      if (req.status === 'DELETION_REQUESTED' || req.status === 'UNDER_REVIEW') {
+        const cancel = el('button', { class: 'btn', type: 'button' }, 'Withdraw request');
+        cancel.addEventListener('click', async () => {
+          try {
+            const res = await Api.cancelAccountDeletion();
+            paint(res.request);
+            toast('Request withdrawn.', 'ok');
+          } catch (e) { toast(e.message || 'Could not withdraw', 'error'); }
+        });
+        panel.appendChild(el('div', { class: 'row-line' }, cancel));
+      }
+      return;
+    }
+
+    panel.appendChild(el('p', { class: 'muted small' },
+      'Asks this instance to erase your account. It opens a request for an administrator to review.'));
+
+    const what = el('div', { class: 'field' });
+    what.appendChild(el('strong', {}, 'Erased'));
+    what.appendChild(el('p', { class: 'muted small' },
+      'Your username, email, display name, bio, avatar and banner, every file you uploaded, your sessions, friendships and notifications.'));
+    panel.appendChild(what);
+
+    const kept = el('div', { class: 'field' });
+    kept.appendChild(el('strong', {}, 'Kept'));
+    kept.appendChild(el('p', { class: 'muted small' },
+      'Messages you posted, and any moderation or audit record that names you. These stay so other people’s conversations and any action taken against your account remain intact. They are attributed to a deleted account rather than to you.'));
+    panel.appendChild(kept);
+
+    const pw = el('input', { class: 'input', id: 'deletion-password', type: 'password', placeholder: 'Your password', autocomplete: 'current-password' });
+    const open = el('button', { class: 'btn danger', type: 'button' }, 'Delete my account');
+    open.setAttribute('aria-describedby', 'deletion-warning');
+    open.addEventListener('click', () => {
+      const password = pw.value;
+      if (!password) {
+        toast('Enter your password to confirm.', 'error');
+        pw.focus();
+        return;
+      }
+      confirmDialog({
+        title: 'Request account deletion?',
+        message: 'Your account will be anonymised and you will not be able to sign in. Messages you posted stay behind, attributed to a deleted account. This cannot be undone.',
+        danger: true,
+        confirmText: 'Request deletion',
+        onConfirm: async () => {
+          try {
+            const res = await Api.requestAccountDeletion(password);
+            pw.value = '';
+            paint(res.request);
+            toast('Request submitted. An administrator will review it.', 'ok');
+          } catch (e) { toast(e.message || 'Could not submit', 'error'); }
+        },
+      });
+    });
+    panel.appendChild(el('div', { class: 'field' },
+      el('label', { for: 'deletion-password' }, 'Password'),
+      pw,
+    ));
+    panel.appendChild(el('div', { class: 'row-line' }, open));
+    panel.appendChild(el('p', { class: 'muted small', id: 'deletion-warning' },
+      'This is a data subject request. Your instance records it against your account and keeps an audit trail of the decision.'));
+  };
+
+  panel.appendChild(el('p', { class: 'muted small' }, 'Loading…'));
+  Api.accountDeletion()
+    .then((res) => paint(res.request))
+    .catch(() => {
+      clear(panel);
+      panel.appendChild(el('p', { class: 'form-error' }, 'Could not load the deletion request status.'));
+    });
+}
+
 function renderDangerZone(wrap) {
   wrap.appendChild(el('div', { class: 'section-label danger' }, 'Danger zone'));
   const logoutBtn = el('button', { class: 'btn danger', type: 'button' }, 'Sign out');
   logoutBtn.addEventListener('click', async () => {
     try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
-    // Shut the gateway down first: a lingering socket would keep
     // reconnecting (and reusing a dead token) after sign-out.
     try { Realtime.disconnect(); } catch { /* ignore */ }
     clearAnnouncements();
@@ -638,8 +730,8 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderBackendSelector(backendBox);
     body.appendChild(backendBox);
   } else {
-    // profile = My Account
     renderProfileEditor(body);
+    renderDeletionSection(body);
     renderDangerZone(body);
   }
 

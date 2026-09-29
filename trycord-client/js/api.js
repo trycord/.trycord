@@ -1,6 +1,3 @@
-// Trycord backend API client.
-// Implements the real HTTP contract of trycord-server (see server routes).
-// Every call returns `data` on success, and on failure throws `ApiError`
 // carrying { code, message, status, retryAfter }. Authorization is attached
 // from state.js (localStorage token) unless overridden.
 
@@ -15,7 +12,6 @@ export class ApiError extends Error {
     this.code = code || 'INTERNAL';
     this.status = status || 500;
     this.retryAfter = retryAfter || 0;
-    // Server-provided context (e.g. the action id on ACCOUNT_ENFORCED).
     // Never sensitive: the server decides what goes in here.
     this.details = details || null;
   }
@@ -67,7 +63,6 @@ async function request(method, path, { body, auth = true, raw = false, form = fa
   }
   if (res.status === 401) {
     // Token missing/bad/revoked: drop it and surface a typed error so the
-    // app can route back to login.
     if (auth) setToken(null);
     try {
       const e = await res.json().catch(() => null);
@@ -93,11 +88,9 @@ async function request(method, path, { body, auth = true, raw = false, form = fa
 }
 
 const Api = {
-  // ---- instance / legal ----------------------------------------------
   instance: () => request('GET', '/api/instance', { auth: false }),
   legal: () => request('GET', '/api/legal', { auth: false }),
 
-  // ---- auth ------------------------------------------------------------
   register: (body) => request('POST', '/api/auth/register', { body, auth: false }),
   login: (body) => request('POST', '/api/auth/login', { body, auth: false }),
   logout: () => request('POST', '/api/auth/logout'),
@@ -111,7 +104,6 @@ const Api = {
   changeEmail: (body) => request('POST', '/api/auth/change-email', { body }),
   wsTicket: () => request('POST', '/api/auth/ws/ticket'),
 
-  // ---- users -------------------------------------------------------------
   me: () => request('GET', '/api/users/me'),
   updateMe: (body) => request('PATCH', '/api/users/me', { body }),
   searchUsers: (q) => request('GET', '/api/users/search?q=' + encodeURIComponent(q)),
@@ -119,7 +111,6 @@ const Api = {
   user: (id, serverId) => request('GET', '/api/users/' + encodeURIComponent(id) + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
   legacyMe: () => request('GET', '/api/me'),
 
-  // ---- profile media -----------------------------------------------------
   uploadProfileImage: (kind, file) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -131,16 +122,13 @@ const Api = {
   fetchProfileImage: (path) => request('GET', path, { raw: true }),
   // Generic authenticated image fetch. Profile avatars/banners and community
   // icons/banners are both "GET this path with the session, get bytes back", so
-  // one method serves both and the shared media cache can stay keyed by path.
   fetchAuthedImage: (path) => request('GET', path, { raw: true }),
 
-  // ---- servers -----------------------------------------------------------
   servers: () => request('GET', '/api/servers'),
   createServer: (body) => request('POST', '/api/servers', { body }),
   server: (id) => request('GET', '/api/servers/' + encodeURIComponent(id)),
   updateServer: (id, body) => request('PATCH', '/api/servers/' + encodeURIComponent(id), { body }),
   deleteServer: (id) => request('DELETE', '/api/servers/' + encodeURIComponent(id)),
-  // Paged. Returns the { items, total, hasMore, limit, offset } envelope.
   serverMembers: (id, { limit, offset, q } = {}) => {
     const p = new URLSearchParams();
     if (limit !== undefined && limit !== null) p.set('limit', String(limit));
@@ -151,8 +139,6 @@ const Api = {
   },
   // Community identity media. The bytes live behind the authenticated media
   // route, so the client fetches them with the session and swaps in a blob URL
-  // - a bare <img src> would 401. Reading one uses the generic
-  // fetchAuthedImage, which is what the media cache calls.
   setServerImage: (id, kind, file) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -175,7 +161,6 @@ const Api = {
   serverByCode: (code) => request('GET', '/api/servers/by-code/' + encodeURIComponent(code)),
   joinServerByCode: (code) => request('POST', '/api/servers/join/' + encodeURIComponent(code)),
 
-  // ---- channels -----------------------------------------------------------
   channels: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/channels'),
   createChannel: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels', { body }),
   updateChannel: (serverId, channelId, body) =>
@@ -183,7 +168,6 @@ const Api = {
   deleteChannel: (serverId, channelId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId)),
 
-  // ---- categories -----------------------------------------------------------
   categories: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/categories'),
   createCategory: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/categories', { body }),
   deleteCategory: (serverId, categoryId) =>
@@ -196,8 +180,6 @@ const Api = {
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels/reorder', { body: { orderedIds } }),
 
   // ---- permission overrides: category -> channel tri-state --------------
-  // effect is 'inherit' | 'allow' | 'deny'. Absent rows mean inherit, so
-  // these calls only fire when someone actually changes something.
   channelOverrides: (serverId, channelId) =>
     request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId) + '/overrides'),
   setChannelOverride: (serverId, channelId, permission, effect) =>
@@ -208,10 +190,6 @@ const Api = {
   setCategoryOverride: (serverId, categoryId, permission, effect) =>
     request('PUT', '/api/servers/' + encodeURIComponent(serverId) + '/categories/' + encodeURIComponent(categoryId) +
       '/overrides/' + encodeURIComponent(permission), { body: { effect } }),
-  // ---- messages -------------------------------------------------------------
-  // One page of history.
-  //   before=<seq>  older page, newest-first server-side, reversed to oldest-first here
-  //   after=<seq>   forward page (reconnect gap fill), oldest-first
   messages: (channelId, { before, after, limit } = {}) => {
     const q = new URLSearchParams();
     if (before !== undefined && before !== null) q.set('before', String(before));
@@ -220,8 +198,6 @@ const Api = {
     const qs = q.toString();
     return request('GET', '/api/channels/' + encodeURIComponent(channelId) + '/messages' + (qs ? '?' + qs : ''));
   },
-  // body.clientNonce makes the POST idempotent: a retry after a lost response
-  // resolves to the message the first attempt already wrote.
   sendMessage: (channelId, body) =>
     request('POST', '/api/channels/' + encodeURIComponent(channelId) + '/messages', { body }),
   updateMessage: (channelId, messageId, body) =>
@@ -229,7 +205,6 @@ const Api = {
   deleteMessage: (channelId, messageId) =>
     request('DELETE', '/api/channels/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId)),
 
-  // ---- engagement: search, pins, reactions, mutes -------------------------------
   search: (q, { serverId, limit } = {}) => {
     const p = new URLSearchParams({ q: String(q || '') });
     if (serverId) p.set('serverId', serverId);
@@ -250,8 +225,6 @@ const Api = {
   muteChannel: (channelId) => request('POST', '/api/mutes', { body: { channelId } }),
   unmuteChannel: (channelId) => request('DELETE', '/api/mutes/' + encodeURIComponent(channelId)),
 
-  // ---- instance announcements ---------------------------------------------
-  // Read is open to any signed-in user; the write calls are admin-gated
   // server-side (this client flag is never the authority).
   announcements: () => request('GET', '/api/announcements'),
   allAnnouncements: () => request('GET', '/api/announcements/all'),
@@ -259,7 +232,6 @@ const Api = {
   updateAnnouncement: (id, data) => request('PATCH', '/api/announcements/' + encodeURIComponent(id), { body: data }),
   deleteAnnouncement: (id) => request('DELETE', '/api/announcements/' + encodeURIComponent(id)),
 
-  // ---- attachments -------------------------------------------------------------
   uploadAttachment: async (channelId, file) => {
     const fd = new FormData();
     fd.append('file', file);
@@ -269,7 +241,6 @@ const Api = {
   attachmentUrl: (id) => base() + '/api/attachments/' + encodeURIComponent(id),
   fetchAttachment: (id) => request('GET', '/api/attachments/' + encodeURIComponent(id), { raw: true }),
 
-  // ---- roles ---------------------------------------------------------------------
   serverPermissions: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/roles/permissions'),
   roles: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/roles'),
   createRole: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles', { body }),
@@ -284,17 +255,13 @@ const Api = {
   reorderRoles: (serverId, orderedIds) =>
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/roles/reorder', { body: { orderedIds } }),
   // There is deliberately no self-assign call. Roles reach members only through
-  // assignRole/unassignRole below, which the server gates on MANAGE_ROLES and
-  // on the actor's own rank.
 
-  // ---- invites ---------------------------------------------------------------------
   invites: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/invites'),
   createInvite: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/invites', { body }),
   deleteInvite: (serverId, inviteId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/invites/' + encodeURIComponent(inviteId)),
   invitePreview: (code) => request('GET', '/api/invites/' + encodeURIComponent(code) + '/preview'),
   joinInvite: (code) => request('POST', '/api/invites/' + encodeURIComponent(code) + '/join'),
-// ---- discovery ---------------------------------------------------------------------
 discover: ({ q = '', page = 1, limit = 12 } = {}) => {
     const qs = new URLSearchParams({
         page: String(page),
@@ -303,7 +270,6 @@ discover: ({ q = '', page = 1, limit = 12 } = {}) => {
 
     if (q) qs.set('q', q);
 
-    // The current Trycord backend requires authentication for Discover.
     // Use the existing stored session token.
     return request(
         'GET',
@@ -326,31 +292,23 @@ joinDiscover: (id) =>
         { auth: true }
     ),
 
-  // ---- activity ---------------------------------------------------------------------
   activity: ({ limit = 20 } = {}) => request('GET', '/api/activity?limit=' + limit),
 
-  // ---- support / appeals ------------------------------------------------------
   // Submit is anonymous by design (possession of the action id is the key);
-  // listing is scoped to the signed-in user.
   submitAppeal: (body) => request('POST', '/api/appeals', { body, auth: false }),
   myAppeals: () => request('GET', '/api/appeals/mine'),
 
-  // ---- dms -----------------------------------------------------------------------
   dms: () => request('GET', '/api/dms'),
   dm: (id) => request('GET', '/api/dms/' + encodeURIComponent(id)),
   openDm: (userId) => request('POST', '/api/dms', { body: { userId } }),
   dmMessages: (id, { before, after, limit } = {}) => {
     const q = new URLSearchParams();
-    // `after` walks forward from a seq for reconnect catch-up; `before` walks
-    // back and accepts a seq or a legacy message id.
     if (after !== undefined && after !== null && after !== '') q.set('after', String(after));
     if (before) q.set('before', before);
     if (limit) q.set('limit', String(limit));
     const qs = q.toString();
     return request('GET', '/api/dms/' + encodeURIComponent(id) + '/messages' + (qs ? '?' + qs : ''));
   },
-  // clientNonce makes a retried send collapse onto the message the first
-  // attempt already wrote, so a lost response cannot duplicate it.
   sendDm: (id, content, clientNonce) =>
     request('POST', '/api/dms/' + encodeURIComponent(id) + '/messages',
       { body: clientNonce ? { content, clientNonce } : { content } }),
@@ -360,7 +318,6 @@ joinDiscover: (id) =>
     request('PATCH', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId), { body: { content } }),
   dmRead: (id) => request('POST', '/api/dms/' + encodeURIComponent(id) + '/read'),
 
-  // ---- friends ---------------------------------------------------------------------------
   friends: () => request('GET', '/api/friends'),
   friendRequests: () => request('GET', '/api/friends/requests'),
   sendFriendRequest: (userId) => request('POST', '/api/friends/requests', { body: { userId } }),
@@ -369,9 +326,6 @@ joinDiscover: (id) =>
   cancelFriendRequest: (id) => request('DELETE', '/api/friends/requests/' + encodeURIComponent(id)),
   removeFriend: (userId) => request('DELETE', '/api/friends/' + encodeURIComponent(userId)),
 
-  // ---- notifications ----------------------------------------------------------------------
-  // `before` is the opaque nextCursor from the previous page; omit it to start
-  // at the newest notification.
   notifications: ({ limit = 30, before = null } = {}) => {
     const q = new URLSearchParams();
     q.set('limit', String(limit));
@@ -381,7 +335,6 @@ joinDiscover: (id) =>
   readAllNotifications: () => request('POST', '/api/notifications/read-all'),
   readNotification: (id) => request('POST', '/api/notifications/' + encodeURIComponent(id) + '/read'),
 
-  // ---- platform admin ---------------------------------------------------------------
   adminOverview: () => request('GET', '/api/admin/overview'),
   adminUsers: ({ q = '', limit = 25 } = {}) =>
     request('GET', '/api/admin/users?q=' + encodeURIComponent(q) + '&limit=' + limit),
@@ -400,7 +353,6 @@ joinDiscover: (id) =>
     request('GET', '/api/admin/servers/' + encodeURIComponent(serverId) + '/actions'),
   adminEnforceServer: (serverId, actionType, reason, { reportId, confirm } = {}) => {
     // The server exposes suspend/remove (there is no /enforce endpoint):
-    // route here so every caller uses the real contract.
     const type = String(actionType || '').toUpperCase();
     if (type === 'SERVER_REMOVAL') {
       return request('POST', '/api/admin/servers/' + encodeURIComponent(serverId) + '/remove',
@@ -436,13 +388,51 @@ joinDiscover: (id) =>
   adminAppeal: (id) => request('GET', '/api/admin/appeals/' + encodeURIComponent(id)),
   adminDecideAppeal: (id, decision, reason) =>
     request('PATCH', '/api/admin/appeals/' + encodeURIComponent(id), { body: { decision, reason } }),
-  adminAudit: ({ actorId, action, limit = 50 } = {}) => {
+  adminAudit: ({ actorId, action, targetId, limit = 50 } = {}) => {
     const q = new URLSearchParams();
     if (actorId) q.set('actorId', actorId);
     if (action) q.set('action', action);
+    if (targetId) q.set('targetId', targetId);
     q.set('limit', String(limit));
     return request('GET', '/api/admin/audit?' + q.toString());
   },
+
+  // Account deletion. The user side is deliberately explicit: a password, and
+  accountDeletion: () => request('GET', '/api/account/deletion'),
+  requestAccountDeletion: (password) =>
+    request('POST', '/api/account/deletion', { body: { password, confirm: 'DELETE' } }),
+  cancelAccountDeletion: () => request('POST', '/api/account/deletion/cancel'),
+
+  adminGdprRequests: ({ status, limit = 50 } = {}) => {
+    const q = new URLSearchParams();
+    if (status) q.set('status', status);
+    q.set('limit', String(limit));
+    return request('GET', '/api/admin/gdpr/requests?' + q.toString());
+  },
+  adminReviewGdprRequest: (id, decision, note) =>
+    request('POST', '/api/admin/gdpr/requests/' + encodeURIComponent(id) + '/review', {
+      body: { decision, note },
+    }),
+  adminProcessGdprRequest: (id) =>
+    request('POST', '/api/admin/gdpr/requests/' + encodeURIComponent(id) + '/process', {
+      body: { confirm: 'ERASE' },
+    }),
+
+  // Static page editor. The body is typed blocks, never HTML.
+  adminPages: () => request('GET', '/api/admin/pages'),
+  adminPage: (route) => request('GET', '/api/admin/pages/' + encodeURIComponent(route)),
+  adminPreviewPage: (route, body) =>
+    request('PUT', '/api/admin/pages/' + encodeURIComponent(route), { body: { preview: true, body } }),
+  adminSavePageDraft: (route, title, body) =>
+    request('PUT', '/api/admin/pages/' + encodeURIComponent(route), { body: { title, body } }),
+  adminPublishPage: (route, confirm) =>
+    request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/publish', { body: { confirm } }),
+  adminUnpublishPage: (route) =>
+    request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/unpublish'),
+  adminPageRevisions: (route) =>
+    request('GET', '/api/admin/pages/' + encodeURIComponent(route) + '/revisions'),
+  adminRestorePageRevision: (route, revision) =>
+    request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/revisions/' + encodeURIComponent(revision) + '/restore'),
 };
 
 export default Api;

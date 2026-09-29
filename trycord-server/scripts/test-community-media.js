@@ -2,7 +2,7 @@
 // MANAGE_SERVER, served from the authenticated media route, and replaceable and
 // removable without leaking the superseded file.
 const http = require('http');
-const API = 'http://localhost:9971';
+const API = (process.env.TRYCORD_TEST_URL || 'http://localhost:9971').replace(/\/+$/, '');
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 function req(m, p, b, t) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Terms of Service — Trycord</title>
+  <title>Terms of Service â€” Trycord</title>
   <meta name="description" content="The terms that apply when you use a Trycord instance, whether an official hosted instance or one you run yourself.">
   <link rel="icon" href="/assets/trycord-logo.ico" type="image/x-icon">
   <link rel="icon" href="/assets/trycord-logo.png" type="image/png">
@@ -32,6 +32,8 @@
   </header>
 
   <main id="main" class="page tight">
+    <!-- page:begin -->
+    <!-- Everything between the two markers below is the editable region. The page editor replaces it on publish; until a page is published this file is served as-is. Remove the markers only if you never intend to use the editor. -->
     <div class="prose">
       <h1>Terms of Service</h1>
       <p class="lede">
@@ -43,7 +45,7 @@
 
       <div class="draft-note" role="note">
         <strong>Operator action required.</strong> Items marked
-        <code>[&nbsp;&nbsp;]</code> are details only the operator of a given
+        <code>OPERATOR</code> are details only the operator of a given
         instance can supply: their legal name, contact address, and where to
         send formal notices. The project cannot fill these in, because they
         differ per instance. Until they are set, an instance should present
@@ -59,8 +61,8 @@
         (see section 2).
       </p>
       <p>
-        Operator: <code>[&nbsp;&nbsp;]</code> &middot; Contact for legal
-        notices: <code>[&nbsp;&nbsp;]</code>
+        Operator: <span class="op-field" data-op="operator">OPERATOR: the legal name of whoever runs this instance</span> &middot; Contact for legal
+        notices: <span class="op-field" data-op="legal-notices">OPERATOR: your address for legal notices</span>
       </p>
 
       <h2>2. Official instances and self-hosted instances</h2>
@@ -175,7 +177,7 @@
         loss of data, profits, or goodwill, arising from your use of the
         service. Aggregate liability is limited to the amount you paid the
         operator in the twelve months before the claim, or to
-        <code>[&nbsp;&nbsp;]</code> if you paid nothing. Nothing here limits
+        <span class="op-field" data-op="liability-floor">OPERATOR: your liability floor for users who paid nothing</span>. Nothing here limits
         liability that cannot lawfully be limited, including for death or
         personal injury caused by negligence, or for fraud.
       </p>
@@ -199,19 +201,20 @@
       <h2>14. Governing law</h2>
       <p>
         These terms are governed by the laws of
-        <code>[&nbsp;&nbsp;]</code>, and disputes are subject to the exclusive
-        courts of <code>[&nbsp;&nbsp;]</code>, without affecting any mandatory
+        <span class="op-field" data-op="governing-law">OPERATOR: your governing law</span>, and disputes are subject to the exclusive
+        courts of <span class="op-field" data-op="jurisdiction">OPERATOR: your jurisdiction</span>, without affecting any mandatory
         consumer protections available where you live.
       </p>
 
       <h2>15. Contact</h2>
       <p>
         Legal notices and formal complaints go to
-        <code>[&nbsp;&nbsp;]</code>. For anything that is not a formal notice,
+        <span class="op-field" data-op="complaints">OPERATOR: where complaints are sent</span>. For anything that is not a formal notice,
         start on the <a href="/support">Support</a> page &mdash; it routes to
         the right place faster.
       </p>
     </div>
+    <!-- page:end -->
   </main>
 
   <footer class="site-footer">
@@ -238,8 +241,8 @@
         <h2 class="footer-heading">Legal</h2>
         <a href="/terms">Terms of Service</a>
         <a href="/instances-terms">Official instance terms</a>
-        <a href="/instances-terms">Official instance terms</a>
         <a href="/privacy">Privacy Policy</a>
+        <a href="/trust-and-safety">Trust &amp; Safety</a>
       </div>
     </div>
     <div class="wrap footer-bottom">

@@ -262,7 +262,7 @@ async function J(method, p, body, tok, form) {
   const WS = require('ws');
   const ticket = (await J('POST', '/api/auth/ws/ticket', {}, A.token)).json.ticket;
   ok('ws-ticket', !!ticket);
-  const ws = new WS('ws://localhost:9971/?ticket=' + ticket);
+  const ws = new WS(API.replace(/^http/, 'ws') + '/?ticket=' + ticket);
   const echo = await new Promise((resolve) => {
     const to = setTimeout(() => resolve(false), 10000);
     ws.on('open', () => { ws.send(JSON.stringify({ type: 'join', channelId: cid })); setTimeout(() => ws.send(JSON.stringify({ type: 'msg', content: 'reg-ws-live' })), 200); });

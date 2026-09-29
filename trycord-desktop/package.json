@@ -5,13 +5,13 @@
   "author": "Trycord",
   "repository": {
     "type": "git",
-    "url": "https://github.com/LanxTheShowmaker/.trycord.git",
+    "url": "https://github.com/trycord/.trycord.git",
     "directory": "trycord-desktop"
   },
   "bugs": {
-    "url": "https://github.com/LanxTheShowmaker/.trycord/issues"
+    "url": "https://github.com/trycord/.trycord/issues"
   },
-  "homepage": "https://github.com/LanxTheShowmaker/.trycord#readme",
+  "homepage": "https://github.com/trycord/.trycord#readme",
   "keywords": ["chat", "self-hosted", "desktop", "electron"],
   "main": "main.js",
   "scripts": {

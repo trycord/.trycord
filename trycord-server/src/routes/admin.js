@@ -9,6 +9,7 @@ const { fail, serviceError } = require('../errors');
 const db = require('../db');
 const enforcement = require('../services/enforcement');
 const ts = require('../services/trustsafety');
+const deletion = require('../services/accountDeletion');
 
 let gateway = { disconnectUser: () => {} };
 function setGateway(gw) {
@@ -228,6 +229,63 @@ async function liftForAction(actionId, adminId) {
   }
 }
 
+// --- GDPR erasure requests ---
+//
+// These are not moderation actions and cannot be created as one. request_type
+// is written by the server when the user asks; nothing here accepts a type from
+// a caller, so the queue cannot be relabelled as ordinary moderation work.
+
+router.get('/gdpr/requests', async (req, res, next) => {
+  try {
+    const rows = await deletion.listRequests(req.query || {});
+    res.json(rows.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      username: r.username,
+      status: r.status,
+      // The label the console shows next to every row in this queue.
+      requestedBy: r.request_type === 'GDPR' ? 'GDPR' : null,
+      requestType: r.request_type,
+      reason: r.reason,
+      requestedAt: r.requested_at,
+      reviewedAt: r.reviewed_at,
+      processedAt: r.processed_at,
+      cancelledAt: r.cancelled_at,
+      anonymisedAt: r.anonymised_at,
+      accountCreatedAt: r.account_created_at,
+    })));
+  } catch (e) { serviceError(res, e); }
+});
+
+router.post('/gdpr/requests/:id/review', async (req, res, next) => {
+  try {
+    const decision = String((req.body || {}).decision || '').toUpperCase();
+    const row = await deletion.reviewRequest({
+      requestId: req.params.id,
+      reviewerId: req.user.id,
+      decision,
+      note: (req.body || {}).note,
+    });
+    res.json({ id: row.id, status: row.status, requestedBy: 'GDPR' });
+  } catch (e) { serviceError(res, e); }
+});
+
+router.post('/gdpr/requests/:id/process', async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    if (body.confirm !== 'ERASE') {
+      return fail(res, 'VALIDATION_ERROR', 'type ERASE to confirm');
+    }
+    await deletion.beginProcessing({ requestId: req.params.id, actorId: req.user.id });
+    const row = await db.get('SELECT user_id FROM account_deletion_requests WHERE id = ?', [req.params.id]);
+    // The account is being erased, so any live socket for it has to go now
+    // rather than when it next tries to use a session.
+    try { gateway.disconnectUser(row.user_id); } catch { /* gateway not wired */ }
+    const report = await deletion.eraseAccount({ userId: row.user_id, actorId: req.user.id });
+    res.json({ ok: true, report });
+  } catch (e) { serviceError(res, e); }
+});
+
 // --- audit ---
 
 router.get('/audit', async (req, res, next) => {
@@ -237,6 +295,7 @@ router.get('/audit', async (req, res, next) => {
     const params = [];
     if (req.query.actorId) { where.push('actor_id = ?'); params.push(req.query.actorId); }
     if (req.query.action) { where.push('action = ?'); params.push(req.query.action); }
+    if (req.query.targetId) { where.push('target_id = ?'); params.push(req.query.targetId); }
     const q = where.length ? 'WHERE ' + where.join(' AND ') : '';
     res.json(await db.all(
       `SELECT a.*, (SELECT username FROM users u WHERE u.id = a.actor_id) AS actor_name,

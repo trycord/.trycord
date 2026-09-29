@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Terms for Official Instances — Trycord</title>
+  <title>Terms for Official Instances â€” Trycord</title>
   <meta name="description" content="The extra terms that apply on official hosted Trycord instances, where the project is the operator rather than a community.">
   <link rel="icon" href="/assets/trycord-logo.ico" type="image/x-icon">
   <link rel="icon" href="/assets/trycord-logo.png" type="image/png">
@@ -32,6 +32,8 @@
   </header>
 
   <main id="main" class="page tight">
+    <!-- page:begin -->
+    <!-- Everything between the two markers below is the editable region. The page editor replaces it on publish; until a page is published this file is served as-is. Remove the markers only if you never intend to use the editor. -->
     <div class="prose">
       <h1>Terms for Official Instances</h1>
       <p class="lede">
@@ -42,7 +44,7 @@
 
       <div class="draft-note" role="note">
         <strong>Operator action required.</strong> Items marked
-        <code>[&nbsp;&nbsp;]</code> need the official operator's legal name,
+        <code class="op-field" data-op="blank">OPERATOR</code> need the official operator's legal name,
         address, retention periods, and supervisory authority before these
         terms are presented to anyone.
       </div>
@@ -72,7 +74,7 @@
       <h2>3. Who runs it, and who you can contact</h2>
       <p>
         The operator is the Trycord project, contactable at
-        <code>[&nbsp;&nbsp;]</code>. Because one organisation operates every
+        <span class="op-field" data-op="official-contact">OPERATOR: your contact address</span>. Because one organisation operates every
         official instance, you do not have to work out who runs the one you
         joined: it is us, and there is one place to raise a problem.
       </p>
@@ -89,10 +91,10 @@
         is not handled differently depending on which one you happened to join.
       </p>
       <ul>
-        <li><strong>Retention:</strong> <code>[&nbsp;&nbsp;]</code></li>
-        <li><strong>Backups:</strong> <code>[&nbsp;&nbsp;]</code></li>
-        <li><strong>Hosting and subprocessors:</strong> <code>[&nbsp;&nbsp;]</code></li>
-        <li><strong>Where data is stored:</strong> <code>[&nbsp;&nbsp;]</code></li>
+        <li><strong>Retention:</strong> <span class="op-field" data-op="official-retention">OPERATOR: your retention periods</span></li>
+        <li><strong>Backups:</strong> <span class="op-field" data-op="official-backups">OPERATOR: your backup schedule and retention</span></li>
+        <li><strong>Hosting and subprocessors:</strong> <span class="op-field" data-op="official-processors">OPERATOR: your hosting provider and subprocessors</span></li>
+        <li><strong>Where data is stored:</strong> <span class="op-field" data-op="official-location">OPERATOR: the country or region your data is stored in</span></li>
         <li><strong>Your rights:</strong> access, correction, export, and erasure, as set out in the <a href="/privacy">Privacy Policy</a></li>
       </ul>
       <p>
@@ -144,7 +146,7 @@
         If an official instance is closed, we will publish notice on the
         <a href="/status">status page</a>, give reasonable time to export, and
         keep the export available for a defined period afterwards:
-        <code>[&nbsp;&nbsp;]</code>. We will not silently delete communities
+        <span class="op-field" data-op="official-export-window">OPERATOR: how long an export stays available after an instance closes</span>. We will not silently delete communities
         that people are still using.
       </p>
 
@@ -158,10 +160,11 @@
 
       <h2>10. Contact</h2>
       <p>
-        <code>[&nbsp;&nbsp;]</code> &middot; Start at
+        <span class="op-field" data-op="official-notice-address">OPERATOR: your address for formal notices</span> &middot; Start at
         <a href="/support">Support</a> for anything that is not a formal notice.
       </p>
     </div>
+    <!-- page:end -->
   </main>
 
   <footer class="site-footer">
@@ -189,6 +192,7 @@
         <a href="/terms">Terms of Service</a>
         <a href="/instances-terms">Official instance terms</a>
         <a href="/privacy">Privacy Policy</a>
+        <a href="/trust-and-safety">Trust &amp; Safety</a>
       </div>
     </div>
     <div class="wrap footer-bottom">

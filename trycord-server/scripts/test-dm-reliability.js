@@ -4,7 +4,7 @@
 //   - `before` accepts a seq OR a legacy message id
 //   - clientNonce makes a retried POST collapse onto the original row
 const http = require('http');
-const API = 'http://localhost:9971';
+const API = (process.env.TRYCORD_TEST_URL || 'http://localhost:9971').replace(/\/+$/, '');
 function req(m, p, b, t) {
   return new Promise((res) => {
     const d = b ? JSON.stringify(b) : null; const u = new URL(p, API);

@@ -31,8 +31,10 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 10 }), 
   } catch (e) { serviceError(res, e); }
 });
 
-// Safe pre-join preview for code holders (subset only — no members, messages, or settings).
-router.get('/by-code/:code', async (req, res, next) => {
+// Safe pre-join preview for code holders (subset only — no members, messages,
+// or settings). Rate limited because a join code is 32 bits, so an
+// unthrottled endpoint is a working oracle for guessing one.
+router.get('/by-code/:code', rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const srv = await db.get(
       `SELECT s.id, s.name, s.description, s.is_public, s.is_discoverable, s.created_at,
@@ -46,7 +48,7 @@ router.get('/by-code/:code', async (req, res, next) => {
 });
 
 // Legacy permanent-code join (kept for back-compat; invites are the real system).
-router.post('/join/:code', auth.requireVerified, async (req, res, next) => {
+router.post('/join/:code', auth.requireVerified, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const out = await memberships.joinByCode(req.params.code, req.user);
     if (out && out.serverId) events.emit(out.serverId, 'member_joined', { userId: String(req.user.id) });
@@ -130,9 +132,9 @@ router.get('/media/:id', auth, async (req, res, next) => {
     res.setHeader('Content-Type', row.mime);
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.sendFile(uploads.filePath(row.id), { dotfiles: 'allow' }, (err) => {
-      if (err && !res.headersSent) return fail(res, 'NOT_FOUND', 'image not found');
-    });
+    const stream = uploads.openServerMedia(row);
+    stream.on('error', () => { if (!res.headersSent) fail(res, 'NOT_FOUND', 'image not found'); });
+    stream.pipe(res);
   } catch (e) { next(e); }
 });
 

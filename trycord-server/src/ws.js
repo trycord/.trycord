@@ -25,6 +25,7 @@ const { hasChannelPermission } = require('./services/permissions');
 const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
 const dms = require('./services/dms');
 const uploads = require('./services/uploads');
+const { nextSeq } = require('./routes/messages');
 
 const TICKET_TTL_MS = 60 * 1000;
 const MAX_PER_USER_SOCKETS = 8;
@@ -34,6 +35,11 @@ const MSG_WINDOW_MS = 10 * 1000;
 const MSG_WINDOW_MAX = 90;
 const MSG_STRIKE_LIMIT = 6;
 const HEARTBEAT_MS = 30 * 1000;
+// A socket that stops reading would otherwise buffer frames without bound and
+// stall delivery for every other member of its room, since broadcast walks the
+// room synchronously. Past this many queued bytes the socket is dropped;
+// clients reconnect and resync over HTTP.
+const MAX_BUFFERED_BYTES = 8 * 1024 * 1024;
 
 function createGateway(server) {
   const wss = new WebSocket.Server({ noServer: true, maxPayload: MAX_PAYLOAD });
@@ -61,11 +67,16 @@ function createGateway(server) {
 
   function sendToUser(userId, payload) {
     const data = JSON.stringify(payload);
-    socketsOf(userId).forEach((c) => {
-      if (c.readyState === WebSocket.OPEN) {
-        try { c.send(data); } catch { /* dead socket: cleaned on close */ }
-      }
-    });
+    socketsOf(userId).forEach((c) => deliver(c, data));
+  }
+
+  function deliver(ws, data) {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    if (ws.bufferedAmount > MAX_BUFFERED_BYTES) {
+      try { ws.close(1013, 'client too slow'); } catch { /* already gone */ }
+      return;
+    }
+    try { ws.send(data); } catch { /* dead socket: cleaned on close */ }
   }
 
   // Channel rooms: serverId/channelId -> sockets currently joined there.
@@ -97,11 +108,7 @@ function createGateway(server) {
     const data = JSON.stringify(payload);
     const set = channelRooms.get(roomKey(serverId, channelId));
     if (!set) return;
-    set.forEach((c) => {
-      if (c.readyState === WebSocket.OPEN) {
-        try { c.send(data); } catch { /* dead socket: cleaned on close */ }
-      }
-    });
+    set.forEach((c) => deliver(c, data));
   }
 
   // Server rooms: serverId -> sockets that opened the community. Structural
@@ -126,17 +133,43 @@ function createGateway(server) {
     if (!serverRooms.has(key)) serverRooms.set(key, new Set());
     serverRooms.get(key).add(ws);
   }
+  // Delivery re-checks membership, so a removed socket cannot linger on
+  // events. That check used to run once per socket: a 10k-member community
+  // meant 10k queries for one role change. It is now one query for the whole
+  // room, and the set of member ids is memoised for a moment because several
+  // structural events fire back to back for the same community.
+  const memberCache = new Map();
+  const MEMBER_CACHE_MS = 2000;
+  async function memberIdsFor(serverId) {
+    const key = String(serverId);
+    const hit = memberCache.get(key);
+    const nowMs = Date.now();
+    if (hit && nowMs - hit.at < MEMBER_CACHE_MS) return hit.ids;
+    const rows = await db.all('SELECT user_id FROM server_members WHERE server_id = ?', [key]);
+    const ids = new Set(rows.map((r) => String(r.user_id)));
+    memberCache.set(key, { at: nowMs, ids });
+    return ids;
+  }
+  function invalidateMembers(serverId) {
+    if (serverId === undefined) memberCache.clear();
+    else memberCache.delete(String(serverId));
+  }
+
   async function broadcastServer(serverId, payload) {
     const data = JSON.stringify(payload);
     const set = serverRooms.get(String(serverId));
-    if (!set) return;
+    if (!set || !set.size) return;
+    let ids;
+    try {
+      ids = await memberIdsFor(serverId);
+    } catch {
+      return; // cannot confirm membership, so nobody is told
+    }
     for (const c of [...set]) {
       if (c.readyState !== WebSocket.OPEN) continue;
       if (!c.user) continue;
-      try {
-        if (!(await isMember(c.user.id, serverId))) continue;
-      } catch { continue; }
-      try { c.send(data); } catch { /* dead socket: cleaned on close */ }
+      if (!ids.has(String(c.user.id))) continue;
+      deliver(c, data);
     }
   }
   // Remove one user's sockets from a server's rooms (kick/ban/leave): they
@@ -176,9 +209,7 @@ function createGateway(server) {
     const data = JSON.stringify(payload);
     (memberIds || []).forEach((id) => {
       socketsOf(id).forEach((c) => {
-        if (c.readyState === WebSocket.OPEN && c.dmIds && c.dmIds.has(String(payload.conversationId))) {
-          try { c.send(data); } catch { /* dead socket */ }
-        }
+        if (c.dmIds && c.dmIds.has(String(payload.conversationId))) deliver(c, data);
       });
     });
   }
@@ -378,12 +409,24 @@ function createGateway(server) {
               author_id: user.id, user: user.username, content, created_at: now(),
               edited_at: null,
             };
-            try {
-              await db.run(
-                'INSERT INTO messages (id, channel_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)',
-                [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at]
-              );
-            } catch { return; }
+            // The per-channel sequence is what the history cursor pages on, so
+            // a socket post without one is invisible to every later read.
+            let inserted = false;
+            for (let attempt = 0; attempt < 5 && !inserted; attempt++) {
+              const seq = await nextSeq(ch.id);
+              try {
+                await db.run(
+                  'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq) VALUES (?, ?, ?, ?, ?, ?)',
+                  [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at, seq]
+                );
+                msg.seq = seq;
+                inserted = true;
+              } catch (e) {
+                const dupSeq = /unique/i.test(String(e && e.message)) || (e && e.code === 'SQLITE_CONSTRAINT');
+                if (!dupSeq || attempt === 4) return;
+              }
+            }
+            if (!inserted) return;
             msg.attachments = ids.length
               ? await uploads.attachToMessage(ids, msg.id, user.id, ch.id)
               : [];
@@ -429,7 +472,8 @@ function createGateway(server) {
   }, HEARTBEAT_MS);
   heartbeat.unref();
 
-  return { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer };
+  return { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser,
+    broadcastServer, evictUserFromServer, invalidateMembers };
 }
 
 module.exports = createGateway;

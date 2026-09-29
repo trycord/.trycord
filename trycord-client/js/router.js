@@ -1,16 +1,11 @@
 // Hash router. Maps #/... routes to real page renderers. Guards routes,
-// re-renders the active shell's chrome, and cleans up listeners on change.
 
 import { isAuthed, refreshServers, clearViewRefresh } from './state.js';
 import PagesPublic from './pages-public.js';
 import { renderHome } from './pages-home.js';
 import { renderBrowse } from './pages-browse.js';
 import HelloDms from './pages-dms.js';
-// Community surfaces are imported from the feature module that owns each one.
 // There is deliberately no `Workspace.*` facade any more: the old single
-// pages-workspace.js mixed a conversation view, a member roster, the role
-// hierarchy and community settings behind one default export, so every route
-// reached every feature through the same namespace.
 import { renderMenu, renderNewServer, renderServerLanding } from './pages-community.js';
 import { renderChannel, renderChannelPins } from './pages-conversation.js';
 import { renderServerMembers } from './pages-members.js';
@@ -20,18 +15,18 @@ import { renderInvites } from './pages-invites.js';
 import { renderServerSettings } from './pages-settings.js';
 import { renderAccount } from './pages-account.js';
 import { renderAdmin } from './pages-admin.js';
+import { renderAdminPages } from './pages-admin-pages.js';
 import { renderProfile } from './pages-profile.js';
 import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support.js';
 import { renderNotifications } from './pages-notifications.js';
-import { presentationMode, closeMobileDrawer, closeDesktopNav } from './presentation.js';
-import { setNavRoute, renderAllChrome, renderContextHeader, renderMobileHeader } from './shell.js';
+import { presentationMode, closeDesktopNav } from './presentation.js';
+import { setNavRoute, renderAllChrome, renderContextHeader } from './shell.js';
 import Api from './api.js';
 import { el, clear, toast } from './ui.js';
 
 let lastCleanup = null;
 let lastRoute = '';
 
-// The active view region depends on the presentation.
 function viewRegion() {
   return presentationMode() === 'mobile'
     ? document.getElementById('mobile-main')
@@ -53,11 +48,18 @@ function setCleanup(fn) {
   lastCleanup = fn;
 }
 
+// A hash carries a path and, optionally, a query: #/server/s/channel/c?m=<id>.
 function parseHash() {
   const raw = (location.hash || '#/').replace(/^#/, '');
-  if (!raw || raw === '/') return { path: '/', parts: [] };
-  const parts = raw.split('/').filter(Boolean).map(decodeURIComponent);
-  return { path: raw, parts };
+  const qIndex = raw.indexOf('?');
+  const path = qIndex === -1 ? raw : raw.slice(0, qIndex);
+  const query = {};
+  if (qIndex !== -1) {
+    for (const [k, v] of new URLSearchParams(raw.slice(qIndex + 1))) query[k] = v;
+  }
+  if (!path || path === '/') return { path: '/', parts: [], query };
+  const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
+  return { path, parts, query };
 }
 
 function requireAuth() {
@@ -68,27 +70,13 @@ function requireAuth() {
 }
 
 async function renderRoute() {
-    const { path, parts } = parseHash();
-    document.documentElement.dataset.route = path || '/';
-    // Cleared here and set only by the auth shell. A dedicated auth page is
+  const { path, parts, query } = parseHash();
+  document.documentElement.dataset.route = path || '/';
     // fixed-position and escapes the desktop shell's grid, but it still has to
-    // live inside a shell that is actually displayed - and below 600px the
-    // mobile shell replaces the desktop one entirely. So the styling hook
-    // follows the page that renders rather than a repeated list of routes.
     delete document.documentElement.dataset.authPage;
-  // The auth overlay is mounted on <body> so that shell visibility rules cannot
-  // collapse it (see the note in pages-public.js). Clearing the view region
-  // therefore no longer removes it, so drop a leftover overlay here. Every
-  // render passes through this point, which covers both re-rendering another
-  // auth route and navigating away from one.
   for (const stray of document.querySelectorAll('body > .auth-page')) stray.remove();
   // Session state as a styling hook. Without a session there is no rail and
-  // no context sidebar to render, but the desktop shell is still a fixed
-  // three-column grid - so a signed-out visitor on any non-static route
-  // (Support, Discover) got a 304px phantom gutter and every centred element
-  // sat ~152px right of the viewport centre. Keying the collapse off the
   // session rather than the route fixes every such page at once, instead of
-  // needing each one added to a route list.
   document.documentElement.dataset.session = isAuthed() ? 'in' : 'out';
   const region = viewRegion();
   if (!region) return;
@@ -96,17 +84,13 @@ async function renderRoute() {
   setNavRoute(() => path);
   runCleanup();
 
-  closeMobileDrawer();
   closeDesktopNav();
 
-  // --- public-only routes -----------------------------------------
   if (path.startsWith('/login') || path === '' || path === '/') {
     if (isAuthed()) { location.hash = '#/home'; return; }
     renderContextHeader({});
     PagesPublic.login(region);
     setNavRoute(() => '/login');
-    // The default route renders the login surface. Normalize presentation state
-    // so route-scoped auth layout applies to both `/` and `/login`.
     document.documentElement.dataset.route = '/login';
     renderAllChrome();
     return;
@@ -141,7 +125,6 @@ async function renderRoute() {
     return;
   }
 
-  // --- discover is public to browse, guarded to join -------------
   if (path.startsWith('/discover')) {
     const previewId = parts[1] || null;
     await renderBrowse(region, { previewId });
@@ -149,7 +132,6 @@ async function renderRoute() {
     return;
   }
 
-  // --- support hub + appeals (submission is anonymous by design) ------
   if (path.startsWith('/support/appeals/new')) {
     renderNewAppeal(region);
     renderAllChrome();
@@ -178,10 +160,8 @@ async function renderRoute() {
     return;
   }
 
-  // Warm the server list (we render chrome from it).
   try { await refreshServers().catch(() => {}); } catch { /* offline */ }
 
-  // --- friends / dms -------------------------------------------------
   if (path.startsWith('/friends')) {
     setCleanup(() => { HelloDms.leaveDm(); });
     await HelloDms.renderFriendsPage(region);
@@ -211,7 +191,6 @@ async function renderRoute() {
     return;
   }
 
-  // --- settings (account hub; /account* kept as working aliases) ----------
   if (path.startsWith('/settings/updates')) { await renderAccount(region, { tab: 'updates' }); renderAllChrome(); return; }
   if (path.startsWith('/settings/appearance')) { await renderAccount(region, { tab: 'appearance' }); renderAllChrome(); return; }
   if (path.startsWith('/settings/password')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
@@ -227,7 +206,11 @@ async function renderRoute() {
   if (path.startsWith('/account/backend')) { await renderAccount(region, { tab: 'backend' }); renderAllChrome(); return; }
   if (path.startsWith('/account')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
 
-  // --- platform admin ------------------------------------------------------
+  if (path === '/admin/pages' || path.startsWith('/admin/pages/')) {
+    await renderAdminPages(region, { route: parts[2] || null });
+    renderAllChrome();
+    return;
+  }
   if (path.startsWith('/admin/')) {
     const adminSection = parts[1] === 'servers' ? 'communities' : (parts[1] || 'overview');    await renderAdmin(region, { section: adminSection });
     renderAllChrome();
@@ -239,7 +222,6 @@ async function renderRoute() {
     return;
   }
 
-  // --- joins ------------------------------------------------------------
   if (path.startsWith('/invite/')) {
     const code = parts[1];
     renderContextHeader({ title: 'Joining', sub: code });
@@ -259,14 +241,12 @@ async function renderRoute() {
     }
   }
 
-  // --- profile -> public page ----------------------------------------------
   if (path.startsWith('/users/')) {
     await renderProfile(region, { id: parts[1] });
     renderAllChrome();
     return;
   }
 
-  // --- servers -----------------------------------------------------
   if (path.startsWith('/servers/new')) {
     await renderNewServer(region);
     renderAllChrome();
@@ -283,7 +263,7 @@ async function renderRoute() {
     }
     if (what === 'channel' && parts[3]) {
       setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
-      await renderChannel(region, serverId, parts[3]);
+      await renderChannel(region, serverId, parts[3], { focusMessage: query.m || null });
       renderAllChrome();
       return;
     }
@@ -313,9 +293,6 @@ async function renderRoute() {
       return;
     }
     if (what === 'settings') {
-      // Sections live under /server/:id/settings/<section> so each one is
-      // linkable and the back button behaves. An unknown section falls back to
-      // the overview rather than rendering a blank page.
       const known = ['overview', 'appearance', 'structure', 'members', 'roles', 'invites', 'moderation', 'ownership'];
       const section = parts[3] && known.includes(parts[3]) ? parts[3] : 'overview';
       await renderServerSettings(region, serverId, section);
@@ -332,7 +309,6 @@ async function renderRoute() {
     return;
   }
 
-  // --- home as default ---------------------------------------------------
   await renderHome(region);
   renderAllChrome();
 }
@@ -342,8 +318,6 @@ async function run() {
     return await renderRoute();
   } catch (ex) {
     // A failed data request must not strand the desktop shell with the last
-    // view cleared. Keep real navigation mounted and give the user a route
-    // back to the live application.
     const region = viewRegion();
     if (region) {
       clear(region);

@@ -42,10 +42,11 @@
 </head>
 
 <body>
-  <!-- Keyboard accessibility -->
-  <a class="skip-link" href="#trycord-main">
-    Skip to main content
-  </a>
+  <!-- Keyboard accessibility. Each shell owns a main landmark and only one is
+       displayed at a time, so there is one skip link per breakpoint pointing at
+       the landmark that is actually live. CSS decides which is shown. -->
+  <a class="skip-link skip-link--desktop" href="#trycord-main">Skip to main content</a>
+  <a class="skip-link skip-link--mobile" href="#mobile-main">Skip to main content</a>
 
   <!--
     ============================================================
@@ -193,7 +194,6 @@
           <section
             id="view-root"
             class="view-root"
-            aria-live="polite"
           ></section>
 
           <aside
@@ -226,12 +226,21 @@
     <div
       id="modal-root"
       class="modal-root"
-      aria-live="assertive"
     ></div>
 
     <div
       id="popover-root"
       class="popover-root"
+    ></div>
+
+    <!-- Route changes are announced here rather than by making the whole view a
+         live region, which would re-read the entire page on every render. -->
+    <div
+      id="route-announcer"
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
     ></div>
 
     <div

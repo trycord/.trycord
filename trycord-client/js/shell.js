@@ -1,31 +1,20 @@
-// Shell chrome. Renders the supplied structural regions from real
-// application state only — the Presence Spine (identity, global
-// navigation, communities, current-place navigation), the in-environment
-// context header, and the MobileShell drawer + bottom tabs.
 
-import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, attachContextMenu, showUserCard, copyText } from './ui.js';
+import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
 import { avatar, navRow, serverChip, channelRow, communityMark, communityBannerUrl, loadAuthedImage, navGroup } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, setMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
-import { closeMobileDrawer, toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
+import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 
-// Shared context-menu builders. Every entity routes through attachContextMenu,
-// which covers right-click, long-press and the keyboard equivalent from one
 // wiring, so a menu can never exist on one input method and be missing on
 // another. Menus are permission-shaped here: an action the viewer cannot perform
-// is not rendered at all. That is presentation only - the server re-checks
-// every one of these on the request.
 
-// Right-click / long-press / keyboard on a community chip. The settings entry
-// lives here rather than only inside the settings shell, because the chip is
-// where you are when you want to administer a community.
 function serverChipMenuFor(s) {
   return () => {
     const sid = String(s.id);
     const isCurrent = sid === String(currentServerId());
     const mayManage = (isCurrent && can('MANAGE_SERVER')) || (s.is_owner && !isCurrent);
     return [
-      { label: 'Open community', desc: s.name || '', onSelect: () => { location.hash = '#/server/' + sid; closeMobileDrawer(); } },
+      { label: 'Open community', desc: s.name || '', onSelect: () => { location.hash = '#/server/' + sid; } },
       {
         label: 'Community settings', desc: mayManage ? undefined : 'Requires Manage Community',
         disabled: !mayManage,
@@ -65,7 +54,6 @@ function roleAssignable(roleId) {
   return myTopPosition() > Number(role.position || 0);
 }
 
-// Highest position the signed-in member holds; -1 when they hold nothing.
 function myTopPosition() {
   const me = State.me;
   if (!me) return -1;
@@ -74,15 +62,11 @@ function myTopPosition() {
   return mine.length ? Math.max(...mine.map((r) => Number(r.position || 0))) : -1;
 }
 
-// Right-click / long-press / keyboard on a member row opens the member menu.
 function memberMenu(m) {
   return () => memberActions(m);
 }
 
 // The action list for one member, permission-shaped. Exported so the member
-// management page and the member sidebar share it: one list, one set of rules,
-// and no way for the two surfaces to drift into offering different actions for
-// the same person.
 export function memberActions(m) {
   const id = m.user_id || m.id;
   const sid = currentServerId();
@@ -113,8 +97,6 @@ export function memberActions(m) {
     });
   };
 
-  // Roles this viewer may hand out, and this member does not already hold.
-  // The server re-checks the hierarchy on the request; this only decides what is
   // offered. There is deliberately no "assign to yourself" path anywhere.
   const held = new Set(((m.roles) || []).map((r) => String(r.id)));
   const assignable = (State.roles || []).filter((r) => !held.has(String(r.id)) && roleAssignable(String(r.id)));
@@ -222,12 +204,12 @@ export function memberActions(m) {
 }
 
 const DESTINATIONS = [
-  { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
-  { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
-  { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
-  { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
+  { id: 'home', label: 'Home', icon: 'âŒ‚', href: '#/home' },
+  { id: 'dms', label: 'DMs', icon: 'âœ‰', href: '#/dms' },
+  { id: 'notifications', label: 'Notifications', icon: 'â™§', href: '#/notifications', badge: () => State.notifUnread },
+  { id: 'discover', label: 'Discover', icon: 'âŒ•', href: '#/discover' },
   { id: 'support', label: 'Support', icon: '?', href: '#/support' },
-  { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
+  { id: 'friends', label: 'Friends', icon: 'â˜º', href: '#/friends' },
 ];
 
 let navRoute = () => '';
@@ -240,22 +222,18 @@ function currentRoute() {
   return navRoute();
 }
 
-// ---- desktop presence spine ---------------------------------------------
 
 export function renderCommunities(region) {
   clear(region);
   if (!isAuthed()) return;
   const route = currentRoute();
 
-  // Rail groups, in order: global destinations, then the user's
-  // communities, then creation. Discover lives in the global group
-  // only — it is a primary destination, not a community action.
   const globalItems = [
-    { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
-    { id: 'dms', label: 'Direct messages', icon: '✉', href: '#/dms' },
-    { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
-    { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
-    { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends', badge: () => (State.friendsIn || []).length },
+    { id: 'home', label: 'Home', icon: 'âŒ‚', href: '#/home' },
+    { id: 'dms', label: 'Direct messages', icon: 'âœ‰', href: '#/dms' },
+    { id: 'notifications', label: 'Notifications', icon: 'â™§', href: '#/notifications', badge: () => State.notifUnread },
+    { id: 'discover', label: 'Discover', icon: 'âŒ•', href: '#/discover' },
+    { id: 'friends', label: 'Friends', icon: 'â˜º', href: '#/friends', badge: () => (State.friendsIn || []).length },
   ];
 
   const railButton = ({ label, icon, href, active, badge }) => {
@@ -299,7 +277,6 @@ export function renderCommunities(region) {
   }
 
   // Creation action. Discover is deliberately absent: it is a global
-  // destination above, and duplicating it here double-counts it.
   const create = el('button', {
     class: 'rail-nav-item community-action',
     type: 'button',
@@ -311,19 +288,11 @@ export function renderCommunities(region) {
   region.appendChild(el('div', { class: 'rail-divider' }));
   region.appendChild(create);
 
-  // The rail used to carry its own account button - an avatar in a circle with
-  // an expand chevron - which duplicated the profile card at the foot of the
-  // context sidebar. Two representations of "you" in two places, with the rail
-  // one disappearing entirely when a context had no sidebar. There is now one:
-  // the pinned profile card, always visible, in every context.
   const foot = el('div', { class: 'rail-foot' });
   foot.appendChild(sidebarToggleButton());
   region.appendChild(foot);
 }
 
-// Background refresh for the DM context (conversations, requests, unread).
-// Throttled + single-flight: the repaint it triggers re-enters this
-// renderer, which returns early — no refresh loop possible.
 let homeRefreshAt = 0;
 let homeRefreshOn = false;
 function refreshHomeSidebar(region) {
@@ -340,14 +309,7 @@ function refreshHomeSidebar(region) {
   });
 }
 
-// ---- context sidebar ------------------------------------------------------
-// One component tree, composed per context:
-//
-//   ctx-head      optional context header (community identity, page title)
-//   ctx-scroll    the only scrolling region: nav groups for this context
 //   user-controls pinned session bar
-//
-// The global rail owns global destinations; everything below is contextual.
 
 const LS_COLLAPSED_GROUPS = 'trycord.collapsedGroups';
 
@@ -361,7 +323,6 @@ function persistCollapsedGroups(set) {
   try { localStorage.setItem(LS_COLLAPSED_GROUPS, JSON.stringify([...set])); } catch { /* ignore */ }
 }
 
-// Anchored dropdown panel. Self-contained (no portal) so it inherits the
 // sidebar's stacking context; closes on outside click and Escape.
 function dropdownPanel(anchor, buildItems) {
   const panel = el('div', { class: 'ctx-dropdown', role: 'menu', hidden: true });
@@ -403,8 +364,6 @@ function dropdownPanel(anchor, buildItems) {
   return panel;
 }
 
-// Community header. Identity is the community's own icon when it has one and
-// the derived coloured mark otherwise, over its banner when set - the
 // geometry is unchanged either way, so adding media never moves the controls.
 function communityHeader(sid, server) {
   const name = (server && server.name) || (State.serverDetail && State.serverDetail.name) || 'Community';
@@ -428,36 +387,34 @@ function communityHeader(sid, server) {
   const trigger = el('button', {
     class: 'ctx-head__action', type: 'button',
     title: 'Community menu', 'aria-label': 'Community menu for ' + name,
-  }, '⌄');
+  }, 'âŒ„');
   bar.appendChild(trigger);
   head.appendChild(bar);
 
-  // Community-level actions live here, not scattered through the channel
   // list. Every entry is permission-gated by the existing role system.
   const panel = dropdownPanel(trigger, () => {
     const go = (path) => () => { location.hash = path; };
     const base = '#/server/' + sid;
     const items = [];
 
-    // Navigation: where am I in this community, and what can I reach.
-    items.push({ label: 'Community overview', icon: '⌂', onSelect: go(base) });
-    items.push({ label: 'Members', icon: '👥', onSelect: go(base + '/members') });
+    items.push({ label: 'Community overview', icon: 'âŒ‚', onSelect: go(base) });
+    items.push({ label: 'Members', icon: 'ðŸ‘¥', onSelect: go(base + '/members') });
     if (can('MANAGE_ROLES') || can('MANAGE_SERVER')) {
-      items.push({ label: 'Roles', icon: '🏷', onSelect: go(base + '/roles') });
+      items.push({ label: 'Roles', icon: 'ðŸ·', onSelect: go(base + '/roles') });
     }
     if (can('MANAGE_CHANNELS')) {
-      items.push({ label: 'Categories', icon: '≡', onSelect: go(base + '/categories') });
-      items.push({ label: 'Create channel', icon: '＋', onSelect: go(base + '/channels/new') });
+      items.push({ label: 'Categories', icon: 'â‰¡', onSelect: go(base + '/categories') });
+      items.push({ label: 'Create channel', icon: 'ï¼‹', onSelect: go(base + '/channels/new') });
     }
     if (can('MANAGE_INVITES')) {
-      items.push({ label: 'Invites', icon: '✉', onSelect: go(base + '/invites') });
+      items.push({ label: 'Invites', icon: 'âœ‰', onSelect: go(base + '/invites') });
     }
     if (can('MANAGE_SERVER')) {
       items.push({ sep: true });
-      items.push({ label: 'Community settings', icon: '⚙', onSelect: go(base + '/settings') });
+      items.push({ label: 'Community settings', icon: 'âš™', onSelect: go(base + '/settings') });
     }
     items.push({ sep: true });
-    items.push({ label: 'Leave community', icon: '⤶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
+    items.push({ label: 'Leave community', icon: 'â¤¶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
     return items;
   });
   head.appendChild(panel);
@@ -484,7 +441,6 @@ function serverChipMenuLeave(sid, server) {
   });
 }
 
-// Generic context header for non-community contexts.
 function pageHeader(title, sub) {
   const head = el('header', { class: 'ctx-head' });
   const bar = el('div', { class: 'ctx-head__bar' });
@@ -506,11 +462,6 @@ function sessionBar() {
     title: 'Your account', 'aria-label': 'Your account',
     onClick: () => { location.hash = '#/settings'; },
   });
-  // Pass State.me through untouched. This used to hand-build a literal with
-  // `displayName: me.display_name, avatarUrl: me.avatar_url`, but /api/auth/me
-  // returns publicUser() which is camelCase, so both were always undefined and
-  // the bar rendered coloured initials ("A") with the username as the name no
-  // matter what the member had uploaded. avatar() and the display name below
   // both normalise casing themselves, so never rebuild the user object here.
   idBox.appendChild(el('span', { class: 'user-controls__avatar' }, avatar(me, { size: 'sm', withPresence: true })));
   const info = el('span', { class: 'user-controls__info' });
@@ -523,18 +474,12 @@ function sessionBar() {
     class: 'user-controls__btn', type: 'button',
     title: 'Settings', 'aria-label': 'Settings',
     onClick: () => { location.hash = '#/settings'; },
-  }, '⚙'));
+  }, 'âš™'));
   bar.appendChild(buttons);
   return bar;
 }
 
 // Re-render every mounted session bar in place.
-//
-// The bar is built once per view render, so a change to the signed-in user's
-// own profile (a new avatar, a new display name) was invisible in the rail
-// until the next navigation happened to rebuild it. Queried by class rather
-// than by holding a reference, because the bar is appended into five different
-// region builders depending on which surface is mounted.
 export function refreshSessionBar() {
   if (!State.me) return;
   document.querySelectorAll('.user-controls').forEach((old) => {
@@ -543,7 +488,6 @@ export function refreshSessionBar() {
   });
 }
 
-// ---- community context ----------------------------------------------------
 
 function communityContext(region, sid) {
   const route = currentRoute();
@@ -571,8 +515,6 @@ function communityContext(region, sid) {
   }
 
   // Channel actions, permission-shaped. Editing a channel lives in Community
-  // Settings rather than a separate editor here, so the menu entry point and
-  // the settings shell are the same place - the spec is explicit that channel
   // administration must not become a disconnected second system.
   const channelActions = (ch) => {
     const cid = String(ch.id);
@@ -603,7 +545,6 @@ function communityContext(region, sid) {
     return row;
   };
 
-  // One group per category. Uncategorized channels sit in a leading group so
   // they are never visually merged with a real category.
   const addChannelGroup = (label, list, catId) => {
     if (!list.length) return;
@@ -632,15 +573,12 @@ function communityContext(region, sid) {
     scroll.appendChild(el('div', { class: 'ctx-empty' }, 'No channels yet.'));
   }
 
-  // Community-level navigation lives in the community header dropdown, not
   // here. The sidebar is deliberately channels-only: mixing destinations
-  // in with #channels made the two read as the same kind of thing.
 
   const bar = sessionBar();
   if (bar) region.appendChild(bar);
 }
 
-// ---- DMs context ----------------------------------------------------------
 
 function dmsContext(region) {
   const route = currentRoute();
@@ -709,7 +647,6 @@ function dmsContext(region) {
   refreshHomeSidebar(region);
 }
 
-// ---- settings context -----------------------------------------------------
 
 const SETTINGS_SECTIONS = [
   { id: 'profile', label: 'My Account', path: '/settings' },
@@ -748,7 +685,6 @@ function settingsContext(region) {
   if (bar) region.appendChild(bar);
 }
 
-// ---- friends / notifications / discover / profile / admin -----------------
 
 function simpleListContext(region, { title, sub, groups }) {
   const route = currentRoute();
@@ -805,10 +741,7 @@ function discoverContext(region) {
   });
 }
 
-// Support context. Only in-app destinations belong here: Terms and the
 // Privacy Policy are full document loads at /terms and /privacy, not hash
-// routes, and a sidebar row that reloads the page would be a lie about
-// what it is. The Support page itself carries the policy links.
 function supportContext(region) {
   simpleListContext(region, {
     title: 'Support',
@@ -833,11 +766,7 @@ function profileContext(region, userId) {
   });
 }
 
-// The console is used most often for Overview/Users/Reports, so those stay on
-// the surface. Announcements is a publishing tool rather than a moderation
 // queue - an admin reaches it deliberately, not while triaging - so it lives
-// behind a disclosure instead of taking a permanent slot in a seven-item list.
-// The disclosure adopts the active section's name and opens itself, so the
 // current destination is never hidden behind a collapsed control.
 const ADMIN_SECTIONS = [
   { label: 'Overview', path: '/admin', exact: true },
@@ -861,8 +790,6 @@ function adminContext(region) {
   region.appendChild(scroll);
   const group = navGroup({ label: 'Console' });
   for (const s of ADMIN_SECTIONS) {
-    // Overview is the /admin parent, so it must match exactly or every
-    // sub-section would light it up alongside its own entry.
     group.list.appendChild(navRow({
       label: s.label, href: '#' + s.path, active: adminSectionActive(s, route),
       onClick: () => { location.hash = '#' + s.path; },
@@ -889,7 +816,6 @@ function adminContext(region) {
   if (bar) region.appendChild(bar);
 }
 
-// ---- dispatcher -----------------------------------------------------------
 
 export function sidebarContext() {
   const path = currentRoute() || '';
@@ -901,9 +827,6 @@ export function sidebarContext() {
   if (path.startsWith('/notifications')) return { type: 'notifications' };
   if (path.startsWith('/friends')) return { type: 'friends' };
   if (path.startsWith('/discover')) return { type: 'discover' };
-  // Support and legal are not DM surfaces. Without an explicit case they
-  // fall through to the default and the user gets a "Direct messages"
-  // sidebar next to a page that has nothing to do with messages.
   if (path.startsWith('/support') || path.startsWith('/legal')) return { type: 'support' };
   if (path.startsWith('/users/')) return { type: 'profile', userId: path.split('/')[2] };
   return { type: 'dms' };
@@ -940,9 +863,6 @@ export function toggleMembers() {
   renderMemberSidebar(qs('#member-sidebar'));
 }
 
-// ---- collapsible sidebar ---------------------------------------------------
-// Persistent preference (localStorage). Collapsed = icon-only rail with
-// tooltips; expanded = full labels. Survives navigation and reloads.
 
 export function isSidebarCollapsed() {
   try { return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === '1'; } catch { return false; }
@@ -957,11 +877,9 @@ export function toggleSidebar() {
 export function applySidebarState() {
   const shell = qs('#desktop-shell');
   if (shell) shell.classList.toggle('sidebar-collapsed', isSidebarCollapsed());
-  // Re-render chrome so tooltips and aria states update immediately.
   renderAllChrome();
 }
 
-// Widths below this cannot dock the context sidebar; it becomes an overlay.
 const SIDEBAR_DOCK_MIN = 760;
 
 function contextSidebarDocked() {
@@ -976,10 +894,6 @@ function contextSidebarVisible() {
   return contextSidebarDocked();
 }
 
-// The context-header hamburger is a true visibility toggle. When the sidebar
-// is docked it collapses it (releasing the content column); when it is
-// off-canvas it opens/closes the overlay drawer. Previously it only ever
-// opened the overlay, so pressing it against a docked sidebar looked dead.
 export function toggleContextSidebar() {
   const shell = qs('#desktop-shell');
   if (!shell) return;
@@ -1002,7 +916,7 @@ function sidebarToggleButton() {
     title: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
     'aria-label': collapsed ? 'Expand sidebar' : 'Collapse sidebar',
     'aria-pressed': collapsed ? 'true' : 'false',
-  }, collapsed ? '▶' : '◀');
+  }, collapsed ? 'â–¶' : 'â—€');
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleSidebar();
@@ -1012,8 +926,6 @@ function sidebarToggleButton() {
 
 export function renderMemberSidebar(region) {
   clear(region);
-  // The member panel belongs to community surfaces only. On home, DMs,
-  // settings and other app routes it hid a stale community's roster.
   if (!isAuthed() || !currentServerId() || !State.serverDetail || !currentRoute().startsWith('/server/')) {
     region.hidden = true;
     return;
@@ -1058,7 +970,7 @@ export function renderMemberSidebar(region) {
       label = role ? String(role.name || 'ROLE').toUpperCase() : 'ROLE';
     }
     const group = el('section', { class: 'member-group' });
-    const groupLabel = el('div', { class: 'member-group__label' }, label + ' · ' + members.length);
+    const groupLabel = el('div', { class: 'member-group__label' }, label + ' Â· ' + members.length);
     if (key !== '__owner__' && key !== '__member__') {
       const role = roleById.get(key);
       if (role && role.color) groupLabel.style.color = role.color;
@@ -1088,11 +1000,6 @@ export function renderMemberSidebar(region) {
       attachContextMenu(row, memberMenu(m), {
         target: (node) => ({ type: 'member', id: String(m.user_id || m.id) }),
       });
-      // Hover still shows the profile card. The two live on different inputs on
-      // purpose: the card is the preview, the menu is the set of actions, and
-      // merging them made right-click open something you could only read.
-      // Pointer-only, and delayed, so sweeping the mouse down the list does not
-      // strobe a card per row.
       let hoverTimer = null;
       const hoverCapable = () => {
         try { return matchMedia('(hover: hover) and (pointer: fine)').matches; } catch { return true; }
@@ -1123,7 +1030,6 @@ export function renderMemberSidebar(region) {
   }
 }
 
-// ---- context header -------------------------------------------------------
 
 export function renderContextHeader({ title, sub, icon, actions } = {}) {
   const header = qs('#context-header');
@@ -1131,13 +1037,13 @@ export function renderContextHeader({ title, sub, icon, actions } = {}) {
   header.dataset.hasIcon = icon ? 'true' : 'false';
   clear(header);
 
-  // Pop-out rail toggle: the spine is off-canvas on desktop, this
-  // hamburger is its only persistent entry point.
+  if (title) announce(title + (sub ? '. ' + sub : ''));
+
   const navToggle = el('button', {
     class: 'nav-toggle', type: 'button',
     title: 'Navigation', 'aria-label': 'Toggle navigation',
     'aria-expanded': isDesktopNavOpen() ? 'true' : 'false',
-  }, '☰');
+  }, 'â˜°');
   navToggle.addEventListener('click', () => toggleContextSidebar());
   header.appendChild(navToggle);
 
@@ -1151,38 +1057,26 @@ export function renderContextHeader({ title, sub, icon, actions } = {}) {
   for (const a of actions || []) acts.appendChild(a);
   if (actions && actions.length) header.appendChild(acts);
 
-  // Mirror into the mobile header context region so both presentations
-  // show the current place context.
   const mobileCtx = qs('#mobile-context');
   if (mobileCtx && typeof title === 'string') {
     clear(mobileCtx);
     const mt = el('div', { class: 'context-title', style: { fontSize: 'var(--t-fs-l)' } }, title);
-    if (sub) mt.appendChild(el('span', { style: { color: 'var(--t-mut)', fontWeight: '400', fontSize: 'var(--t-fs-xs)' } }, ' · ' + String(sub)));
+    if (sub) mt.appendChild(el('span', { style: { color: 'var(--t-mut)', fontWeight: '400', fontSize: 'var(--t-fs-xs)' } }, ' Â· ' + String(sub)));
     mobileCtx.appendChild(mt);
   }
 }
 
-// ---- mobile --------------------------------------------------------------
-
-export function renderMobileHeader() {
-  const ctx = qs('#mobile-context');
-  if (ctx) {
-    const header = qs('.mobile-header');
-    const t = (header && header.dataset.title) || 'Trycord';
-    if (!ctx.children.length) ctx.appendChild(el('div', { class: 'context-title', style: { fontSize: 'var(--t-fs-l)' } }, t));
-  }
-}
 
 export function renderMobileTabs(region) {
   clear(region);
   if (!isAuthed()) return;
   const route = currentRoute();
   const tabs = [
-    { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
-    { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
-    { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
-    { id: 'notifications', label: 'Alerts', icon: '♧', href: '#/notifications' },
-    { id: 'menu', label: 'Menu', icon: '☰', href: '#/menu' },
+    { id: 'home', label: 'Home', icon: 'âŒ‚', href: '#/home' },
+    { id: 'dms', label: 'DMs', icon: 'âœ‰', href: '#/dms' },
+    { id: 'friends', label: 'Friends', icon: 'â˜º', href: '#/friends' },
+    { id: 'notifications', label: 'Alerts', icon: 'â™§', href: '#/notifications' },
+    { id: 'menu', label: 'Menu', icon: 'â˜°', href: '#/menu' },
   ];
   for (const t of tabs) {
     const active = route.startsWith(t.href.replace('#', ''));
@@ -1205,10 +1099,7 @@ export function renderAllChrome() {
   renderVerifyBanner();
 }
 
-// Instance announcement banners. These are per-deployment chrome, persisted
-// server-side, and shown above the context header in both shells. They are
 // fetched once per session and then refreshed on a slow interval, so an admin
-// publishing a banner reaches other clients without a reload.
 let annState = { items: [], loaded: false, timer: null };
 
 export function loadAnnouncements({ force = false } = {}) {
@@ -1232,11 +1123,9 @@ function scheduleAnnouncementRefresh() {
 // Announcements are session-scoped chrome. Without this the refresh timer
 // outlives sign-out, keeps firing against a dead session, and carries the
 // previous user's banners into the next session.
-//
 // This only tears down. It must not go back through renderAnnouncementBanner(),
 // which reschedules whenever a session still looks live: sign-out clears the
 // token *after* calling this, so the old token is still present here and the
-// banner would immediately start a brand-new interval.
 export function clearAnnouncements() {
   if (annState.timer) { clearInterval(annState.timer); }
   annState = { items: [], loaded: false, timer: null };
@@ -1248,13 +1137,11 @@ export function renderAnnouncementBanner() {
   paintAnnouncementBanners();
 }
 
-// Paint only - no scheduling, no fetching. Safe to call from teardown.
 function paintAnnouncementBanners() {
   const items = annState.items || [];
   for (const shell of [qs('#trycord-main'), qs('#mobile-shell')]) {
     if (!shell) continue;
     for (const old of Array.from(shell.querySelectorAll(':scope > .announce-banner'))) old.remove();
-    // Newest first, at most two, so a stale pile-up cannot take over the UI.
     for (const a of items.slice(0, 2)) {
       const level = ['info', 'warning', 'critical'].includes(a.level) ? a.level : 'info';
       const bar = el('div', {
@@ -1270,9 +1157,7 @@ function paintAnnouncementBanners() {
   }
 }
 
-// Email-verification notice (UX only — the backend is the authority).
 // Shows in both shells while the session is unverified, with resend or
-// add-email paths. Disappears on the next chrome paint after verify.
 export function renderVerifyBanner() {
   const me = State.me;
   const show = !!(isAuthed() && mustVerifyToPost());
@@ -1311,4 +1196,4 @@ export function renderVerifyBanner() {
   }
 }
 
-export default { renderAllChrome, renderVerifyBanner, renderContextHeader, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileHeader, renderMobileTabs, setNavRoute, membersHidden, toggleMembers, isSidebarCollapsed, toggleSidebar, applySidebarState };
+export default { renderAllChrome, renderVerifyBanner, renderContextHeader, renderCommunities, renderPlaceNavigation, renderMemberSidebar, renderMobileTabs, setNavRoute, membersHidden, toggleMembers, isSidebarCollapsed, toggleSidebar, applySidebarState };

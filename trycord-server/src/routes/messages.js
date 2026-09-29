@@ -14,9 +14,6 @@ const mentions = require('../services/mentions');
 
 let broadcast = () => {};
 let sendToUser = () => {};
-function setBroadcaster(fn) {
-  broadcast = fn;
-}
 // Full gateway wiring (broadcast + per-user push for mention delivery).
 function setGateway(gw) {
   if (gw && typeof gw.broadcast === 'function') broadcast = gw.broadcast;
@@ -219,6 +216,12 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
     if (!isAuthor && !(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'MANAGE_MESSAGES'))) {
       return fail(res, 'PERMISSION_DENIED', 'cannot delete this message');
     }
+    // A timeout means the member cannot act in this community, not merely that
+    // they cannot post. A moderator with MANAGE_MESSAGES is exempt, so a
+    // moderation action is still possible while someone is timed out.
+    if (isAuthor && (await memberships.isTimedOut(ch.server_id, req.user.id))) {
+      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
+    }
     const fileRows = await db.all('SELECT id FROM attachments WHERE message_id = ?', [msg.id]);
     await db.run('DELETE FROM messages WHERE id = ?', [msg.id]);
     uploads.removeFiles(fileRows.map((r) => r.id));
@@ -236,6 +239,13 @@ router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, m
     const msg = await db.get('SELECT * FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
     if (!msg) return fail(res, 'NOT_FOUND', 'message not found');
     if (msg.author_id !== req.user.id) return fail(res, 'PERMISSION_DENIED', 'only the author can edit');
+    // Editing is a write, so it is gated the same way posting is.
+    if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
+      return fail(res, 'PERMISSION_DENIED', 'you cannot edit here');
+    }
+    if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
+      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
+    }
     const content = String(((req.body || {}).content === null || (req.body || {}).content === undefined) ? '' : req.body.content).trim().slice(0, 2000);
     if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
     const editedAt = now();
@@ -288,6 +298,15 @@ router.delete('/:messageId/reactions/:emoji', auth.requireVerified, async (req, 
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     const msg = await db.get('SELECT id FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
     if (!msg) return fail(res, 'NOT_FOUND', 'message not found in this channel');
+    // Removing your own reaction is a write, so it carries the same gate as
+    // adding one. Without this a member denied SEND_MESSAGES, or timed out,
+    // could still act on a channel they are supposed to be locked out of.
+    if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
+      return fail(res, 'PERMISSION_DENIED', 'you cannot react here');
+    }
+    if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
+      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
+    }
     let emoji;
     try {
       emoji = await reactions.remove(req.user.id, msg.id, req.params.emoji);
@@ -302,5 +321,5 @@ router.delete('/:messageId/reactions/:emoji', auth.requireVerified, async (req, 
 });
 
 module.exports = router;
-module.exports.setBroadcaster = setBroadcaster;
 module.exports.setGateway = setGateway;
+module.exports.nextSeq = nextSeq;

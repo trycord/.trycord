@@ -5,9 +5,9 @@
 // with an action id; server suspension/removal with owner/admin bypass and
 // discovery suppression; the audit trail.
 //
-// Precondition: the server was booted with ADMIN_USERNAMES=tsadmin and the
-// account `tsadmin` / `secret123` exists and is promoted (see README for the
-// bootstrap flow — a missing admin fails fast with a clear message).
+// Precondition: the server was booted with ALLOW_TEST_HOOKS=true and
+// ADMIN_USERNAMES=tsadmin. The suite creates and promotes its own admin
+// account, so no manual bootstrap is needed.
 //
 // Run: node scripts/test-trustsafety.js [baseUrl]
 // Exit 0 = all assertions passed. Exit 1 = failures.
@@ -54,9 +54,23 @@ function wsClosed(ws, ms = 5000) {
     return { name: u, token: r.json.token, id: r.json.user.id };
   }
 
-  const adm = await J('POST', '/api/auth/login', { username: 'tsadmin', password: 'secret123' });
+  // The suite bootstraps its own platform admin instead of requiring a
+  // hand-made account: the server promotes any account named in
+  // ADMIN_USERNAMES at registration, so naming it here is enough.
+  let adm = await J('POST', '/api/auth/login', { username: 'tsadmin', password: 'secret123' });
   if (adm.status !== 200) {
-    console.log('tsadmin is not an admin or login failed (' + adm.status + '). Boot server with ADMIN_USERNAMES=tsadmin.');
+    const reg = await J('POST', '/api/auth/register', {
+      username: 'tsadmin', password: 'secret123',
+      termsVersion: legal.termsVersion, privacyVersion: legal.privacyVersion,
+    });
+    if (reg.status !== 200) {
+      console.log('could not create the tsadmin account: ' + reg.status + ' ' + JSON.stringify(reg.json));
+      process.exit(1);
+    }
+    adm = await J('POST', '/api/auth/login', { username: 'tsadmin', password: 'secret123' });
+  }
+  if (adm.status !== 200) {
+    console.log('tsadmin login failed (' + adm.status + '). Boot the server with ADMIN_USERNAMES=tsadmin.');
     process.exit(1);
   }
   const A = await mkuser('tsA');   // server owner, later suspended then lifted

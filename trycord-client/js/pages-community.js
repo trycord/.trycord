@@ -1,5 +1,3 @@
-// Community-level surfaces: the landing page, its member list, the app
-// menu, and creating a community.
 import Api from './api.js';
 import State from './state.js';
 
@@ -24,8 +22,6 @@ async function renderServerLanding(container, serverId) {
   renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
     const wrap = el('div', { class: 'page atrium' });
     const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
-    // Banner behind the hero when the community has one, otherwise the hero
-    // stands on the page background as before.
     const banner = communityBannerUrl(server);
     if (banner) {
       const band = el('div', { class: 'community-banner' });
@@ -37,9 +33,6 @@ async function renderServerLanding(container, serverId) {
       wrap.appendChild(band);
     }
     const hero = el('div', { class: 'community-hero' });
-    // The mark carries the community's own icon when set and the derived
-    // coloured initial otherwise, so there is one identity element rather than
-    // a gradient wrapper around a second one.
     hero.appendChild(communityMark(server.name || '?', { size: 'lg', server }));
   const heroText = el('div', { class: 'community-hero__text' });
   heroText.appendChild(el('h2', { class: 'community-hero__name' }, server.name || 'Community'));
@@ -94,8 +87,6 @@ async function renderServerLanding(container, serverId) {
   renderAllChrome();
 }
 
-// Community member list with per-community nicknames. Re-renderable in place
-// so a nickname change in the modal updates this section without a reroute.
 
 async function renderNewServer(container, serverId) {
   clear(container);
@@ -149,8 +140,6 @@ async function renderNewServer(container, serverId) {
   container.appendChild(wrap);
 }
 
-// Pinned messages for one channel: static list with jump-to-message.
-// Live pin/unpin events refresh the list (cheap, rare events).
 
 async function renderMenu(container) {
   clear(container);

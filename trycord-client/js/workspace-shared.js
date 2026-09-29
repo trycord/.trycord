@@ -1,9 +1,3 @@
-// Shared plumbing for the community (server) surfaces.
-//
-// ensureServer, the reaction picker and the realtime community-room wiring are
-// used by more than one feature module. They live here rather than being
-// duplicated, so a change to how a community is entered or how reactions are
-// inserted applies everywhere at once.
 import Api from './api.js';
 import State from './state.js';
 import Realtime from './realtime.js';
@@ -12,13 +6,6 @@ import { currentServerId, enterServer, isAuthed, leaveServerContext, refreshServ
 import { showEmojiPicker, toast } from './ui.js';
 import { renderAllChrome } from './shell.js';
 
-// The channel the conversation view currently has open.
-//
-// This is shared state: the conversation view sets it, and the reaction picker
-// (which lives here) needs it to know which channel to attach a reaction to.
-// It used to be a plain module-level variable because both lived in the same
-// file; after the split that would mean two independent copies, and an imported
-// binding cannot be assigned from the importing module anyway. So the state
 // stays private here and is reached through these two accessors.
 let activeChannelId = null;
 
@@ -37,10 +24,6 @@ function pickReaction(messageId) {
   });
 }
 
-// Community realtime wiring (subscribed once — module evaluates once).
-// Structural events arrive on the server room; the handler refreshes state
-// (serialized, so rapid events converge) and repaints the active view via
-// its refresh hook. If WE were removed, drop context and go home.
 const COMMUNITY_EVENTS = [
   'member_joined', 'member_left', 'member_kicked', 'member_banned',
   'member_unbanned', 'member_timeout', 'member_updated', 'member_roles_updated',

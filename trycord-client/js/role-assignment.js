@@ -1,11 +1,3 @@
-// Role assignment for a single member.
-//
-// Shared by the member management page and the user action menu so there is one
-// assignment flow rather than a second, slightly different one. The server
-// remains the authority: `assertAssignable` refuses any role at or above the
-// actor's own rank, and `assignable` below is the client mirroring that same
-// rule so the UI can grey out what would be rejected instead of offering it and
-// eating an error.
 import Api from './api.js';
 import State, { can, refreshServerView } from './state.js';
 import { el, clear, toast, openModal } from './ui.js';
@@ -14,10 +6,6 @@ function colorOf(role) {
   return /^#[0-9a-f]{6}$/i.test((role && role.color) || '') ? role.color : null;
 }
 
-// The one role pill, used by the member page, the role detail pane and the
-// assignment dialog. It lived in pages-workspace.js until the assignment flow
-// needed it too, and importing it back from there would have been a cycle -
-// so it moved here rather than being written a second time.
 export function rolePill(r, { removable = false, onRemove = null } = {}) {
   const pill = el('span', { class: 'role-pill' },
     colorOf(r) ? el('span', { class: 'role-color-dot', style: { background: r.color } }) : null,
@@ -32,8 +20,6 @@ export function rolePill(r, { removable = false, onRemove = null } = {}) {
   return el('span', { class: 'role-pill-wrap' }, pill, x);
 }
 
-// A row of role chips for a member, each removable when the viewer is allowed
-// to remove it. Renders read-only when they are not.
 export function rolePills(member, { serverId, assignable, onChanged } = {}) {
   const wrap = el('div', { class: 'role-pills' });
   const held = Array.isArray(member.roles) ? member.roles : [];
@@ -61,7 +47,6 @@ export function rolePills(member, { serverId, assignable, onChanged } = {}) {
   return wrap;
 }
 
-// Roles the signed-in user may hand out: strictly below their own top role,
 // which is exactly what assertAssignable allows. Owners may assign anything.
 export function assignableRoleTest(topPosition) {
   const isOwner = (State.permissions || []).includes('*');
@@ -74,8 +59,6 @@ export function assignableRoleTest(topPosition) {
   };
 }
 
-// Highest position the signed-in member holds. -1 when they hold nothing, which
-// correctly makes every role unassignable.
 export function myTopPosition() {
   const me = State.me;
   if (!me) return -1;

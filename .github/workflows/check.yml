@@ -38,6 +38,9 @@ jobs:
       - name: Schema smoke test (throwaway SQLite)
         run: npm run check
 
+      - name: End-to-end suite (boots a throwaway server and database)
+        run: npm test
+
   client:
     name: Client checks
     runs-on: ubuntu-latest
@@ -48,7 +51,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Syntax-check client sources
         run: for f in trycord-client/js/*.js; do node --check "$f" || exit 1; done
@@ -63,7 +66,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Syntax-check desktop sources
         run: for f in trycord-desktop/main.js trycord-desktop/updater.js trycord-desktop/preload.js trycord-desktop/scripts/*.js; do node --check "$f" || exit 1; done

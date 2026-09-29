@@ -22,7 +22,7 @@ const path = require('path');
 const fs = require('fs');
 
 const PROVIDER = 'github';
-const REPO_OWNER = 'LanxTheShowmaker';
+const REPO_OWNER = 'trycord';
 const REPO_NAME = '.trycord';
 
 function prefsPath(app) {

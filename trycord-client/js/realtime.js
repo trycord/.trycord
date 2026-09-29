@@ -1,6 +1,4 @@
-// WebSocket gateway client. Connects via the single-use ticket flow
 // (POST /api/auth/ws/ticket then ?ticket= handshake — token auth is refused
-// by the server). Emits typed events through TrycordRealtime.on(type, fn).
 
 import Api from './api.js';
 import { TrycordConfig } from './config.js';
@@ -26,16 +24,13 @@ let typingTimer = null;
 let closedIntentionally = false;
 
 function wsUrl(ticket) {
-  // Single derivation from BACKEND_URL: https -> wss, http -> ws.
   return TrycordConfig.wsUrl(ticket);
 }
 
 async function connect() {
-  // Explicit (re)connect: a previous intentional shutdown no longer applies.
   closedIntentionally = false;
   clearTimeout(reconnectTimer);
   // Never stack sockets: an already-open/connecting gateway is reused, a
-  // stale one is torn down before dialing fresh.
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   if (ws) { try { ws.close(1000, 'reconnect'); } catch { /* ignore */ } ws = null; }
   if (!isAuthed()) return;
@@ -54,11 +49,6 @@ async function connect() {
   ws.addEventListener('open', () => {
     reconnectDelay = 1000;
     setOnline(true);
-    // Restore subscriptions BEFORE announcing the reopen. Listeners on
-    // 'open' kick off a resync fetch; if the joins are still in flight
-    // when that fetch is issued, a message committed in the gap is missed
-    // live *and* is not in the snapshot the fetch returns, so it is lost
-    // until the next reload.
     if (joinedServer) send({ type: 'join-server', serverId: joinedServer });
     if (joinedChannel) send({ type: 'join', channelId: joinedChannel });
     if (joinedDm) send({ type: 'dm:join', conversationId: joinedDm });
@@ -115,12 +105,7 @@ const TrycordRealtime = {
   },
   join(channelId) { joinedChannel = channelId; send({ type: 'join', channelId }); },
   leaveChannel() { joinedChannel = null; },
-  // Track the community room locally as well as on the wire. It used to
   // be sent but never remembered, so after any reconnect the socket was in
-  // no community room and every structural event (member joined/left,
-  // channel created, role changed, server updated, kick/ban) became
-  // undeliverable - with no way to self-heal, because the only thing that
-  // re-ran the community load was one of those very events.
   joinServer(serverId) { joinedServer = serverId; send({ type: 'join-server', serverId }); },
   leaveServer() { joinedServer = null; send({ type: 'leave-server' }); },
   sendMessageToChannel(content, attachments) {
@@ -130,14 +115,11 @@ const TrycordRealtime = {
     send({ type: 'msg', ...body });
   },
   joinDm(conversationId) { joinedDm = conversationId; send({ type: 'dm:join', conversationId }); },
-  // Tell the server to prune this DM room too (F3): without dm:leave the
-  // socket accumulated every DM ever opened and kept receiving them.
   leaveDm() {
     if (joinedDm) send({ type: 'dm:leave', conversationId: joinedDm });
     joinedDm = null;
   },
   typing(conversationId) {
-    // throttled ephemeral echo
     const now = Date.now();
     if (typingTimer && now - typingTimer < 3500) return;
     typingTimer = now;

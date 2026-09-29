@@ -1,7 +1,4 @@
-// Platform Administration. Backed by the real /api/admin/* endpoints
-// (adminGuard on the server is the single source of truth — this client only
 // renders what the API returns and never fabricates privileges). Sections:
-// Overview, Users, Communities, Reports, Appeals, Audit log.
 
 import Api from './api.js';
 import State from './state.js';
@@ -18,13 +15,13 @@ const SECTIONS = [
   { id: 'communities', label: 'Communities', href: '#/admin/communities' },
   { id: 'reports', label: 'Reports', href: '#/admin/reports' },
   { id: 'appeals', label: 'Appeals', href: '#/admin/appeals' },
+  { id: 'gdpr', label: 'GDPR requests', href: '#/admin/gdpr' },
+  { id: 'pages', label: 'Pages', href: '#/admin/pages' },
   { id: 'audit', label: 'Audit log', href: '#/admin/audit' },
   { id: 'announcements', label: 'Announcements', href: '#/admin/announcements' },
 ];
 
-// Stale-request guard: each route render bumps this; async work checks its
 // captured sequence before touching the DOM so a slow response never writes
-// over a newer view.
 let adminSeq = 0;
 
 function debounced(fn, ms = 300) {
@@ -45,13 +42,11 @@ function loadError(ex, retry) {
     el('button', { class: 'btn primary', type: 'button', onClick: retry }, 'Retry'));
 }
 
-function statusChip(status) {
+export function statusChip(status, text) {
   const cls = String(status).toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  return el('span', { class: 'admin-chip ' + cls }, status);
+  return el('span', { class: 'status-chip ' + cls }, text || String(status).replace(/_/g, ' '));
 }
 
-// Translate server error codes into plain hoster language. Only maps codes
-// whose meaning is unambiguous; everything else falls through to the
 // server's own message so we never fabricate a cause.
 function adminError(ex, fallback) {
   const code = ex && ex.code;
@@ -77,7 +72,6 @@ function actionRow(a) {
     el('div', { class: 'muted small admin-when' }, relTime(a.createdAt)));
 }
 
-// ---- overview -------------------------------------------------------------
 
 async function renderOverview(body, show, seq) {
   const data = await Api.adminOverview();
@@ -108,7 +102,6 @@ async function renderOverview(body, show, seq) {
   show(el('div', { class: 'admin-block admin-block--sections' }, grid, recent));
 }
 
-// ---- users ----------------------------------------------------------------
 
 function userRow(u, onChanged) {
   const row = el('div', { class: 'card card--list--row' });
@@ -117,16 +110,11 @@ function userRow(u, onChanged) {
   idt.append(
     el('div', { class: 'admin-name' }, esc(u.displayName || u.username), ' ', el('span', { class: 'muted small' }, '@' + esc(u.username))),
     el('div', { class: 'muted small' }, 'Created ' + relTime(u.createdAt)));
-  // Enforcement state belongs with identity, not in the action column, so
-  // the row keeps a stable three-part shape.
   if (u.enforced) {
     idt.appendChild(el('div', { class: 'admin-row-state' }, statusChip(u.enforcement || 'ENFORCED')));
   }
   row.append(who, idt);
 
-  // Actions carry their meaning: enforcement is destructive and reads as
-  // such, lifting is only offered when there is something to lift, and
-  // history is a quiet disclosure.
   const acts = el('div', { class: 'card--list__actions' });
   acts.appendChild(el('button', {
     class: 'btn sm ' + (u.enforced ? 'ghost' : 'danger'),
@@ -181,7 +169,6 @@ async function renderUsers(body, show, seq) {
   await render(search.value.trim());
 }
 
-// ---- enforcement modals (user) ---------------------------------------------
 
 function userEnforceModal(user, onDone) {
   const err = el('div', { class: 'form-error', hidden: true });
@@ -255,7 +242,6 @@ function liftUserModal(user, onDone) {
   return modal;
 }
 
-// ---- communities ------------------------------------------------------------
 
 function serverRow(s, onChanged) {
   const row = el('div', { class: 'card card--list--row' });
@@ -267,7 +253,7 @@ function serverRow(s, onChanged) {
     el('div', { class: 'muted small' }, (s.description ? esc(String(s.description).slice(0, 120)) + ' · ' : '') + 'Created ' + relTime(s.createdAt)));
   row.append(who, idt);
   if (s.enforcement_state === 'suspended') {
-    row.appendChild(el('span', { class: 'admin-chip suspended', title: s.enforcement_reason || '' }, 'SUSPENDED'));
+    row.appendChild(el('span', { class: 'status-chip suspended', title: s.enforcement_reason || '' }, 'SUSPENDED'));
   }
 
   const acts = el('div', { class: 'card--list__actions' });
@@ -410,7 +396,6 @@ function serverRemoveModal(server, onDone) {
   return modal;
 }
 
-// ---- reports ---------------------------------------------------------------
 
 function reportRow(r, refresh) {
   const row = el('div', { class: 'card card--list--row' });
@@ -498,7 +483,138 @@ async function renderReports(body, show, seq) {
   await render(sel.value);
 }
 
-// ---- appeals ---------------------------------------------------------------
+
+const GDPR_STATUSES = ['DELETION_REQUESTED', 'UNDER_REVIEW', 'DELETION_PROCESSING', 'DELETED', 'CANCELLED', 'REJECTED'];
+
+function gdprRow(r, refresh) {
+  const row = el('div', { class: 'card card--list--row' });
+  row.appendChild(statusChip(r.status));
+  if (r.requestedBy === 'GDPR') row.appendChild(statusChip('GDPR', 'REQUESTED BY GDPR'));
+
+  const idt = el('div', { class: 'grow' });
+  idt.append(
+    el('div', { class: 'admin-name' }, esc(r.username || 'deleted account')),
+    el('div', { class: 'muted small' }, 'Account ' + esc(r.userId) + ' · joined ' + fullTime(r.accountCreatedAt || r.requestedAt)),
+    r.reason ? el('div', { class: 'muted small' }, 'Stated: ' + esc(String(r.reason).slice(0, 160))) : null,
+    r.processedAt ? el('div', { class: 'muted small' }, 'Erased ' + fullTime(r.processedAt)) : null,
+    r.reviewedAt ? el('div', { class: 'muted small' }, 'Reviewed ' + fullTime(r.reviewedAt)) : null,
+  );
+  row.appendChild(idt);
+  row.appendChild(el('div', { class: 'muted small admin-when' }, relTime(r.requestedAt)));
+
+  const acts = el('div', { class: 'card--list__actions' });
+  if (r.status === 'DELETION_REQUESTED') {
+    acts.append(
+      el('button', {
+        class: 'btn primary sm', type: 'button',
+        onClick: () => reviewGdpr(r, 'APPROVE', refresh),
+      }, 'Approve'),
+      el('button', {
+        class: 'btn sm', type: 'button',
+        onClick: () => reviewGdpr(r, 'REJECT', refresh),
+      }, 'Decline'));
+  } else if (r.status === 'UNDER_REVIEW') {
+    acts.appendChild(el('button', {
+      class: 'btn danger sm', type: 'button',
+      onClick: () => processGdpr(r, refresh),
+    }, 'Erase account'));
+  }
+  if (acts.childElementCount) row.appendChild(acts);
+  return row;
+}
+
+function reviewGdpr(r, decision, refresh) {
+  const err = el('div', { class: 'form-error', hidden: true });
+  const note = el('input', { class: 'input', type: 'text', placeholder: 'Note (optional, kept with the request)' });
+  const approve = decision === 'APPROVE';
+  const modal = openModal({
+    title: (approve ? 'Approve' : 'Decline') + ' erasure request - ' + (r.username || r.userId),
+    body: el('div', { class: 'admin-form' }, err,
+      el('p', { class: 'muted small' }, approve
+        ? 'Approving moves this to the processing queue. Nothing is erased until you run it.'
+        : 'The user is told the request was declined and can submit a new one.'),
+      el('div', { class: 'field' }, el('label', {}, 'Note'), note)),
+    footer: [
+      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      el('button', { class: approve ? 'btn primary' : 'btn danger', type: 'button', onClick: submit },
+        approve ? 'Approve' : 'Decline'),
+    ],
+  });
+  async function submit() {
+    err.hidden = true;
+    try {
+      await Api.adminReviewGdprRequest(r.id, decision, note.value);
+      modal.close();
+      toast(approve ? 'Approved. Run the erase to complete it.' : 'Request declined.', 'ok');
+      refresh();
+    } catch (ex) { err.hidden = false; err.textContent = adminError(ex, 'Failed to record the decision.'); }
+  }
+  return modal;
+}
+
+function processGdpr(r, refresh) {
+  const err = el('div', { class: 'form-error', hidden: true });
+  const modal = openModal({
+    title: 'Erase this account?',
+    body: el('div', { class: 'admin-form' }, err,
+      el('p', {}, 'This erases the identity of ' + (r.username || r.userId) + ':'),
+      el('p', { class: 'muted small' },
+        'Username, email, display name, profile, avatar and banner, every uploaded file, and all sessions. '
+        + 'Messages stay, attributed to a deleted account. Communities they owned are handed to their '
+        + 'longest-standing member. Moderation and audit records that name them are kept.'),
+      el('p', { class: 'muted small' }, 'This cannot be undone.')),
+    footer: [
+      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      el('button', { class: 'btn danger', type: 'button', onClick: submit }, 'Erase account'),
+    ],
+  });
+  async function submit() {
+    err.hidden = true;
+    try {
+      const res = await Api.adminProcessGdprRequest(r.id);
+      const rep = res.report || {};
+      modal.close();
+      toast('Erased ' + rep.username + '. ' + rep.objectsRemoved + ' object(s) removed, '
+        + rep.messagesRedacted + ' message(s) kept as anonymous.', 'ok');
+      refresh();
+    } catch (ex) { err.hidden = false; err.textContent = adminError(ex, 'The erase failed.'); }
+  }
+  return modal;
+}
+
+async function renderGdpr(sec) {
+  sec.appendChild(el('h2', { class: 'section-label' }, 'Data subject requests'));
+  sec.appendChild(el('p', { class: 'muted small' },
+    'Erasure requests a user submitted from Settings → Account. They are created by the user, not by an administrator, and every one of them is a GDPR request.'));
+
+  const sel = el('select', { class: 'select' });
+  sel.appendChild(el('option', { value: '' }, 'All states'));
+  for (const s of GDPR_STATUSES) sel.appendChild(el('option', { value: s }, s.replace(/_/g, ' ').toLowerCase()));
+
+  const listWrap = el('div', { class: 'card-list' });
+  sec.append(sel);
+  sec.appendChild(listWrap);
+
+  const render = async (status) => {
+    listWrap.setAttribute('aria-busy', 'true');
+    clear(listWrap);
+    try {
+      const rows = await Api.adminGdprRequests({ status: status || undefined });
+      if (!rows.length) {
+        listWrap.appendChild(emptyState('', 'No requests here.', status ? 'Change the filter to see other states.' : 'No one has requested deletion.'));
+        return;
+      }
+      for (const r of rows) listWrap.appendChild(gdprRow(r, () => render(status)));
+    } catch (ex) {
+      listWrap.appendChild(el('p', { class: 'form-error' }, adminError(ex, 'Could not load GDPR requests.')));
+    } finally {
+      listWrap.removeAttribute('aria-busy');
+    }
+  };
+  sel.addEventListener('change', () => render(sel.value));
+  await render(sel.value);
+}
+
 
 function appealRow(a, refresh) {
   const row = el('div', { class: 'card card--list--row' });
@@ -568,7 +684,6 @@ async function renderAppeals(body, show, seq) {
   await render(sel.value);
 }
 
-// ---- audit -----------------------------------------------------------------
 
 function auditRow(a) {
   const row = el('div', { class: 'card card--list--row' });
@@ -606,11 +721,7 @@ async function renderAudit(body, show, seq) {
   await render(search.value.trim().toUpperCase());
 }
 
-// ---- announcements ---------------------------------------------------------
 
-// Instance announcement management. Writes are admin-gated on the server; this
-// only drives the UI. Retired banners stay listed so an operator can see what
-// was shown and when it retired.
 async function renderAnnouncements(body, show, seq) {
   const listWrap = el('div', { class: 'admin-list' });
   const editor = el('div', { class: 'admin-block' });
@@ -647,7 +758,6 @@ async function renderAnnouncements(body, show, seq) {
         level: level.value,
         linkLabel: linkLabel.value,
         linkHref: linkHref.value,
-        // datetime-local has no timezone; send it as an ISO instant.
         expiresAt: expires.value ? new Date(expires.value).toISOString() : null,
       });
       text.value = ''; linkLabel.value = ''; linkHref.value = ''; expires.value = '';
@@ -713,15 +823,12 @@ async function renderAnnouncements(body, show, seq) {
   await loadList();
 }
 
-// ---- entry -----------------------------------------------------------------
 
 export async function renderAdmin(container, { section = 'overview' } = {}) {
   clear(container);
   const meta = SECTIONS.find((s) => s.id === section) || SECTIONS[0];
   renderContextHeader({ title: 'Admin', sub: 'Platform trust, safety, and enforcement' });
 
-  // Section navigation lives in the context sidebar, not here. Repeating it
-  // as a tab bar in the content duplicated every destination on screen.
   const wrap = el('div', { class: 'page admin' });
   const head = el('header', { class: 'page-head' });
   head.appendChild(el('div', { class: 'page-head__main' },
@@ -732,8 +839,6 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
   container.appendChild(wrap);
 
   // isAdmin is server-computed on /me; refresh it here so a session started
-  // before the flag existed still resolves correctly. Guard logic stays on
-  // the API — this only decides what the page renders.
   let me = State.me;
   if (!me || me.isAdmin !== true) {
     const fresh = await Api.me().catch(() => null);
@@ -743,9 +848,7 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
 
   const seq = ++adminSeq;
   const show = (node) => { if (seq === adminSeq) { clear(body); body.appendChild(node); } };
-  // Section renderers append their toolbar + list directly, so the loading
   // node must not linger in body: give them a fresh container that show()
-  // repaints, keeping exactly one loading/empty state on screen.
   const sec = el('div', { class: 'admin-block' });
   const showSec = (node) => { if (seq === adminSeq) { clear(sec); sec.appendChild(node); } };
   show(sec);
@@ -755,6 +858,7 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
     else if (section === 'communities') await renderCommunities(sec, showSec, seq);
     else if (section === 'reports') await renderReports(sec, showSec, seq);
     else if (section === 'appeals') await renderAppeals(sec, showSec, seq);
+    else if (section === 'gdpr') await renderGdpr(sec);
     else if (section === 'audit') await renderAudit(sec, showSec, seq);
     else if (section === 'announcements') await renderAnnouncements(sec, showSec, seq);
     else await renderOverview(sec, showSec, seq);

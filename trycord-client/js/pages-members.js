@@ -1,5 +1,3 @@
-// The member roster and the moderation actions that hang off it:
-// nickname, ban, timeout and role assignment.
 import Api from './api.js';
 import State from './state.js';
 
@@ -28,9 +26,6 @@ function timedOutUntil(m) {
   return Number.isFinite(t) && t > Date.now() ? m.timeout_expires_at : null;
 }
 
-// The role pill now lives in role-assignment.js, which the assignment dialog
-// also needs it for; keeping a second copy here meant the two surfaces could
-// drift apart on the removable affordance.
 
 function openNicknameModal(serverId, member, wrap) {
   const name = member.nickname || member.display_name || member.username;
@@ -140,8 +135,6 @@ async function renderServerMembers(container, serverId) {
   const toolbar = el('div', { class: 'community-manager__toolbar' });
   const search = el('input', { class: 'input', type: 'search', placeholder: 'Search members…' });
   const roleFilter = el('select', { class: 'input sm', title: 'Filter by role' });
-  // Seeded before the first paint: paint() reads the value before it
-  // rebuilds the live role options, and an empty value would filter all out.
   roleFilter.appendChild(el('option', { value: 'all' }, 'All roles'));
   const presFilter = el('select', { class: 'input sm', title: 'Filter by presence' });
   presFilter.appendChild(el('option', { value: 'all' }, 'All statuses'));
@@ -191,10 +184,6 @@ async function renderServerMembers(container, serverId) {
       return dispName(a).localeCompare(dispName(b));
     });
 
-    // Counts come from the server, not from the page in hand: a paged roster
-    // would otherwise report "12 total" for a community of 4000. The online
-    // figure is the one thing the client must count itself, because presence
-    // is live socket state the database does not hold.
     const loaded = (State.members || []).length;
     const total = typeof State.memberTotal === 'number' ? State.memberTotal : loaded;
     const onlineCount = (State.members || []).filter(online).length;
@@ -231,7 +220,6 @@ async function renderServerMembers(container, serverId) {
       counts.appendChild(more);
     }
 
-    // Role filter options follow live roles.
     const curRole = roleFilter.value;
     clear(roleFilter);
     roleFilter.appendChild(el('option', { value: 'all' }, 'All roles'));
@@ -249,18 +237,12 @@ async function renderServerMembers(container, serverId) {
       const id = m.user_id || m.id;
       const mine = String(id) === String(State.me && State.me.id);
       const row = el('article', { class: 'card card--list' });
-      // The same member context menu the sidebar uses, so this page and the
-      // member sidebar cannot offer different actions for one person. Right
-      // click, long press, or the keyboard equivalent.
       attachContextMenu(row, () => memberActions(m), {
         target: () => ({ type: 'member', id: String(id) }),
       });
       row.appendChild(avatar({ id, username: m.username, displayName: m.nickname || m.display_name, avatarUrl: m.avatar_url }, { size: 'sm', withPresence: true }));
       const info = el('div', { class: 'card--list__info' });
       const nameLine = el('div', { class: 'member-name-line' },
-        // Click opens the contextual card, right-click gives the action list
-        // directly. Shares one action builder with message authors, so this
-        // page and a channel cannot offer different actions for one person.
         userNameButton(
           { id, username: m.username, displayName: m.nickname || m.display_name, avatarUrl: m.avatar_url, roles: m.roles },
           { className: 'member-name-btn', serverId, label: dispName(m) }
@@ -294,10 +276,6 @@ async function renderServerMembers(container, serverId) {
         actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => openNicknameModal(serverId, m, wrap) }, 'Nickname'));
       }
       if (can('MANAGE_ROLES') && !m.is_owner) {
-        // The same assignment dialog the member context menu opens, rather than
-        // a bare <select> of every role. The select listed roles at or above the
-        // actor's own rank, which the server refuses - so it offered actions that
-        // could only fail. One dialog means one set of rules and one search box.
         const manage = el('button', {
           class: 'btn sm', type: 'button',
           title: 'Assign or remove roles for this member',
@@ -366,18 +344,6 @@ async function renderServerMembers(container, serverId) {
 }
 
 // Role management, as a hierarchy rather than a permission checklist.
-//
-// Two columns on wide screens: the ordered role list on the left, the editor
-// for the selected role on the right. Position is the property that decides
-// what a member is allowed to manage, so it is shown as the primary structure
-// rather than hidden behind up/down arrows on a card.
-//
-// Every restriction here mirrors a server rule that already exists - the UI
-// explains them instead of letting someone hit a wall:
-//   assertAssignable     - you may only manage roles strictly below your own
-//   assertCanReorderAll  - a reorder submits the WHOLE set, so one locked role
-//                          blocks the entire operation, not just its own row
-// The server still enforces both; nothing below grants anything.
 
 function renderMemberList(wrap, serverId) {
   const old = wrap.querySelector('.member-list');
@@ -399,9 +365,6 @@ function renderMemberList(wrap, serverId) {
       avatarUrl: m.avatar_url,
       roles: m.roles,
     };
-    // Name opens the contextual card; right-click gives the action list
-    // (roles, kick, ban, report) directly. Both come from one module so the
-    // member list and a message author cannot offer different actions.
     const nameEl = userNameButton(member, { className: 'row-title', serverId });
     mm.appendChild(nameEl);
     const sub = m.nickname

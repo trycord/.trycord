@@ -8,6 +8,16 @@ const { fail } = require('../errors');
 
 const buckets = new Map();
 
+// RATE_LIMIT_MAX raises every per-endpoint ceiling to one value. Unset in
+// normal operation, so each endpoint keeps its own tuned limit. It exists for
+// the E2E suites, which share a single process-wide bucket per client address
+// and cannot otherwise run as a suite, and for private-network deployments
+// where several people share one egress address.
+function maxFor(max) {
+  const override = parseInt(process.env.RATE_LIMIT_MAX || '', 10);
+  return Number.isFinite(override) && override > 0 ? override : max;
+}
+
 function keyFor(req) {
   const user = (req.user && req.user.id) || 'anon';
   const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
@@ -15,6 +25,7 @@ function keyFor(req) {
 }
 
 function rateLimit({ windowMs = 60000, max = 60 } = {}) {
+  const limit = maxFor(max);
   return (req, res, next) => {
     const nowMs = Date.now();
     const key = keyFor(req);
@@ -30,7 +41,7 @@ function rateLimit({ windowMs = 60000, max = 60 } = {}) {
         if (nowMs - v.start >= windowMs) buckets.delete(k);
       }
     }
-    if (entry.count > max) {
+    if (entry.count > limit) {
       const retryAfter = Math.ceil((entry.start + windowMs - nowMs) / 1000);
       res.set('Retry-After', String(Math.max(retryAfter, 1)));
       return fail(res, 'RATE_LIMITED', 'slow down — try again shortly');

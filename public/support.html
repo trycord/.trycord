@@ -32,6 +32,8 @@
   </header>
 
   <main id="main" class="page tight">
+    <!-- page:begin -->
+    <!-- Everything between the two markers below is the editable region. The page editor replaces it on publish; until a page is published this file is served as-is. Remove the markers only if you never intend to use the editor. -->
     <div class="prose">
       <h1>Support</h1>
       <p class="lede">
@@ -69,7 +71,7 @@
       </p>
       <p>
         Report it in the app where you can, or contact the operator directly.
-        <code>[operator contact &mdash; instance specific]</code>
+        <span class="op-field" data-op="support-contact">OPERATOR: your contact address</span>
       </p>
 
       <h2>Appealing a moderation decision</h2>
@@ -120,8 +122,8 @@
       </p>
       <p>
         A request about an official instance can go to
-        <code>[privacy contact &mdash; official operator]</code>. Formal legal
-        notices go to <code>[&nbsp;&nbsp;]</code>.
+        <span class="op-field" data-op="support-privacy-contact">OPERATOR: the privacy contact for official instances</span>. Formal legal
+        notices go to <span class="op-field" data-op="support-notices">OPERATOR: your address for formal legal notices</span>.
       </p>
 
       <h2>Security report</h2>
@@ -148,6 +150,7 @@
         support hours where the placeholders appear.
       </div>
     </div>
+    <!-- page:end -->
   </main>
 
   <footer class="site-footer">
@@ -174,8 +177,8 @@
         <h2 class="footer-heading">Legal</h2>
         <a href="/terms">Terms of Service</a>
         <a href="/instances-terms">Official instance terms</a>
-        <a href="/instances-terms">Official instance terms</a>
         <a href="/privacy">Privacy Policy</a>
+        <a href="/trust-and-safety">Trust &amp; Safety</a>
       </div>
     </div>
     <div class="wrap footer-bottom">

@@ -1,25 +1,17 @@
-// Attachment pipeline. Files live on disk keyed by their UUID (never the
-// uploader's filename), are validated by magic bytes, bounded in size, and
-// served through an authenticated route with a membership check — never the
-// static file server. `message_id` is null while an upload is "pending"
+// Attachment pipeline. Files are written through the storage service, never
+// straight to disk, so the same code works on local disk or an S3-compatible
+// bucket. Files are keyed by a generated id and a key that encodes the owner,
+// never by the uploader's filename, and are validated by magic bytes before
+// anything is written. `message_id` is null while an upload is "pending"
 // (uploaded but not yet attached to a message); pending files older than
 // PENDING_TTL_MS are purged.
-const fs = require('fs');
-const path = require('path');
 const db = require('../db');
+const storage = require('./storage');
 const { now, uuid, isMember } = require('../util');
 
 const MAX_SIZE = 8 * 1024 * 1024; // bytes
 const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
-
-function uploadsDir() {
-  return path.join(__dirname, '..', '..', 'uploads');
-}
-
-function filePath(id) {
-  return path.join(uploadsDir(), id);
-}
 
 const EXT_FOR_MIME = {
   'image/png': '.png',
@@ -97,6 +89,47 @@ function publicRow(r) {
 }
 
 // Persist a pending attachment. Returns the row on success or
+// Per-account storage ceiling.
+//
+// MAX_SIZE bounds one file and the route's rate limit bounds the rate, but
+// neither bounds the total: 8 MB every 30 minutes is 14 GB an hour, and nothing
+// ever reclaims an attached file. This is the only thing that stops one member
+// filling the host disk.
+//
+// Counted from the database rather than by walking the storage tree, so it
+// works identically on local disk and in an object store, and costs one indexed
+// aggregate. Attachments only: avatars and community art are replaced in place
+// rather than accumulated, so they do not grow without bound.
+const QUOTA_BYTES = (() => {
+  const mb = parseInt(process.env.STORAGE_QUOTA_MB || '', 10);
+  return Number.isFinite(mb) && mb > 0 ? mb * 1024 * 1024 : 512 * 1024 * 1024;
+})();
+
+async function checkQuota(userId, incoming) {
+  const row = await db.get(
+    'SELECT COALESCE(SUM(size), 0) AS total FROM attachments WHERE uploader_id = ?',
+    [userId]
+  );
+  const used = row ? Number(row.total) : 0;
+  if (used + incoming <= QUOTA_BYTES) return null;
+  return {
+    error: 'QUOTA_EXCEEDED',
+    message: 'storage quota reached; delete an attachment or ask a moderator to raise your limit',
+    detail: { used, limit: QUOTA_BYTES, incoming },
+  };
+}
+
+function quota(userId) {
+  return db.get(
+    'SELECT COALESCE(SUM(size), 0) AS used, COUNT(*) AS files FROM attachments WHERE uploader_id = ?',
+    [userId]
+  ).then((row) => ({
+    used: row ? Number(row.used) : 0,
+    files: row ? Number(row.files) : 0,
+    limit: QUOTA_BYTES,
+  }));
+}
+
 // { error, message } for a rejected file. The buffer is < MAX_SIZE
 // (enforced by the route), so sync write is cheap and atomic enough.
 async function store({ uploaderId, channelId, buffer, originalName }) {
@@ -107,17 +140,20 @@ async function store({ uploaderId, channelId, buffer, originalName }) {
   if (!mime) {
     return { error: 'VALIDATION_ERROR', message: 'file type not supported (images, PDF, or text files only)' };
   }
+  const quota = await checkQuota(uploaderId, buffer.length);
+  if (quota) return quota;
   const id = uuid();
   const ext = safeExt(originalName) || (EXT_FOR_MIME[mime] || '').slice(1);
   const filename = cleanFilename(originalName) + (ext ? '.' + ext : '');
-  fs.writeFileSync(filePath(id), buffer);
+  const key = storage.key.messageMedia(channelId, id);
+  await storage.put(key, buffer, mime);
   try {
     await db.run(
       'INSERT INTO attachments (id, message_id, channel_id, uploader_id, filename, mime, size, url, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)',
       [id, channelId, uploaderId, filename, mime, buffer.length, '/api/attachments/' + id, now()]
     );
   } catch (e) {
-    try { fs.unlinkSync(filePath(id)); } catch { /* nothing on disk to clean */ }
+    await storage.delete(key).catch(() => {});
     throw e;
   }
   return {
@@ -170,12 +206,21 @@ async function authorized(userId, attachmentId) {
   return a;
 }
 
-// Best-effort disk cleanup for the given attachment rows (e.g. when the
+// Best-effort object cleanup for the given attachment rows (e.g. when the
 // owning message is deleted — the row cascade is handled by the database).
-function removeFiles(ids) {
-  (ids || []).forEach((id) => {
-    try { fs.unlinkSync(filePath(id)); } catch { /* already gone */ }
-  });
+// The key comes from the row, so a channel id that no longer exists cannot
+// redirect the delete somewhere else.
+async function removeFiles(rows) {
+  for (const row of rows || []) {
+    if (typeof row === 'string') {
+      const r = await db.get('SELECT channel_id FROM attachments WHERE id = ?', [row]);
+      if (r) await storage.delete(storage.key.messageMedia(r.channel_id, row)).catch(() => {});
+    } else {
+      await storage
+        .delete(storage.key.messageMedia(row.channel_id, row.id))
+        .catch(() => {});
+    }
+  }
 }
 
 // Called on the hourly purge: drop orphaned files and their rows so an
@@ -185,7 +230,7 @@ async function purgePending() {
   const rows = await db.all('SELECT id FROM attachments WHERE message_id IS NULL AND created_at < ?', [cutoff]);
   if (!rows.length) return;
   await db.run('DELETE FROM attachments WHERE message_id IS NULL AND created_at < ?', [cutoff]);
-  removeFiles(rows.map((r) => r.id));
+  await removeFiles(rows.map((r) => r.id));
 }
 
 // Profile media (avatars / banners). Same disk store and magic-byte
@@ -202,14 +247,15 @@ async function storeProfileMedia({ userId, kind, buffer, originalName }) {
     return { error: 'VALIDATION_ERROR', message: 'profile images must be PNG, JPEG, GIF, or WebP' };
   }
   const id = 'pf-' + uuid();
-  fs.writeFileSync(filePath(id), buffer);
+  const key = storage.key.userMedia(userId, kind, id);
+  await storage.put(key, buffer, mime);
   try {
     await db.run(
       'INSERT INTO profile_media (id, user_id, kind, filename, mime, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [id, userId, kind, cleanFilename(originalName) || 'profile', mime, buffer.length, now()]
     );
   } catch (e) {
-    try { fs.unlinkSync(filePath(id)); } catch { /* nothing to clean */ }
+    await storage.delete(key).catch(() => {});
     throw e;
   }
   return { id, url: '/api/attachments/profile/' + id, mime, size: buffer.length, kind };
@@ -220,14 +266,15 @@ async function profileMedia(id) {
   return db.get('SELECT * FROM profile_media WHERE id = ?', [id]);
 }
 
-// Best-effort removal of a previously set profile image: deletes the disk
-// file and its row. Accepts only profile-prefixed paths so a malformed
-// profile row can never delete a message attachment.
+// Removal deletes the object and the row. The object key is rebuilt from the
+// row that owns it, never from the value stored on a profile, so a corrupt
+// avatar_url can only ever remove the user's own current media.
 async function removeProfileFile(urlOrId) {
   const idMatch = String(urlOrId || '').match(/^(?:.*\/)+?(pf-[a-f0-9-]{1,64})$/);
   const id = idMatch ? idMatch[1] : (/^pf-[a-f0-9-]{1,64}$/.test(String(urlOrId || '')) ? String(urlOrId) : null);
   if (!id) return;
-  try { fs.unlinkSync(filePath(id)); } catch { /* already gone */ }
+  const row = await db.get('SELECT user_id, kind FROM profile_media WHERE id = ?', [id]);
+  if (row) await storage.delete(storage.key.userMedia(row.user_id, row.kind, id)).catch(() => {});
   try { await db.run('DELETE FROM profile_media WHERE id = ?', [id]); } catch { /* row already gone */ }
 }
 
@@ -253,14 +300,15 @@ async function storeServerMedia({ serverId, kind, buffer, originalName }) {
     return { error: 'VALIDATION_ERROR', message: 'images must be PNG, JPEG, GIF, or WebP' };
   }
   const id = 'sv-' + uuid();
-  fs.writeFileSync(filePath(id), buffer);
+  const key = storage.key.communityMedia(serverId, kind, id);
+  await storage.put(key, buffer, mime);
   try {
     await db.run(
       'INSERT INTO server_media (id, server_id, kind, filename, mime, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [id, serverId, kind, cleanFilename(originalName) || kind, mime, buffer.length, now()]
     );
   } catch (e) {
-    try { fs.unlinkSync(filePath(id)); } catch { /* nothing to clean */ }
+    await storage.delete(key).catch(() => {});
     throw e;
   }
   return { id, url: '/api/servers/media/' + id, mime, size: buffer.length, kind };
@@ -271,26 +319,36 @@ async function serverMedia(id) {
   return db.get('SELECT * FROM server_media WHERE id = ?', [id]);
 }
 
-// Best-effort removal of a superseded community image. Accepts only sv- paths
-// so a malformed servers row can never delete a message attachment.
+// Best-effort removal of a superseded community image, keyed off the owning
+// row so it can never touch a message attachment.
 async function removeServerFile(urlOrId) {
   const s = String(urlOrId || '');
   const idMatch = s.match(/^(?:.*\/)+?(sv-[a-f0-9-]{1,64})$/);
   const id = idMatch ? idMatch[1] : (/^sv-[a-f0-9-]{1,64}$/i.test(s) ? s : null);
   if (!id) return;
-  try { fs.unlinkSync(filePath(id)); } catch { /* already gone */ }
+  const row = await db.get('SELECT server_id, kind FROM server_media WHERE id = ?', [id]);
+  if (row) await storage.delete(storage.key.communityMedia(row.server_id, row.kind, id)).catch(() => {});
   try { await db.run('DELETE FROM server_media WHERE id = ?', [id]); } catch { /* row already gone */ }
 }
 
-function ensureDir() {
-  fs.mkdirSync(uploadsDir(), { recursive: true });
+// Read helpers for the serving routes. Each returns a readable stream plus the
+// sniffed mime, or null when the row is gone or the object is missing. The
+// caller has already authorised the request.
+function openAttachment(row) {
+  return storage.createReadStream(storage.key.messageMedia(row.channel_id, row.id));
 }
-ensureDir();
+
+function openProfileMedia(row) {
+  return storage.createReadStream(storage.key.userMedia(row.user_id, row.kind, row.id));
+}
+
+function openServerMedia(row) {
+  return storage.createReadStream(storage.key.communityMedia(row.server_id, row.kind, row.id));
+}
 
 module.exports = {
   MAX_SIZE,
   MAX_ATTACHMENTS_PER_MESSAGE,
-  filePath,
   store,
   storeProfileMedia,
   profileMedia,
@@ -304,6 +362,11 @@ module.exports = {
   authorized,
   removeFiles,
   purgePending,
+  quota,
+  QUOTA_BYTES,
+  openAttachment,
+  openProfileMedia,
+  openServerMedia,
 };
 
 // Allow ids from the wire to be used safely in SQL IN lists. Service stays

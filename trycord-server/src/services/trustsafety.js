@@ -85,9 +85,11 @@ async function actionExists(id) {
   return db.get('SELECT * FROM moderation_actions WHERE id = ?', [id]);
 }
 
-// Submission is keyed on actionId so only the account holder who received
-// the enforcement details (returned at a correct-password login attempt)
-// can open an appeal — no public account enumeration.
+// Submission is keyed on actionId, which is handed back only to the account
+// the action targets — at a correct-password login attempt, or in the
+// enforcement payload. Possession of that id is the whole authorisation
+// check, so it must stay an unguessable id that is never exposed in a list
+// or a log: an appeal row is written against action.target_id.
 async function submitAppeal(input) {
   const actionId = String((input && input.actionId) || '');
   const reason = String((input && input.reason) || '').trim().slice(0, 4000);
@@ -103,9 +105,12 @@ async function submitAppeal(input) {
     if (!srv || srv.enforcement_state !== 'suspended') bad('this action is no longer active');
   } else {
     const u = await db.get('SELECT enforcement_state, enforcement_expires_at FROM users WHERE id = ?', [action.target_id]);
-    if (!u || action.action_type === 'WARNING') {
-      // warnings don't set live enforcement state; any authenticated user may
-      // appeal a warning attached to them, and id-having holders can too.
+    if (!u) bad('this action is no longer active');
+    else if (action.action_type === 'WARNING') {
+      // A warning records no live enforcement state of its own, so there is
+      // nothing to compare. It stops being appealable once the account is
+      // banned, because that action carries its own appeal path.
+      if (u.enforcement_state === 'banned') bad('this action is no longer active');
     } else if (u.enforcement_state === 'banned' || (u.enforcement_state === 'suspended' && !(u.enforcement_expires_at && new Date(u.enforcement_expires_at).getTime() < Date.now()))) {
       // still active -> ok
     } else {

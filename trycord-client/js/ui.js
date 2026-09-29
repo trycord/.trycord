@@ -1,5 +1,3 @@
-// Low-level UI primitives: DOM helpers, escaping, toasts, modals,
-// popovers, and time formatting. Framework-free.
 
 import { TrycordConfig } from './config.js';
 
@@ -10,6 +8,23 @@ export function esc(v) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+const FORM_CONTROLS = ['input', 'select', 'textarea'];
+
+let autoId = 0;
+
+function associateLabels(node) {
+  for (const label of node.querySelectorAll('label:not([for])')) {
+    const siblings = label.parentElement ? Array.from(label.parentElement.children) : [];
+    const at = siblings.indexOf(label);
+    const control = siblings
+      .slice(at + 1)
+      .find((sib) => FORM_CONTROLS.includes(sib.tagName.toLowerCase()));
+    if (!control) continue;
+    if (!control.id) control.id = 'f-' + (++autoId);
+    label.setAttribute('for', control.id);
+  }
 }
 
 export function el(tag, attrs, ...children) {
@@ -31,6 +46,7 @@ export function el(tag, attrs, ...children) {
     if (c == null) continue;
     node.append(c.nodeType ? c : document.createTextNode(String(c)));
   }
+  if (node.querySelector('label')) associateLabels(node);
   return node;
 }
 
@@ -42,12 +58,11 @@ export function clear(node) {
 export function qs(sel, root = document) { return root.querySelector(sel); }
 export function qsa(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
 
-// ---- toasts -----------------------------------------------------------
 
 export function toast(message, kind = 'info', timeout = 4200) {
   const root = qs('#toast-root');
   if (!root) return;
-  const t = el('div', { class: 'toast ' + kind, role: 'status' }, message);
+  const t = el('div', { class: 'toast ' + kind }, message);
   root.appendChild(t);
   setTimeout(() => {
     t.style.opacity = '0';
@@ -56,7 +71,13 @@ export function toast(message, kind = 'info', timeout = 4200) {
   }, timeout);
 }
 
-// ---- modals --------------------------------------------------------------
+export function announce(text) {
+  const node = qs('#route-announcer');
+  if (!node) return;
+  node.textContent = '';
+  requestAnimationFrame(() => { node.textContent = text; });
+}
+
 
 export function openModal({ title, eyebrow, closable, body, footer, closeText = 'Close' }) {
   let box;
@@ -79,7 +100,7 @@ export function openModal({ title, eyebrow, closable, body, footer, closeText = 
     }
     head.appendChild(titles);
     if (closable) {
-      const x = el('button', { class: 'modal-close', type: 'button', 'aria-label': 'Close dialog' }, '×');
+      const x = el('button', { class: 'modal-close', type: 'button', 'aria-label': 'Close dialog' }, 'Ã—');
       x.addEventListener('click', doClose);
       head.appendChild(x);
     }
@@ -141,80 +162,8 @@ export function confirmDialog({ title, message, confirmText = 'Confirm', danger 
   return modal;
 }
 
-// ---- popovers -----------------------------------------------------------
-
-export function showPopover(anchor, items, { onSelect } = {}) {
-  const root = qs('#popover-root') || document.body;
-  const pop = el('div', { class: 'popover', hidden: true });
-  for (const item of items || []) {
-    if (item.sep) { pop.appendChild(el('div', { class: 'pop-sep' })); continue; }
-    const b = el('button', { class: 'pop-item ' + (item.danger ? 'danger' : '') }, (() => {
-      if (item.html) return item.html();
-      const wrap = el('span', {});
-      wrap.append(el('span', {}, item.label));
-      if (item.desc) wrap.append(el('span', { class: 'pop-desc' }, item.desc));
-      return wrap;
-    })());
-    b.addEventListener('click', () => {
-      hidePopover();
-      if (onSelect) onSelect(item);
-      else if (item.onClick) item.onClick();
-    });
-    pop.appendChild(b);
-  }
-  root.appendChild(pop);
-  // position
-  const r = anchor.getBoundingClientRect();
-  pop.removeAttribute('hidden');
-  const pr = pop.getBoundingClientRect();
-  let left = r.left;
-  let top = r.bottom + 6;
-  if (left + pr.width > innerWidth - 8) left = innerWidth - pr.width - 8;
-  if (top + pr.height > innerHeight - 8) top = Math.max(8, r.top - pr.height - 6);
-  pop.style.left = left + 'px';
-  pop.style.top = top + 'px';
-  function hide(e) {
-    if (e && pop.contains(e.target)) return;
-    hidePopover();
-  }
-  function hidePopover() {
-    pop.remove();
-    document.removeEventListener('pointerdown', hide);
-    document.removeEventListener('keydown', onKey);
-    if (pop.contains(document.activeElement) && anchor && typeof anchor.focus === 'function') {
-      try { anchor.focus(); } catch { /* ignore */ }
-    }
-  }
-  function onKey(e) { if (e.key === 'Escape') hidePopover(); }
-  setTimeout(() => {
-    document.addEventListener('pointerdown', hide);
-    document.addEventListener('keydown', onKey);
-  }, 0);
-  return { pop, hide: hidePopover };
-}
-
-// ---- context menus ---------------------------------------------------------
 // One menu system for every entity in the app. Callers do not build DOM; they
-// hand over a plain action list and this decides how to present it.
-//
-// An action is one of:
-//   { label, desc?, danger?, disabled?, onSelect?, items? }  items => submenu
-//   { sep: true }                                            divider
-//   { heading: 'Roles' }                                     group label
-//
-// Presentation is chosen by the surface, not the caller: a cursor-anchored menu
-// with the pointer, a bottom sheet on touch/narrow. Both render the same action
 // list, so a long-press and a right-click can never drift apart.
-//
-// opts:
-//   target   { type, id }  identity of what was clicked
-//   node     the element   used to refuse actions if it has since been removed
-//   sheet    force the bottom-sheet presentation
-//
-// The `node` guard is the reason a stale menu cannot act. Menus are opened
-// against a live element; if a route change, repaint or delete detaches that
-// element before the user clicks, every action is refused rather than firing
-// against whatever now occupies the same coordinates.
 
 const MENU_EDGE = 8;
 const LONG_PRESS_MS = 480;
@@ -230,7 +179,6 @@ function sheetMode(force) {
   catch { return innerWidth < 560; }
 }
 
-// Normalise the action list: drop empties, coerce, and keep order.
 function normItems(items) {
   const out = [];
   for (const it of items || []) {
@@ -270,15 +218,12 @@ function buildMenu(items, ctx, depth) {
     wrap.append(el('span', {}, item.label));
     if (item.desc) wrap.append(el('span', { class: 'pop-desc' }, item.desc));
     b.appendChild(wrap);
-    if (hasSub) b.appendChild(el('span', { class: 'pop-item__caret', 'aria-hidden': 'true' }, '›'));
+    if (hasSub) b.appendChild(el('span', { class: 'pop-item__caret', 'aria-hidden': 'true' }, 'â€º'));
 
     if (hasSub) {
-      // Submenus open on hover AND on ArrowRight, so the whole thing works with
-      // a mouse and with a keyboard without two code paths.
       let sub = null;
       const openSub = () => {
         if (sub || b.disabled) return;
-        // Only one submenu per parent level.
         for (let i = menuStack.length - 1; i > ctx.depth; i--) closeFrom(i);
         sub = showContextMenuAt(b, item.items, { ...ctx, depth: ctx.depth + 1, parent: pop, anchor: b });
         b.setAttribute('aria-expanded', 'true');
@@ -291,19 +236,15 @@ function buildMenu(items, ctx, depth) {
       };
       b.addEventListener('mouseenter', openSub);
       // Deliberately NOT on focus. Focus is how the keyboard walks the list, so
-      // opening on it made a parent with a submenu a trap: arrowing onto it
       // pulled the next ArrowDown into the submenu and the user could never
-      // reach the items below it. ArrowRight opens, and so does a tap.
       b.addEventListener('click', (e) => { e.stopPropagation(); openSub(); });
       b.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); openSub(); } });
     } else {
       b.addEventListener('mouseenter', () => {
-        // Moving off a parent closes its submenu, the way every native menu does.
         if (ctx.depth < menuStack.length - 1) closeFrom(ctx.depth + 1);
       });
       b.addEventListener('click', () => {
         if (b.disabled) return;
-        // Refuse to act on an entity that is no longer on screen.
         if (ctx.node && !ctx.node.isConnected) { closeContextMenu(); return; }
         closeContextMenu();
         if (item.onSelect) item.onSelect(ctx.target);
@@ -356,8 +297,6 @@ function onMenuKey(e) {
     case 'Home': e.preventDefault(); focusIndex(pop, 0, 'first'); return;
     case 'End': e.preventDefault(); focusIndex(pop, 0, 'last'); return;
     case 'ArrowLeft':
-      // Only a submenu closes on ArrowLeft; a root menu ignores it so the
-      // browser/host can still handle back navigation.
       if (menuStack.length > 1) { e.preventDefault(); e.stopPropagation(); closeFrom(menuStack.length - 1); }
       return;
     case 'Tab':
@@ -373,17 +312,6 @@ function onDocPointerDown(e) {
   closeContextMenu();
 }
 
-// Clamp into the viewport.
-//
-// Sizing uses offsetWidth/offsetHeight, NOT getBoundingClientRect. The popover
-// carries an entry animation that translates it, and a transformed rect reports
-// the translated box - so measuring during the animation made a menu that was
-// correctly placed look like it overflowed, and it got yanked to the top edge.
-// The layout box is the honest size.
-//
-// Two passes, because the first measurement can precede late layout (a wrapped
-// label, a freshly opened submenu) and clamping against a stale size leaves the
-// menu hanging off the edge.
 function place(pop, x, y) {
   const clampTo = () => {
     const w = pop.offsetWidth;
@@ -397,8 +325,6 @@ function place(pop, x, y) {
   clampTo();
   clampTo();
 
-  // Judge fit from the arithmetic we just performed, not from a rect that may
-  // still be mid-animation.
   const w = pop.offsetWidth;
   const h = pop.offsetHeight;
   const left = Math.min(Math.max(MENU_EDGE, x), Math.max(MENU_EDGE, innerWidth - w - MENU_EDGE));
@@ -406,8 +332,6 @@ function place(pop, x, y) {
   const overflowsX = x + w > innerWidth - MENU_EDGE;
   const overflowsY = y + h > innerHeight - MENU_EDGE;
   if ((overflowsX && innerWidth - w - MENU_EDGE < MENU_EDGE) || (overflowsY && innerHeight - h - MENU_EDGE < MENU_EDGE)) {
-    // Genuinely taller or wider than the window allows: pin to the top-left and
-    // scroll rather than overflow.
     pop.style.left = Math.round(left) + 'px';
     pop.style.top = MENU_EDGE + 'px';
     if (h > innerHeight - MENU_EDGE * 2) {
@@ -417,7 +341,6 @@ function place(pop, x, y) {
   }
 }
 
-// Position a submenu beside its parent item, flipping to the left at the edge.
 function placeSub(pop, anchorBtn) {
   const a = anchorBtn.getBoundingClientRect();
   const pr = pop.getBoundingClientRect();
@@ -429,7 +352,6 @@ function placeSub(pop, anchorBtn) {
   pop.style.top = Math.round(top) + 'px';
 }
 
-// Internal: open a menu anchored to an element (submenus) or a point (root).
 function showContextMenuAt(anchor, items, ctx) {
   const pop = buildMenu(items, ctx, ctx.depth);
   if (!pop.querySelector('.pop-item')) return null;
@@ -440,7 +362,6 @@ function showContextMenuAt(anchor, items, ctx) {
     root.appendChild(pop);
     placeSub(pop, ctx.anchor);
   } else if (ctx.sheet) {
-    // Bottom sheet: same actions, thumb-reachable, full-width.
     pop.classList.add('ctx-menu--sheet');
     const scrim = el('div', { class: 'ctx-scrim' });
     root.appendChild(scrim);
@@ -478,7 +399,6 @@ export function showContextMenu(clientX, clientY, items, opts = {}) {
     document.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onResize);
   };
-  // Defer so the click that opened the menu does not immediately close it.
   setTimeout(bind, 0);
   menuCleanup = () => {
     document.removeEventListener('pointerdown', onDocPointerDown, true);
@@ -492,8 +412,6 @@ export function showContextMenu(clientX, clientY, items, opts = {}) {
   return { pop, hide: closeContextMenu };
 }
 
-// Wire an element to the menu system: right-click, long-press, and a keyboard
-// equivalent. Returns a detach function so callers can unbind on teardown
 // rather than leaking listeners through repaints.
 export function attachContextMenu(el, factory, opts = {}) {
   if (!el) return () => {};
@@ -513,8 +431,6 @@ export function attachContextMenu(el, factory, opts = {}) {
     open(e.clientX, e.clientY);
   };
 
-  // Long press. Chromium does not fire `contextmenu` for a held touch the way
-  // a mobile browser does, so a phone would otherwise get no menu at all.
   let timer = null; let sx = 0; let sy = 0; let fired = false;
   const cancel = () => { clearTimeout(timer); timer = null; };
   const onTouchStart = (e) => {
@@ -533,8 +449,6 @@ export function attachContextMenu(el, factory, opts = {}) {
   // A long press that opened the menu must not also fire a click underneath it.
   const onClickCapture = (e) => { if (fired) { e.stopPropagation(); e.preventDefault(); fired = false; } };
 
-  // Keyboard equivalent: the menu key, and Shift+F10 which is the ARIA
-  // convention for "context menu" on a focused element.
   const onKeyDown = (e) => {
     if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
       e.preventDefault();
@@ -567,29 +481,18 @@ export function closeContextMenu() {
   closeFrom(0);
   menuStack = [];
   if (menuCleanup) { try { menuCleanup(); } catch { /* ignore */ } menuCleanup = null; }
-  // Unconditional, and not part of menuStack: the emoji palette, the profile
-  // card and the sheet scrim each own their popover and their listeners. Gating
   // this on menuCleanup - which only showContextMenu sets - left Escape unable
-  // to close the palette.
   for (const pop of Array.from(document.querySelectorAll('.popover.user-card, .popover.emoji-picker, .ctx-scrim'))) {
     try { if (pop._ctxCleanup) pop._ctxCleanup(); } catch { /* ignore */ }
     pop.remove();
   }
 }
 
-export function isContextMenuOpen() {
-  return menuStack.length > 0;
-}
-
-// Mini profile card anchored at a cursor point. The caller supplies the
-// rendered avatar node (avatar lives in components.js; ui.js stays
-// dependency-free) plus plain action descriptors.
 export function showUserCard(clientX, clientY, { avatarEl, title, sub, statusLine, actions, bannerUrl = null } = {}) {
   closeContextMenu();
   const root = qs('#popover-root') || document.body;
   const pop = el('div', { class: 'popover user-card', role: 'dialog', 'aria-label': title || 'User' });
   // Banner is optional and loads through the authenticated media route, so
-  // it is filled in asynchronously and simply stays empty when absent.
   const banner = el('div', { class: 'user-card__banner' });
   if (bannerUrl) {
     import('./components.js').then(({ loadAuthedImage }) => loadAuthedImage(bannerUrl)).then((url) => {
@@ -652,7 +555,6 @@ export async function copyText(text, label = 'Copied to clipboard.') {
     await navigator.clipboard.writeText(value);
   } catch {
     // Clipboard API unavailable (permissions / non-secure context):
-    // fall back to a transient textarea + execCommand.
     try {
       const ta = document.createElement('textarea');
       ta.value = value;
@@ -667,11 +569,7 @@ export async function copyText(text, label = 'Copied to clipboard.') {
   toast(label, 'ok');
 }
 
-// ---- report dialog --------------------------------------------------------
 // Trust & Safety entry point shared by message/user reports. Fixed
-// categories map to the report reason (the backend has no category
-// enum — reason + free-text description is the whole contract), so the
-// admin queue shows a consistent label plus details.
 export const REPORT_CATEGORIES = [
   'Harassment or bullying',
   'Spam',
@@ -685,6 +583,11 @@ export const REPORT_CATEGORIES = [
 ];
 
 export function openReportDialog({ targetType, targetId, title, subtitle, onSubmit }) {
+  // A report that is never sent must not be reported as sent. A missing target
+  if (!targetType || !targetId || typeof onSubmit !== 'function') {
+    toast('This report cannot be submitted.', 'error');
+    return null;
+  }
   const err = el('div', { class: 'form-error', hidden: true });
   const sel = el('select', { class: 'input', 'aria-label': 'Reason' });
   for (const c of REPORT_CATEGORIES) sel.appendChild(el('option', { value: c }, c));
@@ -709,7 +612,7 @@ export function openReportDialog({ targetType, targetId, title, subtitle, onSubm
     err.hidden = true;
     go.disabled = true;
     try {
-      if (onSubmit) await onSubmit({ targetType, targetId, category, extra });
+      await onSubmit({ targetType, targetId, category, extra });
       modal.close();
       toast('Reported. Moderators will review it.', 'ok');
     } catch (ex) {
@@ -723,61 +626,52 @@ export function openReportDialog({ targetType, targetId, title, subtitle, onSubm
   return modal;
 }
 
-// ---- emoji picker ---------------------------------------------------------
-// A categorised, searchable palette that inserts at the caller's cursor. Pure
-// client-side: no backend, no contracts — the composer sends plain text.
-//
-// Grouped with a sticky search field, because a single flat grid of ~70 emoji
-// meant scrolling for anything past the first screenful. Categories are ordered
-// by how often people reach for them, not alphabetically.
 const EMOJI_CATEGORIES = [
   {
-    id: 'faces', label: 'Smileys', emoji: ('😀 😁 😂 🤣 😊 😄 😍 🥰 😘 😗 😙 😚 🙂 🙃 😉 😌 😔 🥺 😢 😭 😤 😠 😡 🤬 '
-      + '🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🫣 🤭 🫢 🫡 🤫 🤥 😶 😐 😑 😬 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😵 '
-      + '❓ ❗ 😇 🤠 😈 👿 👹 👺 🤡 💩 👻 💀 ☠️ 👽 👾 🤖 😺 😸 😹 😻 😼 😽 🙀 😿 😾 🥳 😎 😕 🙃'),
+    id: 'faces', label: 'Smileys', emoji: ('ðŸ˜€ ðŸ˜ ðŸ˜‚ ðŸ¤£ ðŸ˜Š ðŸ˜„ ðŸ˜ ðŸ¥° ðŸ˜˜ ðŸ˜— ðŸ˜™ ðŸ˜š ðŸ™‚ ðŸ™ƒ ðŸ˜‰ ðŸ˜Œ ðŸ˜” ðŸ¥º ðŸ˜¢ ðŸ˜­ ðŸ˜¤ ðŸ˜  ðŸ˜¡ ðŸ¤¬ '
+      + 'ðŸ¤¯ ðŸ˜³ ðŸ¥µ ðŸ¥¶ ðŸ˜± ðŸ˜¨ ðŸ˜° ðŸ˜¥ ðŸ˜“ ðŸ¤— ðŸ¤” ðŸ«£ ðŸ¤­ ðŸ«¢ ðŸ«¡ ðŸ¤« ðŸ¤¥ ðŸ˜¶ ðŸ˜ ðŸ˜‘ ðŸ˜¬ ðŸ™„ ðŸ˜¯ ðŸ˜¦ ðŸ˜§ ðŸ˜® ðŸ˜² ðŸ¥± ðŸ˜´ ðŸ¤¤ ðŸ˜ª ðŸ˜µ '
+      + 'â“ â— ðŸ˜‡ ðŸ¤  ðŸ˜ˆ ðŸ‘¿ ðŸ‘¹ ðŸ‘º ðŸ¤¡ ðŸ’© ðŸ‘» ðŸ’€ â˜ ï¸ ðŸ‘½ ðŸ‘¾ ðŸ¤– ðŸ˜º ðŸ˜¸ ðŸ˜¹ ðŸ˜» ðŸ˜¼ ðŸ˜½ ðŸ™€ ðŸ˜¿ ðŸ˜¾ ðŸ¥³ ðŸ˜Ž ðŸ˜• ðŸ™ƒ'),
   },
   {
-    id: 'people', label: 'People', emoji: ('👋 🤚 🖐 ✋ 🖖 👌 🤌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 👐 '
-      + '🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 🦻 👃 🧠 🫀 🫁 🦷 🦴 👀 👁 👅 👄 💋 🩸'),
+    id: 'people', label: 'People', emoji: ('ðŸ‘‹ ðŸ¤š ðŸ– âœ‹ ðŸ–– ðŸ‘Œ ðŸ¤Œ ðŸ¤ âœŒï¸ ðŸ¤ž ðŸ¤Ÿ ðŸ¤˜ ðŸ¤™ ðŸ‘ˆ ðŸ‘‰ ðŸ‘† ðŸ–• ðŸ‘‡ â˜ï¸ ðŸ‘ ðŸ‘Ž âœŠ ðŸ‘Š ðŸ¤› ðŸ¤œ ðŸ‘ ðŸ™Œ ðŸ‘ '
+      + 'ðŸ¤² ðŸ¤ ðŸ™ âœï¸ ðŸ’… ðŸ¤³ ðŸ’ª ðŸ¦¾ ðŸ¦¿ ðŸ¦µ ðŸ¦¶ ðŸ‘‚ ðŸ¦» ðŸ‘ƒ ðŸ§  ðŸ«€ ðŸ« ðŸ¦· ðŸ¦´ ðŸ‘€ ðŸ‘ ðŸ‘… ðŸ‘„ ðŸ’‹ ðŸ©¸'),
   },
   {
-    id: 'nature', label: 'Nature', emoji: ('🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐽 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🐤 🐣 🐥 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🪱 🐛 🦋 🐌 🐞 🐜 🪰 🪲 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🐡 🐠 🐟 🐬 🐳 🐋 '
-      + '🦈 🐊 🐅 🐆 🦓 🦍 🦧 🐘 🦛 🦏 🐪 🐫 🦒 🦘 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🦙 🐐 🦌 🐕 🐩 🦮 🐈 🐓 🦃 🦤 🦚 🦜 🦢 🕊 🐇 🦝 🦨 🦡 🦫 🦦 🦥 🐁 🐀 🐿 🦔 🌵 🎄 🌲 🌳 🌴 🪵 🌱 🌿 ☘️ 🍀 🎍 🎋 🍃 🍂 🍁 🍄 🌾 💐 🌷 🌹 🥀 🌺 🌸 🌼 🌻'),
+    id: 'nature', label: 'Nature', emoji: ('ðŸ¶ ðŸ± ðŸ­ ðŸ¹ ðŸ° ðŸ¦Š ðŸ» ðŸ¼ ðŸ¨ ðŸ¯ ðŸ¦ ðŸ® ðŸ· ðŸ½ ðŸ¸ ðŸµ ðŸ™ˆ ðŸ™‰ ðŸ™Š ðŸ” ðŸ§ ðŸ¦ ðŸ¤ ðŸ£ ðŸ¥ ðŸ¦† ðŸ¦… ðŸ¦‰ ðŸ¦‡ ðŸº ðŸ— ðŸ´ ðŸ¦„ ðŸ ðŸª± ðŸ› ðŸ¦‹ ðŸŒ ðŸž ðŸœ ðŸª° ðŸª² ðŸ¦‚ ðŸ¢ ðŸ ðŸ¦Ž ðŸ¦– ðŸ¦• ðŸ™ ðŸ¦‘ ðŸ¦ ðŸ¦ž ðŸ¦€ ðŸ¡ ðŸ  ðŸŸ ðŸ¬ ðŸ³ ðŸ‹ '
+      + 'ðŸ¦ˆ ðŸŠ ðŸ… ðŸ† ðŸ¦“ ðŸ¦ ðŸ¦§ ðŸ˜ ðŸ¦› ðŸ¦ ðŸª ðŸ« ðŸ¦’ ðŸ¦˜ ðŸƒ ðŸ‚ ðŸ„ ðŸŽ ðŸ– ðŸ ðŸ‘ ðŸ¦™ ðŸ ðŸ¦Œ ðŸ• ðŸ© ðŸ¦® ðŸˆ ðŸ“ ðŸ¦ƒ ðŸ¦¤ ðŸ¦š ðŸ¦œ ðŸ¦¢ ðŸ•Š ðŸ‡ ðŸ¦ ðŸ¦¨ ðŸ¦¡ ðŸ¦« ðŸ¦¦ ðŸ¦¥ ðŸ ðŸ€ ðŸ¿ ðŸ¦” ðŸŒµ ðŸŽ„ ðŸŒ² ðŸŒ³ ðŸŒ´ ðŸªµ ðŸŒ± ðŸŒ¿ â˜˜ï¸ ðŸ€ ðŸŽ ðŸŽ‹ ðŸƒ ðŸ‚ ðŸ ðŸ„ ðŸŒ¾ ðŸ’ ðŸŒ· ðŸŒ¹ ðŸ¥€ ðŸŒº ðŸŒ¸ ðŸŒ¼ ðŸŒ»'),
   },
   {
-    id: 'food', label: 'Food', emoji: ('🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥬 🥒 🌶️ 🫑 🌽 🥕 🫒 🧄 🧅 🥔 🍠 🥐 🥯 🍞 🥖 🥨 🧀 🥚 🍳 🧈 🥞 🧇 🥓 🥩 🍗 🍖 🌭 🍔 🍟 🍕 🫓 🥙 🧆 🌮 🌯 🥗 🥘 🫕 🍝 🍜 🍲 🍛 🍣 🍱 🥟 🦪 🍤 🍙 🍚 🍘 🍥 🥠 🥮 🍢 🍡 🍧 🍨 🍦 🥧 🧁 🍰 🎂 🍮 🍭 🍬 🍫 🍿 🍩 🍪 🌰 🥜 🍯 🥛 🍼 🫖 ☕ 🍵 🧃 🥤 🧋 🍶 🍺 🍻 🥂 🍷 🥃 🍸 🍹 🧉 🍾 🧊'),
+    id: 'food', label: 'Food', emoji: ('ðŸ ðŸŽ ðŸ ðŸŠ ðŸ‹ ðŸŒ ðŸ‰ ðŸ‡ ðŸ“ ðŸ« ðŸˆ ðŸ’ ðŸ‘ ðŸ¥­ ðŸ ðŸ¥¥ ðŸ¥ ðŸ… ðŸ† ðŸ¥‘ ðŸ¥¦ ðŸ¥¬ ðŸ¥’ ðŸŒ¶ï¸ ðŸ«‘ ðŸŒ½ ðŸ¥• ðŸ«’ ðŸ§„ ðŸ§… ðŸ¥” ðŸ  ðŸ¥ ðŸ¥¯ ðŸž ðŸ¥– ðŸ¥¨ ðŸ§€ ðŸ¥š ðŸ³ ðŸ§ˆ ðŸ¥ž ðŸ§‡ ðŸ¥“ ðŸ¥© ðŸ— ðŸ– ðŸŒ­ ðŸ” ðŸŸ ðŸ• ðŸ«“ ðŸ¥™ ðŸ§† ðŸŒ® ðŸŒ¯ ðŸ¥— ðŸ¥˜ ðŸ«• ðŸ ðŸœ ðŸ² ðŸ› ðŸ£ ðŸ± ðŸ¥Ÿ ðŸ¦ª ðŸ¤ ðŸ™ ðŸš ðŸ˜ ðŸ¥ ðŸ¥  ðŸ¥® ðŸ¢ ðŸ¡ ðŸ§ ðŸ¨ ðŸ¦ ðŸ¥§ ðŸ§ ðŸ° ðŸŽ‚ ðŸ® ðŸ­ ðŸ¬ ðŸ« ðŸ¿ ðŸ© ðŸª ðŸŒ° ðŸ¥œ ðŸ¯ ðŸ¥› ðŸ¼ ðŸ«– â˜• ðŸµ ðŸ§ƒ ðŸ¥¤ ðŸ§‹ ðŸ¶ ðŸº ðŸ» ðŸ¥‚ ðŸ· ðŸ¥ƒ ðŸ¸ ðŸ¹ ðŸ§‰ ðŸ¾ ðŸ§Š'),
   },
   {
-    id: 'activity', label: 'Activity', emoji: ('⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🪀 🏓 🏸 🏒 🏑 🥍 🏏 🪃 🥅 ⛳ 🪁 🏹 🎣 🤿 🥊 🥋 🎽 🛹 🛼 🛷 ⛸️ 🥌 🎿 ⛷️ 🏂 🪂 🏋️ 🤼 🤸 ⛹️ 🤺 🤾 🏌️ 🏇 🧘 🏄 🏊 🤽 🚣 🧗 🚵 🚴 🏆 🥇 🥈 🥉 🏅 🎖️ 🏵️ 🎗️ 🎫 🎟️ 🎪 🤹 🎭 🩰 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🪕 🎻 🎲 ♟️ 🎯 🎳 🎮 🎰 🧩 🎆 🎇 🎊 🎉 🎈 🎁 🔔'),
+    id: 'activity', label: 'Activity', emoji: ('âš½ ðŸ€ ðŸˆ âš¾ ðŸ¥Ž ðŸŽ¾ ðŸ ðŸ‰ ðŸ¥ ðŸŽ± ðŸª€ ðŸ“ ðŸ¸ ðŸ’ ðŸ‘ ðŸ¥ ðŸ ðŸªƒ ðŸ¥… â›³ ðŸª ðŸ¹ ðŸŽ£ ðŸ¤¿ ðŸ¥Š ðŸ¥‹ ðŸŽ½ ðŸ›¹ ðŸ›¼ ðŸ›· â›¸ï¸ ðŸ¥Œ ðŸŽ¿ â›·ï¸ ðŸ‚ ðŸª‚ ðŸ‹ï¸ ðŸ¤¼ ðŸ¤¸ â›¹ï¸ ðŸ¤º ðŸ¤¾ ðŸŒï¸ ðŸ‡ ðŸ§˜ ðŸ„ ðŸŠ ðŸ¤½ ðŸš£ ðŸ§— ðŸšµ ðŸš´ ðŸ† ðŸ¥‡ ðŸ¥ˆ ðŸ¥‰ ðŸ… ðŸŽ–ï¸ ðŸµï¸ ðŸŽ—ï¸ ðŸŽ« ðŸŽŸï¸ ðŸŽª ðŸ¤¹ ðŸŽ­ ðŸ©° ðŸŽ¨ ðŸŽ¬ ðŸŽ¤ ðŸŽ§ ðŸŽ¼ ðŸŽ¹ ðŸ¥ ðŸŽ· ðŸŽº ðŸŽ¸ ðŸª• ðŸŽ» ðŸŽ² â™Ÿï¸ ðŸŽ¯ ðŸŽ³ ðŸŽ® ðŸŽ° ðŸ§© ðŸŽ† ðŸŽ‡ ðŸŽŠ ðŸŽ‰ ðŸŽˆ ðŸŽ ðŸ””'),
   },
   {
-    id: 'travel', label: 'Travel', emoji: ('🚗 🚕 🚙 🚌 🚎 🏎️ 🚓 🚑 🚒 🚐 🛻 🚚 🚛 🚜 🦯 🦽 🦼 🛴 🚲 🛵 🏍️ 🛺 🚨 🚔 🚍 🚘 🚖 🚡 🚠 🚟 🚃 🚋 🚞 🚝 🚄 🚅 🚈 🚂 🚆 🚇 🚊 🚉 ✈️ 🛫 🛬 🛩️ 💺 🛰️ 🚀 🛸 🚁 🛶 ⛵ 🚤 🛥️ 🛳️ ⛴️ 🚢 ⚓ 🪝 ⛽ 🚧 🚦 🚥 🗺️ 🗿 🗽 🗼 🏰 🎡 🎢 🎠 ⛲ ⛱️ 🏖️ 🏝️ 🏜️ 🌋 ⛰️ 🏔️ 🗻 🏕️ ⛺ 🛖 🏠 🏡 🏘️ 🏚️ 🏗️ 🏭 🏢 🏬 🏣 🏤 🏥 🏦 🏨 🏪 🏫 🏩 💒 🏛️ ⛪ 🕌 🕍 🛕 🕋 🌁 🌃 🏙️ 🌄 🌅 🌆 🌇 🌉 ♨️ 🎑 🏞️ 🌠 🎇 🎆 🌌'),
+    id: 'travel', label: 'Travel', emoji: ('ðŸš— ðŸš• ðŸš™ ðŸšŒ ðŸšŽ ðŸŽï¸ ðŸš“ ðŸš‘ ðŸš’ ðŸš ðŸ›» ðŸšš ðŸš› ðŸšœ ðŸ¦¯ ðŸ¦½ ðŸ¦¼ ðŸ›´ ðŸš² ðŸ›µ ðŸï¸ ðŸ›º ðŸš¨ ðŸš” ðŸš ðŸš˜ ðŸš– ðŸš¡ ðŸš  ðŸšŸ ðŸšƒ ðŸš‹ ðŸšž ðŸš ðŸš„ ðŸš… ðŸšˆ ðŸš‚ ðŸš† ðŸš‡ ðŸšŠ ðŸš‰ âœˆï¸ ðŸ›« ðŸ›¬ ðŸ›©ï¸ ðŸ’º ðŸ›°ï¸ ðŸš€ ðŸ›¸ ðŸš ðŸ›¶ â›µ ðŸš¤ ðŸ›¥ï¸ ðŸ›³ï¸ â›´ï¸ ðŸš¢ âš“ ðŸª â›½ ðŸš§ ðŸš¦ ðŸš¥ ðŸ—ºï¸ ðŸ—¿ ðŸ—½ ðŸ—¼ ðŸ° ðŸŽ¡ ðŸŽ¢ ðŸŽ  â›² â›±ï¸ ðŸ–ï¸ ðŸï¸ ðŸœï¸ ðŸŒ‹ â›°ï¸ ðŸ”ï¸ ðŸ—» ðŸ•ï¸ â›º ðŸ›– ðŸ  ðŸ¡ ðŸ˜ï¸ ðŸšï¸ ðŸ—ï¸ ðŸ­ ðŸ¢ ðŸ¬ ðŸ£ ðŸ¤ ðŸ¥ ðŸ¦ ðŸ¨ ðŸª ðŸ« ðŸ© ðŸ’’ ðŸ›ï¸ â›ª ðŸ•Œ ðŸ• ðŸ›• ðŸ•‹ ðŸŒ ðŸŒƒ ðŸ™ï¸ ðŸŒ„ ðŸŒ… ðŸŒ† ðŸŒ‡ ðŸŒ‰ â™¨ï¸ ðŸŽ‘ ðŸžï¸ ðŸŒ  ðŸŽ‡ ðŸŽ† ðŸŒŒ'),
   },
   {
-    id: 'objects', label: 'Objects', emoji: ('⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 💽 💾 💿 📀 📼 📷 📸 📹 🎥 📽️ 📞 ☎️ 📟 📠 📺 📻 🎙️ ⏱️ ⏲️ ⏰ 🕰️ ⌛ ⏳ 📡 🔋 🔌 💡 🔦 🕯️ 🪔 🧯 🛢️ 💸 💵 💴 💶 💷 🪙 💰 💳 💎 ⚖️ 🪜 🧰 🔧 🔨 ⚒️ 🛠️ ⛏️ 🔩 ⚙️ 🧱 ⛓️ 🧲 🔫 💣 🧨 🪓 🔪 🗡️ ⚔️ 🛡️ 🚬 ⚰️ 🪦 🏺 🔮 📿 🧿 💈 ⚗️ 🔭 🔬 🕳️ 🩹 🩺 💊 💉 🧬 🦠 🧫 🧪 🌡️ 🧹 🪠 🧺 🧻 🚽 🚰 🚿 🛁 🛀 🧼 🪥 🪒 🧽 🪣 🧴 🛎️ 🔑 🗝️ 🚪 🪑 🛋️ 🛏️ 🖼️ 🛍️ 🛒 🎁 🎈 🎏 🎀 🎊 🎉 🪄 🪅 🎎 🏮 🎐 🧧 ✉️ 📩 📨 📧 💌 📥 📤 📦 🏷️ 📪 📫 📬 📭 📮 📯 📜 📃 📄 📑 🧾 📊 📈 📉 🗒️ 🗓️ 📆 📅 🗑️ 📇 🗃️ 🗳️ 🗄️ 📋 📁 📂 🗂️ 🗞️ 📰 📓 📔 📒 📕 📗 📘 📙 📚 📖 🔖 🧷 🔗 📎 🖇️ 📐 📏 🧮 📌 📍 ✂️ 🖊️ 🖋️ ✒️ 🖌️ 🖍️ 📝 ✏️ 🔍 🔎 🔏 🔐 🔒 🔓'),
+    id: 'objects', label: 'Objects', emoji: ('âŒš ðŸ“± ðŸ’» âŒ¨ï¸ ðŸ–¥ï¸ ðŸ–¨ï¸ ðŸ–±ï¸ ðŸ’½ ðŸ’¾ ðŸ’¿ ðŸ“€ ðŸ“¼ ðŸ“· ðŸ“¸ ðŸ“¹ ðŸŽ¥ ðŸ“½ï¸ ðŸ“ž â˜Žï¸ ðŸ“Ÿ ðŸ“  ðŸ“º ðŸ“» ðŸŽ™ï¸ â±ï¸ â²ï¸ â° ðŸ•°ï¸ âŒ› â³ ðŸ“¡ ðŸ”‹ ðŸ”Œ ðŸ’¡ ðŸ”¦ ðŸ•¯ï¸ ðŸª” ðŸ§¯ ðŸ›¢ï¸ ðŸ’¸ ðŸ’µ ðŸ’´ ðŸ’¶ ðŸ’· ðŸª™ ðŸ’° ðŸ’³ ðŸ’Ž âš–ï¸ ðŸªœ ðŸ§° ðŸ”§ ðŸ”¨ âš’ï¸ ðŸ› ï¸ â›ï¸ ðŸ”© âš™ï¸ ðŸ§± â›“ï¸ ðŸ§² ðŸ”« ðŸ’£ ðŸ§¨ ðŸª“ ðŸ”ª ðŸ—¡ï¸ âš”ï¸ ðŸ›¡ï¸ ðŸš¬ âš°ï¸ ðŸª¦ ðŸº ðŸ”® ðŸ“¿ ðŸ§¿ ðŸ’ˆ âš—ï¸ ðŸ”­ ðŸ”¬ ðŸ•³ï¸ ðŸ©¹ ðŸ©º ðŸ’Š ðŸ’‰ ðŸ§¬ ðŸ¦  ðŸ§« ðŸ§ª ðŸŒ¡ï¸ ðŸ§¹ ðŸª  ðŸ§º ðŸ§» ðŸš½ ðŸš° ðŸš¿ ðŸ› ðŸ›€ ðŸ§¼ ðŸª¥ ðŸª’ ðŸ§½ ðŸª£ ðŸ§´ ðŸ›Žï¸ ðŸ”‘ ðŸ—ï¸ ðŸšª ðŸª‘ ðŸ›‹ï¸ ðŸ›ï¸ ðŸ–¼ï¸ ðŸ›ï¸ ðŸ›’ ðŸŽ ðŸŽˆ ðŸŽ ðŸŽ€ ðŸŽŠ ðŸŽ‰ ðŸª„ ðŸª… ðŸŽŽ ðŸ® ðŸŽ ðŸ§§ âœ‰ï¸ ðŸ“© ðŸ“¨ ðŸ“§ ðŸ’Œ ðŸ“¥ ðŸ“¤ ðŸ“¦ ðŸ·ï¸ ðŸ“ª ðŸ“« ðŸ“¬ ðŸ“­ ðŸ“® ðŸ“¯ ðŸ“œ ðŸ“ƒ ðŸ“„ ðŸ“‘ ðŸ§¾ ðŸ“Š ðŸ“ˆ ðŸ“‰ ðŸ—’ï¸ ðŸ—“ï¸ ðŸ“† ðŸ“… ðŸ—‘ï¸ ðŸ“‡ ðŸ—ƒï¸ ðŸ—³ï¸ ðŸ—„ï¸ ðŸ“‹ ðŸ“ ðŸ“‚ ðŸ—‚ï¸ ðŸ—žï¸ ðŸ“° ðŸ““ ðŸ“” ðŸ“’ ðŸ“• ðŸ“— ðŸ“˜ ðŸ“™ ðŸ“š ðŸ“– ðŸ”– ðŸ§· ðŸ”— ðŸ“Ž ðŸ–‡ï¸ ðŸ“ ðŸ“ ðŸ§® ðŸ“Œ ðŸ“ âœ‚ï¸ ðŸ–Šï¸ ðŸ–‹ï¸ âœ’ï¸ ðŸ–Œï¸ ðŸ–ï¸ ðŸ“ âœï¸ ðŸ” ðŸ”Ž ðŸ” ðŸ” ðŸ”’ ðŸ”“'),
   },
   {
-    id: 'symbols', label: 'Symbols', emoji: ('❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞 📵 🚭 〽️ ⚠️ 🚸 🔱 ⚜️ 🔰 ♻️ ✅ 🈯 💹 ❇️ ✳️ ❎ 🌐 💠 Ⓜ️ 🌀 💤 💬 🗯️ ♠️ ♣️ ♥️ ♦️ ♟️ 🃏 🎴 🀄 🕐 ⭐ 🌟 ✨ 🔥 ⚡ 💥 💫'),
+    id: 'symbols', label: 'Symbols', emoji: ('â¤ï¸ ðŸ§¡ ðŸ’› ðŸ’š ðŸ’™ ðŸ’œ ðŸ–¤ ðŸ¤ ðŸ¤Ž ðŸ’” â£ï¸ ðŸ’• ðŸ’ž ðŸ’“ ðŸ’— ðŸ’– ðŸ’˜ ðŸ’ ðŸ’Ÿ â˜®ï¸ âœï¸ â˜ªï¸ ðŸ•‰ï¸ â˜¸ï¸ âœ¡ï¸ ðŸ”¯ ðŸ•Ž â˜¯ï¸ â˜¦ï¸ ðŸ› â›Ž â™ˆ â™‰ â™Š â™‹ â™Œ â™ â™Ž â™ â™ â™‘ â™’ â™“ ðŸ†” âš›ï¸ ðŸ‰‘ â˜¢ï¸ â˜£ï¸ ðŸ“´ ðŸ“³ ðŸˆ¶ ðŸˆš ðŸˆ¸ ðŸˆº ðŸˆ·ï¸ âœ´ï¸ ðŸ†š ðŸ’® ðŸ‰ ãŠ™ï¸ ãŠ—ï¸ ðŸˆ´ ðŸˆµ ðŸˆ¹ ðŸˆ² ðŸ…°ï¸ ðŸ…±ï¸ ðŸ†Ž ðŸ†‘ ðŸ…¾ï¸ ðŸ†˜ âŒ â­• ðŸ›‘ â›” ðŸ“› ðŸš« ðŸ’¯ ðŸ’¢ â™¨ï¸ ðŸš· ðŸš¯ ðŸš³ ðŸš± ðŸ”ž ðŸ“µ ðŸš­ ã€½ï¸ âš ï¸ ðŸš¸ ðŸ”± âšœï¸ ðŸ”° â™»ï¸ âœ… ðŸˆ¯ ðŸ’¹ â‡ï¸ âœ³ï¸ âŽ ðŸŒ ðŸ’  â“‚ï¸ ðŸŒ€ ðŸ’¤ ðŸ’¬ ðŸ—¯ï¸ â™ ï¸ â™£ï¸ â™¥ï¸ â™¦ï¸ â™Ÿï¸ ðŸƒ ðŸŽ´ ðŸ€„ ðŸ• â­ ðŸŒŸ âœ¨ ðŸ”¥ âš¡ ðŸ’¥ ðŸ’«'),
   },
 ];
 
-// Shortcodes, so the palette is usable without reading glyphs and so search
 // works in English. Deliberately partial: it covers the common ones, and
-// anything unlisted still gets a text-substring match on its label.
 const EMOJI_NAMES = {
-  grin: '😀', smile: '😄', joy: '😂', rofl: '🤣', blush: '😊', heart_eyes: '😍',
-  thinking: '🤔', neutral: '😐', rolling_eyes: '🙄', sleep: '😴', scream: '😱',
-  sob: '😭', rage: '😡', party: '🥳', fire: '🔥', tada: '🎉', sparkles: '✨',
-  ok: '👌', thumbsup: '👍', '+1': '👍', thumbsdown: '👎', '-1': '👎',
-  clap: '👏', pray: '🙏', muscle: '💪', wave: '👋', heart: '❤️', broken_heart: '💔',
-  hundred: '💯', star: '⭐', zap: '⚡', boom: '💥', eyes: '👀', see_no_evil: '🙈',
-  skull: '💀', ghost: '👻', robot: '🤖', poop: '💩', clown: '🤡',
-  pizza: '🍕', beer: '🍺', coffee: '☕', cake: '🎂', cookie: '🍪',
-  rocket: '🚀', game: '🎮', guitar: '🎸', soccer: '⚽', basketball: '🏀',
-  trophy: '🏆', bug: '🐛', cat: '🐱', dog: '🐶', fox: '🦊',
-  white_check_mark: '✅', x: '❌', warning: '⚠️', question: '❓', exclamation: '❗',
-  bulb: '💡', lock: '🔒', key: '🔑', hammer: '🔨', wrench: '🔧',
-  bell: '🔔', link: '🔗', memo: '📝', book: '📚', calendar: '📅',
+  grin: 'ðŸ˜€', smile: 'ðŸ˜„', joy: 'ðŸ˜‚', rofl: 'ðŸ¤£', blush: 'ðŸ˜Š', heart_eyes: 'ðŸ˜',
+  thinking: 'ðŸ¤”', neutral: 'ðŸ˜', rolling_eyes: 'ðŸ™„', sleep: 'ðŸ˜´', scream: 'ðŸ˜±',
+  sob: 'ðŸ˜­', rage: 'ðŸ˜¡', party: 'ðŸ¥³', fire: 'ðŸ”¥', tada: 'ðŸŽ‰', sparkles: 'âœ¨',
+  ok: 'ðŸ‘Œ', thumbsup: 'ðŸ‘', '+1': 'ðŸ‘', thumbsdown: 'ðŸ‘Ž', '-1': 'ðŸ‘Ž',
+  clap: 'ðŸ‘', pray: 'ðŸ™', muscle: 'ðŸ’ª', wave: 'ðŸ‘‹', heart: 'â¤ï¸', broken_heart: 'ðŸ’”',
+  hundred: 'ðŸ’¯', star: 'â­', zap: 'âš¡', boom: 'ðŸ’¥', eyes: 'ðŸ‘€', see_no_evil: 'ðŸ™ˆ',
+  skull: 'ðŸ’€', ghost: 'ðŸ‘»', robot: 'ðŸ¤–', poop: 'ðŸ’©', clown: 'ðŸ¤¡',
+  pizza: 'ðŸ•', beer: 'ðŸº', coffee: 'â˜•', cake: 'ðŸŽ‚', cookie: 'ðŸª',
+  rocket: 'ðŸš€', game: 'ðŸŽ®', guitar: 'ðŸŽ¸', soccer: 'âš½', basketball: 'ðŸ€',
+  trophy: 'ðŸ†', bug: 'ðŸ›', cat: 'ðŸ±', dog: 'ðŸ¶', fox: 'ðŸ¦Š',
+  white_check_mark: 'âœ…', x: 'âŒ', warning: 'âš ï¸', question: 'â“', exclamation: 'â—',
+  bulb: 'ðŸ’¡', lock: 'ðŸ”’', key: 'ðŸ”‘', hammer: 'ðŸ”¨', wrench: 'ðŸ”§',
+  bell: 'ðŸ””', link: 'ðŸ”—', memo: 'ðŸ“', book: 'ðŸ“š', calendar: 'ðŸ“…',
 };
 
 const NAME_OF = (() => {
@@ -792,7 +686,7 @@ export function showEmojiPicker(anchor, onPick) {
   const pop = el('div', { class: 'popover emoji-picker', role: 'dialog', 'aria-label': 'Choose an emoji' });
 
   const search = el('input', {
-    class: 'emoji-search', type: 'search', placeholder: 'Search emoji…',
+    class: 'emoji-search', type: 'search', placeholder: 'Search emojiâ€¦',
     'aria-label': 'Search emoji', autocomplete: 'off', spellcheck: 'false',
   });
   const results = el('div', { class: 'emoji-results' });
@@ -813,8 +707,6 @@ export function showEmojiPicker(anchor, onPick) {
     return b;
   };
 
-  // Grouped view: each category keeps its own heading so the palette stays
-  // navigable as it grows.
   const paintGroups = () => {
     clear(results);
     for (const cat of EMOJI_CATEGORIES) {
@@ -829,8 +721,6 @@ export function showEmojiPicker(anchor, onPick) {
     }
   };
 
-  // Search view: a flat grid of matches. Matching the shortcode is what makes
-  // this usable - a glyph has no text to search against.
   const paintSearch = (q) => {
     clear(results);
     const needle = String(q || '').trim().toLowerCase();
@@ -851,8 +741,6 @@ export function showEmojiPicker(anchor, onPick) {
     timer = setTimeout(() => paintSearch(search.value), 60);
   });
 
-  // Arrow keys walk the visible grid; Enter picks. Without this the palette is
-  // mouse-only, which is half the reason the old one felt thin.
   results.addEventListener('keydown', (e) => {
     const keys = ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'];
     if (!keys.includes(e.key)) return;
@@ -882,8 +770,6 @@ export function showEmojiPicker(anchor, onPick) {
   pop.style.top = Math.max(8, top) + 'px';
   const onKey = (e) => {
     if (e.key === 'Escape') { closeContextMenu(); return; }
-    // Typing while the palette is open filters it, matching how every other
-    // picker in the app behaves. Guarded so it does not fight the search field.
     if (e.target === search || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key.length === 1) {
       search.value += e.key;
@@ -909,7 +795,6 @@ export function showEmojiPicker(anchor, onPick) {
   return { pop, hide: closeContextMenu };
 }
 
-// Insert text at the cursor of a textarea/input, preserving undo + focus.
 export function insertAtCursor(field, text) {
   try {
     field.focus();
@@ -923,7 +808,6 @@ export function insertAtCursor(field, text) {
   try { field.focus(); } catch { /* ignore */ }
 }
 
-// ---- time -----------------------------------------------------------------
 
 export function relTime(iso) {
   if (!iso) return '';
@@ -944,23 +828,6 @@ export function fullTime(iso) {
   });
 }
 
-export function mentionify(text, meUsername, meId) {
-  // Highlight @mentions and @me so the client can act on mentions.
-  // Pure presentation; no markdown engine. Also linkify bare URLs.
-  let out = esc(text);
-  const fmtMention = (m0, name) => {
-    const mine = name === meUsername || name === meId;
-    return '<span class="msg-mention">' + esc(m0) + '</span>';
-  };
-  if (meUsername || meId) {
-    out = out.replace(/@((?:[A-Za-z0-9_.]{2,32})|me|Me)/g, fmtMention);
-  }
-  out = out.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
-  out = out.replace(/\n/g, '<br>');
-  return out;
-}
-
-// ---- api base for attachment src ----------------------------------
 
 export function apiSrc(path) {
   if (!path) return '';
@@ -968,4 +835,4 @@ export function apiSrc(path) {
   return TrycordConfig.apiUrl().replace(/\/+$/, '') + path;
 }
 
-export default { esc, el, clear, toast, openModal, confirmDialog, showPopover, relTime, fullTime, mentionify, apiSrc };
+export default { esc, el, clear, toast, openModal, confirmDialog, relTime, fullTime, apiSrc, announce };

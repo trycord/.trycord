@@ -1,5 +1,4 @@
 // Central application state. Holds the authenticated session as revealed by
-// the real API + WebSocket system only. There is no fake data here.
 
 import Api, { token, setToken } from './api.js';
 
@@ -7,9 +6,7 @@ const LS_SERVER_ID = 'trycord.lastServerId';
 
 const state = {
   me: null,            // { id, username, displayName, email, emailVerified, createdAt }
-  // Whether this instance can actually deliver verification mail. When it
   // cannot, an address can never be confirmed, so the client must not gate
-  // messaging or nag about verification.
   verificationRequired: true,
   token: null,
   servers: [],         // serverCore rows the user belongs to
@@ -40,7 +37,6 @@ export function isAuthed() {
 
 export function currentServerId() {
   // A malformed backend payload (e.g. empty-body 200) must never brick
-  // every chrome paint with a null-index TypeError — degrade to null.
   const list = Array.isArray(state.servers) ? state.servers : [];
   return state.lastServerId || (list[0] && list[0].id) || null;
 }
@@ -51,21 +47,15 @@ export function can(perm) {
 }
 
 export function peerPresence(id) {
-  // Canonical key only. Presence used to be written twice per user (once
-  // stringified, once raw) and read with a two-key fallback, which held 2N
-  // entries instead of N and made the "which key" question load-bearing.
   return state.presence.get(String(id)) || 'offline';
 }
 
-// Server-room hooks (join/leave the community realtime room). Set once by
 // app.js — state must not import realtime (realtime imports state).
 let serverRoomHooks = { join() {}, leave() {} };
 export function setServerRoomHooks(hooks) {
   serverRoomHooks = Object.assign({ join() {}, leave() {} }, hooks || {});
 }
 
-// Active view repaint hook, set by workspace renderers so realtime community
-// events can repaint the current view. Cleared on every route change.
 export function setViewRefresh(fn) {
   state.raw.refresh = typeof fn === 'function' ? fn : null;
 }
@@ -83,7 +73,6 @@ export function repaintView() {
 export function hydrate() {
   state.token = token();
   return state.token ? Api.me().then((me) => {
-    // A 200 with an empty/non-JSON body yields null — treat it exactly
     // like a dead session instead of storing a null user.
     if (!me || typeof me !== 'object' || !me.id) {
       clearSession();
@@ -107,9 +96,6 @@ function validAuthPayload(payload) {
 
 export function applyAuth(payload) {
   // Contract: { token: string, user: { id, ... } }. Never dereference the
-  // payload before proving its shape — a misconfigured backend, proxy, or
-  // captive portal can answer 200 with HTML/empty bodies, which the API
-  // layer surfaces as null. Callers catch the thrown error and show it.
   if (!validAuthPayload(payload)) {
     throw new Error('The backend did not return a valid session. Check the configured backend and try again.');
   }
@@ -117,14 +103,10 @@ export function applyAuth(payload) {
   state.token = payload.token;
   state.me = payload.user;
   // Login/register responses do not carry the policy flag, so treat the
-  // optimistic window as "verification expected" until /me confirms it.
-  // The first hydrate() call corrects it either way.
   state.verificationRequired = payload.user.verificationRequired !== false;
   return state.me;
 }
 
-// Single place that decides whether verification is enforceable. The server is
-// the authority (it is what actually rejects writes); this mirrors it so the
 // UI never nags about an action the backend will not enforce.
 function syncVerificationPolicy(me) {
   state.verificationRequired = !me || me.verificationRequired !== false;
@@ -134,7 +116,6 @@ export function verificationRequired() {
   return state.verificationRequired !== false;
 }
 
-// True only when the user is genuinely blocked from messaging.
 export function mustVerifyToPost() {
   return verificationRequired() && !!(state.me && state.me.emailVerified === false);
 }
@@ -156,14 +137,11 @@ export function clearSession() {
   state.friendsIn = [];
   state.friendsOut = [];
   state.activity = [];
-  // Presence was the one unbounded structure that survived sign-out, so
   // a shared browser carried the previous session's peer list into the
-  // next one. Mutes are rebuilt wholesale by refreshMutes().
   state.presence.clear();
   state.mutedChannels.clear();
 }
 
-// ---- data -----------------------------------------------------------------
 
 export async function refreshServers() {
   const list = await Api.servers();
@@ -171,7 +149,6 @@ export async function refreshServers() {
   if (state.servers.length) {
     const found = state.servers.find((s) => s.id === state.lastServerId);
     if (!found && state.lastServerId) {
-      // server no longer among ours
       state.lastServerId = null;
       localStorage.removeItem(LS_SERVER_ID);
     }
@@ -189,21 +166,15 @@ export async function enterServer(serverId) {
   ]);
   state.serverDetail = detail;
   state.channels = (layout && typeof layout === 'object') ? layout : { categories: [], channels: [] };
-  // The roster endpoint returns an envelope. `members` stays a plain array
-  // because a dozen surfaces (the member sidebar, the roles page, the
-  // assignment dialog) read it directly, and the aggregates live beside it.
   state.members = Array.isArray(members) ? members : (members && Array.isArray(members.items) ? members.items : []);
   state.memberTotal = members && typeof members.total === 'number' ? members.total : state.members.length;
   state.memberHasMore = !!(members && members.hasMore);
   // Easy to drop while editing the lines above, and every permission gate in
-  // the app reads this - with it unset, can() is false for everyone including
   // the owner.
   state.permissions = (perms && perms.permissions) || [];
   state.roles = roles || [];
   state.lastServerId = serverId;
   try { localStorage.setItem(LS_SERVER_ID, serverId); } catch { /* ignore */ }
-  // Join the community realtime room, then backfill live presence for every
-  // visible member (pushes alone only reach friends/DM peers otherwise).
   try { serverRoomHooks.join(serverId); } catch { /* ignore */ }
   try {
     const ids = (members || []).map((m) => m.user_id || m.id).filter(Boolean).slice(0, 100);
@@ -219,8 +190,6 @@ export async function enterServer(serverId) {
   return { detail, layout, members, perms, roles };
 }
 
-// Serialized community refresh for realtime handlers: concurrent events
-// chain instead of racing, so state always converges to the latest fetch.
 let serverRefreshChain = Promise.resolve();
 export function refreshServerView() {
   const sid = state.lastServerId;
@@ -230,21 +199,7 @@ export function refreshServerView() {
   return run.then(() => { repaintView(); return null; });
 }
 
-// Ban list for the members page.
-//
 // Two things this deliberately does not do any more:
-//
-//  - it does not clear the list on error. It used to set state.bans = [] in
-//    the catch, so a single failed request made every ban vanish from the UI
-//    even though the rows were still in the database. A transient network
-//    blip looked exactly like data loss.
-//  - it does not rely solely on state.lastServerId. On a cold load that is
-//    still null when the members page asks, which produced an empty list; and
-//    switching communities could show the previous community's bans. The id
-//    is now passed in, with the old field only as a fallback.
-//
-// A late response for a previous community is also discarded rather than
-// being allowed to overwrite the current one.
 let bansSeq = 0;
 export async function refreshBans(serverId) {
   const sid = serverId || state.lastServerId;
@@ -255,8 +210,6 @@ export async function refreshBans(serverId) {
     if (seq !== bansSeq) return state.bans;          // superseded
     state.bans = Array.isArray(list) ? list : [];
   } catch {
-    // Keep the last known list. The server is the source of truth; a failed
-    // read is not evidence that the bans are gone.
   }
   return state.bans;
 }
@@ -272,8 +225,6 @@ export function leaveServerContext() {
   state.roles = [];
   state.bans = [];
   state.lastServerId = null;
-  // Presence is scoped to a community's roster. Carrying it across
-  // community switches is what let the map grow without bound over a long
   // session; the next enterServer() repopulates it from a fresh snapshot.
   state.presence.clear();
   try { localStorage.removeItem(LS_SERVER_ID); } catch { /* ignore */ }
@@ -293,13 +244,6 @@ export async function refreshFriends() {
   return state;
 }
 
-// Single-flight. A single notification frame currently fans out to two
-// independent refresh callers (the socket handler and the app-level
-// listener), and they fire in the same tick, so every notification used to
-// cost two identical GET /api/notifications requests. Coalescing here
-// fixes it for all callers rather than for one call site, and also stops a
-// burst of N notifications from becoming N parallel fetches of the same
-// unread count.
 let notifInFlight = null;
 export function refreshNotifications() {
   if (notifInFlight) return notifInFlight;
@@ -343,10 +287,6 @@ export function setPresence(id, presence) {
 
 export function setOnline(v) {
   state.online = v;
-}
-
-export function serverWithId(list, id) {
-  return (list || []).find((s) => String(s.id) === String(id)) || null;
 }
 
 const TrycordState = state;

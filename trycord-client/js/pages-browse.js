@@ -1,5 +1,3 @@
-// Discover / browse. Lists public discoverable servers with real search
-// and pagination from the backend.
 
 import Api from './api.js';
 import { esc, el, clear, toast } from './ui.js';
@@ -43,7 +41,6 @@ export async function renderBrowse(container, { previewId } = {}) {
 
   const wrap = el('div', { class: 'page atrium' });
 
-  // Search bar
   const searchRow = el('div', { class: 'row-line' });
   const input = el('input', {
     class: 'input', type: 'search', placeholder: 'Search servers…', value: query,
@@ -56,7 +53,6 @@ export async function renderBrowse(container, { previewId } = {}) {
   const resultMeta = el('div', { class: 'muted small', style: { margin: 'var(--t-d-2) 0' } });
   wrap.appendChild(resultMeta);
 
-  // Server preview pane when a specific one is selected
   const previewPane = el('div', { hidden: true, class: 'stack' });
   wrap.appendChild(previewPane);
 
@@ -116,7 +112,6 @@ export async function renderBrowse(container, { previewId } = {}) {
           listPane.appendChild(serverCard(s, () => showPreview(s.id)));
         }
       }
-      // pagination
       if (pages > 1) {
         const pager = el('div', { class: 'row-line' });
         pager.appendChild(el('span', { class: 'small muted' }, 'Page ' + page + ' of ' + pages));

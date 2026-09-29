@@ -151,8 +151,18 @@ async function joinInner(serverId, userId, username, conn) {
   return { serverId };
 }
 
+// The gateway memoises a community's member ids for a moment so a burst of
+// structural events costs one query instead of one per event. A membership
+// change has to clear it, or a removed member keeps receiving events until the
+// window expires.
+function invalidateMembership(serverId) {
+  try { events.invalidateMembership(serverId); } catch { /* gateway not wired */ }
+}
+
 async function join(serverId, user) {
-  return db.transaction((t) => joinInner(serverId, user.id, user.username, t));
+  const out = await db.transaction((t) => joinInner(serverId, user.id, user.username, t));
+  invalidateMembership(serverId);
+  return out;
 }
 
 async function joinByCode(code, user) {
@@ -210,6 +220,7 @@ async function assertManageable(serverId, actorId, targetId, verb, conn = db) {
 async function removeMembership(serverId, targetId, conn) {
   await conn.run('DELETE FROM member_roles WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
   await conn.run('DELETE FROM server_members WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
+  invalidateMembership(serverId);
 }
 
 async function kick(serverId, actorId, targetId) {

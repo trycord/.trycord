@@ -1,40 +1,8 @@
-/* ============================================================
-   TRYCORD — application stylesheet (rebuilt UI)
-   ============================================================
-   Single stylesheet for the Trycord client.
 
-   Composition:
-     Desktop : Presence Spine -> Main Environment. Full viewport,
-               fluid from 1280x720 through ultrawide.
-     Mobile  : MobileShell, a separate purpose-built presentation.
-
-   Theme contract:
-     - Every visual surface consumes semantic `--t-*` tokens.
-     - Built-in themes are immutable token blocks.
-     - `html[data-theme="custom"]` maps `--c-*` values injected by
-       js/theme.js (guided builder + validated advanced CSS).
-     - Layout-critical rules carry `!important` so validated custom
-       CSS (which may never use `!important`) cannot break required
-       structure, navigation, or safety surfaces.
-
-   Layout contract:
-     - `.shell--desktop` owns the two top-level columns.
-     - `.app-rail` owns rail + navigation internals.
-     - `.main-content` is always grid column 2, so hiding the
-       spine releases its track instead of trapping content.
-     - `.chat-environment` gives the member rail an `auto` track and
-       the sidebar a fixed token width, so a hidden member sidebar
-       releases its column instead of leaving a phantom rail.
-   ============================================================ */
-
-/* ============================================================
-   1. DESIGN TOKENS
-   ============================================================ */
 
 :root {
   color-scheme: dark;
 
-  /* Layout geometry (single source for the desktop frame) */
   --ui-rail: 64px;
   --ui-sidebar: 240px;
   --ui-members: 260px;
@@ -43,7 +11,6 @@
   --ui-page-width: 1180px;
   --t-content-width: 1180px;
 
-  /* Palette */
   --t-pg:        #100b08;
   --t-base:      #181110;
   --t-base2:     #221510;
@@ -60,7 +27,6 @@
   --t-warn:      #e2b03c;
   --t-err:       #e06a5e;
 
-  /* Typography */
   --t-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --t-mono: ui-monospace, "Cascadia Code", "Segoe UI Mono", Consolas, monospace;
   --t-fs-xs: 0.72rem;
@@ -70,30 +36,28 @@
   --t-fs-xl: clamp(1.4rem, 2vw, 1.9rem);
   --t-fs-2xl: clamp(2rem, 3.2vw, 2.9rem);
 
-  /* Motion */
   --t-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --t-fast: 120ms;
   --t-med: 220ms;
   --t-slow: 420ms;
   --t-spin: 0.7s;
 
-  /* Radii */
   --t-r-s: 8px;
   --t-r-m: 12px;
   --t-r-l: 18px;
 
-  /* Avatar sizes */
   --t-avatar-sm: 28px;
   --t-avatar-md: 36px;
   --t-avatar-lg: 64px;
   --t-avatar-xl: 72px;
 
-  /* Density */
   --t-d-2: 4px;
   --t-d-3: 8px;
   --t-d-4: 12px;
   --t-d-5: 16px;
   --t-d-6: 24px;
+
+  --t-hit: 44px;
 
   /* Derived glyph tokens — text/accents on fills (never raw hex) */
   --t-on-accent:  #1d1008;
@@ -108,7 +72,6 @@
   --t-img-mat:    rgba(0, 0, 0, 0.3);
   --t-avatar-ring: rgba(255, 255, 255, 0.18);
 
-  /* Ambient environment — themes re-tint the whole scene */
   --t-env-base:   #100b08;
   --t-shell-gradient: linear-gradient(180deg, rgba(64, 36, 22, 0.82), rgba(22, 15, 11, 0.7));
   --t-shell-edge: rgba(255, 190, 150, 0.18);
@@ -121,14 +84,12 @@
   --t-hero-top:   rgba(255, 176, 111, 0.08);
   --t-hero-bottom: rgba(40, 19, 10, 0.3);
 
-  /* Glass */
   --t-blur-s: 14px;  --t-sat-s: 120%;
   --t-blur-m: 26px;  --t-sat-m: 130%;
   --t-blur-l: 28px;  --t-sat-l: 135%;
   --t-inset-hi:   inset 0 1px 0 rgba(255, 255, 255, 0.12);
   --t-inset-glass: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 
-  /* Shadows */
   --t-sh-edge:   18px 0 48px rgba(0, 0, 0, 0.18);
   --t-sh-drawer: 24px 0 48px rgba(0, 0, 0, 0.45);
   --t-sh-1:      0 18px 44px rgba(0, 0, 0, 0.48);
@@ -137,12 +98,10 @@
   --t-sh-4:      0 10px 30px rgba(0, 0, 0, 0.4);
   --t-sh-hero:   0 24px 80px rgba(0, 0, 0, 0.26);
 
-  /* Layer opacity */
   --t-op-mid: 0.55;
   --t-op-fade: 0.5;
   --t-op-dim: 0.6;
 
-  /* Elevation */
   --z-inline: 2;
   --z-header: 20;
   --z-drawer-back: 40;
@@ -153,13 +112,6 @@
   --z-status: 1300;
   --z-skip: 2000;
 
-  /* BREAKPOINTS (single source — mirrors js/presentation.js):
-     1200px+ — full desktop (sidebar + context sidebar + main)
-     900–1199px — compact desktop (narrower sidebar)
-     600–899px — tablet / compact navigation (collapsible sidebar)
-     <600px — mobile (bottom tabs, no sidebar)
-     Media queries cannot consume custom properties, so these stay in
-     the matching @media rules and the JS constant. */
 }
 
 html[data-density="compact"] {
@@ -172,17 +124,12 @@ html[data-motion="reduced"] {
   --t-fast: 0.001s; --t-med: 0.001s; --t-slow: 0.001s; --t-spin: 0.001s;
 }
 
-/* ============================================================
-   2. THEME BLOCKS (immutable; token overrides only)
-   ============================================================ */
-
-/* --- Orthocord: cool steel on neutral charcoal --- */
 html[data-theme="orthocord"] {
   color-scheme: dark;
   --t-pg: #0e0e10;  --t-base: #151518;  --t-base2: #1f1f24;  --t-elev: #28282e;
   --t-sur2: #26262c;
   --t-line: rgba(224, 228, 240, 0.14);  --t-line-hi: rgba(224, 228, 240, 0.24);
-  --t-txt: #f2f0ea;  --t-txt2: #c8c5bd;  --t-mut: #8e8b83;
+  --t-txt: #f2f0ea;  --t-txt2: #c8c5bd;  --t-mut: #9c998f;
   --t-accent: #6ea8ff;  --t-accent-2: #2f6fd6;
   --t-ok: #5cc98a;  --t-warn: #e0b64d;  --t-err: #e0675f;
   --t-on-accent: #0c1320;  --t-accent-hi: #a9c9ff;
@@ -203,13 +150,12 @@ html[data-theme="orthocord"] {
   --t-hero-bottom: rgba(12, 16, 26, 0.38);
 }
 
-/* --- Midnight: deep indigo-blue, dim and focused --- */
 html[data-theme="midnight"] {
   color-scheme: dark;
   --t-pg: #070810;  --t-base: #0d0f1a;  --t-base2: #161930;  --t-elev: #1d2138;
   --t-sur2: #20243c;
   --t-line: rgba(190, 200, 255, 0.13);  --t-line-hi: rgba(190, 200, 255, 0.22);
-  --t-txt: #e6e9ff;  --t-txt2: #b6bccf;  --t-mut: #79809a;
+  --t-txt: #e6e9ff;  --t-txt2: #b6bccf;  --t-mut: #868da8;
   --t-accent: #a78bfa;  --t-accent-2: #6d5ae6;
   --t-ok: #5cc98a;  --t-warn: #ddb64e;  --t-err: #e0675f;
   --t-on-accent: #150f2e;  --t-accent-hi: #cab9ff;
@@ -230,7 +176,6 @@ html[data-theme="midnight"] {
   --t-hero-bottom: rgba(8, 8, 20, 0.4);
 }
 
-/* --- Ember (default): hotter, saturated amber foreground --- */
 html[data-theme="ember"] {
   color-scheme: dark;
   --t-pg: #130b07;  --t-base: #1c120b;  --t-base2: #2b1a10;  --t-elev: #391f11;
@@ -257,13 +202,12 @@ html[data-theme="ember"] {
   --t-hero-bottom: rgba(36, 16, 8, 0.42);
 }
 
-/* --- Light: warm pale surfaces with dark text --- */
 html[data-theme="light"] {
   color-scheme: light;
-  --t-pg: #f6f0e7;  --t-base: #f0e9dc;  --t-base2: #e6dcc9;  --t-elev: #dccfb8;
-  --t-sur2: #ddd2bd;
+  --t-pg: #f6f0e7;  --t-base: #f2ece0;  --t-base2: #ece4d5;  --t-elev: #e8dfcd;
+  --t-sur2: #e2d8c4;
   --t-line: rgba(92, 60, 30, 0.16);  --t-line-hi: rgba(92, 60, 30, 0.3);
-  --t-txt: #2b211a;  --t-txt2: #5a4a3d;  --t-mut: #8a7766;
+  --t-txt: #2b211a;  --t-txt2: #5a4a3d;  --t-mut: #6d5a47;
   --t-accent: #c84f12;  --t-accent-2: #a8381b;
   --t-ok: #2f8d50;  --t-warn: #8f6a16;  --t-err: #c03a2b;
   --t-on-accent: #ffffff;  --t-accent-hi: #e26a28;
@@ -296,7 +240,6 @@ html[data-theme="light"] {
   --t-sh-hero: 0 20px 60px rgba(90, 60, 30, 0.16);
 }
 
-/* --- High Contrast: maximum readability --- */
 html[data-theme="high-contrast"] {
   color-scheme: dark;
   --t-pg: #000000;  --t-base: #0b0b0d;  --t-base2: #16161a;  --t-elev: #212126;
@@ -328,7 +271,6 @@ html[data-theme="high-contrast"] {
   --t-op-mid: 0.75;  --t-op-fade: 0.7;  --t-op-dim: 0.8;
 }
 
-/* High Contrast focus must be unmistakable. */
 html[data-theme="high-contrast"] button:focus-visible,
 html[data-theme="high-contrast"] a:focus-visible,
 html[data-theme="high-contrast"] input:focus-visible,
@@ -339,7 +281,6 @@ html[data-theme="high-contrast"] [tabindex]:focus-visible {
   outline-offset: 2px !important;
 }
 
-/* --- Custom: values injected as --c-* by js/theme.js --- */
 html[data-theme="custom"] {
   --t-pg: var(--c-pg);          --t-base: var(--c-base);
   --t-base2: var(--c-base2);    --t-elev: var(--c-elev);
@@ -364,10 +305,6 @@ html[data-theme="custom"] {
   --t-backdrop: var(--c-backdrop); --t-img-mat: var(--c-img-mat);
   --t-avatar-ring: var(--c-avatar-ring); --t-on-danger: var(--c-on-danger);
 }
-
-/* ============================================================
-   3. BASE
-   ============================================================ */
 
 * { box-sizing: border-box; }
 
@@ -436,10 +373,6 @@ img { max-width: 100%; }
 }
 .skip-link:focus { left: 0; }
 
-/* ============================================================
-   4. SHELL LAYOUT (structural; protected from custom CSS)
-   ============================================================ */
-
 .shell {
   flex: 1 1 100% !important;
   min-width: 0 !important;
@@ -448,7 +381,6 @@ img { max-width: 100%; }
 
 .shell--desktop {
   display: grid !important;
-  /* Three-column layout: rail + context sidebar + main content */
   grid-template-columns: var(--ui-rail) var(--ui-sidebar) minmax(0, 1fr) !important;
   height: 100dvh !important;
   width: 100% !important;
@@ -467,16 +399,10 @@ img { max-width: 100%; }
 .rail-global-nav {
   display: none !important;
 }
-/* Ultrawide: 1920px and beyond.
-   The frame keeps using the full viewport (rail + sidebar hug the left
-   edge, member list hugs the right), but the CONTENT column is capped so
-   conversation measure, settings forms and tables stay readable instead of
-   one line of text stretching across 3000px. */
 @media (min-width: 1920px) { :root { --ui-content-max: 1680px; } }
 @media (min-width: 2560px) { :root { --ui-content-max: 2040px; } }
 @media (min-width: 3440px) { :root { --ui-content-max: 2400px; } }
 
-/* Content column: centre the readable measure inside the main column. */
 .view-root > .page,
 .view-root > .conversation,
 .view-root > .home-environment,
@@ -486,7 +412,6 @@ img { max-width: 100%; }
   width: 100%;
 }
 
-/* Application rail: the global navigation column. */
 .app-rail__items {
   grid-column: 1 !important;
   grid-row: 1 / 4 !important;
@@ -501,8 +426,6 @@ img { max-width: 100%; }
   border-right: 1px solid var(--t-line);
   background: color-mix(in srgb, var(--t-base) 96%, var(--t-accent));
 }
-
-/* Context sidebar: routes the rail selection to its own navigation. */
 
 /* User bar pinned to the bottom of the context sidebar. One component for
    every context: identity left, session controls right. */
@@ -580,11 +503,6 @@ img { max-width: 100%; }
   .shell--desktop .app-rail { transition: none !important; }
 }
 
-/* ---- collapsible sidebar -------------------------------------------------- */
-/* Collapsed: the icon rail stays, the context sidebar is released, and the
-   main content column takes the freed width immediately. The stored
-   preference only decides the default state; the context-header hamburger
-   still opens it on demand. Nothing opens on hover any more. */
 .shell--desktop.sidebar-collapsed {
   grid-template-columns: var(--ui-rail) minmax(0, 1fr) !important;
 }
@@ -595,10 +513,6 @@ img { max-width: 100%; }
 .shell--desktop.sidebar-collapsed .context-sidebar {
   display: none !important;
 }
-/* Collapsed: the rail stays, the context sidebar is released, and the main
-   content column takes the freed width immediately (no reserved track left
-   behind). The stored preference only decides the default state; the
-   hamburger still opens it on demand. */
 .shell--desktop.sidebar-collapsed {
   grid-template-columns: var(--ui-rail) minmax(0, 1fr) !important;
 }
@@ -617,10 +531,6 @@ img { max-width: 100%; }
   max-width: none;
   margin-inline: 0;
 }
-/* Explicit toggle: the context-header hamburger (.nav-toggle) flips
-   .nav-open, which slides the context sidebar in as an overlay drawer.
-   This is the accessible, touch-friendly path and the only one on mobile
-   pointer devices. */
 .shell--desktop.nav-open .context-sidebar {
   display: flex !important;
   position: fixed !important;
@@ -635,10 +545,6 @@ img { max-width: 100%; }
 .shell--desktop.nav-open .app-rail__items {
   animation: none;
 }
-/* The hamburger is only meaningful while the sidebar is not already docked. */
-/* The hamburger is always available: it is the keyboard/touch path to the
-   context sidebar when the sidebar is collapsed or off-canvas. */
-/* Collapse toggle button — visible in both expanded and collapsed states */
 .sidebar-collapse-toggle {
   width: 28px;
   height: 28px;
@@ -658,7 +564,6 @@ img { max-width: 100%; }
   color: var(--t-txt);
   border-color: var(--t-line-hi);
 }
-/* When collapsed, the rail-foot toggle gets a divider */
 .shell--desktop.sidebar-collapsed .rail-foot .sidebar-collapse-toggle {
   margin-top: 8px;
   position: relative;
@@ -673,9 +578,6 @@ img { max-width: 100%; }
   height: 1px;
   background: var(--t-line);
 }
-/* Profile editor. Only layout lives here — inputs, labels, hints and
-   dividers all come from the shared control primitives, so a field in
-   Settings looks identical to a field during registration. */
 .profile-editor {
   width: 100%;
   max-width: 100%;
@@ -683,8 +585,6 @@ img { max-width: 100%; }
   flex-direction: column;
   gap: var(--t-d-5);
 }
-
-/* Home/DM context sidebar: search, new message, conversation list. */
 
 .main-content {
   grid-column: 3 !important;
@@ -770,8 +670,6 @@ img { max-width: 100%; }
   gap: 6px !important;
   margin-left: auto !important;
 }
-/* Chat-header icon buttons: every contextual header action renders as a
-   34px quiet icon button (reference chat-actions pattern). */
 .context-actions button {
   width: 34px !important;
   height: 34px !important;
@@ -789,8 +687,6 @@ img { max-width: 100%; }
   flex: 1 1 auto !important;
   min-height: 0 !important;
   display: grid !important;
-  /* The member track follows the rendered sidebar: a hidden member
-     sidebar releases its column instead of leaving a phantom rail. */
   grid-template-columns: minmax(0, 1fr) auto !important;
   position: relative !important;
   z-index: 1 !important;
@@ -854,24 +750,23 @@ img { max-width: 100%; }
 .shell[hidden],
 [hidden] { display: none !important; }
 
-/* Focus must always remain visible, in every theme. */
 button:focus-visible, a:focus-visible, input:focus-visible,
 select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   outline: 2px solid var(--t-accent) !important;
   outline-offset: 1px !important;
 }
 
-/* ============================================================
-   5. NAVIGATION ELEMENTS
-   ============================================================ */
-
-.realm-title {
-  font-size: var(--t-fs-xs);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--t-mut);
-  padding: var(--t-d-3) var(--t-d-4) var(--t-d-2);
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 .app-rail__items .realm-title { display: none; }
 
@@ -934,9 +829,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   color: var(--t-txt);
   box-shadow: inset 2px 0 0 var(--t-accent);
 }
-/* The rail chip's community mark. Sizing and radius match the letter badge it
-   replaced exactly, so an icon and an initial occupy the same box and the rail
-   does not reflow when a community uploads an icon. */
 .server-chip .community-mark--chip {
   flex: 0 0 auto;
   width: 36px; height: 36px;
@@ -946,15 +838,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .server-chip .chip-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
 .server-chip .chip-live { flex: 0 0 auto; color: var(--t-accent); }
 
-/* ============================================================
-   Application rail
-   One shape system for every rail entry (global destination,
-   community, create, account). Idle entries stay quiet; hover and
-   the active route morph into a filled rounded square so the
-   current destination is unmistakable without a glowing slab.
-   Every entry also mirrors its label into data-label, which is the
-   only affordance the collapsed rail has besides the icon.
-   ============================================================ */
 .app-rail__items .rail-nav-item,
 .app-rail__items .server-chip,
 .app-rail__items .community-action {
@@ -1033,9 +916,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   border-color: var(--t-accent);
 }
 
-/* Rail tooltips. CSS cannot read the title attribute, so shell.js mirrors
-   the label into data-label; this renders it on hover and keyboard focus.
-   The button already carries aria-label, so this is decoration only. */
 .app-rail__items [data-label]:hover::after,
 .app-rail__items [data-label]:focus-visible::after {
   content: attr(data-label);
@@ -1063,7 +943,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   margin: 6px 0;
   background: var(--t-line);
 }
-/* Rail foot: account + collapse toggle, pinned to the column bottom. */
 .app-rail__items .rail-foot {
   margin-top: auto;
   padding-top: 10px;
@@ -1117,10 +996,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .app-rail__items .community-actions { width: 100%; }
 .app-rail__items .community-action { width: 48px; }
 
-/* ============================================================
-   6. OVERLAYS
-   ============================================================ */
-
 .modal-root { position: relative; z-index: var(--z-modal); }
 .backdrop {
   position: fixed !important;
@@ -1169,7 +1044,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
    No entry animation: the shared `rise` translates the popover, which both
    looked wrong for a native-feeling menu and made the viewport fit check see a
    phantom overflow mid-animation. */
-/* The protected @everyone role: stated, not merely implied by a missing button. */
 .role-protected {
   display: flex;
   flex-direction: column;
@@ -1211,7 +1085,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .pop-item.danger:hover { background: color-mix(in srgb, var(--t-err) 14%, transparent); }
 .pop-sep { height: 1px; background: var(--t-line); margin: 6px 0; }
 
-/* Context menu: submenus, group headings, and the touch presentation. */
 .popover.ctx-menu .pop-item__text { flex: 1 1 auto; min-width: 0; }
 .popover.ctx-menu .pop-item__caret {
   flex: 0 0 auto;
@@ -1230,10 +1103,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-/* A submenu is anchored beside its parent, not at the pointer, so it carries no
-   shadow of its own - the stack reads as one object. */
 .popover.ctx-menu--sub { min-width: 176px; }
-/* Touch / narrow: the same action list as a thumb-reachable bottom sheet. */
 .ctx-scrim {
   position: fixed;
   inset: 0;
@@ -1267,8 +1137,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .pop-item[disabled]:hover { background: transparent; }
 /* Session footer pinned to the bottom of the place navigation
    (reference sidebar-user pattern): live identity + settings shortcut. */
-/* User popup card (Checkpoint C, reference user-popup pattern): banner
-   with overlapping avatar, name + handle, Message/Profile actions. */
 .user-card { min-width: 240px; width: 300px; max-width: calc(100vw - 32px); padding: 0 0 6px; overflow: hidden; }
 .user-card__banner {
   height: 72px;
@@ -1285,7 +1153,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .user-card__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-card__status { font-size: var(--t-fs-s); color: var(--t-mut); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-card__actions { display: flex; gap: var(--t-d-2); flex-wrap: wrap; padding: var(--t-d-2); border-top: 1px solid var(--t-line); }
-/* Engagement surfaces (G milestone): reactions, pins, search, mute. */
 .msg-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .msg-reactions[hidden] { display: none; }
 .react-pill {
@@ -1306,8 +1173,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .row--channel.muted .ch-name { text-decoration: line-through; text-decoration-thickness: 1px; }
 .emoji-btn { color: var(--t-mut); font-size: 1.15rem; padding: 6px 8px; border-radius: var(--t-r-s); background: transparent; }
 .emoji-btn:hover { color: var(--t-txt); background: var(--t-base2); }
-/* Emoji palette. Wider than the old 8-column strip, scrollable, with a sticky
-   search field and per-category headings. */
 .popover.emoji-picker {
   display: flex;
   flex-direction: column;
@@ -1474,22 +1339,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .connection-status.show { display: flex !important; animation: rise var(--t-fast); }
 
-/* ============================================================
-   7. CONTROLS
-
-   Button hierarchy. A screen should make its intent obvious, so the
-   levels are visually distinct rather than all being filled chips:
-
-     (default)  SECONDARY - neutral surface, neutral hover
-     .primary   PRIMARY   - solid accent. One per view; the main action.
-     .ghost     GHOST     - no surface until hovered. Cancel, dismiss.
-     .quiet     TERTIARY  - text only, no chrome at all.
-     .danger    DESTRUCTIVE - red outline, fills only on hover.
-
-   Sizing (.sm/.block/.icon) is orthogonal to emphasis, so the two
-   axes never fight each other.
-   ============================================================ */
-
 .btn {
   display: inline-flex;
   align-items: center;
@@ -1511,8 +1360,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
     color var(--t-fast) var(--t-ease),
     opacity var(--t-fast) var(--t-ease);
 }
-/* Secondary hover stays neutral. An accent border on every button was
-   flattening the hierarchy and spreading amber across the whole app. */
 .btn:hover { background: var(--t-elev); border-color: var(--t-txt); }
 .btn:active { transform: translateY(1px); }
 
@@ -1524,8 +1371,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .btn.primary:hover { background: var(--t-accent-hi); border-color: var(--t-accent-hi); color: var(--t-on-accent); }
 
-/* Ghost keeps a hairline border: without it these read as plain text links
-   rather than controls. `.quiet` is the genuinely borderless tier. */
 .btn.ghost { background: transparent; border-color: var(--t-line); color: var(--t-txt2); }
 .btn.ghost:hover { background: color-mix(in srgb, var(--t-txt) 8%, transparent); border-color: var(--t-line-hi); color: var(--t-txt); }
 
@@ -1540,16 +1385,12 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .btn.danger:hover { background: var(--t-err); border-color: var(--t-err); color: var(--t-on-danger); }
 .btn.danger.ghost { border-color: transparent; }
 
-/* Sizing (orthogonal to emphasis). */
 .btn.sm { min-height: 28px; padding: 4px var(--t-d-3); font-size: var(--t-fs-s); }
 .btn.lg { min-height: 42px; padding: 10px var(--t-d-5); font-size: var(--t-fs-l); }
 .btn.block { width: 100%; }
 .btn.icon { width: 36px; min-height: 36px; padding: 0; color: var(--t-txt2); }
 .btn.icon.sm { width: 28px; min-height: 28px; }
 
-/* Selected / pressed state for toggle-style buttons (update channel,
-   theme pickers). Communicates state by fill + border + weight, not
-   colour alone. */
 .btn.active,
 .btn[aria-pressed="true"] {
   background: color-mix(in srgb, var(--t-accent) 16%, transparent);
@@ -1627,10 +1468,6 @@ select.input { appearance: auto; }
 .badge.warn { color: var(--t-warn); border-color: color-mix(in srgb, var(--t-warn) 45%, transparent); }
 .badge.err { color: var(--t-err); border-color: color-mix(in srgb, var(--t-err) 45%, transparent); }
 
-/* ============================================================
-   8. PAGE SURFACES
-   ============================================================ */
-
 .page { width: 100%; max-width: var(--ui-page-width); margin: 0 auto; padding: 24px clamp(16px, 3vw, 42px) 40px; }
 .page.atrium { display: flex; flex-direction: column; gap: var(--t-d-4); }
 
@@ -1653,18 +1490,14 @@ select.input { appearance: auto; }
 .small { font-size: var(--t-fs-xs); }
 .mono { font-family: var(--t-mono); }
 
-/* ============================================================
-   List row
-   `.row` is the shared geometry for every clickable line in the
-   product. It is deliberately FLAT, because most rows live in the
-   rail and the context sidebar where a raised surface per row would
-   read as noise.
+.msg--linked {
+  animation: msg-linked-fade 2.4s ease-out;
+}
+@keyframes msg-linked-fade {
+  0%, 60% { background: color-mix(in srgb, var(--t-accent) 18%, transparent); }
+  100% { background: transparent; }
+}
 
-   Content lists (Discover servers, DM conversations, notifications,
-   friend requests, admin entries) opt into a real surface with
-   `.row--surface`, so a list of results reads as a list of objects
-   rather than loose text on the page background.
-   ============================================================ */
 .row {
   display: flex;
   align-items: center;
@@ -1682,7 +1515,6 @@ select.input { appearance: auto; }
 .row:hover { background: color-mix(in srgb, var(--t-txt) 5%, transparent); color: var(--t-txt); }
 .row.active { background: color-mix(in srgb, var(--t-accent) 13%, transparent); color: var(--t-txt); }
 
-/* Content-list surface: Discover, DMs, notifications, friends, admin. */
 .row--surface {
   min-height: 56px;
   padding: var(--t-d-3) var(--t-d-4);
@@ -1729,10 +1561,6 @@ select.input { appearance: auto; }
 }
 .empty-state .es-icon { font-size: 2rem; opacity: var(--t-op-dim); }
 
-/* ============================================================
-   9. AVATARS
-   ============================================================ */
-
 .avatar {
   flex: 0 0 auto;
   width: var(--t-avatar-md); height: var(--t-avatar-md);
@@ -1751,10 +1579,6 @@ select.input { appearance: auto; }
 .avatar .presence-dot { position: absolute; right: 0; bottom: 0; border: 2px solid var(--t-base); }
 .avatar.has-img { background: var(--t-sur2); border-color: var(--t-line); }
 .avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
-
-/* ============================================================
-   10. HOME
-   ============================================================ */
 
 .home-environment {
   width: 100%;
@@ -1777,10 +1601,6 @@ select.input { appearance: auto; }
 .home-event + .home-event { margin-top: 2px; }
 .home-stream .empty-state { min-height: min(54dvh, 460px); }
 .home-empty-actions { display: flex; gap: var(--t-d-3); flex-wrap: wrap; justify-content: center; margin-top: var(--t-d-3); }
-
-/* ============================================================
-   11. CONVERSATION
-   ============================================================ */
 
 .conversation {
   display: flex;
@@ -1812,18 +1632,11 @@ select.input { appearance: auto; }
      to change it. */
   gap: 0;
   max-width: 100%;
-  /* Bottom-anchored feed: short conversations rest on the composer
-     instead of dangling from the top with a void below. When content
-     exceeds the viewport the margin collapses to zero and normal
-     scrolling takes over (no unreachable content, unlike
-     justify-content: flex-end). */
   margin-top: auto;
   min-height: min-content;
 }
 
 .feed-loading { padding: 32px 8px; text-align: center; color: var(--t-mut); font-size: var(--t-fs-m); }
-/* Channel intro: anchors the top of the feed with identity. Always
-   rendered (scrolls away with history); doubles as the empty state. */
 .channel-intro { padding: 26px 10px 18px; border-bottom: 1px solid var(--t-line); margin-bottom: 10px; }
 .channel-intro__mark {
   width: 52px; height: 52px;
@@ -1843,10 +1656,6 @@ select.input { appearance: auto; }
   display: flex;
   gap: 12px;
   padding: 8px;
-  /* Vertical margin is the gap BETWEEN rows. The list is a flex column, so
-     adjacent margins add rather than collapse: 0.25px per side gives the
-     0.5px between consecutive messages. The 8px padding above is inside the
-     row, which is what keeps each message's own text off its neighbour's. */
   margin: 0.25px 0;
   border-radius: 6px;
   width: 100%;
@@ -1877,9 +1686,6 @@ select.input { appearance: auto; }
 .msg .msg-author:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
 .msg .msg-author:disabled { cursor: default; }
 
-/* A username rendered as a <button> must look exactly like the text it
-   replaced, while staying focusable and hoverable. Shared by the member
-   list, the message author and anywhere else a name is actionable. */
 .member-name-btn,
 .user-name-btn {
   font: inherit;
@@ -1900,11 +1706,6 @@ select.input { appearance: auto; }
 .member-name-btn:disabled,
 .user-name-btn:disabled { cursor: default; }
 .msg .msg-time { color: var(--t-mut); font-size: var(--t-fs-xs); font-weight: 500; }
-/* Hover actions are absolutely positioned rather than sitting in the flex
-   flow. They were `opacity: 0` but still laid out, so every message reserved
-   a ~19px row for buttons nobody could see - which is most of the vertical
-   gap between consecutive grouped messages. .msg is already position:relative,
-   so this costs nothing and stops reserving space. */
 .msg .msg-actions {
   position: absolute;
   top: 2px;
@@ -1922,7 +1723,6 @@ select.input { appearance: auto; }
 .msg .msg-actions button { color: var(--t-mut); font-size: var(--t-fs-xs); padding: 2px 6px; border-radius: var(--t-r-s); }
 .msg .msg-actions button:hover { color: var(--t-txt); background: var(--t-base2); }
 .msg .msg-actions button:focus-visible { opacity: 1; }
-/* Hover toolbar: quick react + full menu without occupying layout. */
 .msg-hoverbar {
   position: absolute;
   top: 2px;
@@ -2049,10 +1849,6 @@ select.input { appearance: auto; }
 .composer button.file-btn:hover { color: var(--t-txt); background: var(--t-base2); }
 .composer .btn.primary { border-radius: 10px; min-height: 36px; }
 
-/* ============================================================
-   12. AUTH
-   ============================================================ */
-
 .auth-wrap {
   width: min(var(--ui-auth-width), 100%);
   margin: 0 auto;
@@ -2071,11 +1867,6 @@ select.input { appearance: auto; }
 }
 .card--auth { width: min(var(--ui-auth-width), 100%); }
 .card--profile { width: 100%; max-width: 860px; }
-/* Card heading + action row. Shared by every card surface so a card never
-   has to hand-roll a font-size or stack its own button row.
-   --t-fs-l, not --t-fs-xl/-2xl: those are page-title sizes and reach ~46px
-   at ultrawide, which turns a short card heading into three wrapped lines. */
-.card-title { margin: 0 0 var(--t-d-2); font-size: var(--t-fs-l); line-height: 1.3; }
 .card-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2083,46 +1874,12 @@ select.input { appearance: auto; }
   margin-top: var(--t-d-4);
 }
 .card-actions > .btn { flex: 0 0 auto; }
-/* Content-card grid for hub/support-style pages: a few equal cards that fill
-   the available page width. Deliberately NOT .theme-grid, which is a
-   theme-picker grid (minmax 220px) and squeezes text cards too narrow.
-   The 420px ceiling matters: with only a minmax() the tracks grow to fill
-   whatever width they are given, so on an ultrawide main column a short
-   "Community rules" card stretched to 644px and read as mostly emptiness. */
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 420px));
-  gap: var(--t-d-4);
-  align-items: stretch;
-  justify-content: start;
-}
 .card-grid > .card { width: 100%; display: flex; flex-direction: column; }
 .card-grid > .card > .card-actions { margin-top: auto; padding-top: var(--t-d-4); }
 .card--list { padding: 12px; }
 .card--auth h1 { margin: 0 0 4px; font-size: var(--t-fs-2xl); letter-spacing: -0.025em; }
 .card--auth .auth-sub { color: var(--t-mut); margin: 0 0 var(--t-d-5); font-size: var(--t-fs-s); }
 .auth-alt { text-align: center; margin-top: var(--t-d-4); color: var(--t-mut); font-size: var(--t-fs-s); }
-
-/* ============================================================
-   12b. PUBLIC / STATIC PAGES
-   ------------------------------------------------------------
-   Login, signup, password recovery, Support, Appeals, Terms and
-   Privacy are public-facing pages, not application views. The reference
-   for how they should look is the server-served marketing site in
-   public/ (site.css) - a constrained, left-aligned column with
-   generous vertical rhythm on the page background.
-
-   They are explicitly NOT "the client with the navigation hidden".
-   Hiding the rail still leaves the shell's 304px of grid tracks, its
-   vertical dividers and its context header, which reads as an empty
-   application rather than a page of a website. So below the chrome is
-   removed *and* the content is restyled onto the public-site metrics.
-
-   Metrics mirrored from public/css/site.css:
-     --content-w: 1080px   (site .wrap / .page)
-     --header-h: 64px
-     prose column 760px, h1 at --fs-xl, vertical padding clamp(32px,6vw,72px)
-   ============================================================ */
 
 :root {
   --pub-content-w: 1080px;
@@ -2131,9 +1888,6 @@ select.input { appearance: auto; }
   --pub-pad-x: 20px;
 }
 
-/* The route list. :is() keeps this to one place - the previous version
-   repeated the same five-route list on six rules, which is how the appeal
-   form and legal pages were missed while looking identical in intent. */
 html:is(
   [data-route="/login"],
   [data-route="/register"],
@@ -2146,7 +1900,6 @@ html:is(
   --is-public-page: 1;
 }
 
-/* No application navigation on a public page. */
 html:is(
   [data-route="/login"],
   [data-route="/register"],
@@ -2184,14 +1937,6 @@ html:is(
   [data-route^="/support"]
 ) #member-sidebar { display: none !important; }
 
-/* Collapse the desktop shell to one column.
-   Hiding the rail and sidebar is NOT enough: a display:none grid item does
-   not collapse its track. The shell is still
-   `var(--ui-rail) var(--ui-sidebar) minmax(0,1fr)` with .main-content
-   pinned to grid-column 3, so it began 64px + 240px = 304px in from the
-   left and every centred element sat ~152px right of the true viewport
-   centre. `width: 100%` on .main-content cannot fix this - it fills
-   column 3 rather than moving to column 1. */
 html:is(
   [data-route="/login"],
   [data-route="/register"],
@@ -2224,11 +1969,6 @@ html:is(
   [data-route^="/support"]
 ) .chat-environment { display: block !important; }
 
-/* Public content sits in a constrained, top-aligned column with the
-   marketing site's rhythm - not vertically centred in a void. Centring was
-   the other half of the "floating form" problem: a short form pinned to the
-   middle of a tall viewport reads as a mistake, whereas a real page starts
-   near the top with the title leading. */
 html:is(
   [data-route="/login"],
   [data-route="/register"],
@@ -2247,7 +1987,6 @@ html:is(
   overflow-y: auto !important;
 }
 
-/* The public column. Same max-width and vertical rhythm as site.css .page. */
 .pub-page {
   width: 100%;
   max-width: var(--pub-content-w);
@@ -2256,8 +1995,6 @@ html:is(
 }
 .pub-page--narrow { max-width: calc(var(--pub-prose-w) + 2 * var(--pub-pad-x)); }
 
-/* Left-aligned page title at the site's display scale, not an auth-card
-   heading. */
 .pub-title {
   margin: 0 0 8px;
   font-size: clamp(1.9rem, 4vw, 3rem);
@@ -2284,8 +2021,6 @@ html:is(
 .pub-prose h3 { font-size: var(--t-fs-m); margin: 24px 0 6px; color: var(--t-txt); }
 .pub-prose ul, .pub-prose ol { padding-left: 22px; }
 
-/* Link groups (Support, legal index) use the site's flat bordered rows
-   rather than app cards, so the page reads as a page. */
 .pub-links { display: grid; gap: 12px; margin-top: var(--t-d-4); }
 .pub-link {
   display: block;
@@ -2306,22 +2041,6 @@ html:is(
   .pub-lede { font-size: var(--t-fs-m); }
 }
 
-/* ============================================================
-   12c. DEDICATED AUTH PAGES
-   ------------------------------------------------------------
-   Login, signup, recovery, reset and verification share one shell:
-   the supplied background image baked in behind a centred card with
-   an optional side panel.
-
-   This is a fixed full-viewport surface rather than a normal view
-   region child on purpose. These routes render inside the app shell,
-   and every "just hide the chrome" approach still leaves the shell's
-   grid tracks behind - the card ends up ~152px off centre on a wide
-   window, and any shell element that paints above the overlay shows
-   through. Taking the viewport outright is what makes it a dedicated
-   auth page instead of a themed app screen.
-   ============================================================ */
-
 .auth-page {
   position: fixed;
   inset: 0;
@@ -2334,13 +2053,10 @@ html:is(
 .auth-background {
   position: fixed;
   inset: 0;
-  /* The real asset from the repo root, copied to trycord-client/assets/.
-     Not a gradient or generated artwork - it is the supplied image. */
   background-image: url('/assets/trycord-login-bg.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  /* Keep a touch of the image legible under text without hiding it. */
   box-shadow: inset 0 0 0 100vmax rgba(18, 17, 21, 0.62);
 }
 .auth-page__inner {
@@ -2375,7 +2091,6 @@ html:is(
   box-shadow: var(--t-sh-2);
   overflow: hidden;
 }
-/* Two-panel only when there is actually a side panel to show. */
 .auth-card:has(> .auth-secondary) { grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); }
 
 .auth-main { padding: clamp(22px, 3.4vw, 34px); min-width: 0; }
@@ -2430,7 +2145,6 @@ html:is(
 @media (max-width: 599px) {
   html[data-auth-page] .shell--mobile { display: none !important; }
   html[data-auth-page] .shell--desktop { display: grid !important; }
-  /* Nothing to tap back to from a sign-in screen. */
   html[data-auth-page] .mobile-tab-navigation,
   html[data-auth-page] .mobile-header { display: none !important; }
 }
@@ -2438,8 +2152,6 @@ html:is(
 .settings-nav { display: flex; gap: var(--t-d-2); flex-wrap: wrap; margin-bottom: var(--t-d-5); padding: 4px; background: var(--t-base); border: 1px solid var(--t-line); border-radius: 9px; width: max-content; max-width: 100%; }
 .settings-nav .btn { border: 0; background: transparent; }
 .settings-nav .btn.active { background: var(--t-accent); color: var(--t-on-accent); }
-/* Two-column settings layout: sticky sidebar nav + content.
-   Specificity must beat .page.atrium (0,2,0) to keep display:grid. */
 .page.atrium.settings-layout { display: grid; grid-template-columns: var(--ui-sidebar) minmax(0, 1fr); gap: var(--t-d-5); align-items: start; }
 .settings-layout > .settings-nav {
   flex-direction: column;
@@ -2467,7 +2179,6 @@ html:is(
 .settings-layout > .settings-nav .settings-signout:hover { background: color-mix(in srgb, var(--t-err) 12%, transparent); color: var(--t-err); }
 .settings-body { min-width: 0; display: flex; flex-direction: column; gap: var(--t-d-5); }
 .settings-body > .card--auth:first-child { margin-top: 0; }
-/* Profile editor uses full content width — no narrow card--auth constraint. */
 .settings-body .profile-editor {
   width: 100%;
   max-width: 100%;
@@ -2542,9 +2253,6 @@ html:is(
 .community-manager { width: min(var(--ui-page-width), calc(100% - 32px)); margin: 0 auto; padding: 24px 0 40px; }
 .settings-form { display: flex; flex-direction: column; gap: var(--t-d-4); max-width: 720px; }
 .settings-form .btn.block { width: 100%; }
-.community-manager__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; padding: 18px 20px; border: 1px solid var(--t-line); border-radius: 14px; background: var(--t-base); }
-.community-manager__head h1 { font-size: var(--t-fs-xl); margin: 0 0 3px; }
-.community-manager__head p { margin: 0; color: var(--t-mut); }
 .community-manager__toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px; border: 1px solid var(--t-line); border-radius: 10px; background: color-mix(in srgb, var(--t-base) 88%, transparent); }
 .community-manager__toolbar .input { flex: 1; }
 .community-list { display: grid; gap: 8px; }
@@ -2568,7 +2276,6 @@ html:is(
 .card--list__actions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 .community-role-card__main,
 .community-category-card__main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-.community-role-editor { margin-bottom: 20px; padding: 14px; border: 1px solid var(--t-line); border-radius: 12px; background: var(--t-base); }
 .role-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 .role-pill {
   display: inline-flex; align-items: center;
@@ -2581,22 +2288,14 @@ html:is(
 }
 .role-pill.owner { color: var(--t-accent); border-color: color-mix(in srgb, var(--t-accent) 45%, var(--t-line)); }
 .role-pill.muted-role { color: var(--t-mut); border-color: var(--t-line); background: var(--t-base2); }
-/* Paging control for a notification list. Hidden entirely once the list is
-   exhausted - a permanently disabled button reads as a broken feature. */
 .notif-load-more { margin-top: var(--t-d-2); }
 
-/* Paging control for a direct-message conversation. Sits above the oldest
-   rendered row and is removed once a page comes back short. */
 .dm-load-older {
   align-self: center;
   margin: 0 auto var(--t-d-3);
   display: block;
 }
 
-/* ---- community settings hub ---------------------------------------------
-   Sectioned index over the pages that already do the work. Reuses
-   .settings-nav from account settings rather than introducing a second
-   navigation pattern. */
 .settings-body { display: flex; flex-direction: column; gap: var(--t-d-4); min-width: 0; }
 .settings-panel {
   display: flex;
@@ -2615,7 +2314,6 @@ html:is(
   letter-spacing: -0.01em;
 }
 .settings-panel__blurb { margin: 0; max-width: 68ch; line-height: 1.55; }
-/* A second heading inside one panel should not look like a peer section. */
 .settings-panel__title + .field { margin-top: 0; }
 .settings-panel form.field { margin: 0; }
 
@@ -2624,11 +2322,6 @@ html:is(
   .settings-panel { padding: var(--t-d-3); }
 }
 
-/* ---- role hierarchy ------------------------------------------------------
-   The roles page is a two-column layout: the ordered role list, and the editor
-   for whichever role is selected. Position is shown as an explicit rank
-   because it is the property that decides what a member may manage - burying
-   it in up/down arrows made the hierarchy invisible. */
 .roles-page { display: flex; flex-direction: column; gap: var(--t-d-4); }
 .roles-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--t-d-4); flex-wrap: wrap; }
 .roles-head__text { min-width: 0; }
@@ -2698,7 +2391,6 @@ html:is(
   letter-spacing: 0.03em;
 }
 
-/* ---- role detail pane ---------------------------------------------------- */
 .role-detail {
   min-height: 160px;
   padding: var(--t-d-4);
@@ -2722,7 +2414,6 @@ html:is(
 .role-holder { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--t-line); border-radius: var(--t-r-s); background: var(--t-base2); }
 .role-holder__name { min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 
-/* ---- grouped permissions ------------------------------------------------ */
 .perm-groups { display: flex; flex-direction: column; gap: var(--t-d-4); }
 .perm-group { border: 1px solid var(--t-line); border-radius: var(--t-r-s); background: var(--t-base2); padding: 10px 12px; }
 .perm-group__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
@@ -2732,28 +2423,11 @@ html:is(
 .permission-item__name { font-weight: 650; color: var(--t-txt); }
 .permission-item__desc { color: var(--t-mut); font-size: 0.7rem; line-height: 1.35; }
 
-/* ---- role pills + assignment -------------------------------------------- */
-.role-pill--sm { min-height: 20px; }
-.role-pill__remove {
-  margin-left: 4px;
-  padding: 0 2px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 0.85rem;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0.7;
-}
-.role-pill__remove:hover { opacity: 1; }
-.role-pill__remove:disabled { cursor: progress; opacity: 0.4; }
-
 .role-assign { display: flex; flex-direction: column; gap: var(--t-d-3); }
 .role-assign__head { display: flex; flex-direction: column; gap: 2px; }
 .role-assign__member strong { font-size: 1.05rem; }
 .role-add-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; }
 .role-add-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border: 1px solid var(--t-line); border-radius: var(--t-r-s); background: var(--t-base2); }
-.role-add-row__name { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; font-weight: 600; }
 
 .permission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; margin: 8px 0 14px; }
 .permission-item { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid var(--t-line); border-radius: 8px; color: var(--t-txt2); background: var(--t-base2); font-size: 0.76rem; }
@@ -2807,13 +2481,6 @@ html:is(
 .perm-override-opt:has(input:disabled) { opacity: 0.55; cursor: default; }
 .perm-override-opt input { margin: 0; accent-color: var(--t-accent); }
 
-/* ============================================================
-   Instance announcement banner
-   Sits above the context header in both shells. Restrained by
-   default: `info` is a low-key strip, and only `warning`/`critical`
-   earn stronger emphasis, so a routine notice never competes with
-   the app for attention.
-   ============================================================ */
 .announce-banner {
   flex: 0 0 auto;
   display: flex;
@@ -2839,26 +2506,6 @@ html:is(
 }
 .announce-banner__link:hover { background: color-mix(in srgb, var(--t-accent) 14%, transparent); text-decoration: none; }
 
-.announce-banner--warning {
-  background: color-mix(in srgb, var(--t-warn) 12%, var(--t-base));
-  border-bottom-color: color-mix(in srgb, var(--t-warn) 38%, var(--t-line));
-  color: var(--t-warn-fg);
-}
-.announce-banner--critical {
-  background: color-mix(in srgb, var(--t-err) 16%, var(--t-base));
-  border-bottom-color: color-mix(in srgb, var(--t-err) 45%, var(--t-line));
-  color: var(--t-err-fg);
-  font-weight: 600;
-}
-
-/* ============================================================
-   Administration
-   A moderation console is a dense, table-like surface, so it uses the
-   full content width rather than the reading measure, and it carries
-   exactly one padding system (the page's own). Rows are a fixed
-   three-part grid so identity, state and actions never reflow into a
-   second line.
-   ============================================================ */
 .page.admin {
   max-width: var(--ui-content-max, none);
   display: flex;
@@ -2876,10 +2523,7 @@ html:is(
 
 .admin-page { display: flex; flex-direction: column; gap: var(--t-d-5); }
 
-/* A labelled group of console content. Owns its internal rhythm so the
-   page container only has to space whole blocks. */
 .admin-block { display: flex; flex-direction: column; gap: var(--t-d-3); }
-/* Wider rhythm between whole console sections (stats -> activity, etc). */
 .admin-block--sections { gap: var(--t-d-5); }
 .admin-block > .section-label:first-child { margin-top: 0; }
 .admin-block > .section-label { margin-bottom: 0; }
@@ -2898,7 +2542,6 @@ html:is(
 .admin-stat b { display: block; font-size: var(--t-fs-xl); line-height: 1.15; color: var(--t-txt); }
 .admin-stat span { color: var(--t-mut); font-size: var(--t-fs-s); }
 
-/* One toolbar row: search grows, filters sit right. */
 .admin-toolbar {
   display: flex;
   align-items: center;
@@ -2906,7 +2549,6 @@ html:is(
   flex-wrap: wrap;
 }
 .admin-toolbar .input { flex: 1 1 240px; min-width: 0; }
-/* Filters keep their natural width; only the search field grows. */
 .admin-toolbar select.input,
 .admin-toolbar .select { flex: 0 1 auto; width: auto; min-width: 150px; max-width: 220px; }
 
@@ -2952,16 +2594,27 @@ html:is(
 .admin-when { white-space: nowrap; }
 .admin-confirm { gap: var(--t-d-3); align-items: center; }
 .admin-more { margin-top: var(--t-d-3); }
-
-.admin-chip { display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--t-mut); color: var(--t-txt); }
-.admin-chip.open, .admin-chip.under-review, .admin-chip.investigating { background: var(--t-warn-bg); color: var(--t-warn-fg); }
-.admin-chip.resolved, .admin-chip.approved { background: color-mix(in srgb, var(--t-ok) 16%, transparent); color: var(--t-ok); }
-.admin-chip.dismissed { background: rgba(128, 128, 128, 0.18); color: var(--t-mut); }
-.admin-chip.denied { background: rgba(224, 106, 94, 0.18); color: var(--t-err); }
-.admin-chip.banned { background: rgba(224, 106, 94, 0.18); color: var(--t-err); }
-.admin-chip.suspended { background: var(--t-warn-bg); color: var(--t-warn-fg); }
-.admin-chip.warning { background: var(--t-warn-bg); color: var(--t-warn-fg); }
-.admin-chip.moderated { background: rgba(128, 128, 128, 0.18); color: var(--t-mut); }
+/* Shared status indicator. One chip, one colour per state, used by the admin
+   console and by the account deletion panel, so the same status never renders
+   two different ways. The modifier is the kebab-cased state. */
+.status-chip { display: inline-block; font-size: var(--t-fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: var(--t-r-s); background: var(--t-mut); color: var(--t-txt); }
+.status-chip.open,
+.status-chip.under-review,
+.status-chip.investigating,
+.status-chip.deletion-requested,
+.status-chip.deletion-processing { background: var(--t-warn-bg); color: var(--t-warn-fg); }
+.status-chip.resolved,
+.status-chip.approved,
+.status-chip.cancelled { background: color-mix(in srgb, var(--t-ok) 16%, transparent); color: var(--t-ok); }
+.status-chip.dismissed,
+.status-chip.moderated,
+.status-chip.rejected { background: color-mix(in srgb, var(--t-mut) 18%, transparent); color: var(--t-mut); }
+.status-chip.denied,
+.status-chip.banned,
+.status-chip.deleted { background: color-mix(in srgb, var(--t-err) 18%, transparent); color: var(--t-err); }
+.status-chip.suspended,
+.status-chip.warning { background: var(--t-warn-bg); color: var(--t-warn-fg); }
+.status-chip.gdpr { background: color-mix(in srgb, var(--t-accent) 18%, transparent); color: var(--t-accent); }
 .admin-tag { display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; padding: 1px 7px; border-radius: 6px; background: rgba(128, 128, 128, 0.16); color: var(--t-mut); }
 .admin-history { border-left: 2px solid var(--t-line); margin: 0 12px 10px 22px; padding: 4px 12px; display: flex; flex-direction: column; gap: 6px; }
 .admin-history-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border: 1px solid var(--t-line); border-radius: 8px; background: rgba(0, 0, 0, 0.12); overflow-wrap: anywhere; }
@@ -2969,10 +2622,6 @@ html:is(
 .admin-detail { border: 1px solid var(--t-line); border-radius: 10px; background: rgba(0, 0, 0, 0.18); margin: 0 12px 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; overflow-wrap: anywhere; }
 .admin-detail-head { display: flex; gap: 8px; align-items: center; }
 .admin-form { display: flex; flex-direction: column; gap: 10px; }
-
-/* ============================================================
-   14. MOBILE SHELL (independent presentation)
-   ============================================================ */
 
 .shell--mobile {
   display: flex !important;
@@ -3070,23 +2719,13 @@ html[data-route="/forgot"] .mobile-tab-navigation,
 html[data-route^="/reset-password/"] .mobile-tab-navigation,
 html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !important; }
 
-/* ============================================================
-   15. RESPONSIVE
-   ============================================================ */
-
-/* Compact desktop: 900–1199px — sidebar stays docked, just narrower. */
 @media (max-width: 1199px) and (min-width: 900px) {
   :root { --ui-sidebar: 216px; --ui-members: 220px; }
 }
-/* Narrow desktop: 760–899px — still docked, at its narrowest. Losing
-   navigation entirely around 900px is a usability cliff, so the
-   off-canvas threshold sits near the phone range instead. */
 @media (max-width: 899px) and (min-width: 760px) {
   :root { --ui-sidebar: 196px; --ui-members: 0px; }
 }
 
-/* Tablet: 600–759px — the rail stays, the context sidebar becomes an
-   overlay drawer driven by the context-header hamburger. */
 @media (max-width: 759px) and (min-width: 600px) {
   :root { --ui-sidebar: 232px; --ui-members: 0px; }
   .shell--desktop {
@@ -3101,7 +2740,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   }
 }
 
-/* Mobile: <600px */
 @media (max-width: 599px) {
   body { overflow: hidden !important; }
   .shell--desktop { display: none !important; }
@@ -3110,18 +2748,73 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   .msg { padding-left: var(--t-d-2); padding-right: var(--t-d-2); }
   .msg-file.image img { max-height: 240px; }
   .permission-grid { grid-template-columns: 1fr; }
-  .community-manager__head { align-items: flex-start; flex-direction: column; }
   .card--list__actions { width: 100%; justify-content: flex-end; }
+
+  .btn.sm,
+  .btn.icon,
+  .react-pill,
+  .role-pill,
+  .ctx-head__action,
+  .msg-actions button,
+  .msg-hoverbar button,
+  .user-controls__btn,
+  .nav-toggle,
+  .sidebar-collapse-toggle,
+  .role-unassign {
+    min-height: var(--t-hit);
+  }
+  .btn.icon,
+  .user-controls__btn,
+  .nav-toggle,
+  .sidebar-collapse-toggle {
+    width: var(--t-hit);
+  }
+  .role-pill,
+  .role-unassign,
+  .react-pill {
+    padding-left: var(--t-d-3);
+    padding-right: var(--t-d-3);
+  }
+  .msg-hoverbar,
+  .msg-actions {
+    position: static;
+    display: flex;
+    gap: var(--t-d-2);
+    margin-top: var(--t-d-2);
+  }
+  /* Rows that carry an action must not overflow on a narrow screen. */
+  .card--list--row {
+    grid-template-columns: 1fr;
+  }
+  .card--list__actions {
+    flex-wrap: wrap;
+  }
+  .community-manager__toolbar {
+    flex-wrap: wrap;
+  }
+  .role-row {
+    grid-template-columns: 18px 30px minmax(0, 1fr);
+    row-gap: var(--t-d-2);
+  }
+  .role-row__meta,
+  .role-row__lock {
+    grid-column: 3;
+    justify-self: start;
+  }
+  .context-header {
+    padding-left: var(--t-d-3);
+    padding-right: var(--t-d-3);
+  }
+  .context-title {
+    max-width: none;
+  }
+  .skip-link--desktop { display: none; }
+  .skip-link--mobile { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001s !important; transition-duration: 0.001s !important; }
 }
-
-/* ============================================================
-   F1/F2 community surfaces: bot identity, persisted role colors,
-   member management rows, channel rows, community profile block.
-   ============================================================ */
 
 .bot-tag {
   display: inline-block;
@@ -3168,12 +2861,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .community-channel-row .ch-name { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .prof-community { margin-top: var(--t-d-4); padding-top: var(--t-d-3); border-top: 1px solid var(--t-line); display: flex; flex-direction: column; gap: 6px; }
 
-/* ============================================================
-   Checkpoint A: Discord-style community presentation.
-   Layout hooks and IDs are unchanged; this is presentation only.
-   ============================================================ */
-
-/* --- Community rail: icon morph + active pill --- */
 .app-rail__items .server-chip {
   transition: border-radius var(--t-fast) var(--t-ease), background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
 }
@@ -3183,7 +2870,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .app-rail__items .row--nav { transition: border-radius var(--t-fast) var(--t-ease), color var(--t-fast), border-color var(--t-fast); }
 .app-rail__items .row--nav:hover { border-radius: 17px; }
 
-/* --- Channel sidebar: header hierarchy --- */
 .context-sidebar .place-header {
   position: sticky;
   top: 0;
@@ -3195,7 +2881,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
 }
 
-/* --- Community landing hero --- */
 .community-hero {
   display: flex;
   align-items: center;
@@ -3213,7 +2898,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .community-hero__name { margin: 0 0 4px; font-size: var(--t-fs-xl); letter-spacing: -0.02em; }
 .community-hero__text .muted { margin: 0 0 8px; }
 
-/* --- Profile: full-width card instead of card--auth constraint --- */
 .card--profile {
   border: 1px solid var(--t-line);
   padding: 0 26px 26px;
@@ -3229,14 +2913,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   .community-hero { flex-direction: column; align-items: flex-start; padding: 18px; }
     .card--profile { padding: 0 16px 18px; }
 }
-
-/* ============================================================
-   Context sidebar
-   Fixed three-band vertical layout:
-     ctx-head      context identity, never scrolls
-     ctx-scroll    the only scrolling region
-     user-controls pinned session bar
-   ============================================================ */
 
 .context-sidebar {
   display: flex;
@@ -3266,7 +2942,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .ctx-actions { display: flex; flex-direction: column; gap: var(--t-d-2); }
 .ctx-list { display: flex; flex-direction: column; gap: 2px; }
 
-/* --- context header ---------------------------------------------------- */
 .ctx-head {
   flex: 0 0 auto;
   border-bottom: 1px solid var(--t-line);
@@ -3279,8 +2954,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   min-height: 56px;
   padding: var(--t-d-3) var(--t-d-3) var(--t-d-3) var(--t-d-4);
 }
-/* Communities have no stored banner, so the header uses a restrained accent
-   wash keyed to the community mark instead of an empty image well. */
 .ctx-head--community {
   background:
   linear-gradient(180deg,
@@ -3321,8 +2994,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
-/* An uploaded community icon replaces the coloured initial. The text-shadow is
-   dropped with the initial, and the image is clipped by the parent's radius. */
 .community-mark.has-img { background: transparent; text-shadow: none; }
 .community-mark.lg { width: 72px; height: 72px; border-radius: 22px; font-size: 1.9rem; }
 .community-mark__img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -3336,18 +3007,12 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   overflow: hidden;
 }
 .community-banner__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-/* Keeps the name legible over an arbitrary uploaded image. */
 .community-banner__scrim {
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.55) 100%);
 }
-.community-banner__body { position: relative; padding: var(--t-d-4); }
-.community-banner__title { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.community-banner__title h1 { margin: 0; font-size: var(--t-fs-xl); font-weight: 800; }
-.community-banner__title p { margin: 2px 0 0; color: var(--t-txt2); font-size: var(--t-fs-s); }
 
-/* Icon + banner editor in community settings. */
 .community-media { display: flex; flex-direction: column; gap: var(--t-d-3); }
 .community-media__preview { display: flex; align-items: center; gap: var(--t-d-3); flex-wrap: wrap; }
 .community-media__banner {
@@ -3390,7 +3055,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 }
 .ctx-head__action:hover { background: color-mix(in srgb, var(--t-txt) 8%, transparent); color: var(--t-txt); }
 
-/* --- anchored dropdown -------------------------------------------------- */
 .ctx-dropdown {
   position: absolute;
   left: var(--t-d-3);
@@ -3422,7 +3086,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .ctx-dropdown__item.is-danger .ctx-dropdown__icon { color: var(--t-err); }
 .ctx-dropdown__sep { height: 1px; margin: 4px 2px; background: var(--t-line); }
 
-/* --- nav groups --------------------------------------------------------- */
 .nav-group { display: flex; flex-direction: column; }
 .nav-group__head {
   display: flex;
@@ -3459,7 +3122,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 }
 .nav-group__action:hover { background: var(--t-base2); color: var(--t-txt); }
 
-/* --- sidebar nav rows ---------------------------------------------------- */
 .row--nav {
   min-height: 34px;
   padding: 5px var(--t-d-2);
@@ -3477,7 +3139,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .row--nav .nv-icon { display: none; }
 .row--nav .nv-label { font-weight: 600; }
 
-/* --- channel rows -------------------------------------------------------- */
 .row--channel { min-height: 34px; padding: 5px var(--t-d-2); border-radius: 6px; color: var(--t-mut); font-size: var(--t-fs-s); }
 .row--channel:hover { background: color-mix(in srgb, var(--t-txt) 6%, transparent); color: var(--t-txt2); }
 .row--channel.active {
@@ -3488,7 +3149,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .row--channel.muted .ch-name { opacity: 0.55; }
 .row--channel.muted::after { content: "🔇"; font-size: 0.7rem; }
 
-/* --- DM rows ------------------------------------------------------------- */
 .row--dm { min-height: 44px; padding: 6px var(--t-d-2); border-radius: 8px; }
 .row--dm .row__stack { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }
 .row--dm .row__line { display: flex; align-items: baseline; gap: var(--t-d-2); }

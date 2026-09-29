@@ -1,5 +1,3 @@
-// Theme system. Single source of truth for theme state (persistence, the
-// html[data-theme] attribute, and the Custom palette derivation).
 
 export const DEFAULT_THEME = 'ember';
 
@@ -22,7 +20,6 @@ const CUSTOM_CSS_LIMIT = 20000;
 const CUSTOM_CSS_RULE_LIMIT = 200;
 
 // Guided builder schema. These controls can never break layout: they only
-// derive palette values, set documented density/motion attributes, or set
 // inline token overrides that are cleared when leaving the custom theme.
 export const CUSTOM_TOKEN_DEFS = [
   { key: 'contrast', label: 'Contrast', type: 'select', options: ['standard', 'high'] },
@@ -42,9 +39,7 @@ export const DEFAULT_CUSTOM_TOKENS = {
   ambient: 'balanced',
 };
 
-// Inline custom properties written by the guided builder. Tracked so they
 // can be removed when leaving the custom theme (they would otherwise leak
-// into built-in themes, since inline styles beat stylesheets).
 const CUSTOM_INLINE_PROPS = [
   '--t-r-s', '--t-r-m', '--t-r-l',
   '--t-txt', '--t-txt2', '--t-mut', '--t-line', '--t-line-hi',
@@ -61,9 +56,6 @@ export function getTheme() {
 }
 
 // System theme resolution: 'system' is a selection, never a stylesheet
-// target. Dark OS setting resolves to Ember (the default dark theme),
-// light resolves to Light. The data-theme attribute always carries the
-// resolved built-in id so every themed surface responds.
 export function resolveTheme(name) {
   if (name !== 'system') return name;
   try {
@@ -97,8 +89,6 @@ export function setTheme(name) {
   return name;
 }
 
-// Re-apply when the OS scheme flips while System is selected. Live,
-// no reload, no state loss — same as manual switching.
 let sysWatcher = null;
 export function watchSystemTheme() {
   try {
@@ -112,7 +102,6 @@ export function watchSystemTheme() {
   } catch { /* matchMedia unsupported */ }
 }
 
-// ---- Custom palette -----------------------------------------------------
 
 export function loadPalette() {
   // Legacy two-field palette, kept for backward compatibility. Merged into
@@ -143,7 +132,6 @@ export function loadCustomTheme() {
 export function saveCustomTheme(state) {
   const tokens = Object.assign({}, DEFAULT_CUSTOM_TOKENS, (state && state.tokens) || {});
   try { localStorage.setItem(LS_CUSTOM_TOKENS, JSON.stringify(tokens)); } catch { /* ignore */ }
-  // Mirror the two legacy fields so older code paths keep working.
   try { localStorage.setItem(LS_PALETTE, JSON.stringify({ accent: tokens.accent, tone: tokens.tone })); } catch { /* ignore */ }
   try { localStorage.setItem(LS_CUSTOM_CSS, String((state && state.css) || '')); } catch { /* ignore */ }
   return { tokens, css: String((state && state.css) || '') };
@@ -279,17 +267,14 @@ export function clearCustomInline() {
 
 function applyGuidedTokens(p) {
   const root = document.documentElement;
-  // Density + motion use the documented attribute contract from app.css.
   try {
     if (p.density === 'compact' || p.density === 'roomy') root.dataset.density = p.density;
     else delete root.dataset.density;
     if (p.motion === 'reduced') root.dataset.motion = 'reduced';
     else delete root.dataset.motion;
   } catch { /* ignore */ }
-  // Corner style.
   if (p.radius === 'sharp') { setInline('--t-r-s', '2px'); setInline('--t-r-m', '4px'); setInline('--t-r-l', '8px'); }
   else if (p.radius === 'round') { setInline('--t-r-s', '12px'); setInline('--t-r-m', '18px'); setInline('--t-r-l', '28px'); }
-  // Contrast boost (neutral, works on dark and light tones).
   const dark = p.tone !== 'light';
   if (p.contrast === 'high') {
     if (dark) {
@@ -300,7 +285,6 @@ function applyGuidedTokens(p) {
       setInline('--t-line', 'rgba(20,12,6,.24)'); setInline('--t-line-hi', 'rgba(20,12,6,.38)');
     }
   }
-  // Ambient glow intensity, derived from the accent hue.
   try {
     const { h, s } = hexToHsl(p.accent);
     const glow = (l2, base) => {
@@ -314,7 +298,6 @@ function applyGuidedTokens(p) {
   } catch { /* ignore */ }
 }
 
-// ---- Advanced custom CSS (validated, recoverable) -----------------------
 
 const PROTECTED_IDS = new Set([
   'app', 'mobile-shell', 'mobile-main',
@@ -326,23 +309,19 @@ const PROTECTED_IDS = new Set([
 ]);
 
 const PROTECTED_CLASSES = new Set([
-  // Application shell: rail / context sidebar / main content.
   'app-rail', 'app-rail__items', 'rail-identity', 'rail-global-nav',
   'context-sidebar', 'main-content',
   'context-header', 'chat-environment', 'view-root',
   'member-sidebar', 'shell', 'shell--desktop', 'shell--mobile',
-  // Navigation primitives.
   'row', 'row--nav', 'row--dm', 'row--member', 'row--channel',
   'server-chip', 'channel-category', 'place-header',
   'place-menu', 'place-actions', 'community-actions',
   'member-group', 'msg', 'msg-actions', 'composer',
-  // Overlays + controls.
   'auth-wrap', 'card', 'card--auth', 'form-error', 'form-success', 'btn',
-  // Dedicated auth pages: the full-viewport shell, its card and the two panels.
   'auth-page', 'auth-background', 'auth-card', 'auth-main', 'auth-secondary',
   'auth-title', 'auth-lede', 'auth-footer', 'auth-brand',
   'popover', 'pop-item', 'toast', 'connection-status',
-  'settings-nav', 'theme-chip', 'admin-chip',
+  'settings-nav', 'theme-chip', 'status-chip',
   'mobile-header', 'mobile-main', 'mobile-tab-navigation',
 ]);
 
@@ -391,8 +370,6 @@ function stripCssComments(css) {
 }
 
 function splitTopLevelRules(css) {
-  // Splits `selector { declarations }` blocks, respecting quotes and
-  // parentheses. Nested blocks (from at-rules) are rejected by validation.
   const rules = [];
   let i = 0, n = css.length;
   const skipWs = () => { while (i < n && /\s/.test(css[i])) i++; };
@@ -553,7 +530,6 @@ export function clearCustomCss() {
   } catch { /* ignore */ }
 }
 
-// ---- Safety monitor + recovery ------------------------------------------
 
 function rectOf(node) {
   if (!node || !node.getBoundingClientRect) return null;
@@ -591,8 +567,6 @@ export function verifyCustomSafety() {
     problems.push('View region `' + viewSel + '` is not visibly laid out.');
   }
   if (mode === 'desktop') {
-    // The rail is the anchor column of the desktop frame; if custom CSS
-    // collapses it, navigation becomes unusable.
     const rail = visibleSize('#community-navigation');
     if (rail.present && rail.display !== 'none' && rail.width < 40) {
       problems.push('Application rail collapsed below a usable width.');
