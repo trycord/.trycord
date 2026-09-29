@@ -56,11 +56,11 @@ const code = (r) => (r.body && r.body.error && r.body.error.code) || r.status;
 
   const ownerPost = await req('POST', msgs, { content: 'owner message' }, owner.token);
   const ownerMid = ownerPost.body.id;
-  const ownReact = await req('POST', msgs + '/' + ownerMid + '/reactions', { emoji: '🎉' }, owner.token);
+  const ownReact = await req('POST', msgs + '/' + ownerMid + '/reactions', { emoji: '♡' }, owner.token);
   ok('a member can react to a message', ownReact.status === 200, 'status ' + ownReact.status);
 
   // The control case: an outsider cannot touch a channel they cannot see.
-  const outReact = await req('POST', msgs + '/' + ownerMid + '/reactions', { emoji: '🎉' }, outsider.token);
+  const outReact = await req('POST', msgs + '/' + ownerMid + '/reactions', { emoji: '♡' }, outsider.token);
   ok('a non-member cannot react', outReact.status !== 200, 'status ' + outReact.status);
 
   const timed = await req('POST', '/api/servers/' + sid + '/timeout', { userId: member.id, minutes: 30 }, owner.token);
@@ -77,13 +77,13 @@ const code = (r) => (r.body && r.body.error && r.body.error.code) || r.status;
   ok('timed-out member cannot delete their own message',
     del.status === 403 && code(del) === 'TIMED_OUT', 'status ' + del.status + ' ' + code(del));
 
-  const react = await req('POST', msgs + '/' + mid + '/reactions', { emoji: '🎉' }, member.token);
+  const react = await req('POST', msgs + '/' + mid + '/reactions', { emoji: '♡' }, member.token);
   ok('timed-out member cannot add a reaction',
     react.status === 403 && code(react) === 'TIMED_OUT', 'status ' + react.status + ' ' + code(react));
 
   // Removing a reaction is the same write as adding one. It is asserted
   // separately because it is a separate handler and the easier one to miss.
-  const unreact = await req('DELETE', msgs + '/' + ownerMid + '/reactions/' + encodeURIComponent('🎉'), null, member.token);
+  const unreact = await req('DELETE', msgs + '/' + ownerMid + '/reactions/' + encodeURIComponent('♡'), null, member.token);
   ok('timed-out member cannot remove a reaction',
     unreact.status === 403 && code(unreact) === 'TIMED_OUT', 'status ' + unreact.status + ' ' + code(unreact));
 

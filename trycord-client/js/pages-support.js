@@ -91,9 +91,9 @@ export async function renderMyAppeals(container) {
   for (const a of items) {
     const row = el('article', { class: 'card card--list' });
     const info = el('div', { class: 'card--list__info' });
-    info.appendChild(el('strong', {}, (a.action_type || 'Moderation action') + ' Â· ' + (APPEAL_STATUS_LABEL[a.status] || a.status || '')));
+    info.appendChild(el('strong', {}, (a.action_type || 'Moderation action') + ' · ' + (APPEAL_STATUS_LABEL[a.status] || a.status || '')));
     info.appendChild(el('span', { class: 'muted small' },
-      'Submitted ' + esc(a.created_at || '') + (a.updated_at && a.updated_at !== a.created_at ? ' Â· updated ' + esc(a.updated_at) : '')));
+      'Submitted ' + esc(a.created_at || '') + (a.updated_at && a.updated_at !== a.created_at ? ' · updated ' + esc(a.updated_at) : '')));
     if (a.decision) info.appendChild(el('span', { class: 'muted small' }, 'Decision: ' + esc(a.decision)));
     row.appendChild(info);
     list.appendChild(row);

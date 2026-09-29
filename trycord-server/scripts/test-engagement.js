@@ -62,14 +62,14 @@ async function J(method, p, body, tok) {
   // ---- reactions ----
   const bad = await J('POST', '/api/channels/' + cid + '/messages/' + mid + '/reactions', { emoji: '   ' }, B.token);
   ok('reactRejected', bad.status === 400, 'status=' + bad.status);
-  const r1 = await J('POST', '/api/channels/' + cid + '/messages/' + mid + '/reactions', { emoji: '🔥' }, B.token);
+  const r1 = await J('POST', '/api/channels/' + cid + '/messages/' + mid + '/reactions', { emoji: '♡' }, B.token);
   ok('react', r1.status === 200 && r1.json.reactions[0].count === 1 && r1.json.reactions[0].mine === true, JSON.stringify(r1.json).slice(0, 120));
-  const r2 = await J('POST', '/api/channels/' + cid + '/messages/' + mid + '/reactions', { emoji: '🔥' }, B.token);
+  const r2 = await J('POST', '/api/channels/' + cid + '/messages/' + mid + '/reactions', { emoji: '♡' }, B.token);
   ok('reactIdempotent', r2.status === 200 && r2.json.reactions[0].count === 1, 'count=' + ((r2.json.reactions || [])[0] || {}).count);
   const hist = await J('GET', '/api/channels/' + cid + '/messages?limit=5', null, A.token);
   const seen = (hist.json || []).find((m) => m.id === mid);
   ok('reactInHistory', !!(seen && seen.reactions && seen.reactions.length === 1), 'reactions=' + JSON.stringify(seen && seen.reactions));
-  ok('unreact', (await J('DELETE', '/api/channels/' + cid + '/messages/' + mid + '/reactions/' + encodeURIComponent('🔥'), null, B.token)).status === 200);
+  ok('unreact', (await J('DELETE', '/api/channels/' + cid + '/messages/' + mid + '/reactions/' + encodeURIComponent('♡'), null, B.token)).status === 200);
 
   // ---- mentions + mutes ----
   await J('POST', '/api/channels/' + cid + '/messages', { content: 'hey @' + B.name + ' look' }, A.token);

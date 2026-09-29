@@ -3124,7 +3124,7 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   box-shadow: inset 2px 0 0 var(--t-accent);
 }
 .row--channel.muted .ch-name { opacity: 0.55; }
-.row--channel.muted::after { content: "🔇"; font-size: 0.7rem; }
+.row--channel.muted::after { content: "⊘"; font-size: 0.7rem; }
 
 .row--dm { min-height: 44px; padding: 6px var(--t-d-2); border-radius: 8px; }
 .row--dm .row__stack { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 1 auto; }

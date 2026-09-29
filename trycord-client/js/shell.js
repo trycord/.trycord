@@ -378,7 +378,7 @@ function communityHeader(sid, server) {
       items.push({ label: 'Community settings', icon: 'âš™', onSelect: go(base + '/settings') });
     }
     items.push({ sep: true });
-    items.push({ label: 'Leave community', icon: 'â¤¶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
+    items.push({ label: 'Leave community', icon: '⤶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
     return items;
   });
   return head;
@@ -933,7 +933,7 @@ export function renderMemberSidebar(region) {
       label = role ? String(role.name || 'ROLE').toUpperCase() : 'ROLE';
     }
     const group = el('section', { class: 'member-group' });
-    const groupLabel = el('div', { class: 'member-group__label' }, label + ' Â· ' + members.length);
+    const groupLabel = el('div', { class: 'member-group__label' }, label + ' · ' + members.length);
     if (key !== '__owner__' && key !== '__member__') {
       const role = roleById.get(key);
       if (role && role.color) groupLabel.style.color = role.color;
@@ -1024,7 +1024,7 @@ export function renderContextHeader({ title, sub, icon, actions } = {}) {
   if (mobileCtx && typeof title === 'string') {
     clear(mobileCtx);
     const mt = el('div', { class: 'context-title', style: { fontSize: 'var(--t-fs-l)' } }, title);
-    if (sub) mt.appendChild(el('span', { style: { color: 'var(--t-mut)', fontWeight: '400', fontSize: 'var(--t-fs-xs)' } }, ' Â· ' + String(sub)));
+    if (sub) mt.appendChild(el('span', { style: { color: 'var(--t-mut)', fontWeight: '400', fontSize: 'var(--t-fs-xs)' } }, ' · ' + String(sub)));
     mobileCtx.appendChild(mt);
   }
 }
