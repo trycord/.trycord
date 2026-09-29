@@ -3159,3 +3159,135 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   font-weight: 800;
   text-align: center;
 }
+
+/* ---- page editor: full-viewport layout ----
+   The editor escapes the app shell so a long legal page gets the whole window
+   and the action bar stays reachable. It is the one admin surface that is a
+   single-focus task rather than a panel. */
+.page-editor-host {
+  padding: 0;
+}
+.page-editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  gap: var(--t-d-3, 12px);
+}
+.page-editor__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--t-d-3, 12px);
+  padding: var(--t-d-3, 12px) var(--t-d-4, 16px);
+  border-bottom: 1px solid var(--t-line);
+  background: var(--t-sur, transparent);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.page-editor__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-family: var(--t-mono, monospace);
+}
+.page-editor__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--t-d-4, 16px);
+  padding: var(--t-d-4, 16px);
+  align-items: start;
+  flex: 1 1 auto;
+}
+@media (min-width: 1100px) {
+  .page-editor__main { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); }
+}
+.page-editor__body { min-width: 0; display: flex; flex-direction: column; gap: var(--t-d-3, 12px); }
+.page-editor__side { min-width: 0; }
+.page-editor__side-inner {
+  position: sticky;
+  top: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-2, 8px);
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  padding: var(--t-d-3, 12px);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-2, 8px);
+  background: var(--t-sur2, transparent);
+}
+.page-editor__preview {
+  min-height: 80px;
+  padding: var(--t-d-3, 12px);
+  border: 1px dashed var(--t-line);
+  border-radius: var(--t-r-1, 6px);
+}
+.page-editor__status { display: flex; justify-content: flex-end; }
+.page-editor__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-d-2, 8px);
+  padding: var(--t-d-3, 12px) var(--t-d-4, 16px);
+  border-top: 1px solid var(--t-line);
+  background: var(--t-sur, Canvas);
+}
+
+/* ---- BBCode toolbar and reference ---- */
+.bbcode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 4px;
+}
+.bbcode-bar__btn {
+  min-width: 30px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--t-mut);
+  background: var(--t-sur2, transparent);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-1, 4px);
+  cursor: pointer;
+}
+.bbcode-bar__btn:hover { color: var(--t-txt); border-color: var(--t-acc, currentColor); }
+.bbcode-bar__btn:focus-visible { outline: 2px solid var(--t-acc); outline-offset: 1px; }
+.bbcode-ref { margin: 0; padding-left: 18px; font-size: 0.78rem; }
+.bbcode-ref li { margin-bottom: 2px; }
+.bbcode-ref code { font-family: var(--t-mono, monospace); font-size: 0.75rem; }
+
+/* Rendered BBCode. Sizing is class-based, never an inline style, so a stored
+   page cannot express arbitrary CSS. */
+.bbcode-code {
+  margin: var(--t-d-2, 8px) 0;
+  padding: var(--t-d-2, 8px);
+  overflow-x: auto;
+  background: var(--t-sur2, rgba(127, 127, 127, 0.12));
+  border-radius: var(--t-r-1, 4px);
+  font-family: var(--t-mono, monospace);
+  font-size: 0.85em;
+}
+.bbcode-quote {
+  margin: var(--t-d-2, 8px) 0;
+  padding: var(--t-d-2, 8px) var(--t-d-3, 12px);
+  border-left: 3px solid var(--t-line);
+  color: var(--t-mut);
+}
+.bbcode-quote-who { display: block; font-weight: 700; color: var(--t-txt); font-style: normal; margin-bottom: 4px; }
+.bbcode-spoiler {
+  background: var(--t-txt, Canvas);
+  color: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.bbcode-spoiler:hover, .bbcode-spoiler:focus-visible { background: var(--t-sur2, rgba(127,127,127,0.2)); color: inherit; }
+.bbcode-size-1 { font-size: 0.75em; }
+.bbcode-size-2 { font-size: 0.85em; }
+.bbcode-size-3 { font-size: 0.95em; }
+.bbcode-size-4 { font-size: 1.05em; }
+.bbcode-size-5 { font-size: 1.2em; }
+.bbcode-size-6 { font-size: 1.4em; }
+.bbcode-size-7 { font-size: 1.7em; }
