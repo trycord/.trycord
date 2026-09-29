@@ -120,7 +120,7 @@ export function renderNewAppeal(container) {
   });
   const reason = el('textarea', {
     class: 'input', rows: 5, maxlength: 4000,
-    placeholder: 'What happened, in your own words? Be specific â€” this goes to a human reviewer.',
+    placeholder: 'What happened, in your own words? Be specific — this goes to a human reviewer.',
   });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Submit appeal');
   const form = el('form', {}, err, ok,
@@ -140,7 +140,7 @@ export function renderNewAppeal(container) {
     if (!reason.value.trim()) { err.hidden = false; err.textContent = 'Tell the reviewer why this should be reconsidered.'; return; }
     busy = true;
     submit.setAttribute('aria-busy', 'true');
-    submit.textContent = 'Submittingâ€¦';
+    submit.textContent = 'Submitting…';
     try {
       const res = await Api.submitAppeal({ actionId, reason: reason.value.trim() });
       ok.hidden = false;

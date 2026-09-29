@@ -233,6 +233,22 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client');
     parseOut.split('\n').filter((l) => /FAIL|Error/.test(l)).slice(0, 3).join(' | '));
   if (parse.status !== 0) console.log('       ' + parseOut.trim().split('\n').slice(0, 4).join('\n       '));
 
+  console.log('the admin console is reachable');
+  // The site builder and the GDPR queue were both fully implemented and both
+  // invisible: the router served them, the page had its own tab bar, and nothing
+  // in the sidebar pointed at them. A feature nobody can navigate to is not
+  // exposed, whatever else is true of it. This asserts every admin section the
+  // router serves has a navigation entry, so the next one added cannot be
+  // forgotten the same way.
+  const shellNav = fs.readFileSync(path.join(jsDir, 'shell.js'), 'utf8');
+  const routerAdmin = [...fs.readFileSync(path.join(jsDir, 'router.js'), 'utf8')
+    .matchAll(/\/admin\/([a-z-]+)/g)].map((m) => m[1]);
+  const navAdmin = [...shellNav.matchAll(/path: '\/admin\/([a-z-]+)'/g)].map((m) => m[1]);
+  const missing = [...new Set(routerAdmin)].filter((r) => !navAdmin.includes(r));
+  ok('every admin route the router serves is in the sidebar', missing.length === 0, 'missing: ' + missing.join(', '));
+  ok('the site builder is in the sidebar', navAdmin.includes('pages'), 'no /admin/pages entry');
+  ok('the GDPR queue is in the sidebar', navAdmin.includes('gdpr'), 'no /admin/gdpr entry');
+
   console.log('a11y contract in the markup');
   const html = fs.readFileSync(path.join(CLIENT, 'index.html'), 'utf8');
   ok('the view region is not a live region', !/id="view-root"[\s\S]{0,80}aria-live/.test(html));

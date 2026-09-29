@@ -35,7 +35,7 @@ const SERVER_SUITES = [
   'test-overrides', 'test-engagement',
   'test-role-security', 'test-no-self-assign', 'test-notification-paging',
   'test-roster-aggregates', 'test-community-media', 'test-timeout-gates', 'test-twofactor',
-  'test-routing', 'test-template', 'test-sessions',
+  'test-routing', 'test-template', 'test-sessions', 'test-emoji-data',
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -147,6 +147,7 @@ function summarise(result) {
   console.log(`\n${results.length - failed}/${results.length} suites passed`);
   process.exit(failed ? 1 : 0);
 })();
+
 
 
 

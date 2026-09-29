@@ -1,0 +1,2021 @@
+{
+  "$comment": "Reaction picker dataset. Data only - no UI, no rendering. The client consumes this; it does not live inside a component, so a rewrite of the picker does not mean rebuilding the list. Names are the Unicode CLDR short names, which are the names Discord exposes as :shortcodes:, so a name typed by a member here resolves the same way it would there. Categories mirror Discord's own grouping so muscle memory carries over.",
+  "version": "1.0.0",
+  "scope": "A curated subset: the emoji a reaction picker actually needs, not all ~1800. A full set can be generated from CLDR short-name data and dropped in without any code change, since the shape is fixed.",
+  "conventions": {
+    "name": "CLDR short name, lowercase, no colons. The client adds them.",
+    "keywords": "Extra search terms. Optional; omitting them is valid.",
+    "skinTones": "Skin-tone variants are NOT enumerated per entry. Apply them at render time from the base code point, so adding tone support does not multiply this file."
+  },
+  "categories": [
+    {
+      "id": "frequent",
+      "label": "Frequent",
+      "emoji": [
+        {
+          "char": "👍",
+          "name": "thumbsup",
+          "keywords": [
+            "+1",
+            "like",
+            "yes",
+            "approve"
+          ]
+        },
+        {
+          "char": "👎",
+          "name": "thumbsdown",
+          "keywords": [
+            "-1",
+            "dislike",
+            "no"
+          ]
+        },
+        {
+          "char": "❤",
+          "name": "heart",
+          "keywords": [
+            "love",
+            "like"
+          ]
+        },
+        {
+          "char": "🎉",
+          "name": "tada",
+          "keywords": [
+            "party",
+            "celebrate",
+            "ship"
+          ]
+        },
+        {
+          "char": "😂",
+          "name": "joy",
+          "keywords": [
+            "lol",
+            "laugh",
+            "haha"
+          ]
+        },
+        {
+          "char": "😮",
+          "name": "open_mouth",
+          "keywords": [
+            "wow",
+            "surprised",
+            "huh"
+          ]
+        },
+        {
+          "char": "😢",
+          "name": "cry",
+          "keywords": [
+            "sad",
+            "tear"
+          ]
+        },
+        {
+          "char": "🔥",
+          "name": "fire",
+          "keywords": [
+            "hot",
+            "lit",
+            "burn"
+          ]
+        },
+        {
+          "char": "👏",
+          "name": "clap",
+          "keywords": [
+            "applause",
+            "bravo"
+          ]
+        },
+        {
+          "char": "🙏",
+          "name": "pray",
+          "keywords": [
+            "thanks",
+            "please",
+            "hope"
+          ]
+        },
+        {
+          "char": "💯",
+          "name": "100",
+          "keywords": [
+            "perfect",
+            "score",
+            "full"
+          ]
+        },
+        {
+          "char": "✅",
+          "name": "white_check_mark",
+          "keywords": [
+            "done",
+            "yes",
+            "ok",
+            "approve"
+          ]
+        },
+        {
+          "char": "👀",
+          "name": "eyes",
+          "keywords": [
+            "look",
+            "watch",
+            "review"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "smileys_people",
+      "label": "Smileys & People",
+      "emoji": [
+        {
+          "char": "😀",
+          "name": "grinning",
+          "keywords": [
+            "smile",
+            "happy"
+          ]
+        },
+        {
+          "char": "😃",
+          "name": "smiley",
+          "keywords": [
+            "happy",
+            "joy"
+          ]
+        },
+        {
+          "char": "😄",
+          "name": "smile",
+          "keywords": [
+            "happy",
+            "laugh"
+          ]
+        },
+        {
+          "char": "😁",
+          "name": "grin",
+          "keywords": [
+            "happy"
+          ]
+        },
+        {
+          "char": "😆",
+          "name": "laughing",
+          "keywords": [
+            "lol",
+            "satisfied"
+          ]
+        },
+        {
+          "char": "😅",
+          "name": "sweat_smile",
+          "keywords": [
+            "relief",
+            "nervous"
+          ]
+        },
+        {
+          "char": "🤣",
+          "name": "rofl",
+          "keywords": [
+            "lol",
+            "rolling"
+          ]
+        },
+        {
+          "char": "😊",
+          "name": "blush",
+          "keywords": [
+            "shy",
+            "happy"
+          ]
+        },
+        {
+          "char": "😇",
+          "name": "innocent",
+          "keywords": [
+            "angel",
+            "halo"
+          ]
+        },
+        {
+          "char": "🙂",
+          "name": "slightly_smiling_face",
+          "keywords": [
+            "smile"
+          ]
+        },
+        {
+          "char": "😉",
+          "name": "wink",
+          "keywords": [
+            "flirt"
+          ]
+        },
+        {
+          "char": "😌",
+          "name": "relieved",
+          "keywords": [
+            "calm"
+          ]
+        },
+        {
+          "char": "😍",
+          "name": "heart_eyes",
+          "keywords": [
+            "love",
+            "crush"
+          ]
+        },
+        {
+          "char": "😘",
+          "name": "kissing_heart",
+          "keywords": [
+            "love",
+            "kiss"
+          ]
+        },
+        {
+          "char": "🤔",
+          "name": "thinking",
+          "keywords": [
+            "hmm",
+            "consider"
+          ]
+        },
+        {
+          "char": "😐",
+          "name": "neutral_face",
+          "keywords": [
+            "meh"
+          ]
+        },
+        {
+          "char": "😑",
+          "name": "expressionless",
+          "keywords": [
+            "blank"
+          ]
+        },
+        {
+          "char": "🙄",
+          "name": "roll_eyes",
+          "keywords": [
+            "annoyed",
+            "whatever"
+          ]
+        },
+        {
+          "char": "😴",
+          "name": "sleeping",
+          "keywords": [
+            "zzz",
+            "tired",
+            "bored"
+          ]
+        },
+        {
+          "char": "😤",
+          "name": "triumph",
+          "keywords": [
+            "frustrated",
+            "huff"
+          ]
+        },
+        {
+          "char": "😡",
+          "name": "rage",
+          "keywords": [
+            "angry",
+            "mad"
+          ]
+        },
+        {
+          "char": "🤯",
+          "name": "exploding_head",
+          "keywords": [
+            "mindblown",
+            "wow"
+          ]
+        },
+        {
+          "char": "😱",
+          "name": "scream",
+          "keywords": [
+            "fear",
+            "shock"
+          ]
+        },
+        {
+          "char": "🥺",
+          "name": "pleading_face",
+          "keywords": [
+            "please",
+            "beg",
+            "puppy eyes"
+          ]
+        },
+        {
+          "char": "🤗",
+          "name": "hugs",
+          "keywords": [
+            "hug",
+            "embrace"
+          ]
+        },
+        {
+          "char": "🤭",
+          "name": "hand_over_mouth",
+          "keywords": [
+            "oops",
+            "giggle"
+          ]
+        },
+        {
+          "char": "🫠",
+          "name": "melting_face",
+          "keywords": [
+            "dying",
+            "awkward"
+          ]
+        },
+        {
+          "char": "🤝",
+          "name": "handshake",
+          "keywords": [
+            "deal",
+            "agree"
+          ]
+        },
+        {
+          "char": "👋",
+          "name": "wave",
+          "keywords": [
+            "hello",
+            "bye",
+            "greeting"
+          ]
+        },
+        {
+          "char": "🙌",
+          "name": "raising_hands",
+          "keywords": [
+            "celebration",
+            "praise"
+          ]
+        },
+        {
+          "char": "👌",
+          "name": "ok_hand",
+          "keywords": [
+            "perfect",
+            "okay"
+          ]
+        },
+        {
+          "char": "✌",
+          "name": "v",
+          "keywords": [
+            "peace",
+            "victory"
+          ]
+        },
+        {
+          "char": "🤞",
+          "name": "crossed_fingers",
+          "keywords": [
+            "luck",
+            "hope"
+          ]
+        },
+        {
+          "char": "💪",
+          "name": "muscle",
+          "keywords": [
+            "strong",
+            "flex"
+          ]
+        },
+        {
+          "char": "🫶",
+          "name": "heart_hands",
+          "keywords": [
+            "love",
+            "care"
+          ]
+        },
+        {
+          "char": "🧠",
+          "name": "brain",
+          "keywords": [
+            "think",
+            "smart"
+          ]
+        },
+        {
+          "char": "👤",
+          "name": "bust_in_silhouette",
+          "keywords": [
+            "user",
+            "person"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "animals_nature",
+      "label": "Animals & Nature",
+      "emoji": [
+        {
+          "char": "🐶",
+          "name": "dog",
+          "keywords": [
+            "puppy",
+            "pet"
+          ]
+        },
+        {
+          "char": "🐱",
+          "name": "cat",
+          "keywords": [
+            "kitten",
+            "pet"
+          ]
+        },
+        {
+          "char": "🐭",
+          "name": "mouse",
+          "keywords": []
+        },
+        {
+          "char": "🐹",
+          "name": "hamster",
+          "keywords": []
+        },
+        {
+          "char": "🐰",
+          "name": "rabbit",
+          "keywords": [
+            "bunny"
+          ]
+        },
+        {
+          "char": "🦊",
+          "name": "fox",
+          "keywords": []
+        },
+        {
+          "char": "🐻",
+          "name": "bear",
+          "keywords": []
+        },
+        {
+          "char": "🐼",
+          "name": "panda_face",
+          "keywords": []
+        },
+        {
+          "char": "🐨",
+          "name": "koala",
+          "keywords": []
+        },
+        {
+          "char": "🐯",
+          "name": "tiger_face",
+          "keywords": []
+        },
+        {
+          "char": "🦁",
+          "name": "lion_face",
+          "keywords": []
+        },
+        {
+          "char": "🐮",
+          "name": "cow_face",
+          "keywords": []
+        },
+        {
+          "char": "🐷",
+          "name": "pig_face",
+          "keywords": []
+        },
+        {
+          "char": "🐸",
+          "name": "frog",
+          "keywords": []
+        },
+        {
+          "char": "🐵",
+          "name": "monkey_face",
+          "keywords": []
+        },
+        {
+          "char": "🦄",
+          "name": "unicorn",
+          "keywords": [
+            "magic"
+          ]
+        },
+        {
+          "char": "🐔",
+          "name": "chicken",
+          "keywords": []
+        },
+        {
+          "char": "🐧",
+          "name": "penguin",
+          "keywords": []
+        },
+        {
+          "char": "🐦",
+          "name": "bird",
+          "keywords": []
+        },
+        {
+          "char": "🦆",
+          "name": "duck",
+          "keywords": []
+        },
+        {
+          "char": "🦉",
+          "name": "owl",
+          "keywords": []
+        },
+        {
+          "char": "🐝",
+          "name": "bee",
+          "keywords": [
+            "buzz"
+          ]
+        },
+        {
+          "char": "🦋",
+          "name": "butterfly",
+          "keywords": []
+        },
+        {
+          "char": "🐌",
+          "name": "snail",
+          "keywords": [
+            "slow"
+          ]
+        },
+        {
+          "char": "🐛",
+          "name": "bug",
+          "keywords": [
+            "issue",
+            "insect"
+          ]
+        },
+        {
+          "char": "🐢",
+          "name": "turtle",
+          "keywords": [
+            "slow"
+          ]
+        },
+        {
+          "char": "🐍",
+          "name": "snake",
+          "keywords": []
+        },
+        {
+          "char": "🐙",
+          "name": "octopus",
+          "keywords": []
+        },
+        {
+          "char": "🐳",
+          "name": "whale",
+          "keywords": []
+        },
+        {
+          "char": "🐬",
+          "name": "dolphin",
+          "keywords": []
+        },
+        {
+          "char": "🐟",
+          "name": "fish",
+          "keywords": []
+        },
+        {
+          "char": "🌵",
+          "name": "cactus",
+          "keywords": []
+        },
+        {
+          "char": "🎄",
+          "name": "christmas_tree",
+          "keywords": []
+        },
+        {
+          "char": "🌲",
+          "name": "evergreen_tree",
+          "keywords": []
+        },
+        {
+          "char": "🌳",
+          "name": "deciduous_tree",
+          "keywords": []
+        },
+        {
+          "char": "🌴",
+          "name": "palm_tree",
+          "keywords": []
+        },
+        {
+          "char": "🍀",
+          "name": "four_leaf_clover",
+          "keywords": [
+            "luck",
+            "irish"
+          ]
+        },
+        {
+          "char": "🌸",
+          "name": "cherry_blossom",
+          "keywords": [
+            "spring",
+            "flower"
+          ]
+        },
+        {
+          "char": "🌹",
+          "name": "rose",
+          "keywords": [
+            "flower",
+            "love"
+          ]
+        },
+        {
+          "char": "🌻",
+          "name": "sunflower",
+          "keywords": [
+            "flower"
+          ]
+        },
+        {
+          "char": "🌙",
+          "name": "crescent_moon",
+          "keywords": [
+            "night"
+          ]
+        },
+        {
+          "char": "⭐",
+          "name": "star",
+          "keywords": [
+            "favourite",
+            "night"
+          ]
+        },
+        {
+          "char": "🌟",
+          "name": "star2",
+          "keywords": [
+            "glow"
+          ]
+        },
+        {
+          "char": "⚡",
+          "name": "zap",
+          "keywords": [
+            "lightning",
+            "fast",
+            "power"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "food_drink",
+      "label": "Food & Drink",
+      "emoji": [
+        {
+          "char": "🍎",
+          "name": "apple",
+          "keywords": [
+            "fruit"
+          ]
+        },
+        {
+          "char": "🍌",
+          "name": "banana",
+          "keywords": [
+            "fruit"
+          ]
+        },
+        {
+          "char": "🍇",
+          "name": "grapes",
+          "keywords": [
+            "fruit"
+          ]
+        },
+        {
+          "char": "🍓",
+          "name": "strawberry",
+          "keywords": [
+            "fruit",
+            "berry"
+          ]
+        },
+        {
+          "char": "🍉",
+          "name": "watermelon",
+          "keywords": [
+            "fruit",
+            "summer"
+          ]
+        },
+        {
+          "char": "🍊",
+          "name": "tangerine",
+          "keywords": [
+            "orange",
+            "fruit"
+          ]
+        },
+        {
+          "char": "🍋",
+          "name": "lemon",
+          "keywords": [
+            "fruit"
+          ]
+        },
+        {
+          "char": "🥑",
+          "name": "avocado",
+          "keywords": [
+            "guacamole"
+          ]
+        },
+        {
+          "char": "🍅",
+          "name": "tomato",
+          "keywords": []
+        },
+        {
+          "char": "🥕",
+          "name": "carrot",
+          "keywords": [
+            "vegetable"
+          ]
+        },
+        {
+          "char": "🌽",
+          "name": "corn",
+          "keywords": []
+        },
+        {
+          "char": "🌶",
+          "name": "hot_pepper",
+          "keywords": [
+            "spicy",
+            "chilli"
+          ]
+        },
+        {
+          "char": "🍞",
+          "name": "bread",
+          "keywords": [
+            "loaf"
+          ]
+        },
+        {
+          "char": "🧀",
+          "name": "cheese",
+          "keywords": []
+        },
+        {
+          "char": "🍔",
+          "name": "hamburger",
+          "keywords": [
+            "burger",
+            "fast food"
+          ]
+        },
+        {
+          "char": "🍟",
+          "name": "fries",
+          "keywords": [
+            "chips",
+            "fast food"
+          ]
+        },
+        {
+          "char": "🍕",
+          "name": "pizza",
+          "keywords": []
+        },
+        {
+          "char": "🌭",
+          "name": "hotdog",
+          "keywords": []
+        },
+        {
+          "char": "🍣",
+          "name": "sushi",
+          "keywords": []
+        },
+        {
+          "char": "🍜",
+          "name": "ramen",
+          "keywords": [
+            "noodles",
+            "soup"
+          ]
+        },
+        {
+          "char": "🍰",
+          "name": "cake",
+          "keywords": [
+            "dessert",
+            "birthday"
+          ]
+        },
+        {
+          "char": "🎂",
+          "name": "birthday",
+          "keywords": [
+            "cake",
+            "party"
+          ]
+        },
+        {
+          "char": "🍪",
+          "name": "cookie",
+          "keywords": []
+        },
+        {
+          "char": "🍩",
+          "name": "doughnut",
+          "keywords": [
+            "donut"
+          ]
+        },
+        {
+          "char": "🍫",
+          "name": "chocolate_bar",
+          "keywords": [
+            "candy"
+          ]
+        },
+        {
+          "char": "🍿",
+          "name": "popcorn",
+          "keywords": [
+            "movie",
+            "snack"
+          ]
+        },
+        {
+          "char": "☕",
+          "name": "coffee",
+          "keywords": [
+            "cafe",
+            "espresso"
+          ]
+        },
+        {
+          "char": "🍵",
+          "name": "tea",
+          "keywords": []
+        },
+        {
+          "char": "🥤",
+          "name": "cup_with_straw",
+          "keywords": [
+            "soda",
+            "drink"
+          ]
+        },
+        {
+          "char": "🍺",
+          "name": "beer",
+          "keywords": [
+            "drink",
+            "pint"
+          ]
+        },
+        {
+          "char": "🍻",
+          "name": "beers",
+          "keywords": [
+            "cheers",
+            "drink"
+          ]
+        },
+        {
+          "char": "🥂",
+          "name": "clinking_glasses",
+          "keywords": [
+            "cheers",
+            "celebrate"
+          ]
+        },
+        {
+          "char": "🍾",
+          "name": "champagne",
+          "keywords": [
+            "celebrate"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "activities",
+      "label": "Activities",
+      "emoji": [
+        {
+          "char": "⚽",
+          "name": "soccer",
+          "keywords": [
+            "football",
+            "ball"
+          ]
+        },
+        {
+          "char": "🏀",
+          "name": "basketball",
+          "keywords": [
+            "ball"
+          ]
+        },
+        {
+          "char": "🏈",
+          "name": "football",
+          "keywords": [
+            "american",
+            "ball"
+          ]
+        },
+        {
+          "char": "⚾",
+          "name": "baseball",
+          "keywords": [
+            "ball"
+          ]
+        },
+        {
+          "char": "🎾",
+          "name": "tennis",
+          "keywords": [
+            "ball"
+          ]
+        },
+        {
+          "char": "🏐",
+          "name": "volleyball",
+          "keywords": [
+            "ball"
+          ]
+        },
+        {
+          "char": "🏓",
+          "name": "table_tennis_paddle_and_ball",
+          "keywords": [
+            "ping pong"
+          ]
+        },
+        {
+          "char": "🏆",
+          "name": "trophy",
+          "keywords": [
+            "win",
+            "award",
+            "champion"
+          ]
+        },
+        {
+          "char": "🥇",
+          "name": "first_place_medal",
+          "keywords": [
+            "gold",
+            "win"
+          ]
+        },
+        {
+          "char": "🥈",
+          "name": "second_place_medal",
+          "keywords": [
+            "silver"
+          ]
+        },
+        {
+          "char": "🥉",
+          "name": "third_place_medal",
+          "keywords": [
+            "bronze"
+          ]
+        },
+        {
+          "char": "🎮",
+          "name": "video_game",
+          "keywords": [
+            "controller",
+            "gaming"
+          ]
+        },
+        {
+          "char": "🕹",
+          "name": "joystick",
+          "keywords": [
+            "arcade"
+          ]
+        },
+        {
+          "char": "🎲",
+          "name": "game_die",
+          "keywords": [
+            "dice",
+            "random",
+            "rpg"
+          ]
+        },
+        {
+          "char": "♟",
+          "name": "chess_pawn",
+          "keywords": [
+            "chess"
+          ]
+        },
+        {
+          "char": "🎯",
+          "name": "dart",
+          "keywords": [
+            "target",
+            "aim",
+            "bullseye"
+          ]
+        },
+        {
+          "char": "🎨",
+          "name": "art",
+          "keywords": [
+            "palette",
+            "paint",
+            "design"
+          ]
+        },
+        {
+          "char": "🎭",
+          "name": "performing_arts",
+          "keywords": [
+            "theatre",
+            "drama"
+          ]
+        },
+        {
+          "char": "🎤",
+          "name": "microphone",
+          "keywords": [
+            "sing",
+            "mic"
+          ]
+        },
+        {
+          "char": "🎧",
+          "name": "headphones",
+          "keywords": [
+            "music",
+            "listen"
+          ]
+        },
+        {
+          "char": "🎸",
+          "name": "guitar",
+          "keywords": [
+            "music"
+          ]
+        },
+        {
+          "char": "🎹",
+          "name": "musical_keyboard",
+          "keywords": [
+            "piano"
+          ]
+        },
+        {
+          "char": "🥁",
+          "name": "drum_with_drumsticks",
+          "keywords": [
+            "music"
+          ]
+        },
+        {
+          "char": "🎬",
+          "name": "clapper",
+          "keywords": [
+            "film",
+            "movie",
+            "action"
+          ]
+        },
+        {
+          "char": "🎊",
+          "name": "confetti_ball",
+          "keywords": [
+            "party"
+          ]
+        },
+        {
+          "char": "🎁",
+          "name": "gift",
+          "keywords": [
+            "present",
+            "birthday"
+          ]
+        },
+        {
+          "char": "🎈",
+          "name": "balloon",
+          "keywords": [
+            "party"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "travel_places",
+      "label": "Travel & Places",
+      "emoji": [
+        {
+          "char": "🚗",
+          "name": "car",
+          "keywords": [
+            "vehicle",
+            "drive"
+          ]
+        },
+        {
+          "char": "🚕",
+          "name": "taxi",
+          "keywords": [
+            "cab"
+          ]
+        },
+        {
+          "char": "🚌",
+          "name": "bus",
+          "keywords": []
+        },
+        {
+          "char": "🏎",
+          "name": "racing_car",
+          "keywords": [
+            "fast",
+            "f1"
+          ]
+        },
+        {
+          "char": "🚓",
+          "name": "police_car",
+          "keywords": []
+        },
+        {
+          "char": "🚲",
+          "name": "bike",
+          "keywords": [
+            "bicycle",
+            "cycle"
+          ]
+        },
+        {
+          "char": "🛴",
+          "name": "kick_scooter",
+          "keywords": [
+            "scooter"
+          ]
+        },
+        {
+          "char": "🏍",
+          "name": "racing_motorcycle",
+          "keywords": [
+            "motorbike"
+          ]
+        },
+        {
+          "char": "✈",
+          "name": "airplane",
+          "keywords": [
+            "flight",
+            "travel"
+          ]
+        },
+        {
+          "char": "🚀",
+          "name": "rocket",
+          "keywords": [
+            "launch",
+            "ship",
+            "fast"
+          ]
+        },
+        {
+          "char": "🛸",
+          "name": "flying_saucer",
+          "keywords": [
+            "ufo"
+          ]
+        },
+        {
+          "char": "🚁",
+          "name": "helicopter",
+          "keywords": []
+        },
+        {
+          "char": "⛵",
+          "name": "sailboat",
+          "keywords": [
+            "ship"
+          ]
+        },
+        {
+          "char": "🚢",
+          "name": "ship",
+          "keywords": [
+            "cruise"
+          ]
+        },
+        {
+          "char": "🏠",
+          "name": "house",
+          "keywords": [
+            "home"
+          ]
+        },
+        {
+          "char": "🏢",
+          "name": "office",
+          "keywords": [
+            "work",
+            "building"
+          ]
+        },
+        {
+          "char": "🏥",
+          "name": "hospital",
+          "keywords": [
+            "medical"
+          ]
+        },
+        {
+          "char": "🏫",
+          "name": "school",
+          "keywords": [
+            "education"
+          ]
+        },
+        {
+          "char": "🏦",
+          "name": "bank",
+          "keywords": [
+            "money"
+          ]
+        },
+        {
+          "char": "🌍",
+          "name": "earth_africa",
+          "keywords": [
+            "world",
+            "globe",
+            "international"
+          ]
+        },
+        {
+          "char": "🌎",
+          "name": "earth_americas",
+          "keywords": [
+            "world",
+            "globe"
+          ]
+        },
+        {
+          "char": "🌏",
+          "name": "earth_asia",
+          "keywords": [
+            "world",
+            "globe"
+          ]
+        },
+        {
+          "char": "🗺",
+          "name": "world_map",
+          "keywords": [
+            "map",
+            "travel"
+          ]
+        },
+        {
+          "char": "🏔",
+          "name": "mountain_snow",
+          "keywords": [
+            "peak"
+          ]
+        },
+        {
+          "char": "🏖",
+          "name": "beach_with_umbrella",
+          "keywords": [
+            "vacation",
+            "holiday"
+          ]
+        },
+        {
+          "char": "🏝",
+          "name": "desert_island",
+          "keywords": [
+            "vacation"
+          ]
+        },
+        {
+          "char": "🌋",
+          "name": "volcano",
+          "keywords": []
+        },
+        {
+          "char": "🎡",
+          "name": "ferris_wheel",
+          "keywords": [
+            "fair"
+          ]
+        },
+        {
+          "char": "🗽",
+          "name": "statue_of_liberty",
+          "keywords": [
+            "new york",
+            "usa"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "objects",
+      "label": "Objects",
+      "emoji": [
+        {
+          "char": "⌚",
+          "name": "watch",
+          "keywords": [
+            "time",
+            "clock"
+          ]
+        },
+        {
+          "char": "📱",
+          "name": "iphone",
+          "keywords": [
+            "phone",
+            "mobile",
+            "device"
+          ]
+        },
+        {
+          "char": "💻",
+          "name": "computer",
+          "keywords": [
+            "laptop",
+            "desktop",
+            "work"
+          ]
+        },
+        {
+          "char": "⌨",
+          "name": "keyboard",
+          "keywords": [
+            "type"
+          ]
+        },
+        {
+          "char": "🖥",
+          "name": "desktop_computer",
+          "keywords": [
+            "monitor"
+          ]
+        },
+        {
+          "char": "🖨",
+          "name": "printer",
+          "keywords": [
+            "print"
+          ]
+        },
+        {
+          "char": "🖱",
+          "name": "computer_mouse",
+          "keywords": []
+        },
+        {
+          "char": "💾",
+          "name": "floppy_disk",
+          "keywords": [
+            "save",
+            "storage"
+          ]
+        },
+        {
+          "char": "💿",
+          "name": "cd",
+          "keywords": [
+            "disc"
+          ]
+        },
+        {
+          "char": "📷",
+          "name": "camera",
+          "keywords": [
+            "photo"
+          ]
+        },
+        {
+          "char": "🔒",
+          "name": "lock",
+          "keywords": [
+            "secure",
+            "private",
+            "closed"
+          ]
+        },
+        {
+          "char": "🔑",
+          "name": "key",
+          "keywords": [
+            "unlock",
+            "access"
+          ]
+        },
+        {
+          "char": "🔧",
+          "name": "wrench",
+          "keywords": [
+            "tool",
+            "fix",
+            "maintenance"
+          ]
+        },
+        {
+          "char": "🔨",
+          "name": "hammer",
+          "keywords": [
+            "tool",
+            "build"
+          ]
+        },
+        {
+          "char": "⚙",
+          "name": "gear",
+          "keywords": [
+            "settings",
+            "config",
+            "cog"
+          ]
+        },
+        {
+          "char": "📌",
+          "name": "pushpin",
+          "keywords": [
+            "pin",
+            "important"
+          ]
+        },
+        {
+          "char": "📎",
+          "name": "paperclip",
+          "keywords": [
+            "attach",
+            "file"
+          ]
+        },
+        {
+          "char": "📁",
+          "name": "file_folder",
+          "keywords": [
+            "folder",
+            "directory"
+          ]
+        },
+        {
+          "char": "📄",
+          "name": "page_facing_up",
+          "keywords": [
+            "document",
+            "file"
+          ]
+        },
+        {
+          "char": "📝",
+          "name": "memo",
+          "keywords": [
+            "write",
+            "note",
+            "edit"
+          ]
+        },
+        {
+          "char": "✏",
+          "name": "pencil2",
+          "keywords": [
+            "write",
+            "edit"
+          ]
+        },
+        {
+          "char": "📊",
+          "name": "bar_chart",
+          "keywords": [
+            "chart",
+            "stats",
+            "graph"
+          ]
+        },
+        {
+          "char": "📈",
+          "name": "chart_with_upwards_trend",
+          "keywords": [
+            "growth",
+            "up",
+            "metrics"
+          ]
+        },
+        {
+          "char": "📉",
+          "name": "chart_with_downwards_trend",
+          "keywords": [
+            "decline",
+            "down"
+          ]
+        },
+        {
+          "char": "📅",
+          "name": "date",
+          "keywords": [
+            "calendar",
+            "schedule"
+          ]
+        },
+        {
+          "char": "🔍",
+          "name": "mag",
+          "keywords": [
+            "search",
+            "find",
+            "zoom"
+          ]
+        },
+        {
+          "char": "🔔",
+          "name": "bell",
+          "keywords": [
+            "notify",
+            "alert"
+          ]
+        },
+        {
+          "char": "🔕",
+          "name": "bell_with_slash",
+          "keywords": [
+            "mute",
+            "silent",
+            "off"
+          ]
+        },
+        {
+          "char": "🔗",
+          "name": "link",
+          "keywords": [
+            "url",
+            "chain"
+          ]
+        },
+        {
+          "char": "💡",
+          "name": "bulb",
+          "keywords": [
+            "idea",
+            "light"
+          ]
+        },
+        {
+          "char": "🗑",
+          "name": "wastebasket",
+          "keywords": [
+            "delete",
+            "trash",
+            "bin"
+          ]
+        },
+        {
+          "char": "🛠",
+          "name": "hammer_and_wrench",
+          "keywords": [
+            "tools",
+            "build",
+            "maintain"
+          ]
+        },
+        {
+          "char": "🧹",
+          "name": "broom",
+          "keywords": [
+            "clean",
+            "chore"
+          ]
+        },
+        {
+          "char": "🧪",
+          "name": "test_tube",
+          "keywords": [
+            "experiment",
+            "lab",
+            "test"
+          ]
+        },
+        {
+          "char": "🧬",
+          "name": "dna",
+          "keywords": [
+            "biology"
+          ]
+        },
+        {
+          "char": "🩺",
+          "name": "stethoscope",
+          "keywords": [
+            "doctor",
+            "health"
+          ]
+        },
+        {
+          "char": "💊",
+          "name": "pill",
+          "keywords": [
+            "medicine",
+            "health"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "symbols",
+      "label": "Symbols",
+      "emoji": [
+        {
+          "char": "☑",
+          "name": "ballot_box_with_check",
+          "keywords": [
+            "done"
+          ]
+        },
+        {
+          "char": "✔",
+          "name": "heavy_check_mark",
+          "keywords": [
+            "done"
+          ]
+        },
+        {
+          "char": "❌",
+          "name": "x",
+          "keywords": [
+            "no",
+            "fail",
+            "reject",
+            "cancel"
+          ]
+        },
+        {
+          "char": "⭕",
+          "name": "o",
+          "keywords": [
+            "circle"
+          ]
+        },
+        {
+          "char": "❗",
+          "name": "exclamation",
+          "keywords": [
+            "warning",
+            "important"
+          ]
+        },
+        {
+          "char": "❓",
+          "name": "question",
+          "keywords": [
+            "help",
+            "unknown"
+          ]
+        },
+        {
+          "char": "⚠",
+          "name": "warning",
+          "keywords": [
+            "caution",
+            "danger"
+          ]
+        },
+        {
+          "char": "🚫",
+          "name": "no_entry_sign",
+          "keywords": [
+            "forbidden",
+            "banned"
+          ]
+        },
+        {
+          "char": "♻",
+          "name": "recycle",
+          "keywords": [
+            "reuse",
+            "green"
+          ]
+        },
+        {
+          "char": "🔁",
+          "name": "repeat",
+          "keywords": [
+            "loop",
+            "again"
+          ]
+        },
+        {
+          "char": "🔀",
+          "name": "twisted_rightwards_arrows",
+          "keywords": [
+            "shuffle",
+            "random"
+          ]
+        },
+        {
+          "char": "➕",
+          "name": "heavy_plus_sign",
+          "keywords": [
+            "add",
+            "new",
+            "create"
+          ]
+        },
+        {
+          "char": "➖",
+          "name": "heavy_minus_sign",
+          "keywords": [
+            "remove",
+            "minus"
+          ]
+        },
+        {
+          "char": "✖",
+          "name": "heavy_multiplication_x",
+          "keywords": [
+            "cancel",
+            "wrong"
+          ]
+        },
+        {
+          "char": "♾",
+          "name": "infinity",
+          "keywords": [
+            "forever"
+          ]
+        },
+        {
+          "char": "©",
+          "name": "copyright",
+          "keywords": []
+        },
+        {
+          "char": "®",
+          "name": "registered",
+          "keywords": []
+        },
+        {
+          "char": "™",
+          "name": "tm",
+          "keywords": []
+        },
+        {
+          "char": "🔴",
+          "name": "red_circle",
+          "keywords": [
+            "red",
+            "status",
+            "offline"
+          ]
+        },
+        {
+          "char": "🟠",
+          "name": "orange_circle",
+          "keywords": [
+            "orange",
+            "status"
+          ]
+        },
+        {
+          "char": "🟡",
+          "name": "yellow_circle",
+          "keywords": [
+            "yellow",
+            "status",
+            "pending"
+          ]
+        },
+        {
+          "char": "🟢",
+          "name": "green_circle",
+          "keywords": [
+            "green",
+            "status",
+            "online"
+          ]
+        },
+        {
+          "char": "🔵",
+          "name": "blue_circle",
+          "keywords": [
+            "blue",
+            "status"
+          ]
+        },
+        {
+          "char": "🟣",
+          "name": "purple_circle",
+          "keywords": [
+            "purple",
+            "status"
+          ]
+        },
+        {
+          "char": "⚫",
+          "name": "black_circle",
+          "keywords": [
+            "black",
+            "status"
+          ]
+        },
+        {
+          "char": "⚪",
+          "name": "white_circle",
+          "keywords": [
+            "white",
+            "status"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flags",
+      "label": "Flags",
+      "emoji": [
+        {
+          "char": "🇺🇳",
+          "name": "flag_un",
+          "keywords": [
+            "united nations"
+          ]
+        },
+        {
+          "char": "🇬🇧",
+          "name": "flag_gb",
+          "keywords": [
+            "uk",
+            "britain",
+            "england"
+          ]
+        },
+        {
+          "char": "🇺🇸",
+          "name": "flag_us",
+          "keywords": [
+            "usa",
+            "america",
+            "united states"
+          ]
+        },
+        {
+          "char": "🇩🇪",
+          "name": "flag_de",
+          "keywords": [
+            "germany"
+          ]
+        },
+        {
+          "char": "🇫🇷",
+          "name": "flag_fr",
+          "keywords": [
+            "france"
+          ]
+        },
+        {
+          "char": "🇪🇸",
+          "name": "flag_es",
+          "keywords": [
+            "spain"
+          ]
+        },
+        {
+          "char": "🇮🇹",
+          "name": "flag_it",
+          "keywords": [
+            "italy"
+          ]
+        },
+        {
+          "char": "🇳🇱",
+          "name": "flag_nl",
+          "keywords": [
+            "netherlands",
+            "dutch"
+          ]
+        },
+        {
+          "char": "🇵🇱",
+          "name": "flag_pl",
+          "keywords": [
+            "poland"
+          ]
+        },
+        {
+          "char": "🇷🇺",
+          "name": "flag_ru",
+          "keywords": [
+            "russia"
+          ]
+        },
+        {
+          "char": "🇸🇪",
+          "name": "flag_se",
+          "keywords": [
+            "sweden"
+          ]
+        },
+        {
+          "char": "🇺🇦",
+          "name": "flag_ua",
+          "keywords": [
+            "ukraine"
+          ]
+        },
+        {
+          "char": "🇧🇷",
+          "name": "flag_br",
+          "keywords": [
+            "brazil"
+          ]
+        },
+        {
+          "char": "🇨🇳",
+          "name": "flag_cn",
+          "keywords": [
+            "china"
+          ]
+        },
+        {
+          "char": "🇮🇳",
+          "name": "flag_in",
+          "keywords": [
+            "india"
+          ]
+        },
+        {
+          "char": "🇯🇵",
+          "name": "flag_jp",
+          "keywords": [
+            "japan"
+          ]
+        },
+        {
+          "char": "🇲🇽",
+          "name": "flag_mx",
+          "keywords": [
+            "mexico"
+          ]
+        },
+        {
+          "char": "🇦🇺",
+          "name": "flag_au",
+          "keywords": [
+            "australia"
+          ]
+        },
+        {
+          "char": "🇨🇦",
+          "name": "flag_ca",
+          "keywords": [
+            "canada"
+          ]
+        }
+      ]
+    }
+  ]
+}
