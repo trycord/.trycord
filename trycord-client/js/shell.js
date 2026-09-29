@@ -205,12 +205,12 @@ export function memberActions(m) {
 }
 
 const DESTINATIONS = [
-  { id: 'home', label: 'Home', icon: 'âŒ‚', href: '#/home' },
-  { id: 'dms', label: 'DMs', icon: 'âœ‰', href: '#/dms' },
-  { id: 'notifications', label: 'Notifications', icon: 'â™§', href: '#/notifications', badge: () => State.notifUnread },
-  { id: 'discover', label: 'Discover', icon: 'âŒ•', href: '#/discover' },
+  { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
+  { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
+  { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
+  { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
   { id: 'support', label: 'Support', icon: '?', href: '#/support' },
-  { id: 'friends', label: 'Friends', icon: 'â˜º', href: '#/friends' },
+  { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
 ];
 
 let navRoute = () => '';
@@ -230,11 +230,11 @@ export function renderCommunities(region) {
   const route = currentRoute();
 
   const globalItems = [
-    { id: 'home', label: 'Home', icon: 'âŒ‚', href: '#/home' },
-    { id: 'dms', label: 'Direct messages', icon: 'âœ‰', href: '#/dms' },
-    { id: 'notifications', label: 'Notifications', icon: 'â™§', href: '#/notifications', badge: () => State.notifUnread },
-    { id: 'discover', label: 'Discover', icon: 'âŒ•', href: '#/discover' },
-    { id: 'friends', label: 'Friends', icon: 'â˜º', href: '#/friends', badge: () => (State.friendsIn || []).length },
+    { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
+    { id: 'dms', label: 'Direct messages', icon: '✉', href: '#/dms' },
+    { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
+    { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
+    { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends', badge: () => (State.friendsIn || []).length },
   ];
 
   const railButton = ({ label, icon, href, active, badge }) => {
@@ -348,7 +348,7 @@ function communityHeader(sid, server) {
   const trigger = el('button', {
     class: 'ctx-head__action', type: 'button',
     title: 'Community menu', 'aria-label': 'Community menu for ' + name,
-  }, 'âŒ„');
+  }, '⌄');
   bar.appendChild(trigger);
   head.appendChild(bar);
 
@@ -361,21 +361,21 @@ function communityHeader(sid, server) {
     const base = serverPath(sid);
     const items = [];
 
-    items.push({ label: 'Community overview', icon: 'âŒ‚', onSelect: go(base) });
-    items.push({ label: 'Members', icon: 'ðŸ‘¥', onSelect: go(base + '/members') });
+    items.push({ label: 'Community overview', icon: '⌂', onSelect: go(base) });
+    items.push({ label: 'Members', icon: '☰', onSelect: go(base + '/members') });
     if (can('MANAGE_ROLES') || can('MANAGE_SERVER')) {
-      items.push({ label: 'Roles', icon: 'ðŸ·', onSelect: go(base + '/roles') });
+      items.push({ label: 'Roles', icon: '◈', onSelect: go(base + '/roles') });
     }
     if (can('MANAGE_CHANNELS')) {
-      items.push({ label: 'Categories', icon: 'â‰¡', onSelect: go(base + '/categories') });
-      items.push({ label: 'Create channel', icon: 'ï¼‹', onSelect: go(base + '/channels/new') });
+      items.push({ label: 'Categories', icon: '≡', onSelect: go(base + '/categories') });
+      items.push({ label: 'Create channel', icon: '＋', onSelect: go(base + '/channels/new') });
     }
     if (can('MANAGE_INVITES')) {
-      items.push({ label: 'Invites', icon: 'âœ‰', onSelect: go(base + '/invites') });
+      items.push({ label: 'Invites', icon: '✉', onSelect: go(base + '/invites') });
     }
     if (can('MANAGE_SERVER')) {
       items.push({ sep: true });
-      items.push({ label: 'Community settings', icon: 'âš™', onSelect: go(base + '/settings') });
+      items.push({ label: 'Community settings', icon: '⚙', onSelect: go(base + '/settings') });
     }
     items.push({ sep: true });
     items.push({ label: 'Leave community', icon: '⤶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
@@ -437,7 +437,7 @@ function sessionBar() {
     class: 'user-controls__btn', type: 'button',
     title: 'Settings', 'aria-label': 'Settings',
     onClick: () => { location.hash = '#/settings'; },
-  }, 'âš™'));
+  }, '⚙'));
   bar.appendChild(buttons);
   return bar;
 }
@@ -737,6 +737,11 @@ const ADMIN_SECTIONS = [
   { label: 'Communities', path: '/admin/communities' },
   { label: 'Reports', path: '/admin/reports' },
   { label: 'Appeals', path: '/admin/appeals' },
+  { label: 'GDPR requests', path: '/admin/gdpr' },
+  // The site builder. It was reachable only by typing the URL or by arriving
+  // from the account menu, because nothing in the navigation pointed at it -
+  // the router and the page's own tab bar had it, the sidebar did not.
+  { label: 'Pages', path: '/admin/pages' },
   { label: 'Audit log', path: '/admin/audit' },
 ];
 
@@ -879,7 +884,7 @@ function sidebarToggleButton() {
     title: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
     'aria-label': collapsed ? 'Expand sidebar' : 'Collapse sidebar',
     'aria-pressed': collapsed ? 'true' : 'false',
-  }, collapsed ? 'â–¶' : 'â—€');
+  }, collapsed ? '▶' : '◀');
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleSidebar();
@@ -1006,7 +1011,7 @@ export function renderContextHeader({ title, sub, icon, actions } = {}) {
     class: 'nav-toggle', type: 'button',
     title: 'Navigation', 'aria-label': 'Toggle navigation',
     'aria-expanded': isDesktopNavOpen() ? 'true' : 'false',
-  }, 'â˜°');
+  }, '☰');
   navToggle.addEventListener('click', () => toggleContextSidebar());
   header.appendChild(navToggle);
 
@@ -1035,11 +1040,11 @@ export function renderMobileTabs(region) {
   if (!isAuthed()) return;
   const route = currentRoute();
   const tabs = [
-    { id: 'home', label: 'Home', icon: 'âŒ‚', href: '#/home' },
-    { id: 'dms', label: 'DMs', icon: 'âœ‰', href: '#/dms' },
-    { id: 'friends', label: 'Friends', icon: 'â˜º', href: '#/friends' },
-    { id: 'notifications', label: 'Alerts', icon: 'â™§', href: '#/notifications' },
-    { id: 'menu', label: 'Menu', icon: 'â˜°', href: '#/menu' },
+    { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
+    { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
+    { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
+    { id: 'notifications', label: 'Alerts', icon: '♧', href: '#/notifications' },
+    { id: 'menu', label: 'Menu', icon: '☰', href: '#/menu' },
   ];
   for (const t of tabs) {
     const active = route.startsWith(t.href.replace('#', ''));

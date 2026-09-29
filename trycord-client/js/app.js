@@ -61,7 +61,7 @@ async function boot() {
     if (!statusEl) return;
     if (!on) {
       statusEl.classList.add('show');
-      statusEl.textContent = 'Offline â€” reconnectingâ€¦';
+      statusEl.textContent = 'Offline — reconnecting…';
     } else {
       statusEl.classList.remove('show');
     }
