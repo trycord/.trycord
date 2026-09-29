@@ -536,9 +536,11 @@ async function boot() {
     app.get('/welcome', publicPage('home.html'));
     app.get('/404', publicPage('404.html'));
     // Browsers auto-request /favicon.ico on every page: serve the brand
-    // icon instead of logging a 404 into every console.
+    // icon instead of logging a 404 into every console. The icon is read from
+    // the client tree, which is the single copy; public/ no longer carries one.
     app.get('/favicon.ico', (req, res) => {
-      res.set('Cache-Control', 'public, max-age=86400').sendFile('assets/trycord-logo.ico', { root: publicDir }, () => {
+      const root = clientDir || publicDir;
+      res.set('Cache-Control', 'public, max-age=86400').sendFile('assets/trycord-logo.ico', { root }, () => {
         if (!res.headersSent) res.status(404).end();
       });
     });
