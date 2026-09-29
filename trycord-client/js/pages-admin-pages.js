@@ -224,10 +224,15 @@ function applyBBCode(input, spec) {
 function pageEditor(container, route) {
   clear(container);
 
-  // Full-page layout, deliberately outside the admin context panel. Editing a
-  // legal page is a long, single-focus task and the nested scroll region meant
-  // the action bar drifted out of reach while scrolling a long body.
-  container.classList.add('page-editor-host');
+  // Full page means escaping the shell's content column, not just using a wider
+  // div inside it. Two things sit between the editor and the viewport: the
+  // context header, which the shell renders for every route, and the padding and
+  // width cap on .main-content. The editor draws its own bar, so the header is
+  // hidden for this route only, by the flag below. Scoped to the route so every
+  // other page keeps the chrome it expects, and cleared on the way out so
+  // leaving the editor restores it.
+  document.documentElement.dataset.fullpage = 'page-editor';
+
   const wrap = el('div', { class: 'page-editor' });
 
   const head = el('header', { class: 'page-editor__bar' });
@@ -307,6 +312,19 @@ function pageEditor(container, route) {
       body.appendChild(el('div', { class: 'draft-note', role: 'note' },
         el('strong', {}, 'This is a legal page. '),
         'Publishing is visible to everyone immediately and is written to the audit log. Check the content carefully before you publish.'));
+    }
+
+    // An empty editor on a page that has never been drafted reads as a broken
+    // one. It is not: the shipped file is still live until something is
+    // published, and saying so is the difference between an operator who
+    // understands what they are looking at and one who assumes the page is
+    // empty for visitors too.
+    if (!state.blocks.length && state.page.status !== 'PUBLISHED') {
+      const box = el('div', { class: 'draft-note', role: 'note' });
+      box.appendChild(el('strong', {}, 'Nothing drafted yet. '));
+      box.appendChild(el('span', {}, 'Visitors are currently seeing the template that ships with Trycord. '
+        + 'Add blocks below, or save an empty draft to publish a blank page.'));
+      body.appendChild(box);
     }
     if (state.page.outstandingFields && state.page.outstandingFields.length) {
       const box = el('div', { class: 'field' });
@@ -483,8 +501,12 @@ export async function renderAdminPages(container, { route } = {}) {
     pageEditor(container, route);
     return;
   }
+  // The editor hid the shell's context header for itself. Leaving it set would
+  // take the header away from the page list too, and from whatever the member
+  // navigates to next.
+  delete document.documentElement.dataset.fullpage;
   clear(container);
-  renderContextHeader({ title: 'Pages', sub: 'Public pages an operator can edit' });
+  renderContextHeader({ title: 'Pages', sub: 'Public pages an editor can change' });
   const wrap = el('div', { class: 'page atrium' });
   wrap.appendChild(el('p', { class: 'muted small' },
     'These pages ship as templates. The sections describing what the software does are accurate everywhere; '

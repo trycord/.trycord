@@ -3163,10 +3163,9 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 /* ---- page editor: full-viewport layout ----
    The editor escapes the app shell so a long legal page gets the whole window
    and the action bar stays reachable. It is the one admin surface that is a
-   single-focus task rather than a panel. */
-.page-editor-host {
-  padding: 0;
-}
+   single-focus task rather than a panel. Width and padding are dealt with by
+   the html[data-fullpage] block at the end of this file, which has to reach the
+   editor's ancestors and so cannot be scoped to a class on the editor itself. */
 .page-editor {
   display: flex;
   flex-direction: column;
@@ -3291,3 +3290,32 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .bbcode-size-5 { font-size: 1.2em; }
 .bbcode-size-6 { font-size: 1.4em; }
 .bbcode-size-7 { font-size: 1.7em; }
+/* ---- full-page routes ----
+   The page editor is the one surface that is a long single-focus task, so it
+   takes the whole content column rather than sitting inside it. The shell puts
+   a context header above the view region and caps the column's width, and both
+   have to go - a wider div inside a capped, padded column is still a capped,
+   padded column, which is what the first attempt produced.
+
+   Scoped to a data attribute on <html> rather than a class on the view region,
+   because the elements that need neutralising are the editor's ancestors and a
+   class on a descendant cannot reach them. The flag is set on the editor route
+   and deleted on the way out, so no other page is affected. */
+html[data-fullpage="page-editor"] .context-header {
+  display: none !important;
+}
+html[data-fullpage="page-editor"] .main-content {
+  padding: 0 !important;
+  gap: 0 !important;
+}
+html[data-fullpage="page-editor"] .chat-environment {
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: none !important;
+}
+html[data-fullpage="page-editor"] .view-root {
+  max-width: none !important;
+  margin: 0 !important;
+  width: 100% !important;
+  overflow-y: auto !important;
+}
