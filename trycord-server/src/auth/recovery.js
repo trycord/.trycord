@@ -79,14 +79,26 @@ async function resetPassword(token, newPassword) {
   if (reuse) throw { code: 'VALIDATION_ERROR', message: 'new password must be different from the current one' };
   const hash = await bcrypt.hash(String(newPassword), BCRYPT_COST);
   const ts = now();
-  await db.transaction(async (t) => {
+  // A reset terminates every existing session. Without this, whoever prompted
+  // the reset keeps their session: the account holder changes the password
+  // precisely because they believe the old credential is gone, and the token
+  // the attacker already holds is not. The version bump also makes the token
+  // returned below valid, where stamping a timestamp alone left the same-second
+  // hole open and signed the replacement with a stale version.
+  const version = await db.transaction(async (t) => {
     await t.run('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?', [hash, ts, user.id]);
+    await t.run(
+      'UPDATE users SET session_version = session_version + 1, sessions_invalidated_at = ? WHERE id = ?',
+      [ts, user.id]
+    );
     await t.run('UPDATE password_resets SET used_at = ? WHERE id = ?', [ts, row.id]);
     await t.run('DELETE FROM password_resets WHERE user_id = ? AND id != ?', [user.id, row.id]);
+    const after = await t.get('SELECT session_version FROM users WHERE id = ?', [user.id]);
+    return after ? Number(after.session_version || 0) : 0;
   });
-  console.log(`[security] password_reset_completed user=${user.id}`);
+  console.log(`[security] password_reset_completed user=${user.id} sessions_revoked=1`);
   return {
-    token: sign({ id: user.id, username: user.username }),
+    token: sign({ id: user.id, username: user.username, session_version: version }),
     user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },
   };
 }
