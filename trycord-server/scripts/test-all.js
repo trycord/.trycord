@@ -22,7 +22,7 @@ const SUITES = [
   'test-migration',
   'test-schema-parity',
   'test-storage',
-  'test-storage-migrate',
+  'test-storage-migrate', 'test-sigv4',
   'test-client-dom',
   'test-dead-css',
   'test-cors-matcher',
@@ -147,5 +147,6 @@ function summarise(result) {
   console.log(`\n${results.length - failed}/${results.length} suites passed`);
   process.exit(failed ? 1 : 0);
 })();
+
 
 
