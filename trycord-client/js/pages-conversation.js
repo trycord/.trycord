@@ -8,6 +8,7 @@ import { emptyState, messageRow, paintReactions } from './components.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
 import { TrycordConfig } from './config.js';
+import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
 
 async function renderChannel(container, serverId, channelId, opts = {}) {
   clear(container);
@@ -78,7 +79,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }, '⌕');
   const pinsBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Pinned messages', 'aria-label': 'Pinned messages',
-    onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + channelId + '/pins'; },
+    onClick: () => { location.hash = channelPath(serverId, channelId, '/pins'); },
   }, '☆');
   const moreBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Community actions', 'aria-label': 'Community actions',
@@ -307,7 +308,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
 
   // identifies it - never the text, the author or the timestamp.
   function msgLink(m) {
-    return location.origin + '/#/server/' + currentServerId() + '/channel/' + channelId + '?m=' + encodeURIComponent(m.id);
+    return absoluteChannelUrl(currentServerId(), channelId, m.id);
   }
 
   function openMsgMenu(x, y, m, isMine) {
@@ -619,11 +620,11 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
           if (!hits.length) { status.textContent = 'No messages found.'; return; }
           status.textContent = hits.length + ' result' + (hits.length === 1 ? '' : 's') + '.';
           for (const h of hits) {
-            const dest = '#/server/' + h.server_id + '/channel/' + h.channel_id;
+            const dest = channelPath(h.server_id, h.channel_id);
             // can never disagree about where a result goes.
             const jump = () => {
               panel.remove(); searchPanel = null;
-              const cur = '#/server/' + serverId + '/channel/' + channelId;
+              const cur = channelPath(serverId, channelId);
               if (dest === cur) {
                 const node = feed.querySelector('[data-message-id="' + h.id + '"]');
                 if (node) {
@@ -683,7 +684,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   setViewRefresh(() => {
     const layout = State.channels || { channels: [] };
     const ch = (layout.channels || []).find((c) => String(c.id) === String(channelId));
-    if (!ch) { location.hash = '#/server/' + serverId; return; }
+    if (!ch) { location.hash = serverPath(serverId); return; }
     renderContextHeader({ title: '#' + (ch.name || 'channel'), sub: ch.topic ? esc(ch.topic) : server.name, icon: '#' });
   });
   renderAllChrome();
@@ -706,7 +707,7 @@ async function renderChannelPins(container, serverId, channelId) {
   const layout = State.channels;
   const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
   const back = el('button', { class: 'btn ghost sm', type: 'button' }, '← Back to #' + (channel ? channel.name : 'channel'));
-  back.addEventListener('click', () => { location.hash = '#/server/' + serverId + '/channel/' + channelId; });
+  back.addEventListener('click', () => { location.hash = channelPath(serverId, channelId); });
   renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: '☆', actions: [back] });
   const wrap = el('div', { class: 'page atrium' });
   const list = el('div', { class: 'stack' });
@@ -734,7 +735,7 @@ async function renderChannelPins(container, serverId, channelId) {
       node.title = 'Jump to message';
       node.addEventListener('click', (e) => {
         if (e.target.closest('a, button')) return;
-        location.hash = '#/server/' + serverId + '/channel/' + channelId;
+        location.hash = channelPath(serverId, channelId);
       });
       list.appendChild(node);
     }

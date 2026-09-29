@@ -3,6 +3,7 @@ import State, { refreshServers, refreshActivity, refreshDms } from './state.js';
 import { esc, el, clear, relTime } from './ui.js';
 import { avatar, emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
+import { channelPath } from './links.js';
 
 export async function renderHome(container) {
   clear(container);
@@ -42,7 +43,7 @@ export async function renderHome(container) {
       const a = entry.item;
       const row = el('button', {
         class: 'row home-event', type: 'button',
-        onClick: () => { location.hash = '#/server/' + a.server_id + '/channel/' + a.channel_id; },
+        onClick: () => { location.hash = channelPath(a.server_id, a.channel_id); },
       });
       row.appendChild(avatar({ username: a.author_name, displayName: a.author_display }, { withPresence: false }));
       const main = el('div', { class: 'row-main' });

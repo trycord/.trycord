@@ -18,6 +18,7 @@ import { clear, confirmDialog, el, relTime, toast } from './ui.js';
 import { communityMark, invalidateAuthedImage, loadAuthedImage } from './components.js';
 import { renderContextHeader } from './shell.js';
 import { ensureServer } from './workspace-shared.js';
+import { serverPath } from './links.js';
 
 function settingsNav(serverId, active) {
   const nav = el('div', { class: 'settings-nav' });
@@ -28,7 +29,7 @@ function settingsNav(serverId, active) {
       type: 'button',
       'aria-current': on ? 'page' : null,
     }, s.label);
-    b.addEventListener('click', () => { location.hash = '#/server/' + serverId + '/settings/' + s.id; });
+    b.addEventListener('click', () => { location.hash = serverPath(serverId, 'settings/' + s.id; });
     nav.appendChild(b);
   }
   return nav;
@@ -44,7 +45,7 @@ function linkedSection({ serverId, title, blurb, href, cta, counts }) {
     for (const c of counts) row.appendChild(el('span', {}, c));
     box.appendChild(row);
   }
-  const go = el('a', { class: 'btn primary', href: '#/server/' + serverId + href }, cta);
+  const go = el('a', { class: 'btn primary', href: serverPath(serverId, href) }, cta);
   box.appendChild(el('div', { class: 'card-actions' }, go));
   return box;
 }
@@ -304,7 +305,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       if (bans.length > 20) box.appendChild(el('p', { class: 'muted small' }, '+ ' + (bans.length - 20) + ' more'));
     }
     const link = el('div', { class: 'card-actions' },
-      el('a', { class: 'btn', href: '#/server/' + serverId + '/members' }, 'Manage on the member roster'));
+      el('a', { class: 'btn', href: serverPath(serverId, 'members') }, 'Manage on the member roster'));
     box.appendChild(link);
     panel.appendChild(box);
     return;

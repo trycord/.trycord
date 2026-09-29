@@ -9,6 +9,7 @@ import { renderContextHeader } from './shell.js';
 import { groupPermissions, humanizePerm } from './permission-groups.js';
 import { assignableRoleTest, myTopPosition, openRoleAssignModal } from './role-assignment.js';
 import { ensureServer } from './workspace-shared.js';
+import { serverPath } from './links.js';
 
 function roleColor(role) {
   return /^#[0-9a-f]{6}$/i.test((role && role.color) || '') ? role.color : null;
@@ -92,7 +93,7 @@ async function renderServerRoles(container, serverId) {
     if (mayManage) {
       items.push({
         label: 'Manage members', desc: 'Assign or remove this role',
-        onSelect: () => { location.hash = '#/server/' + serverId + '/members'; },
+        onSelect: () => { location.hash = serverPath(serverId, 'members'); },
       });
     }
 

@@ -3,6 +3,7 @@ import State, { refreshNotifications } from './state.js';
 import { attachContextMenu, copyText, el, clear, toast, relTime } from './ui.js';
 import { emptyState, avatar } from './components.js';
 import { renderContextHeader, renderAllChrome } from './shell.js';
+import { channelPath } from './links.js';
 
 function describe(n) {
   const who = (n.actor && (n.actor.displayName || n.actor.username)) || 'Someone';
@@ -17,7 +18,7 @@ function describe(n) {
 
 function destination(n) {
   if (n.type === 'mention' && n.context) {
-    return '#/server/' + n.context.serverId + '/channel/' + n.context.channelId;
+    return channelPath(n.context.serverId, n.context.channelId);
   }
   if (n.type === 'dm' && n.referenceId) return '#/dms/' + n.referenceId;
   if ((n.type === 'friend_request' || n.type === 'friend_accepted') && n.actor) {
