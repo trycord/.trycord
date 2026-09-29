@@ -10,17 +10,17 @@
 // the id. The id route always resolves, so a missing slug degrades the URL
 // rather than breaking it - which is the whole reason resolution accepts both
 // forms.
-import { state } from './state.js';
+import State from './state.js';
 
 function serverRow(id) {
-  const list = Array.isArray(state.servers) ? state.servers : [];
+  const list = Array.isArray(State.servers) ? State.servers : [];
   return list.find((s) => String(s.id) === String(id)) || null;
 }
 
 // The channel cache the shell already keeps, if any. Read defensively: a
 // missing cache must yield an id link, not an exception.
 function channelRow(serverId, channelId) {
-  const byServer = state.raw && state.raw.channels;
+  const byServer = State.raw && State.raw.channels;
   const rows = byServer && byServer[String(serverId)];
   if (!Array.isArray(rows)) return null;
   return rows.find((c) => String(c.id) === String(channelId)) || null;
