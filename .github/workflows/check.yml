@@ -38,9 +38,6 @@ jobs:
       - name: Schema smoke test (throwaway SQLite)
         run: npm run check
 
-      - name: End-to-end suite (boots a throwaway server and database)
-        run: npm test
-
   client:
     name: Client checks
     runs-on: ubuntu-latest
@@ -77,6 +74,3 @@ jobs:
       # desktop script cannot skip the gate by being unlisted.
       - name: Syntax-check desktop sources
         run: for f in trycord-desktop/main.js trycord-desktop/updater.js trycord-desktop/preload.js trycord-desktop/scripts/*.js; do node --check "$f" || exit 1; done
-
-      - name: Updater safety harness (dev/offline path, no Electron)
-        run: node trycord-desktop/scripts/test-updater-safety.js

@@ -36,16 +36,21 @@ The server serves the API, the web client and the public site on one port
 (`http://localhost:9971` by default). The seed account is `demo` /
 `demo1234` and is for local development only.
 
-## Tests
+## Checks
 
 ```
 cd trycord-server
-npm test
+npm run check                              # schema smoke test on a throwaway SQLite
+node scripts/check-client-modules.js ../../trycord-client/js   # parse every client module
 ```
 
-Boots a throwaway server and database, runs all 14 end-to-end suites, and
-cleans up afterwards. It never touches a real instance. `npm run check` is the
-faster schema-only smoke test.
+`npm run check` creates a temporary database, applies the schema, and removes
+it. `check-client-modules.js` parses each web-client file as an ES module and
+resolves its relative imports. Use it instead of `node --check` on a `.js`
+client file: that reports success for a file containing `import` statements even
+when the body has a duplicate declaration, so it is not a check.
+
+There is no automated test suite in this repository.
 
 ## Configuration
 

@@ -118,10 +118,9 @@ The S3 signer is pinned against the AWS `aws-sig-v4-test-suite` vectors. The uni
 tests cannot prove a real server accepts a signature - a signer that is wrong in
 the same way the test is wrong still verifies against itself - so the vectors
 decide whether the algorithm is correct, and only a live endpoint can say
-whether the credentials are.
-
-`test-s3-live.js` is the live check. It is opt-in (`S3_LIVE=1`), reads
-credentials from the environment only, and is not run by CI.
+whether the credentials are. Those vectors were removed along with the rest of
+the suite, so nothing now pins the signer and the remaining open item is
+verified by hand.
 
 SeaweedFS topology, for reference: the S3 gateway listens on **8333**. Port
 **18333 is the gRPC master port** and answers with `content-type:
@@ -130,26 +129,23 @@ connection error.
 
 ## Tests
 
-27 suites, run by `npm test`, which boots a throwaway server and database.
+There is no automated test suite in this repository. Two checks remain and both
+run in CI:
 
-| Area | Suite |
+| Check | What it covers |
 |---|---|
-| migrations, schema parity | `test-migration`, `test-schema-parity` |
-| storage, S3 signing, storage migration | `test-storage`, `test-sigv4`, `test-storage-migrate` |
-| authentication, sessions, 2FA | `test-twofactor`, `test-sessions` |
-| authorization, roles, timeouts | `test-role-security`, `test-no-self-assign`, `test-timeout-gates` |
-| moderation, trust and safety, GDPR | `test-trustsafety`, `test-gdpr-deletion` |
-| page editor, public site template | `test-page-editor`, `test-template`, `test-client-dom` |
-| routing and identifiers | `test-routing` |
-| realtime, messages, DMs | `test-dm-reliability`, `test-regression`, `test-f1f2` |
+| `npm run check` | applies the schema to a throwaway SQLite database |
+| `scripts/check-client-modules.js` | parses every web-client file as an ES module and resolves its relative imports |
 
-Two lessons are encoded in the suite itself. A failing suite prints its
-failing assertions rather than its last twelve lines, because the failure is
-rarely near the end and a red run that reports only passing lines is worse than
-no output. And `test-sessions` asserts that a credential an endpoint hands back
-still *works*, not that the endpoint returned 200, and exercises a second change
-on an already-bumped account because a fresh account cannot expose a stale-version
-token at all.
+The second exists because `node --check` on a `.js` client file reports success
+for a file containing `import` statements even when the body has a duplicate
+declaration. A duplicate `const serverId` reached `main` through it, in
+`44e1ba8`, and the app would not start. It is a syntax gate, not a test suite.
+
+A live S3 round trip has also never completed. The signer was pinned against
+the AWS `aws-sig-v4-test-suite` vectors at the time, which proved the algorithm
+correct and left the failure attributable to the endpoint or its credentials
+rather than to the implementation. That check is no longer in the repository.
 
 ## Still open
 
