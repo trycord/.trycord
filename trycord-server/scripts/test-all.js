@@ -31,7 +31,7 @@ const LIMITED_SUITE = 'test-dm-reliability';
 const SERVER_SUITES = [
   'test-regression', 'test-f1f2', 'test-phase2', 'test-trustsafety',
   'test-gdpr-deletion',
-  'test-page-editor',
+  'test-page-editor', 'test-bbcode',
   'test-overrides', 'test-engagement',
   'test-role-security', 'test-no-self-assign', 'test-notification-paging',
   'test-roster-aggregates', 'test-community-media', 'test-timeout-gates', 'test-twofactor',
@@ -147,6 +147,7 @@ function summarise(result) {
   console.log(`\n${results.length - failed}/${results.length} suites passed`);
   process.exit(failed ? 1 : 0);
 })();
+
 
 
 

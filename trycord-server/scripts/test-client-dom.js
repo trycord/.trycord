@@ -249,6 +249,21 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client');
   ok('the site builder is in the sidebar', navAdmin.includes('pages'), 'no /admin/pages entry');
   ok('the GDPR queue is in the sidebar', navAdmin.includes('gdpr'), 'no /admin/gdpr entry');
 
+  console.log('the site builder can format and is full page');
+  // A formatting feature that is not on every text field is a formatting
+  // feature that silently does not exist there, and a full-page editor that
+  // drifts back into the nested panel loses its action bar on a long page.
+  const pe = fs.readFileSync(path.join(jsDir, 'pages-admin-pages.js'), 'utf8');
+  ok('every text field goes through the bbcode field wrapper',
+    (pe.match(/bbcodeField\('Text'/g) || []).length >= 4, 'only ' + (pe.match(/bbcodeField\('Text'/g) || []).length);
+  ok('the editor has its own full-viewport layout', /page-editor-host/.test(pe) && /page-editor__actions/.test(pe), 'no full-page layout');
+  ok('the action bar is outside the scrolling body', /wrap\.appendChild\(bar\)/.test(pe), 'bar is inside the body');
+  ok('the preview is server-rendered, not a second parser',
+    /adminPreviewPage/.test(pe) && !/replace\(.+\[b\]/.test(pe), 'preview reimplemented client-side');
+  ok('the preview is coalesced and ordered',
+    /previewSeq/.test(pe) && /previewTimer/.test(pe), 'no sequencing guard');
+  ok('the supported tags are listed in the editor', /BBCODE_TOOLS/.test(pe) && /bbcode-ref/.test(pe), 'no reference');
+
   console.log('a11y contract in the markup');
   const html = fs.readFileSync(path.join(CLIENT, 'index.html'), 'utf8');
   ok('the view region is not a live region', !/id="view-root"[\s\S]{0,80}aria-live/.test(html));

@@ -29,6 +29,24 @@ const js = fs.readdirSync(JS_DIR)
   .map((f) => fs.readFileSync(path.join(JS_DIR, f), 'utf8'))
   .join('\n');
 
+// Some classes are not written in client JavaScript at all: the page renderer
+// runs on the server and emits them into the HTML it sends. The BBCode classes
+// are the current example - they appear only in services/bbcode.js, so a
+// client-only scan reports them as dead and the correct fix would be to delete
+// styling that is very much in use. Sources that produce markup are therefore
+// searched too.
+const SERVER_HTML_DIRS = [
+  path.join(__dirname, '..', 'src', 'services'),
+  path.join(__dirname, '..', '..', 'public'),
+];
+const serverHtml = SERVER_HTML_DIRS
+  .flatMap((dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []))
+  .filter((e) => e.isFile() && /\.(js|html)$/.test(e.name))
+  .map((e) => fs.readFileSync(path.join(e.parentPath || e.path, e.name), 'utf8'))
+  .join('\n');
+
+const allSources = js + '\n' + html + '\n' + serverHtml;
+
 // Comments are stripped before parsing so a banner block above a rule cannot be
 // mistaken for part of its selector. Line numbers are computed against the
 // original file, so removals still land in the right place.
@@ -43,6 +61,7 @@ const harvest = (text) => {
 };
 harvest(html);
 harvest(js);
+harvest(serverHtml);
 
 // Walks the stylesheet once, collecting every rule and recursing into at-rule
 // bodies, so a rule inside @media is judged the same as one at the top level.

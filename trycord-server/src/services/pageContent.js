@@ -125,23 +125,32 @@ function toHtml(blocks) {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
+  // A block's text may carry BBCode, which is the notation operators already
+  // type and the one a page can be lifted out into. It is parsed rather than
+  // escaped, so text still reaches the page as markup only through the parser's
+  // allowlist. esc() stays as the fallback for every value the parser rejects
+  // or does not recognise, which is what keeps a stored string from ever
+  // becoming markup directly.
+  const { toHtmlInline } = require('./bbcode');
+  const inline = (s) => toHtmlInline(s);
+
   return blocks
     .map((b) => {
       switch (b.type) {
         case 'heading':
-          return `<h${b.level}>${esc(b.text)}</h${b.level}>`;
+          return `<h${b.level}>${inline(b.text)}</h${b.level}>`;
         case 'paragraph':
-          return `<p>${esc(b.text)}</p>`;
+          return `<p>${inline(b.text)}</p>`;
         case 'lead':
-          return `<p class="lede">${esc(b.text)}</p>`;
+          return `<p class="lede">${inline(b.text)}</p>`;
         case 'list': {
           const tag = b.ordered ? 'ol' : 'ul';
-          return `<${tag}>${b.items.map((i) => `<li>${esc(i)}</li>`).join('')}</${tag}>`;
+          return `<${tag}>${b.items.map((i) => `<li>${inline(i)}</li>`).join('')}</${tag}>`;
         }
         case 'note':
           return `<div class="draft-note" role="note">${esc(b.text)}</div>`;
         case 'link':
-          return `<p><a href="${esc(b.href)}">${esc(b.text)}</a></p>`;
+          return `<p><a href="${esc(b.href)}">${inline(b.text)}</a></p>`;
         case 'rule':
           return '<hr>';
         default:
@@ -164,4 +173,10 @@ function operatorFields(blocks) {
   return found;
 }
 
-module.exports = { normalise, toHtml, measure, operatorFields, MAX_BLOCKS };
+// Blocks back to BBCode. The other half of "compatible": a page authored here
+// can be lifted into a forum and keep its formatting, so nothing is trapped in
+// this editor. Required at the top level rather than lazily because an export
+// has to exist whether or not anything has rendered yet.
+const { toBBCode } = require('./bbcode');
+
+module.exports = { normalise, toHtml, toBBCode, measure, operatorFields, MAX_BLOCKS };
