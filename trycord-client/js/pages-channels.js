@@ -77,7 +77,7 @@ async function renderNewChannel(container, serverId) {
         categoryId: catSelect.value || undefined,
       });
       toast('Channel created.', 'ok');
-      location.hash = '#/server/' + serverId + '/channel/' + ch.id;
+      location.hash = channelPath(serverId, ch.id);
     } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
   });
 

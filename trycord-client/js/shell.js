@@ -4,6 +4,7 @@ import { avatar, navRow, serverChip, channelRow, communityMark, communityBannerU
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, setMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
 import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
+import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
 
 // wiring, so a menu can never exist on one input method and be missing on
 // another. Menus are permission-shaped here: an action the viewer cannot perform
@@ -14,11 +15,11 @@ function serverChipMenuFor(s) {
     const isCurrent = sid === String(currentServerId());
     const mayManage = (isCurrent && can('MANAGE_SERVER')) || (s.is_owner && !isCurrent);
     return [
-      { label: 'Open community', desc: s.name || '', onSelect: () => { location.hash = '#/server/' + sid; } },
+      { label: 'Open community', desc: s.name || '', onSelect: () => { location.hash = serverPath(sid); } },
       {
         label: 'Community settings', desc: mayManage ? undefined : 'Requires Manage Community',
         disabled: !mayManage,
-        onSelect: () => { location.hash = '#/server/' + sid + '/settings'; },
+        onSelect: () => { location.hash = serverPath(sid, 'settings'); },
       },
       { label: 'Copy community link', onSelect: () => copyText(sid, 'Community ID copied.') },
       { label: 'Copy community ID', onSelect: () => copyText(sid, 'Community ID copied.') },
@@ -266,7 +267,7 @@ export function renderCommunities(region) {
     for (const s of servers) {
       const chip = serverChip(s, {
         active: String(s.id) === String(currentServerId()),
-        onClick: () => { location.hash = '#/server/' + s.id; },
+        onClick: () => { location.hash = serverPath(s.id); },
       });
       chip.dataset.label = s.name || 'Community';
       attachContextMenu(chip, serverChipMenuFor(s), {
@@ -394,7 +395,7 @@ function communityHeader(sid, server) {
   // list. Every entry is permission-gated by the existing role system.
   const panel = dropdownPanel(trigger, () => {
     const go = (path) => () => { location.hash = path; };
-    const base = '#/server/' + sid;
+    const base = serverPath(sid);
     const items = [];
 
     items.push({ label: 'Community overview', icon: 'âŒ‚', onSelect: go(base) });
@@ -519,15 +520,15 @@ function communityContext(region, sid) {
   const channelActions = (ch) => {
     const cid = String(ch.id);
     const items = [
-      { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = '#/server/' + sid + '/channel/' + cid; } },
+      { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = channelPath(sid, cid); } },
       { label: isMuted(ch.id) ? 'Unmute channel' : 'Mute channel', onSelect: () => setMuted(ch.id, !isMuted(ch.id)) },
-      { label: 'Copy channel link', onSelect: () => copyText(location.origin + '/#/server/' + sid + '/channel/' + cid, 'Channel link copied.') },
+      { label: 'Copy channel link', onSelect: () => copyText(absoluteChannelUrl(sid, cid), 'Channel link copied.') },
       { label: 'Copy channel ID', onSelect: () => copyText(cid, 'Channel ID copied.') },
     ];
     if (can('MANAGE_CHANNELS')) {
       items.push({ sep: true });
       items.push({
-        label: 'Edit channel', onSelect: () => { location.hash = '#/server/' + sid + '/settings/structure'; },
+        label: 'Edit channel', onSelect: () => { location.hash = serverPath(sid, 'settings/structure'); },
       });
     }
     return items;
@@ -537,7 +538,7 @@ function communityContext(region, sid) {
     const active = route === '/server/' + sid + '/channel/' + ch.id;
     const row = channelRow(ch, {
       active, muted: isMuted(ch.id),
-      onClick: () => { location.hash = '#/server/' + sid + '/channel/' + ch.id; },
+      onClick: () => { location.hash = channelPath(sid, ch.id); },
     });
     attachContextMenu(row, () => channelActions(ch), {
       target: () => ({ type: 'channel', id: String(ch.id) }),

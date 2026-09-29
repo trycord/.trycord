@@ -22,7 +22,46 @@ import { renderNotifications } from './pages-notifications.js';
 import { presentationMode, closeDesktopNav } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from './shell.js';
 import Api from './api.js';
+
+// A slug is a display convenience, not an identity, so a route that cannot
+// resolve one says so plainly instead of rendering an empty page that looks
+// like a broken app.
+function renderRouteError(region, message) {
+  region.replaceChildren();
+  region.appendChild(el('div', { class: 'empty-state' }, [
+    el('p', {}, message),
+    el('a', { class: 'btn', href: '#/' }, 'Go home'),
+  ]));
+}
+
+// Both accept an id or a slug, because a link may be either: copied from the
+// address bar after the move to slugs, or shared before it. A failed lookup
+// returns null rather than throwing, so an unknown community reads as a dead
+// link and not a crash.
+async function resolveCommunity(token) {
+  try {
+    const row = await Api.server(token);
+    return row && row.id ? { serverId: row.id } : null;
+  } catch {
+    return null;
+  }
+}
+
+// Always resolved inside the community. A channel slug is unique per community
+// and not globally, so resolving one without that context would be a guess - and
+// a guess here can land on somebody else's channel.
+async function resolveChannelToken(serverId, token) {
+  try {
+    const list = await Api.channels(serverId);
+    const chans = (list && list.channels) || [];
+    const hit = chans.find((c) => String(c.slug) === String(token) || String(c.id) === String(token));
+    return hit ? hit.id : null;
+  } catch {
+    return null;
+  }
+}
 import { el, clear, toast } from './ui.js';
+import { serverPath } from './links.js';
 
 let lastCleanup = null;
 let lastRoute = '';
@@ -58,7 +97,10 @@ function parseHash() {
     for (const [k, v] of new URLSearchParams(raw.slice(qIndex + 1))) query[k] = v;
   }
   if (!path || path === '/') return { path: '/', parts: [], query };
-  const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
+  // Mutable: the V2 /c/... form is rewritten into the legacy /server/... shape
+  // below so a single set of route branches serves both. The old routes are
+  // kept working rather than removed because links to them already exist.
+  let parts = path.split('/').filter(Boolean).map(decodeURIComponent);
   return { path, parts, query };
 }
 
@@ -83,6 +125,13 @@ async function renderRoute() {
 
   setNavRoute(() => path);
   runCleanup();
+
+  // The route the chrome compares against. Published again after a V2 slug is
+  // resolved, so the sidebar's active highlighting keeps working no matter which
+  // form the URL arrived in: the shell matches on the normalised
+  // /server/:id/... shape, and matching against the raw /c/:slug path would
+  // silently leave nothing highlighted.
+  const publishRoute = (p) => setNavRoute(() => p);
 
   closeDesktopNav();
 
@@ -231,7 +280,7 @@ async function renderRoute() {
       const res = await Api.joinInvite(code);
       await refreshServers();
       toast('You joined the server.', 'ok');
-      location.hash = '#/server/' + res.serverId;
+      location.hash = serverPath(res.serverId);
       return;
     } catch (ex) {
       clear(region);
@@ -242,6 +291,8 @@ async function renderRoute() {
   }
 
   if (path.startsWith('/users/')) {
+    // A username is the V2 form and a UUID still works. The profile renderer
+    // takes whatever the server accepts, and it accepts both.
     await renderProfile(region, { id: parts[1] });
     renderAllChrome();
     return;
@@ -252,7 +303,34 @@ async function renderRoute() {
     renderAllChrome();
     return;
   }
+
+  // V2 community routes: #/c/:slug and #/c/:slug/channel/:channelSlug.
+  // Resolved to ids here, once, and then handed to the same renderers the
+  // legacy /server/:id routes use. Resolution goes through the server-scoped
+  // API, so a channel slug is always resolved inside its own community and can
+  // never reach another one's channel.
+  if (parts[0] === 'c' && parts[1]) {
+    const community = await resolveCommunity(parts[1]);
+    if (!community) return renderRouteError(region, 'That community does not exist.');
+    parts = ['server', community.serverId].concat(parts.slice(2));
+    publishRoute('/' + parts.join('/'));
+  }
+
   if (parts[0] === 'server' && parts[1]) {
+    // A legacy id route may still carry a channel slug, and a V2 route carries
+    // the channel token verbatim. Either way it is resolved inside the
+    // community, so one lookup serves both.
+    const serverId = parts[1];
+    const what = parts[2];
+    if (what === 'channel' && parts[3]) {
+      const resolved = await resolveChannelToken(serverId, parts[3]);
+      if (!resolved) return renderRouteError(region, 'That channel does not exist.');
+      // Republished so the sidebar marks the right channel as current.
+      if (resolved !== parts[3]) {
+        parts[3] = resolved;
+        publishRoute('/' + parts.join('/'));
+      }
+    }
     const serverId = parts[1];
     const what = parts[2];
     if (what === 'channel' && parts[3] && parts[4] === 'pins') {

@@ -59,7 +59,7 @@ async function renderServerLanding(container, serverId) {
       for (const ch of inCat) {
         const r = el('button', {
           class: 'row row--channel', type: 'button', style: { marginLeft: 0, width: '100%' },
-          onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + ch.id; },
+          onClick: () => { location.hash = channelPath(serverId, ch.id); },
         });
         r.appendChild(el('span', { class: 'ch-prefix' }, '#'));
         r.appendChild(el('span', { class: 'ch-name' }, ch.name));
@@ -72,7 +72,7 @@ async function renderServerLanding(container, serverId) {
       for (const ch of ungrouped) {
         const r = el('button', {
           class: 'row row--channel', type: 'button', style: { marginLeft: 0, width: '100%' },
-          onClick: () => { location.hash = '#/server/' + serverId + '/channel/' + ch.id; },
+          onClick: () => { location.hash = channelPath(serverId, ch.id); },
         });
         r.appendChild(el('span', { class: 'ch-prefix' }, '#'));
         r.appendChild(el('span', { class: 'ch-name' }, ch.name));
@@ -124,7 +124,7 @@ async function renderNewServer(container, serverId) {
       toast('Server created!', 'ok');
       await refreshServers();
       const sid = res.serverId;
-      location.hash = '#/server/' + sid + '/channel/' + res.channelId;
+      location.hash = channelPath(sid, res.channelId);
     } catch (ex) {
       err.hidden = false;
       err.textContent = ex.message || 'Failed';
@@ -204,7 +204,7 @@ async function renderMenu(container) {
     for (const ch of channels) {
       const b = el('button', {
         class: 'row' + (route === '/server/' + s.id + '/channel/' + ch.id ? ' active' : ''),
-        type: 'button', onClick: () => { location.hash = '#/server/' + s.id + '/channel/' + ch.id; },
+        type: 'button', onClick: () => { location.hash = channelPath(s.id, ch.id); },
       });
       const bm = el('div', { class: 'row-main' });
       bm.appendChild(el('div', { class: 'row-title' }, '# ' + (ch.name || 'channel')));

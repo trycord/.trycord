@@ -143,6 +143,35 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client');
     && two.children[2].getAttribute('for') === two.children[3].id);
   ok('generated ids are unique', two.children[1].id !== two.children[3].id);
 
+  console.log('links are built in one place');
+  // A link built inline as '#/server/' + id silently pins the URL to the UUID
+  // form forever, which is how readable slugs never reached the address bar.
+  // Nothing outside the helper should know the route shape.
+  const jsDir = path.join(CLIENT, 'js');
+  const linkFiles = fs.readdirSync(jsDir).filter((f) => f.endsWith('.js'));
+  const inline = [];
+  for (const f of linkFiles) {
+    if (f === 'links.js' || f === 'router.js') continue;
+    const src = fs.readFileSync(path.join(jsDir, f), 'utf8');
+    if (src.includes("'#/server/'") || src.includes('"#/server/"')) inline.push(f);
+  }
+  ok('no module builds a community link by hand', inline.length === 0, 'still inline in: ' + inline.join(', '));
+
+  // The helper must exist and be imported by the entry graph, or the guards
+  // above pass while every link silently stays on the UUID form.
+  const linksSrc = fs.readFileSync(path.join(jsDir, 'links.js'), 'utf8');
+  ok('links.js exists and offers both forms',
+    linksSrc.includes('export function serverPath') && linksSrc.includes('export function channelPath'), 'missing exports');
+  ok('links.js falls back to the id when no slug is known',
+    linksSrc.includes('|| String(id)') || linksSrc.includes('|| String(channelId)'), 'no id fallback');
+  const importers = linkFiles.filter((f) => f !== 'links.js' &&
+    fs.readFileSync(path.join(jsDir, f), 'utf8').includes("from './links.js'"));
+  ok('the sidebar imports the helper', importers.includes('shell.js'), importers.join(', '));
+  ok('the router still understands the legacy form',
+    fs.readFileSync(path.join(jsDir, 'router.js'), 'utf8').includes("parts[0] === 'server'"), 'legacy branch gone');
+  ok('the router understands the slug form',
+    fs.readFileSync(path.join(jsDir, 'router.js'), 'utf8').includes("parts[0] === 'c'"), 'no /c/ branch');
+
   console.log('a11y contract in the markup');
   const html = fs.readFileSync(path.join(CLIENT, 'index.html'), 'utf8');
   ok('the view region is not a live region', !/id="view-root"[\s\S]{0,80}aria-live/.test(html));
@@ -277,7 +306,7 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client');
   console.log('every dangling label for= is resolved');
   const declaredIds = new Set();
   const forRefs = [];
-  for (const f of clientFiles) {
+  for (const f of linkFiles) {
     const src = fs.readFileSync(path.join(CLIENT, 'js', f), 'utf8');
     for (const m of src.matchAll(/id:\s*'([^']+)'/g)) declaredIds.add(m[1]);
     for (const m of src.matchAll(/for:\s*'([^']+)'/g)) forRefs.push([f, m[1]]);
