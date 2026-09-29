@@ -36,7 +36,18 @@ function tables(engine) {
       -- migration lists, so a freshly created database had the column added by
       -- the first boot's ALTER rather than by the schema itself. publicUser()
       -- reads it unconditionally, so it belongs in the canonical DDL.
-      is_bot INTEGER NOT NULL DEFAULT 0
+      is_bot INTEGER NOT NULL DEFAULT 0,
+      -- Second factor. totp_secret is AES-256-GCM encrypted at rest under a
+      -- key derived from JWT_SECRET, not hashed: verification needs the
+      -- original secret, and a plaintext column would make a database backup
+      -- a 2FA bypass for every account in it.
+      totp_secret TEXT,
+      totp_enabled_at VARCHAR(64),
+      -- Login throttling. Reset only on a successful password check, never on
+      -- an attempt, so interleaving guesses with the real password cannot hold
+      -- the counter at zero.
+      login_fail_count INTEGER NOT NULL DEFAULT 0,
+      login_locked_until VARCHAR(64)
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS servers (
@@ -376,7 +387,25 @@ function tables(engine) {
     // inject script or arbitrary markup into a legal page. The original file in
     // public/ stays the fallback until a page is published, so an instance that
     // never uses the editor behaves exactly as before.
-    `CREATE TABLE IF NOT EXISTS pages (
+    `CREATE TABLE IF NOT EXISTS totp_recovery_codes (
+    id         VARCHAR(64) PRIMARY KEY,
+    user_id    VARCHAR(64) NOT NULL,
+    code_hash  VARCHAR(64) NOT NULL,
+    used_at    VARCHAR(64),
+    created_at VARCHAR(64) NOT NULL
+  )${engine}`,
+
+  // One time pad for TOTP steps. Without it a code observed in transit stays
+  // valid for the rest of its 30 second window, which is long enough to relay.
+  // Steps are only worth remembering for as long as they could be replayed.
+  `CREATE TABLE IF NOT EXISTS totp_used_steps (
+    id      VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    step    INTEGER NOT NULL,
+    used_at VARCHAR(64) NOT NULL
+  )${engine}`,
+
+  `CREATE TABLE IF NOT EXISTS pages (
       id          VARCHAR(64) PRIMARY KEY,
       route       VARCHAR(64) NOT NULL UNIQUE,
       title       VARCHAR(128) NOT NULL,
@@ -555,6 +584,11 @@ const LEGACY_ALTERS = [
   ['users', 'is_bot', 'ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0'],
   ['roles', 'color', 'ALTER TABLE roles ADD COLUMN color VARCHAR(16)'],
   ['server_members', 'timeout_expires_at', 'ALTER TABLE server_members ADD COLUMN timeout_expires_at VARCHAR(64)'],
+  // Second factor + login throttling. Mirrored in MYSQL_ADD.
+  ['users', 'totp_secret', 'ALTER TABLE users ADD COLUMN totp_secret TEXT'],
+  ['users', 'totp_enabled_at', 'ALTER TABLE users ADD COLUMN totp_enabled_at VARCHAR(64)'],
+  ['users', 'login_fail_count', 'ALTER TABLE users ADD COLUMN login_fail_count INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'login_locked_until', 'ALTER TABLE users ADD COLUMN login_locked_until VARCHAR(64)'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -605,6 +639,11 @@ const MYSQL_ADD = [
   ['users', 'is_bot', 'ALTER TABLE users ADD COLUMN is_bot INTEGER NOT NULL DEFAULT 0'],
   ['roles', 'color', 'ALTER TABLE roles ADD COLUMN color VARCHAR(16)'],
   ['server_members', 'timeout_expires_at', 'ALTER TABLE server_members ADD COLUMN timeout_expires_at VARCHAR(64)'],
+  // Second factor + login throttling. Mirrored in LEGACY_ALTERS.
+  ['users', 'totp_secret', 'ALTER TABLE users ADD COLUMN totp_secret TEXT'],
+  ['users', 'totp_enabled_at', 'ALTER TABLE users ADD COLUMN totp_enabled_at VARCHAR(64)'],
+  ['users', 'login_fail_count', 'ALTER TABLE users ADD COLUMN login_fail_count INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'login_locked_until', 'ALTER TABLE users ADD COLUMN login_locked_until VARCHAR(64)'],
   // --- parity block ---------------------------------------------------------
   // Every column below is ALSO declared in LEGACY_ALTERS, which only runs on
   // SQLite. They were missing here, so on an existing MySQL/MariaDB database
@@ -681,6 +720,8 @@ const INDEXES = [
   // (twice: once to count, once to page).
   'CREATE INDEX idx_servers_discovery ON servers(is_public, is_discoverable, enforcement_state)',
   'CREATE INDEX idx_servers_owner ON servers(owner_id)',
+  'CREATE INDEX idx_totp_recovery_user ON totp_recovery_codes(user_id, used_at)',
+  'CREATE INDEX idx_totp_used_user ON totp_used_steps(user_id, used_at)',
   'CREATE INDEX idx_pins_channel ON pinned_messages(channel_id, pinned_at)',
   'CREATE INDEX idx_reactions_message ON reactions(message_id)',
   'CREATE INDEX idx_muted_user ON muted_channels(user_id)',

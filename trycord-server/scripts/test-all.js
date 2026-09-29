@@ -34,7 +34,7 @@ const SERVER_SUITES = [
   'test-page-editor',
   'test-overrides', 'test-engagement',
   'test-role-security', 'test-no-self-assign', 'test-notification-paging',
-  'test-roster-aggregates', 'test-community-media', 'test-timeout-gates',
+  'test-roster-aggregates', 'test-community-media', 'test-timeout-gates', 'test-twofactor',
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -128,8 +128,17 @@ function summarise(result) {
   for (const r of results) {
     if (r.code !== 0) {
       failed++;
+      const lines = r.out.trim().split('\n');
+      // The failing assertion is what matters, and it is usually nowhere near
+      // the end of the output. Printing only the tail hid it, so a red suite
+      // reported nothing but its last dozen passing lines.
+      const failures = lines.filter((l) => /(^|\s)FAIL\s/.test(l) || l.includes('->'));
       console.log(`FAIL  ${r.name}`);
-      console.log(r.out.trim().split('\n').slice(-12).map((l) => '      ' + l).join('\n'));
+      const shown = failures.length ? failures : lines.slice(-12);
+      console.log(shown.map((l) => '      ' + l).join('\n'));
+      if (failures.length && lines.length > failures.length + 12) {
+        console.log(`      (${lines.length - failures.length} other lines omitted)`);
+      }
     } else {
       console.log(`PASS  ${r.name.padEnd(26)} ${summarise(r)}`);
     }

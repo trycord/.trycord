@@ -61,6 +61,8 @@ function seed(dbFile) {
   d.exec(`INSERT INTO revoked_tokens (jti,expires_at) VALUES ('jti1','2099-01-01T00:00:00.000Z')`);
   d.exec(`INSERT INTO dm_conversations (id,pair_key,created_at,updated_at) VALUES ('dc1','pair-1','${ts}','${ts}')`);
   d.exec(`INSERT INTO dm_members (conversation_id,user_id,joined_at) VALUES ('dc1','u1','${ts}')`);
+  d.exec(`INSERT INTO totp_recovery_codes (id,user_id,code_hash,created_at) VALUES ('trc1','u1','hash1','${ts}')`);
+  d.exec(`INSERT INTO totp_used_steps (id,user_id,step,used_at) VALUES ('tus1','u1',12345,'${ts}')`);
   d.exec(`INSERT INTO dm_messages (id,conversation_id,author_id,content,created_at,seq) VALUES ('dm1','dc1','u1','yo','${ts}',1)`);
   d.exec(`INSERT INTO friend_requests (id,from_user_id,to_user_id,status,created_at,updated_at) VALUES ('fr1','u1','u1','pending','${ts}','${ts}')`);
   d.exec(`INSERT INTO friendships (user_id,friend_id,created_at) VALUES ('u1','u1','${ts}')`);

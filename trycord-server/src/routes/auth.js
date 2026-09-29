@@ -4,7 +4,8 @@ const bcrypt = require('bcrypt');
 const db = require('../db');
 const auth = require('../middleware/auth');
 const { fail, serviceError } = require('../errors');
-const { now, uuid, sign } = require('../util');
+const { now, uuid, sign, secret } = require('../util');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 const rateLimit = require('../middleware/ratelimit');
@@ -12,6 +13,28 @@ const { TERMS_VERSION, PRIVACY_VERSION } = require('../legal');
 const { checkPassword, BCRYPT_COST } = require('../auth/passwords');
 const enforcement = require('../services/enforcement');
 const recovery = require('../auth/recovery');
+const twofactor = require('../services/twofactor');
+
+// A challenge is not a session. It is a short-lived, single-audience token that
+// proves "this password was correct" and nothing else: the auth middleware
+// rejects it, and it carries no username or permissions. Its only power is to
+// let /2fa/verify mint a real session, and only while a second factor is still
+// outstanding. 5 minutes is long enough to find an authenticator and short
+// enough that a challenge left in a log or a proxy buffer is not useful later.
+const CHALLENGE_TTL_SECONDS = 300;
+
+function signChallenge(userId) {
+  return jwt.sign({ sub: userId, jti: uuid(), purpose: 'mfa' }, secret(), { expiresIn: CHALLENGE_TTL_SECONDS });
+}
+
+function readChallenge(token) {
+  try {
+    const claims = jwt.verify(token, secret());
+    return claims && claims.purpose === 'mfa' && claims.sub ? String(claims.sub) : null;
+  } catch {
+    return null;
+  }
+}
 
 let disconnectUser = () => {};
 function setGateway(gw) {
@@ -70,8 +93,31 @@ router.post('/login', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, 
     if (!username || !password) return fail(res, 'VALIDATION_ERROR', 'username and password required');
     const user = await db.get('SELECT * FROM users WHERE username = ?', [String(username).trim()]);
     if (!user) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
+
+    // Lockout is checked after the lookup but before the password comparison, so
+    // a locked account cannot be used as a password oracle: the same response
+    // comes back whether or not the guess would have been right.
+    const lockMs = await twofactor.remainingLockMs(user.id);
+    if (lockMs > 0) {
+      return fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+        retryAfterSeconds: Math.ceil(lockMs / 1000),
+      });
+    }
+
     const ok = await bcrypt.compare(String(password), user.password_hash);
-    if (!ok) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
+    if (!ok) {
+      const locked = await twofactor.recordFailure(user.id);
+      return locked
+        ? fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+          retryAfterSeconds: Math.ceil(twofactor.LOCKOUT_MS / 1000),
+        })
+        : fail(res, 'AUTH_REQUIRED', 'invalid credentials');
+    }
+    // Reset on success, never per attempt: resetting on every attempt would let
+    // a caller interleave one guess with the real password to hold the counter
+    // at zero indefinitely.
+    await twofactor.recordSuccess(user.id);
+
     // Trust & Safety: a correct login from a banned/suspended account must
     // not mint new sessions — the account holder gets the enforcement
     // details plus the action id so they can open an appeal with it.
@@ -87,12 +133,128 @@ router.post('/login', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, 
     // Same promotion at login: covers listed names whose accounts
     // postdate the last boot, with case-insensitive matching.
     await enforcement.ensureListedAdmin(user.id, user.username);
+
+    // Second factor. The password was correct, but no session is minted yet:
+    // returning one here would make the second factor advisory.
+    if (user.totp_enabled_at) {
+      return res.json({
+        mfaRequired: true,
+        challengeToken: signChallenge(user.id),
+        expiresInSeconds: CHALLENGE_TTL_SECONDS,
+      });
+    }
+
     res.json({
       token: sign(user),
       user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },
     });
   } catch (e) { next(e); }
 });
+
+// ---- second factor -------------------------------------------------------
+
+// Completes a login that stopped at the second factor. Takes the challenge
+// token rather than the password, so the password is not re-sent a second time
+// and cannot be harvested from this endpoint's logs.
+router.post('/2fa/verify', rateLimit({ windowMs: 60000, max: 10 }), async (req, res, next) => {
+  try {
+    const { challengeToken, code } = req.body || {};
+    if (!challengeToken || !code) return fail(res, 'VALIDATION_ERROR', 'challengeToken and code required');
+    const userId = readChallenge(challengeToken);
+    if (!userId) return fail(res, 'AUTH_REQUIRED', 'challenge expired or invalid');
+
+    const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
+    if (!user) return fail(res, 'NOT_FOUND', 'user not found');
+    // The factor may have been turned off between the challenge and the code.
+    if (!user.totp_enabled_at) return fail(res, 'VALIDATION_ERROR', '2FA is not enabled for this account');
+
+    const result = await twofactor.verifySecondFactor(user.id, code);
+    if (!result.ok) return fail(res, 'AUTH_REQUIRED', 'invalid code');
+
+    res.json({
+      token: sign(user),
+      user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },
+      usedRecoveryCode: result.via === 'recovery',
+    });
+  } catch (e) { next(e); }
+});
+
+// ---- 2FA management ------------------------------------------------------
+//
+// All of these require a recent session (the normal auth middleware) and, for
+// enable and disable, the current password. A stolen session token must not be
+// enough to remove the factor that is supposed to survive it.
+
+router.get('/2fa/status', auth, async (req, res, next) => {
+  try {
+    res.json(await twofactor.status(req.user.id));
+  } catch (e) { next(e); }
+});
+
+router.post('/2fa/setup', auth, async (req, res, next) => {
+  try {
+    if (!(await requirePassword(req, res))) return;
+    const out = await twofactor.beginSetup(req.user.id, req.user.username);
+    res.json(out);
+  } catch (e) { next(e); }
+});
+
+router.post('/2fa/enable', auth, async (req, res, next) => {
+  try {
+    if (!(await requirePassword(req, res))) return;
+    const out = await twofactor.enable(req.user.id, (req.body || {}).code);
+    // Changing the authentication factor invalidates existing sessions: a
+    // session minted before the factor existed should not outlive it.
+    await invalidateSessions(req.user.id);
+    res.json(out);
+  } catch (e) { serviceError(res, e); }
+});
+
+router.post('/2fa/disable', auth, async (req, res, next) => {
+  try {
+    if (!(await requirePassword(req, res))) return;
+    await twofactor.disable(req.user.id, (req.body || {}).code);
+    await invalidateSessions(req.user.id);
+    res.json({ ok: true });
+  } catch (e) { serviceError(res, e); }
+});
+
+router.post('/2fa/recovery-codes', auth, async (req, res, next) => {
+  try {
+    if (!(await requirePassword(req, res))) return;
+    // Re-issue by disabling and re-enabling is not an option: it would need a
+    // current code the member may no longer have. Mint a fresh set directly.
+    res.json(await twofactor.issueRecoveryCodes(req.user.id));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Password re-confirmation. Failures are throttled into the same lockout counter
+// as login, so a stolen session token cannot be brute-forced through here.
+async function requirePassword(req, res) {
+  const { password } = req.body || {};
+  if (!password) {
+    fail(res, 'VALIDATION_ERROR', 'password required');
+    return false;
+  }
+  const row = await db.get('SELECT password_hash FROM users WHERE id = ?', [req.user.id]);
+  const ok = row && await bcrypt.compare(String(password), row.password_hash);
+  if (!ok) {
+    await twofactor.recordFailure(req.user.id);
+    fail(res, 'AUTH_REQUIRED', 'password is not correct');
+    return false;
+  }
+  await twofactor.recordSuccess(req.user.id);
+  return true;
+}
+
+// Bumps sessions_invalidated_at, which the auth middleware compares against the
+// token's issued-at on every request.
+async function invalidateSessions(userId) {
+  await db.run('UPDATE users SET sessions_invalidated_at = ? WHERE id = ?', [now(), userId]);
+  if (typeof disconnectUser === 'function') {
+    try { disconnectUser(userId, 'security settings changed'); } catch { /* gateway not wired */ }
+  }
+}
 
 // Revoke the current token so it cannot be used again.
 router.post('/logout', auth, async (req, res, next) => {
