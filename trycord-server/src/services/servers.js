@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { now, uuid } = require('../util');
 const roles = require('./roles');
+const slugs = require('./slugs');
 const { Codes } = require('../errors');
 const { effectivePermissions, isKnown } = require('./permissions');
 
@@ -11,6 +12,7 @@ const LIST_COLS = `
   s.id, s.name, s.description, s.owner_id, s.join_code,
   s.is_public, s.is_discoverable, s.icon_url, s.banner_url, s.created_at,
   s.enforcement_state,
+  s.slug,
   (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count,
   (SELECT COUNT(*) FROM channels c WHERE c.server_id = s.id) AS channel_count,
   (SELECT MAX(m2.created_at) FROM messages m2
@@ -68,10 +70,11 @@ async function create({ name, description, joinCode, isPublic, isDiscoverable },
       const serverId = uuid();
       await t.run(
         `INSERT INTO servers
-         (id, name, description, owner_id, join_code, is_public, is_discoverable, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, name, description, owner_id, join_code, is_public, is_discoverable, created_at, slug)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [serverId, cleanName, String(description || '').slice(0, 500), owner.id, code,
-          isPublic ? 1 : 0, isDiscoverable === undefined ? (isPublic ? 1 : 0) : (isDiscoverable ? 1 : 0), now()]
+          isPublic ? 1 : 0, isDiscoverable === undefined ? (isPublic ? 1 : 0) : (isDiscoverable ? 1 : 0), now(),
+          await slugs.forServer(cleanName)]
       );
       await t.run(
         'INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)',
@@ -84,11 +87,16 @@ async function create({ name, description, joinCode, isPublic, isDiscoverable },
       const catId = uuid();
       await t.run('INSERT INTO categories (id, server_id, name, position) VALUES (?, ?, ?, ?)', [catId, serverId, 'Text Channels', 0]);
       const channelId = uuid();
+      const defaultChannel = 'general';
       await t.run(
-        'INSERT INTO channels (id, server_id, category_id, name, topic, type, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [channelId, serverId, catId, 'general', 'General chat', 'text', 0]
+        'INSERT INTO channels (id, server_id, category_id, name, topic, type, position, slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [channelId, serverId, catId, defaultChannel, 'General chat', 'text', 0, await slugs.forChannel(defaultChannel, serverId)]
       );
-      return { serverId, joinCode: code, channelId };
+      // The slugs come back too: a client that has just created a community has
+      // to build a link immediately, and without them the only addressable form
+      // is the UUID it would otherwise have to round-trip for.
+      const row = await t.get('SELECT slug FROM servers WHERE id = ?', [serverId]);
+      return { serverId, joinCode: code, channelId, slug: row.slug, channelSlug: defaultChannel };
     });
   } catch (e) {
     // Service-shaped errors pass through; raw driver errors get translated.
@@ -130,7 +138,13 @@ async function update(serverId, patch) {
   if (patch.name !== undefined) {
     if (!String(patch.name).trim()) throw { code: 'VALIDATION_ERROR', message: 'name cannot be empty' };
     sets.push('name = ?');
-    vals.push(String(patch.name).slice(0, 64));
+    const name = String(patch.name).slice(0, 64);
+    vals.push(name);
+    // The slug follows the name, so a renamed community has a URL that matches
+    // what it now calls itself. Excluded from itself so renaming to the same
+    // name is not treated as a collision with its own slug.
+    sets.push('slug = ?');
+    vals.push(await slugs.forServer(name, serverId));
   }
   if (patch.description !== undefined) {
     sets.push('description = ?');

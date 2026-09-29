@@ -2,6 +2,7 @@
 // optionally grouped under a category.
 const db = require('../db');
 const { uuid } = require('../util');
+const slugs = require('./slugs');
 
 function cleanName(name) {
   return String(name || '').trim().toLowerCase().replace(/[^a-z0-9-_ ]/g, '').slice(0, 32) || 'channel';
@@ -96,9 +97,11 @@ async function create(serverId, { name, topic, categoryId }) {
   }
   const pos = await db.get('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM channels WHERE server_id = ?', [serverId]);
   const id = uuid();
+  const clean = cleanName(name);
   await db.run(
-    'INSERT INTO channels (id, server_id, category_id, name, topic, type, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, serverId, cat ? cat.id : null, cleanName(name), String(topic || '').slice(0, 200), 'text', pos.p]
+    'INSERT INTO channels (id, server_id, category_id, name, topic, type, position, slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, serverId, cat ? cat.id : null, clean, String(topic || '').slice(0, 200), 'text', pos.p,
+      await slugs.forChannel(clean, serverId)]
   );
   return db.get('SELECT * FROM channels WHERE id = ?', [id]);
 }

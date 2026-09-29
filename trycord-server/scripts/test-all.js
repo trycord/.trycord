@@ -35,6 +35,7 @@ const SERVER_SUITES = [
   'test-overrides', 'test-engagement',
   'test-role-security', 'test-no-self-assign', 'test-notification-paging',
   'test-roster-aggregates', 'test-community-media', 'test-timeout-gates', 'test-twofactor',
+  'test-routing',
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

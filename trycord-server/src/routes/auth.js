@@ -247,10 +247,13 @@ async function requirePassword(req, res) {
   return true;
 }
 
-// Bumps sessions_invalidated_at, which the auth middleware compares against the
-// token's issued-at on every request.
+// Bumps the session version, which the auth middleware compares against the
+// token's sv claim on every request. Increments a counter rather than stamping a
+// timestamp because iat has one-second resolution: a token issued in the same
+// second as this call is otherwise indistinguishable from a fresh one, and the
+// change would not take effect.
 async function invalidateSessions(userId) {
-  await db.run('UPDATE users SET sessions_invalidated_at = ? WHERE id = ?', [now(), userId]);
+  await db.run('UPDATE users SET session_version = session_version + 1, sessions_invalidated_at = ? WHERE id = ?', [now(), userId]);
   if (typeof disconnectUser === 'function') {
     try { disconnectUser(userId, 'security settings changed'); } catch { /* gateway not wired */ }
   }

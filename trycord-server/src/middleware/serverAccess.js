@@ -6,6 +6,7 @@ const { fail } = require('../errors');
 const { isMember } = require('../util');
 const { getOwnerId, effectivePermissionsFor } = require('../services/permissions');
 const { isPlatformAdmin } = require('../services/enforcement');
+const slugs = require('../services/slugs');
 
 function serverIdOf(req) {
   return req.params.serverId || req.params.id || null;
@@ -13,7 +14,10 @@ function serverIdOf(req) {
 
 async function resolveServer(req, res, next) {
   try {
-    const srv = await db.get('SELECT * FROM servers WHERE id = ?', [serverIdOf(req)]);
+    // Accepts an id or a slug. This is the one place every server-scoped route
+    // resolves the community, so teaching it both forms is what makes
+    // /api/servers/:slug/... work everywhere without touching each route.
+    const srv = await slugs.resolveServer(serverIdOf(req));
     if (!srv) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
     // Trust & Safety: suspended servers are out of reach for everyone except
     // the owner (still needs a maintenance access path) and platform admins

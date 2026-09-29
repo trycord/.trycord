@@ -49,7 +49,7 @@ function auth(req, res, next) {
   // Identical semantics: revoked jti, missing user, or stale markers reject.
   db.get(
     `SELECT u.password_changed_at, u.sessions_invalidated_at, u.enforcement_state,
-       u.enforcement_expires_at, u.email_verified_at,
+       u.enforcement_expires_at, u.email_verified_at, u.session_version,
        (SELECT 1 FROM revoked_tokens r WHERE r.jti = ?) AS revoked
      FROM users u WHERE u.id = ?`,
     [user.jti || '', user.id]
@@ -58,6 +58,12 @@ function auth(req, res, next) {
       if (!row) return fail(res, 'NOT_FOUND', 'user not found');
       if (user.jti && row.revoked) return fail(res, 'SESSION_REVOKED', 'session revoked');
       if (tokenStale(user, row)) return fail(res, 'SESSION_REVOKED', 'session revoked');
+      // Authoritative: a token minted before the version was bumped is dead,
+      // whatever second it was issued in. Tokens with no sv predate the column
+      // and are judged by the timestamps alone, which is the old behaviour.
+      if (user.sv !== undefined && Number(user.sv) !== Number(row.session_version || 0)) {
+        return fail(res, 'SESSION_REVOKED', 'session revoked');
+      }
       const ef = enforced(user, row);
       if (ef) return fail(res, 'ACCOUNT_ENFORCED', 'account is subject to a moderation action', 403, ef);
       req.user = user;

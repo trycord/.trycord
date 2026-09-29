@@ -47,7 +47,11 @@ function tables(engine) {
       -- an attempt, so interleaving guesses with the real password cannot hold
       -- the counter at zero.
       login_fail_count INTEGER NOT NULL DEFAULT 0,
-      login_locked_until VARCHAR(64)
+      login_locked_until VARCHAR(64),
+      -- Bumped to revoke every outstanding session at once. A counter rather
+      -- than a timestamp because JWT iat has one-second resolution. See
+      -- invalidateSessions in routes/auth.js.
+      session_version INTEGER NOT NULL DEFAULT 0
     )${engine}`,
 
     `CREATE TABLE IF NOT EXISTS servers (
@@ -66,6 +70,10 @@ function tables(engine) {
       enforcement_state VARCHAR(16),
       enforcement_reason TEXT,
       enforcement_updated_at VARCHAR(64),
+      -- Human-readable URL segment. Backfilled from name at boot and unique, so
+      -- a community can be linked as /c/my-community rather than by UUID.
+      -- Users deliberately have no slug: the username already serves that role.
+      slug          VARCHAR(64),
       FOREIGN KEY (owner_id) REFERENCES users(id)
     )${engine}`,
 
@@ -145,6 +153,9 @@ function tables(engine) {
       server_id   VARCHAR(64) NOT NULL,
       category_id VARCHAR(64),
       name        VARCHAR(64) NOT NULL,
+      -- Unique within its community, so /c/community/channel/general resolves
+      -- without carrying the community id in the path.
+      slug        VARCHAR(64),
       topic       TEXT,
       type        VARCHAR(16) NOT NULL DEFAULT 'text',
       position    INTEGER NOT NULL DEFAULT 0,
@@ -589,6 +600,10 @@ const LEGACY_ALTERS = [
   ['users', 'totp_enabled_at', 'ALTER TABLE users ADD COLUMN totp_enabled_at VARCHAR(64)'],
   ['users', 'login_fail_count', 'ALTER TABLE users ADD COLUMN login_fail_count INTEGER NOT NULL DEFAULT 0'],
   ['users', 'login_locked_until', 'ALTER TABLE users ADD COLUMN login_locked_until VARCHAR(64)'],
+  ['users', 'session_version', 'ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0'],
+  // Human-readable URL segments. Mirrored in MYSQL_ADD.
+  ['servers', 'slug', 'ALTER TABLE servers ADD COLUMN slug VARCHAR(64)'],
+  ['channels', 'slug', 'ALTER TABLE channels ADD COLUMN slug VARCHAR(64)'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -644,6 +659,10 @@ const MYSQL_ADD = [
   ['users', 'totp_enabled_at', 'ALTER TABLE users ADD COLUMN totp_enabled_at VARCHAR(64)'],
   ['users', 'login_fail_count', 'ALTER TABLE users ADD COLUMN login_fail_count INTEGER NOT NULL DEFAULT 0'],
   ['users', 'login_locked_until', 'ALTER TABLE users ADD COLUMN login_locked_until VARCHAR(64)'],
+  ['users', 'session_version', 'ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0'],
+  // Human-readable URL segments. See services/slugs.js.
+  ['servers', 'slug', 'ALTER TABLE servers ADD COLUMN slug VARCHAR(64)'],
+  ['channels', 'slug', 'ALTER TABLE channels ADD COLUMN slug VARCHAR(64)'],
   // --- parity block ---------------------------------------------------------
   // Every column below is ALSO declared in LEGACY_ALTERS, which only runs on
   // SQLite. They were missing here, so on an existing MySQL/MariaDB database
@@ -722,6 +741,10 @@ const INDEXES = [
   'CREATE INDEX idx_servers_owner ON servers(owner_id)',
   'CREATE INDEX idx_totp_recovery_user ON totp_recovery_codes(user_id, used_at)',
   'CREATE INDEX idx_totp_used_user ON totp_used_steps(user_id, used_at)',
+  'CREATE UNIQUE INDEX idx_servers_slug ON servers(slug)',
+  // Unique per community, not globally: two communities may both have a
+  // #general, and the community is already in the path.
+  'CREATE UNIQUE INDEX idx_channels_slug ON channels(server_id, slug)',
   'CREATE INDEX idx_pins_channel ON pinned_messages(channel_id, pinned_at)',
   'CREATE INDEX idx_reactions_message ON reactions(message_id)',
   'CREATE INDEX idx_muted_user ON muted_channels(user_id)',
@@ -864,6 +887,12 @@ async function applySchema(conn) {
   // moment every row has an explicit seq.
   await backfillSequence(conn, 'messages', 'channel_id');
   await backfillSequence(conn, 'dm_messages', 'conversation_id');
+
+  // Slugs must be populated and de-duplicated before the unique index below is
+  // created, for the same reason messages.seq is backfilled first: building the
+  // index over duplicates fails, and a failure here would stop every instance
+  // from booting.
+  await require('../services/slugs').backfill(conn);
 
   // users.email must be unique on every dialect, including a MySQL database
   // created by an older build. CREATE TABLE IF NOT EXISTS is a no-op on an

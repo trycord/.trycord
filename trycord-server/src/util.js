@@ -15,7 +15,11 @@ const uuid = () => crypto.randomUUID();
 
 function sign(user) {
   return jwt.sign(
-    { id: user.id, username: user.username, jti: uuid() },
+    // sv is the session version. It is what makes "invalidate every session"
+    // exact: iat has one-second resolution, so a token issued in the same second
+    // as a password change or a 2FA enable is indistinguishable from one issued
+    // after it, and the change silently fails to take effect.
+    { id: user.id, username: user.username, jti: uuid(), sv: Number(user.session_version || 0) },
     secret(),
     { expiresIn: '7d' }
   );
@@ -31,8 +35,18 @@ async function isOwner(userId, serverId) {
 }
 
 // Channel row if it exists AND the user belongs to its server, else null.
-async function visibleChannel(channelId, userId) {
-  const ch = await db.get('SELECT * FROM channels WHERE id = ?', [channelId]);
+// Accepts a channel id, or a channel slug when the owning community is known.
+// The server argument is not optional sugar: channel slugs are unique per
+// community, not globally, so two communities can each have a #general. Without
+// the server there is no single correct answer, and guessing one would let a
+// link resolve to somebody else's channel.
+async function visibleChannel(channelId, userId, serverId) {
+  let ch = null;
+  if (serverId) {
+    ch = await require('./services/slugs').resolveChannel(channelId, serverId);
+  } else {
+    ch = await db.get('SELECT * FROM channels WHERE id = ?', [channelId]);
+  }
   if (!ch || !(await isMember(userId, ch.server_id))) return null;
   return ch;
 }

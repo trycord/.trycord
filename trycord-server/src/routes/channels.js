@@ -6,10 +6,24 @@ const { resolveServer, requireMember, requirePerm } = require('../middleware/ser
 const { fail, serviceError } = require('../errors');
 const channels = require('../services/channels');
 const events = require('../services/events');
+const slugs = require('../services/slugs');
 const permissions = require('../services/permissions');
 
 const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
+
+// :channelId may be an id or a slug. Resolution happens here, at the route
+// boundary, so every service below keeps taking plain ids and none of them
+// needs to know slugs exist. The community is required because channel slugs
+// are unique per community, not globally.
+async function resolveChannelParam(req, res) {
+  const ch = await slugs.resolveChannel(req.params.channelId, req.server.id);
+  if (!ch) {
+    fail(res, 'NOT_FOUND', 'channel not found');
+    return null;
+  }
+  return ch;
+}
 
 // Channel-room broadcaster (pins land on the channel room, next to the
 // message events). Wired once at boot; structural events keep using emit().
@@ -36,8 +50,8 @@ router.post('/', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (re
 
 router.patch('/:channelId', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
-    const ch = await db.get('SELECT * FROM channels WHERE id = ? AND server_id = ?', [req.params.channelId, req.server.id]);
-    if (!ch) return fail(res, 'NOT_FOUND', 'channel not found');
+    const ch = await resolveChannelParam(req, res);
+    if (!ch) return;
     const { name, topic, categoryId } = req.body || {};
     const updated = await channels.update(ch, { name, topic, categoryId });
     events.emit(req.server.id, 'channel_updated', { channel: updated });
@@ -56,8 +70,10 @@ router.post('/reorder', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), as
 
 router.delete('/:channelId', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
-    const out = await channels.remove(req.server.id, req.params.channelId);
-    events.emit(req.server.id, 'channel_deleted', { channelId: String(req.params.channelId) });
+    const ch = await resolveChannelParam(req, res);
+    if (!ch) return;
+    const out = await channels.remove(req.server.id, ch.id);
+    events.emit(req.server.id, 'channel_deleted', { channelId: String(ch.id) });
     res.json(out);
   } catch (e) { serviceError(res, e); }
 });
@@ -74,7 +90,8 @@ const reactions = require('../services/reactions');
 const { now } = require('../util');
 
 async function pinChannel(req) {
-  const ch = await visibleChannel(req.params.channelId, req.user.id);
+  // The community is already resolved, so a slug here is unambiguous.
+  const ch = await visibleChannel(req.params.channelId, req.user.id, req.server.id);
   if (!ch || String(ch.server_id) !== String(req.server.id)) return null;
   return ch;
 }
