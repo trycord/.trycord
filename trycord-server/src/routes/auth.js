@@ -247,16 +247,26 @@ async function requirePassword(req, res) {
   return true;
 }
 
-// Bumps the session version, which the auth middleware compares against the
-// token's sv claim on every request. Increments a counter rather than stamping a
-// timestamp because iat has one-second resolution: a token issued in the same
-// second as this call is otherwise indistinguishable from a fresh one, and the
-// change would not take effect.
+// Invalidates every outstanding session by bumping the session version, which
+// the auth middleware compares against the token's sv claim on every request.
+//
+// A counter, not a timestamp: JWT iat has one-second resolution, so a token
+// issued in the same second as the change is indistinguishable from one issued
+// after it and the invalidation silently does nothing. Every path that signs out
+// sessions must go through here - the earlier version of this used the
+// timestamp for three of the four, which left them racy.
+//
+// Returns the new version, because the caller usually has to hand back a fresh
+// token and that token must carry it. Signing with a stale sv produces a token
+// the middleware rejects immediately, which looks like a successful sign-out
+// followed by a mysterious login failure.
 async function invalidateSessions(userId) {
-  await db.run('UPDATE users SET session_version = session_version + 1, sessions_invalidated_at = ? WHERE id = ?', [now(), userId]);
-  if (typeof disconnectUser === 'function') {
-    try { disconnectUser(userId, 'security settings changed'); } catch { /* gateway not wired */ }
-  }
+  await db.run(
+    'UPDATE users SET session_version = session_version + 1, sessions_invalidated_at = ? WHERE id = ?',
+    [now(), userId]
+  );
+  const row = await db.get('SELECT session_version FROM users WHERE id = ?', [userId]);
+  return row ? Number(row.session_version || 0) : 0;
 }
 
 // Revoke the current token so it cannot be used again.
@@ -290,12 +300,17 @@ router.post('/change-password', auth, rateLimit({ windowMs: 60000, max: 20 }), a
     if (reuse) return fail(res, 'VALIDATION_ERROR', 'new password must be different from the current one');
     const hash = await bcrypt.hash(String(newPassword), BCRYPT_COST);
     const ts = now();
-    await db.run(
-      'UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?',
-      [hash, ts, req.user.id]
-    );
+    // Changing the password is a credential change, so it invalidates sessions
+    // through the same version bump as every other path. It used to stamp only
+    // sessions_invalidated_at, which left the same-second hole open here, and
+    // the replacement token was signed without a session_version - so for an
+    // account whose version had ever been bumped, the token this call returns
+    // was already stale and the member was signed out by their own password
+    // change with no error.
+    const version = await invalidateSessions(req.user.id);
+    await db.run('UPDATE users SET password_hash = ?, password_changed_at = ? WHERE id = ?', [hash, ts, req.user.id]);
     console.log(`[security] password_changed user=${req.user.id}`);
-    const token = sign({ id: row.id, username: row.username });
+    const token = sign({ id: row.id, username: row.username, session_version: version });
     // Every token issued before now is stale, the caller's included. Sockets
     // are authorized only at upgrade time, so live ones are dropped here or a
     // stolen session stays interactive for the life of the connection.
@@ -311,7 +326,7 @@ router.post('/change-password', auth, rateLimit({ windowMs: 60000, max: 20 }), a
 // The client drops its token and returns to login.
 router.post('/sessions/revoke-all', auth, async (req, res, next) => {
   try {
-    await db.run('UPDATE users SET sessions_invalidated_at = ? WHERE id = ?', [now(), req.user.id]);
+    await invalidateSessions(req.user.id);
     console.log(`[security] all_sessions_revoked user=${req.user.id}`);
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
     res.json({ ok: true });
@@ -322,13 +337,19 @@ router.post('/sessions/revoke-all', auth, async (req, res, next) => {
 // only the caller's session survives.
 router.post('/sessions/revoke-others', auth, async (req, res, next) => {
   try {
-    const ts = now();
-    await db.run('UPDATE users SET sessions_invalidated_at = ? WHERE id = ?', [ts, req.user.id]);
-    const row = await db.get('SELECT id, username, display_name, created_at FROM users WHERE id = ?', [req.user.id]);
+    // The new token must carry the bumped version. Signing before reading it
+    // back, or signing a row that does not include the column, hands back a
+    // token the middleware rejects on its very next request - the member is
+    // signed out of the session they are standing in, with no error.
+    const version = await invalidateSessions(req.user.id);
+    const row = await db.get(
+      'SELECT id, username, display_name, created_at, session_version FROM users WHERE id = ?',
+      [req.user.id]
+    );
     console.log(`[security] other_sessions_revoked user=${req.user.id}`);
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
     res.json({
-      token: sign({ id: row.id, username: row.username }),
+      token: sign({ id: row.id, username: row.username, session_version: version }),
       user: { id: row.id, username: row.username, displayName: row.display_name, createdAt: row.created_at },
     });
   } catch (e) { next(e); }
