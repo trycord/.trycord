@@ -4,6 +4,9 @@ const Codes = {
   AUTH_REQUIRED: 401,
   SESSION_REVOKED: 401,
   BAD_PASSWORD: 400,
+  // Login throttling. 429 so a client can show a countdown and so a caller can
+  // tell "locked out" from "wrong password" without parsing prose.
+  ACCOUNT_LOCKED: 429,
   ACCOUNT_ENFORCED: 403,
   VALIDATION_ERROR: 400,
   ALREADY_MEMBER: 400,
