@@ -79,6 +79,27 @@ export function announce(text) {
 }
 
 
+// The button factory. Not a style convenience - `type` defaults to 'button'
+// because a <button> with no type is a submit button, and most of these live
+// inside a <form>. Every call site that wrote `type: 'button'` by hand was
+// re-deriving the same three lines and one omission submitted the surrounding
+// form by accident. `submit: true` is the deliberate opt-in for the exception.
+export function btn(label, opts = {}) {
+  const { variant = '', size = '', icon, onClick, type, title, ariaLabel, disabled, className = '' } = opts;
+  const classes = ['btn', variant, size, className].filter(Boolean).join(' ');
+  const node = el('button', {
+    class: classes,
+    type: type || (opts.submit ? 'submit' : 'button'),
+    onClick,
+    title: title || null,
+    'aria-label': ariaLabel || null,
+    disabled: !!disabled,
+  });
+  if (icon) node.appendChild(el('span', { class: 'btn__icon', 'aria-hidden': 'true' }, icon));
+  node.appendChild(el('span', {}, label));
+  return node;
+}
+
 export function openModal({ title, eyebrow, closable, body, footer, closeText = 'Close' }) {
   let box;
   const backdrop = el('div', { class: 'backdrop' }, (box = el('div', {
@@ -148,7 +169,7 @@ export function openModal({ title, eyebrow, closable, body, footer, closeText = 
 
 export function confirmDialog({ title, message, confirmText = 'Confirm', danger = false, onConfirm }) {
   let doClose = () => {};
-  const cancelBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const cancelBtn = btn('Cancel', { variant: 'ghost' });
   const okBtn = el('button', { class: danger ? 'btn danger' : 'btn primary', type: 'button' }, confirmText);
   const modal = openModal({
     title, body: el('p', {}, message),
@@ -217,6 +238,9 @@ function buildMenu(items, ctx, depth) {
     const wrap = el('span', { class: 'pop-item__text' });
     wrap.append(el('span', {}, item.label));
     if (item.desc) wrap.append(el('span', { class: 'pop-desc' }, item.desc));
+    // Icon first, so the label and its description stay left-aligned with each
+    // other whether or not an item has one.
+    if (item.icon) b.appendChild(el('span', { class: 'pop-item__icon', 'aria-hidden': 'true' }, item.icon));
     b.appendChild(wrap);
     if (hasSub) b.appendChild(el('span', { class: 'pop-item__caret', 'aria-hidden': 'true' }, 'â€º'));
 
@@ -352,6 +376,69 @@ function placeSub(pop, anchorBtn) {
   pop.style.top = Math.round(top) + 'px';
 }
 
+// Positions a menu under its trigger rather than at a point. The alignment
+// rules match placeSub so a dropdown and a submenu opened from it line up.
+function placeUnder(pop, anchor) {
+  const a = anchor.getBoundingClientRect();
+  const pr = pop.getBoundingClientRect();
+  let left = a.left;
+  if (left + pr.width > innerWidth - MENU_EDGE) left = Math.max(MENU_EDGE, innerWidth - pr.width - MENU_EDGE);
+  pop.style.left = Math.round(left) + 'px';
+  let top = a.bottom + 4;
+  // Flip above when there is no room below, so a menu near the bottom of the
+  // window is still reachable.
+  if (top + pr.height > innerHeight - MENU_EDGE) {
+    const above = a.top - pr.height - 4;
+    top = above >= MENU_EDGE ? above : Math.max(MENU_EDGE, innerHeight - pr.height - MENU_EDGE);
+  }
+  pop.style.top = Math.round(top) + 'px';
+}
+
+// A menu owned by a trigger button, opened by click and by Enter/Space.
+//
+// This is the same menu as right-click and long-press use - same items, same
+// keyboard handling, same dismissal. It replaces a second, thinner dropdown
+// implementation that knew nothing about submenus, disabled items, focus
+// movement or Escape, and so behaved differently from every other menu in the
+// app depending on which one a member happened to open.
+export function attachMenu(anchor, factory, opts = {}) {
+  if (!anchor) return () => {};
+  anchor.setAttribute('aria-haspopup', 'menu');
+  anchor.setAttribute('aria-expanded', 'false');
+
+  const toggle = () => {
+    if (menuStack.length) { closeContextMenu(); return; }
+    const items = factory();
+    if (!items || !items.length) return;
+    const pop = showContextMenuAt(null, items, {
+      x: 0, y: 0, depth: 0,
+      target: opts.target ? opts.target(anchor) : null,
+      node: anchor,
+      sheet: sheetMode(opts.sheet),
+      under: anchor,
+    });
+    if (!pop) return;
+    anchor.setAttribute('aria-expanded', 'true');
+    // First real item, so the keyboard does not have to hunt past the panel.
+    const first = pop.querySelector('.pop-item:not([disabled])');
+    if (first && opts.focusFirst !== false) first.focus();
+  };
+
+  anchor.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggle();
+  });
+  anchor.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
+    }
+  });
+  return () => closeContextMenu();
+}
+
 function showContextMenuAt(anchor, items, ctx) {
   const pop = buildMenu(items, ctx, ctx.depth);
   if (!pop.querySelector('.pop-item')) return null;
@@ -370,12 +457,16 @@ function showContextMenuAt(anchor, items, ctx) {
     pop.style.top = 'auto';
     pop.style.bottom = '0px';
     scrim.addEventListener('pointerdown', closeContextMenu);
+  } else if (ctx.under) {
+    // Owned by a trigger button rather than a pointer position.
+    root.appendChild(pop);
+    placeUnder(pop, ctx.under);
   } else {
     root.appendChild(pop);
     place(pop, ctx.x, ctx.y);
   }
 
-  menuStack.push({ pop, depth: ctx.depth, anchorBtn: ctx.anchorBtn || null });
+  menuStack.push({ pop, depth: ctx.depth, anchorBtn: ctx.anchorBtn || ctx.under || null });
   return pop;
 }
 
@@ -386,6 +477,10 @@ export function showContextMenu(clientX, clientY, items, opts = {}) {
     target: opts.target || null,
     node: opts.node || null,
     sheet: sheetMode(opts.sheet),
+    // The trigger, when the menu was opened from a button. Tracked so closing
+    // the menu can put the button's aria-expanded back, whether it was closed by
+    // Escape, an outside click, a selection, or a resize.
+    under: opts.under || null,
   };
   const pop = showContextMenuAt(null, items, ctx);
   if (!pop) return { pop: null, hide: () => {} };
@@ -592,7 +687,7 @@ export function openReportDialog({ targetType, targetId, title, subtitle, onSubm
   const sel = el('select', { class: 'input', 'aria-label': 'Reason' });
   for (const c of REPORT_CATEGORIES) sel.appendChild(el('option', { value: c }, c));
   const details = el('textarea', { class: 'textarea', style: { minHeight: '80px' }, maxlength: 4000, placeholder: 'Additional information (optional)' });
-  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
+  const cancel = btn('Cancel', { variant: 'ghost' });
   const go = el('button', { class: 'btn danger', type: 'button' }, 'Submit report');
   const modal = openModal({
     title: title || 'Report',

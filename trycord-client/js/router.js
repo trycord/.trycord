@@ -331,8 +331,6 @@ async function renderRoute() {
         publishRoute('/' + parts.join('/'));
       }
     }
-    const serverId = parts[1];
-    const what = parts[2];
     if (what === 'channel' && parts[3] && parts[4] === 'pins') {
       setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
       await renderChannelPins(region, serverId, parts[3]);

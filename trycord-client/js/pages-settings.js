@@ -29,7 +29,7 @@ function settingsNav(serverId, active) {
       type: 'button',
       'aria-current': on ? 'page' : null,
     }, s.label);
-    b.addEventListener('click', () => { location.hash = serverPath(serverId, 'settings/' + s.id; });
+    b.addEventListener('click', () => { location.hash = serverPath(serverId, 'settings/' + s.id); });
     nav.appendChild(b);
   }
   return nav;

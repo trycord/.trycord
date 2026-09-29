@@ -187,6 +187,60 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client');
   ok('recovery codes can be re-issued', /twoFactorRecoveryCodes/.test(acctSrc), 'missing');
   ok('the security tab renders the 2FA section', /renderTwoFactorSection\(body\)/.test(acctSrc), 'not mounted');
 
+  console.log('one design system, not several');
+  // There were two menu implementations: the rich one in ui.js and a thinner
+  // dropdown in shell.js that knew nothing about submenus, disabled items or
+  // Escape. Whichever a member happened to open behaved differently, so a
+  // second implementation appearing again is the regression to catch.
+  
+  const shellSrc = fs.readFileSync(path.join(jsDir, 'shell.js'), 'utf8');
+  const menuSrc = fs.readFileSync(path.join(jsDir, 'ui.js'), 'utf8');
+  ok('no module defines a second menu system',
+    !/function dropdownPanel|function buildDropdown/.test(shellSrc + menuSrc), 'a second menu builder exists');
+  ok('the anchored menu is exported from ui.js', /export function attachMenu/.test(menuSrc), 'missing attachMenu');
+  ok('the anchored menu is used by the shell', /attachMenu\(trigger/.test(shellSrc), 'not adopted');
+  ok('dropdown CSS is gone', !fs.readFileSync(path.join(CLIENT, 'css', 'app.css'), 'utf8').includes('ctx-dropdown'), 'orphan rules remain');
+  ok('menu icons are styled on the unified menu',
+    /\.pop-item__icon/.test(fs.readFileSync(path.join(CLIENT, 'css', 'app.css'), 'utf8')), 'no icon style');
+
+  // components.js owns avatar rendering. A second hand-built one means the
+  // authenticated image fetch and its blob revoke have been re-derived, and a
+  // fix to either will apply in one place and not the other.
+  const acctForAvatar = fs.readFileSync(path.join(jsDir, 'pages-account.js'), 'utf8');
+  ok('no module builds an avatar outside components.js',
+    linkFiles.filter((f) => f !== 'components.js' &&
+      /el\('span', \{ class: 'avatar/.test(fs.readFileSync(path.join(jsDir, f), 'utf8'))).length === 0, 'a second renderer');
+  ok('the profile preview uses the shared avatar', /avatar\(shown/.test(acctForAvatar), 'still hand-built');
+
+  // The button factory exists to make type="button" the default, so a button
+  // dropped into a form cannot submit it by accident.
+  ok('a button factory is exported', /export function btn\(/.test(menuSrc), 'missing btn()');
+  ok('the factory defaults to a non-submitting type', /type \|\| \(opts\.submit \? 'submit' : 'button'\)/.test(menuSrc), 'no default');
+  ok('dialogs use the factory', /btn\('Cancel'/.test(menuSrc), 'still inline');
+
+  console.log('every client module parses');
+  // `node --check foo.js` reports success for a .js file that contains `import`
+  // statements even when the body has a duplicate declaration, so the checks
+  // run against it are worthless. A duplicate `const` in router.js shipped
+  // through a green suite and took the whole app down on load, because the
+  // server tests exercise the API and never parse the client.
+  //
+  // The extension is the fix: .mjs forces module parsing, which does report it.
+  // Verified before relying on it - the same body fails as .mjs and passes as .js.
+  const parseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-parse-'));
+  const broken = [];
+  for (const f of fs.readdirSync(path.join(CLIENT, 'js')).filter((x) => x.endsWith('.js'))) {
+    const tmp = path.join(parseDir, f.replace(/\.js$/, '.mjs'));
+    fs.copyFileSync(path.join(CLIENT, 'js', f), tmp);
+    const r = require('child_process').spawnSync(process.execPath, ['--check', tmp], { encoding: 'utf8' });
+    if (r.status !== 0) {
+      const first = String(r.stderr || '').split('\n').find((l) => /Error/.test(l)) || 'parse error';
+      broken.push(f + ': ' + first.trim());
+    }
+  }
+  fs.rmSync(parseDir, { recursive: true, force: true });
+  ok('all client modules parse as ES modules', broken.length === 0, broken.slice(0, 4).join(' | '));
+
   console.log('a11y contract in the markup');
   const html = fs.readFileSync(path.join(CLIENT, 'index.html'), 'utf8');
   ok('the view region is not a live region', !/id="view-root"[\s\S]{0,80}aria-live/.test(html));
@@ -397,3 +451,5 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client');
 function pathToFileUrl(p) {
   return 'file:///' + p.split(path.sep).join('/').replace(/^\/+/, '');
 }
+
+

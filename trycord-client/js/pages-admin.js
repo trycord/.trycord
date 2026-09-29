@@ -2,7 +2,7 @@
 
 import Api from './api.js';
 import State from './state.js';
-import { esc, el, clear, toast, openModal, confirmDialog, relTime, fullTime } from './ui.js';
+import { esc, el, btn, clear, toast, openModal, confirmDialog, relTime, fullTime } from './ui.js';
 import { initialOf, emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
 
@@ -194,7 +194,7 @@ function userEnforceModal(user, onDone) {
       hoursField, confirmField,
       el('div', { class: 'field' }, el('label', {}, 'Reason'), reason)),
     footer: [
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: 'btn danger', type: 'button', onClick: submit }, 'Apply action'),
     ],
   });
@@ -224,7 +224,7 @@ function liftUserModal(user, onDone) {
     body: el('div', { class: 'admin-form' }, err,
       el('div', { class: 'field' }, el('label', {}, 'Reason'), reason)),
     footer: [
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: 'btn primary', type: 'button', onClick: submit }, 'Lift enforcement'),
     ],
   });
@@ -318,7 +318,7 @@ function serverEnforceModal(server, onDone) {
       confirmField,
       el('div', { class: 'field' }, el('label', {}, 'Reason'), reason)),
     footer: [
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: 'btn danger', type: 'button', onClick: submit }, 'Apply action'),
     ],
   });
@@ -347,7 +347,7 @@ function serverLiftModal(server, onDone) {
     body: el('div', { class: 'admin-form' }, err,
       el('div', { class: 'field' }, el('label', {}, 'Reason'), reason)),
     footer: [
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: 'btn primary', type: 'button', onClick: submit }, 'Lift enforcement'),
     ],
   });
@@ -377,7 +377,7 @@ function serverRemoveModal(server, onDone) {
         confirm, el('span', {}, 'I confirm this removes the community and its content permanently.')),
       el('p', { class: 'muted small' }, 'This is irreversible. Members are removed and the server record is deleted.')),
     footer: [
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: 'btn danger', type: 'button', onClick: submit }, 'Remove community'),
     ],
   });
@@ -535,7 +535,7 @@ function reviewGdpr(r, decision, refresh) {
         : 'The user is told the request was declined and can submit a new one.'),
       el('div', { class: 'field' }, el('label', {}, 'Note'), note)),
     footer: [
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: approve ? 'btn primary' : 'btn danger', type: 'button', onClick: submit },
         approve ? 'Approve' : 'Decline'),
     ],
@@ -564,7 +564,7 @@ function processGdpr(r, refresh) {
         + 'longest-standing member. Moderation and audit records that name them are kept.'),
       el('p', { class: 'muted small' }, 'This cannot be undone.')),
     footer: [
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: 'btn danger', type: 'button', onClick: submit }, 'Erase account'),
     ],
   });
@@ -647,7 +647,7 @@ function appealDecisionModal(appeal, decision, onDone) {
       approve ? el('p', {}, 'Approving lifts the enforcement on this account or community.') : null,
       el('div', { class: 'field' }, el('label', {}, 'Note'), note)),
     footer: [
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => modal.close() }, 'Cancel'),
+      btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: approve ? 'btn primary' : 'btn danger', type: 'button', onClick: submit }, approve ? 'Approve appeal' : 'Deny appeal'),
     ],
   });
