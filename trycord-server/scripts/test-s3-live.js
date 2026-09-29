@@ -29,7 +29,6 @@ const ok = (n, c, d) => { c ? pass++ : fail++; console.log((c ? '  ok   ' : ' FA
 // would be in production rather than through a test-only shortcut.
 storage.reset();
 process.env.STORAGE_DRIVER = 's3';
-storage.init();
 
 const cfg = {
   endpoint: process.env.S3_ENDPOINT,
@@ -78,6 +77,9 @@ async function ensureBucket() {
     console.error('missing env: ' + missing.join(', '));
     process.exit(1);
   }
+  // Initialised here, after the opt-in gate, so running the script without
+  // S3_LIVE=1 is a clean skip rather than a credential error.
+  storage.init();
 
   console.log('endpoint ' + cfg.endpoint + '  bucket ' + cfg.bucket + '  region ' + cfg.region);
   ok('bucket is creatable or already present', await ensureBucket(), 'could not create bucket');
