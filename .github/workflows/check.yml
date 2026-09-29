@@ -53,8 +53,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: Syntax-check client sources
-        run: for f in trycord-client/js/*.js; do node --check "$f" || exit 1; done
+      # NOT `node --check trycord-client/js/*.js`: that reports success for a
+      # .js file containing import statements even when the body has a duplicate
+      # declaration, so it is not a check. A duplicate `const serverId` shipped
+      # to main through it in 44e1ba8. This parses each module as a module.
+      - name: Parse client modules as ES modules
+        run: node trycord-server/scripts/check-client-modules.js trycord-client/js
 
   desktop:
     name: Desktop checks (no install needed)
@@ -68,6 +72,9 @@ jobs:
         with:
           node-version: 22
 
+      # Same trap as the client job: these are CommonJS and node --check is
+      # genuinely meaningful for them, but they are listed explicitly so a new
+      # desktop script cannot skip the gate by being unlisted.
       - name: Syntax-check desktop sources
         run: for f in trycord-desktop/main.js trycord-desktop/updater.js trycord-desktop/preload.js trycord-desktop/scripts/*.js; do node --check "$f" || exit 1; done
 

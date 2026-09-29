@@ -219,27 +219,19 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client');
   ok('dialogs use the factory', /btn\('Cancel'/.test(menuSrc), 'still inline');
 
   console.log('every client module parses');
-  // `node --check foo.js` reports success for a .js file that contains `import`
-  // statements even when the body has a duplicate declaration, so the checks
-  // run against it are worthless. A duplicate `const` in router.js shipped
-  // through a green suite and took the whole app down on load, because the
-  // server tests exercise the API and never parse the client.
-  //
-  // The extension is the fix: .mjs forces module parsing, which does report it.
-  // Verified before relying on it - the same body fails as .mjs and passes as .js.
-  const parseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-parse-'));
-  const broken = [];
-  for (const f of fs.readdirSync(path.join(CLIENT, 'js')).filter((x) => x.endsWith('.js'))) {
-    const tmp = path.join(parseDir, f.replace(/\.js$/, '.mjs'));
-    fs.copyFileSync(path.join(CLIENT, 'js', f), tmp);
-    const r = require('child_process').spawnSync(process.execPath, ['--check', tmp], { encoding: 'utf8' });
-    if (r.status !== 0) {
-      const first = String(r.stderr || '').split('\n').find((l) => /Error/.test(l)) || 'parse error';
-      broken.push(f + ': ' + first.trim());
-    }
-  }
-  fs.rmSync(parseDir, { recursive: true, force: true });
-  ok('all client modules parse as ES modules', broken.length === 0, broken.slice(0, 4).join(' | '));
+  // Delegated to the same script CI runs, because a second implementation here
+  // is how the two would drift and one would keep reporting a false pass.
+  // node --check is not usable: it reports success for a .js file containing
+  // import statements even with a duplicate declaration, which is how
+  // 44e1ba8 shipped a router.js that would not load.
+  const { spawnSync } = require('child_process');
+  const parse = spawnSync(process.execPath,
+    [path.join(__dirname, 'check-client-modules.js'), 'trycord-client/js'],
+    { cwd: path.join(__dirname, '..', '..'), encoding: 'utf8' });
+  const parseOut = String(parse.stdout || '') + String(parse.stderr || '');
+  ok('all client modules parse as ES modules', parse.status === 0,
+    parseOut.split('\n').filter((l) => /FAIL|Error/.test(l)).slice(0, 3).join(' | '));
+  if (parse.status !== 0) console.log('       ' + parseOut.trim().split('\n').slice(0, 4).join('\n       '));
 
   console.log('a11y contract in the markup');
   const html = fs.readFileSync(path.join(CLIENT, 'index.html'), 'utf8');
