@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PAGE TITLE &mdash; Trycord</title>
+  <meta name="description" content="ONE SENTENCE, 120-160 CHARACTERS. Shown in search results and link previews.">
+  <link rel="icon" href="/assets/trycord-logo.ico" type="image/x-icon">
+  <link rel="icon" href="/assets/trycord-logo.png" type="image/png">
+  <link rel="stylesheet" href="/css/site.css">
+</head>
+<body>
+  <!--
+    Starter template for a page editable through Admin > Pages.
+
+    Copy this file, rename it, then register it in
+    trycord-server/src/services/pages.js under EDITABLE with its route, file
+    and whether it is a legal page. Registering it is what makes the page
+    reachable at its clean URL and openable in the editor; a file on disk that is
+    not registered is served unchanged and cannot be edited.
+
+    Two things drive the editor, and both must survive your edits:
+
+      1. The page:begin / page:end markers. Everything between them is replaced
+         when an administrator publishes. The header and footer sit outside them
+         on purpose, so publishing cannot change the navigation or lose the
+         footer. A page with no markers is served as-is rather than guessed at.
+
+      2. .op-field spans with a stable data-op name. These are the individual
+         values an operator fills in, such as a contact address. data-op is the
+         key the stored value is matched against, so treat it as a permanent
+         identifier: renaming one orphans whatever an operator has already typed
+         into it.
+
+    Operator fields are for values a self-hoster must supply and that Trycord
+    cannot know: names, addresses, jurisdictions, retention periods. Write the
+    prose around them yourself. Do not put layout, scripts or whole sections in
+    an .op-field - the editor treats the value as text, not markup.
+
+    Legal pages additionally cannot be published without confirming the change,
+    so an operator is made to acknowledge what they are editing.
+  -->
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="wrap nav-wrap">
+      <a class="brand" href="/">
+        <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
+        <span class="brand-name">Trycord</span>
+      </a>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/features">Features</a>
+        <a href="/docs">Docs</a>
+        <a href="/download">Download</a>
+        <a href="/about">About</a>
+        <a href="/support">Support</a><a href="/security">Security</a><a href="/status">Status</a>
+        <a class="btn-open" href="/app/">Open the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="page tight">
+    <!-- page:begin -->
+    <h1>Page title</h1>
+    <p class="lede">One or two sentences on what this page is for and who it is for.</p>
+
+    <h2>A section heading</h2>
+    <p>
+      Write the content directly. An administrator editing this page replaces
+      everything between the markers, so put anything that must survive a publish
+      above <code>&lt;!-- page:begin --&gt;</code> or below <code>&lt;!-- page:end --&gt;</code>.
+    </p>
+
+    <h2>What the operator fills in</h2>
+    <p>
+      Anything Trycord cannot know is an operator field. Each one needs its own
+      stable <code>data-op</code> name:
+    </p>
+    <ul>
+      <li>
+        Contact address:
+        <span class="op-field" data-op="contact-email">OPERATOR: the address people should contact you on</span>
+      </li>
+      <li>
+        Legal entity, if you have one:
+        <span class="op-field" data-op="legal-entity">OPERATOR: your registered name, or omit this line</span>
+      </li>
+      <li>
+        Jurisdiction:
+        <span class="op-field" data-op="jurisdiction">OPERATOR: the country or state your instance operates under</span>
+      </li>
+    </ul>
+    <p>
+      The all-caps prefix is the placeholder. It tells whoever is setting this
+      up that the value is still missing, and it disappears as soon as the field
+      is filled in.
+    </p>
+
+    <h2>Another section</h2>
+    <p>Use the same heading and paragraph elements as the rest of the site.</p>
+    <ul>
+      <li>Ordinary list item.</li>
+      <li>Another one.</li>
+    </ul>
+    <p><a href="/docs">Link to the documentation</a> the way other pages do.</p>
+    <!-- page:end -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/">
+          <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
+          <span class="brand-name">Trycord</span>
+        </a>
+        <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Product</h2>
+        <a href="/features">Features</a>
+        <a href="/download">Download</a>
+        <a href="/docs">Documentation</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Project</h2>
+        <a href="/about">About</a>
+        <a href="/support">Support</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Legal</h2>
+        <a href="/terms">Terms of Service</a>
+        <a href="/instances-terms">Official instance terms</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/trust-and-safety">Trust &amp; Safety</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/site.js" defer></script>
+</body>
+</html>
