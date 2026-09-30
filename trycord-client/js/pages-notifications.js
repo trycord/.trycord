@@ -151,7 +151,7 @@ export async function renderNotifications(container) {
     return;
   }
   if (!items.length) {
-    list.appendChild(emptyState('♧', 'All caught up', 'Mentions, messages and friend activity land here.'));
+    list.appendChild(emptyState('bell', 'All caught up', 'Mentions, messages and friend activity land here.'));
     loadMoreBtn.hidden = true;
     return;
   }

@@ -30,7 +30,7 @@ export async function renderHome(container) {
     if (!servers.length) {
       try { servers = await refreshServers(); } catch { servers = State.servers; }
     }
-    const empty = emptyState('○', 'Your space is quiet',
+    const empty = emptyState('hash', 'Your space is quiet',
       servers.length ? 'Choose a community from the spine to start talking.' : 'Create a community or browse places to join the conversation.');
     empty.appendChild(el('div', { class: 'home-empty-actions' },
       el('button', { class: 'btn primary', type: 'button', onClick: () => { location.hash = '#/servers/new'; } }, 'Create community'),

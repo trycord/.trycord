@@ -51,7 +51,7 @@ async function renderServerLanding(container, serverId) {
   const categories = layout.categories || [];
   const channels = layout.channels || [];
   if (!channels.length) {
-    wrap.appendChild(emptyState('◌', 'No channels yet', 'Create a channel to get started.'));
+    wrap.appendChild(emptyState('hash', 'No channels yet', 'Create a channel to get started.'));
   } else {
     for (const cat of categories) {
       const inCat = channels.filter((ch) => String(ch.category_id) === String(cat.id));

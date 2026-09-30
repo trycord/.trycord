@@ -37,7 +37,7 @@ async function renderInvites(container, serverId) {
     let invites = [];
     try { invites = await Api.invites(serverId); } catch { /* ignore */ }
     if (!invites.length) {
-      listPane.appendChild(emptyState('◇', 'No invites yet', 'Create one above to share a link.'));
+      listPane.appendChild(emptyState('compass', 'No invites yet', 'Create one above to share a link.'));
       return;
     }
     for (const inv of invites) {

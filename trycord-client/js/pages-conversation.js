@@ -4,7 +4,7 @@ import Realtime from './realtime.js';
 
 import { can, canInChannel, isMuted, mustVerifyToPost, refreshMutes, setChannelPermissions, setMuted, setViewRefresh } from './state.js';
 import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDialog, relTime, showContextMenu, attachContextMenu, showEmojiPicker, toast } from './ui.js';
-import { emptyState, messageRow, paintReactions } from './components.js';
+import { emptyState, icon, messageRow, paintReactions } from './components.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
 import { TrycordConfig } from './config.js';
@@ -45,7 +45,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       btn.setAttribute('aria-label', btn.title);
       btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
     },
-  }, '☰');
+  }, icon('menu'));
   // The server's own channel-scoped permission answer for this viewer. Fetched
   // per channel because an override on this channel, or on its category, is
   // invisible to the community-level list the composer used to consult.
@@ -83,18 +83,18 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   const searchBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Search in this community', 'aria-label': 'Search messages',
     onClick: () => toggleSearchPanel(),
-  }, '⌕');
+  }, icon('search'));
   const pinsBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Pinned messages', 'aria-label': 'Pinned messages',
     onClick: () => { location.hash = channelPath(serverId, channelId, '/pins'); },
-  }, '☆');
+  }, icon('star'));
   const moreBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Community actions', 'aria-label': 'Community actions',
     onClick: () => {
       const menu = document.querySelector('#place-navigation .place-header__menu');
       if (menu) menu.click();
     },
-  }, '⋯');
+  }, icon('more'));
   renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [searchBtn, pinsBtn, bellBtn, moreBtn, memberToggle] });
 
   const conv = el('div', { class: 'conversation' });
@@ -254,7 +254,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       pinState.set(String(id), !!pinned);
       const head = node.querySelector('.msg-head');
       const badge = node.querySelector('.msg-pinned');
-      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, '⚑'));
+      if (pinned && head && !badge) head.appendChild(el('span', { class: 'msg-pinned', title: 'Pinned message' }, icon('flag')));
       if (!pinned && badge) badge.remove();
     }
     if (list !== undefined) {
@@ -425,11 +425,11 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }
 
   const composer = el('div', { class: 'composer' });
-  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, '⊕');
+  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, icon('plus'));
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
-  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, '☺');
+  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('users'));
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
   composer.appendChild(fileBtn);
   composer.appendChild(fileInput);
@@ -721,7 +721,7 @@ async function renderChannelPins(container, serverId, channelId) {
   const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
   const back = el('button', { class: 'btn ghost sm', type: 'button' }, '← Back to #' + (channel ? channel.name : 'channel'));
   back.addEventListener('click', () => { location.hash = channelPath(serverId, channelId); });
-  renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: '☆', actions: [back] });
+  renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: 'star', actions: [back] });
   const wrap = el('div', { class: 'page atrium' });
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
@@ -736,7 +736,7 @@ async function renderChannelPins(container, serverId, channelId) {
       return;
     }
     if (!pins.length) {
-      list.appendChild(emptyState('☆', 'No pinned messages', 'Pin important messages to find them here.'));
+      list.appendChild(emptyState('star', 'No pinned messages', 'Pin important messages to find them here.'));
       return;
     }
     for (const m of pins) {

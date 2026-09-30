@@ -145,7 +145,7 @@ export function navGroup({ label, collapsible = false, collapsed = false, action
       'aria-expanded': collapsible ? (collapsed ? 'false' : 'true') : null,
     });
     if (collapsible) {
-      head.appendChild(el('span', { class: 'nav-group__caret' }, '▾'));
+      head.appendChild(el('span', { class: 'nav-group__caret' }, icon('chevronDown')));
     }
     head.appendChild(el('span', { class: 'nav-group__label' }, label));
     if (action) head.appendChild(action);
@@ -209,7 +209,7 @@ export function serverChip(server, { active = false, onClick } = {}) {
   // the authenticated loader, so use it rather than a second implementation.
   chip.appendChild(communityMark(server.name || '?', { size: 'community-mark--chip', server }));
   chip.appendChild(el('span', { class: 'chip-name' }, server.name));
-  if (server.is_owner) chip.appendChild(el('span', { class: 'chip-live', title: 'You own this community' }, '★'));
+  if (server.is_owner) chip.appendChild(el('span', { class: 'chip-live', title: 'You own this community' }, icon('star')));
   return chip;
 }
 
@@ -226,13 +226,93 @@ export function channelRow(channel, { active = false, muted = false, onClick } =
   return row;
 }
 
-export function emptyState(icon, title, sub) {
+// One icon set, drawn rather than typed.
+//
+// The UI used to reach for Unicode pictographs - a smiling face for Friends, a
+// club suit for Alerts, an envelope for DMs. They render differently on every
+// platform, some are emoji and get the coloured treatment, and none of them line
+// up with the stroke weight of the type beside them. That inconsistency is most
+// of what makes an interface read as assembled rather than designed.
+//
+// These are inline SVG on a 24-grid with a 1.7 stroke, so they inherit
+// currentColor, scale with font-size, and match each other. `icon()` returns an
+// element rather than a string so it can be dropped straight into el().
+const ICON_PATHS = {
+  home: 'M3 10.6 12 3.5l9 7.1V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+  mail: 'M3 6.5h18v11H3zM3 7l9 6.5L21 7',
+  users: 'M16 20v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.4V20M9.5 11.5a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5M21 20v-1.6a3.4 3.4 0 0 0-2.6-3.3M15.5 5.2a3.25 3.25 0 0 1 0 6.1',
+  bell: 'M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5M13.7 20a2 2 0 0 1-3.4 0',
+  search: 'M11 18.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15M20.5 20.5l-4.4-4.4',
+  menu: 'M3.5 6.5h17M3.5 12h17M3.5 17.5h17',
+  hash: 'M9 3.5 7 20.5M17 3.5l-2 17M3.5 8.5h17M3 15.5h17',
+  gear: 'M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1',
+  pin: 'M9 3.5h6l-.7 5.2 3.2 3.3H6.5l3.2-3.3zM12 12v8.5',
+  pencil: 'M16.5 4.5l3 3M4 20l.9-3.8L15.6 5.5a1.6 1.6 0 0 1 2.3 0l.6.6a1.6 1.6 0 0 1 0 2.3L7.8 19.1z',
+  close: 'M6 6l12 12M18 6L6 18',
+  more: 'M12 6.5h.01M12 12h.01M12 17.5h.01',
+  chevronDown: 'M6 9.5l6 6 6-6',
+  chevronRight: 'M9.5 6l6 6-6 6',
+  flag: 'M5 21V4.5M5 5h11l-1.8 3.5L16 12H5',
+  star: 'M12 3.5l2.7 5.5 6 .9-4.4 4.2 1 6-5.3-2.8-5.4 2.8 1-6L3.3 9.9l6-.9z',
+  check: 'M4.5 12.5l5 5 10-11',
+  warn: 'M12 4 2.8 20h18.4zM12 10v4.2M12 17.2h.01',
+  shield: 'M12 3.2 19 6v6.2c0 4.3-2.9 7.4-7 8.6-4.1-1.2-7-4.3-7-8.6V6z',
+  upload: 'M12 16V4.5M7.5 9 12 4.5 16.5 9M4 15.5v3A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-3',
+  download: 'M12 4v11.5M7.5 11l4.5 4.5 4.5-4.5M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2',
+  trash: 'M4.5 6.5h15M9.5 6.5V4.8A1.3 1.3 0 0 1 10.8 3.5h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7M6.5 6.5 7.4 20a1.3 1.3 0 0 0 1.3 1.2h6.6a1.3 1.3 0 0 0 1.3-1.2l.9-13.5',
+  ban: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M5.6 5.6l12.8 12.8',
+  mute: 'M11 5.5 6.8 9H3.5v6h3.3L11 18.5zM15.5 9.5l5 5M20.5 9.5l-5 5',
+  volume: 'M11 5.5 6.8 9H3.5v6h3.3L11 18.5zM15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12',
+  layers: 'M12 3 3 7.5l9 4.5 9-4.5zM3 12.5l9 4.5 9-4.5M3 17l9 4.5 9-4.5',
+  list: 'M8 6.5h12M8 12h12M8 17.5h12M4 6.5h.01M4 12h.01M4 17.5h.01',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M3.2 9.5h17.6M3.2 14.5h17.6M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18',
+  logout: 'M15 8V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20h8a1.5 1.5 0 0 0 1.5-1.5V16M10 12h10M17 8.5l3.5 3.5-3.5 3.5',
+  compass: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M15.5 8.5l-2 5-5 2 2-5z',
+  image: 'M4.5 4.5h15v15h-15zM8.5 11a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M4.5 16.5l4.5-4.5 3.5 3.5 3-3 4 4',
+  document: 'M6 3.5h7l5 5v12H6zM13 3.5v5h5M9 13h6M9 16.5h6',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M12 7v5.2l3.2 2',
+  inbox: 'M3.5 13.5h4l1.5 3h6l1.5-3h4M3.5 13.5 6 5h12l2.5 8.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19z',
+};
+
+export function icon(name, opts = {}) {
+  const d = ICON_PATHS[name];
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', opts.weight || '1.7');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  if (opts.size) { svg.setAttribute('width', opts.size); svg.setAttribute('height', opts.size); }
+  if (opts.class) svg.setAttribute('class', opts.class);
+  // className on an SVGElement is read-only in WebKit, and el() assigns
+  // className directly. setAttribute is the only safe route.
+  else svg.setAttribute('class', 'ui-icon');
+  for (const seg of (d || ICON_PATHS.inbox).split(' M').map((p, i) => (i ? 'M' + p : p))) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', seg);
+    svg.appendChild(path);
+  }
+  return svg;
+}
+
+// `iconName` is a key of ICON_PATHS. A caller may still pass an element, which
+// is appended as-is.
+export function emptyState(iconName, title, sub) {
   const box = el('div', { class: 'empty-state' });
-  if (icon) box.appendChild(el('div', { class: 'es-icon' }, icon));
+  if (iconName) {
+    box.appendChild(typeof iconName === 'string'
+      ? el('div', { class: 'es-icon' }, icon(iconName))
+      : iconName);
+  }
   if (title) box.appendChild(el('div', { style: { color: 'var(--t-txt2)', fontWeight: '600' } }, title));
   if (sub) box.appendChild(el('div', { style: { maxWidth: '420px' } }, sub));
   return box;
 }
+
+export { ICON_PATHS };
 
 
 export function messageRow(msg, opts = {}) {
@@ -314,13 +394,13 @@ export function messageRow(msg, opts = {}) {
     actions.appendChild(el('button', {
       type: 'button', title: 'Delete', 'aria-label': 'Delete message',
       onClick: opts.onDelete,
-    }, '✕'));
+    }, icon('close')));
   }
   if (isMine) {
     actions.appendChild(el('button', {
       type: 'button', title: 'Edit', 'aria-label': 'Edit message',
       onClick: opts.onEdit,
-    }, '✎'));
+    }, icon('pencil')));
   }
   head.appendChild(actions);
   body.appendChild(head);
@@ -329,14 +409,14 @@ export function messageRow(msg, opts = {}) {
   body.appendChild(text);
 
   if (msg.pinned) {
-    const pin = el('span', { class: 'msg-pinned', title: 'Pinned message' }, '⚑');
+    const pin = el('span', { class: 'msg-pinned', title: 'Pinned message' }, icon('flag'));
     head.appendChild(pin);
   }
   if (opts.onHover) {
     const bar = el('div', { class: 'msg-hoverbar' });
-    const react = el('button', { type: 'button', title: 'Add reaction', 'aria-label': 'Add reaction' }, '☺');
+    const react = el('button', { type: 'button', title: 'Add reaction', 'aria-label': 'Add reaction' }, icon('users'));
     react.addEventListener('click', (e) => { e.stopPropagation(); opts.onHover('react', react); });
-    const more = el('button', { type: 'button', title: 'More actions', 'aria-label': 'More actions' }, '⋯');
+    const more = el('button', { type: 'button', title: 'More actions', 'aria-label': 'More actions' }, icon('more'));
     more.addEventListener('click', (e) => { e.stopPropagation(); opts.onHover('more', more); });
     bar.append(react, more);
     row.appendChild(bar);

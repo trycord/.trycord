@@ -2,7 +2,7 @@
 import Api from './api.js';
 import State, { refreshDms, refreshFriends, isAuthed, mustVerifyToPost } from './state.js';
 import { attachContextMenu, copyText, esc, el, clear, toast, relTime, showEmojiPicker, insertAtCursor, openModal } from './ui.js';
-import { avatar, emptyState, messageRow } from './components.js';
+import { avatar, emptyState, icon, messageRow } from './components.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
 
@@ -21,7 +21,7 @@ async function renderDmList(container) {
   try { dms = await refreshDms(); } catch { /* non-fatal */ }
 
   if (!dms || !dms.length) {
-    wrap.appendChild(emptyState('✉', 'No conversations yet',
+    wrap.appendChild(emptyState('mail', 'No conversations yet',
       'Start a chat from a user\'s profile or send a friend a message.'));
   } else {
     for (const dm of dms) {
@@ -70,7 +70,7 @@ async function renderDmThread(container, dmId) {
   conv.appendChild(thread);
 
   function dmIntro(withCta) {
-    const box = el('div', { class: 'channel-intro' }, el('div', { class: 'channel-intro__mark' }, '✉'));
+    const box = el('div', { class: 'channel-intro' }, el('div', { class: 'channel-intro__mark' }, icon('mail')));
     box.appendChild(el('h2', { class: 'channel-intro__title' }, peer.displayName || peer.username));
     box.appendChild(el('p', { class: 'channel-intro__sub' }, 'This is the beginning of your conversation.'));
     if (withCta) box.appendChild(el('p', { class: 'channel-intro__cta' }, 'Say something kind below.'));
@@ -211,7 +211,7 @@ async function renderDmThread(container, dmId) {
   const composer = el('div', { class: 'composer' });
   const ta = el('textarea', { placeholder: 'Message ' + (peer.displayName || peer.username) + '…', rows: 1 });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
-  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, '☺');
+  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('users'));
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
   composer.appendChild(ta);
   composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
@@ -325,7 +325,7 @@ async function renderFriends(container) {
     try { items = await Api.searchUsers(q); } catch { /* non-fatal */ }
     clear(resultsPane);
     if (!items.length) {
-      resultsPane.appendChild(emptyState('⌕', 'No users found', 'Try a different name.'));
+      resultsPane.appendChild(emptyState('search', 'No users found', 'Try a different name.'));
       return;
     }
     for (const u of items) {
@@ -462,7 +462,7 @@ async function renderFriendsList(wrap) {
       row.appendChild(rmBtn);
     }
   } else if (!State.friendsIn.length && !State.friendsOut.length) {
-    reqsBox.appendChild(emptyState('☺', 'No friends yet', 'Search for someone above and send them a request.'));
+    reqsBox.appendChild(emptyState('users', 'No friends yet', 'Search for someone above and send them a request.'));
   }
 }
 
