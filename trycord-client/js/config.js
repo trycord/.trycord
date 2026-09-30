@@ -251,7 +251,20 @@ export const TrycordConfig = {
         try {
           const parsed = JSON.parse(js.slice(lit.start, lit.end + 1));
           if (parsed && typeof parsed === 'object') {
-            window.TRYCORD_CONFIG = Object.assign(window.TRYCORD_CONFIG || {}, parsed);
+            // Same reasoning as app.js: under contextIsolation a property the
+            // isolated preload world defines on `window` may be a
+            // non-configurable accessor, and a plain assignment to it throws.
+            // Merging onto a copy keeps whatever is already readable, then
+            // defineProperty installs it - or falls back to assignment for a
+            // window that has no such property yet.
+            const merged = Object.assign({}, readRuntimeConfig(), parsed);
+            try {
+              Object.defineProperty(window, 'TRYCORD_CONFIG', {
+                value: merged, writable: true, configurable: true, enumerable: true,
+              });
+            } catch {
+              window.TRYCORD_CONFIG = merged;
+            }
             return parsed;
           }
         } catch { /* fall through */ }
