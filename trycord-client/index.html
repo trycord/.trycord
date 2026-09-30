@@ -44,11 +44,7 @@
 </head>
 
 <body>
-  <!-- Keyboard accessibility. Each shell owns a main landmark and only one is
-       displayed at a time, so there is one skip link per breakpoint pointing at
-       the landmark that is actually live. CSS decides which is shown. -->
-  <a class="skip-link skip-link--desktop" href="#trycord-main">Skip to main content</a>
-  <a class="skip-link skip-link--mobile" href="#mobile-main">Skip to main content</a>
+  <a class="skip-link" href="#trycord-main">Skip to main content</a>
 
   <!--
     ============================================================
@@ -75,88 +71,54 @@
   <div id="app" class="trycord-app">
 
     <!-- ======================================================
-         MOBILE SHELL
-         ====================================================== -->
+         APPLICATION SHELL
+
+         One tree, two layouts. The rail is a column on a wide
+         viewport and an overlay drawer on a narrow one; nothing
+         else differs. It used to be two parallel DOM trees with
+         only one mounted at a time, which meant two skip links,
+         two main landmarks, two sets of layout rules and a
+         scroll container that moved on rotation.
+    ====================================================== -->
 
     <section
-      id="mobile-shell"
-      class="shell shell--mobile"
-      aria-label="Trycord mobile application"
-      hidden
-    >
-      <!-- Mobile drawer navigation was removed for a clean-slate remake.
-           Bottom tabs (renderMobileTabs) remain the interim navigation. -->
-      <header class="mobile-header">
-        <div
-          id="mobile-context"
-          class="mobile-context"
-        ></div>
-      </header>
-
-      <main
-        id="mobile-main"
-        class="mobile-main"
-      ></main>
-
-      <nav
-        id="mobile-tab-navigation"
-        class="mobile-tab-navigation"
-        aria-label="Primary navigation"
-      ></nav>
-    </section>
-
-
-    <!-- ======================================================
-         DESKTOP SHELL
-         ====================================================== -->
-
-    <section
-      id="desktop-shell"
-      class="shell shell--desktop"
-      aria-label="Trycord desktop application"
-      hidden
+      id="shell"
+      class="shell"
+      aria-label="Trycord"
     >
 
-      <!-- ====================================================
-           PRESENCE SPINE
-
-           This is NOT an icon rail.
-
-           It is the persistent spatial navigation environment.
-           ==================================================== -->
-
+      <!-- The rail is the same element in both layouts: a column beside the
+           main area when there is room, a slide-over drawer when there is not.
+           aria-expanded reflects the drawer state only. -->
       <aside
         id="app-rail"
         class="app-rail"
-        aria-label="Trycord navigation"
+        aria-label="Navigation"
       >
 
-        <!-- Identity lives in the context sidebar header; kept as an empty
-             landmark so the region is addressable by the shell. -->
+        <!-- Identity lives in the rail header; kept as an empty landmark so
+             the region is addressable by the shell. -->
         <header
           id="identity-region"
           class="rail-identity"
         ></header>
 
-        <!-- Global destinations:
-             Home / DMs / other real application destinations.
-             Collapsed into the rail on desktop; kept as a landmark for
-             assistive tech and future per-context rail groups. -->
+        <!-- Global destinations: Home, DMs and other application-level routes.
+             Collapsed into the rail on desktop. -->
         <nav
           id="global-navigation"
           class="rail-global-nav"
           aria-label="Global navigation"
         ></nav>
 
-        <!-- Real communities belonging to the authenticated user -->
+        <!-- Communities the authenticated user belongs to -->
         <section
           id="community-navigation"
           class="app-rail__items"
           aria-label="Communities"
         ></section>
 
-        <!-- Contextual navigation for the currently selected
-             community/place -->
+        <!-- Channels and categories for the selected community -->
         <section
           id="place-navigation"
           class="context-sidebar"
@@ -165,33 +127,26 @@
 
       </aside>
 
-
-      <!-- ====================================================
-           MAIN ENVIRONMENT / ATRIUM
-           ==================================================== -->
+      <!-- Behind the drawer on narrow viewports only. -->
+      <div
+        id="desktop-backdrop"
+        class="nav-backdrop"
+        aria-hidden="true"
+        hidden
+      ></div>
 
       <main
         id="trycord-main"
         class="main-content"
       >
 
-        <!--
-          Context belongs INSIDE the environment.
-
-          This is not a permanent application-wide top bar.
-          It changes according to the current place.
-        -->
+        <!-- Context belongs inside the main area and changes with the current
+             place, so it is not an application-wide top bar. -->
         <header
           id="context-header"
           class="context-header"
         ></header>
 
-        <!--
-          Primary application viewport.
-
-          JavaScript renders the currently active real
-          application surface here.
-        -->
         <div class="chat-environment">
           <section
             id="view-root"
@@ -207,15 +162,14 @@
 
       </main>
 
-      <div
-        id="desktop-backdrop"
-        class="desktop-backdrop"
-        aria-hidden="true"
-        hidden
-      ></div>
+      <!-- Thumb-reachable primary navigation. Desktop uses the rail. -->
+      <nav
+        id="mobile-tab-navigation"
+        class="mobile-tab-navigation"
+        aria-label="Primary navigation"
+      ></nav>
 
     </section>
-
 
     <!-- ======================================================
          GLOBAL OVERLAYS

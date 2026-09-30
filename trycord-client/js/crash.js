@@ -72,7 +72,7 @@
   function hasRendered() {
     try {
       return !!document.querySelector(
-        '#view-root > *, #mobile-main > *, body > .auth-page, body > .popover'
+        '#view-root > *, body > .auth-page, body > .popover'
       );
     } catch (e) {
       return false;

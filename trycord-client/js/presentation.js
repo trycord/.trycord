@@ -1,89 +1,127 @@
-
 const BREAKPOINT = 600;
-let modeCache = null; // 'mobile' | 'desktop'
 let onChange = null;
+let returnFocus = null;
 
 
 export function presentationMode() {
-  return modeCache || 'desktop';
+  return document.documentElement.dataset.presentation === 'mobile' ? 'mobile' : 'desktop';
 }
 
 export function setPresentation(mode) {
-  if (mode !== 'mobile' && mode !== 'desktop') mode = 'desktop';
-  if (modeCache === mode && modeCache) {
-    return mode;
-  }
-  modeCache = mode;
-  apply(mode);
-  if (onChange) try { onChange(mode); } catch { /* ignore */ }
-  return mode;
-}
-
-function apply(mode) {
-  const mobile = document.getElementById('mobile-shell');
-  const desktop = document.getElementById('desktop-shell');
-  if (!mobile || !desktop) return;
-  mobile.hidden = mode !== 'mobile';
-  desktop.hidden = mode !== 'desktop';
-  document.documentElement.dataset.presentation = mode;
-  if (mode === 'mobile') {
-    const main = document.getElementById('mobile-main');
-    if (main) main.scrollTop = 0;
-  } else {
-    const view = document.getElementById('view-root');
-    if (view) view.scrollTop = 0;
-  }
+  const next = mode === 'mobile' ? 'mobile' : 'desktop';
+  const prev = presentationMode();
+  document.documentElement.dataset.presentation = next;
+  if (next === prev) return next;
+  // Leaving the drawer open across a rotation would leave an overlay with no
+  // column behind it, so the layout change closes it.
+  if (next === 'desktop') closeNav();
+  const scroller = document.getElementById('view-root');
+  if (scroller) scroller.scrollTop = 0;
+  if (onChange) try { onChange(next); } catch { /* ignore */ }
+  return next;
 }
 
 export function updateFromViewport() {
-  const want = window.innerWidth < BREAKPOINT ? 'mobile' : 'desktop';
-  setPresentation(want);
-  return want;
+  return setPresentation(window.innerWidth < BREAKPOINT ? 'mobile' : 'desktop');
 }
 
 
-export function isDesktopNavOpen() {
-  const shell = document.getElementById('desktop-shell');
-  return !!shell && shell.classList.contains('nav-open');
+// The rail is permanent on desktop and an overlay on mobile, but it is the same
+// element, so "is navigation showing" is one question with one answer.
+export function isNavOpen() {
+  const rail = document.getElementById('app-rail');
+  return !!rail && rail.dataset.open === 'true';
 }
 
-export function openDesktopNav() {
-  const shell = document.getElementById('desktop-shell');
-  const drop = document.getElementById('desktop-backdrop');
-  if (!shell) return;
-  shell.classList.add('nav-open');
-  if (drop) drop.hidden = false;
-  const t = shell.querySelector('.nav-toggle');
-  if (t) t.setAttribute('aria-expanded', 'true');
+export function openNav() {
+  const rail = document.getElementById('app-rail');
+  if (!rail || rail.dataset.open === 'true') return;
+  // Captured before the first control is focused, or the drawer would hand
+  // focus straight back to itself on close.
+  returnFocus = document.activeElement;
+  rail.dataset.open = 'true';
+  const backdrop = document.getElementById('desktop-backdrop');
+  if (backdrop) backdrop.hidden = false;
+  const toggle = rail.ownerDocument.querySelector('.nav-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', 'true');
+  const first = rail.querySelector('a[href], button:not([disabled]), input');
+  if (first && first.focus) first.focus();
 }
 
-export function closeDesktopNav() {
-  const shell = document.getElementById('desktop-shell');
-  const drop = document.getElementById('desktop-backdrop');
-  if (!shell) return;
-  shell.classList.remove('nav-open');
-  if (drop) drop.hidden = true;
-  const t = shell.querySelector('.nav-toggle');
-  if (t) t.setAttribute('aria-expanded', 'false');
+export function closeNav() {
+  const rail = document.getElementById('app-rail');
+  if (!rail || rail.dataset.open !== 'true') return;
+  rail.dataset.open = 'false';
+  const backdrop = document.getElementById('desktop-backdrop');
+  if (backdrop) backdrop.hidden = true;
+  const toggle = rail.ownerDocument.querySelector('.nav-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  if (returnFocus && typeof returnFocus.focus === 'function') {
+    try { returnFocus.focus(); } catch { /* ignore */ }
+  }
+  returnFocus = null;
 }
 
-export function toggleDesktopNav() {
-  if (isDesktopNavOpen()) closeDesktopNav();
-  else openDesktopNav();
+export function toggleNav() {
+  if (isNavOpen()) closeNav();
+  else openNav();
 }
 
 export function onPresentationChange(fn) {
   onChange = fn;
 }
 
+
+// The drawer is modal, so it has to behave like one: Escape closes it, and Tab
+// cycles inside it rather than walking out into the view it is covering. On a
+// wide viewport the same rail is an ordinary column rather than an overlay, so
+// there is nothing to trap and both branches stand down.
+function drawerKeys(e) {
+  if (presentationMode() !== 'mobile' || !isNavOpen()) return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeNav();
+    return;
+  }
+  if (e.key !== 'Tab') return;
+
+  const rail = document.getElementById('app-rail');
+  const f = [...rail.querySelectorAll('a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])')]
+    .filter((n) => n.offsetParent !== null || n === document.activeElement);
+  if (!f.length) return;
+  const first = f[0];
+  const last = f[f.length - 1];
+  const at = document.activeElement;
+  if (e.shiftKey && (at === first || !rail.contains(at))) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && at === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
+export function wireNav() {
+  document.addEventListener('keydown', drawerKeys);
+}
+
+// Retained names from the two-shell era. They are called by the router and the
+// shell, and the behaviour they named is now the drawer's.
+export const isDesktopNavOpen = isNavOpen;
+export const openDesktopNav = openNav;
+export const closeDesktopNav = closeNav;
+export const toggleDesktopNav = toggleNav;
+
 const TrycordPresentation = {
   mode: presentationMode,
   set: setPresentation,
   viewport: updateFromViewport,
-  openNav: openDesktopNav,
-  closeNav: closeDesktopNav,
-  toggleNav: toggleDesktopNav,
-  isNavOpen: isDesktopNavOpen,
+  openNav,
+  closeNav,
+  toggleNav,
+  isNavOpen,
+  wire: wireNav,
   onChange: onPresentationChange,
 };
 

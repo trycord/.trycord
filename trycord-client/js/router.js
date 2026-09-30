@@ -67,13 +67,7 @@ let lastCleanup = null;
 let lastRoute = '';
 
 function viewRegion() {
-  return presentationMode() === 'mobile'
-    ? document.getElementById('mobile-main')
-    : document.getElementById('view-root');
-}
-
-function activeShell() {
-  return presentationMode() === 'mobile' ? 'mobile' : 'desktop';
+  return document.getElementById('view-root');
 }
 
 function runCleanup() {

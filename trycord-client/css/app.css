@@ -377,32 +377,43 @@ img { max-width: 100%; }
 }
 .skip-link:focus { left: 0; }
 
-.shell {
-  flex: 1 1 100% !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-}
+/* ---- application shell ------------------------------------------------
+   One grid, two layouts. Wide viewports put the rail and the place sidebar
+   beside the main area; narrow ones move the whole rail off-canvas and give
+   the main area the full width. Nothing else differs between the two, which
+   is why there is no second DOM tree.
 
-.shell--desktop {
-  display: grid !important;
-  grid-template-columns: var(--ui-rail) var(--ui-sidebar) minmax(0, 1fr) !important;
-  height: 100dvh !important;
-  width: 100% !important;
-  overflow: hidden !important;
+   #app-rail is display:contents so its children can occupy different grid
+   columns: #community-navigation is the narrow icon rail and #place-navigation
+   is the wide sidebar, and they cannot both be inside one box otherwise. On a
+   narrow viewport that stops being true - there the rail becomes a single
+   overlay and display goes back to flex.
+
+   Every region states its own grid-column and grid-row. They used to rely on
+   auto-placement around one explicitly-placed sibling, which is why the
+   placement carried !important: it was fighting auto-flow rather than
+   describing a layout. */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--ui-rail) var(--ui-sidebar) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
   background:
     radial-gradient(circle at 72% -8%, color-mix(in srgb, var(--t-accent) 14%, transparent), transparent 30%),
     var(--t-pg);
 }
 
-.app-rail {
-  display: contents !important;
-}
-.rail-identity {
-  display: none !important;
-}
-.rail-global-nav {
-  display: none !important;
-}
+.app-rail { display: contents; }
+
+/* Addressable landmarks for the rail header and the global destinations. They
+   carry no chrome on a wide viewport - the rail's own header and footer own
+   that - so they stay hidden rather than being removed. */
+.rail-identity,
+.rail-global-nav { display: none; }
+
 @media (min-width: 1920px) { :root { --ui-content-max: 1680px; } }
 @media (min-width: 2560px) { :root { --ui-content-max: 2040px; } }
 @media (min-width: 3440px) { :root { --ui-content-max: 2400px; } }
@@ -417,18 +428,23 @@ img { max-width: 100%; }
 }
 
 .app-rail__items {
-  grid-column: 1 !important;
-  grid-row: 1 / 4 !important;
-  min-height: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  gap: 6px !important;
-  padding: 12px 8px !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  grid-column: 1;
+  grid-row: 1 / -1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
   border-right: 1px solid var(--t-line);
   background: color-mix(in srgb, var(--t-base) 96%, var(--t-accent));
+}
+
+.context-sidebar {
+  grid-column: 2;
+  grid-row: 1 / -1;
 }
 
 /* User bar pinned to the bottom of the context sidebar. One component for
@@ -483,71 +499,47 @@ img { max-width: 100%; }
   font-size: 0.95rem;
 }
 .user-controls__btn:hover { background: var(--t-txt); color: var(--t-base); }
-.desktop-backdrop {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 55 !important;
-  background: rgba(0, 0, 0, 0.55) !important;
-}
-.desktop-backdrop[hidden] { display: none !important; }
-.nav-toggle {
-  flex: 0 0 auto !important;
-  width: 34px !important;
-  height: 34px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border-radius: var(--t-r-xs) !important;
-  color: var(--t-mut) !important;
-  background: transparent !important;
-  font-size: 1.1rem !important;
-}
-.nav-toggle:hover { background: var(--t-base2) !important; color: var(--t-txt) !important; }
-@media (prefers-reduced-motion: reduce) {
-  .shell--desktop .app-rail { transition: none !important; }
-}
 
-.shell--desktop.sidebar-collapsed {
-  grid-template-columns: var(--ui-rail) minmax(0, 1fr) !important;
+/* Behind the drawer. Above the dock breakpoint the place sidebar is a column
+   rather than an overlay, so there is nothing to dismiss and no backdrop. */
+.nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: rgba(0, 0, 0, 0.55);
 }
-.shell--desktop.sidebar-collapsed .main-content {
-  grid-column: 2 !important;
+@media (max-width: 759px) {
+  .nav-backdrop { display: block; }
 }
-.shell--desktop.sidebar-collapsed .rail-identity,
-.shell--desktop.sidebar-collapsed .context-sidebar {
-  display: none !important;
+.nav-backdrop[hidden] { display: none; }
+
+.nav-toggle {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--t-r-xs);
+  color: var(--t-mut);
+  background: transparent;
+  font-size: 1.1rem;
 }
-.shell--desktop.sidebar-collapsed {
-  grid-template-columns: var(--ui-rail) minmax(0, 1fr) !important;
-}
-.shell--desktop.sidebar-collapsed .main-content {
-  grid-column: 2 !important;
-  width: 100% !important;
-}
-.shell--desktop.sidebar-collapsed .context-sidebar,
-.shell--desktop.sidebar-collapsed .rail-identity {
-  display: none !important;
-}
+.nav-toggle:hover { background: var(--t-base2); color: var(--t-txt); }
+
+/* Collapsing the place sidebar. Removing the column is what gives the width
+   back, so the track changes rather than the sidebar merely being hidden. */
+.shell.sidebar-collapsed { grid-template-columns: var(--ui-rail) minmax(0, 1fr); }
+.shell.sidebar-collapsed .context-sidebar,
+.shell.sidebar-collapsed .rail-identity { display: none; }
+.shell.sidebar-collapsed .main-content { grid-column: 2; }
 /* Collapsing must not cap the content measure: give the extra width back. */
-.shell--desktop.sidebar-collapsed .view-root > .page,
-.shell--desktop.sidebar-collapsed .view-root > .conversation,
-.shell--desktop.sidebar-collapsed .view-root > .home-environment {
+.shell.sidebar-collapsed .view-root > .page,
+.shell.sidebar-collapsed .view-root > .conversation,
+.shell.sidebar-collapsed .view-root > .home-environment {
   max-width: none;
   margin-inline: 0;
-}
-.shell--desktop.nav-open .context-sidebar {
-  display: flex !important;
-  position: fixed !important;
-  left: var(--ui-rail) !important;
-  top: 0 !important;
-  bottom: 0 !important;
-  width: var(--ui-sidebar) !important;
-  z-index: 60 !important;
-  box-shadow: var(--t-sh-drawer) !important;
-}
-.shell--desktop.nav-open .context-sidebar,
-.shell--desktop.nav-open .app-rail__items {
-  animation: none;
 }
 .sidebar-collapse-toggle {
   width: 28px;
@@ -568,11 +560,11 @@ img { max-width: 100%; }
   color: var(--t-txt);
   border-color: var(--t-line-hi);
 }
-.shell--desktop.sidebar-collapsed .rail-foot .sidebar-collapse-toggle {
+.shell.sidebar-collapsed .rail-foot .sidebar-collapse-toggle {
   margin-top: 8px;
   position: relative;
 }
-.shell--desktop.sidebar-collapsed .rail-foot .sidebar-collapse-toggle::before {
+.shell.sidebar-collapsed .rail-foot .sidebar-collapse-toggle::before {
   content: "";
   position: absolute;
   top: -8px;
@@ -591,14 +583,14 @@ img { max-width: 100%; }
 }
 
 .main-content {
-  grid-column: 3 !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  height: 100dvh !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
-  position: relative !important;
+  grid-column: 3;
+  grid-row: 1 / -1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
   background: var(--t-env-depth);
 }
 .main-content::before {
@@ -610,25 +602,25 @@ img { max-width: 100%; }
 }
 
 .context-header {
-  flex: 0 0 auto !important;
-  min-height: 58px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  gap: 12px !important;
-  padding: 0 18px !important;
+  flex: 0 0 auto;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 18px;
   border-bottom: 1px solid var(--t-line);
   background: color-mix(in srgb, var(--t-base) 90%, transparent);
   backdrop-filter: blur(18px);
-  position: relative !important;
-  z-index: var(--z-inline) !important;
+  position: relative;
+  z-index: var(--z-inline);
 }
 .context-header__titles {
-  min-width: 0 !important;
-  flex: 1 1 auto !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .context-title {
   font-size: var(--t-fs-l);
@@ -1574,12 +1566,6 @@ select.input { appearance: auto; }
   color: var(--t-txt);
 }
 
-.row--dm .dm-row__main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.row--dm .dm-row__top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--t-d-2); }
-.row--dm .dm-row__name { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--t-fs-m); }
-.row--dm .dm-row__time { color: var(--t-mut); font-size: var(--t-fs-xs); flex: 0 0 auto; }
-.row--dm .dm-row__sub { color: var(--t-mut); font-size: var(--t-fs-s); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row--dm.unread .dm-row__name { color: var(--t-accent); }
 
 .row .row-main { flex: 1 1 auto; min-width: 0; }
 .row .row-title { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: var(--t-d-2); }
@@ -1725,8 +1711,7 @@ select.input { appearance: auto; }
 .msg .msg-author:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
 .msg .msg-author:disabled { cursor: default; }
 
-.member-name-btn,
-.user-name-btn {
+.member-name-btn {
   font: inherit;
   font-weight: 700;
   color: var(--t-txt);
@@ -1738,12 +1723,9 @@ select.input { appearance: auto; }
   cursor: pointer;
   border-radius: 4px;
 }
-.member-name-btn:hover:not(:disabled),
-.user-name-btn:hover:not(:disabled) { text-decoration: underline; }
-.member-name-btn:focus-visible,
-.user-name-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
-.member-name-btn:disabled,
-.user-name-btn:disabled { cursor: default; }
+.member-name-btn:hover:not(:disabled) { text-decoration: underline; }
+.member-name-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.member-name-btn:disabled { cursor: default; }
 .msg .msg-time { color: var(--t-mut); font-size: var(--t-fs-xs); font-weight: 500; }
 .msg .msg-actions {
   position: absolute;
@@ -1984,7 +1966,7 @@ html:is(
   [data-route^="/verify-email"],
   [data-route^="/legal"],
   [data-route^="/support"]
-) .shell--desktop { grid-template-columns: minmax(0, 1fr) !important; }
+) .shell { grid-template-columns: minmax(0, 1fr); }
 html:is(
   [data-route="/login"],
   [data-route="/register"],
@@ -1993,10 +1975,10 @@ html:is(
   [data-route^="/verify-email"],
   [data-route^="/legal"],
   [data-route^="/support"]
-) .shell--desktop > .main-content {
-  grid-column: 1 !important;
-  width: 100% !important;
-  background: var(--pg) !important;
+) .main-content {
+  grid-column: 1;
+  width: 100%;
+  background: var(--pg);
 }
 html:is(
   [data-route="/login"],
@@ -2174,19 +2156,9 @@ html:is(
   .auth-page__inner { gap: 16px; padding: 18px 14px 28px; }
 }
 
-/* Keep the auth page visible on phones. Under 600px the app swaps to the
-   mobile shell and sets .shell--desktop to display:none - which also hides this
-   page, because it renders inside the desktop view region. A position:fixed
-   element escapes the grid but NOT an ancestor's display:none, so the sign-in
-   screen would simply not exist on a phone. Show the desktop shell instead:
-   the page is a fixed full-viewport overlay, so the shell's own chrome,
-   columns and height are all underneath it and never seen. */
-@media (max-width: 599px) {
-  html[data-auth-page] .shell--mobile { display: none !important; }
-  html[data-auth-page] .shell--desktop { display: grid !important; }
-  html[data-auth-page] .mobile-tab-navigation,
-  html[data-auth-page] .mobile-header { display: none !important; }
-}
+/* The sign-in screen is a fixed full-viewport overlay, so on a phone it only
+   needs the shell's chrome out of the way rather than a different shell. */
+html[data-auth-page] .mobile-tab-navigation { display: none; }
 
 .settings-nav { display: flex; gap: var(--t-d-2); flex-wrap: wrap; margin-bottom: var(--t-d-5); padding: 4px; background: var(--t-base); border: 1px solid var(--t-line); border-radius: var(--t-r-s); width: max-content; max-width: 100%; }
 .settings-nav .btn { border: 0; background: transparent; }
@@ -2295,7 +2267,6 @@ html:is(
 .community-manager__toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px; border: 1px solid var(--t-line); border-radius: var(--t-r-m); background: color-mix(in srgb, var(--t-base) 88%, transparent); }
 .community-manager__toolbar .input { flex: 1; }
 .community-list { display: grid; gap: 8px; }
-.community-role-card,
 .community-category-card {
   display: flex; align-items: center; gap: 12px;
   padding: 12px;
@@ -2305,7 +2276,6 @@ html:is(
   box-shadow: var(--t-inset-glass);
   transition: border-color var(--t-fast), transform var(--t-fast), background var(--t-fast);
 }
-.community-role-card:hover,
 .community-category-card:hover {
   border-color: var(--t-line-hi);
   background: color-mix(in srgb, var(--t-base2) 55%, var(--t-base));
@@ -2313,7 +2283,6 @@ html:is(
 }
 .card--list__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .card--list__actions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-.community-role-card__main,
 .community-category-card__main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
 .role-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 .role-pill {
@@ -2662,60 +2631,114 @@ html:is(
 .admin-detail-head { display: flex; gap: 8px; align-items: center; }
 .admin-form { display: flex; flex-direction: column; gap: 10px; }
 
-.shell--mobile {
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100dvh !important;
-  width: 100% !important;
-  overflow: hidden !important;
-  position: relative !important;
-  background: var(--t-pg);
+/* ---- narrow layout ----------------------------------------------------
+   Below 600px the rail leaves the grid and becomes an overlay drawer, and the
+   main area takes the whole width. The regions are the same elements: nothing
+   is unmounted, so nothing has to be re-rendered on a rotation.
+
+   These rules are scoped to html[data-presentation] rather than a media query
+   so that they agree with the breakpoint JavaScript uses to set that
+   attribute. A pure media query would let the two disagree during the frame
+   before a resize handler runs, which shows a phone the desktop grid. */
+
+html[data-presentation="mobile"] .shell {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
-.mobile-header {
-  flex: 0 0 auto !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  height: calc(62px + env(safe-area-inset-top)) !important;
-  padding: env(safe-area-inset-top) 12px 0 !important;
-  background: color-mix(in srgb, var(--t-pg) 92%, transparent);
-  border-bottom: 1px solid var(--t-line);
-  backdrop-filter: blur(22px) saturate(130%);
-  position: relative !important;
-  z-index: 30 !important;
+html[data-presentation="mobile"] .main-content {
+  grid-column: 1;
+  padding-bottom: env(safe-area-inset-bottom);
 }
-.mobile-header button {
-  width: 42px; height: 42px;
-  min-width: 42px;
+
+/* The drawer. One box holding the community list above the channel list, so
+   the whole navigation is a single swipeable surface instead of two panels. */
+html[data-presentation="mobile"] .app-rail {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(84vw, 340px);
+  z-index: 60;
+  background: var(--t-env-base);
+  border-right: 1px solid var(--t-line);
+  box-shadow: var(--t-sh-drawer);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform var(--t-med) var(--t-ease), visibility var(--t-med);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow: hidden;
+}
+html[data-presentation="mobile"] .app-rail[data-open="true"] {
+  transform: translateX(0);
+  visibility: visible;
+}
+
+html[data-presentation="mobile"] .app-rail__items {
+  grid-column: 1;
+  grid-row: 1;
+  flex: 0 0 auto;
+  align-items: stretch;
+  flex-direction: row;
+  gap: var(--t-d-2);
+  padding: var(--t-d-3);
+  border-right: none;
+  border-bottom: 1px solid var(--t-line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: color-mix(in srgb, var(--t-base) 96%, var(--t-accent));
+}
+
+html[data-presentation="mobile"] .context-sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-right: none;
+}
+
+/* The rail's own header and global destinations are hidden on a wide viewport;
+   in a drawer there is room for both, and without them the drawer opens onto a
+   list with no way to reach Home or DMs. */
+html[data-presentation="mobile"] .rail-identity,
+html[data-presentation="mobile"] .rail-global-nav {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--t-d-2);
+  padding: var(--t-d-3);
+}
+html[data-presentation="mobile"] .rail-identity { border-bottom: 1px solid var(--t-line); }
+
+/* The title strip is the desktop context header in this layout too - it is the
+   same element - so it only needs the taller, inset-aware mobile metrics. */
+html[data-presentation="mobile"] .context-header {
+  min-height: calc(58px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 12px 0;
+  background: color-mix(in srgb, var(--t-pg) 92%, transparent);
+  backdrop-filter: blur(22px) saturate(130%);
+  z-index: var(--z-header);
+}
+html[data-presentation="mobile"] .nav-toggle {
+  width: 42px;
+  height: 42px;
   border-radius: var(--t-r-m);
   border: 1px solid var(--t-line);
   background: var(--t-base);
   color: var(--t-txt);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem;
 }
-.mobile-header button:active { transform: scale(0.96); }
-.mobile-context { flex: 1 1 auto; min-width: 0; padding: 0 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-.mobile-context .context-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-fs-l); font-weight: 800; color: var(--t-txt); }
 
-.mobile-main {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  width: 100% !important;
-  padding: 0 0 calc(68px + env(safe-area-inset-bottom)) !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  background: transparent;
-  position: relative !important;
-  z-index: 1 !important;
+html[data-presentation="mobile"] .view-root { padding-bottom: 12px; }
+html[data-presentation="mobile"] .conversation .thread { padding: 12px 10px 10px; }
+html[data-presentation="mobile"] .msg { padding: 7px 6px; }
+html[data-presentation="mobile"] .msg.grouped .msg-body { padding-left: 0; }
+html[data-presentation="mobile"] .composer { width: calc(100% - 18px); margin: 4px auto 10px; border-radius: var(--t-r-m); }
+html[data-presentation="mobile"] .page.atrium { padding: 18px 14px 32px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-presentation="mobile"] .app-rail { transition: none; }
 }
-.mobile-main .conversation { min-height: 100%; }
-.mobile-main .conversation .thread { padding: 12px 10px 10px; }
-.mobile-main .msg { padding: 7px 6px; }
-.mobile-main .msg.grouped .msg-body { padding-left: 0; }
-.mobile-main .composer { width: calc(100% - 18px); margin: 4px auto 10px; border-radius: var(--t-r-m); }
-.mobile-main .page.atrium { padding: 18px 14px 32px; }
 
 .mobile-tab-navigation {
   flex: 0 0 auto !important;
@@ -2747,11 +2770,6 @@ html:is(
 }
 
 /* Authentication stays deliberately chrome-free on mobile. */
-html[data-route="/login"] .mobile-header,
-html[data-route="/register"] .mobile-header,
-html[data-route="/forgot"] .mobile-header,
-html[data-route^="/reset-password/"] .mobile-header,
-html[data-route^="/verify-email/"] .mobile-header { display: none !important; }
 html[data-route="/login"] .mobile-tab-navigation,
 html[data-route="/register"] .mobile-tab-navigation,
 html[data-route="/forgot"] .mobile-tab-navigation,
@@ -2795,22 +2813,14 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 
 @media (max-width: 759px) and (min-width: 600px) {
   :root { --ui-sidebar: 232px; --ui-members: 0px; }
-  .shell--desktop {
-    grid-template-columns: var(--ui-rail) minmax(0, 1fr) !important;
-  }
-  .main-content {
-    grid-column: 2 !important;
-  }
+  .shell { grid-template-columns: var(--ui-rail) minmax(0, 1fr); }
+  .main-content { grid-column: 2; }
   .rail-identity,
-  .context-sidebar {
-    display: none !important;
-  }
+  .context-sidebar { display: none; }
 }
 
 @media (max-width: 599px) {
-  body { overflow: hidden !important; }
-  .shell--desktop { display: none !important; }
-  .shell--mobile { display: flex !important; }
+  body { overflow: hidden; }
   .conversation { max-width: none; padding-left: 0; padding-right: 0; }
   .msg { padding-left: var(--t-d-2); padding-right: var(--t-d-2); }
   .msg-file.image img { max-height: 240px; }
@@ -2875,8 +2885,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   .context-title {
     max-width: none;
   }
-  .skip-link--desktop { display: none; }
-  .skip-link--mobile { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
