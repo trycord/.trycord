@@ -112,7 +112,10 @@ function requireAuth() {
 }
 
 async function renderRoute() {
-  const { path, parts, query } = parseHash();
+  // `route` is the raw hash split into segments. It is rebound - never mutated
+  // in place - when a V2 path is normalised below, so it is deliberately `let`
+  // while the destructured view of it is not.
+  let { path, parts: route, query } = parseHash();
   document.documentElement.dataset.route = path || '/';
     // fixed-position and escapes the desktop shell's grid, but it still has to
     delete document.documentElement.dataset.authPage;
@@ -158,24 +161,24 @@ async function renderRoute() {
   }
   if (path.startsWith('/reset-password/')) {
     if (isAuthed()) { location.hash = '#/home'; return; }
-    PagesPublic.resetPassword(region, parts[1]);
+    PagesPublic.resetPassword(region, route[1]);
     renderAllChrome();
     return;
   }
   if (path.startsWith('/legal/')) {
-    PagesPublic.legal(region, parts[1]);
+    PagesPublic.legal(region, route[1]);
     renderAllChrome();
     return;
   }
   // Public email-verification link (single-use, token in the URL).
   if (path.startsWith('/verify-email/')) {
-    PagesPublic.verify(region, parts[1]);
+    PagesPublic.verify(region, route[1]);
     renderAllChrome();
     return;
   }
 
   if (path.startsWith('/discover')) {
-    const previewId = parts[1] || null;
+    const previewId = route[1] || null;
     await renderBrowse(region, { previewId });
     renderAllChrome();
     return;
@@ -219,7 +222,7 @@ async function renderRoute() {
   }
   if (path.startsWith('/dms/')) {
     setCleanup(() => { HelloDms.leaveDm(); });
-    await HelloDms.renderDms(region, { id: parts[1] });
+    await HelloDms.renderDms(region, { id: route[1] });
     renderAllChrome();
     return;
   }
@@ -256,12 +259,12 @@ async function renderRoute() {
   if (path.startsWith('/account')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
 
   if (path === '/admin/pages' || path.startsWith('/admin/pages/')) {
-    await renderAdminPages(region, { route: parts[2] || null });
+    await renderAdminPages(region, { route: route[2] || null });
     renderAllChrome();
     return;
   }
   if (path.startsWith('/admin/')) {
-    const adminSection = parts[1] === 'servers' ? 'communities' : (parts[1] || 'overview');    await renderAdmin(region, { section: adminSection });
+    const adminSection = route[1] === 'servers' ? 'communities' : (route[1] || 'overview');    await renderAdmin(region, { section: adminSection });
     renderAllChrome();
     return;
   }
@@ -272,7 +275,7 @@ async function renderRoute() {
   }
 
   if (path.startsWith('/invite/')) {
-    const code = parts[1];
+    const code = route[1];
     renderContextHeader({ title: 'Joining', sub: code });
     clear(region);
     region.appendChild(el('div', { class: 'empty-state' }, 'Joining…'));
@@ -293,7 +296,7 @@ async function renderRoute() {
   if (path.startsWith('/users/')) {
     // A username is the V2 form and a UUID still works. The profile renderer
     // takes whatever the server accepts, and it accepts both.
-    await renderProfile(region, { id: parts[1] });
+    await renderProfile(region, { id: route[1] });
     renderAllChrome();
     return;
   }
@@ -309,37 +312,37 @@ async function renderRoute() {
   // legacy /server/:id routes use. Resolution goes through the server-scoped
   // API, so a channel slug is always resolved inside its own community and can
   // never reach another one's channel.
-  if (parts[0] === 'c' && parts[1]) {
-    const community = await resolveCommunity(parts[1]);
+  if (route[0] === 'c' && route[1]) {
+    const community = await resolveCommunity(route[1]);
     if (!community) return renderRouteError(region, 'That community does not exist.');
-    parts = ['server', community.serverId].concat(parts.slice(2));
-    publishRoute('/' + parts.join('/'));
+    route = ['server', community.serverId].concat(route.slice(2));
+    publishRoute('/' + route.join('/'));
   }
 
-  if (parts[0] === 'server' && parts[1]) {
+  if (route[0] === 'server' && route[1]) {
     // A legacy id route may still carry a channel slug, and a V2 route carries
     // the channel token verbatim. Either way it is resolved inside the
     // community, so one lookup serves both.
-    const serverId = parts[1];
-    const what = parts[2];
-    if (what === 'channel' && parts[3]) {
-      const resolved = await resolveChannelToken(serverId, parts[3]);
+    const serverId = route[1];
+    const what = route[2];
+    if (what === 'channel' && route[3]) {
+      const resolved = await resolveChannelToken(serverId, route[3]);
       if (!resolved) return renderRouteError(region, 'That channel does not exist.');
       // Republished so the sidebar marks the right channel as current.
-      if (resolved !== parts[3]) {
-        parts[3] = resolved;
-        publishRoute('/' + parts.join('/'));
+      if (resolved !== route[3]) {
+        route[3] = resolved;
+        publishRoute('/' + route.join('/'));
       }
     }
-    if (what === 'channel' && parts[3] && parts[4] === 'pins') {
+    if (what === 'channel' && route[3] && route[4] === 'pins') {
       setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
-      await renderChannelPins(region, serverId, parts[3]);
+      await renderChannelPins(region, serverId, route[3]);
       renderAllChrome();
       return;
     }
-    if (what === 'channel' && parts[3]) {
+    if (what === 'channel' && route[3]) {
       setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
-      await renderChannel(region, serverId, parts[3], { focusMessage: query.m || null });
+      await renderChannel(region, serverId, route[3], { focusMessage: query.m || null });
       renderAllChrome();
       return;
     }
@@ -370,12 +373,12 @@ async function renderRoute() {
     }
     if (what === 'settings') {
       const known = ['overview', 'appearance', 'structure', 'members', 'roles', 'invites', 'moderation', 'ownership'];
-      const section = parts[3] && known.includes(parts[3]) ? parts[3] : 'overview';
+      const section = route[3] && known.includes(route[3]) ? route[3] : 'overview';
       await renderServerSettings(region, serverId, section);
       renderAllChrome();
       return;
     }
-    if (parts.length === 2) {
+    if (route.length === 2) {
       await renderServerLanding(region, serverId);
       renderAllChrome();
       return;
