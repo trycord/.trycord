@@ -424,12 +424,73 @@ img { max-width: 100%; }
    leaves the form about 130px wide. Below 900px the nav becomes a disclosure
    above the content rather than a sidebar beside it. */
 
+/* The width at which the settings frame spends a third track on context rather
+   than centring a form in the middle of the window. 1180px is the point where
+   nav + a readable form + a summary all fit without any of them being squeezed;
+   below it the context is hidden, not moved, because it has nowhere to go that
+   is not underneath the form. */
+:root { --ui-settings-context: 0px; --ui-settings-pane: 780px; }
+
 .settings-layout {
   display: grid;
-  grid-template-columns: var(--ui-sidebar) minmax(0, 1fr);
+  grid-template-columns: var(--ui-sidebar) minmax(0, 1fr) var(--ui-settings-context);
   gap: var(--t-d-6);
   align-items: start;
   width: 100%;
+}
+
+/* ---- the contextual column --------------------------------------------
+   A region that only earns width once there is width to earn it with. The
+   transition is on the track rather than on the column, so the pane slides
+   rather than jumping when the window crosses the breakpoint, and a window
+   dragged across the threshold reads as one continuous layout change. */
+.settings-context {
+  position: sticky;
+  top: var(--t-d-4);
+  min-width: 0;
+  max-height: calc(100dvh - var(--t-d-6));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-4);
+}
+/* Nothing in it: no track, no padding, no border. A zero-width region that
+   still paints reads as a stray rule down the edge of the window. */
+.settings-layout:not([data-has-context]) .settings-context { display: none; }
+
+/* Below the breakpoint that gives the column a track, the track is zero. A
+   zero-width region full of paragraphs is not hidden by being narrow - the text
+   paints outside its own box and lands on top of the pane. The content is kept
+   in the DOM and restored by the next breakpoint rather than removed, so a
+   window dragged across the threshold does not refetch anything. */
+@media (max-width: 1179px) {
+  .settings-context { display: none; }
+}
+
+.settings-context__title {
+  margin: 0;
+  font-size: var(--t-fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--t-mut);
+}
+
+@media (min-width: 1180px) {
+  :root {
+    --ui-settings-context: 320px;
+    /* The pane gets wider too, because the cap that keeps a form readable is a
+       cap on the form, not on the frame: the context now carries the overflow
+       that used to be dead space. */
+    --ui-settings-pane: 860px;
+  }
+}
+@media (min-width: 1600px) {
+  :root { --ui-settings-context: 380px; --ui-settings-pane: 940px; }
+}
+@media (min-width: 2200px) {
+  :root { --ui-settings-context: 420px; --ui-settings-pane: 1080px; }
 }
 
 /* ---- the nav ---- */
@@ -596,7 +657,7 @@ img { max-width: 100%; }
   /* The content measure is narrower than a conversation's: a settings form read
      across a 1600px pane has its label and its control at opposite ends of the
      screen. */
-  max-width: 780px;
+  max-width: var(--ui-settings-pane, 780px);
 }
 
 .set-head { display: flex; align-items: flex-start; gap: var(--t-d-4); }
@@ -4087,3 +4148,89 @@ html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width
   outline: 2px solid var(--t-accent);
   outline-offset: 1px;
 }
+
+/* ---- key/value summary ------------------------------------------------
+   A definition list of what is actually stored, as opposed to a restatement of
+   the controls above it. The key takes a fixed share so a long value wraps under
+   a column that does not move between renders. */
+.kv-list { display: flex; flex-direction: column; }
+.kv-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--t-d-4);
+  padding: var(--t-d-3) var(--t-d-4);
+  border-top: 1px solid var(--t-line);
+}
+.kv-row:first-child { border-top: 0; }
+.kv-key { flex: 0 0 40%; min-width: 0; margin: 0; font-size: var(--t-fs-s); color: var(--t-mut); }
+.kv-val {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--t-fs-m);
+  font-weight: 600;
+  color: var(--t-txt);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .kv-row { flex-direction: column; gap: 2px; }
+  .kv-key { flex: 1 1 auto; }
+}
+
+/* ---- card sub-sections -------------------------------------------------
+   A labelled group inside a bordered card. pages-account already emitted both
+   classes without styles, so this fixes those sections too. */
+.set-card__label {
+  padding: var(--t-d-3) var(--t-d-4);
+  border-top: 1px solid var(--t-line);
+  background: var(--t-base2);
+  font-size: var(--t-fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t-mut);
+}
+.set-card > .set-card__label:first-child { border-top: 0; }
+.set-card__body { border-top: 1px solid var(--t-line); }
+
+/* ---- reader-level motion and do-not-disturb ---------------------------
+   The media query above covers what the operating system asks for. These two
+   classes are the same decisions made by the person using the application, so a
+   reader who wants less motion gets it on a machine configured for more. */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+.reduce-motion .msg.flash,
+.reduce-motion .msg--linked { animation: none !important; background: none !important; }
+
+/* Notifications are paused, so nothing on screen should compete for attention:
+   counts stay legible but stop asserting themselves. */
+.is-dnd .rail-nav-badge,
+.is-dnd .nv-count,
+.is-dnd .unread-dot {
+  opacity: 0.35;
+  animation: none !important;
+}
+.is-dnd .notif-row.unread { border-color: var(--t-line); }
+.is-dnd .row--dm.is-unread .row__title { font-weight: 600; }
+.is-dnd .row--dm.is-unread .row__title::before { display: none; }
+
+/* ---- contextual column cards ------------------------------------------
+   Reuses the settings card border rather than inventing a second one: this is
+   the same container at a different size, not a different component. */
+.ctx-card {
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-m);
+  background: var(--t-base);
+  overflow: hidden;
+}
+.ctx-card__body { display: flex; flex-direction: column; }
+.ctx-card__body > :first-child { margin-top: 0; }
+.ctx-card__body > :last-child { margin-bottom: 0; }
+.ctx-card .kv-row { padding-inline: var(--t-d-4); }
+.ctx-card .set-note { border: 0; border-left: 2px solid var(--t-line); padding-inline: var(--t-d-3); }

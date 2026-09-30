@@ -533,6 +533,98 @@ function tables(engine) {
       expires_at  VARCHAR(64),
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
+    // --- V2 privacy, safety and wellbeing -----------------------------------
+    // One row per user rather than columns on `users`. These are read on almost
+    // every request that touches another person (a DM, a friend request, a
+    // mention) and written almost never, so a sparse table keyed by user_id is
+    // the right shape: an absent row means "the default", and the default is
+    // defined in one place rather than being a column default that a migration
+    // would have to backfill.
+    //
+    // Defaults, and why:
+    //   friend_requests  'anyone'  - a closed default would lock a new account
+    //                                 out of making contact at all.
+    //   dms              'anyone'  - same, and the existing product already
+    //                                 lets anyone open one.
+    //   presence         'everyone'- hiding yourself by default would make the
+    //                                 friends list look broken.
+    //   discoverable     1         - profile search is a core feature.
+    // Quiet hours, DND and reduced motion default to off: they are opt-in
+    // behaviour changes and must never surprise an existing account.
+    `CREATE TABLE IF NOT EXISTS privacy_settings (
+    user_id         VARCHAR(64) PRIMARY KEY,
+    -- Who may send this user a friend request.
+    friend_requests VARCHAR(16) NOT NULL DEFAULT 'anyone',
+    -- Who may open a DM with this user.
+    dms             VARCHAR(16) NOT NULL DEFAULT 'anyone',
+    -- Who may see this user's online state.
+    presence        VARCHAR(16) NOT NULL DEFAULT 'everyone',
+    -- Whether this user appears in user search.
+    discoverable    INTEGER NOT NULL DEFAULT 1,
+    updated_at      VARCHAR(64) NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+    // Blocking is symmetric: a row in either direction blocks the relationship.
+    // Enforced in the services that check it, never by hiding a row in the
+    // client.
+    `CREATE TABLE IF NOT EXISTS user_blocks (
+    user_id    VARCHAR(64) NOT NULL,
+    blocked_id VARCHAR(64) NOT NULL,
+    reason     TEXT,
+    created_at VARCHAR(64) NOT NULL,
+    PRIMARY KEY (user_id, blocked_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (blocked_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+    // Notification preferences, per user and per community. `channel_id` is
+    // deliberately absent: muting a channel already exists as muted_channels
+    // and a second mechanism for the same thing would be a duplicate system.
+    // A NULL server_id row is the global default; a server row overrides it.
+    `CREATE TABLE IF NOT EXISTS notification_prefs (
+    user_id    VARCHAR(64) NOT NULL,
+    server_id  VARCHAR(64),
+    -- JSON object of category -> bool. Sparse on purpose: an absent key means
+    -- the global default rather than false, so a new category is not silently
+    -- muted for everyone who already has a row.
+    categories TEXT,
+    updated_at VARCHAR(64) NOT NULL,
+    PRIMARY KEY (user_id, server_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+    // Wellbeing. Times are minutes from local midnight, which survives a
+    // timezone change without a 23/25-hour-day bug and is what the notification
+    // suppression check actually needs to compare.
+    `CREATE TABLE IF NOT EXISTS wellbeing_settings (
+    user_id        VARCHAR(64) PRIMARY KEY,
+    dnd_enabled    INTEGER NOT NULL DEFAULT 0,
+    quiet_hours_on INTEGER NOT NULL DEFAULT 0,
+    quiet_start    INTEGER NOT NULL DEFAULT 1320,
+    quiet_end      INTEGER NOT NULL DEFAULT 480,
+    -- A user-level motion preference, distinct from the OS setting: it is
+    -- applied as a class on <html> so CSS can honour it, and it is what a
+    -- reader who has asked for reduced motion actually gets.
+    reduced_motion INTEGER NOT NULL DEFAULT 0,
+    updated_at     VARCHAR(64) NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+    // Named sessions. The JWT already carries a jti and the users table already
+    // has a session_version counter for bulk revocation; this is the missing
+    // third thing - knowing WHICH devices are signed in so one can be revoked on
+    // its own. `last_seen_at` is written when a session is created and when the
+    // gateway sees it, not on every authenticated request, so a busy client does
+    // not turn each API call into a write.
+    `CREATE TABLE IF NOT EXISTS user_sessions (
+    jti          VARCHAR(128) PRIMARY KEY,
+    user_id      VARCHAR(64) NOT NULL,
+    label        VARCHAR(128),
+    user_agent   VARCHAR(512),
+    ip           VARCHAR(64),
+    created_at   VARCHAR(64) NOT NULL,
+    last_seen_at VARCHAR(64) NOT NULL,
+    revoked_at   VARCHAR(64),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
   ];
 }
 
@@ -748,6 +840,12 @@ const INDEXES = [
   'CREATE INDEX idx_pins_channel ON pinned_messages(channel_id, pinned_at)',
   'CREATE INDEX idx_reactions_message ON reactions(message_id)',
   'CREATE INDEX idx_muted_user ON muted_channels(user_id)',
+  // V2 privacy, safety, wellbeing and session tables. All are keyed by user_id
+  // and read on paths that touch another person, so they are indexed for exactly
+  // the lookups those paths perform.
+  'CREATE INDEX idx_blocks_blocked ON user_blocks(blocked_id)',
+  'CREATE INDEX idx_notif_prefs_server ON notification_prefs(server_id)',
+  'CREATE INDEX idx_sessions_user ON user_sessions(user_id, revoked_at)',
   // ---- Access patterns that were measured as full table scans ----------
   // `categories` was the only table in the schema with no index at all,
   // and its read (by community) runs on every server entry and on every

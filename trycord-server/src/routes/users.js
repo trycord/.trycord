@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const enforcement = require('../services/enforcement');
+const privacy = require('../services/privacy');
 const uploads = require('../services/uploads');
 const { singleImage } = require('../middleware/upload');
 const { escapeLike } = require('../util');
@@ -149,7 +150,19 @@ router.get('/search', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, 
        LIMIT 20`,
       [`${lit}%`, `%${lit}%`, `${lit}%`]
     );
-    res.json(rows.map((r) => Object.assign(publicUser(r), { presence: presenceOf(r.id) })));
+    // Two settings are enforced here rather than in the client, because a
+    // filtered-out row that still reached the browser would be discoverable to
+    // anyone reading the response: a user who is not discoverable, and anyone
+    // in a block in either direction. Presence is filtered for the same reason -
+    // a hidden presence that arrived in the payload is not hidden.
+    const out = [];
+    for (const r of rows) {
+      if (!(await privacy.canDiscover(req.user.id, r.id))) continue;
+      const user = publicUser(r);
+      user.presence = (await privacy.canSeePresence(req.user.id, r.id)) ? presenceOf(r.id) : null;
+      out.push(user);
+    }
+    res.json(out);
   } catch (e) { next(e); }
 });
 

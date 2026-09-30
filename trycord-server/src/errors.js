@@ -30,6 +30,13 @@ const Codes = {
   SERVER_NOT_FOUND: 404,
   INVITE_INVALID: 404,
   NOT_FOUND: 404,
+  // A privacy setting refused an interaction. 403, and distinct from
+  // PERMISSION_DENIED because the answer is a personal preference rather than
+  // a role: the client can say "this person is not accepting messages" instead
+  // of "you do not have permission".
+  BLOCKED: 403,
+  NOT_ACCEPTING_DMS: 403,
+  NOT_ACCEPTING_REQUESTS: 403,
 };
 
 function fail(res, code, message, status, extra) {

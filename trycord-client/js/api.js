@@ -164,6 +164,11 @@ const Api = {
   twoFactorVerify: (body) => request('POST', '/api/auth/2fa/verify', { body, auth: false }),
   revokeAllSessions: () => request('POST', '/api/auth/sessions/revoke-all'),
   revokeOthers: () => request('POST', '/api/auth/sessions/revoke-others'),
+  // Per-session revocation. The list is the only way to learn a jti, and the
+  // jti is the only handle a single revoke accepts - which is why the Security
+  // page cannot offer "sign out this device" without it.
+  sessions: () => request('GET', '/api/auth/sessions'),
+  revokeSession: (jti) => request('POST', '/api/auth/sessions/revoke', { body: { jti } }),
   forgotPassword: (body) => request('POST', '/api/auth/forgot-password', { body, auth: false }),
   resetPassword: (body) => request('POST', '/api/auth/reset-password', { body, auth: false }),
   verifyEmail: (body) => request('POST', '/api/auth/verify-email', { body, auth: false }),
@@ -468,6 +473,23 @@ joinDiscover: (id) =>
   requestAccountDeletion: (password) =>
     request('POST', '/api/account/deletion', { body: { password, confirm: 'DELETE' } }),
   cancelAccountDeletion: () => request('POST', '/api/account/deletion/cancel'),
+
+  // Privacy, blocking, notification preferences and wellbeing. All under
+  // /api/me because they are all about the caller's own account; the server
+  // reads a stranger's preferences when enforcing a rule, never exposes them.
+  privacy: () => request('GET', '/api/me/privacy'),
+  setPrivacy: (body) => request('PATCH', '/api/me/privacy', { body }),
+
+  blocks: () => request('GET', '/api/me/blocks'),
+  blockUser: (userId, reason) => request('POST', '/api/me/blocks', { body: { userId, reason } }),
+  unblockUser: (userId) => request('DELETE', '/api/me/blocks/' + encodeURIComponent(userId)),
+
+  notificationPrefs: (serverId) => request('GET', '/api/me/notification-prefs'
+    + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
+  setNotificationPrefs: (body) => request('PATCH', '/api/me/notification-prefs', { body }),
+
+  wellbeing: () => request('GET', '/api/me/wellbeing'),
+  setWellbeing: (body) => request('PATCH', '/api/me/wellbeing', { body }),
 
   adminGdprRequests: ({ status, limit = 50 } = {}) => {
     const q = new URLSearchParams();

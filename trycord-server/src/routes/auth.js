@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const db = require('../db');
 const auth = require('../middleware/auth');
 const { fail, serviceError } = require('../errors');
-const { now, uuid, sign, secret } = require('../util');
+const { now, uuid, sign, signWithJti, secret } = require('../util');
 const jwt = require('jsonwebtoken');
 
 const router = express.Router();
@@ -14,6 +14,30 @@ const { checkPassword, BCRYPT_COST } = require('../auth/passwords');
 const enforcement = require('../services/enforcement');
 const recovery = require('../auth/recovery');
 const twofactor = require('../services/twofactor');
+const privacy = require('../services/privacy');
+
+// Every token this file mints is also a row in user_sessions, so the Security
+// page can name the devices and revoke one without revoking all. Recording is
+// best-effort by design: failing to note a session must not stop someone
+// signing in, and the token's own signature is still what authenticates them.
+function issued(res, user, req, extra) {
+  const { token, jti } = signWithJti(user);
+  Promise.resolve()
+    .then(() => privacy.recordSession({
+      jti,
+      userId: user.id,
+      userAgent: req.get('user-agent'),
+      ip: req.ip,
+    }))
+    .catch((e) => { console.error('[auth] session record failed', e && e.message); });
+  return res.json(Object.assign({
+    token,
+    user: {
+      id: user.id, username: user.username,
+      displayName: user.display_name, createdAt: user.created_at,
+    },
+  }, extra || {}));
+}
 
 // A challenge is not a session. It is a short-lived, single-audience token that
 // proves "this password was correct" and nothing else: the auth middleware
@@ -144,10 +168,7 @@ router.post('/login', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, 
       });
     }
 
-    res.json({
-      token: sign(user),
-      user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },
-    });
+    issued(res, user, req);
   } catch (e) { next(e); }
 });
 
@@ -171,11 +192,7 @@ router.post('/2fa/verify', rateLimit({ windowMs: 60000, max: 10 }), async (req, 
     const result = await twofactor.verifySecondFactor(user.id, code);
     if (!result.ok) return fail(res, 'AUTH_REQUIRED', 'invalid code');
 
-    res.json({
-      token: sign(user),
-      user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },
-      usedRecoveryCode: result.via === 'recovery',
-    });
+    issued(res, user, req, { usedRecoveryCode: result.via === 'recovery' });
   } catch (e) { next(e); }
 });
 
@@ -327,6 +344,11 @@ router.post('/change-password', auth, rateLimit({ windowMs: 60000, max: 20 }), a
 router.post('/sessions/revoke-all', auth, async (req, res, next) => {
   try {
     await invalidateSessions(req.user.id);
+    // The named rows go too. The version bump is what actually kills the
+    // tokens; leaving the rows would mean the Security page lists devices that
+    // no longer work, which is worse than not listing them at all.
+    await db.run('UPDATE user_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL',
+      [now(), req.user.id]);
     console.log(`[security] all_sessions_revoked user=${req.user.id}`);
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
     res.json({ ok: true });
@@ -346,12 +368,52 @@ router.post('/sessions/revoke-others', auth, async (req, res, next) => {
       'SELECT id, username, display_name, created_at, session_version FROM users WHERE id = ?',
       [req.user.id]
     );
+    // Every named row goes, including the caller's. The version bump above has
+    // already killed the caller's token too - that is why this endpoint returns
+    // a fresh one - so keeping its row would leave the list showing a device
+    // that no longer holds a usable token. issued() below registers the
+    // replacement, so the reader's own device is the row that survives.
+    await privacy.revokeOthers(req.user.id, null);
     console.log(`[security] other_sessions_revoked user=${req.user.id}`);
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
-    res.json({
-      token: sign({ id: row.id, username: row.username, session_version: version }),
-      user: { id: row.id, username: row.username, displayName: row.display_name, createdAt: row.created_at },
-    });
+    issued(res, {
+      id: row.id, username: row.username, display_name: row.display_name,
+      created_at: row.created_at, session_version: version,
+    }, req);
+  } catch (e) { next(e); }
+});
+
+// GET /api/auth/sessions — the caller's live sessions. Backs the Security page.
+// Named from the user agent so a reader can tell which row to revoke; the jti
+// is included because that is the only handle a revoke can use, and it belongs
+// to the caller's own token.
+router.get('/sessions', auth, async (req, res, next) => {
+  try {
+    res.json({ sessions: await privacy.listSessions(req.user.id, req.user.jti || null) });
+  } catch (e) { next(e); }
+});
+
+// POST /api/auth/sessions/revoke { jti } — kill one session.
+//
+// Per-session rather than a version bump, so the caller's own session survives
+// and they are not signed out of the tab they are using. The jti also goes into
+// revoked_tokens, which is what the auth middleware checks, so the revocation
+// takes effect immediately rather than waiting for the token to expire.
+router.post('/sessions/revoke', auth, rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
+  try {
+    const jti = String(((req.body || {}).jti) || '');
+    if (!jti) return fail(res, 'VALIDATION_ERROR', '`jti` is required');
+    if (jti === req.user.jti) {
+      return fail(res, 'VALIDATION_ERROR', 'use sign out to end the session you are currently using');
+    }
+    const revoked = await privacy.revokeSession(req.user.id, jti);
+    if (!revoked) return fail(res, 'NOT_FOUND', 'session not found or already revoked');
+    const exp = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+    try {
+      await db.run(`INSERT ${db.ignoreKeyword} INTO revoked_tokens (jti, expires_at) VALUES (?, ?)
+        ON CONFLICT (jti) DO UPDATE SET expires_at = excluded.expires_at`, [jti, exp]);
+    } catch { /* already revoked */ }
+    res.json({ ok: true, jti });
   } catch (e) { next(e); }
 });
 

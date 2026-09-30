@@ -23,10 +23,12 @@ import { route } from './nav.js';
 // grouping is what tells you that Security and Privacy are one decision and
 // that Backend and Updates are somewhere else entirely.
 //
-// Only capabilities the server actually backs appear here. There is no
-// notification-preference table and no block list, so there is no Notifications
-// toggle that would quietly do nothing - muted channels and pending friend
-// requests are the real equivalents and they get their own sections.
+// Only capabilities the server actually backs appear here. Notifications and
+// blocking were absent from the IA while they existed on the server, which left
+// both unreachable: a reader who had muted something everywhere, or blocked
+// someone who was still messaging them, had no section that said so. The comment
+// that used to sit here said no notification table and no block list existed.
+// They do, and the sections that read them are in privacy-ui.js.
 export const SETTINGS_IA = {
   account: [
     {
@@ -279,15 +281,28 @@ export function settingsNav({ scope, active, resolve, footer, searchable = true 
 /**
  * The page frame: sticky nav beside the content pane.
  *
- * Returns the pane for the caller to render into, and marks the frame as
- * entered so the content can animate in once rather than on every re-render.
+ * A third region sits to the right of the pane and is only given width when the
+ * viewport is wide enough to spend it. It is part of the frame from the first
+ * render rather than something a media query conjures, because the content in it
+ * is real content that a narrow viewport hides by a decision, not by omission.
+ * A frame with no `context` renders an empty region that occupies no track.
+ *
+ * Returns the pane for the caller to render into, and the context region for
+ * whoever has something to say in it, and marks the frame as entered so the
+ * content can animate in once rather than on every re-render.
  */
-export function settingsFrame({ scope, active, resolve, footer, searchable, contentClass = '' }) {
+export function settingsFrame({ scope, active, resolve, footer, searchable, contentClass = '', context = null }) {
   const frame = el('div', { class: 'settings-layout' });
   const nav = settingsNav({ scope, active, resolve, footer, searchable });
   const pane = el('div', { class: 'settings-pane ' + contentClass });
-  frame.append(nav, pane);
-  return { frame, pane, nav };
+  const aside = el('aside', { class: 'settings-context' });
+  if (context) {
+    aside.setAttribute('aria-label', context.label || 'About this section');
+    aside.append(...[context].flat(Infinity).filter(Boolean));
+    frame.dataset.hasContext = 'yes';
+  }
+  frame.append(nav, pane, aside);
+  return { frame, pane, nav, context: aside };
 }
 
 // The back affordance for a nested settings route. Every settings page is

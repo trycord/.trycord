@@ -7,9 +7,17 @@ import { avatar, loadAuthedImage, invalidateAuthedImage } from './components.js'
 import { renderContextHeader, renderAllChrome, clearAnnouncements } from './shell.js';
 import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';
 import { renderBackendSelector } from './pages-public.js';
+import { TrycordConfig } from './config.js';
 import { statusChip } from './pages-admin.js';
 import Realtime from './realtime.js';
 import { settingsFrame, blurbFor, findItem } from './settings-shell.js';
+import {
+  privacyContext, securityContext, notificationsContext,
+  appearanceContext, backendContext, guideContext, profileContext,
+} from './context-column.js';
+import {
+  renderPrivacySection, renderNotificationPrefsSection,
+} from './privacy-ui.js';
 import { sectionHead, sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from './settings-ui.js';
 import { navigate } from './nav.js';
 
@@ -35,14 +43,14 @@ function signOutButton() {
   return b;
 }
 
-// Who can reach you. There is no block list on the server, so this is the two
-// things it does back: who has asked, and who is currently a friend.
-function renderPrivacy(body) {
-  body.appendChild(sectionHead('Privacy', 'Who can reach you, and who has asked.'));
+// The social half of the Privacy page: who has asked, and who is a friend.
+//
+// The gates that decide whether those two lists can be filled at all are above,
+// in privacy-ui.js - they are enforced on the server, and this is the part that
+// only reports. The block list is there too, and the old note claiming there was
+// no such thing is gone with it.
+function renderPrivacySocial(body) {
   const card = sectionCard();
-  body.appendChild(card);
-
-  const list = el('div', { class: 'set-card__body' });
   const incoming = State.friendsIn || [];
   const friends = State.friends || [];
 
@@ -110,8 +118,7 @@ function renderPrivacy(body) {
     card.appendChild(setEmpty('No requests and no friends yet. People you talk to appear here.'));
   }
 
-  body.appendChild(setNote('Trycord has no block list. Removing a friend stops the connection but does not prevent new requests.'));
-  list.remove();
+  body.appendChild(card);
 }
 
 // Suppressed channels. Alerts themselves live at #/notifications; this is the
@@ -818,9 +825,20 @@ function renderTwoFactorSection(wrap) {
   }
 }
 
+// Every device this account is signed in on, with a per-device revoke.
+//
+// This existed only as two buttons - "all" and "others" - which is the wrong
+// shape: the reason somebody opens Security is that they saw a device they do
+// not recognise, and neither button removes that one device without signing out
+// everything they legitimately use.
 function renderSessionsSection(wrap) {
   wrap.appendChild(el('div', { class: 'section-label' }, 'Sessions'));
-  wrap.appendChild(el('p', { class: 'muted small' }, 'Every device you signed in on holds a session. Revoking one signs that device out.'));
+  const host = el('div');
+  wrap.appendChild(host);
+  loadSessions(host);
+
+  // Bulk revocation stays, because it is a real answer to "I do not know which
+  // one is wrong", but it is no longer the only answer.
   const revokeAll = el('button', { class: 'btn danger', type: 'button' }, 'Sign out all sessions');
   revokeAll.addEventListener('click', () => {
     confirmDialog({
@@ -828,9 +846,7 @@ function renderSessionsSection(wrap) {
       message: 'This signs out this device too. You will need to sign in again.',
       danger: true, confirmText: 'Sign out everywhere',
       onConfirm: async () => {
-        try {
-          await Api.revokeAllSessions();
-        } finally {
+        try { await Api.revokeAllSessions(); } finally {
           try { Realtime.disconnect(); } catch { /* ignore */ }
           clearSession();
           navigate('#/login');
@@ -840,15 +856,68 @@ function renderSessionsSection(wrap) {
   });
   const revokeOthers = el('button', { class: 'btn', type: 'button' }, 'Sign out other sessions');
   revokeOthers.addEventListener('click', async () => {
+    revokeOthers.disabled = true;
     try {
       const res = await Api.revokeOthers();
+      // Revoking the others also mints a fresh token for this one, because the
+      // server cannot keep a token it has just declared invalid. Without the
+      // swap below the reader is signed out of the tab they are looking at.
       State.token = res.token;
       localStorage.setItem('trycord.token', res.token);
       toast('Other sessions signed out.', 'ok');
-    } catch (ex) { toast(ex.message || 'Failed', 'error'); }
+      loadSessions(host);
+    } catch (ex) {
+      toast(ex.message || 'Could not sign out other sessions.', 'error');
+      revokeOthers.disabled = false;
+    }
   });
   wrap.appendChild(el('div', { class: 'row-line' }, revokeOthers, revokeAll));
   wrap.appendChild(el('p', { class: 'muted small' }, 'Token-based sessions expire after 7 days or when revoked.'));
+}
+
+async function loadSessions(host) {
+  clear(host);
+  host.appendChild(el('p', { class: 'muted small' }, 'Loading your sessions…'));
+  let sessions;
+  try {
+    const res = await Api.sessions();
+    sessions = res.sessions || [];
+  } catch (ex) {
+    clear(host);
+    host.appendChild(setNote(ex.message || 'Could not load your sessions.'));
+    return;
+  }
+  clear(host);
+  if (!sessions.length) {
+    host.appendChild(setEmpty('No sessions.'));
+    return;
+  }
+  const card = sectionCard();
+  for (const s of sessions) {
+    const label = s.label || 'Unknown device';
+    const hint = s.current
+      ? 'This device'
+      : [
+        s.lastSeenAt ? 'Last active ' + new Date(s.lastSeenAt).toLocaleString() : null,
+        s.ip ? 'from ' + s.ip : null,
+      ].filter(Boolean).join(' ');
+    // The current session has no revoke button: revoking it is "sign out", which
+    // the page already offers, and offering it here too only puts a way to lose
+    // the current session where losing it is surprising.
+    const control = s.current ? null : dangerButton('Sign out', async () => {
+      control.disabled = true;
+      try {
+        await Api.revokeSession(s.jti);
+        toast(label + ' signed out.', 'ok');
+        loadSessions(host);
+      } catch (ex) {
+        toast(ex.message || 'Could not sign that session out.', 'error');
+        control.disabled = false;
+      }
+    }, { variant: 'ghost' });
+    card.appendChild(settingRow({ label, hint, control }));
+  }
+  host.appendChild(card);
 }
 
 const DELETION_STATUS_TEXT = {
@@ -973,7 +1042,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   // The nav footer carries sign-out; the frame puts it in the nav column rather
   // than in the content, which is where a destructive control belongs.
   const footer = el('div', { class: 'settings-nav__footer' }, signOutButton());
-  const { frame, pane } = settingsFrame({
+  const { frame, pane, context } = settingsFrame({
     scope: 'account',
     active: tab,
     footer,
@@ -1011,8 +1080,16 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderBackendSelector(backendBox);
     body.appendChild(backendBox);
   } else if (tab === 'privacy') {
-    renderPrivacy(body);
+    // The gates the server enforces, then the social lists that sit under them.
+    // Order matters: a reader arriving here because someone asked them to should
+    // see the control that decides whether that is allowed before the list of
+    // people who already have.
+    await renderPrivacySection(body);
+    renderPrivacySocial(body);
   } else if (tab === 'notifications') {
+    // Per-category preferences and wellbeing first, then the muted channels that
+    // were the only notification control this page had.
+    await renderNotificationPrefsSection(body);
     renderNotificationsSettings(body);
   } else {
     renderProfileEditor(body);
@@ -1020,7 +1097,61 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderDangerZone(body);
   }
 
+  await fillContext(frame, context, tab);
+
   container.appendChild(wrap);
+}
+
+// The contextual column, per section. Filled after the pane so it can read the
+// same state the pane drew rather than fetching it a second time: two fetches of
+// one preference is two chances to show a reader two different answers.
+async function fillContext(frame, host, tab) {
+  if (!host) return;
+  let nodes = [];
+  try {
+    if (tab === 'privacy') {
+      const [privacy, blocks] = await Promise.all([Api.privacy(), Api.blocks()]);
+      nodes = privacyContext(privacy, blocks);
+    } else if (tab === 'security' || tab === 'password' || tab === 'sessions') {
+      const res = await Api.sessions();
+      nodes = securityContext(res.sessions || []);
+    } else if (tab === 'notifications') {
+      const [prefs, wellbeing] = await Promise.all([
+        Api.notificationPrefs().catch(() => null),
+        Api.wellbeing().catch(() => null),
+      ]);
+      nodes = notificationsContext(
+        (prefs && prefs.global) || {},
+        wellbeing,
+        State.mutedChannels ? State.mutedChannels.size : 0,
+      );
+    } else if (tab === 'appearance') {
+      nodes = appearanceContext(
+        localStorage.getItem('trycord.theme'),
+        localStorage.getItem('trycord.density'),
+        document.documentElement.classList.contains('reduce-motion'),
+      );
+    } else if (tab === 'backend') {
+      const moved = TrycordConfig.failover();
+      nodes = backendContext({
+        url: TrycordConfig.backendUrl(),
+        backupUrl: (TrycordConfig.backendFallbacks() || [])[0] || null,
+        failedOver: !!moved,
+      });
+    } else if (tab === 'updates') {
+      nodes = guideContext('About this build',
+        el('p', { class: 'muted small' }, 'Version and build information for the instance this device is talking to. Trycord does not update itself: a new build appears here when the instance you are connected to is running one.'));
+    } else if (tab === 'profile') {
+      nodes = profileContext(State.me, State.serverDetail);
+    }
+  } catch {
+    // A summary is a convenience. Failing to build one must not take the section
+    // it summarises down with it.
+    return;
+  }
+  if (!nodes.length) return;
+  for (const n of nodes) host.appendChild(n);
+  frame.dataset.hasContext = 'yes';
 }
 
 export default { renderAccount };
