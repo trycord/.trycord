@@ -218,8 +218,8 @@ function registerForm(container) {
     emailField,
     el('p', { class: 'small muted' },
       'By continuing you agree to the ',
-      el('a', { href: route('/terms'), target: '_blank', rel: 'noopener' }, 'Terms of Service'),
-      ' and ', el('a', { href: route('/privacy'), target: '_blank', rel: 'noopener' }, 'Privacy Policy'),
+      el('a', { href: '/terms', 'data-document': '', target: '_blank', rel: 'noopener' }, 'Terms of Service'),
+      ' and ', el('a', { href: '/privacy', 'data-document': '', target: '_blank', rel: 'noopener' }, 'Privacy Policy'),
       '. (v' + esc(legal.termsVersion) + ' / v' + esc(legal.privacyVersion) + ')'),
     submit);
 
@@ -351,7 +351,7 @@ function legalPage(container, kind) {
     'This instance manages its own legal documents. Signing in or registering records your acceptance of the versions this server exposes (v'
     + esc(legal.termsVersion) + ' terms, v' + esc(legal.privacyVersion) + ' privacy).'));
   const cta = el('div', { class: 'pub-links' });
-  cta.appendChild(el('a', { class: 'pub-link', href: docPath },
+  cta.appendChild(el('a', { class: 'pub-link', href: docPath, 'data-document': '' },
     el('div', { class: 'pub-link__title' }, 'Read the full ' + (titles[kind] || 'document')),
     el('div', { class: 'pub-link__desc' }, 'Opens the complete ' + (isTerms ? 'terms' : 'privacy policy') + ' published by this instance.')));
   body.appendChild(cta);

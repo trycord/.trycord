@@ -36,11 +36,17 @@ export async function renderSupport(container) {
     return links;
   };
   // description and the action can never disagree.
-  // route(), not the literal. These were '#/support/appeals/new' as an anchor
-  // href, which set a fragment the router no longer listens for - the link
-  // looked right and did nothing.
-  const link = (parent, title, desc, href) => {
-    const a = el('a', { class: 'pub-link', href: route(href) });
+  //
+  // Two kinds of destination, and they are not interchangeable. A route is
+  // handed to route() so it lands inside the app's mount; a document is the
+  // origin's own page and must be left exactly where it is, because on a
+  // subpath deployment routing '/terms' would send the reader to the app's
+  // /app/terms, which is not the document. So the caller says which it is and
+  // this does not decide for them.
+  const link = (parent, title, desc, href, kind) => {
+    const a = el('a', kind === 'document'
+      ? { class: 'pub-link', href, 'data-document': '' }
+      : { class: 'pub-link', href });
     a.appendChild(el('div', { class: 'pub-link__title' }, title));
     a.appendChild(el('div', { class: 'pub-link__desc' }, desc));
     parent.appendChild(a);
@@ -49,17 +55,16 @@ export async function renderSupport(container) {
   const help = section('Get help');
   link(help, 'Appeal a decision',
     'If your account or community was moderated, appeal with the action ID you received. No sign-in needed to submit.',
-    '#/support/appeals/new');
+    route('/support/appeals/new'));
   if (isAuthed()) {
-    link(help, 'My appeals', 'Track appeals you have submitted and see their decisions.', '#/support/appeals');
+    link(help, 'My appeals', 'Track appeals you have submitted and see their decisions.', route('/support/appeals'));
   } else {
-    link(help, 'My appeals', 'Sign in to see appeals linked to your account.', '#/login');
+    link(help, 'My appeals', 'Sign in to see appeals linked to your account.', route('/login'));
   }
 
-  // The real documents are server-served on this origin at /terms and
   const rules = section('Community rules');
-  link(rules, 'Terms of Service', 'The terms that apply on this instance.', '/terms');
-  link(rules, 'Privacy Policy', 'What this instance stores, and why.', '/privacy');
+  link(rules, 'Terms of Service', 'The terms that apply on this instance.', '/terms', 'document');
+  link(rules, 'Privacy Policy', 'What this instance stores, and why.', '/privacy', 'document');
 
   if (instanceName) {
     wrap.appendChild(el('p', { class: 'muted small', style: { marginTop: 'var(--t-d-5)' } },

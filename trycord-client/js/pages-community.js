@@ -158,7 +158,7 @@ async function renderMenu(container) {
 
   // The route, not the raw pathname: on a subpath deployment the pathname
   // still carries the mount and no channel row would ever read as active.
-  const route = currentRoute();
+  const here = currentRoute();
   const appSec = el('div', { class: 'stack' });
   appSec.appendChild(el('div', { class: 'section-label' }, 'App'));
   const links = [
@@ -170,7 +170,7 @@ async function renderMenu(container) {
   if (me && me.isAdmin) links.push({ label: 'Admin', href: route('/admin'), path: '/admin', badge: 0 });
   for (const l of links) {
     const b = el('button', {
-      class: 'row' + (route === l.path || route.startsWith(l.path + '/') ? ' active' : ''),
+      class: 'row' + (here === l.path || here.startsWith(l.path + '/') ? ' active' : ''),
       type: 'button', onClick: () => { navigate(l.href); },
     });
     const bm = el('div', { class: 'row-main' });
@@ -207,7 +207,7 @@ async function renderMenu(container) {
     }
     for (const ch of channels) {
       const b = el('button', {
-        class: 'row' + (route === '/server/' + s.id + '/channel/' + ch.id ? ' active' : ''),
+        class: 'row' + (here === '/server/' + s.id + '/channel/' + ch.id ? ' active' : ''),
         type: 'button', onClick: () => { navigate(channelPath(s.id, ch.id)); },
       });
       const bm = el('div', { class: 'row-main' });

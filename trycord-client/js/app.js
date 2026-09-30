@@ -5,6 +5,7 @@ import { updateFromViewport, onPresentationChange } from './presentation.js';
 import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends, refreshMutes, setServerRoomHooks } from './state.js';
 import Realtime from './realtime.js';
 import Router from './router.js';
+import { route } from './nav.js';
 import { renderAllChrome, loadAnnouncements } from './shell.js';
 import { qs } from './ui.js';
 import { onFailover, resetFailoverAnnouncement } from './api.js';
@@ -128,7 +129,10 @@ async function boot() {
       // the app if the instance has the SPA fallback mounted. Asking for the
       // root cannot fail that way, and the session is restored from the token
       // regardless of which route the reader lands on.
-      location.assign('/');
+      //
+      // route() so that root is the app's root. A bare '/' is the origin's, and
+      // on a deployment mounted under /app/ that is the public website.
+      location.assign(route('/'));
     });
     el.appendChild(text);
     el.appendChild(back);
