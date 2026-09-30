@@ -1346,6 +1346,36 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 }
 .connection-status.show { display: flex !important; animation: rise var(--t-fast); }
 
+/* A failover notice is informational, not a warning: the session works, it is
+   just talking to a different instance. The warn tokens the offline state uses
+   would imply something is broken and needs fixing, which misreads it. */
+.connection-status--notice {
+  align-items: center;
+  gap: var(--t-d-3);
+  background: var(--t-base2);
+  color: var(--t-base);
+  border-color: var(--t-line);
+  max-width: min(92vw, 640px);
+}
+
+.connection-status__action {
+  flex: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: var(--t-r-s);
+  padding: 2px var(--t-d-3);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.connection-status__action:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

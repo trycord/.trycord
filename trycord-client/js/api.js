@@ -28,6 +28,32 @@ function base() {
 // top of the outage.
 let failoverTriedFor = null;
 let failoverInFlight = null;
+let failoverAnnounced = false;
+
+// Listeners live here rather than in realtime.js: the socket layer calls the
+// API, so having the API emit into it would be a cycle.
+const failoverListeners = new Set();
+
+export function onFailover(fn) {
+  if (typeof fn === 'function') failoverListeners.add(fn);
+  return () => failoverListeners.delete(fn);
+}
+
+// A later outage has to be announceable again after the user switches back.
+export function resetFailoverAnnouncement() {
+  failoverAnnounced = false;
+  failoverTriedFor = null;
+}
+
+function notifyFailover() {
+  if (failoverAnnounced) return;
+  const moved = TrycordConfig.failover();
+  if (!moved) return;
+  failoverAnnounced = true;
+  for (const fn of failoverListeners) {
+    try { fn(moved); } catch { /* one listener must not break the request */ }
+  }
+}
 
 async function maybeFailover() {
   const candidates = TrycordConfig.backendFallbacks();
@@ -84,7 +110,12 @@ async function request(method, path, { body, auth = true, raw = false, form = fa
     // the same probe.
     if (await maybeFailover()) {
       clearTimeout(timer);
-      return request(method, path, { body, auth, raw, form });
+      const retried = await request(method, path, { body, auth, raw, form });
+      // Announced only once the retried request has actually succeeded. Firing
+      // on the switch itself would show the notice for a backup that then fails
+      // too, and would still reject back to the caller.
+      notifyFailover();
+      return retried;
     }
     if (e && e.name === 'AbortError') throw new ApiError('TIMEOUT', 'the request timed out — the backend may be unreachable', 0);
     throw new ApiError('NETWORK', 'cannot reach the Trycord server', 0);
