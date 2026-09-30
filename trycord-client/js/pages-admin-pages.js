@@ -224,6 +224,23 @@ function applyBBCode(input, spec) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+/**
+ * Render an instance's own page HTML for preview.
+ *
+ * This content is the published document, not application chrome, so its links
+ * are documents too. Left unmarked, a relative link inside it would be read as an
+ * app route and opened inside the shell - on a self-hosted instance, where the
+ * app and the site share the origin root, that turns "read the terms" into a
+ * blank page.
+ */
+function pageProse(html) {
+  const node = el('div', { class: 'prose', html });
+  for (const a of node.querySelectorAll('a[href]')) {
+    if (!(a.getAttribute('href') || '').startsWith('#')) a.setAttribute('data-document', '');
+  }
+  return node;
+}
+
 function pageEditor(container, route) {
   clear(container);
 
@@ -279,7 +296,7 @@ function pageEditor(container, route) {
           // A slower earlier request must not overwrite a newer render.
           if (mine !== previewSeq) return;
           clear(previewOut);
-          previewOut.appendChild(el('div', { class: 'prose', html: r.html }));
+          previewOut.appendChild(pageProse(r.html));
         })
         .catch(() => {
           if (mine !== previewSeq) return;
@@ -355,7 +372,7 @@ function pageEditor(container, route) {
     bar.appendChild(el('button', {
       class: 'btn', type: 'button',
       onClick: () => Api.adminPreviewPage(route, state.blocks)
-        .then((r) => openModal({ title: 'Preview', body: el('div', { class: 'prose', html: r.html }) }))
+        .then((r) => openModal({ title: 'Preview', body: pageProse(r.html) }))
         .catch((ex) => toast(ex.message || 'Preview failed', 'error')),
     }, 'Preview'));
     bar.appendChild(el('button', {

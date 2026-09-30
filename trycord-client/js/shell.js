@@ -206,15 +206,6 @@ export function memberActions(m) {
   return actions;
 }
 
-const DESTINATIONS = [
-  { id: 'home', label: 'Home', icon: 'home', href: route('/home') },
-  { id: 'dms', label: 'DMs', icon: 'mail', href: route('/dms') },
-  { id: 'notifications', label: 'Notifications', icon: 'bell', href: route('/notifications'), badge: () => State.notifUnread },
-  { id: 'discover', label: 'Discover', icon: 'search', href: route('/discover') },
-  { id: 'support', label: 'Support', icon: '?', href: route('/support') },
-  { id: 'friends', label: 'Friends', icon: 'users', href: route('/friends') },
-];
-
 let navRoute = () => '';
 
 export function setNavRoute(fn) {
@@ -229,17 +220,20 @@ export function currentRoute() {
 export function renderCommunities(region) {
   clear(region);
   if (!isAuthed()) return;
-  const route = currentRoute();
+  const here = currentRoute();
 
+  // `path` is what the router reports, `href` is where the browser goes. They are
+  // different strings wherever the app is mounted under a subpath, so the active
+  // test has to use the first and the navigation the second.
   const globalItems = [
-    { id: 'home', label: 'Home', icon: 'home', href: route('/home') },
-    { id: 'dms', label: 'Direct messages', icon: 'mail', href: route('/dms') },
-    { id: 'notifications', label: 'Notifications', icon: 'bell', href: route('/notifications'), badge: () => State.notifUnread },
-    { id: 'discover', label: 'Discover', icon: 'search', href: route('/discover') },
-    { id: 'friends', label: 'Friends', icon: 'users', href: route('/friends'), badge: () => (State.friendsIn || []).length },
+    { id: 'home', label: 'Home', icon: 'home', path: '/home' },
+    { id: 'dms', label: 'Direct messages', icon: 'mail', path: '/dms' },
+    { id: 'notifications', label: 'Notifications', icon: 'bell', path: '/notifications', badge: () => State.notifUnread },
+    { id: 'discover', label: 'Discover', icon: 'search', path: '/discover' },
+    { id: 'friends', label: 'Friends', icon: 'users', path: '/friends', badge: () => (State.friendsIn || []).length },
   ];
 
-  const railButton = ({ label, icon: iconName, href, active, badge }) => {
+  const railButton = ({ label, icon: iconName, path, active, badge }) => {
     const btn = el('button', {
       class: 'rail-nav-item' + (active ? ' active' : ''),
       type: 'button',
@@ -247,7 +241,7 @@ export function renderCommunities(region) {
       'aria-label': label,
       'aria-current': active ? 'page' : null,
       dataset: { label },
-      onClick: () => { navigate(href); },
+      onClick: () => { navigate(route(path)); },
     }, el('span', { class: 'rail-nav-icon' }, icon(iconName)));
     const count = badge ? badge() : 0;
     if (count > 0) {
@@ -258,8 +252,8 @@ export function renderCommunities(region) {
 
   for (const item of globalItems) {
     region.appendChild(railButton({
-      label: item.label, icon: item.icon, href: item.href, badge: item.badge,
-      active: route === item.href.replace('#', '') || route.startsWith(item.href.replace('#', '') + '/'),
+      label: item.label, icon: item.icon, path: item.path, badge: item.badge,
+      active: here === item.path || here.startsWith(item.path + '/'),
     }));
   }
 
@@ -455,7 +449,7 @@ export function refreshSessionBar() {
 
 
 function communityContext(region, sid) {
-  const route = currentRoute();
+  const here = currentRoute();
   const server = (State.servers || []).find((x) => String(x.id) === String(sid));
 
   region.appendChild(communityHeader(sid, server));
@@ -499,7 +493,7 @@ function communityContext(region, sid) {
   };
 
   const channelRowEl = (ch) => {
-    const active = route === '/server/' + sid + '/channel/' + ch.id;
+    const active = here === '/server/' + sid + '/channel/' + ch.id;
     const row = channelRow(ch, {
       active, muted: isMuted(ch.id),
       onClick: () => { navigate(channelPath(sid, ch.id)); },
@@ -546,7 +540,7 @@ function communityContext(region, sid) {
 
 
 function dmsContext(region) {
-  const route = currentRoute();
+  const here = currentRoute();
   region.appendChild(pageHeader('Direct messages', 'Your conversations'));
 
   const scroll = el('div', { class: 'ctx-scroll' });
@@ -573,7 +567,7 @@ function dmsContext(region) {
     for (const dm of shown) {
       const peer = dm.peer || {};
       const name = peer.displayName || peer.username || 'Unknown';
-      const active = route === '/dms/' + dm.id;
+      const active = here === '/dms/' + dm.id;
       const row = el('button', {
         class: 'row row--dm' + (active ? ' active' : '') + (dm.unreadCount ? ' is-unread' : ''),
         type: 'button', title: name,
@@ -622,14 +616,14 @@ const SETTINGS_SECTIONS = [
 ];
 
 function settingsContext(region) {
-  const route = currentRoute();
+  const here = currentRoute();
   region.appendChild(pageHeader('Settings', 'Your account and preferences'));
   const scroll = el('div', { class: 'ctx-scroll' });
   region.appendChild(scroll);
 
   const group = navGroup({ label: 'Settings' });
   for (const s of SETTINGS_SECTIONS) {
-    const active = route === s.path || route.startsWith(s.path + '/');
+    const active = here === s.path || here.startsWith(s.path + '/');
     group.list.appendChild(navRow({
       label: s.label, href: route(s.path), active,
       onClick: () => { navigate('#' + s.path); },
@@ -640,7 +634,7 @@ function settingsContext(region) {
   if (State.me && State.me.isAdmin) {
     const admin = navGroup({ label: 'Administration' });
     admin.list.appendChild(navRow({
-      label: 'Admin console', href: route('/admin'), active: route.startsWith('/admin'),
+      label: 'Admin console', href: route('/admin'), active: here.startsWith('/admin'),
       onClick: () => { navigate('#/admin'); },
     }));
     scroll.appendChild(admin);
@@ -652,7 +646,7 @@ function settingsContext(region) {
 
 
 function simpleListContext(region, { title, sub, groups }) {
-  const route = currentRoute();
+  const here = currentRoute();
   region.appendChild(pageHeader(title, sub));
   const scroll = el('div', { class: 'ctx-scroll' });
   region.appendChild(scroll);
@@ -660,7 +654,7 @@ function simpleListContext(region, { title, sub, groups }) {
     if (!g || !g.items.length) continue;
     const group = navGroup({ label: g.label });
     for (const item of g.items) {
-      const active = item.exact ? route === item.path : (route === item.path || route.startsWith(item.path + '/'));
+      const active = item.exact ? here === item.path : (here === item.path || here.startsWith(item.path + '/'));
       group.list.appendChild(navRow({
         label: item.label, href: route(item.path), active,
         onClick: () => { navigate('#' + item.path); },
@@ -754,20 +748,20 @@ const ADMIN_OVERFLOW = [
 const adminSectionActive = (s, route) => (s.exact ? route === s.path : (route === s.path || route.startsWith(s.path + '/')));
 
 function adminContext(region) {
-  const route = currentRoute();
+  const here = currentRoute();
   region.appendChild(pageHeader('Administration', 'Moderation and platform health'));
   const scroll = el('div', { class: 'ctx-scroll' });
   region.appendChild(scroll);
   const group = navGroup({ label: 'Console' });
   for (const s of ADMIN_SECTIONS) {
     group.list.appendChild(navRow({
-      label: s.label, href: route(s.path), active: adminSectionActive(s, route),
+      label: s.label, href: route(s.path), active: adminSectionActive(s, here),
       onClick: () => { navigate('#' + s.path); },
     }));
   }
   scroll.appendChild(group);
 
-  const activeOverflow = ADMIN_OVERFLOW.find((s) => adminSectionActive(s, route));
+  const activeOverflow = ADMIN_OVERFLOW.find((s) => adminSectionActive(s, here));
   const more = navGroup({
     label: activeOverflow ? activeOverflow.label : 'More',
     collapsible: true,
@@ -776,7 +770,7 @@ function adminContext(region) {
   });
   for (const s of ADMIN_OVERFLOW) {
     more.list.appendChild(navRow({
-      label: s.label, href: route(s.path), active: adminSectionActive(s, route),
+      label: s.label, href: route(s.path), active: adminSectionActive(s, here),
       onClick: () => { navigate('#' + s.path); },
     }));
   }
@@ -1057,24 +1051,27 @@ export function setTabBarHidden(hidden) {
 export function renderMobileTabs(region) {
   clear(region);
   if (!isAuthed()) return;
-  const route = currentRoute();
+  const here = currentRoute();
   const hidden = isTabBarHidden();
   region.dataset.collapsed = hidden ? 'true' : 'false';
 
+  // `path` is the route the app compares against, `href` is where it actually
+  // goes. They differ wherever the app is mounted under a subpath, so the active
+  // test has to use one and the navigation the other.
   const tabs = [
-    { id: 'home', label: 'Home', icon: 'home', href: route('/home') },
-    { id: 'dms', label: 'DMs', icon: 'mail', href: route('/dms') },
-    { id: 'friends', label: 'Friends', icon: 'users', href: route('/friends') },
-    { id: 'notifications', label: 'Alerts', icon: 'bell', href: route('/notifications') },
-    { id: 'menu', label: 'Menu', icon: 'menu', href: route('/menu') },
+    { id: 'home', label: 'Home', icon: 'home', path: '/home' },
+    { id: 'dms', label: 'DMs', icon: 'mail', path: '/dms' },
+    { id: 'friends', label: 'Friends', icon: 'users', path: '/friends' },
+    { id: 'notifications', label: 'Alerts', icon: 'bell', path: '/notifications' },
+    { id: 'menu', label: 'Menu', icon: 'menu', path: '/menu' },
   ];
   const strip = el('div', { class: 'mobile-tab-navigation__strip' });
   for (const t of tabs) {
-    const active = route.startsWith(t.href);
+    const active = here === t.path || here.startsWith(t.path + '/');
     const btn = el('button', {
       type: 'button', class: active ? 'active' : '',
       'aria-current': active ? 'page' : null,
-      onClick: () => { navigate(t.href); },
+      onClick: () => { navigate(route(t.path)); },
     });
     btn.appendChild(el('span', { class: 'micon' }, icon(t.icon)));
     btn.appendChild(el('span', { class: 'mlabel' }, t.label));

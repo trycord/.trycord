@@ -79,7 +79,9 @@ export function navigate(target, opts = {}) {
     return;
   }
   if (opts.external) {
-    window.location.assign(path);
+    // route() is a no-op on a full URL and adds the mount to a path, so this
+    // cannot hand a relative route to another origin.
+    window.location.assign(route(path));
     return;
   }
   const current = location.pathname + location.search;
@@ -119,8 +121,65 @@ export function adoptLegacyHash() {
   if (!hash || hash.length < 2) return false;
   const path = routePath(hash);
   if (path === null) return false;
-  history.replaceState(null, '', path + location.search);
+  // Through route(), like every other navigation. Writing the route path
+  // straight into history put '/app/#/settings' at '/settings' on a subpath
+  // deployment: the fragment form is the only way an old URL can arrive under a
+  // mount, and it is the one place that dropped the mount, so the app handed its
+  // own route to the public site.
+  history.replaceState(null, '', route(path.startsWith('/') ? path : '/' + path) + location.search);
   return true;
 }
 
-export default { navigate, route, routePath, currentPath, withQuery, adoptLegacyHash, BASE };
+/**
+ * Route the app's own links instead of reloading the document.
+ *
+ * Anchors are the right element for these links - they are middle-clickable,
+ * they put a real destination in the status bar, and they still work if this
+ * script never runs. But without something listening, a left click asks the
+ * server for the page, throws away the running application and boots it again.
+ * That is the fragment-era behaviour path routing was supposed to end, and it
+ * made every Settings click a cold start.
+ *
+ * Only the plain left click on a same-origin link inside the app is taken over.
+ * Modified clicks keep the browser's own behaviour so open-in-new-tab and
+ * open-in-new-window keep working, and an anchor marked `data-document` is left
+ * alone: the legal pages and the public site are documents on this origin, not
+ * routes, and serving them through the router would show the app instead.
+ */
+export function interceptLinks(doc = document) {
+  doc.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || !doc.contains(a)) return;
+    if (a.hasAttribute('download') || a.hasAttribute('data-document')) return;
+    if (a.target && a.target !== '_self') return;
+
+    const raw = a.getAttribute('href');
+    if (!raw) return;
+    // A legacy '#/route' href. routePath knows the fragment form, and treating it
+    // as an in-page fragment is what left these links looking right and doing
+    // nothing. Only the route shape qualifies.
+    if (raw === '#/' || raw.startsWith('#/')) {
+      e.preventDefault();
+      navigate(routePath(raw));
+      return;
+    }
+    // Every other '#...' is a same-page jump - the skip link above all - and the
+    // browser already does the right thing with it.
+    if (raw.startsWith('#')) return;
+
+    let url;
+    try { url = new URL(raw, location.href); } catch { return; }
+    if (url.origin !== location.origin) return;
+    // Outside the app's mount: a document belonging to the origin, not a route.
+    if (BASE && url.pathname !== BASE && !url.pathname.startsWith(BASE + '/')) return;
+
+    // Back to an app route: the router works in paths without the mount.
+    const appPath = (BASE ? url.pathname.slice(BASE.length) : url.pathname) || '/';
+    e.preventDefault();
+    navigate(appPath + url.search + url.hash);
+  }, { passive: false });
+}
+
+export default { navigate, route, routePath, currentPath, withQuery, adoptLegacyHash, interceptLinks, BASE };

@@ -21,7 +21,7 @@ import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support
 import { renderNotifications } from './pages-notifications.js';
 import { presentationMode, closeDesktopNav } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from './shell.js';
-import { navigate, adoptLegacyHash, BASE } from './nav.js';
+import { navigate, adoptLegacyHash, interceptLinks, BASE } from './nav.js';
 import Api from './api.js';
 
 // A slug is a display convenience, not an identity, so a route that cannot
@@ -443,6 +443,7 @@ const Router = {
     // render, so old links and the desktop build's restored state keep working
     // and the address bar ends up canonical.
     const adopted = adoptLegacyHash();
+    interceptLinks();
     window.addEventListener('popstate', () => run());
     const first = run();
     if (adopted) first.catch(() => {});
