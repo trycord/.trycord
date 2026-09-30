@@ -205,6 +205,13 @@ router.get('/:id', async (req, res, next) => {
         ? (String(pending.from_user_id) === String(me) ? 'pending-out' : 'pending-in')
         : 'none';
     }
+    // Whether the viewer has blocked them. The profile page needs this to label
+    // the control honestly: without it the only way to find out is to press
+    // Block and read the error, which is a terrible way to learn a fact about
+    // your own account. It reveals nothing about them - only what the viewer has
+    // already done - and it stays a boolean, so the blocked party learns nothing
+    // from being looked up.
+    profile.blockedByViewer = await privacy.isBlocked(me, row.id);
     // Community-aware profile: when the viewer names a server they both
     // belong to, attach that community's membership (nickname, roles,
     // joined date). Never leaks memberships of other servers.

@@ -1,7 +1,7 @@
 // in three places that disagreed. Every action is gated on a real permission
 
 import Api from './api.js';
-import State, { can, currentServerId, isAuthed } from './state.js';
+import State, { can, currentServerId, isAuthed, isBlocked, refreshBlocks } from './state.js';
 import { el, toast, confirmDialog, showUserCard, showContextMenu, closeContextMenu } from './ui.js';
 import { avatar, avatarUrlOf, bannerUrlOf } from './components.js';
 import { openRoleAssignModal } from './role-assignment.js';
@@ -49,7 +49,7 @@ export function openUserMenu({ user, x, y, serverId, self = false }) {
   const sid = serverId || currentServerId();
   const name = displayNameOf(user);
   const isSelf = self || String(id) === String(State.me && State.me.id);
-  const actions = buildUserActions({ user, id, name, sid, isSelf });
+  const actions = buildUserActions({ user, id, name, sid, isSelf, blocked: isBlocked(id) });
   return showContextMenu(x, y, actions.map((a) => ({
     label: a.label,
     danger: a.danger,
@@ -69,7 +69,7 @@ export function openUserCard({ user, x, y, serverId, self = false, onCard = null
     { size: 'lg' }
   );
 
-  const actions = buildUserActions({ user, id, name, sid, isSelf });
+  const actions = buildUserActions({ user, id, name, sid, isSelf, blocked: isBlocked(id) });
 
   const sub = user.username && user.username !== name ? '@' + user.username : null;
   const roles = Array.isArray(user.roles) && user.roles.length
@@ -87,7 +87,7 @@ export function openUserCard({ user, x, y, serverId, self = false, onCard = null
   return card;
 }
 
-export function buildUserActions({ user, id, name, sid, isSelf }) {
+export function buildUserActions({ user, id, name, sid, isSelf, blocked = false }) {
   const out = [];
   const authed = isAuthed();
 
@@ -98,8 +98,10 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
 
   out.push({ label: 'View profile', onSelect: () => { navigate('#/users/' + id); } });
 
-  // Direct message. Never offer this to yourself.
-  if (!isSelf) {
+  // Direct message. Never offer this to yourself, and never offer it to someone
+  // the reader has blocked: the server refuses with NOT_ACCEPTING_DMS, so the
+  // menu item would only ever exist to fail.
+  if (!isSelf && !blocked) {
     out.push({
       label: 'Send message',
       primary: true,
@@ -163,6 +165,66 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
           },
         }),
       });
+    }
+  }
+
+  // Blocking is a decision about your own account, not an act against theirs,
+  // so it sits with Report rather than under the moderation gate above. The
+  // server enforces it regardless of permissions; this is only the control.
+  if (!isSelf) {
+    if (blocked) {
+      out.push({
+        label: 'Unblock',
+        onSelect: async () => {
+          closeContextMenu();
+          try {
+            await Api.unblockUser(id);
+            toast(name + ' can reach you again.', 'ok');
+            await refreshBlocks();
+          } catch (ex) { toast(ex.message || 'Could not unblock.', 'error'); }
+        },
+      });
+      // Not returned here: blocking is a personal boundary, not moderation. A
+      // blocked person can still be removed from a community or reported, and
+      // hiding those would make blocking look like it did more than it does.
+    } else {
+    out.push({
+      label: 'Block',
+      danger: true,
+      onSelect: () => {
+        closeContextMenu();
+        import('./ui.js').then(({ openModal, el: el2 }) => {
+          const body = el2('div', { class: 'stack' });
+          body.appendChild(el2('p', {}, 'Block ' + name + '?'));
+          body.appendChild(el2('p', { class: 'set-note set-note--warn' },
+            'They will not be able to message you or send you a friend request. Any friendship ends now, and they are not told why.'));
+          const reason = el2('input', {
+            class: 'input', type: 'text', maxlength: '500',
+            placeholder: 'Reason (optional, for you)',
+            'aria-label': 'Reason for blocking ' + name,
+          });
+          body.appendChild(reason);
+          const row = el2('div', { class: 'row-line' });
+          const cancel = el2('button', { class: 'btn ghost sm', type: 'button' }, 'Cancel');
+          const go = el2('button', { class: 'btn danger sm', type: 'button' }, 'Block ' + name);
+          const close = openModal({ title: 'Block ' + name, body, footer: row });
+          cancel.addEventListener('click', () => close && close());
+          go.addEventListener('click', async () => {
+            go.disabled = true;
+            try {
+              await Api.blockUser(id, reason.value.trim() || undefined);
+              toast(name + ' can no longer reach you.', 'ok');
+              close && close();
+              await refreshBlocks();
+            } catch (ex) {
+              toast(ex.message || 'Could not block.', 'error');
+              go.disabled = false;
+            }
+          });
+          row.append(go, cancel);
+        }).catch(() => { toast('Could not open the block form.', 'error'); });
+      },
+    });
     }
   }
 

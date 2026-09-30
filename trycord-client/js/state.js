@@ -31,6 +31,7 @@ const state = {
   friendsOut: [],      // outgoing requests
   notifUnread: 0,
   mutedChannels: new Set(), // channel ids with notifications suppressed
+  blockedUsers: new Set(), // user ids this reader has blocked
   activity: [],
   online: false,       // WS connected?
   lastServerId: null,
@@ -161,6 +162,7 @@ export function clearSession() {
   // a shared browser carried the previous session's peer list into the
   state.presence.clear();
   state.mutedChannels.clear();
+  state.blockedUsers.clear();
 }
 
 
@@ -303,6 +305,21 @@ export async function refreshMutes() {
     state.mutedChannels = new Set((ids || []).map(String));
   } catch { /* non-fatal: keep last known set */ }
   return state.mutedChannels;
+}
+
+// Who the reader has blocked. Held here rather than fetched per menu open so
+// that the block state shown on a user row, a profile and a hover card is the
+// same answer in all three, and is the same answer on a second device.
+export async function refreshBlocks() {
+  try {
+    const rows = await Api.blocks();
+    state.blockedUsers = new Set((rows || []).map((b) => String(b.id)));
+  } catch { /* non-fatal: keep last known set */ }
+  return state.blockedUsers;
+}
+
+export function isBlocked(userId) {
+  return state.blockedUsers.has(String(userId));
 }
 
 export function isMuted(channelId) {
