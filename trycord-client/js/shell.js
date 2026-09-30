@@ -1058,13 +1058,31 @@ export function renderMobileTabs(region) {
   }
 }
 
+// Each region is independent: the rail, the channel list, the mobile tab bar and
+// the member pane are separate features, and one of them failing says nothing
+// about the others.
+//
+// They were painted by one unguarded sequence, so any throw inside any of them
+// propagated out of renderAllChrome and into the router's catch - which replaced
+// the whole view with an error screen. A stale cached module was enough to blank
+// the entire app that way: shell.js calling icon() against a components.js the
+// page had not reloaded threw "icon is not a function" and took every region
+// with it.
+function paintRegion(fn) {
+  try {
+    fn();
+  } catch (e) {
+    try { console.error('[trycord] chrome region failed', e); } catch { /* ignore */ }
+  }
+}
+
 export function renderAllChrome() {
-  renderCommunities(qs('#community-navigation'));
-  renderPlaceNavigation(qs('#place-navigation'));
-  renderMobileTabs(qs('#mobile-tab-navigation'));
-  renderMemberSidebar(qs('#member-sidebar'));
-  renderAnnouncementBanner();
-  renderVerifyBanner();
+  paintRegion(() => renderCommunities(qs('#community-navigation')));
+  paintRegion(() => renderPlaceNavigation(qs('#place-navigation')));
+  paintRegion(() => renderMobileTabs(qs('#mobile-tab-navigation')));
+  paintRegion(() => renderMemberSidebar(qs('#member-sidebar')));
+  paintRegion(() => renderAnnouncementBanner());
+  paintRegion(() => renderVerifyBanner());
 }
 
 // fetched once per session and then refreshed on a slow interval, so an admin
