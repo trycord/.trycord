@@ -389,21 +389,38 @@ async function renderRoute() {
   renderAllChrome();
 }
 
+// Where a thrown value came from, when it carries a stack. Absent for anything
+// the server sent as a JSON error envelope, which is correct: those have no JS
+// origin and showing a bogus one would send a reader looking in the wrong file.
+function faultOrigin(ex) {
+  if (!ex || typeof ex.stack !== 'string' || !ex.stack.trim()) return null;
+  const frame = ex.stack.split('\n').slice(1).map((l) => l.trim())
+    .find((l) => l && !/^at .*\b(eval|<anonymous>)\b/.test(l));
+  return frame ? frame.replace(/^at\s+/, '') : null;
+}
+
 async function run() {
   try {
     return await renderRoute();
   } catch (ex) {
-    // A failed data request must not strand the desktop shell with the last
     const region = viewRegion();
+    const origin = faultOrigin(ex);
     if (region) {
       clear(region);
       renderContextHeader({ title: 'Unable to load this view' });
       region.appendChild(el('div', { class: 'empty-state' },
         el('div', { class: 'form-error' }, ex && ex.message ? ex.message : 'Please try again.'),
+        // The message alone has repeatedly been ambiguous - "Attempted to
+        // assign to readonly property" names no file, and this screen is the
+        // only surface a mobile user has. Surfacing the originating frame turns
+        // an unactionable report into a locatable one.
+        origin ? el('p', { class: 'muted small', 'data-fault-origin': origin }, origin) : null,
         el('div', { class: 'row-line' },
           el('button', { class: 'btn primary', type: 'button', onClick: () => { location.hash = '#/home'; } }, 'Home'),
           el('button', { class: 'btn ghost', type: 'button', onClick: () => { run(); } }, 'Retry'))));
     }
+    // Also to the console: the on-screen copy is for a reader without devtools.
+    try { console.error('[trycord] view failed', ex); } catch { /* ignore */ }
     renderAllChrome();
     return null;
   }
