@@ -431,20 +431,29 @@ img { max-width: 100%; }
    is not underneath the form. */
 :root { --ui-settings-context: 0px; --ui-settings-pane: 780px; }
 
-.settings-layout {
+/* One contextual-column mechanism, shared. The settings frame and the profile
+   frame have the same shape - content beside a narrow summary - so they use the
+   same tracks, the same breakpoint and the same cards. A second implementation
+   would be a second set of measurements that agree right up until one of them is
+   changed. */
+.settings-layout,
+.profile-layout {
   display: grid;
   grid-template-columns: var(--ui-sidebar) minmax(0, 1fr) var(--ui-settings-context);
   gap: var(--t-d-6);
   align-items: start;
   width: 100%;
 }
+/* The profile carries no settings navigation, so it has no first track. */
+.profile-layout { grid-template-columns: minmax(0, 1fr) var(--ui-settings-context); }
 
 /* ---- the contextual column --------------------------------------------
    A region that only earns width once there is width to earn it with. The
    transition is on the track rather than on the column, so the pane slides
    rather than jumping when the window crosses the breakpoint, and a window
    dragged across the threshold reads as one continuous layout change. */
-.settings-context {
+.settings-context,
+.profile-context {
   position: sticky;
   top: var(--t-d-4);
   min-width: 0;
@@ -457,7 +466,8 @@ img { max-width: 100%; }
 }
 /* Nothing in it: no track, no padding, no border. A zero-width region that
    still paints reads as a stray rule down the edge of the window. */
-.settings-layout:not([data-has-context]) .settings-context { display: none; }
+.settings-layout:not([data-has-context]) .settings-context,
+.profile-layout:not([data-has-context]) .profile-context { display: none; }
 
 /* Below the breakpoint that gives the column a track, the track is zero. A
    zero-width region full of paragraphs is not hidden by being narrow - the text
@@ -465,7 +475,8 @@ img { max-width: 100%; }
    in the DOM and restored by the next breakpoint rather than removed, so a
    window dragged across the threshold does not refetch anything. */
 @media (max-width: 1179px) {
-  .settings-context { display: none; }
+  .settings-context,
+  .profile-context { display: none; }
 }
 
 .settings-context__title {
@@ -2748,9 +2759,17 @@ html[data-auth-page] .mobile-tab-navigation { display: none; }
 
 .stat-inline { display: flex; gap: var(--t-d-4); color: var(--t-mut); font-size: var(--t-fs-s); margin-top: var(--t-d-2); }
 
-.prof-banner { height: 72px; border-radius: var(--t-r-m) var(--t-r-m) 0 0; background: linear-gradient(135deg, var(--t-accent), var(--t-accent-2)); margin: -18px -18px 0; background-size: cover; background-position: center; }
+.prof-banner {
+  height: 72px;
+  border-radius: var(--t-r-m) var(--t-r-m) 0 0;
+  /* An unset banner is a quiet surface, not the accent gradient. The gradient
+     was a placeholder that read as decoration and as a brand-coloured slab of
+     colour on every profile without one, which is most of them. */
+  background: var(--t-base2);
+  margin: -18px -18px 0;
+}
 .card--auth .prof-banner { margin: -18px -18px 0; }
-.prof-banner.has-banner { background-color: var(--t-sur2); }
+.prof-banner.has-banner { background-color: var(--t-sur2); background-image: none; }
 .prof-avatar { margin-top: -26px; margin-left: 6px; position: relative; z-index: 1; }
 .prof-avatar.lg { margin-right: 12px; }
 .prof-preview { display: flex; flex-direction: column; gap: 2px; }
@@ -4275,3 +4294,8 @@ html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width
 
 .state-block--error { border-left: 2px solid var(--t-err); }
 .state-block--error .state-block__label { color: var(--t-err); }
+
+/* The profile's primary column. Capped so a display name does not stretch across
+   a 3440px window; the width that is left over becomes the contextual column
+   rather than empty canvas. */
+.profile-primary { min-width: 0; max-width: var(--ui-settings-pane, 860px); }
