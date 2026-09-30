@@ -375,7 +375,7 @@ function serverRemoveModal(server, onDone) {
       el('div', { class: 'field' }, el('label', {}, 'Reason'), reason),
       el('label', { class: 'field row-line admin-confirm' },
         confirm, el('span', {}, 'I confirm this removes the community and its content permanently.')),
-      el('p', { class: 'muted small' }, 'This is irreversible. Members are removed and the server record is deleted.')),
+      el('p', { class: 'muted small' }, 'This is irreversible. Members are removed and the community record is deleted.')),
     footer: [
       btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: 'btn danger', type: 'button', onClick: submit }, 'Remove community'),
@@ -711,7 +711,7 @@ function libChip(type) {
 async function renderAudit(body, show, seq) {
   const toolbar = el('div', { class: 'admin-toolbar' });
   const search = el('input', { class: 'input', type: 'search', placeholder: 'Filter by action, e.g. MODERATION_ACCOUNT_BAN…', 'aria-label': 'Filter audit log by action' });
-  const info = el('span', { class: 'muted small' }, 'Server keeps the most recent entries per query.');
+  const info = el('span', { class: 'muted small' }, 'This instance keeps the most recent entries per query.');
   toolbar.append(search, info);
   const listWrap = el('div', { class: 'admin-list' });
   show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
@@ -829,6 +829,29 @@ async function renderAnnouncements(body, show, seq) {
 }
 
 
+// Renders SECTIONS as navigation. Pages is a separate module rather than a
+// branch of renderAdmin, so it is marked here rather than being treated as one
+// more if/else.
+const EXTERNAL_SECTIONS = new Set(['pages']);
+
+// Exported because pages-admin-pages.js is a separate route: without the shared
+// renderer, clicking Pages from here would land in a view with no way back.
+export function renderAdminNav(current) {
+  const nav = el('nav', { class: 'settings-nav', 'aria-label': 'Admin sections' });
+  for (const s of SECTIONS) {
+    const active = s.id === current;
+    const btn = el('button', {
+      class: 'btn' + (active ? ' active' : ''),
+      type: 'button',
+      'aria-current': active ? 'page' : null,
+      onClick: () => { location.hash = s.href; },
+    }, s.label);
+    if (EXTERNAL_SECTIONS.has(s.id) && !active) btn.dataset.route = s.id;
+    nav.appendChild(btn);
+  }
+  return nav;
+}
+
 export async function renderAdmin(container, { section = 'overview' } = {}) {
   clear(container);
   const meta = SECTIONS.find((s) => s.id === section) || SECTIONS[0];
@@ -839,6 +862,12 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
   head.appendChild(el('div', { class: 'page-head__main' },
     el('h1', {}, meta.label)));
   wrap.appendChild(head);
+  // Section navigation. SECTIONS was declared but never rendered, so the admin
+  // had no way between its own views: Overview linked to the audit log and
+  // nothing else was reachable without editing the address bar. Pages in
+  // particular is served by a separate module (router.js sends /admin/pages to
+  // renderAdminPages) and so was unreachable even though the route existed.
+  wrap.appendChild(renderAdminNav(section));
   const body = el('div', { class: 'admin-page' });
   wrap.appendChild(body);
   container.appendChild(wrap);
@@ -875,4 +904,4 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
   }
 }
 
-export default { renderAdmin };
+export default { renderAdmin, renderAdminNav };
