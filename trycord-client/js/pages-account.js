@@ -565,7 +565,12 @@ function renderTwoFactorSection(wrap) {
   wrap.appendChild(body);
   wrap.appendChild(err);
 
-  const fail = (ex) => { err.hidden = false; err.textContent = (ex && ex.message) || 'Something went wrong'; };
+  const fail = (ex) => {
+    err.hidden = false;
+    // Fall back to the server's own wording; only when there is none, say
+    // what to do rather than that something happened.
+    err.textContent = (ex && ex.message) || 'Could not save that change. Check your connection and try again.';
+  };
 
   // Status drives the whole section, so it is fetched rather than assumed: a
   // stale local guess would offer to "enable" a factor that is already on.

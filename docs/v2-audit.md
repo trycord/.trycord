@@ -165,6 +165,9 @@ Real, known gaps. None blocks ordinary use.
   revoked at once; they cannot be revoked one at a time.
 - **Full-text search is prefix-based.** There is no index and no ranking, so
   search quality degrades as history grows.
-- **`docs/selfhosting.md` covers the variables that matter most, but
-  `.env.example` lists only 11 of the roughly 40 the server reads.** The rest
-  have working defaults; they are simply not in the example file.
+- **`docs/selfhosting.md` is a deployment narrative, not a variable reference.**
+  `.env.example` now names every variable the server reads - checked by
+  comparing `process.env.X` against the file: 41 read, 41 present - but it stays
+  grouped by concern rather than exhaustively commented one by one, so the full
+  semantics of the rarer tuning values live in the source beside the code that
+  applies them.

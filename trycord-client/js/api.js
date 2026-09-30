@@ -23,6 +23,28 @@ function base() {
   return TrycordConfig.backendUrl().replace(/\/+$/, '');
 }
 
+// At most one failover per origin per session. Without this a dead backend costs
+// a probe on every single request, which turns one outage into a slow client on
+// top of the outage.
+let failoverTriedFor = null;
+let failoverInFlight = null;
+
+async function maybeFailover() {
+  const candidates = TrycordConfig.backendFallbacks();
+  if (!candidates.length) return false;
+
+  const from = base();
+  if (failoverTriedFor === from) return false;
+  failoverTriedFor = from;
+
+  // Concurrent first requests must not each start a probe.
+  if (!failoverInFlight) {
+    failoverInFlight = TrycordConfig.tryFallbacks().finally(() => { failoverInFlight = null; });
+  }
+  const moved = await failoverInFlight;
+  return !!moved;
+}
+
 export function token() {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
@@ -56,6 +78,14 @@ async function request(method, path, { body, auth = true, raw = false, form = fa
   try {
     res = await fetch(url, { method, headers, body: payload, credentials: 'omit', signal: ctrl.signal });
   } catch (e) {
+    // Transport-level failure only: a 5xx or a 404 is the instance answering, so
+    // those never trigger a switch. One attempt per unreachable origin, not one
+    // per request, because a dead backend means every subsequent call would pay
+    // the same probe.
+    if (await maybeFailover()) {
+      clearTimeout(timer);
+      return request(method, path, { body, auth, raw, form });
+    }
     if (e && e.name === 'AbortError') throw new ApiError('TIMEOUT', 'the request timed out — the backend may be unreachable', 0);
     throw new ApiError('NETWORK', 'cannot reach the Trycord server', 0);
   } finally {

@@ -324,7 +324,7 @@ function resetPasswordPage(container, token) {
     try {
       const res = await Api.resetPassword({ token, newPassword: password.value, confirmPassword: confirm.value });
       ok.hidden = false;
-      ok.textContent = 'Password reset successfully. You can now sign in.';
+      ok.textContent = 'Password changed. Sign in with your new one.';
       form.reset();
       submit.hidden = true;
       main.appendChild(el('a', { class: 'btn primary block', href: '#/login' }, 'Continue to sign in'));

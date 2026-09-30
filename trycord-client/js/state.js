@@ -177,7 +177,24 @@ export async function refreshServers() {
   return state.servers;
 }
 
+// One in-flight load per community. Every route that opens a community calls
+// this, and several of them do so concurrently on first paint, so without this a
+// single navigation fired the same six requests more than once. Deduplicating
+// on the community id also means a refresh arriving while the first is still in
+// flight joins it instead of starting a second copy.
+const enterInFlight = new Map();
+
 export async function enterServer(serverId) {
+  const key = String(serverId);
+  const running = enterInFlight.get(key);
+  if (running) return running;
+
+  const load = loadServer(serverId).finally(() => { enterInFlight.delete(key); });
+  enterInFlight.set(key, load);
+  return load;
+}
+
+async function loadServer(serverId) {
   const [detail, layout, members, perms, roles] = await Promise.all([
     Api.server(serverId),
     Api.channels(serverId),
