@@ -26,17 +26,47 @@
     e.appendChild(box);
     document.body.appendChild(e);
   }
+  // First application frame of a stack, which is the only part that belongs to
+  // this codebase. The runtime's own frames sit above it.
+  function faultOrigin(err) {
+    if (!err || typeof err.stack !== 'string' || !err.stack) return null;
+    var lines = err.stack.split('\n').slice(1);
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i].trim();
+      if (!l) continue;
+      if (/^(at )?(eval|<anonymous>|native)/.test(l)) continue;
+      return l.replace(/^at\s+/, '');
+    }
+    return null;
+  }
+
   window.addEventListener('error', function (ev) {
+    // file:line:column, not just the filename. A filename alone left three
+    // separate crashes ambiguous because several modules load from the same
+    // place, and the only alternative was devtools - which a desktop user may
+    // not have open and a phone user certainly does not.
     var where = '';
     if (ev && ev.filename) {
-      try { where = ' in ' + decodeURIComponent(ev.filename).split('/').pop(); } catch (e) { where = ' in ' + ev.filename; }
+      var f;
+      try { f = decodeURIComponent(ev.filename).split('/').pop(); } catch (e) { f = ev.filename; }
+      where = ' in ' + f;
+      if (typeof ev.lineno === 'number' && ev.lineno) where += ':' + ev.lineno + (ev.colno ? ':' + ev.colno : '');
     }
-    if (ev && ev.message) paintError('A script error occurred' + where + ': ' + String(ev.message).slice(0, 160));
+    var msg = (ev && ev.message) ? String(ev.message).slice(0, 200) : 'Unknown script error';
+    paintError('A script error occurred' + where + ': ' + msg);
   });
+
   window.addEventListener('unhandledrejection', function (ev) {
-    if (ev && ev.reason && ev.reason.name === 'TypeError' && /(?:loading.*chunk|module\s+script|imported)\s+/i.test(String(ev.reason.message))) {
+    var reason = ev && ev.reason;
+    if (reason && reason.name === 'TypeError' && /(?:loading.*chunk|module\s+script|imported)\s+/i.test(String(reason.message))) {
       paintError('The app files changed while this window was open. Reload to pick up the latest build.');
+      return;
     }
+    // Everything else was silently discarded before, so a boot that failed on a
+    // rejected promise looked like a blank page with nothing to go on.
+    var origin = faultOrigin(reason);
+    var msg = reason && reason.message ? String(reason.message).slice(0, 200) : String(reason).slice(0, 200);
+    paintError('Background task failed' + (origin ? ' (' + origin + ')' : '') + ': ' + msg);
   });
   // position-fixed layer mounted straight on <body>, deliberately outside the
   function hasRendered() {
