@@ -862,7 +862,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderSessionsSection(body);
   } else if (tab === 'backend') {
     body.appendChild(el('div', { class: 'section-label' }, 'Backend'));
-    body.appendChild(el('p', { class: 'muted small' }, 'Choose which Trycord server this app talks to. Switching servers signs you out here first.'));
+    body.appendChild(el('p', { class: 'muted small' }, 'Choose which Trycord instance this app talks to. Switching instances signs you out here first.'));
     const backendBox = el('div', { class: 'card card--auth' });
     renderBackendSelector(backendBox);
     body.appendChild(backendBox);

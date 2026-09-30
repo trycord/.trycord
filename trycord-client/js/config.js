@@ -286,9 +286,9 @@ export const TrycordConfig = {
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const res = await fetch(v + '/api/instance', { cache: 'no-store', signal: ctrl.signal });
-      if (!res.ok) return { ok: false, error: 'Server answered HTTP ' + res.status + ' — is this a Trycord backend?' };
+      if (!res.ok) return { ok: false, error: 'Something answered HTTP ' + res.status + ' — is that a Trycord backend?' };
       const info = await res.json();
-      if (!info || typeof info !== 'object') return { ok: false, error: 'Server did not answer like a Trycord backend.' };
+      if (!info || typeof info !== 'object') return { ok: false, error: 'That address did not answer like a Trycord backend.' };
       return { ok: true, name: info.name || info.instanceId || 'Trycord backend' };
     } catch (e) {
       if (e && e.name === 'AbortError') return { ok: false, error: 'Connection timed out — check the URL and your network.' };
