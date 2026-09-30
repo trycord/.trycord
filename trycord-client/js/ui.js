@@ -632,7 +632,11 @@ export function attachContextMenu(el, factory, opts = {}) {
     fired = false;
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
     cancel();
-    timer = setTimeout(() => { fired = true; open(sx, sy); }, LONG_PRESS_MS);
+    timer = setTimeout(() => {
+      fired = true;
+      if (opts.onLongPress) opts.onLongPress(el, sx, sy);
+      else open(sx, sy);
+    }, LONG_PRESS_MS);
   };
   const onTouchMove = (e) => {
     if (!timer) return;
@@ -652,10 +656,17 @@ export function attachContextMenu(el, factory, opts = {}) {
   };
 
   el.addEventListener('contextmenu', onContextMenu);
-  el.addEventListener('touchstart', onTouchStart, { passive: true });
-  el.addEventListener('touchmove', onTouchMove, { passive: true });
-  el.addEventListener('touchend', onTouchEnd);
-  el.addEventListener('touchcancel', onTouchEnd);
+  // Long-press is the touch equivalent of a right-click and is kept on every
+  // device. What it produces is not fixed here: a caller that wants the press to
+  // do something other than open a menu - a message expanding its actions in
+  // place, say - passes onLongPress and the gesture still fires, it just lands
+  // somewhere else. Only the tap-suppression bookkeeping is shared.
+  if (opts.touch !== false) {
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('touchcancel', onTouchEnd);
+  }
   el.addEventListener('click', onClickCapture, true);
   el.addEventListener('keydown', onKeyDown);
 

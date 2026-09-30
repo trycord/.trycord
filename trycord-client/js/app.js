@@ -120,9 +120,15 @@ async function boot() {
       // The backend URL is resolved per request, so a reload is what makes the
       // original take effect everywhere, including the WebSocket ticket.
       if (url) el.setAttribute('data-restored', url);
-      // A real reload, keeping whatever route is on the URL. Under path
-      // routing the pathname IS the route, so there is nothing to add.
-      location.assign(location.pathname + location.search || '/');
+      // A real reload is the point - it is what re-resolves every request
+      // against the original backend, including the WebSocket ticket.
+      //
+      // It asks for the app root rather than the current path on purpose: a
+      // reload is a request to the server, and a deep path only comes back as
+      // the app if the instance has the SPA fallback mounted. Asking for the
+      // root cannot fail that way, and the session is restored from the token
+      // regardless of which route the reader lands on.
+      location.assign('/');
     });
     el.appendChild(text);
     el.appendChild(back);
