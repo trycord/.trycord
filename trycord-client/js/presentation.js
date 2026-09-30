@@ -106,6 +106,123 @@ export function wireNav() {
   document.addEventListener('keydown', drawerKeys);
 }
 
+
+// --- swipe ----------------------------------------------------------------
+//
+// A drawer you cannot swipe is half a drawer: on a phone the edge swipe is the
+// fastest way in and the flick is the fastest way out.
+//
+// Three things it must not do, or it makes the app worse than no gesture:
+// hijack a vertical scroll, hijack a horizontal scroller (the community strip
+// scrolls sideways inside the drawer), or leave the drawer parked mid-way when
+// the gesture is abandoned.
+
+// px from the left edge that begins an open gesture.
+const EDGE_ZONE = 24;
+// px of travel that commits the open or close.
+const COMMIT_DIST = 56;
+// horizontal travel must beat vertical by this much to win the gesture.
+const AXIS_LOCK = 1.5;
+
+function horizontallyScrollable(node) {
+  // The target can be the document or a text node, neither of which has a
+  // style or a parentElement.
+  let n = node && node.nodeType === 1 ? node : (node && node.parentElement);
+  for (; n && n !== document.body; n = n.parentElement) {
+    const ox = getComputedStyle(n).overflowX;
+    if (ox === 'auto' || ox === 'scroll') return true;
+  }
+  return false;
+}
+
+export function wireDrawerGestures() {
+  let id = null;
+  let x0 = 0, y0 = 0;
+  let axis = null;          // 'x' once the gesture is known horizontal
+  let width = 0;
+  let wasOpen = false;
+  let offset = 0;           // live travel, negative = closed
+
+  const railEl = () => document.getElementById('app-rail');
+
+  function begin(e) {
+    if (presentationMode() !== 'mobile') return;
+    if (e.touches.length !== 1) return;
+    // A control press is a tap, not a drag. closest() only exists on elements,
+    // and a touch can legitimately land on the document or a text node.
+    const hit = e.target;
+    if (hit && typeof hit.closest === 'function'
+      && hit.closest('button, a[href], input, textarea, select')) return;
+
+    wasOpen = isNavOpen();
+    const x = e.touches[0].clientX;
+    if (!wasOpen && x > EDGE_ZONE) return;          // closed: edge only
+    if (horizontallyScrollable(e.target)) return;    // let the strip scroll
+
+    id = e.touches[0].identifier;
+    x0 = x; y0 = e.touches[0].clientY;
+    axis = null;
+    offset = 0;
+    const rail = railEl();
+    if (!rail) return;
+    width = rail.getBoundingClientRect().width || 1;
+    // Detach from the open/closed transform so the finger can drive it directly.
+    rail.style.transition = 'none';
+    if (wasOpen) rail.style.transform = 'translateX(0)';
+  }
+
+  // Hand the drawer back to the stylesheet. Called on every exit path: a gesture
+  // that turns out to be a vertical scroll must not leave `transition: none`
+  // inline, or the drawer never animates again.
+  function release() {
+    const rail = railEl();
+    if (!rail) return;
+    rail.style.transition = '';
+    rail.style.transform = '';
+  }
+
+  function move(e) {
+    if (id === null) return;
+    const t = [...e.touches].find((x) => x.identifier === id);
+    if (!t) return;
+    const dx = t.clientX - x0;
+    const dy = t.clientY - y0;
+
+    if (axis === null) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;   // not decided yet
+      // Decided on the larger axis, with a bias toward vertical so a sideways
+      // drift while scrolling does not capture the gesture.
+      axis = Math.abs(dx) > Math.abs(dy) * AXIS_LOCK ? 'x' : 'y';
+      if (axis === 'y') { id = null; release(); return; }
+    }
+    if (e.cancelable) e.preventDefault();
+
+    // Opening travels positive, closing negative; past either end it stops.
+    offset = Math.max(-width, Math.min(width, dx));
+    const rail = railEl();
+    if (rail) rail.style.transform = `translateX(${offset}px)`;
+  }
+
+  function end() {
+    if (id === null) return;
+    id = null;
+    const rail = railEl();
+    release();
+    if (!rail) return;
+    if (wasOpen ? offset < -COMMIT_DIST : offset > COMMIT_DIST) {
+      if (wasOpen) closeNav(); else openNav();
+    } else if (wasOpen !== isNavOpen()) {
+      // Came back short: snap to whichever end it started from.
+      if (wasOpen) openNav(); else closeNav();
+    }
+  }
+
+  document.addEventListener('touchstart', begin, { passive: true });
+  document.addEventListener('touchmove', move, { passive: false });
+  document.addEventListener('touchend', end, { passive: true });
+  document.addEventListener('touchcancel', end, { passive: true });
+}
+
 // Retained names from the two-shell era. They are called by the router and the
 // shell, and the behaviour they named is now the drawer's.
 export const isDesktopNavOpen = isNavOpen;
@@ -115,6 +232,7 @@ export const toggleDesktopNav = toggleNav;
 
 const TrycordPresentation = {
   mode: presentationMode,
+  gestures: wireDrawerGestures,
   set: setPresentation,
   viewport: updateFromViewport,
   openNav,

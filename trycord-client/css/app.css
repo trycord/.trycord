@@ -11,6 +11,21 @@
   --ui-page-width: 1180px;
   --t-content-width: 1180px;
 
+  /* The shell's tracks are themselves a token, so the grid describes a layout
+     rather than hard-coding one. Everything that sizes a column reads these,
+     and the breakpoint blocks further down change only their values - never the
+     rules that consume them.
+
+     Driven by @media rather than by a script-set attribute on <html>: a media
+     query always reflects the real viewport, whereas an attribute is only
+     correct once JavaScript has run. When it was attribute-driven, a boot that
+     had not reached the line setting it laid the desktop grid out inside a phone
+     viewport, which is a three-column layout in 390px. */
+  --ui-shell-cols: var(--ui-rail) var(--ui-sidebar) minmax(0, 1fr);
+  --ui-shell-rows: auto minmax(0, 1fr) auto;
+  --ui-drawer-width: min(84vw, 340px);
+  --ui-tabbar-height: 64px;
+
   --t-pg:        #100b08;
   --t-base:      #181110;
   --t-base2:     #221510;
@@ -396,8 +411,8 @@ img { max-width: 100%; }
 
 .shell {
   display: grid;
-  grid-template-columns: var(--ui-rail) var(--ui-sidebar) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: var(--ui-shell-cols);
+  grid-template-rows: var(--ui-shell-rows);
   height: 100dvh;
   width: 100%;
   overflow: hidden;
@@ -530,7 +545,7 @@ img { max-width: 100%; }
 
 /* Collapsing the place sidebar. Removing the column is what gives the width
    back, so the track changes rather than the sidebar merely being hidden. */
-.shell.sidebar-collapsed { grid-template-columns: var(--ui-rail) minmax(0, 1fr); }
+.shell.sidebar-collapsed { --ui-shell-cols: var(--ui-rail) minmax(0, 1fr); }
 .shell.sidebar-collapsed .context-sidebar,
 .shell.sidebar-collapsed .rail-identity { display: none; }
 .shell.sidebar-collapsed .main-content { grid-column: 2; }
@@ -2633,124 +2648,137 @@ html[data-auth-page] .mobile-tab-navigation { display: none; }
 
 /* ---- narrow layout ----------------------------------------------------
    Below 600px the rail leaves the grid and becomes an overlay drawer, and the
-   main area takes the whole width. The regions are the same elements: nothing
-   is unmounted, so nothing has to be re-rendered on a rotation.
+   main area takes the whole width. The regions are the same elements: nothing is
+   unmounted, so a rotation does not have to re-render anything.
 
-   These rules are scoped to html[data-presentation] rather than a media query
-   so that they agree with the breakpoint JavaScript uses to set that
-   attribute. A pure media query would let the two disagree during the frame
-   before a resize handler runs, which shows a phone the desktop grid. */
+   Keyed on @media rather than on the data-presentation attribute. A media query
+   always reflects the real viewport; an attribute is only right once
+   JavaScript has run, and when it was the only thing selecting the layout a
+   window narrower than 600px could be handed the three-column desktop grid -
+   64px rail + 240px sidebar + content in 390px, which is what every symptom of
+   "the desktop shell squeezed into a phone" was. The attribute is still set,
+   because the drawer controller and the breakpoint constant in presentation.js
+   read it; it just no longer decides the layout. */
 
-html[data-presentation="mobile"] .shell {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
+@media (max-width: 599px) {
+
+  /* One column, main content above the tab bar. The rail is fixed below, so it
+     takes no track and cannot push the grid wider than the viewport. */
+  :root {
+    --ui-shell-cols: minmax(0, 1fr);
+    --ui-shell-rows: minmax(0, 1fr) auto;
+  }
+
+  .main-content {
+    grid-column: 1;
+    grid-row: 1;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* The drawer. One box holding the communities above the channels, so the
+     whole navigation is a single swipeable surface rather than two panels. */
+  .app-rail {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--ui-drawer-width);
+    max-width: 100%;
+    z-index: 60;
+    background: var(--t-env-base);
+    border-right: 1px solid var(--t-line);
+    box-shadow: var(--t-sh-drawer);
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform var(--t-med) var(--t-ease), visibility var(--t-med);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow: hidden;
+  }
+  .app-rail[data-open="true"] {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  /* Communities sit on one horizontal strip: the rail is 64px of column on a
+     wide viewport and cannot hold a horizontal list inside that. */
+  .app-rail__items {
+    flex: 0 0 auto;
+    align-items: stretch;
+    flex-direction: row;
+    gap: var(--t-d-2);
+    padding: var(--t-d-3);
+    border-right: none;
+    border-bottom: 1px solid var(--t-line);
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: color-mix(in srgb, var(--t-base) 96%, var(--t-accent));
+  }
+
+  .context-sidebar {
+    flex: 1 1 auto;
+    min-height: 0;
+    border-right: none;
+  }
+
+  /* #rail-identity and #rail-global-nav stay hidden here too. They are empty
+     landmarks - no renderer ever writes to them - and the drawer's navigation
+     comes from .app-rail__items, which already carries Home, Direct messages,
+     Alerts, Discover and Friends above the community chips. Showing them would
+     add two padded empty boxes above the list. */
+
+  /* The drawer is full height, so it needs the top strip the wide layout's
+     header would otherwise occupy. */
+  .context-header {
+    min-height: calc(var(--ui-header) + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 12px 0;
+    background: color-mix(in srgb, var(--t-pg) 92%, transparent);
+    backdrop-filter: blur(22px) saturate(130%);
+    z-index: var(--z-header);
+  }
+  .nav-toggle {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--t-r-m);
+    border: 1px solid var(--t-line);
+    background: var(--t-base);
+    color: var(--t-txt);
+  }
+
+  .view-root { padding-bottom: 12px; }
+  .conversation .thread { padding: 12px 10px 10px; }
+  .msg { padding: 7px 6px; }
+  .msg.grouped .msg-body { padding-left: 0; }
+  .composer { width: calc(100% - 18px); margin: 4px auto 10px; border-radius: var(--t-r-m); }
+  .page.atrium { padding: 18px 14px 32px; }
+
 }
 
-html[data-presentation="mobile"] .main-content {
-  grid-column: 1;
-  padding-bottom: env(safe-area-inset-bottom);
-}
 
-/* The drawer. One box holding the community list above the channel list, so
-   the whole navigation is a single swipeable surface instead of two panels. */
-html[data-presentation="mobile"] .app-rail {
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  inset: 0 auto 0 0;
-  width: min(84vw, 340px);
-  z-index: 60;
-  background: var(--t-env-base);
-  border-right: 1px solid var(--t-line);
-  box-shadow: var(--t-sh-drawer);
-  transform: translateX(-100%);
-  visibility: hidden;
-  transition: transform var(--t-med) var(--t-ease), visibility var(--t-med);
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  overflow: hidden;
-}
-html[data-presentation="mobile"] .app-rail[data-open="true"] {
-  transform: translateX(0);
-  visibility: visible;
-}
-
-html[data-presentation="mobile"] .app-rail__items {
-  grid-column: 1;
-  grid-row: 1;
-  flex: 0 0 auto;
-  align-items: stretch;
-  flex-direction: row;
-  gap: var(--t-d-2);
-  padding: var(--t-d-3);
-  border-right: none;
-  border-bottom: 1px solid var(--t-line);
-  overflow-x: auto;
-  overflow-y: hidden;
-  background: color-mix(in srgb, var(--t-base) 96%, var(--t-accent));
-}
-
-html[data-presentation="mobile"] .context-sidebar {
+/* Thumb-reachable primary navigation. It was a child of .shell--mobile, so it
+   was hidden by that shell's own display:none; as a child of the single .shell
+   it became an unplaced grid item and auto-flowed into a fourth column. It is
+   placed in the second track and hidden above 600px, where the rail is the
+   navigation instead. */
+.mobile-tab-navigation {
+  display: none;
   grid-column: 1;
   grid-row: 2;
-  flex: 1 1 auto;
-  min-height: 0;
-  border-right: none;
-}
-
-/* The rail's own header and global destinations are hidden on a wide viewport;
-   in a drawer there is room for both, and without them the drawer opens onto a
-   list with no way to reach Home or DMs. */
-html[data-presentation="mobile"] .rail-identity,
-html[data-presentation="mobile"] .rail-global-nav {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: var(--t-d-2);
-  padding: var(--t-d-3);
-}
-html[data-presentation="mobile"] .rail-identity { border-bottom: 1px solid var(--t-line); }
-
-/* The title strip is the desktop context header in this layout too - it is the
-   same element - so it only needs the taller, inset-aware mobile metrics. */
-html[data-presentation="mobile"] .context-header {
-  min-height: calc(58px + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) 12px 0;
-  background: color-mix(in srgb, var(--t-pg) 92%, transparent);
-  backdrop-filter: blur(22px) saturate(130%);
-  z-index: var(--z-header);
-}
-html[data-presentation="mobile"] .nav-toggle {
-  width: 42px;
-  height: 42px;
-  border-radius: var(--t-r-m);
-  border: 1px solid var(--t-line);
-  background: var(--t-base);
-  color: var(--t-txt);
-}
-
-html[data-presentation="mobile"] .view-root { padding-bottom: 12px; }
-html[data-presentation="mobile"] .conversation .thread { padding: 12px 10px 10px; }
-html[data-presentation="mobile"] .msg { padding: 7px 6px; }
-html[data-presentation="mobile"] .msg.grouped .msg-body { padding-left: 0; }
-html[data-presentation="mobile"] .composer { width: calc(100% - 18px); margin: 4px auto 10px; border-radius: var(--t-r-m); }
-html[data-presentation="mobile"] .page.atrium { padding: 18px 14px 32px; }
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-presentation="mobile"] .app-rail { transition: none; }
-}
-
-.mobile-tab-navigation {
-  flex: 0 0 auto !important;
-  display: flex !important;
-  min-height: calc(64px + env(safe-area-inset-bottom)) !important;
+  min-height: calc(var(--ui-tabbar-height) + env(safe-area-inset-bottom));
   background: color-mix(in srgb, var(--t-base) 96%, transparent);
   border-top: 1px solid var(--t-line);
   backdrop-filter: blur(18px);
   padding-bottom: env(safe-area-inset-bottom);
   z-index: var(--z-header);
-  position: relative !important;
+  position: relative;
 }
+@media (max-width: 599px) {
+  .mobile-tab-navigation {
+    display: flex;
+    flex: 0 0 auto;
+  }
+}
+
 .mobile-tab-navigation button {
   flex: 1 1 0;
   min-width: 0;
