@@ -243,6 +243,8 @@ async function renderRoute() {
   if (path.startsWith('/settings/sessions')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
   if (path.startsWith('/settings/security')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
   if (path.startsWith('/settings/backend')) { await renderAccount(region, { tab: 'backend' }); renderAllChrome(); return; }
+  if (path.startsWith('/settings/privacy')) { await renderAccount(region, { tab: 'privacy' }); renderAllChrome(); return; }
+  if (path.startsWith('/settings/notifications')) { await renderAccount(region, { tab: 'notifications' }); renderAllChrome(); return; }
   if (path.startsWith('/settings')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
   if (path.startsWith('/account/updates')) { await renderAccount(region, { tab: 'updates' }); renderAllChrome(); return; }
   if (path.startsWith('/account/appearance')) { await renderAccount(region, { tab: 'appearance' }); renderAllChrome(); return; }
@@ -250,6 +252,8 @@ async function renderRoute() {
   if (path.startsWith('/account/sessions')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
   if (path.startsWith('/account/security')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
   if (path.startsWith('/account/backend')) { await renderAccount(region, { tab: 'backend' }); renderAllChrome(); return; }
+  if (path.startsWith('/account/privacy')) { await renderAccount(region, { tab: 'privacy' }); renderAllChrome(); return; }
+  if (path.startsWith('/account/notifications')) { await renderAccount(region, { tab: 'notifications' }); renderAllChrome(); return; }
   if (path.startsWith('/account')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
 
   if (path === '/admin/pages' || path.startsWith('/admin/pages/')) {

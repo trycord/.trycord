@@ -1,15 +1,4 @@
 // plus the ownership-transfer and danger-zone controls.
-const SETTINGS_SECTIONS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'structure', label: 'Channels' },
-  { id: 'members', label: 'Members' },
-  { id: 'roles', label: 'Roles' },
-  { id: 'invites', label: 'Invites' },
-  { id: 'moderation', label: 'Moderation' },
-  { id: 'ownership', label: 'Ownership' },
-];
-
 import Api from './api.js';
 import State from './state.js';
 
@@ -19,22 +8,24 @@ import { communityMark, invalidateAuthedImage, loadAuthedImage } from './compone
 import { renderContextHeader } from './shell.js';
 import { ensureServer } from './workspace-shared.js';
 import { serverPath } from './links.js';
+import { settingsFrame, SETTINGS_IA, findItem } from './settings-shell.js';
+import { sectionHead, sectionCard, setNote } from './settings-ui.js';
 
-function settingsNav(serverId, active) {
-  const nav = el('div', { class: 'settings-nav' });
-  for (const s of SETTINGS_SECTIONS) {
-    const on = s.id === active;
-    const b = el('button', {
-      class: 'btn ' + (on ? 'active' : 'ghost'),
-      type: 'button',
-      'aria-current': on ? 'page' : null,
-    }, s.label);
-    b.addEventListener('click', () => { location.hash = serverPath(serverId, 'settings/' + s.id); });
-    nav.appendChild(b);
-  }
-  return nav;
+// Community sections are addressed relative to the current community, so the
+// href is resolved rather than stored - a stored path would go stale the moment
+// a community is renamed or the URL slug changes.
+//
+// Categories is the exception: it has its own page rather than a settings
+// section, so it points there. Sending it to settings/categories would not be a
+// 404, which is worse - the router would quietly show Overview.
+const SECTION_ROUTE = {
+  categories: (serverId) => serverPath(serverId, 'categories'),
+};
+
+function resolveCommunityHref(serverId, id) {
+  if (SECTION_ROUTE[id]) return SECTION_ROUTE[id](serverId);
+  return serverPath(serverId, 'settings', id === 'overview' ? '' : id);
 }
-
 
 function linkedSection({ serverId, title, blurb, href, cta, counts }) {
   const box = el('div', { class: 'settings-panel' });
@@ -61,13 +52,19 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       "You need permission to manage this community's settings."));
     return;
   }
-  if (!SETTINGS_SECTIONS.some((s) => s.id === section)) section = 'overview';
-  renderContextHeader({ title: 'Settings', sub: server.name });
+  const known = SETTINGS_IA.community.flatMap((g) => g.items).map((i) => i.id);
+  if (!known.includes(section)) section = 'overview';
+  const item = findItem('community', section);
+  renderContextHeader({ title: 'Settings', sub: item && item.blurb ? item.blurb : server.name });
 
-  const wrap = el('div', { class: 'page roles-page' });
-  wrap.appendChild(settingsNav(serverId, section));
-  const panel = el('div', { class: 'settings-body' });
-  wrap.appendChild(panel);
+  const { frame, pane } = settingsFrame({
+    scope: 'community',
+    active: section,
+    resolve: (id) => resolveCommunityHref(serverId, id),
+    contentClass: 'settings-body',
+  });
+  const wrap = el('div', { class: 'page roles-page' }, frame);
+  const panel = pane;
   container.appendChild(wrap);
 
   const reload = async () => { await ensureServer(serverId); };
