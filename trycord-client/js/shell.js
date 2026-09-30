@@ -999,10 +999,15 @@ export function renderMemberSidebar(region) {
 }
 
 
-export function renderContextHeader({ title, sub, icon, actions } = {}) {
+// `icon` is destructured to iconGlyph rather than bound as `icon`: the imported
+// icon() below builds the navigation toggle, and a parameter of the same name
+// shadowed it. Every caller omits it, so icon() resolved to undefined and threw
+// "icon is not a function" on every single header render - which is every page.
+// The public { icon } key is unchanged; only the local binding is renamed.
+export function renderContextHeader({ title, sub, icon: iconGlyph, actions } = {}) {
   const header = qs('#context-header');
   if (!header) return;
-  header.dataset.hasIcon = icon ? 'true' : 'false';
+  header.dataset.hasIcon = iconGlyph ? 'true' : 'false';
   clear(header);
 
   if (title) announce(title + (sub ? '. ' + sub : ''));
@@ -1016,7 +1021,7 @@ export function renderContextHeader({ title, sub, icon, actions } = {}) {
   header.appendChild(navToggle);
 
   const titles = el('div', { class: 'context-header__titles' });
-  if (icon) titles.appendChild(el('div', { class: 'context-header__icon' }, icon));
+  if (iconGlyph) titles.appendChild(el('div', { class: 'context-header__icon' }, iconGlyph));
   titles.appendChild(el('div', { class: 'context-title', id: 'context-title' }, title || 'Trycord'));
   if (sub) titles.appendChild(el('div', { class: 'context-sub' }, sub));
   header.appendChild(titles);
