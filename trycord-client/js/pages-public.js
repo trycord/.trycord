@@ -5,6 +5,7 @@ import State, { applyAuth, isAuthed, clearSession } from './state.js';
 import { renderContextHeader } from './shell.js';
 import { TrycordConfig, BACKEND_URL } from './config.js';
 import Realtime from './realtime.js';
+import { navigate } from './nav.js';
 
 let legal = { termsVersion: '1.0', privacyVersion: '1.0' };
 Api.legal().then((l) => { if (l) legal = l; }).catch(() => {});
@@ -27,7 +28,7 @@ function authShell({ title, lede, secondary, contextTitle }) {
 
   const inner = el('div', { class: 'auth-page__inner' });
 
-  const brand = el('a', { class: 'auth-brand', href: '#/home', 'aria-label': 'Trycord' });
+  const brand = el('a', { class: 'auth-brand', href: '/home', 'aria-label': 'Trycord' });
   brand.appendChild(el('img', { class: 'auth-brand__mark', src: AUTH_LOGO, alt: '' }));
   brand.appendChild(el('span', { class: 'auth-brand__word' }, 'Trycord'));
   inner.appendChild(brand);
@@ -78,7 +79,7 @@ function secondFactorStep(challengeToken, err) {
       } else {
         toast('Signed in.', 'ok');
       }
-      location.hash = '#/home';
+      navigate('#/home');
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -141,7 +142,7 @@ function loginForm(container) {
       }
       applyAuth(res);
       toast('Signed in.', 'ok');
-      location.hash = '#/home';
+      navigate('#/home');
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -150,7 +151,7 @@ function loginForm(container) {
       const actionId = ex && ex.details && ex.details.actionId;
       if (ex && ex.code === 'ACCOUNT_ENFORCED' && actionId) {
         err.appendChild(el('div', { style: { marginTop: 'var(--t-d-2)' } },
-          el('a', { class: 'btn sm', href: '#/support/appeals/new?action=' + encodeURIComponent(actionId) }, 'Appeal this decision')));
+          el('a', { class: 'btn sm', href: '/support/appeals/new?action=' + encodeURIComponent(actionId) }, 'Appeal this decision')));
       }
     } finally {
       busy = false;
@@ -161,8 +162,8 @@ function loginForm(container) {
 
   main.appendChild(form);
   main.appendChild(authFooter(
-    el('span', {}, 'New here? ', el('a', { href: '#/register' }, 'Create an account')),
-    el('span', {}, el('a', { href: '#/forgot' }, 'Forgot password?'), ' · ', el('a', { href: '#/support' }, 'Support')),
+    el('span', {}, 'New here? ', el('a', { href: '/register' }, 'Create an account')),
+    el('span', {}, el('a', { href: '/forgot' }, 'Forgot password?'), ' · ', el('a', { href: '/support' }, 'Support')),
   ));
   mountAuthPage(page);
   username.focus();
@@ -241,7 +242,7 @@ function registerForm(container) {
       });
       applyAuth(res);
       toast('Account created.', 'ok');
-      location.hash = '#/home';
+      navigate('#/home');
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -255,7 +256,7 @@ function registerForm(container) {
 
   main.appendChild(form);
   main.appendChild(authFooter(
-    el('span', {}, 'Already registered? ', el('a', { href: '#/login' }, 'Sign in'), ' · ', el('a', { href: '#/support' }, 'Support')),
+    el('span', {}, 'Already registered? ', el('a', { href: '/login' }, 'Sign in'), ' · ', el('a', { href: '/support' }, 'Support')),
   ));
   mountAuthPage(page);
   username.focus();
@@ -294,7 +295,7 @@ function forgotForm(container) {
 
   main.appendChild(form);
   main.appendChild(authFooter(
-    el('span', {}, el('a', { href: '#/login' }, 'Back to sign in'), ' · ', el('a', { href: '#/support' }, 'Support')),
+    el('span', {}, el('a', { href: '/login' }, 'Back to sign in'), ' · ', el('a', { href: '/support' }, 'Support')),
   ));
   mountAuthPage(page);
 }
@@ -327,14 +328,14 @@ function resetPasswordPage(container, token) {
       ok.textContent = 'Password changed. Sign in with your new one.';
       form.reset();
       submit.hidden = true;
-      main.appendChild(el('a', { class: 'btn primary block', href: '#/login' }, 'Continue to sign in'));
+      main.appendChild(el('a', { class: 'btn primary block', href: '/login' }, 'Continue to sign in'));
     } catch (ex) {
       err.hidden = false;
       err.textContent = ex.message || 'This reset link is no longer valid.';
     } finally { submit.removeAttribute('aria-busy'); }
   });
   main.appendChild(form);
-  main.appendChild(authFooter(el('span', {}, el('a', { href: '#/login' }, 'Back to sign in'))));
+  main.appendChild(authFooter(el('span', {}, el('a', { href: '/login' }, 'Back to sign in'))));
   mountAuthPage(page);
 }
 
@@ -386,14 +387,14 @@ function verifyEmailPage(container, token) {
         : 'Your email is verified and saved to your account.';
       actions.appendChild(el('button', {
         class: 'btn primary', type: 'button',
-        onClick: () => { location.hash = me ? '#/settings' : '#/login'; },
+        onClick: () => { navigate(me ? '#/settings' : '#/login'); },
       }, me ? 'Open your account' : 'Sign in'));
     } catch (ex) {
       err.hidden = false;
       err.textContent = ex.message || 'This verification link is no longer valid. Request a new one from your settings.';
       actions.appendChild(el('button', {
         class: 'btn primary', type: 'button',
-        onClick: () => { location.hash = isAuthed() ? '#/settings' : '#/login'; },
+        onClick: () => { navigate(isAuthed() ? '#/settings' : '#/login'); },
       }, isAuthed() ? 'Open your account' : 'Sign in'));
     }
   })();

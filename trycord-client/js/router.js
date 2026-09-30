@@ -21,6 +21,7 @@ import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support
 import { renderNotifications } from './pages-notifications.js';
 import { presentationMode, closeDesktopNav } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from './shell.js';
+import { adoptLegacyHash } from './nav.js';
 import Api from './api.js';
 
 // A slug is a display convenience, not an identity, so a route that cannot
@@ -30,7 +31,7 @@ function renderRouteError(region, message) {
   region.replaceChildren();
   region.appendChild(el('div', { class: 'empty-state' }, [
     el('p', {}, message),
-    el('a', { class: 'btn', href: '#/' }, 'Go home'),
+    el('a', { class: 'btn', href: '/' }, 'Go home'),
   ]));
 }
 
@@ -82,8 +83,10 @@ function setCleanup(fn) {
 }
 
 // A hash carries a path and, optionally, a query: #/server/s/channel/c?m=<id>.
-function parseHash() {
-  const raw = (location.hash || '#/').replace(/^#/, '');
+function parseLocation() {
+  // Routes are paths. A fragment still on the URL is an old link; nav.js has
+  // already rewritten it onto the path form before this runs.
+  const raw = (location.pathname || '/') + (location.search || '');
   const qIndex = raw.indexOf('?');
   const path = qIndex === -1 ? raw : raw.slice(0, qIndex);
   const query = {};
@@ -109,7 +112,7 @@ async function renderRoute() {
   // `route` is the raw hash split into segments. It is rebound - never mutated
   // in place - when a V2 path is normalised below, so it is deliberately `let`
   // while the destructured view of it is not.
-  let { path, parts: route, query } = parseHash();
+  let { path, parts: route, query } = parseLocation();
   document.documentElement.dataset.route = path || '/';
     // fixed-position and escapes the desktop shell's grid, but it still has to
     delete document.documentElement.dataset.authPage;
@@ -133,7 +136,7 @@ async function renderRoute() {
   closeDesktopNav();
 
   if (path.startsWith('/login') || path === '' || path === '/') {
-    if (isAuthed()) { location.hash = '#/home'; return; }
+    if (isAuthed()) { navigate('#/home'); return; }
     renderContextHeader({});
     PagesPublic.login(region);
     setNavRoute(() => '/login');
@@ -142,19 +145,19 @@ async function renderRoute() {
     return;
   }
   if (path.startsWith('/register')) {
-    if (isAuthed()) { location.hash = '#/home'; return; }
+    if (isAuthed()) { navigate('#/home'); return; }
     PagesPublic.register(region);
     renderAllChrome();
     return;
   }
   if (path.startsWith('/forgot')) {
-    if (isAuthed()) { location.hash = '#/home'; return; }
+    if (isAuthed()) { navigate('#/home'); return; }
     PagesPublic.forgot(region);
     renderAllChrome();
     return;
   }
   if (path.startsWith('/reset-password/')) {
-    if (isAuthed()) { location.hash = '#/home'; return; }
+    if (isAuthed()) { navigate('#/home'); return; }
     PagesPublic.resetPassword(region, route[1]);
     renderAllChrome();
     return;
@@ -186,7 +189,7 @@ async function renderRoute() {
   if (path.startsWith('/support/appeals')) {
     if (!requireAuth()) {
       renderAllChrome();
-      location.hash = '#/login';
+      navigate('#/login');
       return;
     }
     await renderMyAppeals(region);
@@ -202,7 +205,7 @@ async function renderRoute() {
   // --- everything below requires a session -------------------------
   if (!requireAuth()) {
     renderAllChrome();
-    location.hash = '#/login';
+    navigate('#/login');
     return;
   }
 
@@ -281,7 +284,7 @@ async function renderRoute() {
       const res = await Api.joinInvite(code);
       await refreshServers();
       toast('You joined the community.', 'ok');
-      location.hash = serverPath(res.serverId);
+      navigate(serverPath(res.serverId));
       return;
     } catch (ex) {
       clear(region);
@@ -417,7 +420,7 @@ async function run() {
         // an unactionable report into a locatable one.
         origin ? el('p', { class: 'muted small', 'data-fault-origin': origin }, origin) : null,
         el('div', { class: 'row-line' },
-          el('button', { class: 'btn primary', type: 'button', onClick: () => { location.hash = '#/home'; } }, 'Home'),
+          el('button', { class: 'btn primary', type: 'button', onClick: () => { navigate('#/home'); } }, 'Home'),
           el('button', { class: 'btn ghost', type: 'button', onClick: () => { run(); } }, 'Retry'))));
     }
     // Also to the console: the on-screen copy is for a reader without devtools.
@@ -429,8 +432,14 @@ async function run() {
 
 const Router = {
   init() {
-    window.addEventListener('hashchange', () => run());
-    return run();
+    // An arriving '#/settings' is rewritten onto '/settings' before the first
+    // render, so old links and the desktop build's restored state keep working
+    // and the address bar ends up canonical.
+    const adopted = adoptLegacyHash();
+    window.addEventListener('popstate', () => run());
+    const first = run();
+    if (adopted) first.catch(() => {});
+    return first;
   },
   run,
 };

@@ -5,6 +5,7 @@ import Realtime from './realtime.js';
 import { currentServerId, enterServer, isAuthed, leaveServerContext, refreshServerView } from './state.js';
 import { showEmojiPicker, toast } from './ui.js';
 import { renderAllChrome } from './shell.js';
+import { navigate } from './nav.js';
 
 // stays private here and is reached through these two accessors.
 let activeChannelId = null;
@@ -47,7 +48,7 @@ function wireCommunityEvents() {
         if (me && payload && SELF_REMOVAL.has(type) && String(payload.userId) === String(me)) {
           leaveServerContext();
           renderAllChrome();
-          if (!location.hash.startsWith('#/home')) location.hash = '#/home';
+          if ((location.pathname || '/') !== '/home') navigate('#/home');
           toast('You were removed from that community.', 'warn');
           return;
         }

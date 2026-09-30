@@ -6,6 +6,7 @@ import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, le
 import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
 import { SETTINGS_IA } from './settings-shell.js';
+import { navigate } from './nav.js';
 
 // wiring, so a menu can never exist on one input method and be missing on
 // another. Menus are permission-shaped here: an action the viewer cannot perform
@@ -16,11 +17,11 @@ function serverChipMenuFor(s) {
     const isCurrent = sid === String(currentServerId());
     const mayManage = (isCurrent && can('MANAGE_SERVER')) || (s.is_owner && !isCurrent);
     return [
-      { label: 'Open community', desc: s.name || '', onSelect: () => { location.hash = serverPath(sid); } },
+      { label: 'Open community', desc: s.name || '', onSelect: () => { navigate(serverPath(sid)); } },
       {
         label: 'Community settings', desc: mayManage ? undefined : 'Requires Manage Community',
         disabled: !mayManage,
-        onSelect: () => { location.hash = serverPath(sid, 'settings'); },
+        onSelect: () => { navigate(serverPath(sid, 'settings')); },
       },
       { label: 'Copy community link', onSelect: () => copyText(sid, 'Community ID copied.') },
       { label: 'Copy community ID', onSelect: () => copyText(sid, 'Community ID copied.') },
@@ -38,7 +39,7 @@ function serverChipMenuFor(s) {
                 await Api.leaveServer(sid);
                 await refreshServers();
                 if (isCurrent) leaveServerContext();
-                location.hash = '#/home';
+                navigate('#/home');
               } catch (ex) { toast(ex.message || 'Failed', 'error'); }
             },
           });
@@ -179,7 +180,7 @@ export function memberActions(m) {
   };
 
   const actions = [
-    { label: 'View profile', onSelect: () => { location.hash = '#/users/' + id; } },
+    { label: 'View profile', onSelect: () => { navigate('#/users/' + id); } },
     ...(mine ? [] : [{ label: 'Message', onSelect: () => messageMember(id) }]),
     { label: 'Copy user ID', onSelect: () => copyText(String(id), 'User ID copied.') },
   ];
@@ -206,12 +207,12 @@ export function memberActions(m) {
 }
 
 const DESTINATIONS = [
-  { id: 'home', label: 'Home', icon: 'home', href: '#/home' },
-  { id: 'dms', label: 'DMs', icon: 'mail', href: '#/dms' },
-  { id: 'notifications', label: 'Notifications', icon: 'bell', href: '#/notifications', badge: () => State.notifUnread },
-  { id: 'discover', label: 'Discover', icon: 'search', href: '#/discover' },
-  { id: 'support', label: 'Support', icon: '?', href: '#/support' },
-  { id: 'friends', label: 'Friends', icon: 'users', href: '#/friends' },
+  { id: 'home', label: 'Home', icon: 'home', href: '/home' },
+  { id: 'dms', label: 'DMs', icon: 'mail', href: '/dms' },
+  { id: 'notifications', label: 'Notifications', icon: 'bell', href: '/notifications', badge: () => State.notifUnread },
+  { id: 'discover', label: 'Discover', icon: 'search', href: '/discover' },
+  { id: 'support', label: 'Support', icon: '?', href: '/support' },
+  { id: 'friends', label: 'Friends', icon: 'users', href: '/friends' },
 ];
 
 let navRoute = () => '';
@@ -231,11 +232,11 @@ export function renderCommunities(region) {
   const route = currentRoute();
 
   const globalItems = [
-    { id: 'home', label: 'Home', icon: 'home', href: '#/home' },
-    { id: 'dms', label: 'Direct messages', icon: 'mail', href: '#/dms' },
-    { id: 'notifications', label: 'Notifications', icon: 'bell', href: '#/notifications', badge: () => State.notifUnread },
-    { id: 'discover', label: 'Discover', icon: 'search', href: '#/discover' },
-    { id: 'friends', label: 'Friends', icon: 'users', href: '#/friends', badge: () => (State.friendsIn || []).length },
+    { id: 'home', label: 'Home', icon: 'home', href: '/home' },
+    { id: 'dms', label: 'Direct messages', icon: 'mail', href: '/dms' },
+    { id: 'notifications', label: 'Notifications', icon: 'bell', href: '/notifications', badge: () => State.notifUnread },
+    { id: 'discover', label: 'Discover', icon: 'search', href: '/discover' },
+    { id: 'friends', label: 'Friends', icon: 'users', href: '/friends', badge: () => (State.friendsIn || []).length },
   ];
 
   const railButton = ({ label, icon: iconName, href, active, badge }) => {
@@ -246,7 +247,7 @@ export function renderCommunities(region) {
       'aria-label': label,
       'aria-current': active ? 'page' : null,
       dataset: { label },
-      onClick: () => { location.hash = href; },
+      onClick: () => { navigate(href); },
     }, el('span', { class: 'rail-nav-icon' }, icon(iconName)));
     const count = badge ? badge() : 0;
     if (count > 0) {
@@ -268,7 +269,7 @@ export function renderCommunities(region) {
     for (const s of servers) {
       const chip = serverChip(s, {
         active: String(s.id) === String(currentServerId()),
-        onClick: () => { location.hash = serverPath(s.id); },
+        onClick: () => { navigate(serverPath(s.id)); },
       });
       chip.dataset.label = s.name || 'Community';
       attachContextMenu(chip, serverChipMenuFor(s), {
@@ -285,7 +286,7 @@ export function renderCommunities(region) {
     title: 'Create a community',
     'aria-label': 'Create a community',
     dataset: { label: 'Create a community' },
-    onClick: () => { location.hash = '#/servers/new'; },
+    onClick: () => { navigate('#/servers/new'); },
   }, el('span', { class: 'rail-nav-icon' }, icon('plus')));
   region.appendChild(el('div', { class: 'rail-divider' }));
   region.appendChild(create);
@@ -358,7 +359,7 @@ function communityHeader(sid, server) {
   // right-click and long-press, so submenus, disabled items, Escape, arrow keys
   // and outside-click dismissal behave identically whichever menu is opened.
   attachMenu(trigger, () => {
-    const go = (path) => () => { location.hash = path; };
+    const go = (path) => () => { navigate(path); };
     const base = serverPath(sid);
     const items = [];
 
@@ -399,7 +400,7 @@ function serverChipMenuLeave(sid, server) {
         await Api.leaveServer(sid);
         await refreshServers();
         leaveServerContext();
-        location.hash = '#/home';
+        navigate('#/home');
       } catch (ex) { toast(ex.message || 'Failed', 'error'); }
     },
   });
@@ -424,7 +425,7 @@ function sessionBar() {
   const idBox = el('button', {
     class: 'user-controls__identity', type: 'button',
     title: 'Your account', 'aria-label': 'Your account',
-    onClick: () => { location.hash = '#/settings'; },
+    onClick: () => { navigate('#/settings'); },
   });
   // both normalise casing themselves, so never rebuild the user object here.
   idBox.appendChild(el('span', { class: 'user-controls__avatar' }, avatar(me, { size: 'sm', withPresence: true })));
@@ -437,7 +438,7 @@ function sessionBar() {
   buttons.appendChild(el('button', {
     class: 'user-controls__btn', type: 'button',
     title: 'Settings', 'aria-label': 'Settings',
-    onClick: () => { location.hash = '#/settings'; },
+    onClick: () => { navigate('#/settings'); },
   }, icon('gear')));
   bar.appendChild(buttons);
   return bar;
@@ -483,7 +484,7 @@ function communityContext(region, sid) {
   const channelActions = (ch) => {
     const cid = String(ch.id);
     const items = [
-      { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { location.hash = channelPath(sid, cid); } },
+      { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { navigate(channelPath(sid, cid)); } },
       { label: isMuted(ch.id) ? 'Unmute channel' : 'Mute channel', onSelect: () => setMuted(ch.id, !isMuted(ch.id)) },
       { label: 'Copy channel link', onSelect: () => copyText(absoluteChannelUrl(sid, cid), 'Channel link copied.') },
       { label: 'Copy channel ID', onSelect: () => copyText(cid, 'Channel ID copied.') },
@@ -491,7 +492,7 @@ function communityContext(region, sid) {
     if (can('MANAGE_CHANNELS')) {
       items.push({ sep: true });
       items.push({
-        label: 'Edit channel', onSelect: () => { location.hash = serverPath(sid, 'settings/structure'); },
+        label: 'Edit channel', onSelect: () => { navigate(serverPath(sid, 'settings/structure')); },
       });
     }
     return items;
@@ -501,7 +502,7 @@ function communityContext(region, sid) {
     const active = route === '/server/' + sid + '/channel/' + ch.id;
     const row = channelRow(ch, {
       active, muted: isMuted(ch.id),
-      onClick: () => { location.hash = channelPath(sid, ch.id); },
+      onClick: () => { navigate(channelPath(sid, ch.id)); },
     });
     attachContextMenu(row, () => channelActions(ch), {
       target: () => ({ type: 'channel', id: String(ch.id) }),
@@ -576,7 +577,7 @@ function dmsContext(region) {
       const row = el('button', {
         class: 'row row--dm' + (active ? ' active' : '') + (dm.unreadCount ? ' is-unread' : ''),
         type: 'button', title: name,
-        onClick: () => { location.hash = '#/dms/' + dm.id; },
+        onClick: () => { navigate('#/dms/' + dm.id); },
       });
       row.appendChild(avatar(peer, { size: 'sm', withPresence: true }));
       const main = el('div', { class: 'row__stack' });
@@ -598,7 +599,7 @@ function dmsContext(region) {
   const compose = el('div', { class: 'ctx-actions' });
   compose.appendChild(el('button', {
     class: 'btn primary block', type: 'button',
-    onClick: () => { location.hash = '#/friends'; },
+    onClick: () => { navigate('#/friends'); },
   }, 'New message'));
   scroll.appendChild(compose);
   scroll.appendChild(search);
@@ -630,8 +631,8 @@ function settingsContext(region) {
   for (const s of SETTINGS_SECTIONS) {
     const active = route === s.path || route.startsWith(s.path + '/');
     group.list.appendChild(navRow({
-      label: s.label, href: '#' + s.path, active,
-      onClick: () => { location.hash = '#' + s.path; },
+      label: s.label, href:  s.path, active,
+      onClick: () => { navigate('#' + s.path); },
     }));
   }
   scroll.appendChild(group);
@@ -639,8 +640,8 @@ function settingsContext(region) {
   if (State.me && State.me.isAdmin) {
     const admin = navGroup({ label: 'Administration' });
     admin.list.appendChild(navRow({
-      label: 'Admin console', href: '#/admin', active: route.startsWith('/admin'),
-      onClick: () => { location.hash = '#/admin'; },
+      label: 'Admin console', href: '/admin', active: route.startsWith('/admin'),
+      onClick: () => { navigate('#/admin'); },
     }));
     scroll.appendChild(admin);
   }
@@ -661,8 +662,8 @@ function simpleListContext(region, { title, sub, groups }) {
     for (const item of g.items) {
       const active = item.exact ? route === item.path : (route === item.path || route.startsWith(item.path + '/'));
       group.list.appendChild(navRow({
-        label: item.label, href: '#' + item.path, active,
-        onClick: () => { location.hash = '#' + item.path; },
+        label: item.label, href:  item.path, active,
+        onClick: () => { navigate('#' + item.path); },
       }));
     }
     scroll.appendChild(group);
@@ -760,8 +761,8 @@ function adminContext(region) {
   const group = navGroup({ label: 'Console' });
   for (const s of ADMIN_SECTIONS) {
     group.list.appendChild(navRow({
-      label: s.label, href: '#' + s.path, active: adminSectionActive(s, route),
-      onClick: () => { location.hash = '#' + s.path; },
+      label: s.label, href:  s.path, active: adminSectionActive(s, route),
+      onClick: () => { navigate('#' + s.path); },
     }));
   }
   scroll.appendChild(group);
@@ -775,8 +776,8 @@ function adminContext(region) {
   });
   for (const s of ADMIN_OVERFLOW) {
     more.list.appendChild(navRow({
-      label: s.label, href: '#' + s.path, active: adminSectionActive(s, route),
-      onClick: () => { location.hash = '#' + s.path; },
+      label: s.label, href:  s.path, active: adminSectionActive(s, route),
+      onClick: () => { navigate('#' + s.path); },
     }));
   }
   scroll.appendChild(more);
@@ -965,7 +966,7 @@ export function renderMemberSidebar(region) {
       roleLine.appendChild(el('span', {}, roleText));
       info.appendChild(roleLine);
       row.appendChild(info);
-      row.addEventListener('click', () => { location.hash = '#/users/' + id; });
+      row.addEventListener('click', () => { navigate('#/users/' + id); });
       attachContextMenu(row, memberMenu(m), {
         target: (node) => ({ type: 'member', id: String(m.user_id || m.id) }),
       });
@@ -1039,17 +1040,17 @@ export function renderMobileTabs(region) {
   if (!isAuthed()) return;
   const route = currentRoute();
   const tabs = [
-    { id: 'home', label: 'Home', icon: 'home', href: '#/home' },
-    { id: 'dms', label: 'DMs', icon: 'mail', href: '#/dms' },
-    { id: 'friends', label: 'Friends', icon: 'users', href: '#/friends' },
-    { id: 'notifications', label: 'Alerts', icon: 'bell', href: '#/notifications' },
-    { id: 'menu', label: 'Menu', icon: 'menu', href: '#/menu' },
+    { id: 'home', label: 'Home', icon: 'home', href: '/home' },
+    { id: 'dms', label: 'DMs', icon: 'mail', href: '/dms' },
+    { id: 'friends', label: 'Friends', icon: 'users', href: '/friends' },
+    { id: 'notifications', label: 'Alerts', icon: 'bell', href: '/notifications' },
+    { id: 'menu', label: 'Menu', icon: 'menu', href: '/menu' },
   ];
   for (const t of tabs) {
     const active = route.startsWith(t.href.replace('#', ''));
     const btn = el('button', {
       type: 'button', class: active ? 'active' : '',
-      onClick: () => { location.hash = t.href; },
+      onClick: () => { navigate(t.href); },
     });
     btn.appendChild(el('span', { class: 'micon' }, t.icon));
     btn.appendChild(el('span', {}, t.label));
@@ -1176,7 +1177,7 @@ export function renderVerifyBanner() {
       bar.appendChild(resend);
     }
     const go = el('button', { class: 'btn ghost sm', type: 'button' }, hasEmail ? 'Settings' : 'Add email');
-    go.addEventListener('click', () => { location.hash = '#/settings'; });
+    go.addEventListener('click', () => { navigate('#/settings'); });
     bar.appendChild(go);
   }
 }

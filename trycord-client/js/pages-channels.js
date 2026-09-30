@@ -8,6 +8,7 @@ import { renderContextHeader } from './shell.js';
 import { openOverrideEditor } from './permission-overrides.js';
 import { ensureServer } from './workspace-shared.js';
 import { channelPath } from './links.js';
+import { navigate } from './nav.js';
 
 function openChannelEditor(serverId, ch, cats, onDone) {
   const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: ch.name || '' });
@@ -78,7 +79,7 @@ async function renderNewChannel(container, serverId) {
         categoryId: catSelect.value || undefined,
       });
       toast('Channel created.', 'ok');
-      location.hash = channelPath(serverId, ch.id);
+      navigate(channelPath(serverId, ch.id));
     } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
   });
 

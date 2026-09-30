@@ -10,6 +10,7 @@ import { ensureServer } from './workspace-shared.js';
 import { serverPath } from './links.js';
 import { settingsFrame, SETTINGS_IA, findItem } from './settings-shell.js';
 import { sectionHead, sectionCard, setNote } from './settings-ui.js';
+import { navigate } from './nav.js';
 
 // Community sections are addressed relative to the current community, so the
 // href is resolved rather than stored - a stored path would go stale the moment
@@ -352,7 +353,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
               await refreshServers();
               leaveServerContext();
               toast('Ownership transferred.', 'ok');
-              location.hash = '#/home';
+              navigate('#/home');
             } catch (ex) {
               err.hidden = false;
               err.textContent = ex.message || 'Could not transfer ownership.';
@@ -382,7 +383,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
             await Api.leaveServer(serverId);
             await refreshServers();
             leaveServerContext();
-            location.hash = '#/home';
+            navigate('#/home');
           } catch (ex) { toast(ex.message || 'Could not leave.', 'error'); }
         },
       });
@@ -411,7 +412,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
               await refreshServers();
               leaveServerContext();
               toast('Community deleted.', 'warn');
-              location.hash = '#/home';
+              navigate('#/home');
             } catch (ex) { toast(ex.message || 'Could not delete.', 'error'); }
           },
         });

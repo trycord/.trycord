@@ -9,6 +9,7 @@ import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } fr
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
 import { TrycordConfig } from './config.js';
 import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
+import { navigate } from './nav.js';
 
 async function renderChannel(container, serverId, channelId, opts = {}) {
   clear(container);
@@ -86,7 +87,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }, icon('search'));
   const pinsBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Pinned messages', 'aria-label': 'Pinned messages',
-    onClick: () => { location.hash = channelPath(serverId, channelId, '/pins'); },
+    onClick: () => { navigate(channelPath(serverId, channelId, '/pins')); },
   }, icon('star'));
   const moreBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Community actions', 'aria-label': 'Community actions',
@@ -304,7 +305,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
       { label: 'Copy message link', onSelect: () => copyText(msgLink(m), 'Message link copied.') },
       { label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') },
-      ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { location.hash = '#/users/' + m.author_id; } }] : []),
+      ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { navigate('#/users/' + m.author_id); } }] : []),
       ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
       ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
       ...(canInChannel('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
@@ -647,7 +648,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
                   return;
                 }
               }
-              location.hash = dest;
+              navigate(dest);
             };
             const row = el('button', { class: 'search-hit', type: 'button' });
             attachContextMenu(row, () => [
@@ -697,7 +698,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   setViewRefresh(() => {
     const layout = State.channels || { channels: [] };
     const ch = (layout.channels || []).find((c) => String(c.id) === String(channelId));
-    if (!ch) { location.hash = serverPath(serverId); return; }
+    if (!ch) { navigate(serverPath(serverId)); return; }
     renderContextHeader({ title: '#' + (ch.name || 'channel'), sub: ch.topic ? esc(ch.topic) : server.name, icon: '#' });
   });
   renderAllChrome();
@@ -720,7 +721,7 @@ async function renderChannelPins(container, serverId, channelId) {
   const layout = State.channels;
   const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
   const back = el('button', { class: 'btn ghost sm', type: 'button' }, '← Back to #' + (channel ? channel.name : 'channel'));
-  back.addEventListener('click', () => { location.hash = channelPath(serverId, channelId); });
+  back.addEventListener('click', () => { navigate(channelPath(serverId, channelId)); });
   renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: 'star', actions: [back] });
   const wrap = el('div', { class: 'page atrium' });
   const list = el('div', { class: 'stack' });
@@ -748,7 +749,7 @@ async function renderChannelPins(container, serverId, channelId) {
       node.title = 'Jump to message';
       node.addEventListener('click', (e) => {
         if (e.target.closest('a, button')) return;
-        location.hash = channelPath(serverId, channelId);
+        navigate(channelPath(serverId, channelId));
       });
       list.appendChild(node);
     }

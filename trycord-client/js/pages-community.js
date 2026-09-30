@@ -8,6 +8,7 @@ import { renderAllChrome, renderContextHeader } from './shell.js';
 import { renderMemberList } from './pages-members.js';
 import { ensureServer } from './workspace-shared.js';
 import { channelPath } from './links.js';
+import { navigate } from './nav.js';
 
 async function renderServerLanding(container, serverId) {
   clear(container);
@@ -60,7 +61,7 @@ async function renderServerLanding(container, serverId) {
       for (const ch of inCat) {
         const r = el('button', {
           class: 'row row--channel', type: 'button', style: { marginLeft: 0, width: '100%' },
-          onClick: () => { location.hash = channelPath(serverId, ch.id); },
+          onClick: () => { navigate(channelPath(serverId, ch.id)); },
         });
         r.appendChild(el('span', { class: 'ch-prefix' }, '#'));
         r.appendChild(el('span', { class: 'ch-name' }, ch.name));
@@ -73,7 +74,7 @@ async function renderServerLanding(container, serverId) {
       for (const ch of ungrouped) {
         const r = el('button', {
           class: 'row row--channel', type: 'button', style: { marginLeft: 0, width: '100%' },
-          onClick: () => { location.hash = channelPath(serverId, ch.id); },
+          onClick: () => { navigate(channelPath(serverId, ch.id)); },
         });
         r.appendChild(el('span', { class: 'ch-prefix' }, '#'));
         r.appendChild(el('span', { class: 'ch-name' }, ch.name));
@@ -125,7 +126,7 @@ async function renderNewServer(container, serverId) {
       toast('Community created.', 'ok');
       await refreshServers();
       const sid = res.serverId;
-      location.hash = channelPath(sid, res.channelId);
+      navigate(channelPath(sid, res.channelId));
     } catch (ex) {
       err.hidden = false;
       err.textContent = ex.message || 'Failed';
@@ -147,7 +148,7 @@ async function renderMenu(container) {
   renderContextHeader({ title: 'Menu', sub: 'Everywhere in Trycord' });
   const wrap = el('div', { class: 'page atrium' });
   const me = State.me || {};
-  const acct = el('button', { class: 'row', type: 'button', onClick: () => { location.hash = '#/settings'; } });
+  const acct = el('button', { class: 'row', type: 'button', onClick: () => { navigate('#/settings'); } });
   acct.appendChild(avatar(me, { size: 'sm', withPresence: true }));
   const am = el('div', { class: 'row-main' });
   am.appendChild(el('div', { class: 'row-title' }, me.displayName || me.username || 'You'));
@@ -155,20 +156,20 @@ async function renderMenu(container) {
   acct.appendChild(am);
   wrap.appendChild(acct);
 
-  const route = location.hash.replace(/^#/, '');
+  const route = location.pathname || '/';
   const appSec = el('div', { class: 'stack' });
   appSec.appendChild(el('div', { class: 'section-label' }, 'App'));
   const links = [
-    { label: 'Friends', href: '#/friends', path: '/friends' },
-    { label: 'Notifications', href: '#/notifications', path: '/notifications', badge: State.notifUnread },
-    { label: 'Discover', href: '#/discover', path: '/discover' },
-    { label: 'Support', href: '#/support', path: '/support' },
+    { label: 'Friends', href: '/friends', path: '/friends' },
+    { label: 'Notifications', href: '/notifications', path: '/notifications', badge: State.notifUnread },
+    { label: 'Discover', href: '/discover', path: '/discover' },
+    { label: 'Support', href: '/support', path: '/support' },
   ];
-  if (me && me.isAdmin) links.push({ label: 'Admin', href: '#/admin', path: '/admin', badge: 0 });
+  if (me && me.isAdmin) links.push({ label: 'Admin', href: '/admin', path: '/admin', badge: 0 });
   for (const l of links) {
     const b = el('button', {
       class: 'row' + (route === l.path || route.startsWith(l.path + '/') ? ' active' : ''),
-      type: 'button', onClick: () => { location.hash = l.href; },
+      type: 'button', onClick: () => { navigate(l.href); },
     });
     const bm = el('div', { class: 'row-main' });
     bm.appendChild(el('div', { class: 'row-title' }, l.label));
@@ -186,7 +187,7 @@ async function renderMenu(container) {
   try { servers = await refreshServers(); } catch { /* offline */ }
   if (!servers.length) {
     srvSec.appendChild(el('p', { class: 'muted small' }, 'No communities yet.'));
-    const go = el('button', { class: 'btn', type: 'button', onClick: () => { location.hash = '#/discover'; } }, 'Discover communities');
+    const go = el('button', { class: 'btn', type: 'button', onClick: () => { navigate('#/discover'); } }, 'Discover communities');
     srvSec.appendChild(go);
     renderAllChrome();
     return;
@@ -205,7 +206,7 @@ async function renderMenu(container) {
     for (const ch of channels) {
       const b = el('button', {
         class: 'row' + (route === '/server/' + s.id + '/channel/' + ch.id ? ' active' : ''),
-        type: 'button', onClick: () => { location.hash = channelPath(s.id, ch.id); },
+        type: 'button', onClick: () => { navigate(channelPath(s.id, ch.id)); },
       });
       const bm = el('div', { class: 'row-main' });
       bm.appendChild(el('div', { class: 'row-title' }, '# ' + (ch.name || 'channel')));

@@ -5,6 +5,7 @@ import { attachContextMenu, copyText, esc, el, clear, toast, relTime, showEmojiP
 import { avatar, emptyState, icon, messageRow } from './components.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
+import { navigate } from './nav.js';
 
 let activeDmId = null;
 let dmSubs = [];
@@ -28,7 +29,7 @@ async function renderDmList(container) {
       const r = el('button', {
         class: 'row row--surface', type: 'button',
         dataset: { dmId: dm.id },
-        onClick: () => { location.hash = '#/dms/' + dm.id; },
+        onClick: () => { navigate('#/dms/' + dm.id); },
       });
       r.appendChild(avatar(dm.peer, { withPresence: true }));
       const m = el('div', { class: 'row-main' });
@@ -373,10 +374,10 @@ async function renderFriendsList(wrap) {
       items.push({ label: 'Cancel request', onSelect: () => act(() => Api.cancelFriendRequest(person.reqId), 'Request cancelled.', 'Failed', 'warn') });
     } else {
       items.push({ label: 'Message', onSelect: async () => {
-        try { const { id } = await Api.openDm(person.id); location.hash = '#/dms/' + id; }
+        try { const { id } = await Api.openDm(person.id); navigate('#/dms/' + id); }
         catch (ex) { toast(ex.message || 'Cannot open', 'error'); }
       } });
-      items.push({ label: 'View profile', onSelect: () => { location.hash = '#/users/' + person.id; } });
+      items.push({ label: 'View profile', onSelect: () => { navigate('#/users/' + person.id); } });
       items.push({ sep: true });
       items.push({ label: 'Remove friend', danger: true, onSelect: () => act(() => Api.removeFriend(person.id), 'Friend removed.', 'Failed', 'warn') });
     }
@@ -451,7 +452,7 @@ async function renderFriendsList(wrap) {
       dmBtn.addEventListener('click', async () => {
         try {
           const { id } = await Api.openDm(f.id);
-          location.hash = '#/dms/' + id;
+          navigate('#/dms/' + id);
         } catch (ex) { toast(ex.message || 'Cannot open', 'error'); }
       });
       rmBtn.addEventListener('click', async () => {
