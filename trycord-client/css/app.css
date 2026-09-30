@@ -950,6 +950,14 @@ img { max-width: 100%; }
   opacity: 1;
   transition: opacity var(--t-med) var(--t-ease) 40ms;
 }
+/* A surface whose layout declares no contextual sidebar still has the region, so
+   the grid keeps its three tracks and the collapse can still animate. It must
+   then leave nothing behind: a zero-width column that still paints a border
+   reads as a stray rule down the edge of the page. */
+.context-sidebar[data-empty] {
+  border-right: 0;
+  background: none;
+}
 
 /* User bar pinned to the bottom of the context sidebar. One component for
    every context: identity left, session controls right. */
@@ -958,61 +966,6 @@ img { max-width: 100%; }
    no padding of its own (the padding lives on .ctx-scroll), so a negative
    bottom margin did not bleed the card to the edge - it pushed it past the
    sidebar's bottom border and the overflow clipped the name and status. */
-.user-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--t-d-2);
-  flex: 0 0 auto;
-  margin: 0;
-  padding: var(--t-d-3);
-  border-top: 1px solid var(--t-line);
-  background: color-mix(in srgb, var(--t-base2) 70%, var(--t-base));
-  min-width: 0;
-}
-.user-controls__identity {
-  display: flex;
-  align-items: center;
-  gap: var(--t-d-3);
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: var(--t-d-2);
-  border-radius: var(--t-r-s);
-  text-align: left;
-}
-.user-controls__identity:hover { background: color-mix(in srgb, var(--t-txt) 6%, transparent); }
-.user-controls__avatar { display: flex; flex: 0 0 auto; }
-.user-controls__info { display: flex; flex-direction: column; min-width: 0; }
-.user-controls__name {
-  font-size: var(--t-fs-s);
-  font-weight: 700;
-  color: var(--t-txt);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.user-controls__status { color: var(--t-mut); font-size: var(--t-fs-xs); }
-.user-controls__buttons { display: flex; gap: 2px; flex: 0 0 auto; }
-.user-controls__btn {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--t-r-s);
-  color: var(--t-mut);
-  font-size: 0.95rem;
-}
-.user-controls__btn:hover { background: var(--t-txt); color: var(--t-base); }
-
-/* Behind the drawer. Above the dock breakpoint the place sidebar is a column
-   rather than an overlay, so there is nothing to dismiss and no backdrop. */
-.nav-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 55;
-  background: rgba(0, 0, 0, 0.55);
-}
 @media (max-width: 759px) {
   .nav-backdrop { display: block; }
 }
@@ -1187,30 +1140,39 @@ img { max-width: 100%; }
 }
 .context-actions button:hover { background: var(--t-base2) !important; color: var(--t-txt) !important; }
 
+/* The wrapper around the content area and the member panel.
+   It is one column by default, because most surfaces have no member panel and
+   a reserved second column is exactly the "empty area" the old shell was
+   accused of. Only a community declares one, and only then does this become the
+   two-column arrangement. Layout drives it; nothing overrides it. */
 .chat-environment {
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  display: grid !important;
-  grid-template-columns: minmax(0, 1fr) auto !important;
-  position: relative !important;
-  z-index: 1 !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+.shell[data-layout="channel"] .chat-environment {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 .view-root {
-  grid-column: 1 !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  grid-column: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0;
 }
 .chat-environment > .member-sidebar {
-  grid-column: 2 !important;
-  width: var(--ui-members) !important;
-  max-width: var(--ui-members) !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
+  grid-column: 2;
+  width: var(--ui-members);
+  max-width: var(--ui-members);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   border-left: 1px solid var(--t-line);
   background: color-mix(in srgb, var(--t-base) 88%, var(--t-pg));
   padding: var(--t-d-5) 12px 20px;
@@ -2507,34 +2469,6 @@ html:is(
   width: 100%;
   background: var(--pg);
 }
-html:is(
-  [data-route="/login"],
-  [data-route="/register"],
-  [data-route="/forgot"],
-  [data-route^="/reset-password"],
-  [data-route^="/verify-email"],
-  [data-route^="/legal"],
-  [data-route^="/support"]
-) .chat-environment { display: block !important; }
-
-html:is(
-  [data-route="/login"],
-  [data-route="/register"],
-  [data-route="/forgot"],
-  [data-route^="/reset-password"],
-  [data-route^="/verify-email"],
-  [data-route^="/legal"],
-  [data-route^="/support"]
-) .view-root {
-  display: block !important;
-  align-content: normal !important;
-  justify-items: normal !important;
-  min-height: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow-y: auto !important;
-}
-
 .pub-page {
   width: 100%;
   max-width: var(--pub-content-w);
@@ -3385,16 +3319,13 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   .btn.icon,
   .react-pill,
   .role-pill,
-  .ctx-head__action,
   .msg-actions button,
-  .user-controls__btn,
   .nav-toggle,
   .sidebar-collapse-toggle,
   .role-unassign {
     min-height: var(--t-hit);
   }
   .btn.icon,
-  .user-controls__btn,
   .nav-toggle,
   .sidebar-collapse-toggle {
     width: var(--t-hit);
@@ -3620,34 +3551,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   min-height: 56px;
   padding: var(--t-d-3) var(--t-d-3) var(--t-d-3) var(--t-d-4);
 }
-.ctx-head--community {
-  background:
-  linear-gradient(180deg,
-  color-mix(in srgb, var(--t-accent) 12%, var(--t-base)),
-  var(--t-base) 78%);
-  border-bottom-color: color-mix(in srgb, var(--t-accent) 22%, var(--t-line));
-}
-/* With a banner set, the image replaces the accent wash. The bar keeps its
-   height and the controls keep their position - adding media must never move
-   anything. A scrim keeps the title legible over an arbitrary image. */
-.ctx-head__banner {
-  position: absolute;
-  inset: 0;
-  background: var(--t-base2) center/cover no-repeat;
-  pointer-events: none;
-}
-.ctx-head__banner::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--t-base) 88%, transparent) 0%,
-    color-mix(in srgb, var(--t-base) 70%, transparent) 55%,
-    color-mix(in srgb, var(--t-base) 88%, transparent) 100%);
-}
-.ctx-head--community.has-banner .ctx-head__bar { position: relative; }
-.ctx-head--community.has-banner .ctx-head__mark { position: relative; }
-.ctx-head__mark { display: flex; flex: 0 0 auto; }
 .community-mark {
   display: grid;
   place-items: center;
@@ -3709,17 +3612,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ctx-head__action {
-  flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  color: var(--t-txt2);
-}
-.ctx-head__action:hover { background: color-mix(in srgb, var(--t-txt) 8%, transparent); color: var(--t-txt); }
 .ctx-head { position: relative; }
 
 .nav-group { display: flex; flex-direction: column; }
@@ -3997,14 +3889,171 @@ html[data-fullpage="page-editor"] .main-content {
   padding: 0 !important;
   gap: 0 !important;
 }
-html[data-fullpage="page-editor"] .chat-environment {
-  padding: 0 !important;
-  margin: 0 !important;
-  max-width: none !important;
+/* The wrapper is already a single column, so the full-bleed editor only
+   has to say how it fills. */
+html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width: 100%; }
+/* ---- V2 community context navigation -------------------------------------
+   The switcher, the channel filter and the channel groups. Scoped to the
+   surface rather than to a page, because this is the only place these appear. */
+
+.ctx-switcher {
+  flex: 0 0 auto;
+  padding: var(--t-d-3) var(--t-d-3) var(--t-d-2);
 }
-html[data-fullpage="page-editor"] .view-root {
-  max-width: none !important;
-  margin: 0 !important;
-  width: 100% !important;
-  overflow-y: auto !important;
+.ctx-switcher__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--t-d-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--t-d-2);
+  border: 0;
+  border-radius: var(--t-r-m);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--t-ease);
+}
+.ctx-switcher__trigger:hover { background: color-mix(in srgb, var(--t-txt) 7%, transparent); }
+.ctx-switcher__trigger:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 1px;
+}
+.ctx-switcher__mark { display: flex; flex: 0 0 auto; }
+.ctx-switcher__text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.ctx-switcher__name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--t-txt);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctx-switcher__meta { font-size: 0.74rem; color: var(--t-mut); }
+.ctx-switcher__caret {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--t-txt3);
+  transition: transform var(--t-fast) var(--t-ease);
+}
+.ctx-switcher__trigger[aria-expanded="true"] .ctx-switcher__caret { transform: rotate(180deg); }
+
+.ctx-filter {
+  flex: 0 0 auto;
+  margin: 0 var(--t-d-3) var(--t-d-2);
+  padding: 7px 10px;
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-s);
+  background: var(--t-base2);
+  color: var(--t-txt);
+  font-size: 0.84rem;
+  min-width: 0;
+}
+.ctx-filter::placeholder { color: var(--t-mut); }
+.ctx-filter:focus-visible { outline: 2px solid var(--t-accent); outline-offset: -1px; }
+
+.ctx-scroll--channels { padding-top: 0; }
+
+.ctx-group { margin-bottom: var(--t-d-2); }
+.ctx-group[hidden] { display: none; }
+.ctx-group__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px var(--t-d-3) 4px;
+  border: 0;
+  background: transparent;
+  color: var(--t-txt3);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+}
+.ctx-group__head:hover { color: var(--t-txt2); }
+.ctx-group__head:focus-visible { outline: 2px solid var(--t-accent); outline-offset: -2px; }
+.ctx-group__caret {
+  display: flex;
+  flex: 0 0 auto;
+  transition: transform var(--t-fast) var(--t-ease);
+}
+.ctx-group.is-collapsed .ctx-group__caret { transform: rotate(-90deg); }
+.ctx-group__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctx-group__count { flex: 0 0 auto; font-weight: 500; opacity: 0.7; }
+.ctx-group__list { display: flex; flex-direction: column; gap: 1px; }
+.ctx-group.is-collapsed .ctx-group__list { display: none; }
+
+.ctx-channel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 34px;
+  padding: 5px var(--t-d-3);
+  border: 0;
+  border-radius: var(--t-r-s);
+  background: transparent;
+  color: var(--t-mut);
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--t-ease), color var(--t-fast) var(--t-ease);
+}
+.ctx-channel:hover { background: color-mix(in srgb, var(--t-txt) 6%, transparent); color: var(--t-txt); }
+.ctx-channel:focus-visible { outline: 2px solid var(--t-accent); outline-offset: -2px; }
+.ctx-channel.is-active {
+  color: var(--t-txt);
+  background: color-mix(in srgb, var(--t-accent) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--t-accent);
+}
+.ctx-channel[hidden] { display: none; }
+.ctx-channel__hash { flex: 0 0 auto; color: var(--t-txt3); font-size: 0.9rem; }
+.ctx-channel.is-active .ctx-channel__hash { color: var(--t-accent); }
+.ctx-channel__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ctx-channel.is-muted .ctx-channel__name { opacity: 0.55; }
+.ctx-channel__state { display: flex; flex: 0 0 auto; color: var(--t-txt3); }
+
+@media (max-width: 899px) {
+  .ctx-switcher { padding: var(--t-d-2) var(--t-d-2) 0; }
+  .ctx-switcher__trigger { min-height: 48px; }
+  .ctx-filter { margin-left: var(--t-d-2); margin-right: var(--t-d-2); }
+  .ctx-channel { min-height: 44px; }
+  .ctx-group__head { min-height: 40px; padding-block: 8px; }
+}
+
+/* The account control at the foot of the global rail. It replaced the panel that
+   used to be pinned to the bottom of the community sidebar, so it has to read as
+   a rail control rather than as a wide card. */
+.app-rail__items .rail-account {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--t-r-l);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--t-ease);
+}
+.app-rail__items .rail-account:hover { background: color-mix(in srgb, var(--t-txt) 9%, transparent); }
+.app-rail__items .rail-account:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 1px;
 }

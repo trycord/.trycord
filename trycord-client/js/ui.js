@@ -40,6 +40,8 @@ function associateLabels(node) {
 // element rather than a string so it can be dropped straight into el().
 export const ICON_PATHS = {
   home: 'M3 10.6 12 3.5l9 7.1V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+  chevron: 'M6.5 9.5 12 15l5.5-5.5',
+  'bell-off': 'M9.4 5.2A5 5 0 0 1 17 9.5c0 4 1.5 5.5 1.5 5.5H8M6.2 6.8 4 15h3M10.3 19a2 2 0 0 0 3.4 0M3 3l18 18',
   plus: 'M12 5v14M5 12h14',
   smile: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 14.5a4.5 4.5 0 0 0 7 0',
   circle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',

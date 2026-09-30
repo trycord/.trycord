@@ -22,6 +22,7 @@ import { renderNotifications } from './pages-notifications.js';
 import { presentationMode, closeDesktopNav } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from './shell.js';
 import { navigate, adoptLegacyHash, interceptLinks, BASE } from './nav.js';
+import { setLayout, layoutForPath, layoutUsesSidebar } from './layout.js';
 import Api from './api.js';
 
 // A slug is a display convenience, not an identity, so a route that cannot
@@ -129,6 +130,11 @@ async function renderRoute() {
   document.documentElement.dataset.session = isAuthed() ? 'in' : 'out';
   const region = viewRegion();
   if (!region) return;
+
+  // The shell is told what shape this surface is before anything paints. Doing
+  // it here rather than in each page means a route cannot forget, and the chrome
+  // that renders later already knows whether it has a sidebar to fill.
+  setLayout(layoutForPath(path));
 
   setNavRoute(() => path);
   runCleanup();

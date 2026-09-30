@@ -1,12 +1,14 @@
 
 import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, attachMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
-import { avatar, icon, navRow, serverChip, channelRow, communityMark, communityBannerUrl, loadAuthedImage, navGroup } from './components.js';
+import { avatar, icon, navRow, serverChip, navGroup } from './components.js';
 import Api from './api.js';
-import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, setMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
+import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, clearSession, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
 import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
-import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
+import { serverPath } from './links.js';
 import { SETTINGS_IA } from './settings-shell.js';
 import { navigate, route } from './nav.js';
+import { layoutUsesSidebar, layoutUsesMembers } from './layout.js';
+import { renderCommunityContext } from './community-nav.js';
 
 // wiring, so a menu can never exist on one input method and be missing on
 // another. Menus are permission-shaped here: an action the viewer cannot perform
@@ -285,9 +287,52 @@ export function renderCommunities(region) {
   region.appendChild(el('div', { class: 'rail-divider' }));
   region.appendChild(create);
 
+  // The account control lives at the foot of the global rail rather than inside
+  // any one surface's sidebar. It used to be a panel pinned to the bottom of the
+  // community sidebar, which meant it disappeared on every surface without a
+  // sidebar - and there is no surface that has a sidebar and no account, so the
+  // rail is where a global control belongs.
   const foot = el('div', { class: 'rail-foot' });
+  foot.appendChild(railAccountButton());
   foot.appendChild(sidebarToggleButton());
   region.appendChild(foot);
+}
+
+function railAccountButton() {
+  const me = State.me;
+  if (!me) {
+    const guest = el('button', {
+      class: 'rail-foot-btn',
+      type: 'button',
+      title: 'Sign in',
+      'aria-label': 'Sign in',
+      dataset: { label: 'Sign in' },
+      onClick: () => { navigate(route('/login')); },
+    }, el('span', { class: 'nv-icon' }, icon('users')));
+    return guest;
+  }
+  const btn = el('button', {
+    class: 'rail-foot-btn rail-account',
+    type: 'button',
+    title: (me.displayName || me.username) + ' — account',
+    'aria-label': 'Your account and settings',
+    dataset: { label: 'Account' },
+  }, avatar(me, { size: 'sm', withPresence: true }));
+  attachMenu(btn, () => [
+    { label: me.displayName || me.username, desc: '@' + me.username, disabled: true },
+    { sep: true },
+    { label: 'Settings', icon: 'gear', onSelect: () => navigate(route('/settings')) },
+    { label: 'Switch community', icon: 'users', onSelect: () => navigate(route('/menu')) },
+    { sep: true },
+    { label: 'Sign out', icon: 'logout', danger: true, onSelect: () => signOut() },
+  ]);
+  return btn;
+}
+
+async function signOut() {
+  try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
+  clearSession();
+  navigate(route('/login'));
 }
 
 let homeRefreshAt = 0;
@@ -306,100 +351,6 @@ function refreshHomeSidebar(region) {
   });
 }
 
-//   user-controls pinned session bar
-
-const LS_COLLAPSED_GROUPS = 'trycord.collapsedGroups';
-
-function collapsedGroups() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(LS_COLLAPSED_GROUPS) || '[]');
-    return new Set(Array.isArray(raw) ? raw : []);
-  } catch { return new Set(); }
-}
-function persistCollapsedGroups(set) {
-  try { localStorage.setItem(LS_COLLAPSED_GROUPS, JSON.stringify([...set])); } catch { /* ignore */ }
-}
-
-
-// geometry is unchanged either way, so adding media never moves the controls.
-function communityHeader(sid, server) {
-  const name = (server && server.name) || (State.serverDetail && State.serverDetail.name) || 'Community';
-  const identity = server || State.serverDetail;
-  const head = el('header', { class: 'ctx-head ctx-head--community' + (communityBannerUrl(identity) ? ' has-banner' : '') });
-  const bar = el('div', { class: 'ctx-head__bar' });
-  const banner = communityBannerUrl(identity);
-  if (banner) {
-    const layer = el('div', { class: 'ctx-head__banner' });
-    loadAuthedImage(banner).then((url) => {
-      if (url) layer.style.backgroundImage = 'url("' + url + '")';
-    });
-    head.appendChild(layer);
-  }
-  bar.appendChild(el('span', { class: 'ctx-head__mark' }, communityMark(name, { server: identity })));
-  const text = el('div', { class: 'ctx-head__text' });
-  text.appendChild(el('div', { class: 'ctx-head__title' }, name));
-  text.appendChild(el('div', { class: 'ctx-head__sub' }, (server && server.is_owner) ? 'Your community' : 'Community'));
-  bar.appendChild(text);
-
-  const trigger = el('button', {
-    class: 'ctx-head__action', type: 'button',
-    title: 'Community menu', 'aria-label': 'Community menu for ' + name,
-  }, '⌄');
-  bar.appendChild(trigger);
-  head.appendChild(bar);
-
-  // list. Every entry is permission-gated by the existing role system.
-  // attachMenu, not a second dropdown implementation: this is the same menu as
-  // right-click and long-press, so submenus, disabled items, Escape, arrow keys
-  // and outside-click dismissal behave identically whichever menu is opened.
-  attachMenu(trigger, () => {
-    const go = (path) => () => { navigate(path); };
-    const base = serverPath(sid);
-    const items = [];
-
-    items.push({ label: 'Community overview', icon: '⌂', onSelect: go(base) });
-    items.push({ label: 'Members', icon: 'menu', onSelect: go(base + '/members') });
-    if (can('MANAGE_ROLES') || can('MANAGE_SERVER')) {
-      items.push({ label: 'Roles', icon: '◈', onSelect: go(base + '/roles') });
-    }
-    if (can('MANAGE_CHANNELS')) {
-      items.push({ label: 'Categories', icon: 'list', onSelect: go(base + '/categories') });
-      items.push({ label: 'Create channel', icon: '＋', onSelect: go(base + '/channels/new') });
-    }
-    if (can('MANAGE_INVITES')) {
-      items.push({ label: 'Invites', icon: 'mail', onSelect: go(base + '/invites') });
-    }
-    if (can('MANAGE_SERVER')) {
-      items.push({ sep: true });
-      items.push({ label: 'Community settings', icon: 'gear', onSelect: go(base + '/settings') });
-    }
-    items.push({ sep: true });
-    items.push({ label: 'Leave community', icon: 'logout', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
-    return items;
-  });
-  return head;
-}
-
-function serverChipMenuLeave(sid, server) {
-  if (server && server.is_owner) {
-    toast('You own this community. Transfer or delete it first.', 'warn');
-    return;
-  }
-  confirmDialog({
-    title: 'Leave ' + ((server && server.name) || 'community') + '?',
-    message: 'You can rejoin later with a new invite.',
-    danger: true, confirmText: 'Leave',
-    onConfirm: async () => {
-      try {
-        await Api.leaveServer(sid);
-        await refreshServers();
-        leaveServerContext();
-        navigate('#/home');
-      } catch (ex) { toast(ex.message || 'Failed', 'error'); }
-    },
-  });
-}
-
 function pageHeader(title, sub) {
   const head = el('header', { class: 'ctx-head' });
   const bar = el('div', { class: 'ctx-head__bar' });
@@ -411,131 +362,10 @@ function pageHeader(title, sub) {
   return head;
 }
 
-// Pinned session bar, shared by every context.
-function sessionBar() {
-  const me = State.me;
-  if (!me) return null;
-  const bar = el('div', { class: 'user-controls' });
-  const idBox = el('button', {
-    class: 'user-controls__identity', type: 'button',
-    title: 'Your account', 'aria-label': 'Your account',
-    onClick: () => { navigate('#/settings'); },
-  });
-  // both normalise casing themselves, so never rebuild the user object here.
-  idBox.appendChild(el('span', { class: 'user-controls__avatar' }, avatar(me, { size: 'sm', withPresence: true })));
-  const info = el('span', { class: 'user-controls__info' });
-  info.appendChild(el('span', { class: 'user-controls__name' }, me.displayName || me.display_name || me.username || 'You'));
-  info.appendChild(el('span', { class: 'user-controls__status' }, 'Online'));
-  idBox.appendChild(info);
-  bar.appendChild(idBox);
-  const buttons = el('div', { class: 'user-controls__buttons' });
-  buttons.appendChild(el('button', {
-    class: 'user-controls__btn', type: 'button',
-    title: 'Settings', 'aria-label': 'Settings',
-    onClick: () => { navigate('#/settings'); },
-  }, icon('gear')));
-  bar.appendChild(buttons);
-  return bar;
-}
-
-// Re-render every mounted session bar in place.
-export function refreshSessionBar() {
-  if (!State.me) return;
-  document.querySelectorAll('.user-controls').forEach((old) => {
-    const next = sessionBar();
-    if (next) old.replaceWith(next);
-  });
-}
 
 
 function communityContext(region, sid) {
-  const here = currentRoute();
-  const server = (State.servers || []).find((x) => String(x.id) === String(sid));
-
-  region.appendChild(communityHeader(sid, server));
-
-  const scroll = el('div', { class: 'ctx-scroll' });
-  region.appendChild(scroll);
-
-  const collapsed = collapsedGroups();
-  const groupKey = (catId) => 'cat:' + sid + ':' + catId;
-
-  const layout = State.channels || { categories: [], channels: [] };
-  const categories = layout.categories || [];
-  const channels = layout.channels || [];
-
-  const grouped = new Map();
-  grouped.set('__none__', []);
-  for (const c of categories) grouped.set(String(c.id), []);
-  for (const ch of channels) {
-    const key = ch.category_id ? String(ch.category_id) : '__none__';
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(ch);
-  }
-
-  // Channel actions, permission-shaped. Editing a channel lives in Community
-  // administration must not become a disconnected second system.
-  const channelActions = (ch) => {
-    const cid = String(ch.id);
-    const items = [
-      { label: 'Open channel', desc: '#' + (ch.name || 'channel'), onSelect: () => { navigate(channelPath(sid, cid)); } },
-      { label: isMuted(ch.id) ? 'Unmute channel' : 'Mute channel', onSelect: () => setMuted(ch.id, !isMuted(ch.id)) },
-      { label: 'Copy channel link', onSelect: () => copyText(absoluteChannelUrl(sid, cid), 'Channel link copied.') },
-      { label: 'Copy channel ID', onSelect: () => copyText(cid, 'Channel ID copied.') },
-    ];
-    if (can('MANAGE_CHANNELS')) {
-      items.push({ sep: true });
-      items.push({
-        label: 'Edit channel', onSelect: () => { navigate(serverPath(sid, 'settings/structure')); },
-      });
-    }
-    return items;
-  };
-
-  const channelRowEl = (ch) => {
-    const active = here === '/server/' + sid + '/channel/' + ch.id;
-    const row = channelRow(ch, {
-      active, muted: isMuted(ch.id),
-      onClick: () => { navigate(channelPath(sid, ch.id)); },
-    });
-    attachContextMenu(row, () => channelActions(ch), {
-      target: () => ({ type: 'channel', id: String(ch.id) }),
-    });
-    return row;
-  };
-
-  // they are never visually merged with a real category.
-  const addChannelGroup = (label, list, catId) => {
-    if (!list.length) return;
-    const key = groupKey(catId);
-    const group = navGroup({
-      label,
-      collapsible: true,
-      collapsed: collapsed.has(key),
-      id: catId,
-    });
-    group.onToggleChange((isCollapsed) => {
-      const set = collapsedGroups();
-      if (isCollapsed) set.add(key); else set.delete(key);
-      persistCollapsedGroups(set);
-    });
-    for (const ch of list) group.list.appendChild(channelRowEl(ch));
-    scroll.appendChild(group);
-  };
-
-  const uncategorised = grouped.get('__none__') || [];
-  if (uncategorised.length) addChannelGroup(categories.length ? 'Channels' : 'Text channels', uncategorised, '__none__');
-  for (const cat of categories) {
-    addChannelGroup(cat.name || 'Category', grouped.get(String(cat.id)) || [], String(cat.id));
-  }
-  if (!channels.length) {
-    scroll.appendChild(el('div', { class: 'ctx-empty' }, 'No channels yet.'));
-  }
-
-  // here. The sidebar is deliberately channels-only: mixing destinations
-
-  const bar = sessionBar();
-  if (bar) region.appendChild(bar);
+  renderCommunityContext(region, sid, currentRoute());
 }
 
 
@@ -601,8 +431,6 @@ function dmsContext(region) {
   search.addEventListener('input', () => paint(search.value));
   paint('');
 
-  const bar = sessionBar();
-  if (bar) region.appendChild(bar);
   refreshHomeSidebar(region);
 }
 
@@ -640,8 +468,6 @@ function settingsContext(region) {
     scroll.appendChild(admin);
   }
 
-  const bar = sessionBar();
-  if (bar) region.appendChild(bar);
 }
 
 
@@ -662,8 +488,6 @@ function simpleListContext(region, { title, sub, groups }) {
     }
     scroll.appendChild(group);
   }
-  const bar = sessionBar();
-  if (bar) region.appendChild(bar);
 }
 
 function friendsContext(region) {
@@ -776,8 +600,6 @@ function adminContext(region) {
   }
   scroll.appendChild(more);
 
-  const bar = sessionBar();
-  if (bar) region.appendChild(bar);
 }
 
 
@@ -799,9 +621,19 @@ export function sidebarContext() {
 export function renderPlaceNavigation(region) {
   clear(region);
   if (!isAuthed()) return;
+  // The route's layout already said whether this surface has a contextual
+  // sidebar. Settings, Admin and a profile carry their own navigation inside the
+  // content pane, and painting the shell's sidebar as well is what put the same
+  // list on screen twice.
+  if (!layoutUsesSidebar()) {
+    region.dataset.empty = 'true';
+    return;
+  }
+  delete region.dataset.empty;
   const ctx = sidebarContext();
   switch (ctx.type) {
     case 'community': return communityContext(region, ctx.serverId);
+    case 'dms': return dmsContext(region);
     case 'settings': return settingsContext(region);
     case 'admin': return adminContext(region);
     case 'friends': return friendsContext(region);
@@ -890,7 +722,11 @@ function sidebarToggleButton() {
 
 export function renderMemberSidebar(region) {
   clear(region);
-  if (!isAuthed() || !currentServerId() || !State.serverDetail || !currentRoute().startsWith('/server/')) {
+  // A member panel only means something inside a community. The route's layout
+  // decides that, not the panel's own guess about the path, so a surface that
+  // has no member panel cannot leave one reserving width it will not fill.
+  if (!isAuthed() || !layoutUsesMembers() || !currentServerId()
+    || !State.serverDetail || !currentRoute().startsWith('/server/')) {
     region.hidden = true;
     return;
   }
