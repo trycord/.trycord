@@ -6,7 +6,7 @@ import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, le
 import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
 import { SETTINGS_IA } from './settings-shell.js';
-import { navigate } from './nav.js';
+import { navigate, route } from './nav.js';;
 
 // wiring, so a menu can never exist on one input method and be missing on
 // another. Menus are permission-shaped here: an action the viewer cannot perform
@@ -207,12 +207,12 @@ export function memberActions(m) {
 }
 
 const DESTINATIONS = [
-  { id: 'home', label: 'Home', icon: 'home', href: '/home' },
-  { id: 'dms', label: 'DMs', icon: 'mail', href: '/dms' },
-  { id: 'notifications', label: 'Notifications', icon: 'bell', href: '/notifications', badge: () => State.notifUnread },
-  { id: 'discover', label: 'Discover', icon: 'search', href: '/discover' },
-  { id: 'support', label: 'Support', icon: '?', href: '/support' },
-  { id: 'friends', label: 'Friends', icon: 'users', href: '/friends' },
+  { id: 'home', label: 'Home', icon: 'home', href: route('/home') },
+  { id: 'dms', label: 'DMs', icon: 'mail', href: route('/dms') },
+  { id: 'notifications', label: 'Notifications', icon: 'bell', href: route('/notifications'), badge: () => State.notifUnread },
+  { id: 'discover', label: 'Discover', icon: 'search', href: route('/discover') },
+  { id: 'support', label: 'Support', icon: '?', href: route('/support') },
+  { id: 'friends', label: 'Friends', icon: 'users', href: route('/friends') },
 ];
 
 let navRoute = () => '';
@@ -232,11 +232,11 @@ export function renderCommunities(region) {
   const route = currentRoute();
 
   const globalItems = [
-    { id: 'home', label: 'Home', icon: 'home', href: '/home' },
-    { id: 'dms', label: 'Direct messages', icon: 'mail', href: '/dms' },
-    { id: 'notifications', label: 'Notifications', icon: 'bell', href: '/notifications', badge: () => State.notifUnread },
-    { id: 'discover', label: 'Discover', icon: 'search', href: '/discover' },
-    { id: 'friends', label: 'Friends', icon: 'users', href: '/friends', badge: () => (State.friendsIn || []).length },
+    { id: 'home', label: 'Home', icon: 'home', href: route('/home') },
+    { id: 'dms', label: 'Direct messages', icon: 'mail', href: route('/dms') },
+    { id: 'notifications', label: 'Notifications', icon: 'bell', href: route('/notifications'), badge: () => State.notifUnread },
+    { id: 'discover', label: 'Discover', icon: 'search', href: route('/discover') },
+    { id: 'friends', label: 'Friends', icon: 'users', href: route('/friends'), badge: () => (State.friendsIn || []).length },
   ];
 
   const railButton = ({ label, icon: iconName, href, active, badge }) => {
@@ -640,7 +640,7 @@ function settingsContext(region) {
   if (State.me && State.me.isAdmin) {
     const admin = navGroup({ label: 'Administration' });
     admin.list.appendChild(navRow({
-      label: 'Admin console', href: '/admin', active: route.startsWith('/admin'),
+      label: 'Admin console', href: route('/admin'), active: route.startsWith('/admin'),
       onClick: () => { navigate('#/admin'); },
     }));
     scroll.appendChild(admin);
@@ -1062,11 +1062,11 @@ export function renderMobileTabs(region) {
   region.dataset.collapsed = hidden ? 'true' : 'false';
 
   const tabs = [
-    { id: 'home', label: 'Home', icon: 'home', href: '/home' },
-    { id: 'dms', label: 'DMs', icon: 'mail', href: '/dms' },
-    { id: 'friends', label: 'Friends', icon: 'users', href: '/friends' },
-    { id: 'notifications', label: 'Alerts', icon: 'bell', href: '/notifications' },
-    { id: 'menu', label: 'Menu', icon: 'menu', href: '/menu' },
+    { id: 'home', label: 'Home', icon: 'home', href: route('/home') },
+    { id: 'dms', label: 'DMs', icon: 'mail', href: route('/dms') },
+    { id: 'friends', label: 'Friends', icon: 'users', href: route('/friends') },
+    { id: 'notifications', label: 'Alerts', icon: 'bell', href: route('/notifications') },
+    { id: 'menu', label: 'Menu', icon: 'menu', href: route('/menu') },
   ];
   const strip = el('div', { class: 'mobile-tab-navigation__strip' });
   for (const t of tabs) {
