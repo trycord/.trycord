@@ -220,6 +220,43 @@ export function profileContext(user, server) {
   return out;
 }
 
+/**
+ * A viewed profile.
+ *
+ * Everything here is a fact about the profile that the card beside it does not
+ * already say in the same place: the fields that exist but are not worth a row
+ * in the header, the role this person holds here, and where to go to change any
+ * of it. Nothing is derived from their activity - a profile is not a dashboard,
+ * and a stranger's message count is not context for a profile.
+ */
+export function profileViewContext(profile, { membership, isSelf } = {}) {
+  const out = [];
+  if (!profile) return out;
+
+  const facts = [
+    fact('Username', '@' + (profile.username || '')),
+    fact('Joined', profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : 'Unknown'),
+  ];
+  if (profile.statusText) facts.push(fact('Status', profile.statusText));
+  facts.push(fact('Presence', profile.presence === 'online' ? 'Online now' : 'Offline'));
+  if (isSelf) facts.push(fact('Email', profile.email || 'Not set'));
+  out.push(block(isSelf ? 'Your account' : 'Details', list(...facts)));
+
+  if (membership && (membership.roles || []).length) {
+    out.push(block('Roles here',
+      list(...membership.roles.map((r) => fact(r.name || 'Role', r.color ? 'Coloured' : 'Default'))),
+    ));
+  }
+
+  const actions = [];
+  if (isSelf) {
+    actions.push(el('a', { class: 'btn ghost sm', href: route('/settings') }, 'Edit your profile'));
+  }
+  if (actions.length) out.push(block('Actions', ...actions));
+
+  return out;
+}
+
 export default {
   privacyContext,
   securityContext,
@@ -228,4 +265,5 @@ export default {
   backendContext,
   guideContext,
   profileContext,
+  profileViewContext,
 };

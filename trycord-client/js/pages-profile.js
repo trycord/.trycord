@@ -6,23 +6,31 @@ import { avatar, loadAuthedImage } from './components.js';
 import { renderContextHeader } from './shell.js';
 import { fullTime } from './ui.js';
 import { navigate } from './nav.js';
+import { profileViewContext } from './context-column.js';
 
 export async function renderProfile(container, { id } = {}) {
   clear(container);
   renderContextHeader({ title: 'Profile', sub: 'View a member profile' });
-  const wrap = el('div', { class: 'page atrium' });
+  const frame = el('div', { class: 'profile-layout' });
+  const wrap = el('div', { class: 'page atrium' }, frame);
+  // The primary column holds the profile itself. It is capped so the header does
+  // not stretch a name across a 3440px window, and the space to its right is a
+  // real column with real content rather than empty canvas.
+  const primary = el('div', { class: 'profile-primary' });
+  const aside = el('aside', { class: 'profile-context', 'aria-label': 'Profile details' });
+  frame.append(primary, aside);
 
   let profile;
   try {
     // attaches membership both viewer and target share — nothing else leaks.
     profile = await Api.user(id, currentServerId());
   } catch (ex) {
-    wrap.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load this profile'));
+    primary.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load this profile'));
     container.appendChild(wrap);
     return;
   }
   if (!profile) {
-    wrap.appendChild(el('div', { class: 'form-error' }, 'This profile does not exist'));
+    primary.appendChild(el('div', { class: 'form-error' }, 'This profile does not exist'));
     container.appendChild(wrap);
     return;
   }
@@ -163,8 +171,19 @@ export async function renderProfile(container, { id } = {}) {
     card.appendChild(actions);
   }
 
-  wrap.appendChild(card);
+  primary.appendChild(card);
+  wrap.appendChild(frame);
   container.appendChild(wrap);
+
+  // The contextual column is painted after the frame is in the document so its
+  // presence can widen the layout, and it reads the same profile object the card
+  // did rather than fetching again: two reads of one profile is two chances to
+  // show a reader two different people.
+  const nodes = profileViewContext(profile, { membership: profile.membership, isSelf });
+  if (nodes.length) {
+    for (const n of nodes) aside.appendChild(n);
+    frame.dataset.hasContext = 'yes';
+  }
 }
 
 export default { renderProfile };
