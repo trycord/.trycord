@@ -1,7 +1,7 @@
 // auth/session endpoints.
 
 import Api from './api.js';
-import State, { clearSession, refreshServers, mustVerifyToPost } from './state.js';
+import State, { clearSession, refreshServers, refreshFriends, mustVerifyToPost, isMuted, setMuted } from './state.js';
 import { esc, el, clear, toast, confirmDialog } from './ui.js';
 import { avatar, loadAuthedImage, invalidateAuthedImage } from './components.js';
 import { renderContextHeader, renderAllChrome, clearAnnouncements, refreshSessionBar } from './shell.js';
@@ -9,24 +9,15 @@ import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalett
 import { renderBackendSelector } from './pages-public.js';
 import { statusChip } from './pages-admin.js';
 import Realtime from './realtime.js';
+import { settingsFrame, blurbFor, findItem } from './settings-shell.js';
+import { sectionHead, sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from './settings-ui.js';
 
-function accountTabs(active) {
-  const tabs = el('div', { class: 'settings-nav' });
-  const items = [
-    { id: 'profile', label: 'My Account', href: '#/settings', match: ['profile'] },
-    { id: 'security', label: 'Security', href: '#/settings/security', match: ['security', 'password', 'sessions'] },
-    { id: 'appearance', label: 'Appearance', href: '#/settings/appearance', match: ['appearance'] },
-    { id: 'backend', label: 'Backend', href: '#/settings/backend', match: ['backend'] },
-    { id: 'updates', label: 'Updates', href: '#/settings/updates', match: ['updates'] },
-  ];
-  for (const t of items) {
-    const on = t.id === active || (t.match || []).includes(active);
-    const b = el('button', { class: 'btn ' + (on ? 'active' : 'ghost'), type: 'button' }, t.label);
-    b.addEventListener('click', () => { location.hash = t.href; });
-    tabs.appendChild(b);
-  }
-  const signOut = el('button', { class: 'btn danger ghost settings-signout', type: 'button' }, 'Sign out');
-  signOut.addEventListener('click', () => {
+// Sign-out lives under the sections rather than beside them. In the pill row it
+// was the last item in a wrapping flex line, so it looked like one more section
+// until you noticed the colour.
+function signOutButton() {
+  const b = el('button', { class: 'settings-nav__signout', type: 'button' }, 'Sign out');
+  b.addEventListener('click', () => {
     confirmDialog({
       title: 'Sign out?',
       message: 'You will need to sign in again on this device.',
@@ -40,8 +31,138 @@ function accountTabs(active) {
       },
     });
   });
-  tabs.appendChild(signOut);
-  return tabs;
+  return b;
+}
+
+// Who can reach you. There is no block list on the server, so this is the two
+// things it does back: who has asked, and who is currently a friend.
+function renderPrivacy(body) {
+  body.appendChild(sectionHead('Privacy', 'Who can reach you, and who has asked.'));
+  const card = sectionCard();
+  body.appendChild(card);
+
+  const list = el('div', { class: 'set-card__body' });
+  const incoming = State.friendsIn || [];
+  const friends = State.friends || [];
+
+  const reqRow = settingRow({
+    label: 'Friend requests',
+    hint: incoming.length ? incoming.length + ' waiting for a reply' : 'None waiting',
+    control: incoming.length
+      ? el('button', {
+        class: 'btn sm', type: 'button',
+        onClick: () => { location.hash = '#/friends'; },
+      }, 'Review')
+      : el('span', { class: 'muted small' }, 'None'),
+  });
+  card.appendChild(reqRow);
+
+  if (incoming.length) {
+    const pending = sectionCard();
+    pending.appendChild(el('div', { class: 'set-card__label' }, 'Waiting on you'));
+    for (const r of incoming.slice(0, 8)) {
+      const who = (r.from && (r.from.displayName || r.from.username)) || 'Someone';
+      const accept = dangerButton('Accept', async () => {
+        accept.disabled = true;
+        try { await Api.acceptFriendRequest(r.id); toast('Request accepted.', 'ok'); await refreshFriends(); renderPrivacy(clearAndRebuild(body)); }
+        catch (e) { accept.disabled = false; toast(e.message || 'Could not accept that.', 'error'); }
+      }, { variant: 'primary' });
+      const decline = dangerButton('Decline', async () => {
+        decline.disabled = true;
+        try { await Api.declineFriendRequest(r.id); toast('Request declined.', 'warn'); await refreshFriends(); renderPrivacy(clearAndRebuild(body)); }
+        catch (e) { decline.disabled = false; toast(e.message || 'Could not decline that.', 'error'); }
+      }, { variant: 'ghost' });
+      card.appendChild(settingRow({
+        label: who,
+        hint: r.from ? '@' + r.from.username : '',
+        control: [accept, decline],
+      }));
+    }
+    card.appendChild(pending);
+  }
+
+  if (friends.length) {
+    const fr = sectionCard();
+    fr.appendChild(el('div', { class: 'set-card__label' }, 'Friends (' + friends.length + ')'));
+    for (const f of friends.slice(0, 25)) {
+      const who = f.displayName || f.username || 'Someone';
+      fr.appendChild(settingRow({
+        label: who,
+        hint: '@' + (f.username || ''),
+        control: dangerButton('Remove', async () => {
+          confirmDialog({
+            title: 'Remove ' + who + '?',
+            message: 'They stay on this instance and can send you another request.',
+            danger: true, confirmText: 'Remove',
+            onConfirm: async () => {
+              try { await Api.removeFriend(f.id); toast('Friend removed.', 'warn'); await refreshFriends(); renderPrivacy(clearAndRebuild(body)); }
+              catch (e) { toast(e.message || 'Could not remove that friend.', 'error'); }
+            },
+          });
+        }, { variant: 'ghost' }),
+      }));
+    }
+    card.appendChild(fr);
+  }
+
+  if (!incoming.length && !friends.length) {
+    card.appendChild(setEmpty('No requests and no friends yet. People you talk to appear here.'));
+  }
+
+  body.appendChild(setNote('Trycord has no block list. Removing a friend stops the connection but does not prevent new requests.'));
+  list.remove();
+}
+
+// Suppressed channels. Alerts themselves live at #/notifications; this is the
+// list of channels that will not raise one.
+function renderNotificationsSettings(body) {
+  body.appendChild(sectionHead('Notifications', 'Channels that will not raise an alert.'));
+  const ids = [...(State.mutedChannels || [])];
+  const card = sectionCard();
+
+  const alerts = dangerButton('Open alerts', () => { location.hash = '#/notifications'; },
+    { variant: 'ghost' });
+
+  if (!ids.length) {
+    card.appendChild(setEmpty('No muted channels. Mute one from its channel menu.'));
+    card.appendChild(setActionRow(alerts));
+  } else {
+    card.appendChild(settingRow({
+      label: 'Muted channels',
+      hint: ids.length + ' suppressed',
+      control: el('span', { class: 'muted small' }, 'Mute more from a channel menu'),
+    }));
+    const list = sectionCard();
+    list.appendChild(el('div', { class: 'set-card__label' }, 'Currently muted'));
+    const servers = State.servers || [];
+    for (const id of ids) {
+      const server = servers.find((sv) => String(sv.id) === String(id));
+      list.appendChild(settingRow({
+        label: server ? (server.name || 'Community') : 'Channel ' + id,
+        hint: server ? 'In ' + server.name : 'No longer in this community',
+        control: dangerButton('Unmute', async () => {
+          try {
+            await Api.unmuteChannel(id);
+            setMuted(id, false);
+            toast('Channel unmuted.', 'ok');
+            renderNotificationsSettings(clearAndRebuild(body));
+          } catch (e) { toast(e.message || 'Could not unmute that channel.', 'error'); }
+        }, { variant: 'ghost' }),
+      }));
+    }
+    card.appendChild(list);
+    card.appendChild(setActionRow(alerts));
+  }
+  body.appendChild(card);
+  body.appendChild(setNote('Muting is per channel and syncs to every device you sign in on.'));
+}
+
+// Sections rebuild in place so the nav keeps its state and the scroll position
+// survives a reply to a request.
+function clearAndRebuild(body) {
+  const scroll = body.scrollTop;
+  clear(body);
+  return Object.assign(body, { scrollTop: scroll });
 }
 
 function renderAppearance(wrap) {
@@ -845,11 +966,33 @@ function renderDangerZone(wrap) {
 
 export async function renderAccount(container, { tab = 'profile' } = {}) {
   clear(container);
-  renderContextHeader({ title: 'Settings', sub: 'Your account and preferences' });
-  const wrap = el('div', { class: 'page atrium settings-layout' });
-  wrap.appendChild(accountTabs(tab));
-  const body = el('div', { class: 'settings-body' });
-  wrap.appendChild(body);
+  const item = findItem('account', tab);
+  renderContextHeader({ title: 'Settings', sub: blurbFor('account', tab) });
+
+  // The nav footer carries sign-out; the frame puts it in the nav column rather
+  // than in the content, which is where a destructive control belongs.
+  const footer = el('div', { class: 'settings-nav__footer' }, signOutButton());
+  const { frame, pane } = settingsFrame({
+    scope: 'account',
+    active: tab,
+    footer,
+    contentClass: 'settings-body',
+  });
+  const wrap = el('div', { class: 'page atrium' }, frame);
+  const body = pane;
+
+  // Friends and mutes are needed by the two new sections. They are already
+  // loaded on sign-in, so this only covers a deep link straight into them.
+  if (tab === 'privacy' || tab === 'notifications') {
+    try {
+      await Promise.all([
+        State.friends ? Promise.resolve() : refreshFriends(),
+        State.mutedChannels && State.mutedChannels.size ? Promise.resolve() : Api.mutes().then((ids) => {
+          State.mutedChannels = new Set((ids || []).map(String));
+        }).catch(() => {}),
+      ]);
+    } catch { /* the section renders an empty state instead */ }
+  }
 
   if (tab === 'appearance') {
     renderAppearance(body);
@@ -861,11 +1004,15 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderTwoFactorSection(body);
     renderSessionsSection(body);
   } else if (tab === 'backend') {
-    body.appendChild(el('div', { class: 'section-label' }, 'Backend'));
-    body.appendChild(el('p', { class: 'muted small' }, 'Choose which Trycord instance this app talks to. Switching instances signs you out here first.'));
-    const backendBox = el('div', { class: 'card card--auth' });
+    body.appendChild(sectionHead('Backend', 'Which instance this device talks to.'));
+    body.appendChild(setNote('Switching instances signs you out here first.'));
+    const backendBox = sectionCard();
     renderBackendSelector(backendBox);
     body.appendChild(backendBox);
+  } else if (tab === 'privacy') {
+    renderPrivacy(body);
+  } else if (tab === 'notifications') {
+    renderNotificationsSettings(body);
   } else {
     renderProfileEditor(body);
     renderDeletionSection(body);

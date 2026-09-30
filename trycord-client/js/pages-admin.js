@@ -5,6 +5,7 @@ import State from './state.js';
 import { esc, el, btn, clear, toast, openModal, confirmDialog, relTime, fullTime } from './ui.js';
 import { initialOf, emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
+import { settingsNav, settingsFrame } from './settings-shell.js';
 
 const REPORT_STATUSES = ['OPEN', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'];
 const APPEAL_STATUSES = ['OPEN', 'UNDER_REVIEW', 'APPROVED', 'DENIED'];
@@ -829,25 +830,15 @@ async function renderAnnouncements(body, show, seq) {
 }
 
 
-// Pages is a separate module rather than one more branch of renderAdmin.
+// Pages is a separate module rather than one more branch of renderAdmin: the
+// router sends /admin/pages to renderAdminPages. It still needs a place in the
+// nav, and the IA is where that place lives now.
 const EXTERNAL_SECTIONS = new Set(['pages']);
 
 // Shared with pages-admin-pages.js, which is a separate route and would
 // otherwise have no way back to the rest of the dashboard.
 export function renderAdminNav(current) {
-  const nav = el('nav', { class: 'settings-nav', 'aria-label': 'Admin sections' });
-  for (const s of SECTIONS) {
-    const active = s.id === current;
-    const btn = el('button', {
-      class: 'btn' + (active ? ' active' : ''),
-      type: 'button',
-      'aria-current': active ? 'page' : null,
-      onClick: () => { location.hash = s.href; },
-    }, s.label);
-    if (EXTERNAL_SECTIONS.has(s.id) && !active) btn.dataset.route = s.id;
-    nav.appendChild(btn);
-  }
-  return nav;
+  return settingsNav({ scope: 'admin', active: current });
 }
 
 export async function renderAdmin(container, { section = 'overview' } = {}) {
@@ -855,19 +846,16 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
   const meta = SECTIONS.find((s) => s.id === section) || SECTIONS[0];
   renderContextHeader({ title: 'Admin', sub: 'Platform trust, safety, and enforcement' });
 
-  const wrap = el('div', { class: 'page admin' });
-  const head = el('header', { class: 'page-head' });
-  head.appendChild(el('div', { class: 'page-head__main' },
-    el('h1', {}, meta.label)));
-  wrap.appendChild(head);
-  // Section navigation. SECTIONS was declared but never rendered, so the admin
-  // had no way between its own views: Overview linked to the audit log and
-  // nothing else was reachable without editing the address bar. Pages in
-  // particular is served by a separate module (router.js sends /admin/pages to
-  // renderAdminPages) and so was unreachable even though the route existed.
-  wrap.appendChild(renderAdminNav(section));
-  const body = el('div', { class: 'admin-page' });
-  wrap.appendChild(body);
+  // The section title is the pane's heading rather than a page-level h1, so the
+  // nav and the content read as one surface instead of a title stacked above a
+  // nav stacked above the content.
+  const { frame, pane } = settingsFrame({
+    scope: 'admin',
+    active: section,
+    contentClass: 'admin-page',
+  });
+  const body = pane;
+  const wrap = el('div', { class: 'page admin' }, frame);
   container.appendChild(wrap);
 
   // isAdmin is server-computed on /me; refresh it here so a session started

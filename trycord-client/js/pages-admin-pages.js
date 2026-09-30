@@ -4,7 +4,8 @@ import State from './state.js';
 import { esc, el, clear, toast, openModal, confirmDialog } from './ui.js';
 import { emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
-import { renderAdminNav } from './pages-admin.js';
+import { settingsFrame } from './settings-shell.js';
+import { sectionHead } from './settings-ui.js';
 
 const BLOCK_TYPES = [
   { type: 'heading', label: 'Heading', make: () => ({ type: 'heading', level: 2, text: 'Section' }) },
@@ -508,12 +509,14 @@ export async function renderAdminPages(container, { route } = {}) {
   delete document.documentElement.dataset.fullpage;
   clear(container);
   renderContextHeader({ title: 'Pages', sub: 'Public pages an editor can change' });
-  const wrap = el('div', { class: 'page atrium' });
-  wrap.appendChild(renderAdminNav('pages'));
-  wrap.appendChild(el('p', { class: 'muted small' },
+  // Same frame as every other admin section, so Pages is not the one surface
+  // with the nav stacked above the content instead of beside it.
+  const { frame, pane: body } = settingsFrame({ scope: 'admin', active: 'pages', contentClass: 'settings-body' });
+  const wrap = el('div', { class: 'page atrium' }, frame);
+  wrap.appendChild(sectionHead('Pages', 'Public pages an editor can change.'));
+  body.appendChild(el('p', { class: 'muted small' },
     'These pages ship as templates. The sections describing what the software does are accurate everywhere; '
     + 'the fields marked OPERATOR are yours to fill in. Editing a draft does not change what visitors see until you publish.'));
-  const body = el('div', { class: 'settings-body' });
   const list = el('div', {});
   list.appendChild(pageList(() => {}));
   body.appendChild(list);
