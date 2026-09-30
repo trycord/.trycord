@@ -15,6 +15,41 @@
 // The client's own routes, which must not be mistaken for navigation.
 const EXTERNAL = /^(https?:|mailto:|tel:|#$|blob:|data:)/i;
 
+// Where the app is mounted, derived from this module's own URL rather than
+// hard-coded. trycord-client/js/nav.js is served at /js/nav.js on a
+// self-hosted instance and at /app/js/nav.js on the hosted deployment, and the
+// difference matters: a route written as '/settings' is absolute, so from under
+// /app/ it leaves the app entirely and lands on whatever else the origin
+// serves. Deriving the mount point is what makes one set of route literals
+// correct on both.
+function mountPoint() {
+  let pathname;
+  try {
+    const u = new URL('.', import.meta.url);
+    // A file:// module is not a web deployment. Deriving a mount point from it
+    // would produce a filesystem path as a URL prefix, which is worse than not
+    // having one, so a desktop build served straight off disk falls back to the
+    // origin root.
+    if (u.protocol === 'file:' || u.protocol === 'data:') return '';
+    pathname = u.pathname;
+  } catch {
+    return '';
+  }
+  const mount = pathname.replace(/js\/$/, '');
+  if (mount === '/' || !mount.startsWith('/')) return '';
+  return mount.replace(/\/$/, '');
+}
+
+export const BASE = mountPoint();
+
+/** '/settings' -> '/app/settings' where that is where the app lives. */
+export function route(path) {
+  if (!path) return BASE || '/';
+  if (EXTERNAL.test(path) || /^\/\//.test(path)) return path;
+  if (!path.startsWith('/')) return path;
+  return BASE + path;
+}
+
 /** '#/home' -> '/home'. Returns null for anything that is not our route. */
 export function routePath(target) {
   if (target == null) return null;
@@ -48,7 +83,7 @@ export function navigate(target, opts = {}) {
     return;
   }
   const current = location.pathname + location.search;
-  const next = path.startsWith('/') ? path : '/' + path;
+  const next = route(path.startsWith('/') ? path : '/' + path);
   if (next === current && !opts.force) {
     // Already there. Pushing a duplicate entry would make Back do nothing
     // visible, which is worse than not pushing at all.
@@ -88,4 +123,4 @@ export function adoptLegacyHash() {
   return true;
 }
 
-export default { navigate, routePath, currentPath, withQuery, adoptLegacyHash };
+export default { navigate, route, routePath, currentPath, withQuery, adoptLegacyHash, BASE };

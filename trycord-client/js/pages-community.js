@@ -8,7 +8,7 @@ import { renderAllChrome, renderContextHeader } from './shell.js';
 import { renderMemberList } from './pages-members.js';
 import { ensureServer } from './workspace-shared.js';
 import { channelPath } from './links.js';
-import { navigate } from './nav.js';
+import { navigate, route } from './nav.js';;
 
 async function renderServerLanding(container, serverId) {
   clear(container);
@@ -160,12 +160,12 @@ async function renderMenu(container) {
   const appSec = el('div', { class: 'stack' });
   appSec.appendChild(el('div', { class: 'section-label' }, 'App'));
   const links = [
-    { label: 'Friends', href: '/friends', path: '/friends' },
-    { label: 'Notifications', href: '/notifications', path: '/notifications', badge: State.notifUnread },
-    { label: 'Discover', href: '/discover', path: '/discover' },
-    { label: 'Support', href: '/support', path: '/support' },
+    { label: 'Friends', href: route('/friends'), path: '/friends' },
+    { label: 'Notifications', href: route('/notifications'), path: '/notifications', badge: State.notifUnread },
+    { label: 'Discover', href: route('/discover'), path: '/discover' },
+    { label: 'Support', href: route('/support'), path: '/support' },
   ];
-  if (me && me.isAdmin) links.push({ label: 'Admin', href: '/admin', path: '/admin', badge: 0 });
+  if (me && me.isAdmin) links.push({ label: 'Admin', href: route('/admin'), path: '/admin', badge: 0 });
   for (const l of links) {
     const b = el('button', {
       class: 'row' + (route === l.path || route.startsWith(l.path + '/') ? ' active' : ''),

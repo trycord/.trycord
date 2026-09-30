@@ -10,7 +10,7 @@ import { ensureServer } from './workspace-shared.js';
 import { serverPath } from './links.js';
 import { settingsFrame, SETTINGS_IA, findItem } from './settings-shell.js';
 import { sectionHead, sectionCard, setNote } from './settings-ui.js';
-import { navigate } from './nav.js';
+import { navigate, route } from './nav.js';;
 
 // Community sections are addressed relative to the current community, so the
 // href is resolved rather than stored - a stored path would go stale the moment
@@ -233,7 +233,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       serverId,
       title: 'Channels',
       blurb: 'Create and edit text channels, and reorder them within their categories.',
-      href: '/channels/new',
+      href: route('/channels/new'),
       cta: 'Create a channel',
       counts: [channelCount + ' channel' + (channelCount === 1 ? '' : 's'), categoryCount + ' categor' + (categoryCount === 1 ? 'y' : 'ies')],
     }));
@@ -241,7 +241,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       serverId,
       title: 'Categories',
       blurb: 'Group channels so a busy community stays navigable. Categories can also carry their own permission overrides.',
-      href: '/categories',
+      href: route('/categories'),
       cta: 'Manage categories',
       counts: [categoryCount + ' categor' + (categoryCount === 1 ? 'y' : 'ies')],
     }));
@@ -253,7 +253,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       serverId,
       title: 'Members',
       blurb: 'Search the roster, assign roles, set nicknames, and remove or ban people. Role assignment respects the hierarchy — you can only hand out roles below your own highest role.',
-      href: '/members',
+      href: route('/members'),
       cta: 'Open members',
       counts: [memberCount + ' member' + (memberCount === 1 ? '' : 's'), onlineCount + ' online'],
     }));
@@ -265,7 +265,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       serverId,
       title: 'Roles',
       blurb: 'Roles are ordered, and position is what decides what each member may manage. Drag to reorder; permissions are grouped per role. Roles are assigned by people with Manage Roles - members never pick their own.',
-      href: '/roles',
+      href: route('/roles'),
       cta: 'Open the role hierarchy',
       counts: [roleCount + ' role' + (roleCount === 1 ? '' : 's')],
     }));
@@ -277,7 +277,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       serverId,
       title: 'Invites',
       blurb: 'Create and revoke invite links, set use limits and expiry, and copy a link to share.',
-      href: '/invites',
+      href: route('/invites'),
       cta: 'Manage invites',
     }));
     return;

@@ -2,6 +2,7 @@
 import Api from './api.js';
 import { esc, el, clear, toast } from './ui.js';
 import { isAuthed } from './state.js';
+import { route } from './nav.js';
 
 function actionIdFromQuery() {
   try {
@@ -72,7 +73,7 @@ export async function renderMyAppeals(container) {
   const head = el('div', { class: 'pub-section' });
   head.appendChild(el('h1', { class: 'pub-title' }, 'My appeals'));
   head.appendChild(el('p', { class: 'pub-lede' }, 'Decisions appear here once reviewed.'));
-  head.appendChild(el('a', { class: 'btn primary', href: '/support/appeals/new' }, 'New appeal'));
+  head.appendChild(el('a', { class: 'btn primary', href: route('/support/appeals/new') }, 'New appeal'));
   wrap.appendChild(head);
   const list = el('div', { class: 'pub-links' });
   wrap.appendChild(list);
@@ -160,9 +161,9 @@ export function renderNewAppeal(container) {
 
   card.appendChild(form);
   if (isAuthed()) {
-    card.appendChild(el('p', { class: 'auth-alt' }, el('a', { href: '/support/appeals' }, 'View my appeals')));
+    card.appendChild(el('p', { class: 'auth-alt' }, el('a', { href: route('/support/appeals') }, 'View my appeals')));
   } else {
-    card.appendChild(el('p', { class: 'auth-alt' }, 'Signed in? ', el('a', { href: '/support/appeals' }, 'Track your appeals')));
+    card.appendChild(el('p', { class: 'auth-alt' }, 'Signed in? ', el('a', { href: route('/support/appeals') }, 'Track your appeals')));
   }
   section.appendChild(card);
   container.appendChild(wrap);
