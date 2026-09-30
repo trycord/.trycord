@@ -205,7 +205,7 @@ export function memberActions(m) {
 }
 
 const DESTINATIONS = [
-  { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
+  { id: 'home', label: 'Home', icon: 'home', href: '#/home' },
   { id: 'dms', label: 'DMs', icon: 'mail', href: '#/dms' },
   { id: 'notifications', label: 'Notifications', icon: 'bell', href: '#/notifications', badge: () => State.notifUnread },
   { id: 'discover', label: 'Discover', icon: 'search', href: '#/discover' },
@@ -230,14 +230,14 @@ export function renderCommunities(region) {
   const route = currentRoute();
 
   const globalItems = [
-    { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
+    { id: 'home', label: 'Home', icon: 'home', href: '#/home' },
     { id: 'dms', label: 'Direct messages', icon: 'mail', href: '#/dms' },
     { id: 'notifications', label: 'Notifications', icon: 'bell', href: '#/notifications', badge: () => State.notifUnread },
     { id: 'discover', label: 'Discover', icon: 'search', href: '#/discover' },
     { id: 'friends', label: 'Friends', icon: 'users', href: '#/friends', badge: () => (State.friendsIn || []).length },
   ];
 
-  const railButton = ({ label, icon, href, active, badge }) => {
+  const railButton = ({ label, icon: iconName, href, active, badge }) => {
     const btn = el('button', {
       class: 'rail-nav-item' + (active ? ' active' : ''),
       type: 'button',
@@ -246,7 +246,7 @@ export function renderCommunities(region) {
       'aria-current': active ? 'page' : null,
       dataset: { label },
       onClick: () => { location.hash = href; },
-    }, el('span', { class: 'rail-nav-icon' }, icon));
+    }, el('span', { class: 'rail-nav-icon' }, icon(iconName)));
     const count = badge ? badge() : 0;
     if (count > 0) {
       btn.appendChild(el('span', { class: 'rail-nav-badge' }, count > 99 ? '99+' : String(count)));
@@ -285,7 +285,7 @@ export function renderCommunities(region) {
     'aria-label': 'Create a community',
     dataset: { label: 'Create a community' },
     onClick: () => { location.hash = '#/servers/new'; },
-  }, el('span', { class: 'rail-nav-icon' }, '+'));
+  }, el('span', { class: 'rail-nav-icon' }, icon('plus')));
   region.appendChild(el('div', { class: 'rail-divider' }));
   region.appendChild(create);
 
@@ -378,7 +378,7 @@ function communityHeader(sid, server) {
       items.push({ label: 'Community settings', icon: 'gear', onSelect: go(base + '/settings') });
     }
     items.push({ sep: true });
-    items.push({ label: 'Leave community', icon: '⤶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
+    items.push({ label: 'Leave community', icon: 'logout', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
     return items;
   });
   return head;
@@ -1038,7 +1038,7 @@ export function renderMobileTabs(region) {
   if (!isAuthed()) return;
   const route = currentRoute();
   const tabs = [
-    { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
+    { id: 'home', label: 'Home', icon: 'home', href: '#/home' },
     { id: 'dms', label: 'DMs', icon: 'mail', href: '#/dms' },
     { id: 'friends', label: 'Friends', icon: 'users', href: '#/friends' },
     { id: 'notifications', label: 'Alerts', icon: 'bell', href: '#/notifications' },

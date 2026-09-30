@@ -47,6 +47,7 @@ async function boot() {
 
   updateFromViewport();
   TrycordPresentation.wire();
+  TrycordPresentation.gestures();
   window.addEventListener('resize', updateFromViewport);
   onPresentationChange(() => {
     Router.run && Router.run();
