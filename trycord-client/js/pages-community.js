@@ -17,7 +17,7 @@ async function renderServerLanding(container, serverId) {
     server = detail;
   } catch (ex) {
     renderContextHeader({ title: 'Unavailable' });
-    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this server'));
+    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community'));
     return;
   }
   renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
@@ -91,7 +91,7 @@ async function renderServerLanding(container, serverId) {
 
 async function renderNewServer(container, serverId) {
   clear(container);
-  renderContextHeader({ title: 'Create a server' });
+  renderContextHeader({ title: 'Create a community' });
   const wrap = el('div', { class: 'auth-wrap' });
   const card = el('div', { class: 'card card--auth' });
   const err = el('div', { class: 'form-error', hidden: true });
@@ -100,10 +100,10 @@ async function renderNewServer(container, serverId) {
   const joinCode = el('input', { class: 'input', type: 'text', placeholder: 'Public code (letters + numbers, optional)', maxlength: 32 });
   const isPublic = el('input', { type: 'checkbox', checked: true });
   const isDisc = el('input', { type: 'checkbox', checked: true });
-  const createBtn = el('button', { class: 'btn primary block', type: 'submit' }, 'Create server');
+  const createBtn = el('button', { class: 'btn primary block', type: 'submit' }, 'Create community');
 
   const form = el('form', {}, err,
-    el('div', { class: 'field' }, el('label', {}, 'Server name'), name),
+    el('div', { class: 'field' }, el('label', {}, 'Community name'), name),
     el('div', { class: 'field' }, el('label', {}, 'Description'), desc),
     el('div', { class: 'field' }, el('label', {}, 'Join code'), joinCode,
       el('span', { class: 'hint' }, 'Leave blank to auto-generate one.')),
@@ -122,7 +122,7 @@ async function renderNewServer(container, serverId) {
         isPublic: isPublic.checked,
         isDiscoverable: isDisc.checked,
       });
-      toast('Server created!', 'ok');
+      toast('Community created.', 'ok');
       await refreshServers();
       const sid = res.serverId;
       location.hash = channelPath(sid, res.channelId);
@@ -134,7 +134,7 @@ async function renderNewServer(container, serverId) {
     }
   });
 
-  card.appendChild(el('h1', {}, 'Create a server'));
+  card.appendChild(el('h1', {}, 'Create a community'));
   card.appendChild(el('p', { class: 'auth-sub' }, 'A permanent place for your community to gather.'));
   card.appendChild(form);
   wrap.appendChild(card);

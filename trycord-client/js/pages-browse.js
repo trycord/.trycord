@@ -43,7 +43,7 @@ export async function renderBrowse(container, { previewId } = {}) {
 
   const searchRow = el('div', { class: 'row-line' });
   const input = el('input', {
-    class: 'input', type: 'search', placeholder: 'Search servers…', value: query,
+    class: 'input', type: 'search', placeholder: 'Search communities…', value: query,
     style: { flex: '1 1 320px' },
   });
   const goBtn = el('button', { class: 'btn', type: 'button' }, 'Search');
@@ -64,7 +64,7 @@ export async function renderBrowse(container, { previewId } = {}) {
     try {
       detail = await Api.discoverServer(id);
     } catch (ex) {
-      toast(ex.message || 'Cannot load server', 'error');
+      toast(ex.message || 'Cannot load community', 'error');
       return;
     }
     previewPane.hidden = false;
@@ -103,7 +103,7 @@ export async function renderBrowse(container, { previewId } = {}) {
     clear(listPane);
     try {
       const items = await fetchPage(0);
-      resultMeta.textContent = total ? total + ' servers' : 'No results';
+      resultMeta.textContent = total ? total + (total === 1 ? ' community' : ' communities') : 'No results';
       if (!items.length) {
         listPane.appendChild(el('div', { class: 'empty-state' },
           el('div', { class: 'es-icon' }, '◫'), el('div', {}, 'Nothing here'), el('div', {}, 'Try a different search.')));

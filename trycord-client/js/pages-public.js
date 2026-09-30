@@ -100,7 +100,7 @@ function loginForm(container) {
   const secondary = el('div', { class: 'auth-secondary' },
     el('h2', { class: 'auth-secondary__title' }, 'Connect to an instance'),
     el('p', { class: 'auth-secondary__lede' },
-      'Running your own? Point Trycord at your server instead of the default.'),
+      'Running your own? Point Trycord at your instance instead of the default.'),
     backendBox);
 
   const { page, main } = authShell({
@@ -175,7 +175,7 @@ function registerForm(container) {
   const secondary = el('div', { class: 'auth-secondary' },
     el('h2', { class: 'auth-secondary__title' }, 'Connect to an instance'),
     el('p', { class: 'auth-secondary__lede' },
-      'Already running your own? Point Trycord at your server before you sign up.'),
+      'Already running your own? Point Trycord at your instance before you sign up.'),
     backendBox);
 
   const { page, main } = authShell({

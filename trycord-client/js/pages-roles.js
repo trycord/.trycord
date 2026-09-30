@@ -46,7 +46,7 @@ function permissionEditor(allPerms, descriptions, initial) {
     node.appendChild(box);
   }
   if (!allPerms.length) {
-    node.appendChild(el('div', { class: 'muted small' }, 'This server did not report any permissions.'));
+    node.appendChild(el('div', { class: 'muted small' }, 'This community did not report any permissions.'));
   }
   return {
     node,

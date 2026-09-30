@@ -46,7 +46,7 @@ export function groupPermissions(allPerms, descriptions) {
     .filter((p) => !known.has(p))
     .map((p) => ({ key: p, description: (descriptions && descriptions[p]) || '' }));
   if (rest.length) {
-    groups.push({ key: 'other', title: 'Other', blurb: 'Additional permissions from this server.', items: rest });
+    groups.push({ key: 'other', title: 'Other', blurb: 'Additional permissions from this community.', items: rest });
   }
   return groups;
 }
