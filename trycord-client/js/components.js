@@ -287,8 +287,7 @@ export function icon(name, opts = {}) {
   svg.setAttribute('focusable', 'false');
   if (opts.size) { svg.setAttribute('width', opts.size); svg.setAttribute('height', opts.size); }
   if (opts.class) svg.setAttribute('class', opts.class);
-  // className on an SVGElement is read-only in WebKit, and el() assigns
-  // className directly. setAttribute is the only safe route.
+  // SVGElement.className is read-only in WebKit.
   else svg.setAttribute('class', 'ui-icon');
   for (const seg of (d || ICON_PATHS.inbox).split(' M').map((p, i) => (i ? 'M' + p : p))) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');

@@ -337,7 +337,6 @@ discover: ({ q = '', page = 1, limit = 12 } = {}) => {
 
     if (q) qs.set('q', q);
 
-    // Use the existing stored session token.
     return request(
         'GET',
         '/api/discover/servers?' + qs.toString(),

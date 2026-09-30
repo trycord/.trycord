@@ -829,13 +829,11 @@ async function renderAnnouncements(body, show, seq) {
 }
 
 
-// Renders SECTIONS as navigation. Pages is a separate module rather than a
-// branch of renderAdmin, so it is marked here rather than being treated as one
-// more if/else.
+// Pages is a separate module rather than one more branch of renderAdmin.
 const EXTERNAL_SECTIONS = new Set(['pages']);
 
-// Exported because pages-admin-pages.js is a separate route: without the shared
-// renderer, clicking Pages from here would land in a view with no way back.
+// Shared with pages-admin-pages.js, which is a separate route and would
+// otherwise have no way back to the rest of the dashboard.
 export function renderAdminNav(current) {
   const nav = el('nav', { class: 'settings-nav', 'aria-label': 'Admin sections' });
   for (const s of SECTIONS) {

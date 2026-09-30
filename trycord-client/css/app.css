@@ -73,6 +73,9 @@
   --t-img-mat:    rgba(0, 0, 0, 0.3);
   --t-avatar-ring: rgba(255, 255, 255, 0.18);
 
+  --t-env-glow:
+    radial-gradient(700px 320px at 80% -10%, var(--t-env-glow-a), transparent 65%),
+    radial-gradient(600px 280px at 10% 110%, var(--t-env-glow-b), transparent 68%);
   --t-env-base:   #100b08;
   --t-shell-gradient: linear-gradient(180deg, rgba(64, 36, 22, 0.82), rgba(22, 15, 11, 0.7));
   --t-shell-edge: rgba(255, 190, 150, 0.18);
@@ -603,9 +606,7 @@ img { max-width: 100%; }
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(700px 320px at 80% -10%, var(--t-env-glow-a), transparent 65%),
-    radial-gradient(600px 280px at 10% 110%, var(--t-env-glow-b), transparent 68%);
+  background: var(--t-env-glow);
 }
 
 .context-header {
@@ -3155,8 +3156,7 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 .micon .ui-icon,
 .es-icon .ui-icon { width: 1.35em; height: 1.35em; vertical-align: middle; }
 
-/* The caret rotated to indicate a collapsed group; it is an svg now, so the
-   transform needs a transform-origin or it pivots off its own corner. */
+/* An svg rotates about its own box, so it needs an explicit origin. */
 .nav-group__caret { display: inline-flex; align-items: center; transition: transform var(--t-fast) var(--t-ease); transform-origin: 50% 50%; }
 .nav-group.is-collapsed .nav-group__caret { transform: rotate(-90deg); }
 
