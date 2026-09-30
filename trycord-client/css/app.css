@@ -4234,3 +4234,44 @@ html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width
 .ctx-card__body > :last-child { margin-bottom: 0; }
 .ctx-card .kv-row { padding-inline: var(--t-d-4); }
 .ctx-card .set-note { border: 0; border-left: 2px solid var(--t-line); padding-inline: var(--t-d-3); }
+
+/* ---- surface states -----------------------------------------------------
+   One visual language for "not yet", "nothing here" and "that failed". These
+   reserve their own height so arriving content does not shift the page under
+   the reader, and the error state is an alert so it is announced rather than
+   discovered by noticing that nothing appeared. */
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--t-d-3);
+  padding: var(--t-d-5) var(--t-d-4);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-m);
+  background: var(--t-base);
+}
+.state-block__label { font-size: var(--t-fs-m); color: var(--t-txt2); }
+.state-block__actions { display: flex; gap: var(--t-d-2); }
+
+/* A pending surface reads as a surface, not as an empty one. The shimmer is the
+   shared `shimmer` keyframe rather than a second animation, and it stops for a
+   reader who asked for less motion - the class-based rule, not just the media
+   query, because that preference is theirs and not the operating system's. */
+.skeleton {
+  width: 100%;
+  height: 14px;
+  border-radius: var(--t-r-xs);
+  background: linear-gradient(
+    90deg,
+    var(--t-base2) 0%,
+    color-mix(in srgb, var(--t-line) 60%, var(--t-base2)) 50%,
+    var(--t-base2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer var(--t-shimmer) linear infinite;
+}
+.skeleton + .state-block__label { align-self: flex-start; }
+.state-block--loading .state-block__label { color: var(--t-mut); font-size: var(--t-fs-s); }
+
+.state-block--error { border-left: 2px solid var(--t-err); }
+.state-block--error .state-block__label { color: var(--t-err); }

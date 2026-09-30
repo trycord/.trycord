@@ -474,6 +474,11 @@ joinDiscover: (id) =>
     request('POST', '/api/account/deletion', { body: { password, confirm: 'DELETE' } }),
   cancelAccountDeletion: () => request('POST', '/api/account/deletion/cancel'),
 
+  // Assembled by the server on request from the caller's own rows. `ndjson` is
+  // the same export with a different content type, for when one document is
+  // inconvenient to open - not a second export.
+  exportData: () => request('GET', '/api/me/export'),
+
   // Privacy, blocking, notification preferences and wellbeing. All under
   // /api/me because they are all about the caller's own account; the server
   // reads a stranger's preferences when enforcing a rule, never exposes them.
