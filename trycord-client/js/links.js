@@ -11,6 +11,7 @@
 // rather than breaking it - which is the whole reason resolution accepts both
 // forms.
 import State from './state.js';
+import { route } from './nav.js';
 
 function serverRow(id) {
   const list = Array.isArray(State.servers) ? State.servers : [];
@@ -46,8 +47,15 @@ export function userToken(user) {
 // '#/c/:slug' and '#/c/:slug/channel/:slug'. The short prefixes are the V2
 // shape; the old '/server/:id/...' routes are still understood by the router, so
 // nothing here has to know who is reading a given link.
+// Every builder here goes through route(), which is the one place that knows
+// where the app is mounted. They were returning '#/c/...' - hash routing, the
+// thing the move to paths was meant to leave behind - so communities and
+// channels were still a separate navigation system from the rest of the app:
+// /app/home by pathname and #/c/slug/channel/general by fragment. Nested one
+// more level, that hybrid could not work, because the fragment had nowhere to
+// sit once the path was already carrying the mount.
 export function serverPath(serverId, suffix) {
-  const base = '#/c/' + encodeURIComponent(serverToken(serverId));
+  const base = route('/c/' + encodeURIComponent(serverToken(serverId)));
   return suffix ? base + '/' + suffix : base;
 }
 
@@ -57,13 +65,18 @@ export function channelPath(serverId, channelId, query) {
 }
 
 export function userPath(user) {
-  return '#/users/' + encodeURIComponent(userToken(user));
+  return route('/users/' + encodeURIComponent(userToken(user)));
 }
 
 // A shareable absolute link. Channel permalinks are the case that matters:
 // they are pasted into other applications, so a UUID is a poor thing to hand
 // someone.
+//
+// The mount comes from route() rather than a literal '/app/'. Hard-coding it
+// would make a self-hoster's permalinks point at a path they do not serve,
+// while their own app sits at the root - the link would only ever be right on
+// one deployment.
 export function absoluteChannelUrl(serverId, channelId, messageId) {
-  const hash = channelPath(serverId, channelId, messageId ? '?m=' + encodeURIComponent(messageId) : '');
-  return location.origin + '/app/' + hash;
+  const p = channelPath(serverId, channelId, messageId ? '?m=' + encodeURIComponent(messageId) : '');
+  return location.origin + p;
 }

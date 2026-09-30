@@ -298,11 +298,5 @@ export function settingsBack(href, label) {
   return a;
 }
 
-export function settingsScopeHref(scope, serverId, section) {
-  if (scope === 'account') return section === 'profile' ? '#/settings' : '#/settings/' + section;
-  if (scope === 'admin') return '#/admin' + (section === 'users' ? '/users' : '/' + section);
-  return serverPath(serverId, 'settings', section === 'overview' ? '' : section);
-}
 
-export { serverPath };
-export default { SETTINGS_IA, settingsNav, settingsFrame, settingsBack, settingsScopeHref, blurbFor, findItem, isActive, clear };
+export default { SETTINGS_IA, settingsNav, settingsFrame, settingsBack, blurbFor, findItem, isActive, clear };
