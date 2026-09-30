@@ -631,9 +631,16 @@ async function boot() {
   // the shell. It was left out on the reasoning that the in-app support view is
   // only reached by navigation, which is true of the view and not of the URLs
   // pointing at it - so a bookmarked /support was a 404.
+  //
+  // Every segment here must also be a prefix in the client's route table. They
+  // drifted: 'users' and 'invite' were routable but absent, so a profile or an
+  // invite link worked when navigated to and 404ed the moment anyone reloaded or
+  // bookmarked it - the failure only shows up on a hard request, which is
+  // exactly what local navigation testing never does. check-routes.js asserts
+  // the two agree, because a list only one side maintains drifts again.
   const APP_ROUTE_PREFIXES = new Set([
-    'home', 'dms', 'settings', 'account', 'server', 'c', 'admin',
-    'friends', 'notifications', 'discover', 'profile',
+    'home', 'dms', 'settings', 'account', 'server', 'servers', 'c', 'admin',
+    'friends', 'notifications', 'discover', 'profile', 'users', 'invite',
     'login', 'register', 'forgot', 'reset-password', 'verify-email',
     'menu', 'legal', 'channel', 'message', 'support',
   ]);
@@ -666,21 +673,18 @@ async function boot() {
       // /settings/security asked for /settings/css/app.css and rendered with no
       // stylesheet and no script.
       const mount = appMount(req.path);
-      if (!mount) {
-        res.status(200)
-          .set('Cache-Control', 'no-store')
-          .type('html')
-          .sendFile('index.html', { root: clientDir }, (err) => {
-            if (err && !res.headersSent) next(err);
-          });
-        return;
-      }
+      // Always rewritten, including the unmounted case. The file carries the
+      // hosted mount because the Cloudflare deployment serves it statically with
+      // nothing to correct it; a self-hoster at the origin root must therefore
+      // not inherit that value, or every asset URL resolves under /app/ and the
+      // app boots to a blank page. Serving the file untouched when there is no
+      // mount was correct only while the file said "/".
       fs.readFile(path.join(clientDir, 'index.html'), 'utf8', (err, html) => {
         if (err) { if (!res.headersSent) next(err); return; }
         res.status(200)
           .set('Cache-Control', 'no-store')
           .type('html')
-          .send(html.replace(/<base href="[^"]*">/i, `<base href="${mount}/">`));
+          .send(html.replace(/<base href="[^"]*">/i, `<base href="${mount || ''}/">`));
       });
     });
   }

@@ -314,7 +314,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
       { label: 'Copy message link', onSelect: () => copyText(msgLink(m), 'Message link copied.') },
       { label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') },
-      ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { navigate('#/users/' + m.author_id); } }] : []),
+      ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { navigate('/users/' + m.author_id); } }] : []),
       ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
       ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
       ...(canInChannel('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),

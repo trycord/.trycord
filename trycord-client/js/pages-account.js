@@ -36,7 +36,7 @@ function signOutButton() {
         try { Realtime.disconnect(); } catch { /* ignore */ }
         clearAnnouncements();
         clearSession();
-        navigate('#/login');
+        navigate('/login');
       },
     });
   });
@@ -60,7 +60,7 @@ function renderPrivacySocial(body) {
     control: incoming.length
       ? el('button', {
         class: 'btn sm', type: 'button',
-        onClick: () => { navigate('#/friends'); },
+        onClick: () => { navigate('/friends'); },
       }, 'Review')
       : el('span', { class: 'muted small' }, 'None'),
   });
@@ -128,7 +128,7 @@ function renderNotificationsSettings(body) {
   const ids = [...(State.mutedChannels || [])];
   const card = sectionCard();
 
-  const alerts = dangerButton('Open alerts', () => { navigate('#/notifications'); },
+  const alerts = dangerButton('Open alerts', () => { navigate('/notifications'); },
     { variant: 'ghost' });
 
   if (!ids.length) {
@@ -849,7 +849,7 @@ function renderSessionsSection(wrap) {
         try { await Api.revokeAllSessions(); } finally {
           try { Realtime.disconnect(); } catch { /* ignore */ }
           clearSession();
-          navigate('#/login');
+          navigate('/login');
         }
       },
     });
@@ -1028,7 +1028,7 @@ function renderDangerZone(wrap) {
     try { Realtime.disconnect(); } catch { /* ignore */ }
     clearAnnouncements();
     clearSession();
-    navigate('#/login');
+    navigate('/login');
   });
   wrap.appendChild(el('p', { class: 'muted small' }, 'Sign out on this device. Use Security to sign out everywhere.'));
   wrap.appendChild(el('div', { class: 'row-line' }, logoutBtn));

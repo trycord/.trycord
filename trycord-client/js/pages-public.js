@@ -79,7 +79,7 @@ function secondFactorStep(challengeToken, err) {
       } else {
         toast('Signed in.', 'ok');
       }
-      navigate('#/home');
+      navigate('/home');
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -142,7 +142,7 @@ function loginForm(container) {
       }
       applyAuth(res);
       toast('Signed in.', 'ok');
-      navigate('#/home');
+      navigate('/home');
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -242,7 +242,7 @@ function registerForm(container) {
       });
       applyAuth(res);
       toast('Account created.', 'ok');
-      navigate('#/home');
+      navigate('/home');
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -387,14 +387,14 @@ function verifyEmailPage(container, token) {
         : 'Your email is verified and saved to your account.';
       actions.appendChild(el('button', {
         class: 'btn primary', type: 'button',
-        onClick: () => { navigate(me ? '#/settings' : '#/login'); },
+        onClick: () => { navigate(me ? '/settings' : '/login'); },
       }, me ? 'Open your account' : 'Sign in'));
     } catch (ex) {
       err.hidden = false;
       err.textContent = ex.message || 'This verification link is no longer valid. Request a new one from your settings.';
       actions.appendChild(el('button', {
         class: 'btn primary', type: 'button',
-        onClick: () => { navigate(isAuthed() ? '#/settings' : '#/login'); },
+        onClick: () => { navigate(isAuthed() ? '/settings' : '/login'); },
       }, isAuthed() ? 'Open your account' : 'Sign in'));
     }
   })();

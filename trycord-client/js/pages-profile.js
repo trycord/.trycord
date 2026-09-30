@@ -84,8 +84,8 @@ export async function renderProfile(container, { id } = {}) {
         try {
           const conv = await Api.openDm(profile.id);
           toast('Opening conversation.', 'ok');
-          if (conv && conv.conversationId) navigate('#/dms/' + conv.conversationId);
-          else navigate('#/dms');
+          if (conv && conv.conversationId) navigate('/dms/' + conv.conversationId);
+          else navigate('/dms');
           return;
         } catch (ex) { toast(ex.message || 'Could not open a DM', 'error'); }
       });

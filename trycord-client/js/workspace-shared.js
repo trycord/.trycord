@@ -50,7 +50,7 @@ function wireCommunityEvents() {
           renderAllChrome();
           // Compared against the route rather than the raw pathname, which on a
           // subpath deployment still carries the mount.
-          if (currentRoute() !== '/home') navigate('#/home');
+          if (currentRoute() !== '/home') navigate('/home');
           toast('You were removed from that community.', 'warn');
           return;
         }

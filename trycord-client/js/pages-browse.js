@@ -88,7 +88,7 @@ export async function renderBrowse(container, { previewId } = {}) {
           await Api.joinDiscover(id);
           toast('Joined!', 'ok');
           await refreshServers();
-          navigate('#/home');
+          navigate('/home');
         } catch (ex) {
           toast(ex.message || 'Could not join', 'error');
           joinBtn.removeAttribute('aria-busy');
