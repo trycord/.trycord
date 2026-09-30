@@ -132,7 +132,7 @@ async function renderServerCategories(container, serverId) {
     const cats = [...(State.channels.categories || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
     const allChannels = [...(State.channels.channels || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
     if (!cats.length && !allChannels.length) {
-      list.appendChild(emptyState('≡', 'No categories', 'Channels without a category appear under Text channels.'));
+      list.appendChild(emptyState('list', 'No categories', 'Channels without a category appear under Text channels.'));
     }
     cats.forEach((cat, idx) => {
       const channels = allChannels.filter((c) => String(c.category_id) === String(cat.id));

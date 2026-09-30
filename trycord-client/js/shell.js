@@ -1,6 +1,6 @@
 
 import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, attachMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
-import { avatar, navRow, serverChip, channelRow, communityMark, communityBannerUrl, loadAuthedImage, navGroup } from './components.js';
+import { avatar, icon, navRow, serverChip, channelRow, communityMark, communityBannerUrl, loadAuthedImage, navGroup } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, isMuted, setMuted, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
 import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
@@ -206,11 +206,11 @@ export function memberActions(m) {
 
 const DESTINATIONS = [
   { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
-  { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
-  { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
-  { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
+  { id: 'dms', label: 'DMs', icon: 'mail', href: '#/dms' },
+  { id: 'notifications', label: 'Notifications', icon: 'bell', href: '#/notifications', badge: () => State.notifUnread },
+  { id: 'discover', label: 'Discover', icon: 'search', href: '#/discover' },
   { id: 'support', label: 'Support', icon: '?', href: '#/support' },
-  { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
+  { id: 'friends', label: 'Friends', icon: 'users', href: '#/friends' },
 ];
 
 let navRoute = () => '';
@@ -231,10 +231,10 @@ export function renderCommunities(region) {
 
   const globalItems = [
     { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
-    { id: 'dms', label: 'Direct messages', icon: '✉', href: '#/dms' },
-    { id: 'notifications', label: 'Notifications', icon: '♧', href: '#/notifications', badge: () => State.notifUnread },
-    { id: 'discover', label: 'Discover', icon: '⌕', href: '#/discover' },
-    { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends', badge: () => (State.friendsIn || []).length },
+    { id: 'dms', label: 'Direct messages', icon: 'mail', href: '#/dms' },
+    { id: 'notifications', label: 'Notifications', icon: 'bell', href: '#/notifications', badge: () => State.notifUnread },
+    { id: 'discover', label: 'Discover', icon: 'search', href: '#/discover' },
+    { id: 'friends', label: 'Friends', icon: 'users', href: '#/friends', badge: () => (State.friendsIn || []).length },
   ];
 
   const railButton = ({ label, icon, href, active, badge }) => {
@@ -362,20 +362,20 @@ function communityHeader(sid, server) {
     const items = [];
 
     items.push({ label: 'Community overview', icon: '⌂', onSelect: go(base) });
-    items.push({ label: 'Members', icon: '☰', onSelect: go(base + '/members') });
+    items.push({ label: 'Members', icon: 'menu', onSelect: go(base + '/members') });
     if (can('MANAGE_ROLES') || can('MANAGE_SERVER')) {
       items.push({ label: 'Roles', icon: '◈', onSelect: go(base + '/roles') });
     }
     if (can('MANAGE_CHANNELS')) {
-      items.push({ label: 'Categories', icon: '≡', onSelect: go(base + '/categories') });
+      items.push({ label: 'Categories', icon: 'list', onSelect: go(base + '/categories') });
       items.push({ label: 'Create channel', icon: '＋', onSelect: go(base + '/channels/new') });
     }
     if (can('MANAGE_INVITES')) {
-      items.push({ label: 'Invites', icon: '✉', onSelect: go(base + '/invites') });
+      items.push({ label: 'Invites', icon: 'mail', onSelect: go(base + '/invites') });
     }
     if (can('MANAGE_SERVER')) {
       items.push({ sep: true });
-      items.push({ label: 'Community settings', icon: '⚙', onSelect: go(base + '/settings') });
+      items.push({ label: 'Community settings', icon: 'gear', onSelect: go(base + '/settings') });
     }
     items.push({ sep: true });
     items.push({ label: 'Leave community', icon: '⤶', danger: true, onSelect: () => serverChipMenuLeave(sid, server) });
@@ -437,7 +437,7 @@ function sessionBar() {
     class: 'user-controls__btn', type: 'button',
     title: 'Settings', 'aria-label': 'Settings',
     onClick: () => { location.hash = '#/settings'; },
-  }, '⚙'));
+  }, icon('gear')));
   bar.appendChild(buttons);
   return bar;
 }
@@ -1011,7 +1011,7 @@ export function renderContextHeader({ title, sub, icon, actions } = {}) {
     class: 'nav-toggle', type: 'button',
     title: 'Navigation', 'aria-label': 'Toggle navigation',
     'aria-expanded': isDesktopNavOpen() ? 'true' : 'false',
-  }, '☰');
+  }, icon('menu'));
   navToggle.addEventListener('click', () => toggleContextSidebar());
   header.appendChild(navToggle);
 
@@ -1041,10 +1041,10 @@ export function renderMobileTabs(region) {
   const route = currentRoute();
   const tabs = [
     { id: 'home', label: 'Home', icon: '⌂', href: '#/home' },
-    { id: 'dms', label: 'DMs', icon: '✉', href: '#/dms' },
-    { id: 'friends', label: 'Friends', icon: '☺', href: '#/friends' },
-    { id: 'notifications', label: 'Alerts', icon: '♧', href: '#/notifications' },
-    { id: 'menu', label: 'Menu', icon: '☰', href: '#/menu' },
+    { id: 'dms', label: 'DMs', icon: 'mail', href: '#/dms' },
+    { id: 'friends', label: 'Friends', icon: 'users', href: '#/friends' },
+    { id: 'notifications', label: 'Alerts', icon: 'bell', href: '#/notifications' },
+    { id: 'menu', label: 'Menu', icon: 'menu', href: '#/menu' },
   ];
   for (const t of tabs) {
     const active = route.startsWith(t.href.replace('#', ''));

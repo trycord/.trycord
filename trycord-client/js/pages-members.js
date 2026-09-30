@@ -231,7 +231,7 @@ async function renderServerMembers(container, serverId) {
     roleFilter.value = [...roleFilter.options].some((o) => o.value === curRole) ? curRole : 'all';
 
     if (!members.length) {
-      list.appendChild(emptyState('⌕', 'No members found', 'Try a different search or filter.'));
+      list.appendChild(emptyState('search', 'No members found', 'Try a different search or filter.'));
     }
     for (const m of members) {
       const id = m.user_id || m.id;
