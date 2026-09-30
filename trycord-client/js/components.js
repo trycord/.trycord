@@ -344,7 +344,7 @@ export function messageRow(msg, opts = {}) {
   }
   if (opts.onHover) {
     const bar = el('div', { class: 'msg-hoverbar' });
-    const react = el('button', { type: 'button', title: 'Add reaction', 'aria-label': 'Add reaction' }, icon('users'));
+    const react = el('button', { type: 'button', title: 'Add reaction', 'aria-label': 'Add reaction' }, icon('smile'));
     react.addEventListener('click', (e) => { e.stopPropagation(); opts.onHover('react', react); });
     const more = el('button', { type: 'button', title: 'More actions', 'aria-label': 'More actions' }, icon('more'));
     more.addEventListener('click', (e) => { e.stopPropagation(); opts.onHover('more', more); });

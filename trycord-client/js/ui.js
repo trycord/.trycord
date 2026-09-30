@@ -41,6 +41,9 @@ function associateLabels(node) {
 export const ICON_PATHS = {
   home: 'M3 10.6 12 3.5l9 7.1V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
   plus: 'M12 5v14M5 12h14',
+  smile: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 14.5a4.5 4.5 0 0 0 7 0',
+  circle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+  paperclip: 'M20 11.5 12.2 19.3a4.5 4.5 0 0 1-6.4-6.4l8-8a3 3 0 0 1 4.3 4.3l-8 8a1.5 1.5 0 0 1-2.1-2.1l7.3-7.3',
   mail: 'M3 6.5h18v11H3zM3 7l9 6.5L21 7',
   users: 'M16 20v-1.6a3.4 3.4 0 0 0-3.4-3.4H6.4A3.4 3.4 0 0 0 3 18.4V20M9.5 11.5a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5M21 20v-1.6a3.4 3.4 0 0 0-2.6-3.3M15.5 5.2a3.25 3.25 0 0 1 0 6.1',
   bell: 'M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5M13.7 20a2 2 0 0 1-3.4 0',
@@ -463,8 +466,12 @@ function placeSub(pop, anchorBtn) {
 function placeUnder(pop, anchor) {
   const a = anchor.getBoundingClientRect();
   const pr = pop.getBoundingClientRect();
+  // Clamped at both ends, the same way place() clamps a point. It only had the
+  // far edge before, so a trigger near the left of the window put the menu flush
+  // against the screen with no margin at all.
   let left = a.left;
-  if (left + pr.width > innerWidth - MENU_EDGE) left = Math.max(MENU_EDGE, innerWidth - pr.width - MENU_EDGE);
+  if (left + pr.width > innerWidth - MENU_EDGE) left = innerWidth - pr.width - MENU_EDGE;
+  left = Math.max(MENU_EDGE, left);
   pop.style.left = Math.round(left) + 'px';
   let top = a.bottom + 4;
   // Flip above when there is no room below, so a menu near the bottom of the
@@ -548,7 +555,17 @@ function showContextMenuAt(anchor, items, ctx) {
     place(pop, ctx.x, ctx.y);
   }
 
-  menuStack.push({ pop, depth: ctx.depth, anchorBtn: ctx.anchorBtn || ctx.under || null });
+  // closeFrom already resets aria-expanded on whatever it records as the
+  // trigger, so anything reaching here as an anchor has to have had it set.
+  // Without this the button was marked not-expanded on close having never been
+  // marked expanded at all.
+  const anchorBtn = ctx.anchorBtn || ctx.under || null;
+  if (anchorBtn && anchorBtn.setAttribute) {
+    anchorBtn.setAttribute('aria-haspopup', 'menu');
+    anchorBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  menuStack.push({ pop, depth: ctx.depth, anchorBtn });
   return pop;
 }
 

@@ -1035,10 +1035,32 @@ export function renderContextHeader({ title, sub, icon: iconGlyph, actions } = {
 }
 
 
+const LS_TABBAR_HIDDEN = 'trycord.tabbarHidden';
+
+export function isTabBarHidden() {
+  try { return localStorage.getItem(LS_TABBAR_HIDDEN) === '1'; } catch { return false; }
+}
+
+export function setTabBarHidden(hidden) {
+  try { localStorage.setItem(LS_TABBAR_HIDDEN, hidden ? '1' : '0'); } catch { /* ignore */ }
+  const bar = qs('#mobile-tab-navigation');
+  // The attribute lives on the bar, and the narrow layout's grid gives the bar
+  // its own auto track, so collapsing it hands the height straight back to the
+  // content above it. No padding to recalculate and nothing to reflow.
+  if (bar) bar.dataset.collapsed = hidden ? 'true' : 'false';
+}
+
+// Collapsible because on a short phone the bar competes with the composer for
+// the same 64px, and the message being typed matters more than the five
+// destinations are reachable from. One thumb-tall handle remains so it can be
+// brought back without a reload.
 export function renderMobileTabs(region) {
   clear(region);
   if (!isAuthed()) return;
   const route = currentRoute();
+  const hidden = isTabBarHidden();
+  region.dataset.collapsed = hidden ? 'true' : 'false';
+
   const tabs = [
     { id: 'home', label: 'Home', icon: 'home', href: '/home' },
     { id: 'dms', label: 'DMs', icon: 'mail', href: '/dms' },
@@ -1046,16 +1068,34 @@ export function renderMobileTabs(region) {
     { id: 'notifications', label: 'Alerts', icon: 'bell', href: '/notifications' },
     { id: 'menu', label: 'Menu', icon: 'menu', href: '/menu' },
   ];
+  const strip = el('div', { class: 'mobile-tab-navigation__strip' });
   for (const t of tabs) {
-    const active = route.startsWith(t.href.replace('#', ''));
+    const active = route.startsWith(t.href);
     const btn = el('button', {
       type: 'button', class: active ? 'active' : '',
+      'aria-current': active ? 'page' : null,
       onClick: () => { navigate(t.href); },
     });
-    btn.appendChild(el('span', { class: 'micon' }, t.icon));
-    btn.appendChild(el('span', {}, t.label));
-    region.appendChild(btn);
+    btn.appendChild(el('span', { class: 'micon' }, icon(t.icon)));
+    btn.appendChild(el('span', { class: 'mlabel' }, t.label));
+    strip.appendChild(btn);
   }
+
+  const toggle = el('button', {
+    type: 'button',
+    class: 'mobile-tab-navigation__toggle',
+    'aria-expanded': hidden ? 'false' : 'true',
+    'aria-controls': 'mobile-tab-navigation',
+    title: hidden ? 'Show navigation' : 'Hide navigation',
+    'aria-label': hidden ? 'Show navigation' : 'Hide navigation',
+  }, icon('menu'));
+  toggle.addEventListener('click', () => {
+    const next = !isTabBarHidden();
+    setTabBarHidden(next);
+    renderMobileTabs(region);
+  });
+
+  region.append(toggle, strip);
 }
 
 // Each region is independent: the rail, the channel list, the mobile tab bar and

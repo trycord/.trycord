@@ -21,7 +21,7 @@ import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support
 import { renderNotifications } from './pages-notifications.js';
 import { presentationMode, closeDesktopNav } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from './shell.js';
-import { adoptLegacyHash } from './nav.js';
+import { navigate, adoptLegacyHash } from './nav.js';
 import Api from './api.js';
 
 // A slug is a display convenience, not an identity, so a route that cannot
