@@ -11,6 +11,7 @@ import { TrycordConfig } from './config.js';
 import { statusChip } from './pages-admin.js';
 import Realtime from './realtime.js';
 import { settingsFrame, blurbFor, findItem } from './settings-shell.js';
+import { loadingState, errorState } from './states.js';
 import {
   privacyContext, securityContext, notificationsContext,
   appearanceContext, backendContext, guideContext, profileContext,
@@ -877,14 +878,16 @@ function renderSessionsSection(wrap) {
 
 async function loadSessions(host) {
   clear(host);
-  host.appendChild(el('p', { class: 'muted small' }, 'Loading your sessions…'));
+  host.appendChild(loadingState('Loading your sessions'));
   let sessions;
   try {
     const res = await Api.sessions();
     sessions = res.sessions || [];
   } catch (ex) {
     clear(host);
-    host.appendChild(setNote(ex.message || 'Could not load your sessions.'));
+    host.appendChild(errorState(ex.message || 'Could not load your sessions.', () => {
+      loadSessions(host);
+    }));
     return;
   }
   clear(host);
@@ -1121,6 +1124,13 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   const wrap = el('div', { class: 'page atrium' }, frame);
   const body = pane;
 
+  // In the document before anything is awaited. Appending at the end meant every
+  // loading state below was built into a detached tree, so it was never painted:
+  // the pane simply appeared some time later, with nothing in between. That is
+  // indistinguishable from a hung request, which is the one thing a loading
+  // state exists to prevent.
+  container.appendChild(wrap);
+
   // Friends and mutes are needed by the two new sections. They are already
   // loaded on sign-in, so this only covers a deep link straight into them.
   if (tab === 'privacy' || tab === 'notifications') {
@@ -1169,8 +1179,6 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   }
 
   await fillContext(frame, context, tab);
-
-  container.appendChild(wrap);
 }
 
 // The contextual column, per section. Filled after the pane so it can read the

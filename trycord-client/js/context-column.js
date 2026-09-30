@@ -21,11 +21,21 @@ import { sectionCard, settingRow } from './settings-ui.js';
 import { serverPath } from './links.js';
 import { route } from './nav.js';
 
+// The server's vocabulary, verbatim. Presence uses 'everyone' where the request
+// gates use 'anyone', and the two are different words for the same answer - the
+// first is about who can see you, the second about who can reach you. An
+// earlier version of this table knew only 'anyone', so a default presence read
+// as "visible to ." in this column while the pane beside it said anyone. The
+// fallback below exists so an unrecognised value shows itself rather than
+// rendering empty.
 const SCOPE_HELP = {
   anyone: 'Anyone on this instance',
+  everyone: 'Anyone on this instance',
   friends: 'People you have accepted',
   nobody: 'Nobody',
 };
+
+const scopeText = (v) => SCOPE_HELP[v] || ('unrecognised value: ' + v);
 
 const lower = (v) => String(v == null ? '' : v).toLowerCase();
 
@@ -69,13 +79,13 @@ export function privacyContext(privacy, blocks) {
     para(nobody
       ? 'Nobody can reach you directly. Only people already in a community with you can, and only where that community allows it.'
       : privacy.dms === 'nobody'
-        ? 'No one can open a conversation with you. Friend requests still arrive from ' + lower(SCOPE_HELP[privacy.friendRequests]) + '.'
+        ? 'No one can open a conversation with you. Friend requests still arrive from ' + scopeText(privacy.friendRequests) + '.'
         : privacy.dms === 'friends'
           ? 'Only people you have accepted can message you. Anyone else has to send a friend request first.'
           : 'Anyone on this instance can open a conversation with you. Turning this off is the single biggest thing you can do to stop unsolicited messages.'),
     para(privacy.presence === 'nobody'
       ? 'Your online status is hidden. You will still appear offline rather than away.'
-      : 'Your online status is visible to ' + lower(SCOPE_HELP[privacy.presence]) + '.'),
+      : 'Your online status is visible to ' + scopeText(privacy.presence) + '.'),
     para(privacy.discoverable
       ? 'Your username can be found by searching. Turning this off hides you from search without affecting direct messages.'
       : 'You are hidden from search. People can still reach you through a community you share.'),

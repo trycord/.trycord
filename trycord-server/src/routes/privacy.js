@@ -37,9 +37,9 @@ router.patch('/privacy', rateLimit({ windowMs: 60_000, max: 30 }), async (req, r
     const patch = {};
     for (const key of ['friendRequests', 'dms', 'presence']) {
       if (body[key] === undefined) continue;
-      const v = String(body[key]).toLowerCase();
-      if (!privacy.SCOPES.includes(v)) {
-        return fail(res, 'VALIDATION_ERROR', `\`${key}\` must be one of ${privacy.SCOPES.join(', ')}`);
+      const v = privacy.normalizeScope(body[key]);
+      if (!v) {
+        return fail(res, 'VALIDATION_ERROR', `\`${key}\` must be one of ${privacy.SCOPES.join(', ')} or everyone`);
       }
       patch[key] = v;
     }

@@ -14,6 +14,7 @@
 // helpers.
 
 import Api from './api.js';
+import { loadingState, errorState } from './states.js';
 import State from './state.js';
 import { el, clear, toast, openModal } from './ui.js';
 import {
@@ -21,11 +22,20 @@ import {
   setEmpty, setNote, dangerButton, setActionRow,
 } from './settings-ui.js';
 
+// The server's vocabulary. Presence historically stored 'everyone' where the
+// request gates stored 'anyone'; the server now accepts both and canonicalises
+// to 'anyone' on read, so a stored value can still arrive as either and must
+// render as the same sentence either way.
 const SCOPE_HELP = {
   anyone: 'Anyone on this instance',
+  everyone: 'Anyone on this instance',
   friends: 'People you have accepted',
   nobody: 'Nobody',
 };
+
+// An unrecognised value shows itself rather than rendering as nothing. A blank
+// sentence reads as "nobody" and means the opposite.
+const scopeText = (v) => SCOPE_HELP[v] || ('unrecognised value: ' + v);
 
 const scopeOptions = ['anyone', 'friends', 'nobody'].map((v) => ({ value: v, label: SCOPE_HELP[v] }));
 
@@ -92,7 +102,7 @@ function saveAndRefresh(save, repaint) {
  */
 export async function renderPrivacySection(body) {
   body.appendChild(sectionHead('Privacy', 'Who can reach you, and who you have stopped.'));
-  body.appendChild(el('p', { class: 'muted small' }, 'Loading your privacy settings…'));
+  body.appendChild(loadingState('Loading your privacy settings'));
 
   let settings;
   let blocks;
@@ -101,10 +111,9 @@ export async function renderPrivacySection(body) {
   } catch (ex) {
     clear(body);
     body.appendChild(sectionHead('Privacy', 'Who can reach you.'));
-    body.appendChild(setNote(ex.message || 'Could not load your privacy settings.'));
-    body.appendChild(setActionRow([
-      el('button', { class: 'btn', type: 'button', onClick: () => renderPrivacySection(body) }, 'Retry'),
-    ]));
+    body.appendChild(errorState(ex.message || 'Could not load your privacy settings.', () => {
+      renderPrivacySection(body);
+    }));
     return;
   }
   clear(body);
@@ -151,10 +160,9 @@ export async function renderPrivacySection(body) {
   const summary = sectionCard();
   summary.appendChild(el('div', { class: 'set-card__label' }, 'Effective now'));
   const list = el('dl', { class: 'kv-list' });
-  const lower = (v) => String(v).toLowerCase();
-  list.appendChild(fact('Friend requests from', lower(SCOPE_HELP[settings.friendRequests] || settings.friendRequests)));
-  list.appendChild(fact('Direct messages from', lower(SCOPE_HELP[settings.dms] || settings.dms)));
-  list.appendChild(fact('Online status visible to', lower(SCOPE_HELP[settings.presence] || settings.presence)));
+  list.appendChild(fact('Friend requests from', scopeText(settings.friendRequests)));
+  list.appendChild(fact('Direct messages from', scopeText(settings.dms)));
+  list.appendChild(fact('Online status visible to', scopeText(settings.presence)));
   list.appendChild(fact('Listed in search', settings.discoverable ? 'yes' : 'no'));
   list.appendChild(fact('People blocked', String(blocks.length)));
   summary.appendChild(list);
@@ -239,7 +247,7 @@ function confirmBlock(user, onDone) {
  */
 export async function renderNotificationPrefsSection(body) {
   body.appendChild(sectionHead('Notifications', 'What Trycord is allowed to interrupt you for.'));
-  body.appendChild(el('p', { class: 'muted small' }, 'Loading your notification settings…'));
+  body.appendChild(loadingState('Loading your notification settings'));
 
   let prefs;
   let categories;
@@ -250,10 +258,9 @@ export async function renderNotificationPrefsSection(body) {
   } catch (ex) {
     clear(body);
     body.appendChild(sectionHead('Notifications', 'What you are notified about.'));
-    body.appendChild(setNote(ex.message || 'Could not load your notification settings.'));
-    body.appendChild(setActionRow([
-      el('button', { class: 'btn', type: 'button', onClick: () => renderNotificationPrefsSection(body) }, 'Retry'),
-    ]));
+    body.appendChild(errorState(ex.message || 'Could not load your notification settings.', () => {
+      renderNotificationPrefsSection(body);
+    }));
     return;
   }
   clear(body);

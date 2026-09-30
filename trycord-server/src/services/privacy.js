@@ -16,6 +16,17 @@ const { now, uuid } = require('../util');
 // 'anyone'  - no restriction
 // 'friends' - accepted friends only
 // 'nobody'  - nobody except the account holder
+// 'everyone' is a synonym of 'anyone', not a separate value. Presence stored
+// 'everyone' by default while the request gates stored 'anyone', so it needed to
+// be accepted as an input or a reader who chose the obvious option had it
+// silently rewritten on the way in - the stored value then disagreed with what
+// they picked and with the default they never touched.
+//
+// Canonicalised to 'anyone' on read as well as write, so the two gates and
+// presence share one vocabulary and there is nothing left for a client to
+// mistranslate. The default below was left as 'everyone' deliberately: changing
+// it would look like a migration and is not one, since the value is not stored
+// for anyone who never set it.
 const SCOPES = ['anyone', 'friends', 'nobody'];
 
 const DEFAULTS = {
@@ -43,7 +54,19 @@ const intBool = (v) => !!v;
 
 function scope(value, fallback) {
   const v = String(value || '').toLowerCase();
+  if (v === 'everyone') return 'anyone';
   return SCOPES.includes(v) ? v : fallback;
+}
+
+// The accepted input vocabulary for a scope, including the 'everyone' synonym.
+// The route validates against this rather than against SCOPES directly, so that
+// "what values are legal" is answered in exactly one place. Validating against
+// SCOPES while scope() accepted 'everyone' made the two disagree, and the loser
+// was the reader: a client that sent the natural word was told it was invalid.
+function normalizeScope(value) {
+  const v = String(value || '').toLowerCase();
+  if (v === 'everyone') return 'anyone';
+  return SCOPES.includes(v) ? v : null;
 }
 
 // ---- privacy -------------------------------------------------------------
@@ -499,4 +522,7 @@ module.exports = {
   revokeOthers,
   isSessionRevoked,
   describeAgent,
+  normalizeScope,
+  SCOPES,
+  DEFAULTS,
 };
