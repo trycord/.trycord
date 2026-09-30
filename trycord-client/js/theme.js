@@ -300,9 +300,9 @@ function applyGuidedTokens(p) {
 
 
 const PROTECTED_IDS = new Set([
-  'app', 'mobile-shell', 'mobile-main',
-  'mobile-tab-navigation', 'mobile-context',
-  'desktop-shell', 'app-rail', 'identity-region', 'global-navigation',
+  'app',
+  'mobile-tab-navigation',
+  'app-rail', 'identity-region', 'global-navigation',
   'community-navigation', 'place-navigation', 'trycord-main', 'context-header',
   'context-title', 'view-root', 'member-sidebar', 'modal-root', 'popover-root',
   'toast-root', 'connection-status',
@@ -312,7 +312,7 @@ const PROTECTED_CLASSES = new Set([
   'app-rail', 'app-rail__items', 'rail-identity', 'rail-global-nav',
   'context-sidebar', 'main-content',
   'context-header', 'chat-environment', 'view-root',
-  'member-sidebar', 'shell', 'shell--desktop', 'shell--mobile',
+  'member-sidebar', 'shell',
   'row', 'row--nav', 'row--dm', 'row--member', 'row--channel',
   'server-chip', 'channel-category', 'place-header',
   'place-menu', 'place-actions', 'community-actions',
@@ -322,7 +322,7 @@ const PROTECTED_CLASSES = new Set([
   'auth-title', 'auth-lede', 'auth-footer', 'auth-brand',
   'popover', 'pop-item', 'toast', 'connection-status',
   'settings-nav', 'theme-chip', 'status-chip',
-  'mobile-header', 'mobile-main', 'mobile-tab-navigation',
+  'mobile-tab-navigation',
 ]);
 
 // Layout/behavior properties are never allowed in custom CSS. Visual-only.
@@ -554,8 +554,8 @@ function visibleSize(sel, root) {
 export function verifyCustomSafety() {
   const problems = [];
   const mode = document.documentElement.dataset.presentation || 'desktop';
-  const shellSel = mode === 'mobile' ? '#mobile-shell' : '#desktop-shell';
-  const viewSel = mode === 'mobile' ? '#mobile-main' : '#view-root';
+  const shellSel = '#shell';
+  const viewSel = '#view-root';
   const shell = visibleSize(shellSel);
   if (!shell.present) problems.push('Application shell `' + shellSel + '` is missing.');
   else if (shell.display === 'none' || shell.width < 200 || shell.height < 200) {

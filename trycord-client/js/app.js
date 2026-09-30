@@ -46,6 +46,7 @@ async function boot() {
   try { await TrycordConfig.loadRuntimeConfig(); } catch { /* ignore */ }
 
   updateFromViewport();
+  TrycordPresentation.wire();
   window.addEventListener('resize', updateFromViewport);
   onPresentationChange(() => {
     Router.run && Router.run();

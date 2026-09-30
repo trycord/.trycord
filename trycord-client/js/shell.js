@@ -843,7 +843,7 @@ export function toggleSidebar() {
 }
 
 export function applySidebarState() {
-  const shell = qs('#desktop-shell');
+  const shell = qs('#shell');
   if (shell) shell.classList.toggle('sidebar-collapsed', isSidebarCollapsed());
   renderAllChrome();
 }
@@ -855,7 +855,7 @@ function contextSidebarDocked() {
 }
 
 function contextSidebarVisible() {
-  const shell = qs('#desktop-shell');
+  const shell = qs('#shell');
   if (!shell) return false;
   if (shell.classList.contains('sidebar-collapsed')) return isDesktopNavOpen();
   if (isDesktopNavOpen()) return true;
@@ -863,7 +863,7 @@ function contextSidebarVisible() {
 }
 
 export function toggleContextSidebar() {
-  const shell = qs('#desktop-shell');
+  const shell = qs('#shell');
   if (!shell) return;
   if (contextSidebarDocked()) {
     if (isDesktopNavOpen()) closeDesktopNav();
@@ -1030,13 +1030,6 @@ export function renderContextHeader({ title, sub, icon: iconGlyph, actions } = {
   for (const a of actions || []) acts.appendChild(a);
   if (actions && actions.length) header.appendChild(acts);
 
-  const mobileCtx = qs('#mobile-context');
-  if (mobileCtx && typeof title === 'string') {
-    clear(mobileCtx);
-    const mt = el('div', { class: 'context-title', style: { fontSize: 'var(--t-fs-l)' } }, title);
-    if (sub) mt.appendChild(el('span', { style: { color: 'var(--t-mut)', fontWeight: '400', fontSize: 'var(--t-fs-xs)' } }, ' · ' + String(sub)));
-    mobileCtx.appendChild(mt);
-  }
 }
 
 
@@ -1130,7 +1123,7 @@ export function renderAnnouncementBanner() {
 
 function paintAnnouncementBanners() {
   const items = annState.items || [];
-  for (const shell of [qs('#trycord-main'), qs('#mobile-shell')]) {
+  for (const shell of [qs('#trycord-main')]) {
     if (!shell) continue;
     for (const old of Array.from(shell.querySelectorAll(':scope > .announce-banner'))) old.remove();
     for (const a of items.slice(0, 2)) {
@@ -1148,11 +1141,11 @@ function paintAnnouncementBanners() {
   }
 }
 
-// Shows in both shells while the session is unverified, with resend or
+// Shown while the session is unverified, with resend or
 export function renderVerifyBanner() {
   const me = State.me;
   const show = !!(isAuthed() && mustVerifyToPost());
-  for (const shell of [qs('#trycord-main'), qs('#mobile-shell')]) {
+  for (const shell of [qs('#trycord-main')]) {
     if (!shell) continue;
     let bar = shell.querySelector(':scope > .verify-banner');
     if (!show) {
