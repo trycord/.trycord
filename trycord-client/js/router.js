@@ -21,7 +21,7 @@ import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support
 import { renderNotifications } from './pages-notifications.js';
 import { presentationMode, closeDesktopNav } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from './shell.js';
-import { navigate, adoptLegacyHash } from './nav.js';
+import { navigate, adoptLegacyHash, BASE } from './nav.js';
 import Api from './api.js';
 
 // A slug is a display convenience, not an identity, so a route that cannot
@@ -86,7 +86,14 @@ function setCleanup(fn) {
 function parseLocation() {
   // Routes are paths. A fragment still on the URL is an old link; nav.js has
   // already rewritten it onto the path form before this runs.
-  const raw = (location.pathname || '/') + (location.search || '');
+  //
+  // The mount point comes off first. Where the app is served from a subpath the
+  // pathname still carries it - /app/settings, not /settings - and without
+  // stripping it the first route segment is the mount directory itself, which
+  // matches no branch and drops every deep link onto the default route.
+  let pathname = location.pathname || '/';
+  if (BASE && pathname.startsWith(BASE)) pathname = pathname.slice(BASE.length) || '/';
+  const raw = pathname + (location.search || '');
   const qIndex = raw.indexOf('?');
   const path = qIndex === -1 ? raw : raw.slice(0, qIndex);
   const query = {};
