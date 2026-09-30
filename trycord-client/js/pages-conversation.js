@@ -2,7 +2,7 @@ import Api from './api.js';
 import State from './state.js';
 import Realtime from './realtime.js';
 
-import { can, canInChannel, currentServerId, isMuted, mustVerifyToPost, refreshMutes, setChannelPermissions, setMuted, setViewRefresh } from './state.js';
+import { can, canInChannel, isMuted, mustVerifyToPost, refreshMutes, setChannelPermissions, setMuted, setViewRefresh } from './state.js';
 import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDialog, relTime, showContextMenu, attachContextMenu, showEmojiPicker, toast } from './ui.js';
 import { emptyState, messageRow, paintReactions } from './components.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
@@ -314,8 +314,14 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }
 
   // identifies it - never the text, the author or the timestamp.
+  //
+  // serverId is the community this conversation was opened in, not
+  // currentServerId(): the latter is whatever community was entered last, so a
+  // permalink copied after switching communities pointed at a channel id
+  // belonging to a different one - a link that either 404s or, when slugs
+  // collide across communities, resolves somewhere the author never intended.
   function msgLink(m) {
-    return absoluteChannelUrl(currentServerId(), channelId, m.id);
+    return absoluteChannelUrl(serverId, channelId, m.id);
   }
 
   function openMsgMenu(x, y, m, isMine) {
