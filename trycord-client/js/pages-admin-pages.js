@@ -6,6 +6,7 @@ import { emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
 import { settingsFrame } from './settings-shell.js';
 import { sectionHead } from './settings-ui.js';
+import { navigate } from './nav.js';
 
 const BLOCK_TYPES = [
   { type: 'heading', label: 'Heading', make: () => ({ type: 'heading', level: 2, text: 'Section' }) },
@@ -59,7 +60,7 @@ function pageList(refresh) {
       const acts = el('div', { class: 'card--list__actions' });
       acts.appendChild(el('button', {
         class: 'btn sm', type: 'button',
-        onClick: () => { location.hash = '#/admin/pages/' + p.route; },
+        onClick: () => { navigate('#/admin/pages/' + p.route); },
       }, 'Edit'));
       acts.appendChild(el('button', {
         class: 'btn ghost sm', type: 'button',
@@ -240,7 +241,7 @@ function pageEditor(container, route) {
   const head = el('header', { class: 'page-editor__bar' });
   const back = el('button', {
     class: 'btn ghost sm', type: 'button',
-    onClick: () => { location.hash = '#/admin/pages'; },
+    onClick: () => { navigate('#/admin/pages'); },
   }, '← All pages');
   head.appendChild(back);
   head.appendChild(el('h1', { class: 'page-editor__title' }, '/' + route));

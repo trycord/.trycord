@@ -4,6 +4,7 @@ import { esc, el, clear, toast } from './ui.js';
 import State, { refreshServers, isAuthed } from './state.js';
 import { renderContextHeader } from './shell.js';
 import { communityMark } from './components.js';
+import { navigate } from './nav.js';
 
 let page = 1;
 let pages = 1;
@@ -87,7 +88,7 @@ export async function renderBrowse(container, { previewId } = {}) {
           await Api.joinDiscover(id);
           toast('Joined!', 'ok');
           await refreshServers();
-          location.hash = '#/home';
+          navigate('#/home');
         } catch (ex) {
           toast(ex.message || 'Could not join', 'error');
           joinBtn.removeAttribute('aria-busy');

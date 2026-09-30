@@ -130,7 +130,19 @@ function resolveClientFile(requestUrl) {
   const root = path.resolve(clientDir());
   const target = path.resolve(path.join(root, rel));
   if (target !== root && !target.startsWith(root + path.sep)) return null;
+  // Routes are paths, not a hash, so trycord://app/settings is a real
+  // navigation and there is no settings file. Serve the shell instead, or a
+  // reload on any deep route is a blank window.
+  if (!isFile(target)) return path.join(root, 'index.html');
   return target;
+}
+
+function isFile(target) {
+  try {
+    return fs.statSync(target).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function registerAppProtocol() {

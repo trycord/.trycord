@@ -11,6 +11,7 @@ import { statusChip } from './pages-admin.js';
 import Realtime from './realtime.js';
 import { settingsFrame, blurbFor, findItem } from './settings-shell.js';
 import { sectionHead, sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from './settings-ui.js';
+import { navigate } from './nav.js';
 
 // Sign-out lives under the sections rather than beside them. In the pill row it
 // was the last item in a wrapping flex line, so it looked like one more section
@@ -27,7 +28,7 @@ function signOutButton() {
         try { Realtime.disconnect(); } catch { /* ignore */ }
         clearAnnouncements();
         clearSession();
-        location.hash = '#/login';
+        navigate('#/login');
       },
     });
   });
@@ -51,7 +52,7 @@ function renderPrivacy(body) {
     control: incoming.length
       ? el('button', {
         class: 'btn sm', type: 'button',
-        onClick: () => { location.hash = '#/friends'; },
+        onClick: () => { navigate('#/friends'); },
       }, 'Review')
       : el('span', { class: 'muted small' }, 'None'),
   });
@@ -120,7 +121,7 @@ function renderNotificationsSettings(body) {
   const ids = [...(State.mutedChannels || [])];
   const card = sectionCard();
 
-  const alerts = dangerButton('Open alerts', () => { location.hash = '#/notifications'; },
+  const alerts = dangerButton('Open alerts', () => { navigate('#/notifications'); },
     { variant: 'ghost' });
 
   if (!ids.length) {
@@ -832,7 +833,7 @@ function renderSessionsSection(wrap) {
         } finally {
           try { Realtime.disconnect(); } catch { /* ignore */ }
           clearSession();
-          location.hash = '#/login';
+          navigate('#/login');
         }
       },
     });
@@ -958,7 +959,7 @@ function renderDangerZone(wrap) {
     try { Realtime.disconnect(); } catch { /* ignore */ }
     clearAnnouncements();
     clearSession();
-    location.hash = '#/login';
+    navigate('#/login');
   });
   wrap.appendChild(el('p', { class: 'muted small' }, 'Sign out on this device. Use Security to sign out everywhere.'));
   wrap.appendChild(el('div', { class: 'row-line' }, logoutBtn));

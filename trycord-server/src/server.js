@@ -581,6 +581,46 @@ async function boot() {
   })();
   await bootstrapAdmins;
 
+  // The first path segment of every application route. The shell is served for
+  // these and nothing else, so an instance that also publishes a website keeps
+  // its own clean URLs.
+  const APP_ROUTE_PREFIXES = new Set([
+    'home', 'dms', 'settings', 'account', 'server', 'c', 'admin',
+    'friends', 'notifications', 'discover', 'support', 'profile',
+    'login', 'register', 'forgot', 'reset-password', 'verify-email',
+    'menu', 'legal', 'channel', 'message',
+  ]);
+
+  // Application routes are paths, not a hash, so a reload on /settings/privacy
+  // asks the server for a document that does not exist on disk. Anything that is
+  // not a real file and not an API path is the app, so it gets index.html and
+  // the router resolves the rest.
+  //
+  // This is what makes the address bar safe to bookmark. Without it, every
+  // deep link is a link that only works if you never refresh, which is the one
+  // thing a route is for.
+  if (clientDir) {
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      if (req.path.startsWith('/api/') || req.path.startsWith('/uploads') || req.path.startsWith('/ws')) return next();
+      // Anything with a file extension is an asset that genuinely is missing;
+      // answering it with HTML would turn a broken script tag into a syntax
+      // error far from the cause.
+      if (/\.[a-z0-9]+$/i.test(req.path)) return next();
+      // An instance can also serve a marketing site from the same origin. Those
+      // clean URLs belong to it, so the app only claims its own prefixes and
+      // anything else falls through to the public site's own 404.
+      const seg = req.path.split('/').filter(Boolean)[0] || '';
+      if (!APP_ROUTE_PREFIXES.has(seg)) return next();
+      res.status(200)
+        .set('Cache-Control', 'no-store')
+        .type('html')
+        .sendFile('index.html', { root: clientDir }, (err) => {
+          if (err && !res.headersSent) next(err);
+        });
+    });
+  }
+
   // Public site 404 page for unknown non-API GETs (only when the public
   // website is present). API paths keep their JSON error envelope below.
   if (publicDir) {

@@ -5,6 +5,7 @@ import { el, clear, toast } from './ui.js';
 import { avatar, loadAuthedImage } from './components.js';
 import { renderContextHeader } from './shell.js';
 import { fullTime } from './ui.js';
+import { navigate } from './nav.js';
 
 export async function renderProfile(container, { id } = {}) {
   clear(container);
@@ -79,8 +80,8 @@ export async function renderProfile(container, { id } = {}) {
       try {
         const conv = await Api.openDm(profile.id);
         toast('Opening conversation.', 'ok');
-        if (conv && conv.conversationId) location.hash = '#/dms/' + conv.conversationId;
-        else location.hash = '#/dms';
+        if (conv && conv.conversationId) navigate('#/dms/' + conv.conversationId);
+        else navigate('#/dms');
         return;
       } catch (ex) { toast(ex.message || 'Could not open a DM', 'error'); }
     });

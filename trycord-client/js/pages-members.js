@@ -8,6 +8,7 @@ import { renderContextHeader, memberActions } from './shell.js';
 import { openRoleAssignModal, rolePill } from './role-assignment.js';
 import { userNameButton } from './user-actions.js';
 import { ensureServer } from './workspace-shared.js';
+import { navigate } from './nav.js';
 
 function memberTopRole(m) {
   const roles = Array.isArray(m.roles) ? m.roles : [];
@@ -271,7 +272,7 @@ async function renderServerMembers(container, serverId) {
       info.appendChild(roleBox);
       row.appendChild(info);
       const actions = el('div', { class: 'card--list__actions' });
-      actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => { location.hash = '#/users/' + id; } }, 'Profile'));
+      actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => { navigate('#/users/' + id); } }, 'Profile'));
       if (mine || can('KICK_MEMBERS')) {
         actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => openNicknameModal(serverId, m, wrap) }, 'Nickname'));
       }
@@ -355,7 +356,7 @@ function renderMemberList(wrap, serverId) {
     const rid = m.user_id || m.id;
     const avatarEl = avatar({ id: rid, username: m.username, displayName: m.display_name, avatarUrl: m.avatar_url }, { withPresence: true });
     avatarEl.style.cursor = 'pointer';
-    avatarEl.addEventListener('click', () => { location.hash = '#/users/' + rid; });
+    avatarEl.addEventListener('click', () => { navigate('#/users/' + rid); });
     row.appendChild(avatarEl);
     const mm = el('div', { class: 'row-main' });
     const member = {

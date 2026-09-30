@@ -5,6 +5,7 @@ import State, { can, currentServerId, isAuthed } from './state.js';
 import { el, toast, confirmDialog, showUserCard, showContextMenu, closeContextMenu } from './ui.js';
 import { avatar, avatarUrlOf, bannerUrlOf } from './components.js';
 import { openRoleAssignModal } from './role-assignment.js';
+import { navigate } from './nav.js';
 
 export function userNameButton(user, opts = {}) {
   const { serverId, className = 'msg-author', self = false, onCard, label } = opts;
@@ -91,11 +92,11 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
   const authed = isAuthed();
 
   if (!authed) {
-    out.push({ label: 'View profile', primary: true, onSelect: () => { location.hash = '#/users/' + id; } });
+    out.push({ label: 'View profile', primary: true, onSelect: () => { navigate('#/users/' + id); } });
     return out;
   }
 
-  out.push({ label: 'View profile', onSelect: () => { location.hash = '#/users/' + id; } });
+  out.push({ label: 'View profile', onSelect: () => { navigate('#/users/' + id); } });
 
   // Direct message. Never offer this to yourself.
   if (!isSelf) {
@@ -106,7 +107,7 @@ export function buildUserActions({ user, id, name, sid, isSelf }) {
         try {
           const conv = await Api.openDm(id);
           const cid = conv && (conv.id || conv.conversationId);
-          if (cid) location.hash = '#/dms/' + cid;
+          if (cid) navigate('#/dms/' + cid);
         } catch (ex) { toast(ex.message || 'Could not open a conversation.', 'error'); }
       },
     });

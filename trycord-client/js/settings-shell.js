@@ -31,34 +31,34 @@ export const SETTINGS_IA = {
     {
       group: 'You',
       items: [
-        { id: 'profile', label: 'Profile', icon: 'users', href: '#/settings',
+        { id: 'profile', label: 'Profile', icon: 'users', href: '/settings',
           match: ['profile'], blurb: 'Your name, photo and status' },
       ],
     },
     {
       group: 'Safety',
       items: [
-        { id: 'security', label: 'Security', icon: 'shield', href: '#/settings/security',
+        { id: 'security', label: 'Security', icon: 'shield', href: '/settings/security',
           match: ['security', 'password', 'sessions', 'twofactor'], blurb: 'Password, two-factor and sessions' },
-        { id: 'privacy', label: 'Privacy', icon: 'ban', href: '#/settings/privacy',
+        { id: 'privacy', label: 'Privacy', icon: 'ban', href: '/settings/privacy',
           match: ['privacy'], blurb: 'Friend requests and who can reach you' },
-        { id: 'notifications', label: 'Notifications', icon: 'bell', href: '#/settings/notifications',
+        { id: 'notifications', label: 'Notifications', icon: 'bell', href: '/settings/notifications',
           match: ['notifications'], blurb: 'Muted channels and alerts' },
       ],
     },
     {
       group: 'Preferences',
       items: [
-        { id: 'appearance', label: 'Appearance', icon: 'image', href: '#/settings/appearance',
+        { id: 'appearance', label: 'Appearance', icon: 'image', href: '/settings/appearance',
           match: ['appearance'], blurb: 'Theme, density and motion' },
       ],
     },
     {
       group: 'Instance',
       items: [
-        { id: 'backend', label: 'Backend', icon: 'layers', href: '#/settings/backend',
+        { id: 'backend', label: 'Backend', icon: 'layers', href: '/settings/backend',
           match: ['backend'], blurb: 'Which server this device talks to' },
-        { id: 'updates', label: 'Updates', icon: 'download', href: '#/settings/updates',
+        { id: 'updates', label: 'Updates', icon: 'download', href: '/settings/updates',
           match: ['updates'], blurb: 'Version and build information' },
       ],
     },
@@ -100,36 +100,36 @@ export const SETTINGS_IA = {
     {
       group: 'Console',
       items: [
-        { id: 'overview', label: 'Overview', icon: 'home', href: '#/admin',
+        { id: 'overview', label: 'Overview', icon: 'home', href: '/admin',
           match: ['overview'], blurb: 'Platform health and recent activity' },
       ],
     },
     {
       group: 'People',
       items: [
-        { id: 'users', label: 'Users', icon: 'users', href: '#/admin/users', match: ['users'] },
-        { id: 'communities', label: 'Communities', icon: 'layers', href: '#/admin/communities', match: ['communities'] },
+        { id: 'users', label: 'Users', icon: 'users', href: '/admin/users', match: ['users'] },
+        { id: 'communities', label: 'Communities', icon: 'layers', href: '/admin/communities', match: ['communities'] },
       ],
     },
     {
       group: 'Trust and safety',
       items: [
-        { id: 'reports', label: 'Reports', icon: 'warn', href: '#/admin/reports', match: ['reports'] },
-        { id: 'appeals', label: 'Appeals', icon: 'flag', href: '#/admin/appeals', match: ['appeals'] },
-        { id: 'audit', label: 'Audit log', icon: 'document', href: '#/admin/audit', match: ['audit'] },
+        { id: 'reports', label: 'Reports', icon: 'warn', href: '/admin/reports', match: ['reports'] },
+        { id: 'appeals', label: 'Appeals', icon: 'flag', href: '/admin/appeals', match: ['appeals'] },
+        { id: 'audit', label: 'Audit log', icon: 'document', href: '/admin/audit', match: ['audit'] },
       ],
     },
     {
       group: 'Content',
       items: [
-        { id: 'announcements', label: 'Announcements', icon: 'megaphone', href: '#/admin/announcements', match: ['announcements'] },
-        { id: 'pages', label: 'Pages', icon: 'document', href: '#/admin/pages', match: ['pages'] },
+        { id: 'announcements', label: 'Announcements', icon: 'megaphone', href: '/admin/announcements', match: ['announcements'] },
+        { id: 'pages', label: 'Pages', icon: 'document', href: '/admin/pages', match: ['pages'] },
       ],
     },
     {
       group: 'Compliance',
       items: [
-        { id: 'gdpr', label: 'Data requests', icon: 'shield', href: '#/admin/gdpr', match: ['gdpr'] },
+        { id: 'gdpr', label: 'Data requests', icon: 'shield', href: '/admin/gdpr', match: ['gdpr'] },
       ],
     },
   ],

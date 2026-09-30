@@ -120,9 +120,9 @@ async function boot() {
       // The backend URL is resolved per request, so a reload is what makes the
       // original take effect everywhere, including the WebSocket ticket.
       if (url) el.setAttribute('data-restored', url);
-      // location.hash already carries its own '#'; adding one more produced
-      // '/app##/home', which is not a route anything resolves.
-      location.assign(location.pathname + location.search + (location.hash || '#/'));
+      // A real reload, keeping whatever route is on the URL. Under path
+      // routing the pathname IS the route, so there is nothing to add.
+      location.assign(location.pathname + location.search || '/');
     });
     el.appendChild(text);
     el.appendChild(back);
