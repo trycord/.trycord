@@ -32,10 +32,12 @@
 
   <title>Trycord</title>
 
-  <!-- Brand logo -->
-  <link rel="icon" href="./assets/trycord-logo.ico" type="image/x-icon">
-  <link rel="icon" href="./assets/trycord-logo.png" type="image/png">
-  <link rel="apple-touch-icon" href="./assets/trycord-logo.png">
+  <!-- Brand logo. trycord-logo.ico is multi-resolution and is what a desktop
+       tab actually uses. The PNG master is 1254x1254 (958 KB) and is rendered
+       at 28-72px in the UI and 180px by iOS, so neither consumer benefits from
+       it; loading it as a second icon just fetched the large file as well. -->
+  <link rel="icon" href="./assets/trycord-logo.ico" sizes="any" type="image/x-icon">
+  <link rel="apple-touch-icon" href="./assets/trycord-logo.ico">
 
   <!-- Application stylesheet -->
   <link rel="stylesheet" href="./css/app.css">
