@@ -42,12 +42,29 @@ function mountPoint() {
 
 export const BASE = mountPoint();
 
-/** '/settings' -> '/app/settings' where that is where the app lives. */
+/**
+ * '/settings' -> '/app/settings' where that is where the app lives.
+ *
+ * Idempotent. The link builders already return a mounted path - serverPath()
+ * and channelPath() both go through here - and those results are then passed to
+ * navigate(), which routes again. A second application of the mount is what
+ * turned /c/slug into /app/app/c/slug on a subpath deployment and sent the
+ * reader to a route that does not exist. A route never legitimately begins with
+ * the mount, so returning an already-mounted path unchanged is safe.
+ */
 export function route(path) {
   if (!path) return BASE || '/';
   if (EXTERNAL.test(path) || /^\/\//.test(path)) return path;
   if (!path.startsWith('/')) return path;
+  if (BASE && (path === BASE || path.startsWith(BASE + '/'))) return path;
   return BASE + path;
+}
+
+/** The route without the mount: '/app/settings' -> '/settings'. */
+export function unroute(path) {
+  if (!BASE || !path) return path;
+  if (path === BASE) return '/';
+  return path.startsWith(BASE + '/') ? path.slice(BASE.length) : path;
 }
 
 /** '#/home' -> '/home'. Returns null for anything that is not our route. */
@@ -85,6 +102,8 @@ export function navigate(target, opts = {}) {
     return;
   }
   const current = location.pathname + location.search;
+  // A route, not a URL: the mount is added once, here, and route() is
+  // idempotent so a caller that passed an already-mounted path is unaffected.
   const next = route(path.startsWith('/') ? path : '/' + path);
   if (next === current && !opts.force) {
     // Already there. Pushing a duplicate entry would make Back do nothing
@@ -176,10 +195,9 @@ export function interceptLinks(doc = document) {
     if (BASE && url.pathname !== BASE && !url.pathname.startsWith(BASE + '/')) return;
 
     // Back to an app route: the router works in paths without the mount.
-    const appPath = (BASE ? url.pathname.slice(BASE.length) : url.pathname) || '/';
     e.preventDefault();
-    navigate(appPath + url.search + url.hash);
+    navigate(unroute(url.pathname) + url.search + url.hash);
   }, { passive: false });
 }
 
-export default { navigate, route, routePath, currentPath, withQuery, adoptLegacyHash, interceptLinks, BASE };
+export default { navigate, route, unroute, routePath, currentPath, withQuery, adoptLegacyHash, interceptLinks, BASE };

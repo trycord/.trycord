@@ -4,7 +4,7 @@ import Api from './api.js';
 import State, { clearSession, refreshServers, refreshFriends, mustVerifyToPost, isMuted, setMuted } from './state.js';
 import { esc, el, clear, toast, confirmDialog } from './ui.js';
 import { avatar, loadAuthedImage, invalidateAuthedImage } from './components.js';
-import { renderContextHeader, renderAllChrome, clearAnnouncements, refreshSessionBar } from './shell.js';
+import { renderContextHeader, renderAllChrome, clearAnnouncements } from './shell.js';
 import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';
 import { renderBackendSelector } from './pages-public.js';
 import { statusChip } from './pages-admin.js';
@@ -427,7 +427,7 @@ function renderProfileEditor(wrap) {
       const updated = await Api.uploadProfileImage(kind, file);
       invalidateAuthedImage(prev);
       State.me = { ...State.me, ...updated };
-      refreshSessionBar();
+      renderAllChrome();
       okBox.hidden = false;
       if (kind === 'avatar') avatarRm.hidden = !updated.avatarUrl;
       else bannerRm.hidden = !updated.bannerUrl;
@@ -449,7 +449,7 @@ function renderProfileEditor(wrap) {
       const updated = await Api.removeProfileImage('avatar');
       invalidateAuthedImage(prev);
       State.me = { ...State.me, ...updated };
-      refreshSessionBar();
+      renderAllChrome();
       avatarRm.hidden = true;
       paintMedia();
       toast('Avatar removed.', 'ok');
@@ -461,7 +461,7 @@ function renderProfileEditor(wrap) {
       const updated = await Api.removeProfileImage('banner');
       invalidateAuthedImage(prev);
       State.me = { ...State.me, ...updated };
-      refreshSessionBar();
+      renderAllChrome();
       bannerRm.hidden = true;
       paintMedia();
       toast('Banner removed.', 'ok');

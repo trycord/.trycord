@@ -217,19 +217,6 @@ export function serverChip(server, { active = false, onClick } = {}) {
   return chip;
 }
 
-export function channelRow(channel, { active = false, muted = false, onClick } = {}) {
-  const row = el('button', {
-    class: 'row row--channel' + (active ? ' active' : '') + (muted ? ' muted' : ''),
-    type: 'button',
-    title: muted ? '#' + (channel.name || 'channel') + ' (muted)' : '#' + (channel.name || 'channel'),
-    onClick,
-    dataset: { channelId: channel.id },
-  });
-  row.appendChild(el('span', { class: 'ch-prefix' }, '#'));
-  row.appendChild(el('span', { class: 'ch-name' }, channel.name));
-  return row;
-}
-
 // `iconName` is a key of ICON_PATHS. A caller may still pass an element, which
 // is appended as-is.
 export function emptyState(iconName, title, sub) {
@@ -416,4 +403,4 @@ export function paintReactions(bar, list, onReact) {
   bar.hidden = !(list && list.length);
 }
 
-export default { avatar, navRow, serverChip, channelRow, emptyState, messageRow, paintReactions, initialOf, hashColor };
+export default { avatar, navRow, serverChip, emptyState, messageRow, paintReactions, initialOf, hashColor };
