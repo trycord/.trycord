@@ -39,12 +39,16 @@
   <!-- Asset URLs are relative, so without a base they resolve against the current
        route rather than the app root: /settings/security asks the server for
        /settings/css/app.css, receives a document instead of a stylesheet, and
-       renders with no styling and no application. The base is rewritten per
-       request by the server, which is the only place that knows the mount point
-       - the same file is served from the origin root by a self-hoster and from
-       /app by the hosted deployment. Left as "/" it is correct for the root
-       case, which is why the failure only ever appeared on one of them. -->
-  <base href="/">
+       renders with no styling and no application.
+
+       The value written here is the hosted mount. The server rewrites it per
+       request for anything served from a different mount, because it is the only
+       thing that knows where it is mounted - the same file is served from the
+       origin root by a self-hoster and from /app by the hosted deployment. The
+       Cloudflare deployment serves this file statically with no rewrite, so what
+       is written here is what that deployment gets. "/" was correct for a
+       self-hoster at the root and silently broke the hosted one. -->
+  <base href="/app/">
 
   <link rel="icon" href="./assets/trycord-logo.ico" sizes="any" type="image/x-icon">
   <link rel="apple-touch-icon" href="./assets/trycord-logo.ico">
