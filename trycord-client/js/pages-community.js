@@ -7,6 +7,7 @@ import { avatar, communityBannerUrl, communityMark, emptyState, loadAuthedImage 
 import { renderAllChrome, renderContextHeader } from './shell.js';
 import { renderMemberList } from './pages-members.js';
 import { ensureServer } from './workspace-shared.js';
+import { channelPath } from './links.js';
 
 async function renderServerLanding(container, serverId) {
   clear(container);

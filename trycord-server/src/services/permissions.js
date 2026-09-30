@@ -147,16 +147,21 @@ async function setOverride(table, id, permission, effect) {
   }
   // Upsert: the PK is (entity, permission) so a second write replaces rather
   // than accumulating a contradictory pair.
-  await db.run(
-    `INSERT INTO ${table} (${idCol}, permission, effect) VALUES (?, ?, ?)
-     ON CONFLICT (${idCol}, permission) DO UPDATE SET effect = excluded.effect`,
-    [id, permission, effect]
-  ).catch(async (e) => {
-    // MySQL has no ON CONFLICT; do the same thing explicitly.
-    if (!/conflict|duplicate/i.test(String(e && e.message))) throw e;
-    await db.run(`UPDATE ${table} SET effect = ? WHERE ${idCol} = ? AND permission = ?`,
-      [effect, id, permission]);
-  });
+  //
+  // Each dialect spells its own upsert, so the statement is chosen by dialect
+  // rather than attempted and caught. MySQL has no ON CONFLICT: feeding it one
+  // is a parse error, and recovering from that with a bare UPDATE only edits
+  // rows that already exist - it never creates the missing one, so the first
+  // write of every override was silently dropped while the caller was told it
+  // had succeeded. Sniffing the error text is not a fix either: MySQL quotes
+  // the rejected statement back in the message, so the parse error raised by
+  // the wrong dialect trivially "looks like" a duplicate-key conflict.
+  const upsert = db.dialect === 'mysql'
+    ? `INSERT INTO ${table} (${idCol}, permission, effect) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE effect = VALUES(effect)`
+    : `INSERT INTO ${table} (${idCol}, permission, effect) VALUES (?, ?, ?)
+       ON CONFLICT (${idCol}, permission) DO UPDATE SET effect = excluded.effect`;
+  await db.run(upsert, [id, permission, effect]);
   return { permission, effect };
 }
 
