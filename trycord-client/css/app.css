@@ -2757,6 +2757,34 @@ html[data-route="/forgot"] .mobile-tab-navigation,
 html[data-route^="/reset-password/"] .mobile-tab-navigation,
 html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !important; }
 
+/* Safe areas for the desktop shell.
+   The mobile block below already handled these, but the desktop shell is what
+   renders from 600px up - which includes a notched phone in landscape, since
+   844px is well past the switch. With viewport-fit=cover already set, the
+   insets are non-zero there and were simply not being requested. */
+@media (min-width: 600px) {
+  .context-header {
+    padding-left: calc(18px + env(safe-area-inset-left)) !important;
+    padding-right: calc(18px + env(safe-area-inset-right)) !important;
+  }
+  /* Landscape on a notched device cuts the top of the screen off; the header is
+     the first row, so it needs the inset as height, not just as padding. */
+  @supports (padding: max(0px)) {
+    .context-header {
+      padding-top: env(safe-area-inset-top);
+      min-height: calc(58px + env(safe-area-inset-top)) !important;
+    }
+  }
+  .main-content {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* .app-rail is display:contents, so padding on it does nothing; the rail is
+     painted by .app-rail__items, which is the grid child. */
+  .app-rail__items {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
 @media (max-width: 1199px) and (min-width: 900px) {
   :root { --ui-sidebar: 216px; --ui-members: 220px; }
 }
