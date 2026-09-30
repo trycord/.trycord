@@ -279,7 +279,7 @@ async function renderRoute() {
     try {
       const res = await Api.joinInvite(code);
       await refreshServers();
-      toast('You joined the server.', 'ok');
+      toast('You joined the community.', 'ok');
       location.hash = serverPath(res.serverId);
       return;
     } catch (ex) {

@@ -209,7 +209,7 @@ export function serverChip(server, { active = false, onClick } = {}) {
   // the authenticated loader, so use it rather than a second implementation.
   chip.appendChild(communityMark(server.name || '?', { size: 'community-mark--chip', server }));
   chip.appendChild(el('span', { class: 'chip-name' }, server.name));
-  if (server.is_owner) chip.appendChild(el('span', { class: 'chip-live', title: 'You own this server' }, '★'));
+  if (server.is_owner) chip.appendChild(el('span', { class: 'chip-live', title: 'You own this community' }, '★'));
   return chip;
 }
 

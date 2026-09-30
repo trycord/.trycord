@@ -25,7 +25,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     }
   } catch (ex) {
     renderContextHeader({ title: 'Unavailable' });
-    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this server'));
+    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community'));
     return;
   }
 
@@ -714,7 +714,7 @@ async function renderChannelPins(container, serverId, channelId) {
     }
   } catch (ex) {
     renderContextHeader({ title: 'Unavailable' });
-    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this server'));
+    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community'));
     return;
   }
   const layout = State.channels;
