@@ -2,7 +2,11 @@
 
 A self-hostable community chat platform. Run your own instance, or use an
 instance someone else runs. Your communities, users, messages, permissions
-and files stay on the server you choose.
+and files stay on the instance you choose.
+
+Vocabulary: a **community** is a group of people with channels, roles and
+permissions. An **instance** is one running Trycord server. A **client** is the
+web app (WAC) or the desktop shell (DAC).
 
 - `trycord-server/` — REST API, WebSocket gateway, accounts, permissions,
   moderation, uploads, database access
