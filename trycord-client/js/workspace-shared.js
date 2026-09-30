@@ -4,7 +4,7 @@ import Realtime from './realtime.js';
 
 import { currentServerId, enterServer, isAuthed, leaveServerContext, refreshServerView } from './state.js';
 import { showEmojiPicker, toast } from './ui.js';
-import { renderAllChrome } from './shell.js';
+import { renderAllChrome, currentRoute } from './shell.js';
 import { navigate } from './nav.js';
 
 // stays private here and is reached through these two accessors.
@@ -48,7 +48,9 @@ function wireCommunityEvents() {
         if (me && payload && SELF_REMOVAL.has(type) && String(payload.userId) === String(me)) {
           leaveServerContext();
           renderAllChrome();
-          if ((location.pathname || '/') !== '/home') navigate('#/home');
+          // Compared against the route rather than the raw pathname, which on a
+          // subpath deployment still carries the mount.
+          if (currentRoute() !== '/home') navigate('#/home');
           toast('You were removed from that community.', 'warn');
           return;
         }

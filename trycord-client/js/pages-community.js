@@ -4,7 +4,7 @@ import State from './state.js';
 import { peerPresence, refreshServers, setViewRefresh } from './state.js';
 import { clear, el, esc, toast } from './ui.js';
 import { avatar, communityBannerUrl, communityMark, emptyState, loadAuthedImage } from './components.js';
-import { renderAllChrome, renderContextHeader } from './shell.js';
+import { renderAllChrome, renderContextHeader, currentRoute } from './shell.js';;
 import { renderMemberList } from './pages-members.js';
 import { ensureServer } from './workspace-shared.js';
 import { channelPath } from './links.js';
@@ -156,7 +156,9 @@ async function renderMenu(container) {
   acct.appendChild(am);
   wrap.appendChild(acct);
 
-  const route = location.pathname || '/';
+  // The route, not the raw pathname: on a subpath deployment the pathname
+  // still carries the mount and no channel row would ever read as active.
+  const route = currentRoute();
   const appSec = el('div', { class: 'stack' });
   appSec.appendChild(el('div', { class: 'section-label' }, 'App'));
   const links = [

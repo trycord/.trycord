@@ -6,7 +6,7 @@ import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, le
 import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
 import { SETTINGS_IA } from './settings-shell.js';
-import { navigate, route } from './nav.js';;
+import { navigate, route } from './nav.js';
 
 // wiring, so a menu can never exist on one input method and be missing on
 // another. Menus are permission-shaped here: an action the viewer cannot perform
@@ -221,7 +221,7 @@ export function setNavRoute(fn) {
   navRoute = fn;
 }
 
-function currentRoute() {
+export function currentRoute() {
   return navRoute();
 }
 
@@ -631,7 +631,7 @@ function settingsContext(region) {
   for (const s of SETTINGS_SECTIONS) {
     const active = route === s.path || route.startsWith(s.path + '/');
     group.list.appendChild(navRow({
-      label: s.label, href:  s.path, active,
+      label: s.label, href: route(s.path), active,
       onClick: () => { navigate('#' + s.path); },
     }));
   }
@@ -662,7 +662,7 @@ function simpleListContext(region, { title, sub, groups }) {
     for (const item of g.items) {
       const active = item.exact ? route === item.path : (route === item.path || route.startsWith(item.path + '/'));
       group.list.appendChild(navRow({
-        label: item.label, href:  item.path, active,
+        label: item.label, href: route(item.path), active,
         onClick: () => { navigate('#' + item.path); },
       }));
     }
@@ -761,7 +761,7 @@ function adminContext(region) {
   const group = navGroup({ label: 'Console' });
   for (const s of ADMIN_SECTIONS) {
     group.list.appendChild(navRow({
-      label: s.label, href:  s.path, active: adminSectionActive(s, route),
+      label: s.label, href: route(s.path), active: adminSectionActive(s, route),
       onClick: () => { navigate('#' + s.path); },
     }));
   }
@@ -776,7 +776,7 @@ function adminContext(region) {
   });
   for (const s of ADMIN_OVERFLOW) {
     more.list.appendChild(navRow({
-      label: s.label, href:  s.path, active: adminSectionActive(s, route),
+      label: s.label, href: route(s.path), active: adminSectionActive(s, route),
       onClick: () => { navigate('#' + s.path); },
     }));
   }
