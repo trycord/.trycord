@@ -1,5 +1,16 @@
 
 
+/* Declared so the value can be interpolated. Without a syntax a custom property
+   is an inert token stream and transitions skip it, so the sidebar snapped open
+   and shut; with one, --ui-sidebar animates and every grid track built from it
+   follows. Browsers without @property snap instead, which is the old behaviour
+   and perfectly usable. */
+@property --ui-sidebar {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 240px;
+}
+
 :root {
   color-scheme: dark;
 
@@ -52,10 +63,15 @@
   --t-fs-2xl: clamp(2rem, 3.2vw, 2.9rem);
 
   --t-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --t-fast: 120ms;
-  --t-med: 220ms;
-  --t-slow: 420ms;
+  /* A second curve for things that enter: it decelerates harder, so something
+     arriving reads as settling rather than sliding. */
+  --t-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --t-instant: 60ms;   /* press feedback, hover on small controls */
+  --t-fast: 120ms;     /* hovers, focus rings, small state changes */
+  --t-med: 220ms;      /* panels, menus, the sidebar */
+  --t-slow: 420ms;     /* reserved for the rare deliberate one */
   --t-spin: 0.7s;
+  --t-shimmer: 1.4s;
 
   --t-r-xs: 6px;
   --t-r-s: 8px;
@@ -140,7 +156,8 @@ html[data-density="roomy"] {
   --t-d-3: 12px; --t-d-4: 18px; --t-d-5: 24px; --t-d-6: 34px;
 }
 html[data-motion="reduced"] {
-  --t-fast: 0.001s; --t-med: 0.001s; --t-slow: 0.001s; --t-spin: 0.001s;
+  --t-instant: 0.001s; --t-fast: 0.001s; --t-med: 0.001s;
+  --t-slow: 0.001s; --t-spin: 0.001s; --t-shimmer: 0.001s;
 }
 
 html[data-theme="orthocord"] {
@@ -392,6 +409,78 @@ img { max-width: 100%; }
 }
 .skip-link:focus { left: 0; }
 
+/* ---- motion vocabulary -------------------------------------------------
+   Every entrance in the app is one of these four, so nothing invents its own
+   duration or curve. They animate only transform and opacity, never a
+   measured property, so they run on the compositor and cost no layout.
+
+   Deliberately short. The slowest is 220ms, which is under the threshold where
+   motion starts to feel like waiting; anything longer would make a fast action
+   look slow rather than responsive. */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Arrives from slightly below and settles. Used for panels and view roots. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Arrives from a 2% undersize rather than sliding, for anything that opens out
+   of a control: menus, popovers, the rail's menus. */
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* One step, no loop. For a reaction landing or a pin taking hold. */
+@keyframes settle {
+  0% { transform: scale(1); }
+  38% { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+
+/* A skeleton travelling across a placeholder. The only looping animation in
+   the app, and it runs on at most a handful of elements at a time. */
+@keyframes shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+/* Opacity only, for anything that pulses because it is waiting. */
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* Exits. Paired with the entrances above so a dismissal is as quick as an
+   arrival; a dialog that left on a 220ms fade would feel sluggish to close. */
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes pop-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.97); }
+}
+
+@keyframes drop-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(4px); }
+}
+
+/* An error arriving. Two small steps and no displacement, so it reads as the
+   field objecting rather than as the layout shifting. */
+@keyframes reject {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
 /* ---- application shell ------------------------------------------------
    One grid, two layouts. Wide viewports put the rail and the place sidebar
    beside the main area; narrow ones move the whole rail off-canvas and give
@@ -413,6 +502,10 @@ img { max-width: 100%; }
   display: grid;
   grid-template-columns: var(--ui-shell-cols);
   grid-template-rows: var(--ui-shell-rows);
+  /* The track list interpolates because the collapsed state keeps three tracks
+     and only changes the middle one's length. Swapping the list for a
+     two-track one could not animate, which is why it is not done that way. */
+  transition: grid-template-columns var(--t-med) var(--t-ease);
   height: 100dvh;
   width: 100%;
   overflow: hidden;
@@ -460,6 +553,8 @@ img { max-width: 100%; }
 .context-sidebar {
   grid-column: 2;
   grid-row: 1 / -1;
+  opacity: 1;
+  transition: opacity var(--t-med) var(--t-ease) 40ms;
 }
 
 /* User bar pinned to the bottom of the context sidebar. One component for
@@ -545,10 +640,16 @@ img { max-width: 100%; }
 
 /* Collapsing the place sidebar. Removing the column is what gives the width
    back, so the track changes rather than the sidebar merely being hidden. */
-.shell.sidebar-collapsed { --ui-shell-cols: var(--ui-rail) minmax(0, 1fr); }
-.shell.sidebar-collapsed .context-sidebar,
+/* Collapsed: the sidebar track goes to zero rather than disappearing from the
+   list, so the grid animates between two same-shaped track lists and the main
+   area slides rather than jumping. The sidebar itself is clipped by its own
+   overflow, so nothing spills into the collapsed space. */
+.shell.sidebar-collapsed { --ui-sidebar: 0px; }
+.shell.sidebar-collapsed .context-sidebar {
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--t-ease);
+}
 .shell.sidebar-collapsed .rail-identity { display: none; }
-.shell.sidebar-collapsed .main-content { grid-column: 2; }
 /* Collapsing must not cap the content measure: give the extra width back. */
 .shell.sidebar-collapsed .view-root > .page,
 .shell.sidebar-collapsed .view-root > .conversation,
@@ -918,7 +1019,21 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   line-height: 1.5;
   text-align: center;
 }
+/* The active rail button. opacity and a small scale rather than a background
+   swap, so the icon under the finger does not jump. */
+.rail-nav-item {
+  transition:
+    background var(--t-fast) var(--t-ease),
+    color var(--t-fast) var(--t-ease),
+    transform var(--t-instant) var(--t-ease),
+    border-radius var(--t-fast) var(--t-ease);
+}
+.rail-nav-item:active { transform: scale(0.94); }
+.rail-nav-item.active {
+  animation: settle var(--t-med) var(--t-ease);
+}
 .rail-nav-item.active .rail-nav-badge,
+
 .server-chip.active .rail-nav-badge {
   background: var(--t-on-accent);
   color: var(--t-accent);
@@ -1010,6 +1125,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   position: fixed !important;
   inset: 0 !important;
   background: var(--t-backdrop);
+  animation: fade-in var(--t-fast) var(--t-ease);
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -1026,14 +1142,11 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   border-radius: var(--t-r-l);
   padding: var(--t-d-5);
   box-shadow: var(--t-sh-2);
-  animation: rise var(--t-med) var(--t-ease);
+  animation: pop-in var(--t-med) var(--t-ease);
+  transform-origin: center;
 }
 .modal h2, .modal h3 { margin: 0 0 var(--t-d-3); letter-spacing: -0.01em; }
 .modal p { color: var(--t-txt2); }
-@keyframes rise {
-  from { opacity: 0.4; transform: translateY(14px) scale(0.98); }
-  to   { opacity: 1; transform: none; }
-}
 
 .popover-root { position: relative; z-index: var(--z-popover); }
 .popover {
@@ -1046,7 +1159,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   border-radius: var(--t-r-m);
   padding: 6px;
   box-shadow: var(--t-sh-1);
-  animation: rise var(--t-fast) var(--t-ease);
 }
 /* Context menu: a popover carrying menu semantics. Items align in a single
    column and support keyboard focus traversal.
@@ -1138,17 +1250,11 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
   border-radius: var(--t-r-l) var(--t-r-l) 0 0;
   border-bottom: 0;
-  animation: ctx-sheet-in 0.14s ease-out;
+  animation: rise-in var(--t-fast) var(--t-ease-out);
 }
 .popover.ctx-menu--sheet .pop-item { padding: 12px var(--t-d-3); font-size: var(--t-fs-m); }
 .popover.ctx-menu--sheet .pop-sep { margin: 8px 0; }
-@keyframes ctx-sheet-in {
-  from { transform: translateY(14px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .popover.ctx-menu--sheet { animation: none; }
-}
+
 .pop-item[disabled] { opacity: 0.45; cursor: default; }
 .pop-item[disabled]:hover { background: transparent; }
 /* Session footer pinned to the bottom of the place navigation
@@ -1331,7 +1437,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   max-width: 360px;
   box-shadow: var(--t-sh-4);
   font-size: var(--t-fs-m);
-  animation: rise var(--t-med) var(--t-ease);
+  animation: rise-in var(--t-med) var(--t-ease-out);
 }
 .toast.error { border-left-color: var(--t-err); }
 .toast.ok   { border-left-color: var(--t-ok); }
@@ -1353,7 +1459,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   align-items: center;
   gap: var(--t-d-2);
 }
-.connection-status.show { display: flex !important; animation: rise var(--t-fast); }
+.connection-status.show { display: flex !important; animation: rise-in var(--t-fast) var(--t-ease-out); }
 
 /* A failover notice is informational, not a warning: the session works, it is
    just talking to a different instance. The warn tokens the offline state uses
@@ -1556,9 +1662,17 @@ select.input { appearance: auto; }
   text-align: left;
   border: 1px solid transparent;
   background: transparent;
-  transition: background var(--t-fast) var(--t-ease), border-color var(--t-fast) var(--t-ease);
+  /* color and background can be transitioned without a layout pass; nothing
+     measured is in this list. */
+  transition:
+    background var(--t-fast) var(--t-ease),
+    border-color var(--t-fast) var(--t-ease),
+    color var(--t-fast) var(--t-ease),
+    transform var(--t-instant) var(--t-ease);
 }
 .row:hover { background: color-mix(in srgb, var(--t-txt) 5%, transparent); color: var(--t-txt); }
+.row--channel.active,
+.row--nav.active { transform: translateX(2px); }
 .row.active { background: color-mix(in srgb, var(--t-accent) 13%, transparent); color: var(--t-txt); }
 
 .row--surface {
@@ -2791,7 +2905,18 @@ html[data-auth-page] .mobile-tab-navigation { display: none; }
   align-items: center;
   gap: 3px;
 }
-.mobile-tab-navigation button .micon { font-size: 1.15rem; line-height: 1; }
+.mobile-tab-navigation button {
+  transition:
+    color var(--t-fast) var(--t-ease),
+    transform var(--t-instant) var(--t-ease);
+}
+.mobile-tab-navigation button:active { transform: scale(0.94); }
+.mobile-tab-navigation button .micon {
+  font-size: 1.15rem;
+  line-height: 1;
+  transition: transform var(--t-fast) var(--t-ease);
+}
+.mobile-tab-navigation button.active .micon { transform: translateY(-1px) scale(1.06); }
 .mobile-tab-navigation button.active {
   color: var(--t-accent);
   background: color-mix(in srgb, var(--t-accent) 8%, transparent);
@@ -3201,8 +3326,16 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 
 button > .ui-icon:only-child { display: block; margin: 0 auto; }
 .nav-group__label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-group__list { display: flex; flex-direction: column; gap: 1px; }
+.nav-group__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: rise-in var(--t-fast) var(--t-ease);
+}
 .nav-group.is-collapsed .nav-group__list { display: none; }
+.nav-group__head {
+  transition: background var(--t-fast) var(--t-ease), color var(--t-fast) var(--t-ease);
+}
 .nav-group__action {
   flex: 0 0 auto;
   width: 20px;
