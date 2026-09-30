@@ -247,9 +247,18 @@ async function boot() {
   // in .env, comma-separated). The real app page has no inline scripts, so
   // script-src is strict; the static showcase gallery is dev-only and
   // exempted from that one rule.
-  const cspConnect = ['self', 'ws:', 'wss:'];
-  const cspImg = ['self', 'data:', 'blob:'];
-  const apiOrigin = ((process.env.TRYCORD_API_URL || '').trim() || inst.publicUrl || '');
+  // These are scheme-sources and host-sources and are emitted verbatim, so
+  // anything that means "this origin" has to carry its own quotes. An unquoted
+  // 'self' is not a valid source expression: the browser discards the directive
+  // it appears in, which for connect-src means every API call is refused and the
+  // application boots signed out with no error to explain it.
+  const cspConnect = ["'self'", 'ws:', 'wss:'];
+  const cspImg = ["'self'", 'data:', 'blob:'];
+  // The API the client talks to, and the one it falls back to. API_URL is the
+  // deployment's own name for that primary; TRYCORD_API_URL is the older name
+  // and still wins if set, so an existing deployment keeps its behaviour.
+  const apiOrigin = ((process.env.TRYCORD_API_URL || process.env.API_URL || '').trim() || inst.publicUrl || '');
+  const apiBackup = (process.env.API_BACKUP_URL || '').trim();
   const addCspOrigin = (o) => {
     try { const origin = new URL(o).origin; cspConnect.push(origin, origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')); cspImg.push(origin); } catch { /* ignore unparseable */ }
   };
@@ -264,7 +273,10 @@ async function boot() {
     } catch { return null; }
   };
   const wsOriginOf = (origin) => origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
-  [apiOrigin, inst.publicUrl, inst.globalUrl].forEach((o) => o && addCspOrigin(o));
+  // The backup has to be allowed here as well as the primary. A failover the
+  // policy then refuses presents as an empty application rather than as a
+  // switch, which is the same symptom as having no failover at all.
+  [apiOrigin, apiBackup, inst.publicUrl, inst.globalUrl].forEach((o) => o && addCspOrigin(o));
   ['http://localhost:9971', 'http://127.0.0.1:9971', 'https://trycord.dev'].forEach(addCspOrigin);
   String(process.env.CSP_CONNECT_ORIGINS || '')
     .split(',').map((s) => s.trim()).filter(Boolean).forEach(addCspOrigin);
@@ -358,8 +370,12 @@ async function boot() {
   // Lets a deployment pin the API origin without editing client files.
   app.get('/runtime-config.js', (req, res) => {
     const cfg = {};
-    const apiUrl = (process.env.TRYCORD_API_URL || '').trim() || inst.publicUrl;
+    const apiUrl = (process.env.TRYCORD_API_URL || process.env.API_URL || '').trim() || inst.publicUrl;
     if (apiUrl) cfg.API_URL = apiUrl;
+    // Shipped so a browser that has no backend.json still knows where the backup
+    // is. The client only ever moves to it after the primary fails to answer,
+    // and it says so in the interface when it does.
+    if (apiBackup) cfg.API_BACKUP_URL = apiBackup;
     if (inst.instanceId) cfg.instanceId = inst.instanceId;
     if (inst.globalUrl) cfg.globalUrl = inst.globalUrl;
     res.type('application/javascript').set('Cache-Control', 'no-store').send(
@@ -589,11 +605,33 @@ async function boot() {
   // its handler is registered first it takes the path regardless of what is
   // listed here. Claiming it would have been a lie. The in-app support view is
   // reached by navigation, which never asks the server for the document.
+  // The mount this instance serves the application from, derived from the
+  // request rather than configured. A deployment that serves the app from the
+  // origin root has no mount; one that serves it from /app claims the first
+  // segment only when it is not itself an application route. Returns '' when
+  // there is no mount, '' meaning "the base is the origin root".
+  const APP_MOUNT = (process.env.TRYCORD_APP_MOUNT || '').trim().replace(/\/+$/, '');
+  function appMount(reqPath) {
+    if (APP_MOUNT) {
+      const seg = reqPath.split('/').filter(Boolean)[0] || '';
+      return seg === APP_MOUNT.replace(/^\//, '') ? APP_MOUNT : '';
+    }
+    return '';
+  }
+
+  // The application claims a prefix when a deep link on it has to survive a
+  // refresh. Anything not listed is a document belonging to the public site and
+  // falls through to it.
+  //
+  // 'support' is an application route: the router serves it and it renders inside
+  // the shell. It was left out on the reasoning that the in-app support view is
+  // only reached by navigation, which is true of the view and not of the URLs
+  // pointing at it - so a bookmarked /support was a 404.
   const APP_ROUTE_PREFIXES = new Set([
     'home', 'dms', 'settings', 'account', 'server', 'c', 'admin',
     'friends', 'notifications', 'discover', 'profile',
     'login', 'register', 'forgot', 'reset-password', 'verify-email',
-    'menu', 'legal', 'channel', 'message',
+    'menu', 'legal', 'channel', 'message', 'support',
   ]);
 
   // Application routes are paths, not a hash, so a reload on /settings/privacy
@@ -617,12 +655,29 @@ async function boot() {
       // anything else falls through to the public site's own 404.
       const seg = req.path.split('/').filter(Boolean)[0] || '';
       if (!APP_ROUTE_PREFIXES.has(seg)) return next();
-      res.status(200)
-        .set('Cache-Control', 'no-store')
-        .type('html')
-        .sendFile('index.html', { root: clientDir }, (err) => {
-          if (err && !res.headersSent) next(err);
-        });
+      // The base is stamped per request because the mount point is a deployment
+      // fact, not a build-time constant: the same file is served from the origin
+      // root by a self-hoster and from /app by the hosted deployment. Without it
+      // the document's relative asset URLs resolve against the route, so
+      // /settings/security asked for /settings/css/app.css and rendered with no
+      // stylesheet and no script.
+      const mount = appMount(req.path);
+      if (!mount) {
+        res.status(200)
+          .set('Cache-Control', 'no-store')
+          .type('html')
+          .sendFile('index.html', { root: clientDir }, (err) => {
+            if (err && !res.headersSent) next(err);
+          });
+        return;
+      }
+      fs.readFile(path.join(clientDir, 'index.html'), 'utf8', (err, html) => {
+        if (err) { if (!res.headersSent) next(err); return; }
+        res.status(200)
+          .set('Cache-Control', 'no-store')
+          .type('html')
+          .send(html.replace(/<base href="[^"]*">/i, `<base href="${mount}/">`));
+      });
     });
   }
 

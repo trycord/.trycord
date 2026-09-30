@@ -20,28 +20,31 @@ import { qs } from './ui.js';
 
 // Surfaces a route can mount. `sidebar` means the contextual navigation region
 // is used; `members` means the member panel is meaningful. Both are facts about
-// the surface, not about the viewport - the breakpoints in the stylesheet decide
-// how wide those regions are allowed to be.
-const SIDE = 'var(--ui-sidebar)';
-const NONE = '0px';
-
+// the surface, not about the viewport.
+//
+// The track values are NOT here. This module sets one attribute and the
+// stylesheet owns every measurement, because the breakpoints have to be able to
+// override a surface's tracks on a narrow viewport. An inline custom property
+// outranks any media query, so writing the tracks from script meant the
+// one-column phone layout could never apply and the content was laid out in
+// 64px next to a rail that overflowed the screen.
 export const LAYOUTS = {
   // A community: contextual navigation plus the member panel.
-  channel: { sidebar: true, members: true, tracks: `var(--ui-rail) ${SIDE} minmax(0, 1fr)` },
+  channel: { sidebar: true, members: true },
 
   // Conversations and lists. A sidebar holds the conversations, so it stays, but
   // there is no member panel to talk about.
-  list: { sidebar: true, members: false, tracks: `var(--ui-rail) ${SIDE} minmax(0, 1fr)` },
+  list: { sidebar: true, members: false },
 
   // Settings, Admin and a profile each carry their own navigation inside the
   // content surface, because that navigation belongs to the surface and not to
   // the shell. Reserving a shell sidebar for them duplicated it.
-  settings: { sidebar: false, members: false, tracks: `var(--ui-rail) ${NONE} minmax(0, 1fr)` },
-  admin: { sidebar: false, members: false, tracks: `var(--ui-rail) ${NONE} minmax(0, 1fr)` },
-  profile: { sidebar: false, members: false, tracks: `var(--ui-rail) ${NONE} minmax(0, 1fr)` },
+  settings: { sidebar: false, members: false },
+  admin: { sidebar: false, members: false },
+  profile: { sidebar: false, members: false },
 
   // One column by nature. Keeps the rail, spends nothing else.
-  plain: { sidebar: false, members: false, tracks: `var(--ui-rail) ${NONE} minmax(0, 1fr)` },
+  plain: { sidebar: false, members: false },
 };
 
 export const DEFAULT_LAYOUT = 'list';
@@ -70,10 +73,9 @@ export function setLayout(name) {
   if (!shell) return next;
   const spec = LAYOUTS[next];
   shell.dataset.layout = next;
-  shell.style.setProperty('--ui-shell-cols', spec.tracks);
-  // Read by the member panel's own width and by the stylesheet's rules, so a
-  // surface without one cannot leave a panel reserving space it will not fill.
-  shell.style.setProperty('--ui-members', spec.members ? '' : '0px');
+  // The member panel is hidden as a sibling of this attribute rather than by
+  // measurement, so a surface without one cannot leave a panel reserving width.
+  shell.dataset.members = spec.members ? 'yes' : 'no';
   return next;
 }
 

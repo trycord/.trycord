@@ -892,6 +892,26 @@ img { max-width: 100%; }
    placement carried !important: it was fighting auto-flow rather than
    describing a layout. */
 
+/* The tracks each surface declares. These are declarations on the shell, not
+   on :root, so a media query on :root could not narrow the layout; that is why
+   the narrow viewport restates them here per layout instead of relying on
+   inheritance. A surface with a contextual navigation region gets three tracks
+   and a surface that carries its own navigation inside its content gets the
+   middle one at zero width - still three tracks, because the collapse animates
+   by interpolating a track length and a shorter list cannot. */
+.shell[data-layout="channel"],
+.shell[data-layout="list"] {
+  --ui-shell-cols: var(--ui-rail) var(--ui-sidebar) minmax(0, 1fr);
+  --ui-shell-rows: auto minmax(0, 1fr) auto;
+}
+.shell[data-layout="settings"],
+.shell[data-layout="admin"],
+.shell[data-layout="profile"],
+.shell[data-layout="plain"] {
+  --ui-shell-cols: var(--ui-rail) 0px minmax(0, 1fr);
+  --ui-shell-rows: auto minmax(0, 1fr) auto;
+}
+
 .shell {
   display: grid;
   grid-template-columns: var(--ui-shell-cols);
@@ -1157,6 +1177,10 @@ img { max-width: 100%; }
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
 }
+/* No member panel on this surface: the region is not drawn at all, so it cannot
+   reserve the second track. */
+.shell[data-members="no"] .chat-environment { display: flex; }
+.shell[data-members="no"] .member-sidebar { display: none; }
 .view-root {
   grid-column: 1;
   min-width: 0;
@@ -3067,6 +3091,12 @@ html[data-auth-page] .mobile-tab-navigation { display: none; }
     --ui-shell-cols: minmax(0, 1fr);
     --ui-shell-rows: minmax(0, 1fr) auto;
   }
+  /* A surface that declared its own tracks cannot keep them here. The rule below
+     is a plain declaration on the shell, and a media query on :root would lose
+     to a declaration on the element, so the narrow layout is restated per
+     layout rather than inherited. Without this the phone layout is the desktop
+     three tracks with a 64px content column. */
+  .shell[data-layout] { --ui-shell-cols: minmax(0, 1fr); --ui-shell-rows: minmax(0, 1fr) auto; }
 
   .main-content {
     grid-column: 1;

@@ -1,7 +1,10 @@
 // hardcode a backend origin.
 
 // Production backend. Public configuration — safe to expose, and the
-export const DEFAULT_BACKEND_URL = 'https://trycord-api.wispbyte.app';
+// hardcoded last resort for a deployment that ships no backend.json. The hosted
+// origin, and the one a failover falls back to, both live in backend.json
+// rather than here, so changing where the primary is does not mean editing code.
+export const DEFAULT_BACKEND_URL = 'https://api.trycord.dev';
 const LOCAL_BACKEND_URL = 'http://localhost:9971';
 
 const LS_BACKEND = 'trycord.backendUrl';
@@ -264,6 +267,13 @@ export const TrycordConfig = {
               });
             } catch {
               window.TRYCORD_CONFIG = merged;
+            }
+            // A deployment that pins a backup in runtime-config.js rather than in
+            // backend.json still needs it recorded, or the client has a primary
+            // and no way to reach the other one. Only used when the static file
+            // supplied nothing, so it cannot override an operator's own list.
+            if (!staticFallbacks.length) {
+              staticFallbacks = plausibleUrlList([merged.API_BACKUP_URL]);
             }
             return parsed;
           }
