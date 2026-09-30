@@ -2,7 +2,7 @@ import Api from './api.js';
 import State from './state.js';
 import Realtime from './realtime.js';
 
-import { can, currentServerId, isMuted, mustVerifyToPost, refreshMutes, setMuted, setViewRefresh } from './state.js';
+import { can, canInChannel, currentServerId, isMuted, mustVerifyToPost, refreshMutes, setChannelPermissions, setMuted, setViewRefresh } from './state.js';
 import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDialog, relTime, showContextMenu, attachContextMenu, showEmojiPicker, toast } from './ui.js';
 import { emptyState, messageRow, paintReactions } from './components.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
@@ -46,6 +46,13 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
     },
   }, '☰');
+  // The server's own channel-scoped permission answer for this viewer. Fetched
+  // per channel because an override on this channel, or on its category, is
+  // invisible to the community-level list the composer used to consult.
+  try {
+    const ov = await Api.channelOverrides(serverId, channelId);
+    setChannelPermissions(ov && Array.isArray(ov.effective) ? ov.effective : null);
+  } catch { setChannelPermissions(null); /* fall back to community-level */ }
   let muted = isMuted(channelId);
   try { await refreshMutes(); muted = isMuted(channelId); } catch { /* keep last known */ }
   const bellBtn = el('button', {
@@ -300,7 +307,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       ...(m.author_id ? [{ label: 'View profile', desc: authorName, onSelect: () => { location.hash = '#/users/' + m.author_id; } }] : []),
       ...((can('MANAGE_MESSAGES') || isMine) ? [{ sep: true }] : []),
       ...(isMine ? [{ label: 'Edit message', onSelect: () => editMsg(m) }] : []),
-      ...(can('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
+      ...(canInChannel('MANAGE_MESSAGES') ? [{ label: pinned ? 'Unpin message' : 'Pin message', onSelect: () => togglePin(m) }] : []),
       { label: 'Report message', onSelect: () => openReportModal(m) },
       ...((can('MANAGE_MESSAGES') || isMine) ? [{ label: 'Delete message', danger: true, onSelect: () => deleteMsg(m) }] : []),
     ];
@@ -425,7 +432,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   conv.appendChild(composer);
   {
     const me = State.me;
-    const locked = !can('SEND_MESSAGES') ? 'You do not have permission to send messages here.'
+    const locked = !canInChannel('SEND_MESSAGES') ? 'You do not have permission to send messages here.'
       : mustVerifyToPost() ? 'Verify your email to send messages.' : null;
     if (locked) {
       ta.disabled = true;

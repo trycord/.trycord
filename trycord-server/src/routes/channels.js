@@ -159,9 +159,19 @@ router.get('/:channelId/overrides', requireMember, async (req, res, next) => {
   try {
     const ch = await pinChannel(req);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    // The caller's channel-scoped permission set, computed by the same
+    // evaluator the write paths gate on. Sent here because this is already the
+    // one member-gated call about this channel's effective permissions, and the
+    // client needs it: it used to gate the composer on the community-level
+    // permission list, which cannot see a channel or category override at all.
+    // A deny set here is the backend's own answer, not a client guess.
+    const effective = await permissions.effectiveChannelPermissions(
+      await permissions.getOwnerId(ch.server_id), req.user.id, ch.server_id, ch.id
+    );
     res.json({
       channelId: ch.id,
       categoryId: ch.category_id || null,
+      effective: [...effective],
       overrides: await permissions.overridesFor('channel_permission_overrides', ch.id),
       categoryOverrides: ch.category_id
         ? await permissions.overridesFor('category_permission_overrides', ch.category_id)

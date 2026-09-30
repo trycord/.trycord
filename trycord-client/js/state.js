@@ -16,6 +16,12 @@ const state = {
   memberTotal: 0,      // total members in the community, server-computed
   memberHasMore: false,// whether the roster has a further page
   permissions: [],     // current server permission strings (+is_owner via all)
+  // Channel-scoped permission set for the channel currently open, as computed by
+  // the server's own evaluator (GET .../channels/:id/overrides -> `effective`).
+  // Null until that channel has been fetched. `can()` cannot answer channel
+  // questions on its own: the community list has no idea an override exists,
+  // which is why a channel-level deny used to leave the composer looking usable.
+  channelPermissions: null,
   roles: [],           // current server roles
   bans: [],            // current server bans (staff only, refreshed on demand)
   presence: new Map(), // userId -> 'online'|'offline'
@@ -44,6 +50,20 @@ export function currentServerId() {
 export function can(perm) {
   const p = state.permissions || [];
   return p.includes('*') || p.includes(perm);
+}
+
+// Channel-scoped equivalent of can(), backed by the server's answer rather than
+// a reimplementation of the precedence rules here. Falls back to the
+// community-level answer when the current channel's set has not been fetched,
+// which is the previous behaviour rather than a wrong one.
+export function canInChannel(perm) {
+  const p = state.channelPermissions;
+  if (!Array.isArray(p)) return can(perm);
+  return p.includes('*') || p.includes(perm);
+}
+
+export function setChannelPermissions(list) {
+  state.channelPermissions = Array.isArray(list) ? list.slice() : null;
 }
 
 export function peerPresence(id) {
@@ -131,6 +151,7 @@ export function clearSession() {
   state.memberTotal = 0;
   state.memberHasMore = false;
   state.permissions = [];
+  state.channelPermissions = null;
   state.roles = [];
   state.dms = [];
   state.friends = [];
@@ -172,6 +193,7 @@ export async function enterServer(serverId) {
   // Easy to drop while editing the lines above, and every permission gate in
   // the owner.
   state.permissions = (perms && perms.permissions) || [];
+  state.channelPermissions = null;
   state.roles = roles || [];
   state.lastServerId = serverId;
   try { localStorage.setItem(LS_SERVER_ID, serverId); } catch { /* ignore */ }

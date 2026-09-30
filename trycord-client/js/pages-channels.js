@@ -7,6 +7,7 @@ import { emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
 import { openOverrideEditor } from './permission-overrides.js';
 import { ensureServer } from './workspace-shared.js';
+import { channelPath } from './links.js';
 
 function openChannelEditor(serverId, ch, cats, onDone) {
   const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: ch.name || '' });
