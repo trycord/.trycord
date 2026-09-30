@@ -12,7 +12,30 @@ import TrycordPresentation from './presentation.js';
 
 let startup = Promise.resolve(null);
 
-window.TrycordPresentation = TrycordPresentation;
+// Read by the desktop smoke test (main.js) to report which shell is active.
+//
+// Under Electron with contextIsolation, properties the isolated preload world
+// defines on `window` are non-configurable accessors on the renderer's window.
+// A plain assignment to a colliding name throws "Attempted to assign to readonly
+// property", and because this runs at module top level it aborts evaluation of
+// app.js itself - the app then dies before the router starts, which surfaces as
+// the router's "Unable to load this view" screen with no further detail.
+//
+// defineProperty is used rather than a try/catch: it either installs the
+// property with the intended attributes or reports why it could not, and it
+// does not leave a half-initialised module behind.
+try {
+  Object.defineProperty(window, 'TrycordPresentation', {
+    value: TrycordPresentation,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+} catch (e) {
+  // Nothing reads this outside the desktop smoke test, so a renderer that
+  // refuses the property is still a working client.
+  console.warn('[trycord] could not expose TrycordPresentation to the page:', e && e.message);
+}
 
 async function boot() {
   applyTheme();
