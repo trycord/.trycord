@@ -36,8 +36,11 @@ export async function renderSupport(container) {
     return links;
   };
   // description and the action can never disagree.
+  // route(), not the literal. These were '#/support/appeals/new' as an anchor
+  // href, which set a fragment the router no longer listens for - the link
+  // looked right and did nothing.
   const link = (parent, title, desc, href) => {
-    const a = el('a', { class: 'pub-link', href });
+    const a = el('a', { class: 'pub-link', href: route(href) });
     a.appendChild(el('div', { class: 'pub-link__title' }, title));
     a.appendChild(el('div', { class: 'pub-link__desc' }, desc));
     parent.appendChild(a);

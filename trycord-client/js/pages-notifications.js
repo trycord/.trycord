@@ -21,9 +21,11 @@ function destination(n) {
   if (n.type === 'mention' && n.context) {
     return channelPath(n.context.serverId, n.context.channelId);
   }
-  if (n.type === 'dm' && n.referenceId) return '#/dms/' + n.referenceId;
+  // A path, not a fragment: this feeds navigate(), which would accept either,
+  // and a destination is a route like any other.
+  if (n.type === 'dm' && n.referenceId) return route('/dms/' + n.referenceId);
   if ((n.type === 'friend_request' || n.type === 'friend_accepted') && n.actor) {
-    return '#/friends';
+    return route('/friends');
   }
   return null;
 }
