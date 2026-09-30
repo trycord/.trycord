@@ -10,6 +10,7 @@ import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } fr
 import { TrycordConfig } from './config.js';
 import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
 import { navigate } from './nav.js';
+import { presentationMode } from './presentation.js';
 
 async function renderChannel(container, serverId, channelId, opts = {}) {
   clear(container);
@@ -284,12 +285,21 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
           showEmojiPicker(anchor, (emoji) => toggleReaction(m.id, emoji, false));
           return;
         }
-        openMsgMenu(anchor, m, isMine);
+        if (presentationMode() === 'mobile') toggleInlineActions(node, anchor, m, isMine);
+        else openMsgMenu(anchor, m, isMine);
       },
     });
     stampMsgNode(node, m);
     attachContextMenu(node, () => msgActions(m, isMine), {
       target: () => ({ type: 'message', id: String(m.id) }),
+      // The press is kept on touch - it is the only quick way to reach a
+      // message's actions on a phone - but on a phone it expands them in place
+      // rather than opening a sheet over the conversation.
+      onLongPress: (target) => {
+        if (presentationMode() !== 'mobile') return;
+        const btn = target.querySelector('.msg-hoverbar button:last-of-type');
+        toggleInlineActions(target, btn, m, isMine);
+      },
     });
     return node;
   }
@@ -335,6 +345,42 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       target: { type: 'message', id: String(m.id) },
       under: anchor,
     });
+  }
+
+  // On a phone the actions belong to the message, not on top of the
+  // conversation. Same items and same handlers, laid out in place underneath the
+  // message they act on: nothing to dismiss, nothing to mis-tap, and the
+  // surrounding messages do not move. Deliberately not a menu - no overlay, no
+  // scrim, no placement - because a sheet that covers the conversation to offer
+  // things about the conversation is worse than showing them.
+  function toggleInlineActions(node, anchor, m, isMine) {
+    const existing = node.querySelector('.msg-inline-actions');
+    if (existing) { existing.remove(); anchor.setAttribute('aria-expanded', 'false'); return; }
+
+    const panel = el('div', { class: 'msg-inline-actions', role: 'group', 'aria-label': 'Message actions' });
+    for (const it of msgActions(m, isMine)) {
+      if (it.sep) { panel.appendChild(el('span', { class: 'msg-inline-actions__sep' })); continue; }
+      if (it.heading) { panel.appendChild(el('span', { class: 'msg-inline-actions__heading' }, it.heading)); continue; }
+      // A submenu has nowhere to go in a flat list, so it is not offered here.
+      // The desktop menu still has it.
+      if (it.items && it.items.length) continue;
+      const b = el('button', {
+        type: 'button',
+        class: 'msg-inline-actions__item' + (it.danger ? ' is-danger' : ''),
+        disabled: it.disabled ? true : null,
+        'aria-disabled': it.disabled ? 'true' : null,
+      }, it.label);
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        panel.remove();
+        anchor.setAttribute('aria-expanded', 'false');
+        if (typeof it.onSelect === 'function') it.onSelect();
+      });
+      panel.appendChild(b);
+    }
+    if (!panel.children.length) return;
+    node.appendChild(panel);
+    anchor.setAttribute('aria-expanded', 'true');
   }
 
   function newNonce() {
@@ -537,7 +583,9 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
           showEmojiPicker(anchor, (emoji) => toggleReaction(m.id, emoji, false));
           return;
         }
-        openMsgMenu(anchor, m, State.me && String(m.author_id) === String(State.me.id));
+        const mine = State.me && String(m.author_id) === String(State.me.id);
+        if (presentationMode() === 'mobile') toggleInlineActions(node, anchor, m, mine);
+        else openMsgMenu(anchor, m, mine);
       },
     });
     stampMsgNode(node, m);

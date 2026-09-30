@@ -583,10 +583,15 @@ async function boot() {
 
   // The first path segment of every application route. The shell is served for
   // these and nothing else, so an instance that also publishes a website keeps
-  // its own clean URLs.
+  // its own clean URLs - those routes are mounted earlier and win.
+  //
+  // 'support' is deliberately absent: the public site owns /support, and since
+  // its handler is registered first it takes the path regardless of what is
+  // listed here. Claiming it would have been a lie. The in-app support view is
+  // reached by navigation, which never asks the server for the document.
   const APP_ROUTE_PREFIXES = new Set([
     'home', 'dms', 'settings', 'account', 'server', 'c', 'admin',
-    'friends', 'notifications', 'discover', 'support', 'profile',
+    'friends', 'notifications', 'discover', 'profile',
     'login', 'register', 'forgot', 'reset-password', 'verify-email',
     'menu', 'legal', 'channel', 'message',
   ]);
