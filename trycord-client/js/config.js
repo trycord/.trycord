@@ -7,12 +7,91 @@ const LOCAL_BACKEND_URL = 'http://localhost:9971';
 const LS_BACKEND = 'trycord.backendUrl';
 
 let staticBackend = null; // from backend.json, loaded once at boot
+// The origin backend.json configured, which is not necessarily the one in use:
+// a failover moves staticBackend and must be reversible, so the configured value
+// is kept. clearFailover restores this one.
+let configuredBackend = null;
+// Backup origins from the same file, tried in order when the primary cannot be
+// reached. Only the hosted front end ships this key; a self-hoster's
+// backend.json has no `fallbackUrls`, so an operator's own instance is never
+// quietly repointed somewhere else.
+let staticFallbacks = [];
 let staticLoaded = false;
+
+// Set when the client moved itself to a backup. Accounts, communities and
+// messages live on one instance's database, so a silent switch looks to the
+// user like a wrong password and an empty community list. This is what the UI
+// reads to say what happened.
+let failoverNotice = null;
 
 function plausibleUrl(u) {
   if (!u) return null;
   const t = String(u).trim().replace(/\/+$/, '');
   return /^https?:\/\//i.test(t) ? t : null;
+}
+
+// The object literal that is the second argument of the first `Object.assign(`
+// call in `text`, as { start, end } indexes of its braces.
+//
+// The first argument cannot be skipped by looking for the next '{': the snippet
+// is `Object.assign(window.TRYCORD_CONFIG || {}, {...})`, so that finds the
+// fallback object and yields `{}`. This walks the parentheses to the top-level
+// comma that ends the first argument instead. String-aware, so a paren or comma
+// inside a JSON string value does not count.
+function secondArgObjectLiteral(text) {
+  const callAt = text.indexOf('Object.assign(');
+  if (callAt === -1) return null;
+  const argsStart = callAt + 'Object.assign('.length;
+
+  let depth = 0, inStr = false, esc = false, argStart = argsStart;
+  for (let k = argsStart; k < text.length; k++) {
+    const ch = text[k];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth === 0) return null; // call ended without a second argument
+      depth--;
+    } else if (ch === ',' && depth === 0) {
+      // Start of the second argument; take its first balanced object.
+      const start = text.indexOf('{', k + 1);
+      if (start === -1) return null;
+      let d = 0, s = false, e = false;
+      for (let m = start; m < text.length; m++) {
+        const c2 = text[m];
+        if (s) {
+          if (e) e = false;
+          else if (c2 === '\\') e = true;
+          else if (c2 === '"') s = false;
+          continue;
+        }
+        if (c2 === '"') s = true;
+        else if (c2 === '{') d++;
+        else if (c2 === '}') {
+          d--;
+          if (d === 0) return { start, end: m };
+        }
+      }
+      return null;
+    }
+    void argStart;
+  }
+  return null;
+}
+
+function plausibleUrlList(v) {
+  if (!Array.isArray(v)) return [];
+  const out = [];
+  for (const item of v) {
+    const u = plausibleUrl(item);
+    if (u && !out.includes(u)) out.push(u);
+  }
+  return out;
 }
 
 // call is cross-origin, and the backend has to allowlist that scheme explicitly
@@ -98,10 +177,54 @@ export const TrycordConfig = {
       if (!res.ok) return null;
       const json = await res.json();
       staticBackend = plausibleUrl(json && json.backendUrl);
+      configuredBackend = staticBackend;
+      staticFallbacks = plausibleUrlList(json && json.fallbackUrls);
       return staticBackend;
     } catch {
       return null;
     }
+  },
+
+  // Backup origins this build was given. Empty unless the hosted front end
+  // supplied them, which is the whole point: self-hosters get none.
+  backendFallbacks() {
+    return staticFallbacks.slice();
+  },
+
+  // Why the client is on a backup origin, or null. Consumed by the UI.
+  failover() {
+    return failoverNotice;
+  },
+
+  // Try each backup in order and adopt the first that answers. Never called
+  // when the operator chose their own instance: `backendFallbacks()` is empty
+  // for them, and an explicit choice is respected even if a build did ship a
+  // list.
+  async tryFallbacks(timeoutMs = 6000) {
+    const current = resolveBackend().url;
+    for (const candidate of staticFallbacks) {
+      if (candidate === current) continue;
+      const probe = await TrycordConfig.testBackend(candidate, timeoutMs);
+      if (!probe.ok) continue;
+      staticBackend = candidate;
+      failoverNotice = { from: current, to: candidate, name: probe.name || candidate };
+      try { localStorage.setItem(LS_BACKEND, candidate); } catch { /* ignore */ }
+      return failoverNotice;
+    }
+    return null;
+  },
+
+  // Put the configured origin back and forget the failover, so a recovering
+  // instance is picked up again without the user having to know it happened.
+  clearFailover() {
+    failoverNotice = null;
+    staticBackend = configuredBackend;
+    if (staticBackend) {
+      try { localStorage.setItem(LS_BACKEND, staticBackend); } catch { /* ignore */ }
+    } else {
+      TrycordConfig.resetBackend();
+    }
+    return resolveBackend().url;
   },
 
   async loadRuntimeConfig() {
@@ -111,13 +234,26 @@ export const TrycordConfig = {
       const res = await fetch(base + '/runtime-config.js', { cache: 'no-store' });
       if (!res.ok) return null;
       const js = await res.text();
-      // CSP forbids eval(); the server emits a tiny deterministic snippet:
-      const m = js.match(/=\s*Object\.assign\([^;]*?\{\s*([\s\S]*?)\s*\}\)?;/);
-      if (m) {
+      // CSP forbids eval(), so the snippet is not executed. It is not recovered
+      // with a regex either: the previous pattern matched the `{}` in
+      // `window.TRYCORD_CONFIG || {}` before the real literal, so the capture
+      // began `}, {` and JSON.parse rejected it. That failed for every input,
+      // including plain ones, and the failure was swallowed - so this function
+      // has always returned null and an operator's API_URL pin was silently
+      // discarded.
+      //
+      // Find the literal that is the *second* argument of Object.assign.
+      // Scanning forward for the first '{' does not work: the snippet reads
+      // `Object.assign(window.TRYCORD_CONFIG || {}, {...})`, so the first brace
+      // belongs to the fallback object and parsing it yields `{}`.
+      const lit = secondArgObjectLiteral(js);
+      if (lit) {
         try {
-          const parsed = JSON.parse('{' + m[1] + '}');
-          window.TRYCORD_CONFIG = Object.assign(window.TRYCORD_CONFIG || {}, parsed);
-          return parsed;
+          const parsed = JSON.parse(js.slice(lit.start, lit.end + 1));
+          if (parsed && typeof parsed === 'object') {
+            window.TRYCORD_CONFIG = Object.assign(window.TRYCORD_CONFIG || {}, parsed);
+            return parsed;
+          }
         } catch { /* fall through */ }
       }
       return null;

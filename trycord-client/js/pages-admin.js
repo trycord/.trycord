@@ -469,7 +469,12 @@ async function renderReports(body, show, seq) {
   const sel = el('select', { class: 'input', 'aria-label': 'Filter reports by status' },
     el('option', { value: '' }, 'All statuses'),
     REPORT_STATUSES.map((s) => el('option', { value: s }, s)));
-  toolbar.append(sel, el('span', { class: 'muted small' }, 'Reports stay scoped: reviewers see actionable cases only.'));
+  // A report is what someone submitted, not a finding. The old copy ("reports
+  // stay scoped: reviewers see actionable cases only") read as though the queue
+  // contained established cases to action, which is the opposite of what a
+  // reviewer has to determine.
+  toolbar.append(sel, el('span', { class: 'muted small' },
+    'A report records what someone submitted. Decide for yourself whether it happened.'));
   const listWrap = el('div', { class: 'admin-list' });
   show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (status) => {
