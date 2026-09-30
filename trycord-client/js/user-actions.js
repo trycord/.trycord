@@ -92,11 +92,11 @@ export function buildUserActions({ user, id, name, sid, isSelf, blocked = false 
   const authed = isAuthed();
 
   if (!authed) {
-    out.push({ label: 'View profile', primary: true, onSelect: () => { navigate('#/users/' + id); } });
+    out.push({ label: 'View profile', primary: true, onSelect: () => { navigate('/users/' + id); } });
     return out;
   }
 
-  out.push({ label: 'View profile', onSelect: () => { navigate('#/users/' + id); } });
+  out.push({ label: 'View profile', onSelect: () => { navigate('/users/' + id); } });
 
   // Direct message. Never offer this to yourself, and never offer it to someone
   // the reader has blocked: the server refuses with NOT_ACCEPTING_DMS, so the
@@ -109,7 +109,7 @@ export function buildUserActions({ user, id, name, sid, isSelf, blocked = false 
         try {
           const conv = await Api.openDm(id);
           const cid = conv && (conv.id || conv.conversationId);
-          if (cid) navigate('#/dms/' + cid);
+          if (cid) navigate('/dms/' + cid);
         } catch (ex) { toast(ex.message || 'Could not open a conversation.', 'error'); }
       },
     });

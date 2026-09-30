@@ -34,8 +34,8 @@ export async function renderHome(container) {
     const empty = emptyState('hash', 'Your space is quiet',
       servers.length ? 'Choose a community from the spine to start talking.' : 'Create a community or browse places to join the conversation.');
     empty.appendChild(el('div', { class: 'home-empty-actions' },
-      el('button', { class: 'btn primary', type: 'button', onClick: () => { navigate('#/servers/new'); } }, 'Create community'),
-      el('button', { class: 'btn ghost', type: 'button', onClick: () => { navigate('#/discover'); } }, 'Browse communities')));
+      el('button', { class: 'btn primary', type: 'button', onClick: () => { navigate('/servers/new'); } }, 'Create community'),
+      el('button', { class: 'btn ghost', type: 'button', onClick: () => { navigate('/discover'); } }, 'Browse communities')));
     stream.appendChild(empty);
   }
 
@@ -60,7 +60,7 @@ export async function renderHome(container) {
     const dm = entry.item;
     const row = el('button', {
       class: 'row home-event', type: 'button',
-      onClick: () => { navigate('#/dms/' + dm.id); },
+      onClick: () => { navigate('/dms/' + dm.id); },
     });
     row.appendChild(avatar(dm.peer, { withPresence: true }));
     const main = el('div', { class: 'row-main' });

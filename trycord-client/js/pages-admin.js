@@ -35,7 +35,7 @@ function denied(msg) {
   return el('div', { class: 'empty-state' },
     el('div', { class: 'form-error' }, msg || 'You do not have platform administration access.'),
     el('div', { class: 'row-line' },
-      el('button', { class: 'btn primary', type: 'button', onClick: () => { navigate('#/home'); } }, 'Home')));
+      el('button', { class: 'btn primary', type: 'button', onClick: () => { navigate('/home'); } }, 'Home')));
 }
 
 function loadError(ex, retry) {
@@ -100,7 +100,7 @@ async function renderOverview(body, show, seq) {
     }
   }
   recent.appendChild(el('div', { class: 'row-line admin-more' },
-    el('button', { class: 'btn ghost sm', type: 'button', onClick: () => { navigate('#/admin/audit'); } }, 'Open audit log')));
+    el('button', { class: 'btn ghost sm', type: 'button', onClick: () => { navigate('/admin/audit'); } }, 'Open audit log')));
   show(el('div', { class: 'admin-block admin-block--sections' }, grid, recent));
 }
 

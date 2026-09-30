@@ -353,7 +353,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
               await refreshServers();
               leaveServerContext();
               toast('Ownership transferred.', 'ok');
-              navigate('#/home');
+              navigate('/home');
             } catch (ex) {
               err.hidden = false;
               err.textContent = ex.message || 'Could not transfer ownership.';
@@ -383,7 +383,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
             await Api.leaveServer(serverId);
             await refreshServers();
             leaveServerContext();
-            navigate('#/home');
+            navigate('/home');
           } catch (ex) { toast(ex.message || 'Could not leave.', 'error'); }
         },
       });
@@ -412,7 +412,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
               await refreshServers();
               leaveServerContext();
               toast('Community deleted.', 'warn');
-              navigate('#/home');
+              navigate('/home');
             } catch (ex) { toast(ex.message || 'Could not delete.', 'error'); }
           },
         });

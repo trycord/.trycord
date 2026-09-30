@@ -1,16 +1,16 @@
 // Navigation.
 //
-// Routes used to live in the fragment: `location.hash = '#/settings'`, and 83
-// assignments across 23 files did it by hand. Two problems with that beyond the
-// ugliness of the URL. The fragment is not sent to the server, so a bookmarked
-// route is not a route until JavaScript runs; and every one of those 83 sites
-// was its own definition of "go somewhere", which is why half of them missed a
-// case at some point.
+// Routes live in the path. They used to live in the fragment, and 46 call sites
+// still wrote '#/settings' when this was last touched. The fragment form is gone
+// for two reasons. The fragment is never sent to the server, so a bookmarked
+// fragment URL is not a route until JavaScript has booted - which meant a shared
+// link and a refresh were two different behaviours. And having two ways to name
+// one route is two ways for them to disagree.
 //
-// So navigation is one function. It takes the same strings the old code passed
-// to location.hash - '#/home', '#/c/slug', with or without a query - and works
-// out the real path. Call sites keep their existing literals; there is nothing
-// to find and rewrite, and a route added later needs no new plumbing.
+// So navigation is one function, and a route is one string. adoptLegacyHash()
+// still upgrades a fragment URL that arrives from a bookmark, which is the only
+// remaining place the old form is understood; nothing in this codebase produces
+// one.
 
 // The client's own routes, which must not be mistaken for navigation.
 const EXTERNAL = /^(https?:|mailto:|tel:|#$|blob:|data:)/i;
@@ -67,18 +67,27 @@ export function unroute(path) {
   return path.startsWith(BASE + '/') ? path.slice(BASE.length) : path;
 }
 
-/** '#/home' -> '/home'. Returns null for anything that is not our route. */
+/**
+ * A navigation target as a route path, or null if it is not one of ours.
+ *
+ * A leading '#' is no longer stripped. Routes are paths: the fragment form
+ * existed because the app used to live in it, and every call site has been
+ * converted. Accepting it silently would mean a typo like '#/dms' still worked,
+ * which is the opposite of what removing the hash was for - and it would keep the
+ * second addressing scheme alive in a codebase that is supposed to have one.
+ * An old fragment URL is still handled once, by adoptLegacyHash.
+ */
 export function routePath(target) {
   if (target == null) return null;
   const raw = String(target).trim();
   if (!raw || EXTERNAL.test(raw)) return null;
-  return raw.startsWith('#') ? raw.slice(1) || '/' : raw;
+  return raw.startsWith('/') ? raw : '/' + raw;
 }
 
 /**
  * Go to a route.
  *
- * @param {string} target  '#/home', '/home', or a full URL
+ * @param {string} target  '/home', or a full URL to somewhere else
  * @param {object} [opts]
  * @param {boolean} [opts.replace]  replace this entry instead of pushing one
  * @param {boolean} [opts.external]  a different origin: a real navigation
@@ -92,7 +101,8 @@ export function navigate(target, opts = {}) {
       window.location.assign(String(target).trim());
       return;
     }
-    location.hash = String(target);   // a bare '#' anchor, not a route
+    // A fragment with no path is a real anchor on this page, not a route.
+    location.hash = String(target);
     return;
   }
   if (opts.external) {
@@ -138,7 +148,10 @@ export function withQuery(path, query) {
 export function adoptLegacyHash() {
   const hash = location.hash;
   if (!hash || hash.length < 2) return false;
-  const path = routePath(hash);
+  // Stripped here rather than in routePath(), which no longer knows about the
+  // fragment form. This is the only code left that does, and it exists only for
+  // URLs that were already in the wild before the move to paths.
+  const path = routePath(hash.slice(1) || '/');
   if (path === null) return false;
   // Through route(), like every other navigation. Writing the route path
   // straight into history put '/app/#/settings' at '/settings' on a subpath
@@ -176,12 +189,14 @@ export function interceptLinks(doc = document) {
 
     const raw = a.getAttribute('href');
     if (!raw) return;
-    // A legacy '#/route' href. routePath knows the fragment form, and treating it
-    // as an in-page fragment is what left these links looking right and doing
-    // nothing. Only the route shape qualifies.
+    // A legacy '#/route' href, from a page rendered before the move to paths.
+    // Treating it as an in-page fragment is what left these links looking right
+    // and doing nothing. Only the route shape qualifies, and the '#' is stripped
+    // here rather than by routePath(), which no longer understands the fragment
+    // form - passing it straight through would navigate to '/#/route'.
     if (raw === '#/' || raw.startsWith('#/')) {
       e.preventDefault();
-      navigate(routePath(raw));
+      navigate(routePath(raw.slice(1) || '/'));
       return;
     }
     // Every other '#...' is a same-page jump - the skip link above all - and the

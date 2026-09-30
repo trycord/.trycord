@@ -134,9 +134,10 @@ async function run() {
 
 const Router = {
   init() {
-    // An arriving '#/settings' is rewritten onto '/settings' before the first
-    // render, so old links and the desktop build's restored state keep working
-    // and the address bar ends up canonical.
+    // A fragment URL that arrives from a bookmark or the desktop build's
+    // restored window state is rewritten onto its path form before the first
+    // render, so the address bar ends up canonical. Nothing in the client
+    // produces one any more; this only upgrades what already exists.
     const adopted = adoptLegacyHash();
     interceptLinks();
     window.addEventListener('popstate', () => run());

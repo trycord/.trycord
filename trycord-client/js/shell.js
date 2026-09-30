@@ -41,7 +41,7 @@ function serverChipMenuFor(s) {
                 await Api.leaveServer(sid);
                 await refreshServers();
                 if (isCurrent) leaveServerContext();
-                navigate('#/home');
+                navigate('/home');
               } catch (ex) { toast(ex.message || 'Failed', 'error'); }
             },
           });
@@ -182,7 +182,7 @@ export function memberActions(m) {
   };
 
   const actions = [
-    { label: 'View profile', onSelect: () => { navigate('#/users/' + id); } },
+    { label: 'View profile', onSelect: () => { navigate('/users/' + id); } },
     ...(mine ? [] : [{ label: 'Message', onSelect: () => messageMember(id) }]),
     { label: 'Copy user ID', onSelect: () => copyText(String(id), 'User ID copied.') },
   ];
@@ -282,7 +282,7 @@ export function renderCommunities(region) {
     title: 'Create a community',
     'aria-label': 'Create a community',
     dataset: { label: 'Create a community' },
-    onClick: () => { navigate('#/servers/new'); },
+    onClick: () => { navigate('/servers/new'); },
   }, el('span', { class: 'rail-nav-icon' }, icon('plus')));
   region.appendChild(el('div', { class: 'rail-divider' }));
   region.appendChild(create);
@@ -401,7 +401,7 @@ function dmsContext(region) {
       const row = el('button', {
         class: 'row row--dm' + (active ? ' active' : '') + (dm.unreadCount ? ' is-unread' : ''),
         type: 'button', title: name,
-        onClick: () => { navigate('#/dms/' + dm.id); },
+        onClick: () => { navigate('/dms/' + dm.id); },
       });
       row.appendChild(avatar(peer, { size: 'sm', withPresence: true }));
       const main = el('div', { class: 'row__stack' });
@@ -423,7 +423,7 @@ function dmsContext(region) {
   const compose = el('div', { class: 'ctx-actions' });
   compose.appendChild(el('button', {
     class: 'btn primary block', type: 'button',
-    onClick: () => { navigate('#/friends'); },
+    onClick: () => { navigate('/friends'); },
   }, 'New message'));
   scroll.appendChild(compose);
   scroll.appendChild(search);
@@ -454,7 +454,7 @@ function settingsContext(region) {
     const active = here === s.path || here.startsWith(s.path + '/');
     group.list.appendChild(navRow({
       label: s.label, href: route(s.path), active,
-      onClick: () => { navigate('#' + s.path); },
+      onClick: () => { navigate('/' + s.path); },
     }));
   }
   scroll.appendChild(group);
@@ -463,7 +463,7 @@ function settingsContext(region) {
     const admin = navGroup({ label: 'Administration' });
     admin.list.appendChild(navRow({
       label: 'Admin console', href: route('/admin'), active: here.startsWith('/admin'),
-      onClick: () => { navigate('#/admin'); },
+      onClick: () => { navigate('/admin'); },
     }));
     scroll.appendChild(admin);
   }
@@ -483,7 +483,7 @@ function simpleListContext(region, { title, sub, groups }) {
       const active = item.exact ? here === item.path : (here === item.path || here.startsWith(item.path + '/'));
       group.list.appendChild(navRow({
         label: item.label, href: route(item.path), active,
-        onClick: () => { navigate('#' + item.path); },
+        onClick: () => { navigate('/' + item.path); },
       }));
     }
     scroll.appendChild(group);
@@ -580,7 +580,7 @@ function adminContext(region) {
   for (const s of ADMIN_SECTIONS) {
     group.list.appendChild(navRow({
       label: s.label, href: route(s.path), active: adminSectionActive(s, here),
-      onClick: () => { navigate('#' + s.path); },
+      onClick: () => { navigate('/' + s.path); },
     }));
   }
   scroll.appendChild(group);
@@ -595,7 +595,7 @@ function adminContext(region) {
   for (const s of ADMIN_OVERFLOW) {
     more.list.appendChild(navRow({
       label: s.label, href: route(s.path), active: adminSectionActive(s, here),
-      onClick: () => { navigate('#' + s.path); },
+      onClick: () => { navigate('/' + s.path); },
     }));
   }
   scroll.appendChild(more);
@@ -796,7 +796,7 @@ export function renderMemberSidebar(region) {
       roleLine.appendChild(el('span', {}, roleText));
       info.appendChild(roleLine);
       row.appendChild(info);
-      row.addEventListener('click', () => { navigate('#/users/' + id); });
+      row.addEventListener('click', () => { navigate('/users/' + id); });
       attachContextMenu(row, memberMenu(m), {
         target: (node) => ({ type: 'member', id: String(m.user_id || m.id) }),
       });
@@ -1050,7 +1050,7 @@ export function renderVerifyBanner() {
       bar.appendChild(resend);
     }
     const go = el('button', { class: 'btn ghost sm', type: 'button' }, hasEmail ? 'Settings' : 'Add email');
-    go.addEventListener('click', () => { navigate('#/settings'); });
+    go.addEventListener('click', () => { navigate('/settings'); });
     bar.appendChild(go);
   }
 }

@@ -148,7 +148,7 @@ async function renderMenu(container) {
   renderContextHeader({ title: 'Menu', sub: 'Everywhere in Trycord' });
   const wrap = el('div', { class: 'page atrium' });
   const me = State.me || {};
-  const acct = el('button', { class: 'row', type: 'button', onClick: () => { navigate('#/settings'); } });
+  const acct = el('button', { class: 'row', type: 'button', onClick: () => { navigate('/settings'); } });
   acct.appendChild(avatar(me, { size: 'sm', withPresence: true }));
   const am = el('div', { class: 'row-main' });
   am.appendChild(el('div', { class: 'row-title' }, me.displayName || me.username || 'You'));
@@ -189,7 +189,7 @@ async function renderMenu(container) {
   try { servers = await refreshServers(); } catch { /* offline */ }
   if (!servers.length) {
     srvSec.appendChild(el('p', { class: 'muted small' }, 'No communities yet.'));
-    const go = el('button', { class: 'btn', type: 'button', onClick: () => { navigate('#/discover'); } }, 'Discover communities');
+    const go = el('button', { class: 'btn', type: 'button', onClick: () => { navigate('/discover'); } }, 'Discover communities');
     srvSec.appendChild(go);
     renderAllChrome();
     return;
