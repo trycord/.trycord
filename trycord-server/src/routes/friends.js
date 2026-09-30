@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { serviceError } = require('../errors');
 const friends = require('../services/friends');
+const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
 
 let gateway = { sendToUser: () => {}, getPresence: null };
@@ -55,6 +56,16 @@ router.get('/requests', async (req, res, next) => {
 // POST /api/friends/requests { userId }
 router.post('/requests', auth.requireVerified, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
+    // The target's friend-request policy, and a block in either direction, are
+    // checked here rather than inside friends.request() so the rejection reaches
+    // the caller as a real 403 with its own message instead of being flattened
+    // into a generic conflict.
+    const gate = await privacy.canSendFriendRequest(req.user.id, String(((req.body || {}).userId) || ''));
+    if (!gate.allowed) {
+      const err = new Error(gate.message);
+      err.code = gate.code;
+      throw err;
+    }
     const out = await friends.request(req.user.id, String(((req.body || {}).userId) || ''));
     if (out.autoAccepted) {
       await notify(out.accepted.friendId, 'friend_accepted', req.user.id, null);

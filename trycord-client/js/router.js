@@ -1,132 +1,57 @@
-// Hash router. Maps #/... routes to real page renderers. Guards routes,
+// Routing.
+//
+// A pathname is resolved to a row in the route table (routes.js) and the row's
+// work runs. Everything this file owns is what a table cannot: parsing the
+// location, telling the shell what to paint before the view exists, deciding who
+// is allowed where, and the one failure surface for a view that throws.
+//
+// The dispatch itself used to be a ~60-branch if-chain here. It is data now, so
+// the shape of the application can be read in one place and adding a route does
+// not mean finding the right spot in a wall of startsWith calls.
 
 import { isAuthed, refreshServers, clearViewRefresh } from './state.js';
-import PagesPublic from './pages-public.js';
-import { renderHome } from './pages-home.js';
-import { renderBrowse } from './pages-browse.js';
-import HelloDms from './pages-dms.js';
-// There is deliberately no `Workspace.*` facade any more: the old single
-import { renderMenu, renderNewServer, renderServerLanding } from './pages-community.js';
-import { renderChannel, renderChannelPins } from './pages-conversation.js';
-import { renderServerMembers } from './pages-members.js';
-import { renderServerRoles } from './pages-roles.js';
-import { renderNewChannel, renderServerCategories } from './pages-channels.js';
-import { renderInvites } from './pages-invites.js';
-import { renderServerSettings } from './pages-settings.js';
-import { renderAccount } from './pages-account.js';
-import { renderAdmin } from './pages-admin.js';
-import { renderAdminPages } from './pages-admin-pages.js';
-import { renderProfile } from './pages-profile.js';
-import { renderSupport, renderMyAppeals, renderNewAppeal } from './pages-support.js';
-import { renderNotifications } from './pages-notifications.js';
-import { presentationMode, closeDesktopNav } from './presentation.js';
+import { closeDesktopNav } from './presentation.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from './shell.js';
 import { navigate, adoptLegacyHash, interceptLinks, BASE } from './nav.js';
-import { setLayout, layoutForPath, layoutUsesSidebar } from './layout.js';
-import Api from './api.js';
+import { setLayout, layoutForPath } from './layout.js';
+import { matchRoute, HOME_ROUTE } from './routes.js';
+import { runCleanup, setViewRefreshCleaner } from './resolve.js';
+import { el, clear } from './ui.js';
 
-// A slug is a display convenience, not an identity, so a route that cannot
-// resolve one says so plainly instead of rendering an empty page that looks
-// like a broken app.
-function renderRouteError(region, message) {
-  region.replaceChildren();
-  region.appendChild(el('div', { class: 'empty-state' }, [
-    el('p', {}, message),
-    el('a', { class: 'btn', href: '/' }, 'Go home'),
-  ]));
-}
-
-// Both accept an id or a slug, because a link may be either: copied from the
-// address bar after the move to slugs, or shared before it. A failed lookup
-// returns null rather than throwing, so an unknown community reads as a dead
-// link and not a crash.
-async function resolveCommunity(token) {
-  try {
-    const row = await Api.server(token);
-    return row && row.id ? { serverId: row.id } : null;
-  } catch {
-    return null;
-  }
-}
-
-// Always resolved inside the community. A channel slug is unique per community
-// and not globally, so resolving one without that context would be a guess - and
-// a guess here can land on somebody else's channel.
-async function resolveChannelToken(serverId, token) {
-  try {
-    const list = await Api.channels(serverId);
-    const chans = (list && list.channels) || [];
-    const hit = chans.find((c) => String(c.slug) === String(token) || String(c.id) === String(token));
-    return hit ? hit.id : null;
-  } catch {
-    return null;
-  }
-}
-import { el, clear, toast } from './ui.js';
-import { serverPath } from './links.js';
-
-let lastCleanup = null;
 let lastRoute = '';
 
 function viewRegion() {
   return document.getElementById('view-root');
 }
 
-function runCleanup() {
-  if (lastCleanup) { try { lastCleanup(); } catch { /* ignore */ } lastCleanup = null; }
-  // A realtime community event must never repaint the view we just left.
-  try { clearViewRefresh(); } catch { /* ignore */ }
-}
+// The route table's rows register teardown through resolve.js, but the realtime
+// repaint subscription belongs to the router, so it is handed over rather than
+// imported by the module that would otherwise have to import the table back.
+setViewRefreshCleaner(clearViewRefresh);
 
-function setCleanup(fn) {
-  runCleanup();
-  lastCleanup = fn;
-}
-
-// A hash carries a path and, optionally, a query: #/server/s/channel/c?m=<id>.
+// A path is a path, optionally with a query. The mount is stripped so that
+// '/app/settings' and '/settings' are one route rather than two, and a fragment
+// is upgraded to the path form before this runs.
 function parseLocation() {
-  // Routes are paths. A fragment still on the URL is an old link; nav.js has
-  // already rewritten it onto the path form before this runs.
-  //
-  // The mount point comes off first. Where the app is served from a subpath the
-  // pathname still carries it - /app/settings, not /settings - and without
-  // stripping it the first route segment is the mount directory itself, which
-  // matches no branch and drops every deep link onto the default route.
   let pathname = location.pathname || '/';
   if (BASE && pathname.startsWith(BASE)) pathname = pathname.slice(BASE.length) || '/';
-  const raw = pathname + (location.search || '');
-  const qIndex = raw.indexOf('?');
-  const path = qIndex === -1 ? raw : raw.slice(0, qIndex);
-  const query = {};
+  const qIndex = pathname.indexOf('?');
+  let query = {};
   if (qIndex !== -1) {
-    for (const [k, v] of new URLSearchParams(raw.slice(qIndex + 1))) query[k] = v;
+    const search = new URLSearchParams(pathname.slice(qIndex + 1));
+    query = Object.fromEntries(search.entries());
+    pathname = pathname.slice(0, qIndex);
   }
-  if (!path || path === '/') return { path: '/', parts: [], query };
-  // Mutable: the V2 /c/... form is rewritten into the legacy /server/... shape
-  // below so a single set of route branches serves both. The old routes are
-  // kept working rather than removed because links to them already exist.
-  let parts = path.split('/').filter(Boolean).map(decodeURIComponent);
-  return { path, parts, query };
-}
-
-function requireAuth() {
-  if (!isAuthed()) {
-    return false;
-  }
-  return true;
+  const path = pathname || '/';
+  if (!path.startsWith('/')) return { path: '/', parts: [], query };
+  return { path, parts: path.split('/').filter(Boolean).map(decodeURIComponent), query };
 }
 
 async function renderRoute() {
-  // `route` is the raw hash split into segments. It is rebound - never mutated
-  // in place - when a V2 path is normalised below, so it is deliberately `let`
-  // while the destructured view of it is not.
-  let { path, parts: route, query } = parseLocation();
+  const { path, parts, query } = parseLocation();
   document.documentElement.dataset.route = path || '/';
-    // fixed-position and escapes the desktop shell's grid, but it still has to
-    delete document.documentElement.dataset.authPage;
+  delete document.documentElement.dataset.authPage;
   for (const stray of document.querySelectorAll('body > .auth-page')) stray.remove();
-  // Session state as a styling hook. Without a session there is no rail and
-  // session rather than the route fixes every such page at once, instead of
   document.documentElement.dataset.session = isAuthed() ? 'in' : 'out';
   const region = viewRegion();
   if (!region) return;
@@ -136,274 +61,38 @@ async function renderRoute() {
   // that renders later already knows whether it has a sidebar to fill.
   setLayout(layoutForPath(path));
 
+  // Published as the raw path first, then again from inside a community row once
+  // a slug has been resolved to an id. The chrome compares against this, and it
+  // matches the normalised /server/:id/... shape, so publishing only the raw
+  // /c/:slug path would leave nothing highlighted.
   setNavRoute(() => path);
   runCleanup();
-
-  // The route the chrome compares against. Published again after a V2 slug is
-  // resolved, so the sidebar's active highlighting keeps working no matter which
-  // form the URL arrived in: the shell matches on the normalised
-  // /server/:id/... shape, and matching against the raw /c/:slug path would
-  // silently leave nothing highlighted.
-  const publishRoute = (p) => setNavRoute(() => p);
-
   closeDesktopNav();
 
-  if (path.startsWith('/login') || path === '' || path === '/') {
-    if (isAuthed()) { navigate('#/home'); return; }
-    renderContextHeader({});
-    PagesPublic.login(region);
-    setNavRoute(() => '/login');
-    document.documentElement.dataset.route = '/login';
+  const row = matchRoute(path) || HOME_ROUTE;
+  const authed = isAuthed();
+
+  if (row.auth === 'guest' && authed) { navigate(row.guestTo || '/home'); return; }
+  if (row.auth === 'session' && !authed) {
     renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/register')) {
-    if (isAuthed()) { navigate('#/home'); return; }
-    PagesPublic.register(region);
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/forgot')) {
-    if (isAuthed()) { navigate('#/home'); return; }
-    PagesPublic.forgot(region);
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/reset-password/')) {
-    if (isAuthed()) { navigate('#/home'); return; }
-    PagesPublic.resetPassword(region, route[1]);
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/legal/')) {
-    PagesPublic.legal(region, route[1]);
-    renderAllChrome();
-    return;
-  }
-  // Public email-verification link (single-use, token in the URL).
-  if (path.startsWith('/verify-email/')) {
-    PagesPublic.verify(region, route[1]);
-    renderAllChrome();
+    navigate('/login');
     return;
   }
 
-  if (path.startsWith('/discover')) {
-    const previewId = route[1] || null;
-    await renderBrowse(region, { previewId });
-    renderAllChrome();
-    return;
+  // The server list is what the rail, the sidebar and the community switcher all
+  // read, so a session route cannot paint before it is in hand. A failure is not
+  // fatal: surfaces that do not need it still render, and the ones that do show
+  // their own empty state.
+  if (row.auth === 'session') {
+    try { await refreshServers().catch(() => {}); } catch { /* offline */ }
   }
 
-  if (path.startsWith('/support/appeals/new')) {
-    renderNewAppeal(region);
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/support/appeals')) {
-    if (!requireAuth()) {
-      renderAllChrome();
-      navigate('#/login');
-      return;
-    }
-    await renderMyAppeals(region);
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/support')) {
-    await renderSupport(region);
-    renderAllChrome();
-    return;
-  }
-
-  // --- everything below requires a session -------------------------
-  if (!requireAuth()) {
-    renderAllChrome();
-    navigate('#/login');
-    return;
-  }
-
-  try { await refreshServers().catch(() => {}); } catch { /* offline */ }
-
-  if (path.startsWith('/friends')) {
-    setCleanup(() => { HelloDms.leaveDm(); });
-    await HelloDms.renderFriendsPage(region);
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/dms/')) {
-    setCleanup(() => { HelloDms.leaveDm(); });
-    await HelloDms.renderDms(region, { id: route[1] });
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/dms')) {
-    setCleanup(() => { HelloDms.leaveDm(); });
-    await HelloDms.renderDms(region, {});
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/notifications')) {
-    await renderNotifications(region);
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/menu')) {
-    await renderMenu(region);
-    renderAllChrome();
-    return;
-  }
-
-  if (path.startsWith('/settings/updates')) { await renderAccount(region, { tab: 'updates' }); renderAllChrome(); return; }
-  if (path.startsWith('/settings/appearance')) { await renderAccount(region, { tab: 'appearance' }); renderAllChrome(); return; }
-  if (path.startsWith('/settings/password')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
-  if (path.startsWith('/settings/sessions')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
-  if (path.startsWith('/settings/security')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
-  if (path.startsWith('/settings/backend')) { await renderAccount(region, { tab: 'backend' }); renderAllChrome(); return; }
-  if (path.startsWith('/settings/privacy')) { await renderAccount(region, { tab: 'privacy' }); renderAllChrome(); return; }
-  if (path.startsWith('/settings/notifications')) { await renderAccount(region, { tab: 'notifications' }); renderAllChrome(); return; }
-  if (path.startsWith('/settings')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
-  if (path.startsWith('/account/updates')) { await renderAccount(region, { tab: 'updates' }); renderAllChrome(); return; }
-  if (path.startsWith('/account/appearance')) { await renderAccount(region, { tab: 'appearance' }); renderAllChrome(); return; }
-  if (path.startsWith('/account/password')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
-  if (path.startsWith('/account/sessions')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
-  if (path.startsWith('/account/security')) { await renderAccount(region, { tab: 'security' }); renderAllChrome(); return; }
-  if (path.startsWith('/account/backend')) { await renderAccount(region, { tab: 'backend' }); renderAllChrome(); return; }
-  if (path.startsWith('/account/privacy')) { await renderAccount(region, { tab: 'privacy' }); renderAllChrome(); return; }
-  if (path.startsWith('/account/notifications')) { await renderAccount(region, { tab: 'notifications' }); renderAllChrome(); return; }
-  if (path.startsWith('/account')) { await renderAccount(region, { tab: 'profile' }); renderAllChrome(); return; }
-
-  if (path === '/admin/pages' || path.startsWith('/admin/pages/')) {
-    await renderAdminPages(region, { route: route[2] || null });
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/admin/')) {
-    const adminSection = route[1] === 'servers' ? 'communities' : (route[1] || 'overview');    await renderAdmin(region, { section: adminSection });
-    renderAllChrome();
-    return;
-  }
-  if (path.startsWith('/admin')) {
-    await renderAdmin(region, { section: 'overview' });
-    renderAllChrome();
-    return;
-  }
-
-  if (path.startsWith('/invite/')) {
-    const code = route[1];
-    renderContextHeader({ title: 'Joining', sub: code });
-    clear(region);
-    region.appendChild(el('div', { class: 'empty-state' }, 'Joining…'));
-    try {
-      const res = await Api.joinInvite(code);
-      await refreshServers();
-      toast('You joined the community.', 'ok');
-      navigate(serverPath(res.serverId));
-      return;
-    } catch (ex) {
-      clear(region);
-      region.appendChild(el('div', { class: 'form-error' }, ex.message || 'Invite invalid'));
-      renderAllChrome();
-      return;
-    }
-  }
-
-  if (path.startsWith('/users/')) {
-    // A username is the V2 form and a UUID still works. The profile renderer
-    // takes whatever the server accepts, and it accepts both.
-    await renderProfile(region, { id: route[1] });
-    renderAllChrome();
-    return;
-  }
-
-  if (path.startsWith('/servers/new')) {
-    await renderNewServer(region);
-    renderAllChrome();
-    return;
-  }
-
-  // V2 community routes: #/c/:slug and #/c/:slug/channel/:channelSlug.
-  // Resolved to ids here, once, and then handed to the same renderers the
-  // legacy /server/:id routes use. Resolution goes through the server-scoped
-  // API, so a channel slug is always resolved inside its own community and can
-  // never reach another one's channel.
-  if (route[0] === 'c' && route[1]) {
-    const community = await resolveCommunity(route[1]);
-    if (!community) return renderRouteError(region, 'That community does not exist.');
-    route = ['server', community.serverId].concat(route.slice(2));
-    publishRoute('/' + route.join('/'));
-  }
-
-  if (route[0] === 'server' && route[1]) {
-    // A legacy id route may still carry a channel slug, and a V2 route carries
-    // the channel token verbatim. Either way it is resolved inside the
-    // community, so one lookup serves both.
-    const serverId = route[1];
-    const what = route[2];
-    if (what === 'channel' && route[3]) {
-      const resolved = await resolveChannelToken(serverId, route[3]);
-      if (!resolved) return renderRouteError(region, 'That channel does not exist.');
-      // Republished so the sidebar marks the right channel as current.
-      if (resolved !== route[3]) {
-        route[3] = resolved;
-        publishRoute('/' + route.join('/'));
-      }
-    }
-    if (what === 'channel' && route[3] && route[4] === 'pins') {
-      setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
-      await renderChannelPins(region, serverId, route[3]);
-      renderAllChrome();
-      return;
-    }
-    if (what === 'channel' && route[3]) {
-      setCleanup(() => { try { region._cleanup && region._cleanup(); } catch { /* ignore */ } });
-      await renderChannel(region, serverId, route[3], { focusMessage: query.m || null });
-      renderAllChrome();
-      return;
-    }
-    if (what === 'channels') { // /server/:id/channels/new
-      await renderNewChannel(region, serverId);
-      renderAllChrome();
-      return;
-    }
-    if (what === 'invites') {
-      await renderInvites(region, serverId);
-      renderAllChrome();
-      return;
-    }
-    if (what === 'members') {
-      await renderServerMembers(region, serverId);
-      renderAllChrome();
-      return;
-    }
-    if (what === 'roles') {
-      await renderServerRoles(region, serverId);
-      renderAllChrome();
-      return;
-    }
-    if (what === 'categories') {
-      await renderServerCategories(region, serverId);
-      renderAllChrome();
-      return;
-    }
-    if (what === 'settings') {
-      const known = ['overview', 'appearance', 'structure', 'members', 'roles', 'invites', 'moderation', 'ownership'];
-      const section = route[3] && known.includes(route[3]) ? route[3] : 'overview';
-      await renderServerSettings(region, serverId, section);
-      renderAllChrome();
-      return;
-    }
-    if (route.length === 2) {
-      await renderServerLanding(region, serverId);
-      renderAllChrome();
-      return;
-    }
-    await renderServerLanding(region, serverId);
-    renderAllChrome();
-    return;
-  }
-
-  await renderHome(region);
-  renderAllChrome();
+  // A throw is not handled here. run() owns the failure surface, so there is one
+  // error screen rather than one per call site: a page that swallowed its own
+  // failure would leave the reader looking at a half-rendered view with no
+  // explanation and no Retry.
+  lastRoute = path;
+  await row.run({ region, path, parts, query, publishRoute: (p) => setNavRoute(() => p) });
 }
 
 // Where a thrown value came from, when it carries a stack. Absent for anything
@@ -433,7 +122,7 @@ async function run() {
         // an unactionable report into a locatable one.
         origin ? el('p', { class: 'muted small', 'data-fault-origin': origin }, origin) : null,
         el('div', { class: 'row-line' },
-          el('button', { class: 'btn primary', type: 'button', onClick: () => { navigate('#/home'); } }, 'Home'),
+          el('button', { class: 'btn primary', type: 'button', onClick: () => { navigate('/home'); } }, 'Home'),
           el('button', { class: 'btn ghost', type: 'button', onClick: () => { run(); } }, 'Retry'))));
     }
     // Also to the console: the on-screen copy is for a reader without devtools.

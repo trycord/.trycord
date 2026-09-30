@@ -13,16 +13,26 @@ function secret() {
 const now = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
 
-function sign(user) {
-  return jwt.sign(
+// The jti is returned alongside the token so the caller can record the session.
+// The signature is what authenticates a request; the jti is what lets one
+// session be revoked without touching the others, which session_version cannot
+// do (it is all-or-nothing by design).
+function signWithJti(user) {
+  const jti = uuid();
+  const token = jwt.sign(
     // sv is the session version. It is what makes "invalidate every session"
     // exact: iat has one-second resolution, so a token issued in the same second
     // as a password change or a 2FA enable is indistinguishable from one issued
     // after it, and the change silently fails to take effect.
-    { id: user.id, username: user.username, jti: uuid(), sv: Number(user.session_version || 0) },
+    { id: user.id, username: user.username, jti, sv: Number(user.session_version || 0) },
     secret(),
     { expiresIn: '7d' }
   );
+  return { token, jti };
+}
+
+function sign(user) {
+  return signWithJti(user).token;
 }
 
 async function isMember(userId, serverId) {
@@ -60,4 +70,5 @@ function escapeLike(s) {
   return String(s).replace(/[%_!]/g, (c) => '!' + c);
 }
 
-module.exports = { secret, now, uuid, sign, isMember, isOwner, visibleChannel, escapeLike };
+module.exports = {
+  signWithJti, secret, now, uuid, sign, isMember, isOwner, visibleChannel, escapeLike };

@@ -568,6 +568,10 @@ async function boot() {
   require('./routes/auth').setGateway({ disconnectUser });
   require('./routes/messages').setGateway({ broadcast, sendToUser });
   require('./routes/channels').setGateway({ broadcast });
+  // Account-scoped settings that did not previously have a home: privacy
+  // preferences, blocking, notification preferences and wellbeing. One mount so
+  // the Privacy and Notification summaries load in a single round trip.
+  app.use('/api/me', require('./routes/privacy'));
   app.use('/api/mutes', require('./routes/mutes'));
   // Instance-wide announcement banners (per-deployment, not global).
   app.use('/api/announcements', require('./routes/announcements'));

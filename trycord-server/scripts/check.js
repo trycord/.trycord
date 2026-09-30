@@ -21,6 +21,10 @@ async function main() {
     'friend_requests', 'friendships', 'notifications',
     'admins', 'reports', 'moderation_actions', 'appeals', 'audit_logs',
     'server_bans', 'pinned_messages', 'reactions', 'muted_channels',
+    // V2 privacy/safety/wellbeing. Listed so a table cannot be dropped from
+    // the DDL without CI noticing, the same as every other one here.
+    'privacy_settings', 'user_blocks', 'notification_prefs',
+    'wellbeing_settings', 'user_sessions',
   ];
   const missing = required.filter((t) => !names.includes(t));
   if (missing.length) throw new Error('missing tables: ' + missing.join(', '));

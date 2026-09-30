@@ -3,6 +3,7 @@ import { TrycordConfig } from './config.js';
 import { applyTheme, watchSystemTheme } from './theme.js';
 import { updateFromViewport, onPresentationChange } from './presentation.js';
 import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends, refreshMutes, setServerRoomHooks } from './state.js';
+import { loadWellbeing } from './privacy-ui.js';
 import Realtime from './realtime.js';
 import Router from './router.js';
 import { route } from './nav.js';
@@ -78,6 +79,7 @@ async function boot() {
     refreshFriends().catch(() => {});
     refreshMutes().catch(() => {});
     loadAnnouncements().catch(() => {});
+    loadWellbeing().catch(() => {});
   } else if (!isAuthed()) {
     // No session: show the public/auth flow on the active shell.
     renderAllChrome();

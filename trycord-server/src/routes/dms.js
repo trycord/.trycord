@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const dms = require('../services/dms');
+const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
 
 let gateway = { broadcastDm: () => {}, sendToUser: () => {}, isOnline: () => false };
@@ -35,9 +36,21 @@ router.get('/', async (req, res, next) => {
 });
 
 // POST /api/dms { userId } — get-or-create (idempotent, race-safe).
+//
+// Three gates before the conversation is created, in the order that tells a
+// stranger least: the peer has to exist, neither party may have blocked the
+// other, and the peer's DM preference has to permit this sender. Without them
+// the privacy settings would be a display preference on a control that nothing
+// enforced.
 router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const peerId = String(((req.body || {}).userId) || '');
+    const gate = await privacy.canOpenDm(req.user.id, peerId);
+    if (!gate.allowed) {
+      const err = new Error(gate.message);
+      err.code = gate.code;
+      throw err;
+    }
     const { conversation, created } = await dms.getOrCreate({ id: req.user.id }, peerId);
     const detail = await dms.detail(req.user.id, conversation.id, { limit: 1 });
     res.json({ id: conversation.id, peer: detail.peer, created });
