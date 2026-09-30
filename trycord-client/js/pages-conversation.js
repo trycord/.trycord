@@ -284,8 +284,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
           showEmojiPicker(anchor, (emoji) => toggleReaction(m.id, emoji, false));
           return;
         }
-        const r = anchor.getBoundingClientRect();
-        openMsgMenu(r.left, r.bottom + 4, m, isMine);
+        openMsgMenu(anchor, m, isMine);
       },
     });
     stampMsgNode(node, m);
@@ -325,9 +324,16 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     return absoluteChannelUrl(serverId, channelId, m.id);
   }
 
-  function openMsgMenu(x, y, m, isMine) {
-    showContextMenu(x, y, msgActions(m, isMine), {
+  // Opened from the trigger, not from a point. Passing the anchor lets the menu
+  // use the shared placement rule, which flips above the button when there is
+  // no room below, and lets the trigger record aria-expanded for as long as the
+  // menu is open. Handing it raw coordinates instead anchored nothing, so the
+  // menu opened beside the button rather than under it and the button never
+  // announced that it was open.
+  function openMsgMenu(anchor, m, isMine) {
+    showContextMenu(0, 0, msgActions(m, isMine), {
       target: { type: 'message', id: String(m.id) },
+      under: anchor,
     });
   }
 
@@ -426,11 +432,11 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }
 
   const composer = el('div', { class: 'composer' });
-  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, icon('plus'));
+  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, icon('paperclip'));
   const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
-  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('users'));
+  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('smile'));
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
   composer.appendChild(fileBtn);
   composer.appendChild(fileInput);
@@ -531,8 +537,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
           showEmojiPicker(anchor, (emoji) => toggleReaction(m.id, emoji, false));
           return;
         }
-        const r = anchor.getBoundingClientRect();
-        openMsgMenu(r.left, r.bottom + 4, m, State.me && String(m.author_id) === String(State.me.id));
+        openMsgMenu(anchor, m, State.me && String(m.author_id) === String(State.me.id));
       },
     });
     stampMsgNode(node, m);

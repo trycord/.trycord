@@ -212,7 +212,7 @@ async function renderDmThread(container, dmId) {
   const composer = el('div', { class: 'composer' });
   const ta = el('textarea', { placeholder: 'Message ' + (peer.displayName || peer.username) + '…', rows: 1 });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
-  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('users'));
+  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('smile'));
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
   composer.appendChild(ta);
   composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));

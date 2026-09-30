@@ -36,6 +36,9 @@
   --ui-shell-rows: auto minmax(0, 1fr) auto;
   --ui-drawer-width: min(84vw, 340px);
   --ui-tabbar-height: 64px;
+  /* Read by the collapsed tab bar's strip. */
+  --t-ui-tabbar: 56px;
+  --t-ui-tabbar-handle: 18px;
 
   --t-pg:        #100b08;
   --t-base:      #181110;
@@ -2278,7 +2281,11 @@ select.input { appearance: auto; }
   box-shadow: var(--t-sh-1);
   z-index: 3;
 }
-.msg:hover .msg-hoverbar,
+@media (hover: hover) {
+  .msg:hover .msg-hoverbar { display: inline-flex; }
+}
+/* focus-within covers touch without the stuck-hover problem: tapping a control
+   really does focus it, and the bar hides again when focus leaves the message. */
 .msg:focus-within .msg-hoverbar { display: inline-flex; }
 .msg-hoverbar button {
   width: 28px; height: 28px;
@@ -3234,6 +3241,56 @@ html[data-auth-page] .mobile-tab-navigation { display: none; }
   .mobile-tab-navigation {
     display: flex;
     flex: 0 0 auto;
+    align-items: stretch;
+    /* Column: the handle on top, the destinations below. Collapsing hides the
+       strip, and because the bar owns its own auto grid track the content above
+       grows by exactly the height the bar gives back. */
+    flex-direction: column;
+    min-height: calc(var(--t-ui-tabbar) + var(--t-ui-tabbar-handle) + env(safe-area-inset-bottom));
+  }
+  .mobile-tab-navigation[data-collapsed="true"] {
+    min-height: calc(var(--t-ui-tabbar-handle) + env(safe-area-inset-bottom));
+  }
+  .mobile-tab-navigation__strip {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: var(--t-ui-tabbar);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .mobile-tab-navigation__strip::-webkit-scrollbar { display: none; }
+  .mobile-tab-navigation__strip > button {
+    flex: 1 0 auto;
+    min-width: var(--t-ui-tabbar);
+  }
+
+  /* The handle stays reachable when collapsed - it is the only way back. */
+  .mobile-tab-navigation__toggle {
+    flex: 0 0 auto;
+    align-self: center;
+    width: 48px;
+    height: var(--t-ui-tabbar-handle);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--t-r-s) var(--t-r-s) 0 0;
+    background: transparent;
+    color: var(--t-mut);
+    cursor: pointer;
+    transition: color var(--t-fast) var(--t-ease), background var(--t-fast) var(--t-ease);
+  }
+  .mobile-tab-navigation__toggle:hover { color: var(--t-txt); }
+  .mobile-tab-navigation__toggle .ui-icon { width: 15px; height: 15px; }
+  /* The chevron points the way the bar will move. */
+  .mobile-tab-navigation__toggle .ui-icon { transform: rotate(180deg); transition: transform var(--t-fast) var(--t-ease); }
+  .mobile-tab-navigation[data-collapsed="true"] .mobile-tab-navigation__toggle .ui-icon {
+    transform: none;
+  }
+
+  .mobile-tab-navigation[data-collapsed="true"] .mobile-tab-navigation__strip {
+    display: none;
   }
 }
 
@@ -3330,7 +3387,6 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   .role-pill,
   .ctx-head__action,
   .msg-actions button,
-  .msg-hoverbar button,
   .user-controls__btn,
   .nav-toggle,
   .sidebar-collapse-toggle,
@@ -3349,7 +3405,45 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
     padding-left: var(--t-d-3);
     padding-right: var(--t-d-3);
   }
-  .msg-hoverbar,
+  /* The hover bar stays an overlay. Switching it to position:static put it into
+     the message's own flow, so every message grew a row of controls and the
+     list stopped looking like a conversation. */
+  .msg-hoverbar {
+    position: absolute;
+    top: 0;
+    right: 6px;
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--t-r-s);
+    border: 1px solid var(--t-line-hi);
+    background: var(--t-elev);
+    box-shadow: var(--t-sh-2);
+    z-index: 4;
+  }
+  /* Square targets. It inherited min-height:44px while keeping width:28px, so
+     each control rendered as a tall narrow box - which is what the people icon
+     appeared to be sitting inside. */
+  .msg-hoverbar button {
+    width: var(--t-hit);
+    height: var(--t-hit);
+    min-height: 0;
+    border-radius: var(--t-r-s);
+    background: transparent;
+    border: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--t-txt2);
+    cursor: pointer;
+    transition: background var(--t-fast) var(--t-ease), color var(--t-fast) var(--t-ease);
+  }
+  .msg-hoverbar button:active { background: var(--t-base2); }
+  .msg-hoverbar button .ui-icon { width: 19px; height: 19px; }
+
+  /* Delete and edit are message content state, not contextual actions, so they
+     do stay in flow. */
   .msg-actions {
     position: static;
     display: flex;
