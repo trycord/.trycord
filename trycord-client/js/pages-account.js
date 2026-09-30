@@ -929,6 +929,76 @@ const DELETION_STATUS_TEXT = {
   REJECTED: 'Declined. You can submit a new request.',
 };
 
+/**
+ * Take a copy of your data, before you ask for it to be erased.
+ *
+ * Sits directly above the deletion request because that is the order the two are
+ * used in: a person who has decided to leave is entitled to read what they are
+ * leaving, and a deletion panel that offers no way to do that quietly implies
+ * either that they cannot or that it has already happened.
+ */
+function renderExportSection(wrap) {
+  wrap.appendChild(el('div', { class: 'section-label' }, 'Your data'));
+  const panel = el('div', { class: 'card stack' });
+  wrap.appendChild(panel);
+
+  panel.appendChild(el('p', { class: 'muted small' },
+    'Everything this instance holds about you, as a JSON file. It is assembled when you ask, '
+    + 'from your own records, so it reflects what is there right now rather than when you signed up.'));
+
+  const status = el('div', { class: 'muted small', role: 'status', 'aria-live': 'polite' });
+
+  const download = el('button', { class: 'btn primary', type: 'button' }, 'Download my data');
+  download.addEventListener('click', async () => {
+    download.disabled = true;
+    status.textContent = 'Gathering your data…';
+    try {
+      const payload = await Api.exportData();
+      if (!payload || typeof payload !== 'object') throw new Error('The server did not return an export.');
+
+      // Counted here rather than trusted from the payload, because the number a
+      // reader is shown has to describe the file they are about to receive.
+      const sections = Object.keys(payload.data || {}).length;
+      const incomplete = payload.incomplete || null;
+
+      const body = JSON.stringify(payload, null, 2);
+      const blob = new Blob([body], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = el('a', {
+        href: url,
+        download: 'trycord-export-' + new Date().toISOString().slice(0, 10) + '.json',
+      });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoked on the next tick rather than immediately: Firefox aborts the
+      // download if the object URL disappears in the same turn as the click.
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+
+      if (incomplete) {
+        status.textContent = 'Saved, but ' + incomplete.length + ' part(s) could not be read: '
+          + incomplete.join('; ');
+        toast('Export saved with warnings.', 'warn');
+      } else {
+        status.textContent = 'Saved: ' + sections + ' sections.';
+        toast('Export saved.', 'ok');
+      }
+    } catch (e) {
+      status.textContent = e.message || 'Could not gather your data.';
+      toast(e.message || 'Could not export your data.', 'error');
+    } finally {
+      download.disabled = false;
+    }
+  });
+  panel.appendChild(el('div', { class: 'row-line' }, download));
+  panel.appendChild(status);
+
+  panel.appendChild(el('p', { class: 'muted small' },
+    'Not included, and not retrievable by anyone: your password, your two-factor secret, '
+    + 'your recovery codes, and your session tokens. Those are not things you can read back '
+    + 'even here - they are credentials, and an export is not a way to obtain one.'));
+}
+
 function renderDeletionSection(wrap) {
   wrap.appendChild(el('div', { class: 'section-label danger' }, 'Delete my account'));
   const panel = el('div', { class: 'card' });
@@ -1093,6 +1163,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderNotificationsSettings(body);
   } else {
     renderProfileEditor(body);
+    renderExportSection(body);
     renderDeletionSection(body);
     renderDangerZone(body);
   }
