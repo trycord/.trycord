@@ -703,6 +703,23 @@ async function boot() {
     });
   }
 
+  // An unmatched /api path is an API 404, and it answers in the same envelope
+  // as every other API error. Without this it reached Express's default handler
+  // and returned an HTML page: a client with a mistyped path got a document it
+  // cannot parse, in a response with an HTML content type, from an API that
+  // otherwise never does that. It also matters for the static shell, where a
+  // JSON body is the only thing that tells a reader the request was an API call
+  // that does not exist rather than a page that does.
+  app.use('/api', (req, res, next) => {
+    if (res.headersSent) return next();
+    res.status(404).json({
+      error: {
+        code: 'NOT_FOUND',
+        message: `no API route for ${req.method} ${req.path}`,
+      },
+    });
+  });
+
   // Consistent error envelope for anything that escapes routes.
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
