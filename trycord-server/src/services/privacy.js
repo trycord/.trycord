@@ -49,6 +49,13 @@ const DEFAULT_WELLBEING = {
   reducedMotion: false,
 };
 
+// How the incoming row is referenced in an upsert's update branch.
+// SQLite writes `excluded.column`; MySQL and MariaDB write `VALUES(column)`.
+// db.upsert() builds the surrounding statement, but this part is a per-value
+// expression and so is spelled here, once, at the call site.
+const newRef = (column) =>
+  db.dialect === 'mysql' ? `VALUES(${column})` : `excluded.${column}`;
+
 const boolInt = (v) => (v ? 1 : 0);
 const intBool = (v) => !!v;
 
@@ -93,17 +100,18 @@ async function setPrivacy(userId, patch) {
     discoverable: patch.discoverable === undefined ? current.discoverable : !!patch.discoverable,
   };
   const ts = now();
-  await db.run(
-    `INSERT INTO privacy_settings
-       (user_id, friend_requests, dms, presence, discoverable, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT (user_id) DO UPDATE SET
-       friend_requests = excluded.friend_requests,
-       dms = excluded.dms,
-       presence = excluded.presence,
-       discoverable = excluded.discoverable,
-       updated_at = excluded.updated_at`,
-    [userId, next.friendRequests, next.dms, next.presence, boolInt(next.discoverable), ts]
+  await db.upsert(
+    'privacy_settings',
+    ['user_id', 'friend_requests', 'dms', 'presence', 'discoverable', 'updated_at'],
+    [userId, next.friendRequests, next.dms, next.presence, boolInt(next.discoverable), ts],
+    ['user_id'],
+    {
+      friend_requests: newRef('friend_requests'),
+      dms: newRef('dms'),
+      presence: newRef('presence'),
+      discoverable: newRef('discoverable'),
+      updated_at: newRef('updated_at'),
+    }
   );
   return next;
 }
@@ -140,11 +148,12 @@ async function block(userId, blockedId, reason) {
   if (!exists) throw { code: 'NOT_FOUND', message: 'User not found' };
 
   const ts = now();
-  await db.run(
-    `INSERT INTO user_blocks (user_id, blocked_id, reason, created_at)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT (user_id, blocked_id) DO UPDATE SET reason = excluded.reason`,
-    [userId, blockedId, reason || null, ts]
+  await db.upsert(
+    'user_blocks',
+    ['user_id', 'blocked_id', 'reason', 'created_at'],
+    [userId, blockedId, reason || null, ts],
+    ['user_id', 'blocked_id'],
+    { reason: newRef('reason') }
   );
 
   // A block is meant to take effect now, not on the next request the other
@@ -321,23 +330,16 @@ async function setNotificationPrefs(userId, patch, serverId = null) {
   // A NULL server_id is the global row. SQLite and MySQL both need the NULL
   // spelled out for the unique key to match, which is why this is two statements
   // rather than one upsert.
-  if (serverId) {
-    await db.run(
-      `INSERT INTO notification_prefs (user_id, server_id, categories, updated_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT (user_id, server_id) DO UPDATE SET
-         categories = excluded.categories, updated_at = excluded.updated_at`,
-      [userId, serverId, JSON.stringify(next), ts]
-    );
-  } else {
-    await db.run(
-      `INSERT INTO notification_prefs (user_id, server_id, categories, updated_at)
-       VALUES (?, NULL, ?, ?)
-       ON CONFLICT (user_id, server_id) DO UPDATE SET
-         categories = excluded.categories, updated_at = excluded.updated_at`,
-      [userId, JSON.stringify(next), ts]
-    );
-  }
+  // The global row stores NULL for server_id rather than an empty string, and
+  // both databases need the NULL spelled out for the unique key to match it.
+  // That is why this is two calls and not one with a conditional column list.
+  await db.upsert(
+    'notification_prefs',
+    ['user_id', 'server_id', 'categories', 'updated_at'],
+    [userId, serverId || null, JSON.stringify(next), ts],
+    ['user_id', 'server_id'],
+    { categories: newRef('categories'), updated_at: newRef('updated_at') }
+  );
   return next;
 }
 
@@ -371,19 +373,21 @@ async function setWellbeing(userId, patch) {
     reducedMotion: patch.reducedMotion === undefined ? current.reducedMotion : !!patch.reducedMotion,
   };
   const ts = now();
-  await db.run(
-    `INSERT INTO wellbeing_settings
-       (user_id, dnd_enabled, quiet_hours_on, quiet_start, quiet_end, reduced_motion, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (user_id) DO UPDATE SET
-       dnd_enabled = excluded.dnd_enabled,
-       quiet_hours_on = excluded.quiet_hours_on,
-       quiet_start = excluded.quiet_start,
-       quiet_end = excluded.quiet_end,
-       reduced_motion = excluded.reduced_motion,
-       updated_at = excluded.updated_at`,
+  await db.upsert(
+    'wellbeing_settings',
+    ['user_id', 'dnd_enabled', 'quiet_hours_on', 'quiet_start', 'quiet_end',
+      'reduced_motion', 'updated_at'],
     [userId, boolInt(next.dndEnabled), boolInt(next.quietHoursOn), next.quietStart,
-      next.quietEnd, boolInt(next.reducedMotion), ts]
+      next.quietEnd, boolInt(next.reducedMotion), ts],
+    ['user_id'],
+    {
+      dnd_enabled: newRef('dnd_enabled'),
+      quiet_hours_on: newRef('quiet_hours_on'),
+      quiet_start: newRef('quiet_start'),
+      quiet_end: newRef('quiet_end'),
+      reduced_motion: newRef('reduced_motion'),
+      updated_at: newRef('updated_at'),
+    }
   );
   return next;
 }
@@ -424,11 +428,12 @@ function suppressesNow(wellbeing, category, minutesFromMidnight, nowDate = new D
 // turn each API call into a write.
 async function recordSession({ jti, userId, userAgent, ip, label }) {
   const ts = now();
-  await db.run(
-    `INSERT INTO user_sessions (jti, user_id, label, user_agent, ip, created_at, last_seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (jti) DO UPDATE SET last_seen_at = excluded.last_seen_at`,
-    [jti, userId, label || null, (userAgent || '').slice(0, 512) || null, ip || null, ts, ts]
+  await db.upsert(
+    'user_sessions',
+    ['jti', 'user_id', 'label', 'user_agent', 'ip', 'created_at', 'last_seen_at'],
+    [jti, userId, label || null, (userAgent || '').slice(0, 512) || null, ip || null, ts, ts],
+    ['jti'],
+    { last_seen_at: newRef('last_seen_at') }
   );
 }
 

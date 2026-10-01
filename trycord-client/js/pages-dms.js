@@ -1,7 +1,10 @@
 
 import Api from './api.js';
 import State, { refreshDms, refreshFriends, isAuthed, mustVerifyToPost } from './state.js';
-import { attachContextMenu, copyText, esc, el, clear, toast, relTime, showEmojiPicker, insertAtCursor, openModal } from './ui.js';
+import {
+  attachContextMenu, confirmDialog, copyText, esc, el, clear, toast, relTime,
+  showEmojiPicker, insertAtCursor, openModal, openReportDialog,
+} from './ui.js';
 import { avatar, emptyState, icon, messageRow } from './components.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
@@ -180,9 +183,69 @@ async function renderDmThread(container, dmId) {
       onDelete: mine ? () => removeDm(dmId, m.id) : null,
       onEdit: mine ? () => editDm(dmId, m) : null,
     });
+    // A direct message had no context menu at all. The community conversation
+    // attaches one to every row; the DM view only ever attached its menus to
+    // friend rows, so right-clicking a message did nothing and the edit and
+    // delete handlers handed to messageRow above were unreachable. That is what
+    // made context menus look like they had disappeared from the application:
+    // the surfaces that still had them were the ones the crash was not on.
+    //
+    // The menu is ui.js's shared implementation. Only the actions are
+    // DM-specific, because a direct message belongs to no channel and no
+    // community role applies to it - every entry here is a request the DM routes
+    // already serve.
+    attachContextMenu(row, () => dmMessageActions(m, mine), {
+      target: () => ({ type: 'message', id: String(m.id) }),
+    });
     target.appendChild(row);
     noteSeq(m);
     return row;
+  }
+
+  // Actions for one direct message.
+  //
+  // No pin: a DM is in no channel. No moderation entry: there is no community
+  // whose permission would grant one, and being able to delete your own message
+  // is not authority over anyone else's.
+  function dmMessageActions(m, mine) {
+    const items = [];
+    if (m.content) {
+      items.push({ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') });
+    }
+    items.push({ label: 'Copy message ID', onSelect: () => copyText(String(m.id), 'Message ID copied.') });
+    if (!mine && m.authorId) {
+      items.push({ sep: true });
+      items.push({
+        label: 'View profile',
+        desc: m.authorName || 'this person',
+        onSelect: () => navigate('/users/' + m.authorId),
+      });
+      items.push({
+        label: 'Report message',
+        onSelect: () => openReportDialog({
+          targetType: 'message',
+          targetId: m.id,
+          title: 'Report message',
+          subtitle: 'Reports go to this instance’s moderators.',
+          onSubmit: ({ category, extra }) => Api.reportContent('message', m.id, category, extra || undefined),
+        }),
+      });
+    } else if (mine) {
+      items.push({ sep: true });
+      items.push({ label: 'Edit message', onSelect: () => editDm(dmId, m) });
+      items.push({
+        label: 'Delete message',
+        danger: true,
+        onSelect: () => confirmDialog({
+          title: 'Delete this message?',
+          message: 'It is removed for everyone in this conversation.',
+          danger: true,
+          confirmText: 'Delete',
+          onConfirm: () => removeDm(dmId, m.id),
+        }),
+      });
+    }
+    return items;
   }
 
   async function removeDm(cid, mid) {

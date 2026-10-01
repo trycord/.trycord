@@ -1,9 +1,16 @@
-// Community event bus: the single fan-out point for server-scoped
-// mutations (members, roles, channels, categories, invites, settings).
-// Wired once in server.js to the WebSocket gateway; services emit here so
-// routes never touch sockets directly, and there is exactly one realtime
-// protocol for community state (no parallel systems).
-let gateway = { broadcast: () => {}, evict: () => {}, invalidate: () => {} };
+// Community and account event bus: the single fan-out point for mutations that
+// other clients have to learn about. Wired once in server.js to the WebSocket
+// gateway; services and routes emit here so they never touch sockets directly,
+// and there is exactly one realtime protocol (no parallel systems).
+//
+// Two scopes, because they answer different questions. A community event goes to
+// everyone in that community and is about shared state - a channel, a role, a
+// membership. An account event goes to one person's own sockets and is about
+// their own account: a preference changed here and on their phone, a session
+// revoked from elsewhere, two-factor turned on. Account events carry nothing
+// about anyone else - a session revocation is the extreme case where the
+// listener must be told something they would otherwise not know.
+let gateway = { broadcast: () => {}, sendToUser: () => {}, evict: () => {}, invalidate: () => {} };
 
 function setGateway(gw) {
   gateway = Object.assign(gateway, gw);
@@ -14,6 +21,27 @@ function setGateway(gw) {
 function emit(serverId, type, payload) {
   try {
     gateway.broadcast(String(serverId), Object.assign({ type }, payload));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Fan out to every socket a person has open, including the one that made the
+ * change.
+ *
+ * Including the origin is deliberate. The client that issued the write has
+ * already applied its own answer, so an event arriving back for the same write
+ * is the cheapest available proof that the server's idea and the client's idea
+ * agree. A client that suppressed the echo would hide exactly the disagreement
+ * this exists to expose.
+ *
+ * The payload is the caller's, so it must already exclude anything the listener
+ * is not entitled to - which for an account event is everything except the
+ * account holder.
+ */
+function emitTo(userId, type, payload) {
+  if (!userId) return;
+  try {
+    gateway.sendToUser(String(userId), Object.assign({ type }, payload));
   } catch { /* ignore */ }
 }
 
@@ -36,4 +64,4 @@ function evict(serverId, userId, reason) {
   } catch { /* ignore */ }
 }
 
-module.exports = { setGateway, emit, evict, invalidateMembership };
+module.exports = { setGateway, emit, emitTo, evict, invalidateMembership };

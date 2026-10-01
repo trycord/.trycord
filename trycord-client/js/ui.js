@@ -611,6 +611,14 @@ export function showContextMenu(clientX, clientY, items, opts = {}) {
 // rather than leaking listeners through repaints.
 export function attachContextMenu(el, factory, opts = {}) {
   if (!el) return () => {};
+  // A menu that cannot be reached from the keyboard is a mouse-only feature, and
+  // the ContextMenu key and Shift+F10 handlers below are dead code without this.
+  // A plain div is not focusable, so nothing in the interface could deliver those
+  // keys to it: the handlers existed and were unreachable.
+  if (opts.keyboard !== false && el.tagName !== 'BUTTON' && el.tagName !== 'A'
+      && !el.hasAttribute('tabindex') && !el.matches('[tabindex]')) {
+    el.setAttribute('tabindex', '0');
+  }
   const open = (x, y) => {
     const items = factory({ x, y, el, target: opts.target && opts.target(el) });
     if (!items || !items.length) return;

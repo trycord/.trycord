@@ -14,6 +14,7 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail } = require('../errors');
 const privacy = require('../services/privacy');
+const events = require('../services/events');
 
 const router = express.Router();
 router.use(auth);
@@ -52,7 +53,13 @@ router.patch('/privacy', rateLimit({ windowMs: 60_000, max: 30 }), async (req, r
     if (!Object.keys(patch).length) {
       return fail(res, 'VALIDATION_ERROR', 'nothing to update');
     }
-    res.json(await privacy.setPrivacy(req.user.id, patch));
+    const saved = await privacy.setPrivacy(req.user.id, patch);
+    // Account-scoped: a phone that has this page open has to learn that the
+    // setting changed here, or it will keep enforcing the old answer until it is
+    // refreshed. The payload is the caller's own preferences, so it discloses
+    // nothing to anyone else.
+    events.emitTo(req.user.id, 'privacy', { privacy: saved });
+    res.json(saved);
   } catch (e) { next(e); }
 });
 
@@ -81,14 +88,18 @@ router.post('/blocks', rateLimit({ windowMs: 60_000, max: 20 }), async (req, res
     if (body.reason && String(body.reason).length > 500) {
       return fail(res, 'VALIDATION_ERROR', '`reason` must be 500 characters or fewer');
     }
-    res.json(await privacy.block(req.user.id, userId, body.reason ? String(body.reason) : null));
+    const blocked = await privacy.block(req.user.id, userId, body.reason ? String(body.reason) : null);
+    events.emitTo(req.user.id, 'blocks', { blocked });
+    res.json(blocked);
   } catch (e) { next(e); }
 });
 
 // DELETE /api/me/blocks/:userId — unblock.
 router.delete('/blocks/:userId', async (req, res, next) => {
   try {
-    res.json(await privacy.unblock(req.user.id, String(req.params.userId)));
+    const unblocked = await privacy.unblock(req.user.id, String(req.params.userId));
+    events.emitTo(req.user.id, 'blocks', { unblocked });
+    res.json(unblocked);
   } catch (e) { next(e); }
 });
 
@@ -125,10 +136,9 @@ router.patch('/notification-prefs', rateLimit({ windowMs: 60_000, max: 60 }), as
       return fail(res, 'VALIDATION_ERROR', 'nothing to update');
     }
     const serverId = body.serverId ? String(body.serverId) : null;
-    res.json({
-      effective: await privacy.setNotificationPrefs(req.user.id, patch, serverId),
-      serverId,
-    });
+    const effective = await privacy.setNotificationPrefs(req.user.id, patch, serverId);
+    events.emitTo(req.user.id, 'notification-prefs', { prefs: effective, serverId });
+    res.json({ effective, serverId });
   } catch (e) { next(e); }
 });
 
@@ -164,7 +174,11 @@ router.patch('/wellbeing', rateLimit({ windowMs: 60_000, max: 60 }), async (req,
     if (!Object.keys(patch).length) {
       return fail(res, 'VALIDATION_ERROR', 'nothing to update');
     }
-    res.json(await privacy.setWellbeing(req.user.id, patch));
+    const saved = await privacy.setWellbeing(req.user.id, patch);
+    // Wellbeing changes what the client's own chrome does - motion, attention -
+    // so a second client has to apply it without being told to refresh.
+    events.emitTo(req.user.id, 'wellbeing', { wellbeing: saved });
+    res.json(saved);
   } catch (e) { next(e); }
 });
 

@@ -10,6 +10,7 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 const rateLimit = require('../middleware/ratelimit');
 const { TERMS_VERSION, PRIVACY_VERSION } = require('../legal');
+const events = require('../services/events');
 const { checkPassword, BCRYPT_COST } = require('../auth/passwords');
 const enforcement = require('../services/enforcement');
 const recovery = require('../auth/recovery');
@@ -232,6 +233,13 @@ router.post('/2fa/disable', auth, async (req, res, next) => {
     if (!(await requirePassword(req, res))) return;
     await twofactor.disable(req.user.id, (req.body || {}).code);
     await invalidateSessions(req.user.id);
+    // Two-factor off is the single most consequential thing a member can do, and
+    // it was silent: another tab with the page open still showed two-factor as
+    // enabled until it was refreshed. The sessions killed above are told too, so
+    // a second device is sent back through sign-in rather than left holding a
+    // token it can no longer use.
+    events.emitTo(req.user.id, 'twofactor', { enabled: false });
+    events.emitTo(req.user.id, 'session-revoked', { reason: 'twofactor-disabled', all: true });
     res.json({ ok: true });
   } catch (e) { serviceError(res, e); }
 });
@@ -294,6 +302,7 @@ router.post('/logout', auth, async (req, res, next) => {
       await db.run(`INSERT ${db.ignoreKeyword} INTO revoked_tokens (jti, expires_at) VALUES (?, ?)`, [req.user.jti, expiresAt]);
     }
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
+    events.emitTo(req.user.id, 'session-revoked', { all: true, reason: 'revoke-all' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -351,6 +360,7 @@ router.post('/sessions/revoke-all', auth, async (req, res, next) => {
       [now(), req.user.id]);
     console.log(`[security] all_sessions_revoked user=${req.user.id}`);
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
+    events.emitTo(req.user.id, 'session-revoked', { all: true, reason: 'revoke-all' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -407,11 +417,22 @@ router.post('/sessions/revoke', auth, rateLimit({ windowMs: 60000, max: 30 }), a
       return fail(res, 'VALIDATION_ERROR', 'use sign out to end the session you are currently using');
     }
     const revoked = await privacy.revokeSession(req.user.id, jti);
+    // Every socket, including the one that asked: a revoked session that stays
+    // connected is a session the server has already refused but the client has
+    // not noticed, which is the worst of both.
+    events.emitTo(req.user.id, 'session-revoked', { jti, all: false });
     if (!revoked) return fail(res, 'NOT_FOUND', 'session not found or already revoked');
     const exp = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
     try {
-      await db.run(`INSERT ${db.ignoreKeyword} INTO revoked_tokens (jti, expires_at) VALUES (?, ?)
-        ON CONFLICT (jti) DO UPDATE SET expires_at = excluded.expires_at`, [jti, exp]);
+      await db.upsert(
+        'revoked_tokens',
+        ['jti', 'expires_at'],
+        [jti, exp],
+        ['jti'],
+        {
+          expires_at: db.dialect === 'mysql' ? 'VALUES(expires_at)' : 'excluded.expires_at',
+        }
+      );
     } catch { /* already revoked */ }
     res.json({ ok: true, jti });
   } catch (e) { next(e); }
