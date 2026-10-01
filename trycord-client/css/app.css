@@ -2420,6 +2420,7 @@ select.input { appearance: auto; }
 
 .composer {
   flex: 0 0 auto;
+  position: relative;
   width: auto;
   max-width: none;
   margin: 4px clamp(16px, 3vw, 42px) 16px;
@@ -2434,11 +2435,93 @@ select.input { appearance: auto; }
   padding: var(--t-d-3) var(--t-d-3) var(--t-d-3) var(--t-d-2);
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
+.composer-dock { display: flex; flex-direction: column; }
 .composer:focus-within {
   border-color: color-mix(in srgb, var(--t-accent) 65%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--t-accent) 45%, transparent),
     var(--t-sh-3), var(--t-inset-glass);
 }
+.composer.is-dropping {
+  border-color: var(--t-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--t-accent) 55%, transparent),
+    var(--t-sh-3), var(--t-inset-glass);
+}
+.composer.is-dropping::after {
+  content: 'Drop to attach';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--t-elev) 82%, transparent);
+  color: var(--t-txt);
+  font-size: var(--t-f-sm);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.attach-tray {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-1);
+  margin: 4px clamp(16px, 3vw, 42px) 0;
+}
+.attach-tray[hidden] { display: none; }
+.attach-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: var(--t-d-2);
+  padding: var(--t-d-1) var(--t-d-2);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-s);
+  background: color-mix(in srgb, var(--t-elev) 60%, transparent);
+  font-size: var(--t-f-sm);
+}
+.attach-row--error { border-color: color-mix(in srgb, var(--t-danger) 60%, transparent); }
+.attach-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attach-size, .attach-state { color: var(--t-txt-2); white-space: nowrap; }
+.attach-row--error .attach-state { color: var(--t-danger); }
+.attach-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--t-line);
+  overflow: hidden;
+}
+.attach-bar__fill {
+  height: 100%;
+  background: var(--t-accent);
+  transition: width var(--t-fast);
+}
+.attach-remove {
+  border: 0;
+  background: transparent;
+  color: var(--t-txt-2);
+  font-size: 1.1em;
+  line-height: 1;
+  padding: 0 var(--t-d-1);
+  cursor: pointer;
+  border-radius: var(--t-r-s);
+}
+.attach-remove:hover { color: var(--t-txt); background: var(--t-line); }
+
+.modal--lightbox { max-width: min(96vw, 1400px); }
+.lightbox { display: flex; flex-direction: column; align-items: center; gap: var(--t-d-2); }
+.lightbox-img {
+  display: block;
+  max-width: 92vw;
+  max-height: 78vh;
+  width: auto;
+  height: auto;
+  border-radius: var(--t-r-s);
+  background: var(--t-elev);
+}
+.lightbox-name { margin: 0; color: var(--t-txt-2); font-size: var(--t-f-sm); }
 .composer textarea {
   flex: 1 1 auto;
   min-height: 44px;
@@ -3421,6 +3504,12 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
 }
 
 @media (max-width: 599px) {
+  /* The 600-899 bands above zero --ui-members; this one did not, so below 600
+     the panel kept its 260px and the conversation was left about a third of the
+     screen. */
+  :root { --ui-members: 0px; }
+  .chat-environment { grid-template-columns: minmax(0, 1fr); }
+  #member-sidebar { display: none; }
   body { overflow: hidden; }
   .conversation { max-width: none; padding-left: 0; padding-right: 0; }
   .msg { padding-left: var(--t-d-2); padding-right: var(--t-d-2); }

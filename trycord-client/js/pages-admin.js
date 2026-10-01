@@ -1,4 +1,6 @@
-// renders what the API returns and never fabricates privileges). Sections:
+// The admin console.
+//
+// Every section renders what the API returns and never fabricates privileges.
 
 import Api from './api.js';
 import { loadingState } from './states.js';

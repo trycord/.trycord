@@ -1,3 +1,7 @@
+// The HTTP client.
+//
+// One request() and everything goes through it, so auth, error shape, timeouts
+// and backend failover are decided once. Failures arrive as an ApiError
 // carrying { code, message, status, retryAfter }. Authorization is attached
 // from state.js (localStorage token) unless overridden.
 
@@ -309,6 +313,45 @@ const Api = {
     fd.append('file', file);
     return request('POST', '/api/channels/' + encodeURIComponent(channelId) + '/attachments',
       { body: fd, form: true });
+  },
+  // XHR rather than fetch, which cannot report how much of a body has been
+  // sent. Returns { promise, abort } so a caller can show progress and still
+  // let the reader change their mind; the rejection on abort is an AbortError,
+  // so it must not be reported as a failed upload.
+  uploadAttachmentWithProgress: (channelId, file, onProgress) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const xhr = new XMLHttpRequest();
+    const url = base() + '/api/channels/' + encodeURIComponent(channelId) + '/attachments';
+    const promise = new Promise((resolve, reject) => {
+      xhr.open('POST', url, true);
+      xhr.withCredentials = false;
+      const t = token();
+      if (t) xhr.setRequestHeader('Authorization', 'Bearer ' + t);
+      if (onProgress) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(e.loaded / e.total);
+        };
+      }
+      xhr.onload = () => {
+        let parsed = null;
+        try { parsed = JSON.parse(xhr.responseText); } catch { /* not json */ }
+        if (xhr.status >= 200 && xhr.status < 300) return resolve(parsed);
+        const err = new ApiError(
+          (parsed && parsed.error && parsed.error.code) || 'UPLOAD_FAILED',
+          (parsed && parsed.error && parsed.error.message) || 'Upload failed',
+          xhr.status);
+        reject(err);
+      };
+      xhr.onerror = () => reject(new ApiError('Upload failed', 0, 'NETWORK'));
+      xhr.onabort = () => {
+        const e = new Error('aborted');
+        e.name = 'AbortError';
+        reject(e);
+      };
+      xhr.send(fd);
+    });
+    return { promise, abort: () => xhr.abort() };
   },
   attachmentUrl: (id) => base() + '/api/attachments/' + encodeURIComponent(id),
   fetchAttachment: (id) => request('GET', '/api/attachments/' + encodeURIComponent(id), { raw: true }),

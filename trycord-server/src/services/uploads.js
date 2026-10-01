@@ -143,8 +143,12 @@ async function store({ uploaderId, channelId, buffer, originalName }) {
   const quota = await checkQuota(uploaderId, buffer.length);
   if (quota) return quota;
   const id = uuid();
-  const ext = safeExt(originalName) || (EXT_FOR_MIME[mime] || '').slice(1);
-  const filename = cleanFilename(originalName) + (ext ? '.' + ext : '');
+  // Only supply an extension when the name does not already have one. Appending
+  // unconditionally turned every "photo.png" into "photo.png.png", which is both
+  // what the reader sees and what a download is named.
+  const own = safeExt(originalName);
+  const ext = own || (EXT_FOR_MIME[mime] || '').slice(1);
+  const filename = cleanFilename(originalName) + (!own && ext ? '.' + ext : '');
   const key = storage.key.messageMedia(channelId, id);
   await storage.put(key, buffer, mime);
   try {

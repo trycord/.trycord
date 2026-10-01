@@ -1,4 +1,9 @@
-// auth/session endpoints.
+// The account settings surface: profile, security, sessions, two-factor, and
+// taking a copy of or erasing your own data.
+//
+// Everything here goes to the real auth/session endpoints rather than to local
+// state, because these are the settings where a stale local answer is the
+// difference between an account that looks protected and one that is.
 
 import Api from './api.js';
 import State, { clearSession, refreshServers, refreshFriends, mustVerifyToPost, isMuted, setMuted } from './state.js';
