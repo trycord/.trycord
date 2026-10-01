@@ -301,8 +301,13 @@ router.post('/logout', auth, async (req, res, next) => {
       const expiresAt = new Date(req.user.exp * 1000).toISOString();
       await db.run(`INSERT ${db.ignoreKeyword} INTO revoked_tokens (jti, expires_at) VALUES (?, ?)`, [req.user.jti, expiresAt]);
     }
+    // Announced before the sockets are dropped. Sent afterwards it reaches
+    // nobody, because disconnectUser has already closed them - so the event
+    // existed, the revocation was real, and no client was ever told.
+    events.emitTo(req.user.id, 'session-revoked', {
+      all: true, reason: 'revoke-all', actorJti: req.user.jti || null,
+    });
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
-    events.emitTo(req.user.id, 'session-revoked', { all: true, reason: 'revoke-all' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -359,8 +364,13 @@ router.post('/sessions/revoke-all', auth, async (req, res, next) => {
     await db.run('UPDATE user_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL',
       [now(), req.user.id]);
     console.log(`[security] all_sessions_revoked user=${req.user.id}`);
+    // Announced before the sockets are dropped. Sent afterwards it reaches
+    // nobody, because disconnectUser has already closed them - so the event
+    // existed, the revocation was real, and no client was ever told.
+    events.emitTo(req.user.id, 'session-revoked', {
+      all: true, reason: 'revoke-all', actorJti: req.user.jti || null,
+    });
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
-    events.emitTo(req.user.id, 'session-revoked', { all: true, reason: 'revoke-all' });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -385,6 +395,14 @@ router.post('/sessions/revoke-others', auth, async (req, res, next) => {
     // replacement, so the reader's own device is the row that survives.
     await privacy.revokeOthers(req.user.id, null);
     console.log(`[security] other_sessions_revoked user=${req.user.id}`);
+    // Before the sockets go, for the same reason as revoke-all above. This one
+    // also names who asked, because the version bump killed the caller's own
+    // token too - a fresh one is returned below - so a client that treated it
+    // as a revocation of itself would sign the reader out for doing what they
+    // asked.
+    events.emitTo(req.user.id, 'session-revoked', {
+      all: false, reason: 'revoke-others', actorJti: req.user.jti || null,
+    });
     try { disconnectUser(req.user.id); } catch { /* gateway not wired */ }
     issued(res, {
       id: row.id, username: row.username, display_name: row.display_name,
@@ -420,7 +438,9 @@ router.post('/sessions/revoke', auth, rateLimit({ windowMs: 60000, max: 30 }), a
     // Every socket, including the one that asked: a revoked session that stays
     // connected is a session the server has already refused but the client has
     // not noticed, which is the worst of both.
-    events.emitTo(req.user.id, 'session-revoked', { jti, all: false });
+    events.emitTo(req.user.id, 'session-revoked', {
+      jti, all: false, actorJti: req.user.jti || null,
+    });
     if (!revoked) return fail(res, 'NOT_FOUND', 'session not found or already revoked');
     const exp = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
     try {
