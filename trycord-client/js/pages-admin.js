@@ -6,6 +6,7 @@ import { esc, el, btn, clear, toast, openModal, confirmDialog, relTime, fullTime
 import { initialOf, emptyState } from './components.js';
 import { renderContextHeader } from './shell.js';
 import { settingsNav, settingsFrame } from './settings-shell.js';
+import { adminContext } from './context-column.js';
 import { navigate, route } from './nav.js';;
 
 const REPORT_STATUSES = ['OPEN', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'];
@@ -850,7 +851,7 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
   // The section title is the pane's heading rather than a page-level h1, so the
   // nav and the content read as one surface instead of a title stacked above a
   // nav stacked above the content.
-  const { frame, pane } = settingsFrame({
+  const { frame, pane, context } = settingsFrame({
     scope: 'admin',
     active: section,
     contentClass: 'admin-page',
@@ -883,12 +884,24 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
     else if (section === 'audit') await renderAudit(sec, showSec, seq);
     else if (section === 'announcements') await renderAnnouncements(sec, showSec, seq);
     else await renderOverview(sec, showSec, seq);
+    await fillAdminContext(context, section);
   } catch (ex) {
     if (seq !== adminSeq) return;
     clear(body);
     if (ex && (ex.code === 'PERMISSION_DENIED' || ex.code === 'AUTH_REQUIRED')) body.appendChild(denied());
     else body.appendChild(loadError(ex, () => { clear(container); renderAdmin(container, { section }); }));
   }
+}
+
+// Painted after the section so the column reads the same instance the list does.
+// A failure here must not take the console down with it.
+async function fillAdminContext(host, section) {
+  if (!host) return;
+  try {
+    const nodes = await adminContext(section);
+    for (const n of nodes) host.appendChild(n);
+    if (nodes.length) host.closest('.settings-layout').dataset.hasContext = 'yes';
+  } catch { /* a summary is a convenience, never a dependency */ }
 }
 
 export default { renderAdmin, renderAdminNav };
