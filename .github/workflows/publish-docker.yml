@@ -21,7 +21,12 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  # github.repository is "trycord/.trycord", and an image path segment may not
+  # begin with a dot - so ghcr.io/trycord/.trycord is not a valid reference and
+  # the build fails before it starts. The repository name loses its leading dot.
+  # The owner still comes from the context so a transfer does not need an edit
+  # here. Matches the image documented in docker-compose.yml.
+  IMAGE_NAME: ${{ github.repository_owner }}/trycord
 
 jobs:
   publish:
