@@ -9,6 +9,7 @@ import { renderContextHeader } from './shell.js';
 import { ensureServer } from './workspace-shared.js';
 import { serverPath } from './links.js';
 import { settingsFrame, SETTINGS_IA, findItem } from './settings-shell.js';
+import { contextBlock as block, contextFact as fact, contextList as list, contextPara as para } from './context-column.js';
 import { sectionHead, sectionCard, setNote } from './settings-ui.js';
 import { navigate, route } from './nav.js';;
 
@@ -58,7 +59,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   const item = findItem('community', section);
   renderContextHeader({ title: 'Settings', sub: item && item.blurb ? item.blurb : server.name });
 
-  const { frame, pane } = settingsFrame({
+  const { frame, pane, context } = settingsFrame({
     scope: 'community',
     active: section,
     resolve: (id) => resolveCommunityHref(serverId, id),
@@ -67,6 +68,16 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   const wrap = el('div', { class: 'page roles-page' }, frame);
   const panel = pane;
   container.appendChild(wrap);
+
+  // Painted here rather than at the end: every section below finishes with an
+  // early return, so a call after them would only run for the one that falls
+  // through. The counts come from the same values the pane is built from, so
+  // there is no second request and nothing to wait for.
+  paintCommunityContext(context, section, server, {
+    members: (State.members || []).length,
+    channels: ((State.channels && State.channels.channels) || []).length,
+    roles: (State.roles || []).length,
+  });
 
   const reload = async () => { await ensureServer(serverId); };
   setViewRefresh(() => { reload().catch(() => {}); });
@@ -426,6 +437,37 @@ async function renderServerSettings(container, serverId, section = 'overview') {
     panel.appendChild(danger);
     return;
   }
+
+}
+
+/**
+ * The community settings column.
+ *
+ * This community's shape, read from the values the pane was already built from,
+ * plus what the section governs. No fetch: otherwise these would be a third copy
+ * of counts the server has already sent twice.
+ */
+function paintCommunityContext(host, section, server, counts) {
+  if (!host || !server) return;
+  const out = [block('This community', list(
+    fact('Members', String(counts.members)),
+    fact('Channels', String(counts.channels)),
+    fact('Roles', String(counts.roles)),
+  ))];
+  const NOTES = {
+    overview: 'These counts move when you change anything on the left.',
+    structure: 'Deleting a channel removes its messages with it. A category is only an ordering; moving one does not move its channels anywhere.',
+    members: 'A role grants exactly what its permissions say. Holding several roles does not add their permissions together beyond what each grants.',
+    roles: 'An override on a channel or category beats the role list for that place only.',
+    invites: 'An invite is single-use and expires. Revoking one stops it being used again but does not undo it for anyone who already accepted.',
+    moderation: 'A timeout lifts itself when it expires. A ban does not, and only an administrator can lift it.',
+    ownership: 'Transferring ownership is immediate and cannot be undone from here.',
+    appearance: 'Appearance is per member. Nobody else sees the theme you choose.',
+  };
+  const note = NOTES[section];
+  if (note) out.push(block('About this section', para(note)));
+  for (const n of out) host.appendChild(n);
+  host.closest('.settings-layout').dataset.hasContext = 'yes';
 }
 
 export { renderServerSettings };
