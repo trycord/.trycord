@@ -7,6 +7,7 @@ const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const dms = require('../services/dms');
 const threads = require('../services/threads');
+const replies = require('../services/replies');
 const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
 
@@ -122,6 +123,19 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
           gateway.sendToUser(id, { type: 'notification', notification: note });
         } catch { /* notification failure must not fail the send */ }
       }
+    }
+    // A reply additionally tells the author of the message it hangs from, even
+    // if they are connected - the "they are online" shortcut above exists
+    // because the message itself reaches them over the socket, and a reply does
+    // not otherwise interrupt what they are reading.
+    if (!msg.deduped && msg.threadRootId) {
+      try {
+        const r = await replies.notifyReply({
+          kind: 'dm', scopeId: req.params.id, rootId: msg.threadRootId,
+          replyId: msg.id, authorId: req.user.id,
+        });
+        if (r) gateway.sendToUser(r.userId, { type: 'notification', notification: r.notification });
+      } catch { /* ignore */ }
     }
     res.json(msg);
   } catch (e) { serviceError(res, e); }
