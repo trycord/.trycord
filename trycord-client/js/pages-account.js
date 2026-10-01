@@ -323,7 +323,12 @@ function renderThemeStudio(wrap) {
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   });
   const importBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Import');
-  const fileInput = el('input', { type: 'file', accept: '.json,.css,.txt', hidden: true });
+  // Hidden, and so announced by nothing unless named. The visible buttons are
+  // what a reader uses; this is only the mechanism behind them.
+  const fileInput = el('input', {
+    type: 'file', accept: '.json,.css,.txt', hidden: true,
+    'aria-label': 'Choose a file to import',
+  });
   importBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', () => {
     const file = fileInput.files && fileInput.files[0];
@@ -420,8 +425,17 @@ function renderProfileEditor(wrap) {
   profileCard.appendChild(preview);
   profileCard.appendChild(el('div', { class: 'hr' }));
 
-  const avatarInput = el('input', { type: 'file', accept: 'image/*', hidden: true });
-  const bannerInput = el('input', { type: 'file', accept: 'image/*', hidden: true });
+  // Hidden, and therefore not reachable by keyboard or announced at all unless
+  // named: the visible buttons are what a reader uses, and these are only the
+  // mechanism behind them.
+  const avatarInput = el('input', {
+    type: 'file', accept: 'image/*', hidden: true,
+    'aria-label': 'Choose an avatar image to upload',
+  });
+  const bannerInput = el('input', {
+    type: 'file', accept: 'image/*', hidden: true,
+    'aria-label': 'Choose a banner image to upload',
+  });
   const avatarBtn = el('button', { class: 'btn', type: 'button' }, 'Change avatar');
   const avatarRm = el('button', { class: 'btn ghost', type: 'button', hidden: me ? !me.avatarUrl : true }, 'Remove avatar');
   const bannerBtn = el('button', { class: 'btn', type: 'button' }, 'Change banner');

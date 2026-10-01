@@ -898,7 +898,11 @@ export function renderContextHeader({ title, sub, icon: iconGlyph, actions } = {
 
   const titles = el('div', { class: 'context-header__titles' });
   if (iconGlyph) titles.appendChild(el('div', { class: 'context-header__icon' }, iconGlyph));
-  titles.appendChild(el('div', { class: 'context-title', id: 'context-title' }, title || 'Trycord'));
+  // The one h1 on every surface. It was a div, so no page in the application
+  // had a top-level heading: someone navigating by heading found nothing to
+  // land on, and the current view had no heading identifying it at all.
+  titles.appendChild(el('h1', { class: 'context-title', id: 'context-title' },
+    title || 'Trycord'));
   if (sub) titles.appendChild(el('div', { class: 'context-sub' }, sub));
   header.appendChild(titles);
 

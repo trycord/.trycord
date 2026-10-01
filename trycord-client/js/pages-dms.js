@@ -375,7 +375,13 @@ async function renderFriends(container) {
   await refreshFriends();
 
   const addRow = el('div', { class: 'row-line' });
-  const input = el('input', { class: 'input', type: 'search', placeholder: 'Find a user to friend…', style: { flex: '1 1 260px' } });
+  // A placeholder is not a label: it disappears as soon as the field has text
+  // in it, and a screen reader announces the field with nothing at all.
+  const input = el('input', {
+    class: 'input', type: 'search', placeholder: 'Find a user to friend\u2026',
+    'aria-label': 'Search for a user to befriend',
+    style: { flex: '1 1 260px' },
+  });
   const addBtn = el('button', { class: 'btn', type: 'button' }, 'Add friend');
   addRow.appendChild(input);
   addRow.appendChild(addBtn);
