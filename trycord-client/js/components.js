@@ -250,6 +250,18 @@ export async function downloadAttachment(att) {
   URL.revokeObjectURL(a.href);
 }
 
+// The affordance on a message that has replies. It lives beside messageRow
+// rather than in thread.js so the badge and the row that carries it do not
+// import each other.
+export function replyBadge(count, onOpen) {
+  if (!count) return null;
+  const label = count === 1 ? '1 reply' : count + ' replies';
+  return el('button', {
+    class: 'msg-thread-badge', type: 'button', 'aria-expanded': 'false',
+    onClick: (e) => { e.stopPropagation(); onOpen(); },
+  }, [el('span', { class: 'msg-thread-badge__count' }, String(count)), el('span', {}, label)]);
+}
+
 export function messageRow(msg, opts = {}) {
   const authorName = msg.user || msg.author_name || msg.author_display || 'Unknown';
   const disp = msg.author_display || msg.author_name || msg.user || 'Unknown';
@@ -407,6 +419,12 @@ export function messageRow(msg, opts = {}) {
   const reactBar = el('div', { class: 'msg-reactions' });
   paintReactions(reactBar, msg.reactions, opts.onReact);
   body.appendChild(reactBar);
+
+  // Built here rather than by each caller so the badge reads the same in a
+  // channel and in a direct message.
+  if (typeof opts.onOpenThread === 'function' && msg.reply_count > 0) {
+    body.appendChild(replyBadge(msg.reply_count, opts.onOpenThread));
+  }
 
   row.appendChild(body);
   return row;

@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const dms = require('../services/dms');
+const threads = require('../services/threads');
 const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
 
@@ -82,7 +83,21 @@ router.get('/:id/messages', async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
-// POST /api/dms/:id/messages { content, attachmentIds, clientNonce } — persist,
+// A thread, on the same terms as the channel one: membership is the check, so
+// this cannot be used to read a conversation the caller is not in.
+router.get('/:id/messages/:messageId/thread', async (req, res, next) => {
+  try {
+    const seen = await dms.visibleConversation(req.params.id, req.user.id);
+    if (!seen) return fail(res, 'NOT_FOUND', 'conversation not found');
+    const rootId = await threads.resolveRoot('dm', req.params.id, req.params.messageId);
+    res.json(await threads.fetch('dm', req.params.id, rootId));
+  } catch (e) {
+    if (e && e.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'message not found');
+    serviceError(res, e);
+  }
+});
+
+// POST /api/dms/:id/messages { content, attachmentIds, clientNonce, replyToId } — persist,
 // broadcast, notify. The nonce makes a retried submission collapse onto the row
 // the first attempt already wrote, so a lost response cannot duplicate a
 // message. A message with files and no text is allowed, as it is in a channel.
@@ -91,7 +106,7 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
     const msg = await dms.send(
       req.user.id, req.user.username, req.params.id,
       (req.body || {}).content, (req.body || {}).clientNonce,
-      (req.body || {}).attachmentIds
+      (req.body || {}).attachmentIds, (req.body || {}).replyToId
     );
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(members, { type: 'dm:message', ...msg, conversationId: req.params.id });

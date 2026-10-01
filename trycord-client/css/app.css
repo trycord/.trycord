@@ -2522,6 +2522,92 @@ select.input { appearance: auto; }
   background: var(--t-elev);
 }
 .lightbox-name { margin: 0; color: var(--t-txt-2); font-size: var(--t-f-sm); }
+
+.msg-thread-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-d-1);
+  margin-top: var(--t-d-1);
+  padding: 2px var(--t-d-2) 2px var(--t-d-1);
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--t-accent) 14%, transparent);
+  color: var(--t-accent);
+  font-size: var(--t-f-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.msg-thread-badge:hover { background: color-mix(in srgb, var(--t-accent) 24%, transparent); }
+.msg-thread-badge__count {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--t-accent);
+  color: var(--t-base);
+  font-size: 0.7rem;
+}
+
+.msg-thread {
+  margin: 0 clamp(16px, 3vw, 42px) var(--t-d-2) clamp(16px, 3vw, 42px);
+  border: 1px solid var(--t-line);
+  border-left: 3px solid var(--t-accent);
+  border-radius: var(--t-r-s);
+  background: color-mix(in srgb, var(--t-elev) 55%, transparent);
+}
+.msg-thread__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--t-d-2) var(--t-d-3);
+  border-bottom: 1px solid var(--t-line);
+}
+.msg-thread__title {
+  font-size: var(--t-f-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--t-txt-2);
+}
+.msg-thread__close {
+  border: 0;
+  background: transparent;
+  color: var(--t-txt-2);
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--t-d-1);
+  border-radius: var(--t-r-s);
+}
+.msg-thread__close:hover { color: var(--t-txt); background: var(--t-line); }
+.msg-thread__list { display: flex; flex-direction: column; }
+.msg-thread__root {
+  border-bottom: 1px solid var(--t-line);
+  background: color-mix(in srgb, var(--t-base) 40%, transparent);
+}
+.msg-thread__msg { margin: 0; padding: var(--t-d-2) var(--t-d-3); }
+.msg-thread__form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--t-d-2);
+  padding: var(--t-d-2) var(--t-d-3);
+  border-top: 1px solid var(--t-line);
+}
+.msg-thread__form[hidden] { display: none; }
+.msg-thread__input {
+  flex: 1 1 auto;
+  min-height: 40px;
+  max-height: 140px;
+  resize: none;
+  padding: var(--t-d-2);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-s);
+  background: var(--t-base);
+  color: var(--t-txt);
+  font: inherit;
+}
 .composer textarea {
   flex: 1 1 auto;
   min-height: 44px;

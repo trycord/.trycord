@@ -5,6 +5,7 @@
 const db = require('../db');
 const { now, uuid } = require('../util');
 const uploads = require('./uploads');
+const threads = require('./threads');
 
 const MAX_CONTENT = 2000;
 
@@ -218,6 +219,7 @@ async function history(userId, conversationId, { before = null, after = null, li
   if (!forward) rows.reverse();
   // One query for the whole page, the same way the channel history does it.
   const files = await uploads.getForDmMessages(rows.map((m) => m.id));
+  const counts = await threads.replyCounts('dm', conversationId, rows.map((m) => m.id));
   return rows.map((m) => ({
     id: m.id,
     seq: m.seq === null || m.seq === undefined ? null : Number(m.seq),
@@ -227,11 +229,13 @@ async function history(userId, conversationId, { before = null, after = null, li
     editedAt: m.edited_at || null,
     authorId: m.author_id,
     authorName: m.author_display || m.author_name,
+    threadRootId: m.thread_root_id || null,
+    replyCount: counts[m.id] || 0,
     attachments: files[m.id] || [],
   }));
 }
 
-async function send(userId, username, conversationId, content, clientNonce = null, attachmentIds = []) {
+async function send(userId, username, conversationId, content, clientNonce = null, attachmentIds = [], replyToId = null) {
   const seen = await visibleConversation(conversationId, userId);
   if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
   const text = String((content === null || content === undefined) ? '' : content).trim();
@@ -239,6 +243,9 @@ async function send(userId, username, conversationId, content, clientNonce = nul
   // requiring text here meant a picture could not be sent in a DM at all.
   const ids = uploads.sanitizeIds(attachmentIds);
   if (!text && !ids.length) throw { code: 'VALIDATION_ERROR', message: 'message is empty' };
+  // A reply to something that is not in this conversation is refused rather
+  // than quietly posted flat.
+  const threadRootId = await threads.resolveRoot('dm', conversationId, replyToId);
   if (text.length > MAX_CONTENT) {
     throw { code: 'VALIDATION_ERROR', message: `message too long (max ${MAX_CONTENT} characters)` };
   }
@@ -266,13 +273,17 @@ async function send(userId, username, conversationId, content, clientNonce = nul
         editedAt: null,
         authorId: existing.author_id,
         authorName: username,
+        threadRootId: existing.thread_root_id || null,
         attachments: await uploads.getForDmMessage(existing.id),
         deduped: true,
       };
     }
   }
 
-  const msg = { id: uuid(), conversation_id: conversationId, author_id: userId, content: body, created_at: now() };
+  const msg = {
+    id: uuid(), conversation_id: conversationId, author_id: userId,
+    content: body, created_at: now(), thread_root_id: threadRootId,
+  };
 
   // Insert with the canonical position, retrying on the (rare) race where a
   // concurrent writer claimed the same seq first.
@@ -282,8 +293,9 @@ async function send(userId, username, conversationId, content, clientNonce = nul
     try {
       await db.transaction(async (t) => {
         await t.run(
-          'INSERT INTO dm_messages (id, conversation_id, author_id, content, created_at, seq, client_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.conversation_id, msg.author_id, msg.content, msg.created_at, seq, nonce]
+          'INSERT INTO dm_messages (id, conversation_id, author_id, content, created_at, seq, client_nonce, thread_root_id)' +
+          ' VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.conversation_id, msg.author_id, msg.content, msg.created_at, seq, nonce, threadRootId]
         );
         await t.run('UPDATE dm_conversations SET updated_at = ? WHERE id = ?', [msg.created_at, conversationId]);
       });
@@ -318,6 +330,7 @@ async function send(userId, username, conversationId, content, clientNonce = nul
     editedAt: null,
     authorId: userId,
     authorName: username,
+    threadRootId,
     attachments,
   };
 }

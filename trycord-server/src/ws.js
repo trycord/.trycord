@@ -25,6 +25,7 @@ const { hasChannelPermission } = require('./services/permissions');
 const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
 const dms = require('./services/dms');
 const uploads = require('./services/uploads');
+const threads = require('./services/threads');
 const { nextSeq } = require('./routes/messages');
 
 const TICKET_TTL_MS = 60 * 1000;
@@ -393,6 +394,9 @@ function createGateway(server) {
             const ids = uploads.sanitizeIds(data.attachments);
             if (!content && !ids.length) return;
             const ch = await visibleChannel(ws.channelId, user.id);
+            // Same reply contract as the REST post, including refusing a target
+            // that is not in this channel rather than posting flat.
+            const threadRootId = await threads.resolveRoot('channel', ch.id, data.replyToId);
             if (!ch) return;
             // Same gate as the HTTP post: membership alone is not enough.
             if (!(await hasChannelPermission(user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) return;
@@ -407,7 +411,7 @@ function createGateway(server) {
             const msg = {
               id: uuid(), channel_id: ch.id, server_id: ch.server_id,
               author_id: user.id, user: user.username, content, created_at: now(),
-              edited_at: null,
+              edited_at: null, thread_root_id: threadRootId,
             };
             // The per-channel sequence is what the history cursor pages on, so
             // a socket post without one is invisible to every later read.
@@ -416,8 +420,9 @@ function createGateway(server) {
               const seq = await nextSeq(ch.id);
               try {
                 await db.run(
-                  'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq) VALUES (?, ?, ?, ?, ?, ?)',
-                  [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at, seq]
+                  'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq, thread_root_id)' +
+                  ' VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at, seq, threadRootId]
                 );
                 msg.seq = seq;
                 inserted = true;

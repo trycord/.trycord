@@ -183,6 +183,11 @@ function tables(engine) {
          edited_at  VARCHAR(64),
          seq        INTEGER,
          client_nonce VARCHAR(64),
+         -- Set on a reply to the id of the message the thread hangs from, NULL
+         -- on an ordinary message. Deliberately not a self-reference: the root
+         -- is simply the message nobody replied to, so a thread cannot point at
+         -- itself and no second table is needed.
+         thread_root_id VARCHAR(64),
          FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
          FOREIGN KEY (author_id) REFERENCES users(id)
        )${engine}`,
@@ -237,6 +242,7 @@ function tables(engine) {
          edited_at       VARCHAR(64),
          seq             INTEGER,
          client_nonce    VARCHAR(64),
+         thread_root_id  VARCHAR(64),
          FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
          FOREIGN KEY (author_id) REFERENCES users(id)
        )${engine}`,
@@ -711,6 +717,8 @@ const LEGACY_ALTERS = [
   ['channels', 'slug', 'ALTER TABLE channels ADD COLUMN slug VARCHAR(64)'],
   ['attachments', 'dm_conversation_id', 'ALTER TABLE attachments ADD COLUMN dm_conversation_id VARCHAR(64)'],
   ['attachments', 'dm_message_id', 'ALTER TABLE attachments ADD COLUMN dm_message_id VARCHAR(64)'],
+  ['messages', 'thread_root_id', 'ALTER TABLE messages ADD COLUMN thread_root_id VARCHAR(64)'],
+  ['dm_messages', 'thread_root_id', 'ALTER TABLE dm_messages ADD COLUMN thread_root_id VARCHAR(64)'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -800,6 +808,8 @@ const MYSQL_ADD = [
   ['dm_messages', 'client_nonce', 'ALTER TABLE dm_messages ADD COLUMN client_nonce VARCHAR(64)'],
   ['attachments', 'dm_conversation_id', 'ALTER TABLE attachments ADD COLUMN dm_conversation_id VARCHAR(64)'],
   ['attachments', 'dm_message_id', 'ALTER TABLE attachments ADD COLUMN dm_message_id VARCHAR(64)'],
+  ['messages', 'thread_root_id', 'ALTER TABLE messages ADD COLUMN thread_root_id VARCHAR(64)'],
+  ['dm_messages', 'thread_root_id', 'ALTER TABLE dm_messages ADD COLUMN thread_root_id VARCHAR(64)'],
 ];
 
 const INDEXES = [
@@ -813,6 +823,8 @@ const INDEXES = [
   // channel (the /api/activity feed). Write overhead is one narrow index.
   'CREATE INDEX idx_messages_created ON messages(created_at)',
   'CREATE INDEX idx_invites_server ON invites(server_id)',
+  'CREATE INDEX idx_messages_thread ON messages(thread_root_id, seq)',
+  'CREATE INDEX idx_dm_messages_thread ON dm_messages(thread_root_id, seq)',
   'CREATE INDEX idx_attachments_message ON attachments(message_id)',
   'CREATE INDEX idx_attachments_channel ON attachments(channel_id)',
   // Every direct-message history page reads these, so without them a busy

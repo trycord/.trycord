@@ -10,6 +10,7 @@ const { hasChannelPermission } = require('../services/permissions');
 const memberships = require('../services/memberships');
 const uploads = require('../services/uploads');
 const reactions = require('../services/reactions');
+const threads = require('../services/threads');
 const mentions = require('../services/mentions');
 
 let broadcast = () => {};
@@ -91,9 +92,28 @@ router.get('/', async (req, res, next) => {
     // backward page.
     if (req.query.after === undefined || req.query.after === '') rows.reverse();
     rows.forEach((r) => { r.attachments = byId[r.id] || []; });
+    // One grouped query for the whole page, so a history read costs the same
+    // whether or not anything has been replied to.
+    const counts = await threads.replyCounts('channel', ch.id, rows.map((r) => r.id));
+    rows.forEach((r) => { r.reply_count = counts[r.id] || 0; });
     await attachEngagement(rows, req.user.id);
     res.json(rows);
   } catch (e) { next(e); }
+});
+
+// A thread: the message it hangs from, then its replies. The channel is
+// permission-checked exactly as the history read is, so a thread cannot be used
+// to read a channel the reader cannot otherwise see.
+router.get('/:messageId/thread', async (req, res, next) => {
+  try {
+    const ch = await visibleChannel(req.params.channelId, req.user.id);
+    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    const rootId = await threads.resolveRoot('channel', ch.id, req.params.messageId);
+    res.json(await threads.fetch('channel', ch.id, rootId));
+  } catch (e) {
+    if (e && e.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'message not found');
+    next(e);
+  }
 });
 
 // Assign the next seq for a channel. The unique index on (channel_id, seq)
@@ -133,6 +153,16 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     const ids = uploads.sanitizeIds((req.body || {}).attachmentIds);
     if (!content && !ids.length) return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
 
+    // A reply to something that is not in this channel is refused rather than
+    // quietly posted flat, which would look like the app had lost the message.
+    let threadRootId = null;
+    try {
+      threadRootId = await threads.resolveRoot('channel', ch.id, (req.body || {}).replyToId);
+    } catch (e) {
+      return fail(res, e.code === 'NOT_FOUND' ? 'NOT_FOUND' : 'VALIDATION_ERROR',
+        e.code === 'NOT_FOUND' ? 'the message being replied to does not exist here' : 'cannot reply to that message');
+    }
+
     // Idempotency. A caller that retries the same submission (because the
     // response was lost, not because the write failed) sends the same
     // clientNonce and gets the already-persisted message back instead of a
@@ -159,7 +189,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     const msg = {
       id: uuid(), channel_id: ch.id, server_id: ch.server_id,
       author_id: req.user.id, user: req.user.username, content, created_at: now(),
-      edited_at: null,
+      edited_at: null, thread_root_id: threadRootId,
     };
 
     // Insert with the canonical sequence, retrying on the (rare) race.
@@ -168,8 +198,9 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       const seq = await nextSeq(ch.id);
       try {
         await db.run(
-          'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq, client_nonce) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at, seq, nonce]
+          'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq, client_nonce, thread_root_id)' +
+          ' VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at, seq, nonce, threadRootId]
         );
         msg.seq = seq;
         inserted = true;
