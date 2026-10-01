@@ -2,7 +2,13 @@
 
 import Api from './api.js';
 import { TrycordConfig } from './config.js';
-import { setOnline, setPresence, refreshNotifications, isAuthed } from './state.js';
+import State, {
+  setOnline, setPresence, refreshNotifications, isAuthed,
+  refreshFriends, refreshBlocks, clearSession,
+} from './state.js';
+import { renderAllChrome } from './shell.js';
+import { applyWellbeingToDocument } from './privacy-ui.js';
+import { navigate } from './nav.js';
 
 const listeners = {};
 
@@ -62,6 +68,33 @@ async function connect() {
     emit(msg.type, msg);
     if (msg.type === 'presence') setPresence(msg.userId, msg.presence);
     if (msg.type === 'notification') refreshNotifications().catch(() => {});
+
+    // Account-scoped events. Each one means "your own state changed somewhere
+    // else", and the correct response is to read the new state rather than to
+    // patch the old one: the payload is a summary, and a client that trusts a
+    // summary instead of the source is how two devices end up disagreeing about
+    // what the server said.
+    if (msg.type === 'profile' && msg.profile) {
+      State.me = Object.assign({}, State.me, msg.profile);
+      renderAllChrome();
+    }
+    if (msg.type === 'privacy') {
+      // Repainted on the Privacy page itself if it is open; the state store is
+      // not kept because each section reads from the API rather than from here.
+      renderAllChrome();
+    }
+    if (msg.type === 'wellbeing') applyWellbeingToDocument(msg.wellbeing);
+    if (msg.type === 'blocks') refreshBlocks().catch(() => {});
+    if (msg.type === 'friend') refreshFriends().catch(() => {});
+    if (msg.type === 'twofactor') renderAllChrome();
+    if (msg.type === 'session-revoked') {
+      // The server has already invalidated these tokens. Anything still open
+      // here is a session that is dead and does not know it, so the only correct
+      // move is to stop using it and send the reader to sign in again.
+      Realtime.disconnect();
+      clearSession();
+      navigate('/login', { replace: true });
+    }
   });
 
   ws.addEventListener('close', () => {

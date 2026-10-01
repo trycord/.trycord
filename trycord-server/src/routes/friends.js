@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { serviceError } = require('../errors');
 const friends = require('../services/friends');
+const events = require('../services/events');
 const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
 
@@ -81,6 +82,13 @@ router.post('/requests/:id/accept', auth.requireVerified, async (req, res, next)
   try {
     const out = await friends.accept(req.user.id, req.params.id);
     await notify(out.friendId, 'friend_accepted', req.user.id, null);
+    // Both sides change: the requester is now a friend, and the accepter's list
+    // gained someone. Emitting only to the caller left the other client showing a
+    // pending request that no longer existed.
+    if (out && out.friendId) {
+      events.emitTo(out.friendId, 'friend', { state: 'friend' });
+      events.emitTo(req.user.id, 'friend', { state: 'friend', userId: out.friendId });
+    }
     res.json(out);
   } catch (e) { serviceError(res, e); }
 });
@@ -88,21 +96,30 @@ router.post('/requests/:id/accept', auth.requireVerified, async (req, res, next)
 // POST /api/friends/requests/:id/decline
 router.post('/requests/:id/decline', auth.requireVerified, async (req, res, next) => {
   try {
-    res.json(await friends.decline(req.user.id, req.params.id));
+    const out = await friends.decline(req.user.id, req.params.id);
+    events.emitTo(req.user.id, 'friend', { state: 'declined', userId: out && out.userId });
+    res.json(out);
   } catch (e) { serviceError(res, e); }
 });
 
 // DELETE /api/friends/requests/:id — cancel my outgoing request.
 router.delete('/requests/:id', auth.requireVerified, async (req, res, next) => {
   try {
-    res.json(await friends.cancel(req.user.id, req.params.id));
+    const out = await friends.cancel(req.user.id, req.params.id);
+    events.emitTo(req.user.id, 'friend', { state: 'cancelled', userId: out && out.userId });
+    res.json(out);
   } catch (e) { serviceError(res, e); }
 });
 
 // DELETE /api/friends/:userId — remove a friendship.
 router.delete('/:userId', auth.requireVerified, async (req, res, next) => {
   try {
-    res.json(await friends.remove(req.user.id, req.params.userId));
+    const out = await friends.remove(req.user.id, req.params.userId);
+    const otherId = out && out.userId ? out.userId : req.params.userId;
+    // Symmetric: a removed friendship is gone for both people, so both are told.
+    events.emitTo(otherId, 'friend', { state: 'removed', userId: req.user.id });
+    events.emitTo(req.user.id, 'friend', { state: 'removed', userId: otherId });
+    res.json(out);
   } catch (e) { serviceError(res, e); }
 });
 

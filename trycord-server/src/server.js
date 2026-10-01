@@ -580,7 +580,7 @@ async function boot() {
   require('./routes/friends').setGateway({ sendToUser });
   require('./routes/users').setGateway({ getPresence });
   require('./routes/admin').setGateway({ disconnectUser });
-  require('./services/events').setGateway({ broadcast: broadcastServer, evict: evictUserFromServer });
+  require('./services/events').setGateway({ broadcast: broadcastServer, sendToUser, evict: evictUserFromServer });
 
   // Trust & Safety: bootstrap platform admins from ADMIN_USERNAMES before
   // the server accepts traffic. Idempotent — re-runs promote any new names

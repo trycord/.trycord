@@ -96,7 +96,10 @@ async function decline(userId, requestId) {
     throw { code: 'PERMISSION_DENIED', message: 'only the recipient can decline' };
   }
   await db.run("UPDATE friend_requests SET status = 'declined', updated_at = ? WHERE id = ?", [now(), req.id]);
-  return { id: req.id, status: 'declined' };
+  // The other party's id is returned so the caller can tell them. Previously
+  // the response named only the request, so a second client could learn that
+  // something happened but not to whom it happened.
+  return { id: req.id, status: 'declined', userId: String(req.from_user_id) };
 }
 
 // Cancel your own outgoing pending request.
@@ -107,7 +110,7 @@ async function cancel(userId, requestId) {
     throw { code: 'PERMISSION_DENIED', message: 'only the sender can cancel' };
   }
   await db.run('DELETE FROM friend_requests WHERE id = ?', [req.id]);
-  return { id: req.id, cancelled: true };
+  return { id: req.id, cancelled: true, userId: String(req.to_user_id) };
 }
 
 async function list(userId) {
@@ -129,11 +132,12 @@ async function remove(userId, friendId) {
     [userId, friendId]
   );
   if (!row) throw { code: 'NOT_FOUND', message: 'not friends' };
+  const other = String(friendId);
   await db.transaction(async (t) => {
     await t.run('DELETE FROM friendships WHERE user_id = ? AND friend_id = ?', [userId, friendId]);
     await t.run('DELETE FROM friendships WHERE user_id = ? AND friend_id = ?', [friendId, userId]);
   });
-  return { ok: true };
+  return { ok: true, userId: other };
 }
 
 module.exports = {

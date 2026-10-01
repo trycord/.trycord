@@ -8,6 +8,7 @@ const { fail, serviceError } = require('../errors');
 const enforcement = require('../services/enforcement');
 const privacy = require('../services/privacy');
 const uploads = require('../services/uploads');
+const events = require('../services/events');
 const { singleImage } = require('../middleware/upload');
 const { escapeLike } = require('../util');
 
@@ -114,6 +115,7 @@ function profileImageRoute(kind) {
       await db.run(`UPDATE users SET ${kind === 'avatar' ? 'avatar_url' : 'banner_url'} = ? WHERE id = ?`, [out.url, req.user.id]);
       await uploads.removeProfileFile(prev).catch(() => {});
       const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+      events.emitTo(req.user.id, 'profile', { profile: publicUser(updated) });
       res.status(201).json(publicUser(updated));
     } catch (e) { next(e); }
   };
@@ -127,6 +129,7 @@ function profileImageDelete(kind) {
       await db.run(`UPDATE users SET ${kind === 'avatar' ? 'avatar_url' : 'banner_url'} = NULL WHERE id = ?`, [req.user.id]);
       if (prev) await uploads.removeProfileFile(prev).catch(() => {});
       const updated = await db.get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+      events.emitTo(req.user.id, 'profile', { profile: publicUser(updated) });
       res.json(publicUser(updated));
     } catch (e) { next(e); }
   };
