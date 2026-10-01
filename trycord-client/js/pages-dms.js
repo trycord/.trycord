@@ -1,5 +1,6 @@
 
 import Api from './api.js';
+import { loadingState } from './states.js';
 import State, { refreshDms, refreshFriends, isAuthed, mustVerifyToPost } from './state.js';
 import {
   attachContextMenu, confirmDialog, copyText, esc, el, clear, toast, relTime,
@@ -125,7 +126,7 @@ async function renderDmThread(container, dmId) {
 
   async function reload() {
     clear(feed);
-    feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messages…'));
+    feed.appendChild(loadingState('Loading messages'));
     let msgs = [];
     try { msgs = await Api.dmMessages(dmId, { limit: 50 }); } catch (ex) {
       clear(feed);

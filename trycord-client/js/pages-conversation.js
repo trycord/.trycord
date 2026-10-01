@@ -1,4 +1,5 @@
 import Api from './api.js';
+import { loadingState } from './states.js';
 import State from './state.js';
 import Realtime from './realtime.js';
 
@@ -179,7 +180,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     loadingHistory = true;
     pendingLive.clear();
     clear(feed);
-    feed.appendChild(el('div', { class: 'feed-loading' }, 'Loading messages…'));
+    feed.appendChild(loadingState('Loading messages'));
     let msgs = [];
     try {
       msgs = await Api.messages(channelId, { limit: HISTORY_PAGE });

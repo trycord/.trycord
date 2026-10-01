@@ -1,6 +1,7 @@
 // renders what the API returns and never fabricates privileges). Sections:
 
 import Api from './api.js';
+import { loadingState } from './states.js';
 import State from './state.js';
 import { esc, el, btn, clear, toast, openModal, confirmDialog, relTime, fullTime } from './ui.js';
 import { initialOf, emptyState } from './components.js';
@@ -140,7 +141,7 @@ function userRow(u, onChanged) {
     const existing = listRow.querySelector('.admin-history');
     if (existing && existing.dataset.uid === u.id) { existing.remove(); return; }
     if (existing) existing.remove();
-    const ph = el('div', { class: 'admin-history', dataset: { uid: u.id } }, 'Loading history…');
+    const ph = el('div', { class: 'admin-history', dataset: { uid: u.id } }, loadingState('Loading history'));
     row.after(ph);
     Api.adminUserActions(u.id).then((actsList) => {
       clear(ph);
@@ -272,7 +273,7 @@ function serverRow(s, onChanged) {
     const existing = listRow.querySelector('.admin-history');
     if (existing) existing.remove();
     if (existing && existing.dataset.sid === s.id) return;
-    const ph = el('div', { class: 'admin-history', dataset: { sid: s.id } }, 'Loading history…');
+    const ph = el('div', { class: 'admin-history', dataset: { sid: s.id } }, loadingState('Loading history'));
     row.after(ph);
     Api.adminServerActions(s.id).then((actsList) => {
       clear(ph);
@@ -417,7 +418,7 @@ async function toggleReportDetail(row, r, refresh) {
   const parent = row.parentElement;
   const existing = parent.querySelector('.admin-detail');
   if (existing) existing.remove();
-  const det = el('div', { class: 'admin-detail' }, 'Loading detail…');
+  const det = el('div', { class: 'admin-detail' }, loadingState('Loading detail'));
   row.after(det);
   try {
     const full = await Api.adminReport(r.id);
@@ -874,7 +875,7 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
   const sec = el('div', { class: 'admin-block' });
   const showSec = (node) => { if (seq === adminSeq) { clear(sec); sec.appendChild(node); } };
   show(sec);
-  sec.appendChild(el('div', { class: 'empty-state' }, 'Loading…'));
+  sec.appendChild(loadingState('Loading'));
   try {
     if (section === 'users') await renderUsers(sec, showSec, seq);
     else if (section === 'communities') await renderCommunities(sec, showSec, seq);
