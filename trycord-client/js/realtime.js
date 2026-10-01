@@ -61,7 +61,34 @@ async function connect() {
     emit('open', {});
   });
 
-  ws.addEventListener('message', (ev) => {
+  /**
+ * This session's identifier, read from the token's own claims.
+ *
+ * Not verification - nothing here trusts the value. It is used only to
+ * recognise "this event is about me" against a server that names the acting
+ * session, so a reader is not signed out by their own "sign out other sessions".
+ * A token that cannot be decoded yields null, and a null simply means the
+ * comparison is skipped and the event is treated as a real revocation, which is
+ * the safe direction to fail in.
+ */
+function ownJti() {
+  try {
+    const token = State.token || localStorage.getItem('trycord.token');
+    if (!token) return null;
+    const part = String(token).split('.')[1];
+    if (!part) return null;
+    const json = decodeURIComponent(
+      atob(part.replace(/-/g, '+').replace(/_/g, '/'))
+        .split('').map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+    );
+    const claims = JSON.parse(json);
+    return claims && claims.jti ? String(claims.jti) : null;
+  } catch {
+    return null;
+  }
+}
+
+ws.addEventListener('message', (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
     if (!msg || !msg.type) return;
@@ -101,10 +128,26 @@ async function connect() {
     }
     if (msg.type === 'twofactor') renderAllChrome();
     if (msg.type === 'session-revoked') {
+      // Our own action is not a revocation of us. "Sign out other sessions"
+      // returns a fresh token for this device and leaves it signed in, and the
+      // event reaches this socket too - treating it as an attack would sign the
+      // reader out for doing what they asked. The token's own jti claim is
+      // readable without verification, which is all that is needed here.
+      const mine = ownJti();
+      if (msg.actorJti && mine && msg.actorJti === mine) {
+        // Nothing to do: this session survived. Reconnecting is already handled
+        // by the close that disconnectUser caused.
+        return;
+      }
       // The server has already invalidated these tokens. Anything still open
       // here is a session that is dead and does not know it, so the only correct
       // move is to stop using it and send the reader to sign in again.
-      Realtime.disconnect();
+      // Stop using the socket before tearing down the session. The local name here is
+      // TrycordRealtime, not Realtime: writing the exported name resolves to
+      // nothing, throws inside this handler, and leaves the reader on a page
+      // whose session the server has already revoked - which is the worst of both
+      // worlds, because nothing is visibly wrong.
+      TrycordRealtime.disconnect();
       clearSession();
       navigate('/login', { replace: true });
     }
