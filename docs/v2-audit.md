@@ -155,18 +155,28 @@ Real, known gaps. None blocks ordinary use.
   correct against AWS's vectors. The endpoint returns `SignatureDoesNotMatch`,
   which is ambiguous between that and credentials the server does not recognise;
   a key known to work against the target would settle it in one run.
-- **Uploads are sniffed, not decoded.** An earlier version of this file said
-  contents were not inspected; that was wrong. Binary types are checked by magic
-  bytes and text files must have no NUL, no unexpected C0 control byte and no
-  invalid UTF-8, and the *sniffed* type is stored in preference to the declared
-  one - so a GIF named `photo.png` is stored and served as a GIF. The allowlist
-  is PNG, JPEG, GIF, WebP, PDF and four text types, and deliberately excludes
-  SVG, HTML and XML, which are the ones that would execute when served inline
-  from the same origin. Downloads carry `X-Content-Type-Options: nosniff`.
-  What is not done is decoding the image, so bytes that carry a correct magic
-  number and are then malformed, or an image chosen to exhaust a decoder, are
-  stored unexamined. The real residual risk is a reader's client, not this
-  server.
+- **Any file may be attached, and anything unrecognised is sent as a download.**
+  There is no longer a list of accepted types. Size (8 MB), a per-account quota,
+  a per-route rate limit, a per-message count (10) and filename cleaning are all
+  still enforced; nothing is refused for what it is.
+
+  The type is detected from the bytes rather than trusted - magic bytes for the
+  binary formats, and a strict no-NUL / no-stray-C0 / valid-UTF-8 check for the
+  four text types - and the detected type is stored in preference to the declared
+  one, so a GIF named `photo.png` is stored and served as a GIF. A file that
+  matches nothing is stored as `application/octet-stream`.
+
+  What makes accepting every extension safe is the serving side, not the
+  accepting side. A recognised image, PDF or text file is served `inline` with
+  its real type; **everything else is served as `application/octet-stream` with
+  `Content-Disposition: attachment`**, so an `.html` or `.svg` attachment is a
+  download rather than script running on the app's origin with the reader's
+  session. `X-Content-Type-Options: nosniff` is set on all of them. The
+  practical consequence is that an SVG cannot be previewed inline - it downloads.
+
+  Identity media is a separate feature with a real constraint and stays
+  images-only: an avatar or community banner that is not PNG, JPEG, GIF or WebP
+  is refused.
 - **Email verification and password reset need a working SMTP transport.** The
   flows are implemented and rate limited, and the token handling is tested
   directly, but no end-to-end mail delivery is exercised in CI.

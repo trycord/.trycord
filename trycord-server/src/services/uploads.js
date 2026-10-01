@@ -81,10 +81,38 @@ function cleanFilename(name) {
   return s || 'upload';
 }
 
-function resolveMime(buf, originalName) {
+// Any file may be attached. What a thing is, is detected rather than declared,
+// but a file we cannot place is not refused - it is stored as
+// application/octet-stream and served as a download. Restricting uploads was
+// the wrong lever: people send what they send, and the risk was never that a
+// file exists, it is that the browser is asked to interpret it. That is decided
+// on the way out, in isInlineMime().
+const UNKNOWN_MIME = 'application/octet-stream';
+
+// Types a browser may be allowed to interpret on this origin. Everything else
+// goes out as an attachment no matter what it claims to be, which is what makes
+// "accept anything" safe: an .html or .svg attachment is a download rather than
+// a script running on the app's origin with the reader's session.
+const INLINE_MIMES = new Set([
+  'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+  'application/pdf',
+  'text/plain', 'text/markdown', 'text/csv', 'application/json',
+]);
+
+function isInlineMime(mime) {
+  return INLINE_MIMES.has(String(mime || '').toLowerCase());
+}
+
+function detectMime(buf, originalName) {
   const bin = sniffBinary(buf);
   if (bin) return bin;
-  return sniffText(buf, safeExt(originalName));
+  const text = sniffText(buf, safeExt(originalName));
+  if (text) return text;
+  // Anything else is stored as opaque bytes. Calling it text/plain because the
+  // bytes happen to be printable would put an .html or an .svg in the inline set
+  // and quietly decide what a browser may do with it; this way the answer is
+  // always "download it", which needs no judgement about the name.
+  return UNKNOWN_MIME;
 }
 
 function publicRow(r) {
@@ -151,10 +179,7 @@ async function store({ uploaderId, channelId, conversationId, buffer, originalNa
   if (!buffer || buffer.length === 0) {
     return { error: 'VALIDATION_ERROR', message: 'empty file' };
   }
-  const mime = resolveMime(buffer, originalName);
-  if (!mime) {
-    return { error: 'VALIDATION_ERROR', message: 'file type not supported (images, PDF, or text files only)' };
-  }
+  const mime = detectMime(buffer, originalName);
   const quota = await checkQuota(uploaderId, buffer.length);
   if (quota) return quota;
   const id = uuid();
@@ -418,6 +443,8 @@ function openServerMedia(row) {
 module.exports = {
   MAX_SIZE,
   MAX_ATTACHMENTS_PER_MESSAGE,
+  UNKNOWN_MIME,
+  isInlineMime,
   store,
   storeProfileMedia,
   profileMedia,

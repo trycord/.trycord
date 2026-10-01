@@ -5,6 +5,11 @@
 // Uploads require membership + SEND_MESSAGES; downloads the same membership
 // level as reading the message the file is attached to. Files are never
 // served from the public /uploads static mount (there is none).
+//
+// Any file may be attached. Size, quota and rate are bounded, the name is
+// cleaned, and the type is detected from the bytes rather than trusted - but
+// nothing is refused for what it is. See uploads.isInlineMime for how that is
+// kept from becoming script running on this origin.
 const express = require('express');
 const multer = require('multer');
 const auth = require('../middleware/auth');
@@ -113,8 +118,13 @@ router.get('/attachments/:id', auth, async (req, res, next) => {
     const a = await uploads.authorized(req.user.id, req.params.id);
     if (!a) return fail(res, 'NOT_FOUND', 'attachment not found');
     const disp = encodeURIComponent(a.filename).replace(/['()]/g, (c) => '%' + c.charCodeAt(0).toString(16));
-    res.setHeader('Content-Type', a.mime);
-    res.setHeader('Content-Disposition', "inline; filename*=UTF-8''" + disp);
+    // Uploads accept anything, so this is where an unreadable type is kept from
+    // being interpreted. A recognised image, PDF or text file is shown in place;
+    // everything else - including anything named .html or .svg - is sent as an
+    // octet-stream download, which is why accepting every extension is safe.
+    const inline = uploads.isInlineMime(a.mime);
+    res.setHeader('Content-Type', inline ? a.mime : uploads.UNKNOWN_MIME);
+    res.setHeader('Content-Disposition', (inline ? 'inline' : 'attachment') + "; filename*=UTF-8''" + disp);
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, max-age=3600');
     const stream = uploads.openAttachment(a);
