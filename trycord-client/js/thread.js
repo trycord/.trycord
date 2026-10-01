@@ -14,12 +14,68 @@ import Api from './api.js';
 import { el, clear, insertAtCursor, showEmojiPicker, toast } from './ui.js';
 import { icon } from './components.js';
 import { loadingState, errorState } from './states.js';
+import { replyBadge } from './components.js';
+
+// Reply counts, kept per message for the life of the view.
+//
+// A count has to survive a row being rebuilt, and a realtime event carries no
+// count at all: rebuilding a row from one would silently drop its badge. So the
+// last known count is kept here and wins over the wire, the same way pinState
+// does for pins.
+export function createReplyCounts() {
+  const known = new Map();
+  const wire = (m) => Number(m && (m.reply_count != null ? m.reply_count : m.replyCount)) || 0;
+
+  return {
+    get(m) {
+      if (!m || m.id === undefined || m.id === null) return 0;
+      const k = String(m.id);
+      if (known.has(k)) return known.get(k);
+      const v = wire(m);
+      known.set(k, v);
+      return v;
+    },
+    // A reply arrived for `rootId`. Returns the new count, or null when there
+    // is no root to attach it to.
+    noted(rootId) {
+      if (!rootId) return null;
+      const k = String(rootId);
+      const next = (known.has(k) ? known.get(k) : 0) + 1;
+      known.set(k, next);
+      return next;
+    },
+  };
+}
+
+// Put a count on a row that is already in the document, or take it off. Used
+// when a reply arrives for a message the reader is looking at, so the badge
+// moves without a re-read. Returns false when the root is not on screen, which
+// is not an error: the next history read carries the real count.
+export function applyReplyCount(rootId, count, onOpen) {
+  if (!rootId) return false;
+  const row = document.querySelector('[data-message-id="' + CSS.escape(String(rootId)) + '"]');
+  if (!row) return false;
+  const body = row.querySelector('.msg-body');
+  if (!body) return false;
+  const existing = body.querySelector('.msg-thread-badge');
+  if (count <= 0) {
+    if (existing) existing.remove();
+    return true;
+  }
+  if (existing) {
+    const n = existing.querySelector('.msg-thread-badge__count');
+    if (n) n.textContent = String(count);
+    return true;
+  }
+  body.appendChild(replyBadge(count, onOpen));
+  return true;
+}
 
 let openSeq = 0;
 
-export function createThread({ kind, scopeId, rootMessage, onPosted, canReply = true }) {
+export function createThread({ kind, scopeId, rootId, rootMessage = null, onPosted, canReply = true }) {
   const seq = ++openSeq;
-  const box = el('div', { class: 'msg-thread', 'data-thread-root': rootMessage.id });
+  const box = el('div', { class: 'msg-thread', 'data-thread-root': rootId });
   const list = el('div', { class: 'msg-thread__list' });
   const ta = el('textarea', {
     class: 'msg-thread__input', rows: 1, 'aria-label': 'Reply in thread',
@@ -42,15 +98,18 @@ export function createThread({ kind, scopeId, rootMessage, onPosted, canReply = 
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
 
   let rows = null;
+  // The root is whatever the server says it is, not a copy the caller happened
+  // to be holding: it may have been edited, and a badge that has no message
+  // object behind it opens from the id alone.
+  let root = rootMessage;
 
   function paint(state) {
     clear(list);
     if (state) list.appendChild(state);
     if (!rows) return;
-    // The root is rendered from the message we already had, so the thread opens
-    // with its context on screen before the request comes back.
-    const root = el('div', { class: 'msg-thread__root' }, [renderOne(rootMessage, true)]);
-    list.appendChild(root);
+    if (root) {
+      list.appendChild(el('div', { class: 'msg-thread__root' }, [renderOne(root, true)]));
+    }
     for (const r of rows) list.appendChild(renderOne(r, false));
   }
 
@@ -79,8 +138,9 @@ export function createThread({ kind, scopeId, rootMessage, onPosted, canReply = 
   async function load() {
     paint(loadingState('Loading thread'));
     try {
-      const data = await Api.messageThread(kind, scopeId, rootMessage.id);
+      const data = await Api.messageThread(kind, scopeId, rootId);
       if (seq !== openSeq) return;
+      root = data.root || root;
       rows = data.replies || [];
       paint(null);
     } catch (ex) {
@@ -97,7 +157,7 @@ export function createThread({ kind, scopeId, rootMessage, onPosted, canReply = 
     sending = true;
     sendBtn.setAttribute('aria-busy', 'true');
     try {
-      const posted = await Api.sendThreadReply(kind, scopeId, content, rootMessage.id);
+      const posted = await Api.sendThreadReply(kind, scopeId, content, rootId);
       ta.value = '';
       ta.style.height = 'auto';
       if (posted && typeof onPosted === 'function') onPosted(posted);

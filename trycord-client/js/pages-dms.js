@@ -8,7 +8,7 @@ import {
 } from './ui.js';
 import { avatar, downloadAttachment, emptyState, icon, messageRow } from './components.js';
 import { createAttachTray } from './attach-tray.js';
-import { createThread } from './thread.js';
+import { applyReplyCount, createReplyCounts, createThread } from './thread.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
 import { navigate } from './nav.js';
@@ -170,6 +170,8 @@ async function renderDmThread(container, dmId) {
     }
   }
 
+  const replyCounts = createReplyCounts();
+
   function appendDmMessage(m, toFeed) {
     const target = toFeed || feed;
     if (m && m.id && target.querySelector('[data-message-id="' + m.id + '"]')) return null;
@@ -183,7 +185,7 @@ async function renderDmThread(container, dmId) {
       edited_at: m.editedAt,
       // messageRow is the channel row and reads the wire names, so the camelCase
       // a DM message arrives with is mapped here rather than taught two shapes.
-      reply_count: m.replyCount || 0,
+      reply_count: replyCounts.get({ id: m.id, replyCount: m.replyCount }),
       attachments: m.attachments || [],
     }, {
       meId: State.me && State.me.id,
@@ -206,6 +208,14 @@ async function renderDmThread(container, dmId) {
     attachContextMenu(row, () => dmMessageActions(m, mine), {
       target: () => ({ type: 'message', id: String(m.id) }),
     });
+    // A reply has just arrived for some other message: move that message's
+    // badge, if it is on screen. A history read carries a count of its own and
+    // a live push does not, and that is the whole test - counting the history
+    // page would add every reply in it to the badge again.
+    if (m.replyCount === undefined && m.threadRootId && String(m.threadRootId) !== String(m.id)) {
+      const n = replyCounts.noted(m.threadRootId);
+      if (n !== null) applyReplyCount(m.threadRootId, n, () => openDmThread(m.threadRootId));
+    }
     target.appendChild(row);
     noteSeq(m);
     return row;
@@ -215,15 +225,17 @@ async function renderDmThread(container, dmId) {
   // inline blocks in one feed is unreadable on a phone.
   let openDmThreadId = null;
   function openDmThread(m) {
-    if (openDmThreadId && openDmThreadId !== String(m.id)) closeDmThread();
-    if (openDmThreadId === String(m.id)) { closeDmThread(); return; }
-    const row = feed.querySelector('[data-message-id="' + m.id + '"]');
+    const id = m && m.id !== undefined ? m.id : m;
+    if (openDmThreadId && openDmThreadId !== String(id)) closeDmThread();
+    if (openDmThreadId === String(id)) { closeDmThread(); return; }
+    const row = feed.querySelector('[data-message-id="' + id + '"]');
     if (!row) return;
     const view = createThread({
-      kind: 'dm', scopeId: dmId, rootMessage: m,
+      kind: 'dm', scopeId: dmId, rootId: id,
+      rootMessage: m && m.id !== undefined ? m : null,
       canReply: !mustVerifyToPost(),
     });
-    openDmThreadId = String(m.id);
+    openDmThreadId = String(id);
     row.after(view.node);
     view.node.scrollIntoView({ block: 'nearest' });
   }

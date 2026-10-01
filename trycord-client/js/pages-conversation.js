@@ -7,7 +7,7 @@ import { can, canInChannel, isMuted, mustVerifyToPost, refreshMutes, setChannelP
 import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDialog, relTime, showContextMenu, attachContextMenu, showEmojiPicker, toast } from './ui.js';
 import { downloadAttachment, emptyState, icon, messageRow, paintReactions } from './components.js';
 import { createAttachTray } from './attach-tray.js';
-import { createThread } from './thread.js';
+import { applyReplyCount, createReplyCounts, createThread } from './thread.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
 import { TrycordConfig } from './config.js';
@@ -239,6 +239,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }
   // by pin/unpin broadcasts so menus and badges never go stale.
   const pinState = new Map();
+  const replyCounts = createReplyCounts();
   async function toggleReaction(messageId, emoji, mine) {
     try {
       if (mine) await Api.removeReaction(channelId, messageId, emoji);
@@ -277,6 +278,10 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     const meId = State.me && State.me.id;
     const isMine = meId !== undefined && String(m.author_id) === String(meId);
     if (m.pinned) pinState.set(String(m.id), true);
+    // Seed the reply count from history. A realtime event carries no count, so
+    // without this the store would start a root at zero and its badge would sit
+    // one behind for the rest of the view.
+    m.reply_count = replyCounts.get(m);
     const node = messageRow(m, {
       meId,
       onEdit: () => editMsg(m),
@@ -567,6 +572,8 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   // An id already in the feed is replaced, never duplicated - which is what
   // makes this safe to call from both the REST response and the realtime echo.
   function upsertMessage(m, opts = {}) {
+    // Before the row is built: a realtime event has no count of its own.
+    m.reply_count = replyCounts.get(m);
     if (loadingHistory) {
       if (m && m.id) pendingLive.set(String(m.id), m);
       return;
@@ -603,6 +610,13 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
         thread.scrollTop = thread.scrollHeight;
       }
     }
+    // A reply has just arrived for some other message: move that message's
+    // badge, if it is on screen. Only for a row that was not already here -
+    // replacing a row we already counted would count the same reply twice.
+    if (!prev && m.thread_root_id && String(m.thread_root_id) !== String(m.id)) {
+      const n = replyCounts.noted(m.thread_root_id);
+      if (n !== null) applyReplyCount(m.thread_root_id, n, () => openThread(m.thread_root_id));
+    }
     noteSeq(m);
     regroupAround(prev ? node : (node.previousElementSibling || node));
   }
@@ -610,19 +624,24 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   // One thread open at a time. Expanding a second one closes the first rather
   // than stacking: two inline blocks in one feed is unreadable on a phone, and
   // the reader opened a thread to read it, not to compare two.
+  //
+  // Takes the root's id rather than the message, because a badge only has a
+  // count. The message is a convenience - it lets the panel show the root before
+  // the request returns - and the server's copy wins anyway.
   let openThreadId = null;
   function openThread(m) {
-    if (openThreadId && openThreadId !== String(m.id)) closeThread();
+    const id = m && m.id !== undefined ? m.id : m;
+    if (openThreadId && openThreadId !== String(id)) closeThread();
     const existing = conv.querySelector('.msg-thread');
-    if (existing && openThreadId === String(m.id)) { closeThread(); return; }
-    const row = feed.querySelector('[data-message-id="' + m.id + '"]');
+    if (existing && openThreadId === String(id)) { closeThread(); return; }
+    const row = feed.querySelector('[data-message-id="' + id + '"]');
     if (!row) return;
     const view = createThread({
-      kind: 'channel', scopeId: channelId, rootMessage: m,
+      kind: 'channel', scopeId: channelId, rootId: id,
+      rootMessage: m && m.id !== undefined ? m : null,
       canReply: canInChannel('SEND_MESSAGES') && !mustVerifyToPost(),
-      onPosted: () => { /* the badge refreshes with the next history read */ },
     });
-    openThreadId = String(m.id);
+    openThreadId = String(id);
     row.after(view.node);
     view.node.scrollIntoView({ block: 'nearest' });
   }
