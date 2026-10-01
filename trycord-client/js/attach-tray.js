@@ -135,12 +135,10 @@ export function createAttachTray({ upload, onChange }) {
     const onPaste = (e) => {
       const files = e.clipboardData && e.clipboardData.files;
       if (!files || !files.length) return;
-      const list = Array.from(files);
-      // Only intercept a paste that actually carries a picture, so pasting text
-      // into the message box behaves normally.
-      if (!list.some((f) => f.type && f.type.startsWith('image/'))) return;
+      // Only a paste that actually carries files is intercepted, so pasting
+      // text into the message box behaves normally.
       e.preventDefault();
-      addFiles(list);
+      addFiles(Array.from(files));
     };
 
     button.addEventListener('click', onClick);
