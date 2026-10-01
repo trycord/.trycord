@@ -4302,3 +4302,31 @@ html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width
    a 3440px window; the width that is left over becomes the contextual column
    rather than empty canvas. */
 .profile-primary { min-width: 0; max-width: var(--ui-settings-pane, 860px); }
+
+/* ---- the reading measure for conversations ---------------------------
+   A message column has a width past which it stops being easier to read
+   and starts being harder: the eye has to travel from one end of a line
+   to the other and back. At 3440px a conversation ran the full 3136px of
+   the main region, which is not a wide conversation but a very long one.
+
+   The column is centred inside the region rather than pinned left, so the
+   composer, the header and the message list all agree on where the
+   conversation is, and the leftover space reads as margin rather than as
+   two gutters fighting the sidebar.
+
+   --t-content-width was already declared here and read by nothing. This
+   is the consumer it was waiting for; the value is unchanged, because
+   1180px was the intended measure all along. */
+/* The cap goes on .conversation, which is the column: capping its children
+   individually left the feed a flex child filling whatever it was given. */
+.view-root > .conversation {
+  max-width: var(--t-content-width);
+  margin-inline: auto;
+}
+
+@media (min-width: 2200px) {
+  :root { --t-content-width: 1440px; }
+}
+@media (min-width: 3200px) {
+  :root { --t-content-width: 1600px; }
+}
