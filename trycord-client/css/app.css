@@ -1184,6 +1184,9 @@ img { max-width: 100%; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* An h1 carries a browser margin that would break the header's own spacing and
+     shrink the ellipsis box. Reset here rather than by trimming the element
+     back to a div, which is what it was before it had to be a real heading. */
   margin: 0;
   flex: 0 0 auto;
   max-width: 40%;

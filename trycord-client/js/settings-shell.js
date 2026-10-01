@@ -232,7 +232,7 @@ export function settingsNav({ scope, active, resolve, footer, searchable = true 
 
   for (const g of groups) {
     const block = el('div', { class: 'settings-nav__group' });
-    block.appendChild(el('h3', { class: 'settings-nav__heading' }, g.group));
+    block.appendChild(el('h2', { class: 'settings-nav__heading' }, g.group));
     for (const item of g.items) {
       const href = resolveHref(item, resolve);
       const on = isActive(item, active);
