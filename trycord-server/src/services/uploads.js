@@ -40,6 +40,12 @@ function sniffBinary(buf) {
   return null;
 }
 
+// Identity media - an avatar, a community icon or banner - is an image and
+// nothing else. sniffBinary also recognises PDF, so the check has to name what
+// it wants rather than test for "something recognisable": both call sites used
+// to promise images only and quietly accept a PDF.
+const IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
 // Whitelisted text files must be plausible text: no NUL or unexpected C0
 // control bytes and nothing that decodes to U+FFFD (invalid UTF-8). This
 // keeps binary garbage with a .txt alias out.
@@ -302,7 +308,7 @@ async function storeProfileMedia({ userId, kind, buffer, originalName }) {
     return { error: 'VALIDATION_ERROR', message: 'empty file' };
   }
   const mime = sniffBinary(buffer);
-  if (!mime) {
+  if (!mime || IMAGE_MIMES.indexOf(mime) === -1) {
     return { error: 'VALIDATION_ERROR', message: 'profile images must be PNG, JPEG, GIF, or WebP' };
   }
   const id = 'pf-' + uuid();
@@ -355,7 +361,7 @@ async function storeServerMedia({ serverId, kind, buffer, originalName }) {
     return { error: 'VALIDATION_ERROR', message: 'empty file' };
   }
   const mime = sniffBinary(buffer);
-  if (!mime) {
+  if (!mime || IMAGE_MIMES.indexOf(mime) === -1) {
     return { error: 'VALIDATION_ERROR', message: 'images must be PNG, JPEG, GIF, or WebP' };
   }
   const id = 'sv-' + uuid();

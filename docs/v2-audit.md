@@ -155,9 +155,18 @@ Real, known gaps. None blocks ordinary use.
   correct against AWS's vectors. The endpoint returns `SignatureDoesNotMatch`,
   which is ambiguous between that and credentials the server does not recognise;
   a key known to work against the target would settle it in one run.
-- **Uploads are bounded but not scanned.** Size, type and extension are checked;
-  contents are not inspected, so a file that passes those checks is stored
-  unexamined.
+- **Uploads are sniffed, not decoded.** An earlier version of this file said
+  contents were not inspected; that was wrong. Binary types are checked by magic
+  bytes and text files must have no NUL, no unexpected C0 control byte and no
+  invalid UTF-8, and the *sniffed* type is stored in preference to the declared
+  one - so a GIF named `photo.png` is stored and served as a GIF. The allowlist
+  is PNG, JPEG, GIF, WebP, PDF and four text types, and deliberately excludes
+  SVG, HTML and XML, which are the ones that would execute when served inline
+  from the same origin. Downloads carry `X-Content-Type-Options: nosniff`.
+  What is not done is decoding the image, so bytes that carry a correct magic
+  number and are then malformed, or an image chosen to exhaust a decoder, are
+  stored unexamined. The real residual risk is a reader's client, not this
+  server.
 - **Email verification and password reset need a working SMTP transport.** The
   flows are implemented and rate limited, and the token handling is tested
   directly, but no end-to-end mail delivery is exercised in CI.
