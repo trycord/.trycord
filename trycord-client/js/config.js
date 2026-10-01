@@ -146,6 +146,22 @@ function resolveBackend() {
   const pinned = plausibleUrl(readRuntimeConfig().API_URL);
   if (pinned) return { url: pinned, source: 'server pin' };
 
+  // The origin that served this page, when it is an http(s) one. A backend that
+  // hosts its own client is the backend this client talks to, and that is not
+  // something it should have to be told. The previous fallback here was a
+  // hardcoded localhost:9971, which sent a self-hosted instance with no
+  // backend.json to a port on its own host that usually holds something else -
+  // and, once any request resolved before the configuration had loaded, sent the
+  // official client at api.trycord.dev too.
+  //
+  // backend.json and the server pin both still outrank this, so the hosted
+  // deployment is unaffected: it ships both.
+  if (plausibleUrl(window.location.origin)) {
+    return { url: window.location.origin, source: 'serving origin' };
+  }
+
+  // file:// and other contexts with no usable origin: a local development
+  // server is the only thing that can be meant.
   if (isLocalContext()) return { url: LOCAL_BACKEND_URL, source: 'local default' };
   return { url: DEFAULT_BACKEND_URL, source: 'production default' };
 }

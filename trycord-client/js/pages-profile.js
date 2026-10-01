@@ -82,92 +82,101 @@ export async function renderProfile(container, { id } = {}) {
 
   const isSelf = profile.relation === 'self';
   if (!isSelf && State.me) {
-    const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)' } });
-    // Message is hidden rather than shown-and-failing while blocked: opening a
-    // DM is refused server-side, so the button would exist only to produce a
-    // 403 the reader has to interpret.
-    if (!profile.blockedByViewer) {
+    // Message is absent while blocked and Add friend is never offered then: the
+    // server refuses both with BLOCKED, so a control that can only produce an
+    // error is not a control. The row is rebuilt from `blocked` rather than
+    // toggled one button at a time, because blocking changes what else is
+    // possible - flipping only the label left Message and Add friend sitting
+    // there over a person the server now refuses both from.
+    let blocked = !!profile.blockedByViewer;
+
+    function messageButton() {
       const dm = el('button', { class: 'btn primary', type: 'button' }, 'Message');
       dm.addEventListener('click', async () => {
         try {
           const conv = await Api.openDm(profile.id);
-          toast('Opening conversation.', 'ok');
           if (conv && conv.conversationId) navigate('/dms/' + conv.conversationId);
           else navigate('/dms');
-          return;
         } catch (ex) { toast(ex.message || 'Could not open a DM', 'error'); }
       });
-      actions.appendChild(dm);
+      return dm;
     }
 
-    let friendBtn = null;
-    if (profile.relation === 'friend') {
-      friendBtn = el('button', { class: 'btn', type: 'button' }, 'Remove friend');
-      friendBtn.addEventListener('click', async () => {
-        try { await Api.removeFriend(profile.id); toast('Friend removed.', 'warn'); }
-        catch (ex) { toast(ex.message || 'Failed', 'error'); }
-      });
-    } else if (profile.relation === 'pending-out') {
-      friendBtn = el('button', { class: 'btn', type: 'button', disabled: true }, 'Request pending');
-    } else if (profile.relation === 'pending-in') {
-      friendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Accept request');
-      friendBtn.addEventListener('click', async () => {
-        try {
-          await refreshFriends();
-          const req = (State.friendsIn || []).find((r) => r.from && String(r.from.id) === String(profile.id));
-          if (!req) { toast('That request is already gone.', 'error'); return; }
-          await Api.acceptFriendRequest(req.id);
-          toast('Request accepted.', 'ok');
-        } catch (ex) { toast(ex.message || 'Failed', 'error'); }
-      });
-    } else if (profile.blockedByViewer) {
-      // Offering "Add friend" here would be a control that cannot work: the
-      // server rejects the request with BLOCKED, so the button would only ever
-      // produce an error. Unblock is the actual next step, and it is below.
-      friendBtn = null;
-    } else {
-      friendBtn = el('button', { class: 'btn', type: 'button' }, 'Add friend');
-      friendBtn.addEventListener('click', async () => {
+    function friendButton() {
+      if (profile.relation === 'friend') {
+        const b = el('button', { class: 'btn', type: 'button' }, 'Remove friend');
+        b.addEventListener('click', async () => {
+          try { await Api.removeFriend(profile.id); toast('Friend removed.', 'warn'); }
+          catch (ex) { toast(ex.message || 'Could not remove that friend.', 'error'); }
+        });
+        return b;
+      }
+      if (profile.relation === 'pending-out') {
+        return el('button', { class: 'btn', type: 'button', disabled: true }, 'Request pending');
+      }
+      if (profile.relation === 'pending-in') {
+        const b = el('button', { class: 'btn primary', type: 'button' }, 'Accept request');
+        b.addEventListener('click', async () => {
+          try {
+            await refreshFriends();
+            const req = (State.friendsIn || []).find((r) => r.from && String(r.from.id) === String(profile.id));
+            if (!req) { toast('That request is already gone.', 'error'); return; }
+            await Api.acceptFriendRequest(req.id);
+            toast('Request accepted.', 'ok');
+          } catch (ex) { toast(ex.message || 'Could not accept that request.', 'error'); }
+        });
+        return b;
+      }
+      if (blocked) return null;
+      const b = el('button', { class: 'btn', type: 'button' }, 'Add friend');
+      b.addEventListener('click', async () => {
         try {
           const res = await Api.sendFriendRequest(profile.id);
           toast(res.autoAccepted ? 'Friend added!' : 'Request sent.', 'ok');
         } catch (ex) { toast(ex.message || 'Could not send request', 'error'); }
       });
+      return b;
     }
-    if (friendBtn) actions.appendChild(friendBtn);
 
-    // Block state comes from the profile response rather than being tracked
-    // locally, so the label is right on a deep link into this page and stays
-    // right on a second device without a refetch.
-    const blocked = !!profile.blockedByViewer;
+    const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)' } });
     const blockBtn = el('button', { class: 'btn ghost', type: 'button' }, blocked ? 'Unblock' : 'Block');
     blockBtn.addEventListener('click', async () => {
       blockBtn.disabled = true;
       try {
         if (blocked) {
           await Api.unblockUser(profile.id);
-          await refreshBlocks();
+          blocked = false;
           toast(name + ' can reach you again.', 'ok');
         } else {
           await Api.blockUser(profile.id);
-          await refreshBlocks();
+          blocked = true;
           toast(name + ' can no longer reach you.', 'ok');
         }
-        blocked = !blocked;
-        blockBtn.textContent = blocked ? 'Unblock' : 'Block';
+        await refreshBlocks();
+        paintActions();
       } catch (ex) {
         toast(ex.message || 'Could not change who can reach you.', 'error');
       } finally {
         blockBtn.disabled = false;
       }
     });
-    actions.appendChild(blockBtn);
-    if (blocked) {
-      // A blocked person still has a profile page. Saying so is better than
-      // letting someone tap a button that is already in the state they want.
-      actions.appendChild(el('span', { class: 'muted small' },
-        'They cannot message you or send you a friend request.'));
+
+    function paintActions() {
+      clear(actions);
+      if (!blocked) actions.appendChild(messageButton());
+      const friend = friendButton();
+      if (friend) actions.appendChild(friend);
+      blockBtn.textContent = blocked ? 'Unblock' : 'Block';
+      actions.appendChild(blockBtn);
+      if (blocked) {
+        // A blocked person still has a profile page. Saying why the other
+        // controls are gone is better than leaving someone to discover it by
+        // pressing a button that can only fail.
+        actions.appendChild(el('span', { class: 'muted small' },
+          'They cannot message you or send you a friend request.'));
+      }
     }
+    paintActions();
     card.appendChild(actions);
   }
 

@@ -17,6 +17,32 @@ const enforcement = require('./services/enforcement');
 const pages = require('./services/pages');
 
 const PORT = parseInt(process.env.PORT || '9971', 10);
+
+/**
+ * Reduce a configured API location to the origin the client should talk to.
+ *
+ * Returns '' when the value is not a usable http(s) URL, so a typo does not
+ * become a pinned value the client will believe.
+ */
+function apiOriginOnly(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    if (!/^https?:$/.test(u.protocol)) return '';
+    return u.origin;
+  } catch {
+    return '';
+  }
+}
+
+// Where the web client is mounted, if anywhere. Declared at module scope because
+// both the static handler and the route fallback need it, and the fallback runs
+// before the point where it used to be defined - which put it in the temporal
+// dead zone and failed startup with "Cannot access before initialization".
+// Empty means the client is served from the origin root, which is the ordinary
+// self-hosted case.
+const APP_MOUNT = (process.env.TRYCORD_APP_MOUNT || '').trim().replace(/\/+$/, '');
 // §11 host type is validated strictly: exactly "express" (direct exposure)
 // or "nginx" (reverse-proxy deployment). Anything else is a hard startup
 // error — never silently fall back to a different topology.
@@ -370,7 +396,13 @@ async function boot() {
   // Lets a deployment pin the API origin without editing client files.
   app.get('/runtime-config.js', (req, res) => {
     const cfg = {};
-    const apiUrl = (process.env.TRYCORD_API_URL || process.env.API_URL || '').trim() || inst.publicUrl;
+    const configured = (process.env.TRYCORD_API_URL || process.env.API_URL || '').trim() || inst.publicUrl;
+    // The client treats this as an origin and appends /api/... to every request
+    // itself, so a value carrying the path produces /api/api/users/me - a 404 the
+    // client reads as "not signed in", which signs the reader out and looks like
+    // a session problem rather than a configuration one. Operators reasonably
+    // write the API path here, so it is dropped rather than obeyed.
+    const apiUrl = apiOriginOnly(configured);
     if (apiUrl) cfg.API_URL = apiUrl;
     // Shipped so a browser that has no backend.json still knows where the backup
     // is. The client only ever moves to it after the primary fails to answer,
@@ -460,7 +492,25 @@ async function boot() {
           }
         },
       }));
-      console.log('[info] serving web client from ' + candidate);
+      // The same tree again under the configured mount, so a deployment that
+      // serves the client from this server can address it at /app/... with no
+      // proxy in front rewriting the prefix. redirect:false because the default
+      // turns a request for a directory into a 301 to its slash form, and a
+      // redirect on a deep link is another hop that can lose the mount.
+      if (APP_MOUNT) {
+        app.use(APP_MOUNT, express.static(candidate, {
+          redirect: false,
+          setHeaders(res, filePath) {
+            if (/(^|[\\/])(index\.html|config\.js)$/i.test(filePath)) {
+              res.setHeader('Cache-Control', 'no-store');
+            } else {
+              res.setHeader('Cache-Control', 'no-cache');
+            }
+          },
+        }));
+      }
+      console.log('[info] serving web client from ' + candidate
+        + (APP_MOUNT ? ' (also mounted at ' + APP_MOUNT + ')' : ''));
       break;
     }
   }
@@ -615,7 +665,6 @@ async function boot() {
   // origin root has no mount; one that serves it from /app claims the first
   // segment only when it is not itself an application route. Returns '' when
   // there is no mount, '' meaning "the base is the origin root".
-  const APP_MOUNT = (process.env.TRYCORD_APP_MOUNT || '').trim().replace(/\/+$/, '');
   function appMount(reqPath) {
     if (APP_MOUNT) {
       const seg = reqPath.split('/').filter(Boolean)[0] || '';
@@ -665,21 +714,23 @@ async function boot() {
       // An instance can also serve a marketing site from the same origin. Those
       // clean URLs belong to it, so the app only claims its own prefixes and
       // anything else falls through to the public site's own 404.
-      const seg = req.path.split('/').filter(Boolean)[0] || '';
+      //
+      // The mount is stripped first. Under /app the first segment is "app",
+      // which is not an application route, so a mounted deployment 404ed every
+      // deep link it was meant to serve - TRYCORD_APP_MOUNT existed, was
+      // documented, and did nothing.
+      const mount = appMount(req.path);
+      const rest = mount && req.path.length > mount.length ? req.path.slice(mount.length) : '/';
+      const seg = rest.split('/').filter(Boolean)[0] || '';
       if (!APP_ROUTE_PREFIXES.has(seg)) return next();
       // The base is stamped per request because the mount point is a deployment
       // fact, not a build-time constant: the same file is served from the origin
       // root by a self-hoster and from /app by the hosted deployment. Without it
       // the document's relative asset URLs resolve against the route, so
       // /settings/security asked for /settings/css/app.css and rendered with no
-      // stylesheet and no script.
-      const mount = appMount(req.path);
-      // Always rewritten, including the unmounted case. The file carries the
-      // hosted mount because the Cloudflare deployment serves it statically with
-      // nothing to correct it; a self-hoster at the origin root must therefore
-      // not inherit that value, or every asset URL resolves under /app/ and the
-      // app boots to a blank page. Serving the file untouched when there is no
-      // mount was correct only while the file said "/".
+      // stylesheet and no script. Always rewritten, including the unmounted case
+      // - the file carries the hosted mount for the Cloudflare deployment,
+      // which serves it statically with nothing to correct it.
       fs.readFile(path.join(clientDir, 'index.html'), 'utf8', (err, html) => {
         if (err) { if (!res.headersSent) next(err); return; }
         res.status(200)
