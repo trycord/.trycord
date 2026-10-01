@@ -4,6 +4,7 @@
 // All multi-row flows run inside db.transaction (works on SQLite + MySQL).
 const db = require('../db');
 const { now, uuid } = require('../util');
+const uploads = require('./uploads');
 
 const MAX_CONTENT = 2000;
 
@@ -215,6 +216,8 @@ async function history(userId, conversationId, { before = null, after = null, li
   // Normalise to oldest-first for the client. Only the backward page arrives
   // newest-first.
   if (!forward) rows.reverse();
+  // One query for the whole page, the same way the channel history does it.
+  const files = await uploads.getForDmMessages(rows.map((m) => m.id));
   return rows.map((m) => ({
     id: m.id,
     seq: m.seq === null || m.seq === undefined ? null : Number(m.seq),
@@ -224,14 +227,18 @@ async function history(userId, conversationId, { before = null, after = null, li
     editedAt: m.edited_at || null,
     authorId: m.author_id,
     authorName: m.author_display || m.author_name,
+    attachments: files[m.id] || [],
   }));
 }
 
-async function send(userId, username, conversationId, content, clientNonce = null) {
+async function send(userId, username, conversationId, content, clientNonce = null, attachmentIds = []) {
   const seen = await visibleConversation(conversationId, userId);
   if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
   const text = String((content === null || content === undefined) ? '' : content).trim();
-  if (!text) throw { code: 'VALIDATION_ERROR', message: 'message is empty' };
+  // A file on its own is a message. The channels path has always allowed this;
+  // requiring text here meant a picture could not be sent in a DM at all.
+  const ids = uploads.sanitizeIds(attachmentIds);
+  if (!text && !ids.length) throw { code: 'VALIDATION_ERROR', message: 'message is empty' };
   if (text.length > MAX_CONTENT) {
     throw { code: 'VALIDATION_ERROR', message: `message too long (max ${MAX_CONTENT} characters)` };
   }
@@ -259,6 +266,7 @@ async function send(userId, username, conversationId, content, clientNonce = nul
         editedAt: null,
         authorId: existing.author_id,
         authorName: username,
+        attachments: await uploads.getForDmMessage(existing.id),
         deduped: true,
       };
     }
@@ -296,6 +304,11 @@ async function send(userId, username, conversationId, content, clientNonce = nul
   }
   if (!inserted) throw { code: 'CONFLICT', message: 'could not assign a message position, please retry' };
 
+  // Adopted after the insert, exactly as the channel path does: an id that is
+  // not this uploader's own pending upload in this conversation simply does not
+  // match, so it is ignored rather than attached.
+  const attachments = await uploads.attachToMessage(ids, msg.id, userId, { conversationId });
+
   return {
     id: msg.id,
     seq: msg.seq,
@@ -305,6 +318,7 @@ async function send(userId, username, conversationId, content, clientNonce = nul
     editedAt: null,
     authorId: userId,
     authorName: username,
+    attachments,
   };
 }
 
@@ -347,7 +361,15 @@ async function remove(userId, conversationId, messageId) {
   );
   if (!msg) throw { code: 'NOT_FOUND', message: 'message not found' };
   if (msg.author_id !== userId) throw { code: 'PERMISSION_DENIED', message: 'cannot delete this message' };
+  // The rows go with the message by cascade; the objects on disk do not, so they
+  // are named before the delete. Same order the channel path uses.
+  const files = await uploads.getForDmMessage(msg.id);
   await db.run('DELETE FROM dm_messages WHERE id = ?', [msg.id]);
+  await uploads.removeFiles(files.map((f) => ({
+    id: f.id,
+    channel_id: null,
+    dm_conversation_id: conversationId,
+  })));
   return { id: msg.id, conversationId };
 }
 

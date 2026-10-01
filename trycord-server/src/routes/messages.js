@@ -187,7 +187,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     }
     if (!inserted) return fail(res, 'CONFLICT', 'could not assign a message position, please retry');
     msg.attachments = ids.length
-      ? await uploads.attachToMessage(ids, msg.id, req.user.id, ch.id)
+      ? await uploads.attachToMessage(ids, msg.id, req.user.id, { channelId: ch.id })
       : [];
     await attachEngagement([msg], req.user.id);
     broadcast(ch.server_id, ch.id, { type: 'message', ...msg });

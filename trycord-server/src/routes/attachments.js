@@ -1,6 +1,7 @@
 // Attachment upload + authenticated download.
 //   POST /api/channels/:channelId/attachments  (multipart field "file")
-//   GET  /api/attachments/:id                  (member of the server only)
+//   POST /api/dms/:id/attachments              (multipart field "file")
+//   GET  /api/attachments/:id                  (member of the server or the DM)
 // Uploads require membership + SEND_MESSAGES; downloads the same membership
 // level as reading the message the file is attached to. Files are never
 // served from the public /uploads static mount (there is none).
@@ -13,6 +14,7 @@ const { visibleChannel } = require('../util');
 const { hasChannelPermission } = require('../services/permissions');
 const memberships = require('../services/memberships');
 const uploads = require('../services/uploads');
+const dms = require('../services/dms');
 
 const router = express.Router();
 // Auth is applied per-route, not via router.use(auth): this router is
@@ -70,10 +72,38 @@ router.post(
   }
 );
 
+// The same upload for a direct message. Membership of the conversation is the
+// only gate - there is no channel permission to check - but the DM preference
+// and the block list still apply, because being able to open the conversation is
+// not the same as being allowed to put a file in it.
+router.post(
+  '/dms/:id/attachments',
+  auth,
+  auth.requireVerified,
+  rateLimit({ windowMs: 60000, max: 30 }),
+  singleFile,
+  async (req, res, next) => {
+    try {
+      const found = await dms.visibleConversation(req.params.id, req.user.id);
+      if (!found) return fail(res, 'NOT_FOUND', 'conversation not found');
+      if (!req.file || !req.file.buffer) {
+        return fail(res, 'VALIDATION_ERROR', 'send the file as a multipart field named "file"');
+      }
+      const out = await uploads.store({
+        uploaderId: req.user.id,
+        conversationId: found.conv.id,
+        buffer: req.file.buffer,
+        originalName: req.file.originalname || '',
+      });
+      if (out.error) return fail(res, out.error, out.message);
+      res.status(201).json({ attachment: out });
+    } catch (e) { next(e); }
+  }
+);
+
 // Current usage for the caller. The client needs this to show a meter and to
 // explain a 413 before the user has burned an upload on finding out.
-router.get('/attachments/quota', auth, async (req, res, next) => {
-  try {
+router.get('/attachments/quota', auth, async (req, res, next) => {  try {
     res.json(await uploads.quota(req.user.id));
   } catch (e) { next(e); }
 });

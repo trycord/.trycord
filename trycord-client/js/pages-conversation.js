@@ -5,7 +5,8 @@ import Realtime from './realtime.js';
 
 import { can, canInChannel, isMuted, mustVerifyToPost, refreshMutes, setChannelPermissions, setMuted, setViewRefresh } from './state.js';
 import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDialog, relTime, showContextMenu, attachContextMenu, showEmojiPicker, toast } from './ui.js';
-import { emptyState, icon, messageRow, paintReactions } from './components.js';
+import { downloadAttachment, emptyState, icon, messageRow, paintReactions } from './components.js';
+import { createAttachTray } from './attach-tray.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
 import { TrycordConfig } from './config.js';
@@ -465,18 +466,12 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }
 
   async function downloadAtt(e, att) {
-    // Authenticated download; raw blob so the file actually saves.
     e.preventDefault();
     try {
-      const res = await Api.fetchAttachment(att.id);
-      const blob = new Blob([res.buffer]);
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = att.filename;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      await downloadAttachment(att);
     } catch (ex) { toast(ex.message || 'Cannot download', 'error'); }
   }
+
 
   const composer = el('div', { class: 'composer' });
   const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, icon('paperclip'));
@@ -485,7 +480,10 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
   const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('smile'));
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
-  const tray = el('div', { class: 'attach-tray', hidden: true });
+  const attachments = createAttachTray({
+    upload: (file, onProgress) => Api.uploadAttachmentWithProgress(channelId, file, onProgress),
+    onChange: () => { sendBtn.disabled = !attachments.hasReady() && !ta.value.trim(); },
+  });
   composer.appendChild(fileBtn);
   composer.appendChild(fileInput);
   composer.appendChild(ta);
@@ -493,7 +491,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   // The tray is a sibling of the composer rather than a flex child of it: as a
   // child it competed with the textarea for the line and collapsed to nothing on
   // a phone.
-  conv.appendChild(el('div', { class: 'composer-dock' }, tray, composer));
+  conv.appendChild(el('div', { class: 'composer-dock' }, attachments.node, composer));
   {
     const me = State.me;
     const locked = !canInChannel('SEND_MESSAGES') ? 'You do not have permission to send messages here.'
@@ -508,138 +506,13 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     }
   }
 
-  // One entry per file the reader has added, in the order they added them. Kept
-  // as rows rather than a bare id list so an upload that is still running, or
-  // that failed, is visible and can be dealt with.
-  const MAX_BYTES = 8 * 1024 * 1024;
-  let pending = [];
-
-  function fmtSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  }
-
-  function paintTray() {
-    clear(tray);
-    tray.hidden = pending.length === 0;
-    sendBtn.disabled = !pending.some((p) => p.id) && !ta.value.trim();
-    for (const entry of pending) {
-      const pct = Math.round((entry.progress || 0) * 100);
-      const label = entry.state === 'ready' ? 'Ready'
-        : entry.state === 'error' ? (entry.error || 'Upload failed')
-          : 'Uploading ' + pct + '%';
-      const row = el('div', { class: 'attach-row' + (entry.state === 'error' ? ' attach-row--error' : '') }, [
-        el('span', { class: 'attach-name', title: entry.name }, entry.name),
-        el('span', { class: 'attach-size' }, fmtSize(entry.size)),
-        el('span', { class: 'attach-state' }, label),
-      ]);
-      if (entry.state === 'error') {
-        row.appendChild(el('button', {
-          class: 'btn ghost small', type: 'button',
-          onClick: () => startUpload(entry),
-        }, 'Retry'));
-      }
-      row.appendChild(el('button', {
-        class: 'attach-remove', type: 'button',
-        title: entry.state === 'uploading' ? 'Cancel upload' : 'Remove',
-        'aria-label': 'Remove ' + entry.name,
-        onClick: () => {
-          if (entry.xhr) entry.xhr.abort();
-          pending = pending.filter((p) => p !== entry);
-          paintTray();
-        },
-      }, '×'));
-      // Last, because it spans the full width: anything appended after it would
-      // be pushed onto a third row.
-      row.appendChild(el('div', { class: 'attach-bar' },
-        el('div', { class: 'attach-bar__fill', style: 'width:' + (entry.state === 'ready' ? 100 : pct) + '%' })));
-      tray.appendChild(row);
-    }
-  }
-
-  function startUpload(entry) {
-    entry.state = 'uploading';
-    entry.error = null;
-    entry.progress = 0;
-    const up = Api.uploadAttachmentWithProgress(channelId, entry.file, (frac) => {
-      entry.progress = frac;
-      paintTray();
-    });
-    entry.xhr = up;
-    up.promise.then((res) => {
-      entry.id = res && res.attachment && res.attachment.id;
-      entry.state = entry.id ? 'ready' : 'error';
-      if (!entry.id) entry.error = 'Upload failed';
-      entry.xhr = null;
-      paintTray();
-    }).catch((ex) => {
-      // An abort is the reader changing their mind, not a failure, and the row
-      // has usually already been removed by then.
-      if (ex && ex.name === 'AbortError') return;
-      entry.state = 'error';
-      entry.error = ex.message || 'Upload failed';
-      entry.xhr = null;
-      paintTray();
-    });
-  }
-
-  function addFiles(files) {
-    for (const f of files) {
-      if (f.size > MAX_BYTES) { toast('File too large: ' + f.name, 'error'); continue; }
-      pending.push({ file: f, name: f.name, size: f.size, state: 'uploading', progress: 0, id: null });
-    }
-    if (!pending.length) return;
-    paintTray();
-    for (const entry of pending) if (entry.state === 'uploading' && !entry.xhr) startUpload(entry);
-  }
-
-  fileBtn.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', () => {
-    addFiles(Array.from(fileInput.files || []));
-    fileInput.value = '';
-  });
-
-  // Dropping onto the composer, and pasting a screenshot. Both are how people
-  // actually attach a picture, and neither needs the file button.
-  let dragDepth = 0;
-  const setDropping = (on) => composer.classList.toggle('is-dropping', on);
-  conv.addEventListener('dragenter', (e) => {
-    if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
-    dragDepth++;
-    setDropping(true);
-  });
-  conv.addEventListener('dragover', (e) => {
-    if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-  });
-  conv.addEventListener('dragleave', () => {
-    dragDepth = Math.max(0, dragDepth - 1);
-    if (!dragDepth) setDropping(false);
-  });
-  conv.addEventListener('drop', (e) => {
-    if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
-    e.preventDefault();
-    dragDepth = 0;
-    setDropping(false);
-    addFiles(Array.from(e.dataTransfer.files));
-  });
-  ta.addEventListener('paste', (e) => {
-    const items = e.clipboardData && e.clipboardData.files;
-    if (!items || !items.length) return;
-    const files = Array.from(items);
-    if (!files.some((f) => f.type && f.type.startsWith('image/'))) return;
-    e.preventDefault();
-    addFiles(files);
-  });
-  paintTray();
+  attachments.attach({ container: conv, composer, textarea: ta, button: fileBtn, input: fileInput });
 
   function resize() {
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
   }
-  ta.addEventListener('input', () => { resize(); paintTray(); });
+  ta.addEventListener('input', () => { resize(); sendBtn.disabled = !attachments.hasReady() && !ta.value.trim(); });
 
   // A double submit must not produce two real messages. Mirrors the DM sendLock.
   let sending = false;
@@ -649,10 +522,9 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     const content = ta.value.trim();
     // Only files that finished uploading can go on the message. Sending while
     // one is still in flight would attach nothing for it and silently drop it.
-    const ready = pending.filter((p) => p.id);
-    const busy = pending.some((p) => p.state === 'uploading');
-    if (!content && !ready.length) {
-      if (busy) { toast('Still uploading', 'warn'); return; }
+    const readyIds = attachments.readyIds();
+    if (!content && !readyIds.length) {
+      if (attachments.isUploading()) { toast('Still uploading', 'warn'); return; }
       return;
     }
     sending = true;
@@ -662,15 +534,13 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     // nonce is what stops a retry from posting it twice.
     const clientNonce = pendingNonce || newNonce();
     pendingNonce = clientNonce;
-    const attachmentIds = ready.length ? ready.map((p) => p.id) : undefined;
+    const attachmentIds = readyIds.length ? readyIds : undefined;
     try {
       const saved = await Api.sendMessage(channelId, { content, attachmentIds, clientNonce });
       pendingNonce = null;
       ta.value = '';
-      for (const p of pending) if (p.xhr) p.xhr.abort();
-      pending = [];
+      attachments.clear();
       resize();
-      paintTray();
       if (saved && saved.id) {
         upsertMessage(saved, { scroll: true });
       } else {
