@@ -470,6 +470,32 @@ export function loadWellbeing() {
     .catch(() => { /* the OS preference still applies */ });
 }
 
+/**
+ * Re-render a section when the server says its state changed elsewhere.
+ *
+ * The cache is not the same as the screen. An account-scoped websocket event
+ * refreshes State so the next read is right, but a section already on screen was
+ * painted from the value it fetched when it opened, and nothing repaints it - so
+ * a reader who blocked someone on their phone kept seeing an empty list and a
+ * "People blocked: 0" that was true when they loaded and false now.
+ *
+ * Only the section named by the event is repainted, and only while it is still
+ * in the document. Anything else would throw away what the reader is looking at
+ * in order to update something they are not.
+ *
+ * Returns its own teardown; the caller registers that with setCleanup so a
+ * navigation does not leave a listener behind repainting a detached tree.
+ */
+export function watchForRemoteChanges(kind, host, repaint) {
+  const onChange = (e) => {
+    if (!e || e.detail !== kind) return;
+    if (!host.isConnected) return;
+    repaint();
+  };
+  document.addEventListener('trycord:state', onChange);
+  return () => document.removeEventListener('trycord:state', onChange);
+}
+
 export default {
   renderPrivacySection,
   renderNotificationPrefsSection,

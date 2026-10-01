@@ -82,10 +82,23 @@ async function connect() {
       // Repainted on the Privacy page itself if it is open; the state store is
       // not kept because each section reads from the API rather than from here.
       renderAllChrome();
+      document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'privacy' }));
     }
-    if (msg.type === 'wellbeing') applyWellbeingToDocument(msg.wellbeing);
-    if (msg.type === 'blocks') refreshBlocks().catch(() => {});
-    if (msg.type === 'friend') refreshFriends().catch(() => {});
+    if (msg.type === 'wellbeing') {
+      applyWellbeingToDocument(msg.wellbeing);
+      document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'wellbeing' }));
+    }
+    if (msg.type === 'notification-prefs') {
+      document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'notifications' }));
+    }
+    if (msg.type === 'blocks') {
+      refreshBlocks().catch(() => {});
+      document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'blocks' }));
+    }
+    if (msg.type === 'friend') {
+      refreshFriends().catch(() => {});
+      document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'friends' }));
+    }
     if (msg.type === 'twofactor') renderAllChrome();
     if (msg.type === 'session-revoked') {
       // The server has already invalidated these tokens. Anything still open

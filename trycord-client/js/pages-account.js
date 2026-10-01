@@ -11,12 +11,14 @@ import { TrycordConfig } from './config.js';
 import { statusChip } from './pages-admin.js';
 import Realtime from './realtime.js';
 import { settingsFrame, blurbFor, findItem } from './settings-shell.js';
+import { setCleanup } from './resolve.js';
 import { loadingState, errorState } from './states.js';
 import {
   privacyContext, securityContext, notificationsContext,
   appearanceContext, backendContext, guideContext, profileContext,
 } from './context-column.js';
 import {
+  watchForRemoteChanges,
   renderPrivacySection, renderNotificationPrefsSection,
 } from './privacy-ui.js';
 import { sectionHead, sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from './settings-ui.js';
@@ -1166,11 +1168,21 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     // people who already have.
     await renderPrivacySection(body);
     renderPrivacySocial(body);
+    // A block or unblock made on another device has to repaint this list.
+    // Refreshing the cache alone left the section showing an empty list and a
+    // "People blocked: 0" that was no longer true, which is worse than not
+    // syncing at all because it looks like an answer rather than a lag.
+    registerRemote('blocks', body, () => {
+      renderPrivacySection(body);
+      renderPrivacySocial(body);
+    });
   } else if (tab === 'notifications') {
     // Per-category preferences and wellbeing first, then the muted channels that
     // were the only notification control this page had.
     await renderNotificationPrefsSection(body);
     renderNotificationsSettings(body);
+    registerRemote('notifications', body, () => { renderNotificationPrefsSection(body); });
+    registerRemote('wellbeing', body, () => { renderNotificationPrefsSection(body); });
   } else {
     renderProfileEditor(body);
     renderExportSection(body);
@@ -1179,6 +1191,27 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   }
 
   await fillContext(frame, context, tab);
+  setCleanup(releaseRemote);
+}
+
+// Listeners registered for the life of the current route.
+//
+// Collected rather than chained so that several sections can each subscribe and
+// one teardown removes them all. They are handed to setCleanup when the render
+// finishes, because setCleanup() replaces whatever was registered before it:
+// subscribing directly would leak the previous route's listeners, each of which
+// repaints a tree that is no longer in the document.
+const remoteWatchers = [];
+
+function registerRemote(kind, host, repaint) {
+  remoteWatchers.push(watchForRemoteChanges(kind, host, repaint));
+}
+
+function releaseRemote() {
+  while (remoteWatchers.length) {
+    const off = remoteWatchers.pop();
+    try { off(); } catch { /* ignore */ }
+  }
 }
 
 // The contextual column, per section. Filled after the pane so it can read the
