@@ -1,13 +1,12 @@
 // Routing.
 //
-// A pathname is resolved to a row in the route table (routes.js) and the row's
-// work runs. Everything this file owns is what a table cannot: parsing the
-// location, telling the shell what to paint before the view exists, deciding who
-// is allowed where, and the one failure surface for a view that throws.
+// A pathname resolves to a row in routes.js and the row's work runs. What's left
+// here is what a table can't do: parse the location, tell the shell what to
+// paint before the view exists, decide who goes where, and own the single
+// failure surface.
 //
-// The dispatch itself used to be a ~60-branch if-chain here. It is data now, so
-// the shape of the application can be read in one place and adding a route does
-// not mean finding the right spot in a wall of startsWith calls.
+// Dispatch used to be a ~60-branch if-chain in this file. It's data now, so the
+// shape of the app can be read in one place.
 
 import { isAuthed, refreshServers, clearViewRefresh } from './state.js';
 import { closeDesktopNav } from './presentation.js';
@@ -24,14 +23,11 @@ function viewRegion() {
   return document.getElementById('view-root');
 }
 
-// The route table's rows register teardown through resolve.js, but the realtime
-// repaint subscription belongs to the router, so it is handed over rather than
-// imported by the module that would otherwise have to import the table back.
+// Rows register teardown through resolve.js. This one belongs to the router, so
+// it's handed over rather than imported back into the table.
 setViewRefreshCleaner(clearViewRefresh);
 
-// A path is a path, optionally with a query. The mount is stripped so that
-// '/app/settings' and '/settings' are one route rather than two, and a fragment
-// is upgraded to the path form before this runs.
+// The mount is stripped so '/app/settings' and '/settings' are one route.
 function parseLocation() {
   let pathname = location.pathname || '/';
   if (BASE && pathname.startsWith(BASE)) pathname = pathname.slice(BASE.length) || '/';
@@ -56,15 +52,13 @@ async function renderRoute() {
   const region = viewRegion();
   if (!region) return;
 
-  // The shell is told what shape this surface is before anything paints. Doing
-  // it here rather than in each page means a route cannot forget, and the chrome
-  // that renders later already knows whether it has a sidebar to fill.
+// Before anything paints, so a route can't forget and the chrome knows whether
+// it has a sidebar to fill.
   setLayout(layoutForPath(path));
 
-  // Published as the raw path first, then again from inside a community row once
-  // a slug has been resolved to an id. The chrome compares against this, and it
-  // matches the normalised /server/:id/... shape, so publishing only the raw
-  // /c/:slug path would leave nothing highlighted.
+// Raw first, then again from inside a community row once a slug resolves to an
+// id. Chrome matches the normalised /server/:id/... shape, so publishing only
+// /c/:slug would highlight nothing.
   setNavRoute(() => path);
   runCleanup();
   closeDesktopNav();
@@ -79,25 +73,21 @@ async function renderRoute() {
     return;
   }
 
-  // The server list is what the rail, the sidebar and the community switcher all
-  // read, so a session route cannot paint before it is in hand. A failure is not
-  // fatal: surfaces that do not need it still render, and the ones that do show
-  // their own empty state.
+// The rail, sidebar and switcher all read this. Failure isn't fatal - surfaces
+// that need it show their own empty state.
   if (row.auth === 'session') {
     try { await refreshServers().catch(() => {}); } catch { /* offline */ }
   }
 
-  // A throw is not handled here. run() owns the failure surface, so there is one
-  // error screen rather than one per call site: a page that swallowed its own
-  // failure would leave the reader looking at a half-rendered view with no
-  // explanation and no Retry.
+// Not handled here: run() owns the failure surface, so there's one error screen
+// rather than one per call site.
   lastRoute = path;
   await row.run({ region, path, parts, query, publishRoute: (p) => setNavRoute(() => p) });
 }
 
-// Where a thrown value came from, when it carries a stack. Absent for anything
-// the server sent as a JSON error envelope, which is correct: those have no JS
-// origin and showing a bogus one would send a reader looking in the wrong file.
+// Where a throw came from, if it has a stack. Null for a server JSON error
+// envelope - those have no JS origin, and a bogus one sends a reader to the
+// wrong file.
 function faultOrigin(ex) {
   if (!ex || typeof ex.stack !== 'string' || !ex.stack.trim()) return null;
   const frame = ex.stack.split('\n').slice(1).map((l) => l.trim())
@@ -134,10 +124,9 @@ async function run() {
 
 const Router = {
   init() {
-    // A fragment URL that arrives from a bookmark or the desktop build's
-    // restored window state is rewritten onto its path form before the first
-    // render, so the address bar ends up canonical. Nothing in the client
-    // produces one any more; this only upgrades what already exists.
+// A fragment URL from a bookmark or the desktop build's restored window state
+// is rewritten onto its path form before the first render. Nothing in the client
+// produces one any more.
     const adopted = adoptLegacyHash();
     interceptLinks();
     window.addEventListener('popstate', () => run());

@@ -1,21 +1,14 @@
 // Community context navigation.
 //
-// This replaces the community sidebar: the banner header, the "Text channels"
-// label above a flat list, the empty area, and the account panel pinned to the
-// bottom. What it keeps is everything the old one did - switch community, reach
-// every channel, and act on a channel or the community within the permissions
-// the viewer actually has.
+// Replaces the community sidebar: the banner header, the "Text channels" label
+// above a flat list, the empty area, and the account panel pinned to the bottom.
+// What it keeps is everything the old one did - switch community, reach every
+// channel, act within the viewer's actual permissions.
 //
-// The shape is a single switchable header and one scroller, because those are
-// the two things a reader needs before they start reading. The banner is gone:
-// it was a large, mostly empty image that pushed the channels it was supposed to
-// be labelling below the fold, and the community is already identified by the
-// rail chip and by the channel header. A compact control row carries the
-// identity instead, and it is the same control whether or not a banner exists.
-//
-// The account panel moved out rather than being deleted. The rail is global
-// navigation and already spans every surface, so "who am I" and "my settings"
-// belong there rather than in a panel that only existed inside a community.
+// One switchable header and one scroller, because those are the two things a
+// reader needs before they start reading. The banner is gone: a large mostly
+// empty image that pushed the channels it was labelling below the fold, and the
+// community is already identified by the rail chip and the channel header.
 import { el, icon, attachContextMenu, attachMenu, copyText, confirmDialog, toast } from './ui.js';
 import { communityMark } from './components.js';
 import Api from './api.js';

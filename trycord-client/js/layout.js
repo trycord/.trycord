@@ -1,49 +1,39 @@
 // Surface layouts.
 //
-// The shell used to declare three tracks and every route was fitted into them:
-// a contextual sidebar on the left, content on the right, and a members panel
-// inside. That suited a channel and nothing else, so every other surface either
-// wasted a column or fought it. Settings was the worst case: it rendered its
-// own navigation inside the content pane while the shell reserved a second
-// sidebar beside it, so the same list appeared twice, five columns wide, with
-// the part that mattered in the middle.
+// Every route used to be fitted into the shell's three tracks, which suited a
+// channel and nothing else. Settings was the worst: it drew its own nav inside
+// the content pane while the shell reserved a sidebar beside it, so the same list
+// appeared twice with the useful part in the middle.
 //
-// A surface now declares the shape it needs and the shell reads that. This file
-// is the declaration; the CSS consumes it. Nothing else decides geometry.
+// A surface declares the shape it needs; the CSS decides the measurements.
 //
-// The track list is always three tracks, even where the middle one is zero, and
-// that is deliberate: the sidebar collapse animates by interpolating the track
-// lengths, which a shorter track list cannot do. So a surface without a sidebar
-// contributes a zero-width track rather than removing one, and the sidebar
-// region is not rendered into it at all.
+// Always three tracks, even where the middle one is zero - the sidebar collapse
+// animates by interpolating track lengths, which a shorter list can't do. So a
+// surface with no sidebar contributes a zero-width track instead of removing
+// one, and nothing is rendered into it.
 import { qs } from './ui.js';
 
-// Surfaces a route can mount. `sidebar` means the contextual navigation region
-// is used; `members` means the member panel is meaningful. Both are facts about
-// the surface, not about the viewport.
+// `sidebar` means the contextual nav region is used; `members` means the member
+// panel means something. Facts about the surface, not the viewport.
 //
-// The track values are NOT here. This module sets one attribute and the
-// stylesheet owns every measurement, because the breakpoints have to be able to
-// override a surface's tracks on a narrow viewport. An inline custom property
-// outranks any media query, so writing the tracks from script meant the
-// one-column phone layout could never apply and the content was laid out in
-// 64px next to a rail that overflowed the screen.
+// Track values are deliberately absent: this module sets one attribute and the
+// stylesheet owns every measurement. An inline custom property outranks any media
+// query, so writing tracks from script meant the phone layout could never apply
+// and content was laid out in 64px next to a rail that overflowed.
 export const LAYOUTS = {
-  // A community: contextual navigation plus the member panel.
+  // Community: contextual nav plus members.
   channel: { sidebar: true, members: true },
 
-  // Conversations and lists. A sidebar holds the conversations, so it stays, but
-  // there is no member panel to talk about.
+  // Sidebar holds the conversations; no member panel to talk about.
   list: { sidebar: true, members: false },
 
-  // Settings, Admin and a profile each carry their own navigation inside the
-  // content surface, because that navigation belongs to the surface and not to
-  // the shell. Reserving a shell sidebar for them duplicated it.
+  // These carry their own nav inside the content surface. A shell sidebar
+  // duplicated it.
   settings: { sidebar: false, members: false },
   admin: { sidebar: false, members: false },
   profile: { sidebar: false, members: false },
 
-  // One column by nature. Keeps the rail, spends nothing else.
+  // One column by nature.
   plain: { sidebar: false, members: false },
 };
 
@@ -59,12 +49,8 @@ export function currentLayout() {
   return current || DEFAULT_LAYOUT;
 }
 
-/**
- * Declare the layout for the route now on screen.
- *
- * Idempotent, because this runs on every render: writing the same value again
- * would restart the sidebar's width transition on every repaint.
- */
+// Idempotent because this runs on every render - rewriting the same value
+// restarts the sidebar's width transition on every repaint.
 export function setLayout(name) {
   const next = LAYOUTS[name] ? name : DEFAULT_LAYOUT;
   if (next === current) return next;
@@ -73,8 +59,8 @@ export function setLayout(name) {
   if (!shell) return next;
   const spec = LAYOUTS[next];
   shell.dataset.layout = next;
-  // The member panel is hidden as a sibling of this attribute rather than by
-  // measurement, so a surface without one cannot leave a panel reserving width.
+  // Hidden off this attribute rather than by measurement, so a surface without
+  // members can't leave a panel reserving width.
   shell.dataset.members = spec.members ? 'yes' : 'no';
   return next;
 }
@@ -87,11 +73,8 @@ export function layoutUsesMembers(name) {
   return layoutFor(name || currentLayout()).members;
 }
 
-// Which surface a path belongs to. Data, so a new route is one line here rather
-// than a branch inside the renderer that draws it.
-//
-// Order matters: the community and account prefixes are more specific than the
-// fallbacks below them.
+// Data rather than branches inside the renderer. Order matters - the prefixes
+// above are more specific than the fallbacks below them.
 const BY_PREFIX = [
   ['/settings/', 'settings'],
   ['/settings', 'settings'],
@@ -114,9 +97,9 @@ export function layoutForPath(path) {
     if (p === prefix || p.startsWith(prefix)) return layout;
   }
 
-  // A community is a channel surface everywhere inside it, including its own
-  // settings, roles and members pages: those are that community's structure, and
-  // they sit beside the channels they describe rather than replacing them.
+  // A community is a channel surface all the way in, including its own settings
+  // and roles pages - that's the community's structure, sitting beside the
+  // channels it describes.
   if (/^\/(?:c|server)\//.test(p)) return 'channel';
 
   if (p === '/dms' || p.startsWith('/dms/')) return 'list';

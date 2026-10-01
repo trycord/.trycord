@@ -1,7 +1,6 @@
-// Database facade: validated configuration, one active adapter,
-// shared query API, transactions. Replaces the old hardcoded SQLite handle.
+// Validated config, one active adapter, shared query API, transactions.
 //
-//   const db = require('./db');   // or '../db' — no side effects on require
+//   const db = require('./db');   // or '../db' - no side effects on require
 //   await db.connect();           // reads + validates env, verifies connectivity
 //   await db.get('SELECT * FROM users WHERE id = ?', [id]);
 //   await db.transaction(async (t) => { ... t.run(...) ... });
@@ -47,24 +46,24 @@ module.exports = {
   /**
    * Insert a row, or update it if the key already exists.
    *
-   * @param {string} table
+   * @param {string}   table
    * @param {string[]} columns
    * @param {Array}    values
    * @param {string[]} keyColumns  columns whose combination identifies the row
    * @param {Object<string,string>} setColumns  column -> SQL expression for the
    *        update branch, written by the caller because MySQL and SQLite spell
-   *        the same expression differently.
+   *        the same expression differently
    *
-   * This exists because `ON CONFLICT ... DO UPDATE` is SQLite-only and
-   * `ON DUPLICATE KEY UPDATE` is MySQL-only, and writing the wrong one is a
-   * syntax error at run time rather than at load time. Six statements did that:
-   * session recording, all four privacy/preference upserts, and token marking.
-   * On MariaDB every one of them failed, so the preferences they write were
-   * never stored and the caller was told they had been.
+   * `ON CONFLICT DO UPDATE` is SQLite-only, `ON DUPLICATE KEY UPDATE` is
+   * MySQL-only, and writing the wrong one is a run-time syntax error rather than
+   * a load-time one. Six statements did that - session recording, the four
+   * privacy/preference upserts, token marking - and on MariaDB every one failed,
+   * so the preferences they write were never stored while the caller was told
+   * they had been.
    *
-   * The alternative - sending SQLite syntax and retrying on error - cannot work:
-   * MySQL quotes the rejected statement back inside the error message, so a parse
-   * error trivially reads like a duplicate-key conflict.
+   * The tempting alternative, sending SQLite syntax and retrying on error, can't
+   * work: MySQL quotes the rejected statement back inside the error message, so a
+   * parse error reads exactly like a duplicate-key conflict.
    */
   async upsert(table, columns, values, keyColumns, setColumns) {
     const placeholders = columns.map(() => '?').join(', ');

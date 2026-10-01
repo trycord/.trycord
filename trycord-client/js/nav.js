@@ -1,35 +1,25 @@
 // Navigation.
 //
-// Routes live in the path. They used to live in the fragment, and 46 call sites
-// still wrote '#/settings' when this was last touched. The fragment form is gone
-// for two reasons. The fragment is never sent to the server, so a bookmarked
-// fragment URL is not a route until JavaScript has booted - which meant a shared
-// link and a refresh were two different behaviours. And having two ways to name
-// one route is two ways for them to disagree.
+// Routes live in the path. They used to live in the fragment, which is never
+// sent to the server - so a shared fragment link and a refresh were two
+// different behaviours, and two ways to name one route is two ways for them to
+// disagree.
 //
-// So navigation is one function, and a route is one string. adoptLegacyHash()
-// still upgrades a fragment URL that arrives from a bookmark, which is the only
-// remaining place the old form is understood; nothing in this codebase produces
-// one.
+// adoptLegacyHash() is the only thing left that understands the old form. It
+// upgrades bookmarks; nothing here produces one.
 
-// The client's own routes, which must not be mistaken for navigation.
+// Not ours - don't treat these as routes.
 const EXTERNAL = /^(https?:|mailto:|tel:|#$|blob:|data:)/i;
 
-// Where the app is mounted, derived from this module's own URL rather than
-// hard-coded. trycord-client/js/nav.js is served at /js/nav.js on a
-// self-hosted instance and at /app/js/nav.js on the hosted deployment, and the
-// difference matters: a route written as '/settings' is absolute, so from under
-// /app/ it leaves the app entirely and lands on whatever else the origin
-// serves. Deriving the mount point is what makes one set of route literals
-// correct on both.
+// This module is served at /js/nav.js on a self-hosted instance and
+// /app/js/nav.js on the hosted one. Routes are absolute, so without knowing the
+// mount '/settings' would leave the app entirely from under /app/.
 function mountPoint() {
   let pathname;
   try {
     const u = new URL('.', import.meta.url);
-    // A file:// module is not a web deployment. Deriving a mount point from it
-    // would produce a filesystem path as a URL prefix, which is worse than not
-    // having one, so a desktop build served straight off disk falls back to the
-    // origin root.
+    // file:// would give a filesystem path as a URL prefix. Desktop builds
+    // served off disk get no mount.
     if (u.protocol === 'file:' || u.protocol === 'data:') return '';
     pathname = u.pathname;
   } catch {
@@ -42,16 +32,12 @@ function mountPoint() {
 
 export const BASE = mountPoint();
 
-/**
- * '/settings' -> '/app/settings' where that is where the app lives.
- *
- * Idempotent. The link builders already return a mounted path - serverPath()
- * and channelPath() both go through here - and those results are then passed to
- * navigate(), which routes again. A second application of the mount is what
- * turned /c/slug into /app/app/c/slug on a subpath deployment and sent the
- * reader to a route that does not exist. A route never legitimately begins with
- * the mount, so returning an already-mounted path unchanged is safe.
- */
+// '/settings' -> '/app/settings'.
+//
+// Idempotent on purpose: serverPath() and channelPath() already return a
+// mounted path and those results get passed to navigate(), which routes again.
+// Not being idempotent is what turned /c/slug into /app/app/c/slug on a subpath
+// deployment.
 export function route(path) {
   if (!path) return BASE || '/';
   if (EXTERNAL.test(path) || /^\/\//.test(path)) return path;
@@ -60,23 +46,18 @@ export function route(path) {
   return BASE + path;
 }
 
-/** The route without the mount: '/app/settings' -> '/settings'. */
+/** '/app/settings' -> '/settings'. */
 export function unroute(path) {
   if (!BASE || !path) return path;
   if (path === BASE) return '/';
   return path.startsWith(BASE + '/') ? path.slice(BASE.length) : path;
 }
 
-/**
- * A navigation target as a route path, or null if it is not one of ours.
- *
- * A leading '#' is no longer stripped. Routes are paths: the fragment form
- * existed because the app used to live in it, and every call site has been
- * converted. Accepting it silently would mean a typo like '#/dms' still worked,
- * which is the opposite of what removing the hash was for - and it would keep the
- * second addressing scheme alive in a codebase that is supposed to have one.
- * An old fragment URL is still handled once, by adoptLegacyHash.
- */
+// A navigation target as a path, or null if it isn't one of ours.
+//
+// Deliberately doesn't strip a leading '#'. Accepting it would mean a typo like
+// '#/dms' still worked, which keeps two addressing schemes alive in a codebase
+// that has one. Old fragment URLs are handled once, by adoptLegacyHash.
 export function routePath(target) {
   if (target == null) return null;
   const raw = String(target).trim();
@@ -95,8 +76,8 @@ export function routePath(target) {
 export function navigate(target, opts = {}) {
   const path = routePath(target);
   if (path === null) {
-    // Not ours. A full URL to another origin has to be a real navigation or the
-    // SPA stays mounted on the old origin, which reads as the link not working.
+    // Another origin has to be a real navigation or the SPA stays mounted on the
+    // old origin, which reads as the link not working.
     if (/^(https?:)?\/\//i.test(String(target).trim())) {
       window.location.assign(String(target).trim());
       return;
@@ -106,18 +87,17 @@ export function navigate(target, opts = {}) {
     return;
   }
   if (opts.external) {
-    // route() is a no-op on a full URL and adds the mount to a path, so this
-    // cannot hand a relative route to another origin.
+    // route() can't hand a relative route to another origin: it no-ops on a full
+    // URL and otherwise adds the mount.
     window.location.assign(route(path));
     return;
   }
   const current = location.pathname + location.search;
-  // A route, not a URL: the mount is added once, here, and route() is
-  // idempotent so a caller that passed an already-mounted path is unaffected.
+  // route() is idempotent, so a caller that passed an already-mounted path is
+  // unaffected.
   const next = route(path.startsWith('/') ? path : '/' + path);
   if (next === current && !opts.force) {
-    // Already there. Pushing a duplicate entry would make Back do nothing
-    // visible, which is worse than not pushing at all.
+    // Pushing a duplicate entry makes Back do nothing visible.
     return;
   }
   if (opts.replace) history.replaceState(null, '', next);
@@ -137,47 +117,31 @@ export function withQuery(path, query) {
   return path + '?' + new URLSearchParams(entries).toString();
 }
 
-/**
- * Move an old fragment URL onto the path form, once, and drop the fragment.
- *
- * Links to the fragment form already exist in bookmarks, in the desktop build's
- * stored window state, and in messages people have sent each other. Rather than
- * break those, they are upgraded on arrival: the route is identical, and the
- * address bar ends up canonical.
- */
+// Upgrade a fragment URL on arrival. These exist in bookmarks, in the desktop
+// build's saved window state, and in messages people have sent each other.
 export function adoptLegacyHash() {
   const hash = location.hash;
   if (!hash || hash.length < 2) return false;
-  // Stripped here rather than in routePath(), which no longer knows about the
-  // fragment form. This is the only code left that does, and it exists only for
-  // URLs that were already in the wild before the move to paths.
+  // Stripped here, not in routePath() - this is the only code left that knows
+  // the fragment form.
   const path = routePath(hash.slice(1) || '/');
   if (path === null) return false;
-  // Through route(), like every other navigation. Writing the route path
-  // straight into history put '/app/#/settings' at '/settings' on a subpath
-  // deployment: the fragment form is the only way an old URL can arrive under a
-  // mount, and it is the one place that dropped the mount, so the app handed its
-  // own route to the public site.
+  // Through route() like every other navigation. Writing the path straight into
+  // history dropped the mount, which only shows up on a subpath deployment -
+  // the fragment form is the one way an old URL arrives already under a mount.
   history.replaceState(null, '', route(path.startsWith('/') ? path : '/' + path) + location.search);
   return true;
 }
 
-/**
- * Route the app's own links instead of reloading the document.
- *
- * Anchors are the right element for these links - they are middle-clickable,
- * they put a real destination in the status bar, and they still work if this
- * script never runs. But without something listening, a left click asks the
- * server for the page, throws away the running application and boots it again.
- * That is the fragment-era behaviour path routing was supposed to end, and it
- * made every Settings click a cold start.
- *
- * Only the plain left click on a same-origin link inside the app is taken over.
- * Modified clicks keep the browser's own behaviour so open-in-new-tab and
- * open-in-new-window keep working, and an anchor marked `data-document` is left
- * alone: the legal pages and the public site are documents on this origin, not
- * routes, and serving them through the router would show the app instead.
- */
+// Intercept plain left clicks on same-origin app links so navigation doesn't
+// throw away the running application and boot it again.
+//
+// Anchors stay the right element: middle-clickable, real destination in the
+// status bar, and they work if this script never runs.
+//
+// Modified clicks are left to the browser. So is `data-document` - the legal
+// pages and public site are documents on this origin, not routes, and routing
+// them would show the app instead of the page.
 export function interceptLinks(doc = document) {
   doc.addEventListener('click', (e) => {
     if (e.defaultPrevented || e.button !== 0) return;
@@ -193,14 +157,14 @@ export function interceptLinks(doc = document) {
     // Treating it as an in-page fragment is what left these links looking right
     // and doing nothing. Only the route shape qualifies, and the '#' is stripped
     // here rather than by routePath(), which no longer understands the fragment
-    // form - passing it straight through would navigate to '/#/route'.
+    // form. Passing it through would navigate to '/#/route'.
     if (raw === '#/' || raw.startsWith('#/')) {
       e.preventDefault();
       navigate(routePath(raw.slice(1) || '/'));
       return;
     }
-    // Every other '#...' is a same-page jump - the skip link above all - and the
-    // browser already does the right thing with it.
+    // Every other '#...' is a same-page jump (the skip link, mostly) and the
+    // browser already handles it.
     if (raw.startsWith('#')) return;
 
     let url;

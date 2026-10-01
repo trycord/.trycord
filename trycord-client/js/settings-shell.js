@@ -1,19 +1,14 @@
 // The settings framework.
 //
-// There were three of these and they disagreed: account settings drew a
-// horizontal pill row, community settings drew a sticky sidebar, and admin drew
-// its own nav. Same idea, three implementations, so the surfaces drifted apart
-// and none of them could hold more than about six destinations before wrapping.
+// There were three of these and they disagreed: account settings drew a pill
+// row, community settings a sticky sidebar, admin its own thing. Same idea, three
+// implementations, and none held more than about six destinations before
+// wrapping.
 //
-// This is the one implementation. It owns:
-//   - the information architecture, as grouped data rather than markup
-//   - a sticky nav that works as a sidebar and as a disclosure on a phone
-//   - filtering, because the whole thing is twenty-odd destinations deep
-//   - the active-state rules, including matching a section that spans aliases
-//
-// Sections are described by data, not by route literals scattered through a
-// render function, so adding one is a data change and the nav, the search index
-// and the empty state all follow from it.
+// This is the one implementation. It owns the information architecture (grouped
+// data, not markup), a nav that works as a sidebar and as a disclosure on a
+// phone, filtering, and the active-state rules including sections that span
+// aliases. Sections are described by data, so adding one is a data change.
 import { el, clear } from './ui.js';
 import { icon } from './components.js';
 import { serverPath } from './links.js';
@@ -278,19 +273,16 @@ export function settingsNav({ scope, active, resolve, footer, searchable = true 
   return wrap;
 }
 
-/**
- * The page frame: sticky nav beside the content pane.
- *
- * A third region sits to the right of the pane and is only given width when the
- * viewport is wide enough to spend it. It is part of the frame from the first
- * render rather than something a media query conjures, because the content in it
- * is real content that a narrow viewport hides by a decision, not by omission.
- * A frame with no `context` renders an empty region that occupies no track.
- *
- * Returns the pane for the caller to render into, and the context region for
- * whoever has something to say in it, and marks the frame as entered so the
- * content can animate in once rather than on every re-render.
- */
+// Sticky nav beside the content pane, plus a third region on the right that is
+// only given width when the viewport can spend it.
+//
+// That region is part of the frame from the first render, not something a media
+// query conjures: it holds real content that a narrow viewport hides by a
+// decision rather than by omission. No `context` renders an empty region that
+// occupies no track.
+//
+// Returns the pane to render into and the context region, and marks the frame as
+// entered so content animates in once instead of on every re-render.
 export function settingsFrame({ scope, active, resolve, footer, searchable, contentClass = '', context = null }) {
   const frame = el('div', { class: 'settings-layout' });
   const nav = settingsNav({ scope, active, resolve, footer, searchable });

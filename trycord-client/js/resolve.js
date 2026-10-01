@@ -1,15 +1,12 @@
-// Resolving a slug to an identity, and cleaning up after the view we left.
+// Slug -> identity, and teardown for the view we left.
 //
-// These live apart from the router because the route table needs them and the
-// router needs the table: keeping them in the router would mean the table
-// imported the module that imports the table.
+// Not in the router: the table needs these and the router needs the table.
 
 import Api from './api.js';
 import { el, clear } from './ui.js';
 
-// A slug is a display convenience, not an identity, so a route that cannot
-// resolve one says so plainly instead of rendering an empty page that looks
-// like a broken app.
+// A slug is a display convenience, not an identity. An unresolvable one says so
+// plainly rather than rendering an empty page that looks like a broken app.
 export function renderRouteError(region, message) {
   region.replaceChildren();
   region.appendChild(el('div', { class: 'empty-state' }, [
@@ -18,10 +15,8 @@ export function renderRouteError(region, message) {
   ]));
 }
 
-// Both accept an id or a slug, because a link may be either: copied from the
-// address bar after the move to slugs, or shared before it. A failed lookup
-// returns null rather than throwing, so an unknown community reads as a dead
-// link and not a crash.
+// Id or slug - links exist in both forms. Null on failure, so an unknown
+// community reads as a dead link rather than a crash.
 export async function resolveCommunity(token) {
   try {
     const row = await Api.server(token);
@@ -31,9 +26,8 @@ export async function resolveCommunity(token) {
   }
 }
 
-// Always resolved inside the community. A channel slug is unique per community
-// and not globally, so resolving one without that context would be a guess - and
-// a guess here can land on somebody else's channel.
+// Needs the community. A channel slug is unique per community, not globally, so
+// resolving one without that context could land on someone else's channel.
 export async function resolveChannelToken(serverId, token) {
   try {
     const list = await Api.channels(serverId);
@@ -45,9 +39,9 @@ export async function resolveChannelToken(serverId, token) {
   }
 }
 
-// A view registers teardown here. Realtime subscriptions and the DM presence
-// heartbeat both outlive the view that started them, and a community event that
-// repaints the view you just left is how a channel jumps out from under you.
+// Realtime subscriptions and the DM presence heartbeat both outlive the view that
+// started them, and a community event repainting the view you just left is how
+// a channel jumps out from under you.
 let lastCleanup = null;
 let onViewRefreshCleared = null;
 

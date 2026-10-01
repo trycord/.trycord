@@ -1,5 +1,5 @@
-// Shared helpers: ids, timestamps, tokens, membership checks.
-// All database access is async through the db facade (sqlite or mysql).
+// Shared helpers: ids, timestamps, tokens, membership checks. All database
+// access goes through the db facade and is async.
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const db = require('./db');
@@ -13,17 +13,17 @@ function secret() {
 const now = () => new Date().toISOString();
 const uuid = () => crypto.randomUUID();
 
-// The jti is returned alongside the token so the caller can record the session.
-// The signature is what authenticates a request; the jti is what lets one
-// session be revoked without touching the others, which session_version cannot
-// do (it is all-or-nothing by design).
+// jti is returned alongside the token so the caller can record the session.
+// The signature authenticates the request; jti is what lets one session be
+// revoked without touching the others. session_version can't do that - it's
+// all-or-nothing by design.
 function signWithJti(user) {
   const jti = uuid();
   const token = jwt.sign(
-    // sv is the session version. It is what makes "invalidate every session"
-    // exact: iat has one-second resolution, so a token issued in the same second
-    // as a password change or a 2FA enable is indistinguishable from one issued
-    // after it, and the change silently fails to take effect.
+// iat has one-second resolution, so a token minted in the same second as a
+// password change is indistinguishable from one minted after it and the change
+// silently does nothing. The session version is what makes "invalidate every
+// session" exact.
     { id: user.id, username: user.username, jti, sv: Number(user.session_version || 0) },
     secret(),
     { expiresIn: '7d' }
@@ -45,11 +45,10 @@ async function isOwner(userId, serverId) {
 }
 
 // Channel row if it exists AND the user belongs to its server, else null.
-// Accepts a channel id, or a channel slug when the owning community is known.
-// The server argument is not optional sugar: channel slugs are unique per
-// community, not globally, so two communities can each have a #general. Without
-// the server there is no single correct answer, and guessing one would let a
-// link resolve to somebody else's channel.
+// Accepts a channel id, or a slug when the community is known - the server
+// argument isn't optional sugar, because channel slugs are unique per community
+// and not globally, so two communities can each have a #general and guessing one
+// would let a link resolve to somebody else's channel.
 async function visibleChannel(channelId, userId, serverId) {
   let ch = null;
   if (serverId) {
@@ -61,11 +60,9 @@ async function visibleChannel(channelId, userId, serverId) {
   return ch;
 }
 
-// LIKE metacharacters must match literally, never as wildcards. The escape
-// character is '!' rather than backslash because MySQL and MariaDB parse a
-// lone backslash inside a SQL string literal as an escape, which terminates
-// the literal and turns the statement into a syntax error. '!' needs no
-// escaping in either JS or SQL string syntax.
+// Escape char is '!' not backslash: MySQL and MariaDB read a lone backslash
+// inside a SQL string literal as an escape, which ends the literal and turns the
+// statement into a syntax error.
 function escapeLike(s) {
   return String(s).replace(/[%_!]/g, (c) => '!' + c);
 }

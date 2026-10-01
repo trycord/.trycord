@@ -1,26 +1,19 @@
-// Account data export.
+// Everything this instance holds about the caller, in one response, without
+// asking anyone. No queue, no emailed link - those make a person wait on a
+// stranger's infrastructure for their own data.
 //
-// A person asking what an instance holds about them should get everything, in
-// one response, without asking anyone. That rules out a job queue and an email
-// link: the export is assembled on request from the caller's own rows.
-//
-// Two rules govern what goes in.
-//
-// Only the caller's own data. A friendship is written twice, once per side, so
-// the other person's half is reduced to the fact that a relationship existed -
-// they did not consent to their side of it being exported to you, and including
-// their username would be the same leak one level down.
-//
-// No secrets. Password hashes, TOTP secrets and recovery-code hashes are
-// deliberately absent: they are not the caller's data in any sense a person
-// means by "my data", and handing them out turns a self-service export into a
-// credential-disclosure endpoint with a convenient label.
+// Two rules. Only the caller's own data: a friendship is stored twice, so the
+// other person's half is reduced to the fact it existed - they didn't consent to
+// their side being exported to you, and their username is the same leak one
+// level down. And no secrets: password hashes, TOTP secrets and recovery-code
+// hashes aren't the caller's data in any sense a person means by "my data", and
+// handing them over turns this into a credential-disclosure endpoint with a
+// friendly label.
 
 const db = require('../db');
 
-// Rows keyed by the export section they belong to. Each is a query against one
-// table, written here rather than composed from table names at runtime so that
-// the set of things an export contains is readable in one screen.
+// One query per section, written out rather than composed from table names at
+// runtime, so the set of things an export contains is readable in one screen.
 async function collect(userId) {
   const S = {};
 
@@ -43,8 +36,8 @@ async function collect(userId) {
       db.get('SELECT * FROM user_blocks WHERE user_id = ?', [userId]),
       db.all('SELECT * FROM muted_channels WHERE user_id = ?', [userId]),
     ]);
-    // An absent row means the default, not nothing. The export says the default
-    // explicitly so it can be read on its own, without the source that defines it.
+// An absent row means the default, not nothing. Said explicitly so the export
+// reads on its own.
     return {
       privacy: privacy || 'defaults (all settings are open)',
       notifications: notif || 'defaults (all categories delivered)',
@@ -54,8 +47,7 @@ async function collect(userId) {
     };
   };
 
-  // Friendships are symmetric in the table and one-sided in reality: this
-  // export carries your half only.
+// Your half only.
   S.friendships = () => db.all(
     'SELECT friend_id, created_at FROM friendships WHERE user_id = ?', [userId]
   );
@@ -83,11 +75,10 @@ async function collect(userId) {
      WHERE mr.user_id = ?`, [userId]
   );
 
-  // Channel messages are keyed on author_id, the same as direct messages, and the
-  // two live in separate tables. Both are this person's writing, so both are
-  // exported, each under its own key rather than merged - a DM and a channel
-  // message with the same id are different records. server_id comes from the
-  // channel rather than the message row, which does not carry it.
+// channel_messages and dm_messages are both keyed on author_id but are separate
+// tables, and both are this person's writing. Kept under their own keys rather
+// than merged - a DM and a channel message can share an id and are different
+// records. server_id comes from the channel; the message row doesn't carry it.
   S.channelMessages = () => db.all(
     `SELECT m.id, m.channel_id, ch.server_id, m.content, m.created_at, m.edited_at
      FROM messages m LEFT JOIN channels ch ON ch.id = m.channel_id
@@ -115,9 +106,8 @@ async function collect(userId) {
      FROM notifications WHERE user_id = ? ORDER BY created_at DESC`, [userId]
   );
 
-  // Sessions are security-relevant rather than personal, so the identifiers are
-  // kept - a person revoking an unfamiliar session needs the jti - but no
-  // tokens, because the table does not store any.
+// Identifiers kept - you need the jti to revoke a session you don't recognise -
+// but no tokens, because the table doesn't store any.
   S.sessions = () => db.all(
     `SELECT jti, user_agent, ip, created_at, last_seen_at, revoked_at
      FROM user_sessions WHERE user_id = ? ORDER BY created_at DESC`, [userId]
@@ -132,15 +122,14 @@ async function collect(userId) {
     'SELECT message_id, emoji, created_at FROM reactions WHERE user_id = ?', [userId]
   );
 
-  // Reports filed by this person. Reports about them are other people's data and
-  // are not included.
+// Reports filed by this person. Reports *about* them are other people's data.
   S.reportsFiled = () => db.all(
     `SELECT id, target_type, target_id, reason, description, status, created_at
      FROM reports WHERE reporter_id = ? ORDER BY created_at DESC`, [userId]
   );
 
-  // Audit rows this person generated. The audit log is an operator record; a
-  // person's own actions within it are theirs.
+// The audit log is an operator record, but your own actions inside it are
+// yours.
   S.accountActivity = () => db.all(
     `SELECT action, target_type, target_id, reason, created_at
      FROM audit_logs WHERE actor_id = ? ORDER BY created_at DESC LIMIT 2000`,
@@ -157,10 +146,8 @@ async function collect(userId) {
   return S;
 }
 
-// Password hashes, TOTP secrets, recovery-code hashes, revoked token ids and
-// pending email verifications are excluded by construction: none of them is in
-// the query list above. That is deliberate rather than an oversight, and this
-// name exists so that anyone reading the export can find the reason.
+// Excluded by construction - none of them is in the query list above. Named so
+// anyone reading this can find the reason instead of assuming an oversight.
 function neverIncluded() {
   return [
     'password hash',
@@ -171,14 +158,10 @@ function neverIncluded() {
   ];
 }
 
-/**
- * Assemble the whole export.
- *
- * A section that fails does not fail the export. Losing the mute list because
- * one row had an unexpected shape would mean answering "here is everything,
- * except the part that broke", which is the worst possible failure mode for a
- * data-access request.
- */
+// A section that fails does not fail the export. Losing the mute list because
+// one row had an odd shape would mean answering "here is everything, except the
+// part that broke" - the worst possible failure mode for a data-access
+// request.
 async function exportAccount(userId) {
   const sections = await collect(userId);
   const out = {

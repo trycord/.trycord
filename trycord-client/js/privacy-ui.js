@@ -1,17 +1,14 @@
-// Privacy, blocking, notification preferences and wellbeing, as settings
-// sections.
+// Privacy, blocking, notification preferences and wellbeing.
 //
-// These were one thing on the server and nothing on the client: the Privacy page
-// showed who had asked and who was a friend, which is two lists rather than the
-// settings that actually decide those outcomes. Each section here reads its
-// state from the API rather than from local state, because a preference that is
-// enforced server-side and displayed from a cached copy will disagree with
-// reality exactly when it matters.
+// These were enforced on the server and absent here: the Privacy page showed who
+// had asked and who was a friend, which is two lists rather than the settings
+// that decide those outcomes. Every section reads from the API, because a
+// server-enforced preference displayed from a cached copy disagrees with reality
+// exactly when it matters.
 //
-// The controls are settings-ui's toggleRow and selectRow, not hand-rolled inputs.
-// A parallel switch implementation would be a second visual answer to the same
-// question, and the stylesheet already has full switch CSS behind those two
-// helpers.
+// Controls are settings-ui's toggleRow and selectRow, not hand-rolled inputs. A
+// parallel switch implementation would be a second visual answer to the same
+// question.
 
 import Api from './api.js';
 import { loadingState, errorState } from './states.js';
@@ -470,22 +467,18 @@ export function loadWellbeing() {
     .catch(() => { /* the OS preference still applies */ });
 }
 
-/**
- * Re-render a section when the server says its state changed elsewhere.
- *
- * The cache is not the same as the screen. An account-scoped websocket event
- * refreshes State so the next read is right, but a section already on screen was
- * painted from the value it fetched when it opened, and nothing repaints it - so
- * a reader who blocked someone on their phone kept seeing an empty list and a
- * "People blocked: 0" that was true when they loaded and false now.
- *
- * Only the section named by the event is repainted, and only while it is still
- * in the document. Anything else would throw away what the reader is looking at
- * in order to update something they are not.
- *
- * Returns its own teardown; the caller registers that with setCleanup so a
- * navigation does not leave a listener behind repainting a detached tree.
- */
+// The cache is not the screen. An account event refreshes State so the next read
+// is right, but a section already on screen was painted from what it fetched
+// when it opened - so blocking someone on your phone left you looking at an
+// empty list and a "People blocked: 0" that was true when you loaded and is not
+// now.
+//
+// Only the section the event names, and only while it is still in the document.
+// Repainting anything else throws away what the reader is looking at to update
+// something they are not.
+//
+// Returns its own teardown; the caller registers that with setCleanup so a
+// navigation doesn't leave a listener repainting a detached tree.
 export function watchForRemoteChanges(kind, host, repaint) {
   const onChange = (e) => {
     if (!e || e.detail !== kind) return;
