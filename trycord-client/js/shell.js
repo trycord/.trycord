@@ -71,6 +71,43 @@ function memberMenu(m) {
   return () => memberActions(m);
 }
 
+/**
+ * Actions for one conversation in the sidebar.
+ *
+ * Everything here is something the DM routes already serve or something that is
+ * purely local to this device. There is no "delete conversation" because the
+ * server has no such route - offering one would be a button that either does
+ * nothing or removes the conversation for both people, which is not what a
+ * reader clicking it would expect.
+ */
+function dmRowActions(dm, peer, name) {
+  const items = [
+    { label: 'Open conversation', onSelect: () => { navigate('/dms/' + dm.id); } },
+    { label: 'Copy conversation ID', onSelect: () => copyText(String(dm.id), 'Conversation ID copied.') },
+  ];
+  if (peer && peer.id) {
+    items.push({ sep: true });
+    items.push({
+      label: 'View profile',
+      desc: name,
+      onSelect: () => { navigate('/users/' + peer.id); },
+    });
+    items.push({
+      label: 'Mark as read',
+      onSelect: async () => {
+        try {
+          await Api.dmRead(dm.id);
+          toast('Marked as read.', 'ok');
+          refreshDms().catch(() => {});
+        } catch (ex) {
+          toast(ex.message || 'Could not mark that read.', 'error');
+        }
+      },
+    });
+  }
+  return items;
+}
+
 // The action list for one member, permission-shaped. Exported so the member
 export function memberActions(m) {
   const id = m.user_id || m.id;
@@ -416,6 +453,13 @@ function dmsContext(region) {
         row.appendChild(el('span', { class: 'row__count' },
           String(dm.unreadCount > 99 ? '99+' : dm.unreadCount)));
       }
+      // A conversation row was the one interactive row in the sidebar with no
+      // menu. Server chips and member rows beside it both had one, so right
+      // -clicking a conversation did nothing while right-clicking the entry
+      // above it worked.
+      attachContextMenu(row, () => dmRowActions(dm, peer, name), {
+        target: () => ({ type: 'conversation', id: String(dm.id) }),
+      });
       listBox.appendChild(row);
     }
   };
