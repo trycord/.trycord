@@ -1193,6 +1193,11 @@ module.exports = {
   tables,
   tableNames,
   applySchema,
+  // The declared index list, so check.js can assert that every index the schema
+  // claims to create actually exists after it runs, and that the ones whose
+  // uniqueness the application depends on are created UNIQUE. Without this, an
+  // index could be dropped or silently skipped and nothing would notice.
+  INDEXES,
   // Exported for scripts/test-schema-parity.js. The SQLite and MySQL migration
   // lists describe the same schema changes and have to agree; the test needs to
   // read both to prove that, and exporting them keeps the check honest rather
