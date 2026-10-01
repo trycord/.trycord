@@ -815,6 +815,10 @@ const INDEXES = [
   'CREATE INDEX idx_invites_server ON invites(server_id)',
   'CREATE INDEX idx_attachments_message ON attachments(message_id)',
   'CREATE INDEX idx_attachments_channel ON attachments(channel_id)',
+  // Every direct-message history page reads these, so without them a busy
+  // conversation scans the whole table once per page load.
+  'CREATE INDEX idx_attachments_dm_message ON attachments(dm_message_id)',
+  'CREATE INDEX idx_attachments_dm_conversation ON attachments(dm_conversation_id)',
   'CREATE INDEX idx_users_username ON users(username)',
   'CREATE INDEX idx_dm_members_user ON dm_members(user_id)',
   'CREATE INDEX idx_dm_messages_conv ON dm_messages(conversation_id, created_at)',
@@ -940,10 +944,18 @@ async function mysqlColumnIsNullable(conn, table, column) {
 // nullability at all, so it needs the documented rebuild, which does copy every
 // row. The rebuild only runs when the column is actually still NOT NULL, so a
 // database that is already correct is never touched.
+//
+// A failure here must not stop the instance booting. Direct-message attachments
+// are one feature; an instance that will not start is the whole application.
 async function relaxAttachmentsChannelId(conn) {
   if (conn.dialect === 'mysql') {
-    if (await mysqlColumnIsNullable(conn, 'attachments', 'channel_id')) return;
-    await conn.exec('ALTER TABLE attachments MODIFY COLUMN channel_id VARCHAR(64) NULL');
+    try {
+      if (await mysqlColumnIsNullable(conn, 'attachments', 'channel_id')) return;
+      await conn.exec('ALTER TABLE attachments MODIFY COLUMN channel_id VARCHAR(64) NULL');
+    } catch (e) {
+      console.warn('[schema] could not relax attachments.channel_id: ' + (e && e.message));
+      console.warn('[schema] direct-message attachments are unavailable until it succeeds; everything else is unaffected');
+    }
     return;
   }
   const col = await sqliteColumn(conn, 'attachments', 'channel_id');
@@ -978,8 +990,13 @@ async function relaxAttachmentsChannelId(conn) {
       FROM attachments`);
     await conn.exec('DROP TABLE attachments');
     await conn.exec('ALTER TABLE attachments_v2 RENAME TO attachments');
+    // The rebuilt table has no indexes of its own, and INDEXES runs later
+    // against the new name - but the rebuild is inside a transaction, so the
+    // ones this surface needs most are put back here.
     await conn.exec('CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id)');
     await conn.exec('CREATE INDEX IF NOT EXISTS idx_attachments_channel ON attachments(channel_id)');
+    await conn.exec('CREATE INDEX IF NOT EXISTS idx_attachments_dm_message ON attachments(dm_message_id)');
+    await conn.exec('CREATE INDEX IF NOT EXISTS idx_attachments_dm_conversation ON attachments(dm_conversation_id)');
     await conn.exec('COMMIT');
   } catch (e) {
     await conn.exec('ROLLBACK').catch(() => {});
