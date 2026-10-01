@@ -206,21 +206,6 @@ function tables(engine) {
       expires_at VARCHAR(64) NOT NULL
     )${engine}`,
 
-    `CREATE TABLE IF NOT EXISTS attachments (
-      id          VARCHAR(64) PRIMARY KEY,
-      message_id  VARCHAR(64),
-      channel_id  VARCHAR(64) NOT NULL,
-      uploader_id VARCHAR(64) NOT NULL,
-      filename    VARCHAR(255) NOT NULL,
-      mime        VARCHAR(64) NOT NULL,
-      size        INTEGER NOT NULL DEFAULT 0,
-      url         VARCHAR(512) NOT NULL,
-      created_at  VARCHAR(64) NOT NULL,
-      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
-      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
-      FOREIGN KEY (uploader_id) REFERENCES users(id)
-    )${engine}`,
-
     // --- Direct messaging (Phase 2) ---
     // pair_key is the canonical "smaller-id:larger-id" for one-to-one chats
     // and UNIQUE, so Alice↔Bob always resolves to one conversation no matter
@@ -255,6 +240,34 @@ function tables(engine) {
          FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
          FOREIGN KEY (author_id) REFERENCES users(id)
        )${engine}`,
+
+    // After the DM tables: two of its foreign keys point at them, and MySQL
+    // resolves a reference at CREATE time, so declaring it earlier fails on a
+    // fresh database.
+    `CREATE TABLE IF NOT EXISTS attachments (
+      id          VARCHAR(64) PRIMARY KEY,
+      message_id  VARCHAR(64),
+      -- Nullable, and carrying a conversation instead of a channel for a direct
+      -- message. It was NOT NULL with a foreign key to channels, which made an
+      -- attachment in a DM impossible to represent at all: there is no channel
+      -- row to point at. Relaxing it changes nothing for existing rows, and a
+      -- NULL foreign key satisfies the constraint in both engines - so a channel
+      -- attachment and a direct one live in one table rather than two.
+      channel_id  VARCHAR(64),
+      dm_conversation_id VARCHAR(64),
+      dm_message_id      VARCHAR(64),
+      uploader_id VARCHAR(64) NOT NULL,
+      filename    VARCHAR(255) NOT NULL,
+      mime        VARCHAR(64) NOT NULL,
+      size        INTEGER NOT NULL DEFAULT 0,
+      url         VARCHAR(512) NOT NULL,
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_message_id) REFERENCES dm_messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (uploader_id) REFERENCES users(id)
+    )${engine}`,
 
     // --- Friendships (Phase 2) ---
     `CREATE TABLE IF NOT EXISTS friend_requests (
@@ -696,6 +709,8 @@ const LEGACY_ALTERS = [
   // Human-readable URL segments. Mirrored in MYSQL_ADD.
   ['servers', 'slug', 'ALTER TABLE servers ADD COLUMN slug VARCHAR(64)'],
   ['channels', 'slug', 'ALTER TABLE channels ADD COLUMN slug VARCHAR(64)'],
+  ['attachments', 'dm_conversation_id', 'ALTER TABLE attachments ADD COLUMN dm_conversation_id VARCHAR(64)'],
+  ['attachments', 'dm_message_id', 'ALTER TABLE attachments ADD COLUMN dm_message_id VARCHAR(64)'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -783,6 +798,8 @@ const MYSQL_ADD = [
   ['messages', 'client_nonce', 'ALTER TABLE messages ADD COLUMN client_nonce VARCHAR(64)'],
   ['dm_messages', 'seq', 'ALTER TABLE dm_messages ADD COLUMN seq INTEGER'],
   ['dm_messages', 'client_nonce', 'ALTER TABLE dm_messages ADD COLUMN client_nonce VARCHAR(64)'],
+  ['attachments', 'dm_conversation_id', 'ALTER TABLE attachments ADD COLUMN dm_conversation_id VARCHAR(64)'],
+  ['attachments', 'dm_message_id', 'ALTER TABLE attachments ADD COLUMN dm_message_id VARCHAR(64)'],
 ];
 
 const INDEXES = [
@@ -909,6 +926,69 @@ async function mysqlColumn(conn, table, column) {
   return rows[0] ? { dataType: String(rows[0].DATA_TYPE || '').toLowerCase() } : null;
 }
 
+async function mysqlColumnIsNullable(conn, table, column) {
+  const rows = await conn.all(
+    'SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+    [table, column]
+  );
+  return rows[0] ? String(rows[0].IS_NULLABLE || '').toUpperCase() === 'YES' : null;
+}
+
+// attachments.channel_id has to stop being NOT NULL so a direct message can
+// carry a file - a DM has no channel to point at. On MySQL that is an instant
+// metadata change with no table rewrite. SQLite cannot alter a column's
+// nullability at all, so it needs the documented rebuild, which does copy every
+// row. The rebuild only runs when the column is actually still NOT NULL, so a
+// database that is already correct is never touched.
+async function relaxAttachmentsChannelId(conn) {
+  if (conn.dialect === 'mysql') {
+    if (await mysqlColumnIsNullable(conn, 'attachments', 'channel_id')) return;
+    await conn.exec('ALTER TABLE attachments MODIFY COLUMN channel_id VARCHAR(64) NULL');
+    return;
+  }
+  const col = await sqliteColumn(conn, 'attachments', 'channel_id');
+  if (!col || !col.notnull) return;
+
+  // PRAGMA foreign_keys is a no-op inside a transaction, and this rebuild drops
+  // and recreates a table that other tables point at.
+  await conn.exec('PRAGMA foreign_keys = OFF');
+  try {
+    await conn.exec('BEGIN');
+    await conn.exec(`CREATE TABLE attachments_v2 (
+      id          VARCHAR(64) PRIMARY KEY,
+      message_id  VARCHAR(64),
+      channel_id  VARCHAR(64),
+      dm_conversation_id VARCHAR(64),
+      dm_message_id      VARCHAR(64),
+      uploader_id VARCHAR(64) NOT NULL,
+      filename    VARCHAR(255) NOT NULL,
+      mime        VARCHAR(64) NOT NULL,
+      size        INTEGER NOT NULL DEFAULT 0,
+      url         VARCHAR(512) NOT NULL,
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_message_id) REFERENCES dm_messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (uploader_id) REFERENCES users(id)
+    )`);
+    await conn.exec(`INSERT INTO attachments_v2
+      (id, message_id, channel_id, uploader_id, filename, mime, size, url, created_at)
+      SELECT id, message_id, channel_id, uploader_id, filename, mime, size, url, created_at
+      FROM attachments`);
+    await conn.exec('DROP TABLE attachments');
+    await conn.exec('ALTER TABLE attachments_v2 RENAME TO attachments');
+    await conn.exec('CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id)');
+    await conn.exec('CREATE INDEX IF NOT EXISTS idx_attachments_channel ON attachments(channel_id)');
+    await conn.exec('COMMIT');
+  } catch (e) {
+    await conn.exec('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    await conn.exec('PRAGMA foreign_keys = ON');
+  }
+}
+
 async function mysqlIndexExists(conn, table, index) {
   const rows = await conn.all(
     'SELECT COUNT(*) AS n FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?',
@@ -957,6 +1037,10 @@ async function applySchema(conn) {
     );
   }
 
+  // After the two columns above exist, so the rebuild copies a table that is
+  // already the right shape.
+  await relaxAttachmentsChannelId(conn);
+
   // MySQL migrations. These MUST run before idx_messages_channel because
   // messages.created_at was historically TEXT.
   if (dialect === 'mysql') {
@@ -972,6 +1056,7 @@ async function applySchema(conn) {
         await conn.exec(ddl);
       }
     }
+    await relaxAttachmentsChannelId(conn);
   }
 
   // Backfill canonical ordering before the unique index is created, so the

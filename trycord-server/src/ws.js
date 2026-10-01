@@ -428,7 +428,7 @@ function createGateway(server) {
             }
             if (!inserted) return;
             msg.attachments = ids.length
-              ? await uploads.attachToMessage(ids, msg.id, user.id, ch.id)
+              ? await uploads.attachToMessage(ids, msg.id, user.id, { channelId: ch.id })
               : [];
             broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
           } else if (data.type === 'dm:join') {

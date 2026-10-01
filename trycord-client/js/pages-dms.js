@@ -6,7 +6,8 @@ import {
   attachContextMenu, confirmDialog, copyText, esc, el, clear, toast, relTime,
   showEmojiPicker, insertAtCursor, openModal, openReportDialog,
 } from './ui.js';
-import { avatar, emptyState, icon, messageRow } from './components.js';
+import { avatar, downloadAttachment, emptyState, icon, messageRow } from './components.js';
+import { createAttachTray } from './attach-tray.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
 import { navigate } from './nav.js';
@@ -179,10 +180,12 @@ async function renderDmThread(container, dmId) {
       content: m.content,
       created_at: m.createdAt,
       edited_at: m.editedAt,
+      attachments: m.attachments || [],
     }, {
       meId: State.me && State.me.id,
       onDelete: mine ? () => removeDm(dmId, m.id) : null,
       onEdit: mine ? () => editDm(dmId, m) : null,
+      onDownload: (e, att) => { e.preventDefault(); downloadAttachment(att).catch((ex) => toast(ex.message || 'Cannot download', 'error')); },
     });
     // A direct message had no context menu at all. The community conversation
     // attaches one to every row; the DM view only ever attached its menus to
@@ -277,10 +280,19 @@ async function renderDmThread(container, dmId) {
   const ta = el('textarea', { placeholder: 'Message ' + (peer.displayName || peer.username) + '…', rows: 1 });
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
   const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('smile'));
+  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, icon('paperclip'));
+  const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
+  // The same tray the channel composer uses, with the DM upload endpoint.
+  const attachments = createAttachTray({
+    upload: (file, onProgress) => Api.uploadDmAttachment(dmId, file, onProgress),
+    onChange: () => { sendBtn.disabled = !attachments.hasReady() && !ta.value.trim(); },
+  });
+  composer.appendChild(fileBtn);
+  composer.appendChild(fileInput);
   composer.appendChild(ta);
   composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
-  conv.appendChild(composer);
+  conv.appendChild(el('div', { class: 'composer-dock' }, attachments.node, composer));
   {
     const me = State.me;
     if (mustVerifyToPost()) {
@@ -288,15 +300,22 @@ async function renderDmThread(container, dmId) {
       ta.placeholder = 'Verify your email to send messages.';
       sendBtn.disabled = true;
       emojiBtn.disabled = true;
+      fileBtn.disabled = true;
       composer.classList.add('locked');
     }
   }
+  attachments.attach({ container: conv, composer, textarea: ta, button: fileBtn, input: fileInput });
 
   function send() {
     const content = ta.value.trim();
-    if (!content) return;
+    // A file on its own is a message here too, as it is in a channel.
+    const readyIds = attachments.readyIds();
+    if (!content && !readyIds.length) {
+      if (attachments.isUploading()) { toast('Still uploading', 'warn'); return; }
+      return;
+    }
     sendBtn.setAttribute('aria-busy', 'true');
-    threadedSend(content);
+    threadedSend(content, readyIds);
   }
   let sendLock = false;
   // confirmed success, and the composer text is deliberately left in place on
@@ -305,15 +324,16 @@ async function renderDmThread(container, dmId) {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
     return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
   }
-  async function threadedSend(content) {
+  async function threadedSend(content, attachmentIds) {
     if (sendLock) return;
     sendLock = true;
     const nonce = pendingNonce || newNonce();
     pendingNonce = nonce;
     try {
-      await Api.sendDm(dmId, content, nonce);
+      await Api.sendDm(dmId, content, nonce, attachmentIds);
       pendingNonce = null;
       ta.value = '';
+      attachments.clear();
       ta.style.height = 'auto';
       await reload();
     } catch (ex) {

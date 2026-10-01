@@ -237,6 +237,19 @@ export function emptyState(iconName, title, sub) {
 }
 
 
+// Downloading a message attachment. Raw blob, because the bytes are behind an
+// authenticated route and a plain link would only ever produce a login page.
+// Shared by channels and direct messages, which have identical needs here.
+export async function downloadAttachment(att) {
+  const res = await Api.fetchAttachment(att.id);
+  const blob = new Blob([res.buffer]);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = att.filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 export function messageRow(msg, opts = {}) {
   const authorName = msg.user || msg.author_name || msg.author_display || 'Unknown';
   const disp = msg.author_display || msg.author_name || msg.user || 'Unknown';

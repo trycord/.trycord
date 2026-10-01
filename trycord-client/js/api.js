@@ -152,6 +152,42 @@ async function request(method, path, { body, auth = true, raw = false, form = fa
   return res.json().catch(() => null);
 }
 
+// XHR rather than fetch, which cannot report how much of a body has been sent.
+// Returns { promise, abort } so a caller can show progress and still let the
+// reader change their mind; the rejection on abort is an AbortError, so it must
+// not be reported as a failed upload.
+function xhrUpload(path, fd, onProgress) {
+  const xhr = new XMLHttpRequest();
+  const promise = new Promise((resolve, reject) => {
+    xhr.open('POST', base() + path, true);
+    xhr.withCredentials = false;
+    const t = token();
+    if (t) xhr.setRequestHeader('Authorization', 'Bearer ' + t);
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+    }
+    xhr.onload = () => {
+      let parsed = null;
+      try { parsed = JSON.parse(xhr.responseText); } catch { /* not json */ }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(parsed);
+      reject(new ApiError(
+        (parsed && parsed.error && parsed.error.code) || 'UPLOAD_FAILED',
+        (parsed && parsed.error && parsed.error.message) || 'Upload failed',
+        xhr.status));
+    };
+    xhr.onerror = () => reject(new ApiError('NETWORK', 'Upload failed', 0));
+    xhr.onabort = () => {
+      const e = new Error('aborted');
+      e.name = 'AbortError';
+      reject(e);
+    };
+    xhr.send(fd);
+  });
+  return { promise, abort: () => xhr.abort() };
+}
+
 const Api = {
   instance: () => request('GET', '/api/instance', { auth: false }),
   legal: () => request('GET', '/api/legal', { auth: false }),
@@ -315,43 +351,16 @@ const Api = {
       { body: fd, form: true });
   },
   // XHR rather than fetch, which cannot report how much of a body has been
-  // sent. Returns { promise, abort } so a caller can show progress and still
-  // let the reader change their mind; the rejection on abort is an AbortError,
-  // so it must not be reported as a failed upload.
+  // sent. Both upload endpoints go through this.
   uploadAttachmentWithProgress: (channelId, file, onProgress) => {
     const fd = new FormData();
     fd.append('file', file);
-    const xhr = new XMLHttpRequest();
-    const url = base() + '/api/channels/' + encodeURIComponent(channelId) + '/attachments';
-    const promise = new Promise((resolve, reject) => {
-      xhr.open('POST', url, true);
-      xhr.withCredentials = false;
-      const t = token();
-      if (t) xhr.setRequestHeader('Authorization', 'Bearer ' + t);
-      if (onProgress) {
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) onProgress(e.loaded / e.total);
-        };
-      }
-      xhr.onload = () => {
-        let parsed = null;
-        try { parsed = JSON.parse(xhr.responseText); } catch { /* not json */ }
-        if (xhr.status >= 200 && xhr.status < 300) return resolve(parsed);
-        const err = new ApiError(
-          (parsed && parsed.error && parsed.error.code) || 'UPLOAD_FAILED',
-          (parsed && parsed.error && parsed.error.message) || 'Upload failed',
-          xhr.status);
-        reject(err);
-      };
-      xhr.onerror = () => reject(new ApiError('Upload failed', 0, 'NETWORK'));
-      xhr.onabort = () => {
-        const e = new Error('aborted');
-        e.name = 'AbortError';
-        reject(e);
-      };
-      xhr.send(fd);
-    });
-    return { promise, abort: () => xhr.abort() };
+    return xhrUpload('/api/channels/' + encodeURIComponent(channelId) + '/attachments', fd, onProgress);
+  },
+  uploadDmAttachment: (conversationId, file, onProgress) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return xhrUpload('/api/dms/' + encodeURIComponent(conversationId) + '/attachments', fd, onProgress);
   },
   attachmentUrl: (id) => base() + '/api/attachments/' + encodeURIComponent(id),
   fetchAttachment: (id) => request('GET', '/api/attachments/' + encodeURIComponent(id), { raw: true }),
@@ -423,9 +432,12 @@ joinDiscover: (id) =>
     const qs = q.toString();
     return request('GET', '/api/dms/' + encodeURIComponent(id) + '/messages' + (qs ? '?' + qs : ''));
   },
-  sendDm: (id, content, clientNonce) =>
+  sendDm: (id, content, clientNonce, attachmentIds) =>
     request('POST', '/api/dms/' + encodeURIComponent(id) + '/messages',
-      { body: clientNonce ? { content, clientNonce } : { content } }),
+      { body: Object.assign(
+        clientNonce ? { content, clientNonce } : { content },
+        attachmentIds && attachmentIds.length ? { attachmentIds } : {}
+      ) }),
   deleteDm: (id, messageId) =>
     request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId)),
   updateDm: (id, messageId, content) =>

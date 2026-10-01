@@ -82,14 +82,16 @@ router.get('/:id/messages', async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
-// POST /api/dms/:id/messages { content, clientNonce } — persist, broadcast,
-// notify. The nonce makes a retried submission collapse onto the row the
-// first attempt already wrote, so a lost response cannot duplicate a message.
+// POST /api/dms/:id/messages { content, attachmentIds, clientNonce } — persist,
+// broadcast, notify. The nonce makes a retried submission collapse onto the row
+// the first attempt already wrote, so a lost response cannot duplicate a
+// message. A message with files and no text is allowed, as it is in a channel.
 router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
     const msg = await dms.send(
       req.user.id, req.user.username, req.params.id,
-      (req.body || {}).content, (req.body || {}).clientNonce
+      (req.body || {}).content, (req.body || {}).clientNonce,
+      (req.body || {}).attachmentIds
     );
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(members, { type: 'dm:message', ...msg, conversationId: req.params.id });
