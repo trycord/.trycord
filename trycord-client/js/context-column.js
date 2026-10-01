@@ -1,18 +1,14 @@
 // The contextual column beside a settings pane.
 //
-// A settings form has a natural width: read across a 1600px pane and its label
-// and its control end up at opposite ends of the screen with nothing between
-// them. The answer was a max-width, and a max-width on the pane leaves the rest
-// of the window empty. So the width that is not worth spending on a form is
-// spent on the part of the same decision that is not a form: what is currently
-// stored, what it means, what else this section governs, and what a change here
-// costs.
+// A settings form has a natural width. Read one across a 1600px pane and its
+// label and its control end up at opposite ends of the screen. Capping the pane
+// leaves the rest of the window empty, so the width that isn't worth spending on
+// a form is spent on the other half of the same decision: what is stored, what
+// it means, what else this section governs.
 //
-// Every column is built from state the API returned for the section it sits
-// beside. Nothing here is a restatement of the controls in the pane, because a
-// summary that repeats the controls tells a reader nothing and takes space that
-// was supposed to be worth something. The column either says something the pane
-// does not, or it is not rendered at all.
+// Every column is built from state the API returned for the section beside it,
+// and none of it restates the controls - a summary that repeats them tells a
+// reader nothing and takes the space they were meant to have.
 
 import Api from './api.js';
 import State from './state.js';
@@ -267,20 +263,16 @@ export function profileViewContext(profile, { membership, isSelf } = {}) {
   return out;
 }
 
-/**
- * The admin console's contextual column.
- *
- * The admin surfaces are lists: reports, appeals, users, audit rows. A list fills
- * a narrow measure and leaves the rest of the window empty, and the questions a
- * moderator actually asks are not in the list at all - what is waiting, what is
- * old, what this instance is currently enforcing. Those are the counts and the
- * rules, read from the same endpoints the section itself uses, so they cannot
- * disagree with it.
- *
- * Nothing here invents a statistic. If a count cannot be read it is omitted
- * rather than shown as zero, because a zero that means "failed to load" is worse
- * than no number.
- */
+// The admin console's contextual column.
+//
+// Admin surfaces are lists, and a list leaves most of the window empty. The
+// things a moderator actually asks aren't in the list - what's waiting, what's
+// old, what this instance is currently enforcing. Those counts come from the
+// same endpoints the section itself uses, so they can't disagree with it.
+//
+// Nothing here invents a statistic: a count that can't be read is omitted rather
+// than shown as zero, because a zero meaning "failed to load" is worse than no
+// number.
 export async function adminContext(section) {
   const out = [];
   const card = (title, ...children) => contextBlock(title, ...children);
@@ -296,9 +288,15 @@ export async function adminContext(section) {
       // the whole reason this column exists.
     }
   };
-  await add('Open reports', () => Api.adminReports({ status: 'open', limit: 200 }));
-  await add('Pending appeals', () => Api.adminAppeals({ status: 'pending', limit: 200 }));
-  await add('Deletion requests', () => Api.adminGdprRequests({ status: 'pending', limit: 200 }));
+  // /admin/overview counts server-side. Deriving these from the list endpoints
+  // instead would mean counting a page the server caps at 100, so the number
+  // would quietly stop being the number.
+  const overview = await Api.adminOverview().catch(() => null);
+  if (overview) {
+    totals.push(contextFact('Open reports', String(overview.openReports)));
+    totals.push(contextFact('Appeals to review', String(overview.openAppeals)));
+  }
+  await add('Deletion requests', () => Api.adminGdprRequests({ status: 'DELETION_REQUESTED', limit: 100 }));
 
   if (totals.length) {
     out.push(card('Waiting on you', contextList(...totals),

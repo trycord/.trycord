@@ -1,27 +1,12 @@
-// The three states a surface that fetches can be in.
+// Pending / empty / failed, in one place.
 //
-// Before this there were three unrelated answers to "this has no data yet".
-// A bare muted paragraph reading "Loading…", which is invisible to a screen
-// reader as a status and shifts layout when it is replaced; an inline style
-// empty-state built by emptyState(); and, on a failure, whatever the catch block
-// happened to append - usually nothing, so the surface just stayed blank with no
-// explanation and no way to try again.
-//
-// A blank pane is the worst of them, because it is indistinguishable from a
-// slow network. Every fetch in the client routes its pending and failed states
-// through here so that "nothing yet" always looks like nothing yet, always says
-// so, and always offers the retry that is missing from a raw catch.
+// The failure case is why this exists: a bare catch used to leave the surface
+// blank, and a blank pane is indistinguishable from a slow network.
 
 import { el, clear } from './ui.js';
 import { emptyState } from './components.js';
 
-/**
- * A pending surface.
- *
- * The row reserves its own height so the content does not jump when it arrives,
- * and it is a live region so a screen reader announces the change rather than
- * the reader discovering it by listening for nothing.
- */
+// Reserves its own height so content doesn't jump in, and announces itself.
 export function loadingState(label = 'Loading', opts = {}) {
   const box = el('div', {
     class: 'state-block state-block--loading',
@@ -37,25 +22,14 @@ export function loadingState(label = 'Loading', opts = {}) {
   return box;
 }
 
-/**
- * A surface with nothing in it.
- *
- * This is not the same as an error and must not look like one: "you have not
- * blocked anyone" and "we could not load your blocks" need different words, and a
- * reader who cannot tell them apart has to guess whether to retry.
- */
+// Worded differently from an error on purpose. "You have not blocked anyone" and
+// "we could not load your blocks" have to be tellable apart at a glance.
 export function emptyMessage(title, detail, action) {
   return emptyState(null, title, detail, action);
 }
 
-/**
- * A surface whose fetch failed.
- *
- * The server's own message is shown when it sent one, because "This conversation
- * is not available" tells a reader more than anything generic would. A retry is
- * offered whenever the caller can repeat the request, which is the difference
- * between a dead end and a slow network.
- */
+// Prefers the server's own wording - "This conversation is not available" beats
+// anything generic. Retry only when the caller can repeat the request.
 export function errorState(message, onRetry, opts = {}) {
   const box = el('div', {
     class: 'state-block state-block--error',
@@ -81,12 +55,8 @@ export function errorState(message, onRetry, opts = {}) {
   return box;
 }
 
-/**
- * Render one of the three into a host, replacing whatever was there.
- *
- * Callers that paint into a host on every attempt use this rather than clear()
- * followed by a branch, because the three cases then cannot drift apart.
- */
+// Paint into a host, replacing what's there. Callers that repaint on every
+// attempt use this so the three cases can't drift apart.
 export function paintState(host, kind, payload) {
   if (!host) return null;
   clear(host);
