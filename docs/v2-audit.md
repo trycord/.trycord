@@ -161,8 +161,6 @@ Real, known gaps. None blocks ordinary use.
 - **Email verification and password reset need a working SMTP transport.** The
   flows are implemented and rate limited, and the token handling is tested
   directly, but no end-to-end mail delivery is exercised in CI.
-- **No session management UI listing individual devices.** All sessions can be
-  revoked at once; they cannot be revoked one at a time.
 - **Full-text search is prefix-based.** There is no index and no ranking, so
   search quality degrades as history grows.
 - **`docs/selfhosting.md` is a deployment narrative, not a variable reference.**
@@ -171,3 +169,45 @@ Real, known gaps. None blocks ordinary use.
   grouped by concern rather than exhaustively commented one by one, so the full
   semantics of the rarer tuning values live in the source beside the code that
   applies them.
+
+## Changed since this was first written
+
+- **Per-device sessions.** Every device the account is signed in on is listed
+  with its own revoke, and a revoked device is told over its own socket rather
+  than at its next request.
+- **Account data export.** `GET /api/me/export` returns the caller's own rows
+  in fifteen sections, with `?format=ndjson` for a large enough payload to be
+  awkward as one document. A section that fails does not fail the export, and no
+  secret is in the query list.
+- **Attachments in direct messages.** `attachments.channel_id` was `NOT NULL`
+  with a foreign key to `channels`, so a file in a DM was an unrepresentable
+  row. It is nullable now and the row carries a conversation instead. On MySQL
+  that is an instant `MODIFY`; SQLite cannot alter nullability and takes a
+  table rebuild, which runs only when the column is actually still `NOT NULL`.
+- **Attachment progress, cancel and retry, drop and paste, and a lightbox.**
+  The tray is one module used by both composers. Uploading a file with no text
+  was refused by the composer even though the server has always allowed it, and
+  filenames were stored doubled (`photo.png.png`).
+- **Replies.** Flat threads in channels and in direct messages, one nullable
+  indexed column per message table, described once in `services/threads`. A
+  reply notifies the author of the message it hangs from. Deleting a message
+  clears the link on its replies rather than orphaning them.
+- **The member panel took a third of a phone screen.** The `max-width: 599px`
+  breakpoint was the only one that never zeroed `--ui-members`, and the panel's
+  mobile hide rule had been attached to the public-page selector chain, so it
+  never applied on a channel at all.
+
+## Not verified
+
+Worth knowing before trusting any of the above.
+
+- **No MariaDB instance was reachable while this was built** (`sudo` requires a
+  password, so no container). Every migration was verified against SQLite,
+  including against a populated pre-migration database. The MySQL statements are
+  standard guarded DDL and were read back from a live schema, but they have not
+  been executed. A failed `ALTER` warns and the instance still boots: a migration
+  that stops startup is worse than a missing feature.
+- **Visual and interaction checks were headless Chromium only.** No hover, focus
+  order, or real drag pipeline. Drop and paste were exercised with synthetic
+  `DragEvent`/`ClipboardEvent`, which tests the handlers and not the browser's
+  own drag.
