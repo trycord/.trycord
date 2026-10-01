@@ -7,6 +7,7 @@ import { can, canInChannel, isMuted, mustVerifyToPost, refreshMutes, setChannelP
 import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDialog, relTime, showContextMenu, attachContextMenu, showEmojiPicker, toast } from './ui.js';
 import { downloadAttachment, emptyState, icon, messageRow, paintReactions } from './components.js';
 import { createAttachTray } from './attach-tray.js';
+import { createThread } from './thread.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
 import { TrycordConfig } from './config.js';
@@ -281,6 +282,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       onEdit: () => editMsg(m),
       onDelete: () => deleteMsg(m),
       onDownload: (e, att) => downloadAtt(e, att),
+      onOpenThread: () => openThread(m),
       onReact: (emoji, mine) => toggleReaction(m.id, emoji, mine),
       onHover: (action, anchor) => {
         if (action === 'react') {
@@ -312,6 +314,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     const pinned = pinState.get(String(m.id)) ?? !!m.pinned;
     return [
       { label: 'Add reaction', onSelect: () => pickReaction(m.id) },
+      { label: 'Reply in thread', onSelect: () => openThread(m) },
       { sep: true },
       ...(m.content ? [{ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') }] : []),
       { label: 'Copy message link', onSelect: () => copyText(msgLink(m), 'Message link copied.') },
@@ -602,6 +605,31 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     }
     noteSeq(m);
     regroupAround(prev ? node : (node.previousElementSibling || node));
+  }
+
+  // One thread open at a time. Expanding a second one closes the first rather
+  // than stacking: two inline blocks in one feed is unreadable on a phone, and
+  // the reader opened a thread to read it, not to compare two.
+  let openThreadId = null;
+  function openThread(m) {
+    if (openThreadId && openThreadId !== String(m.id)) closeThread();
+    const existing = conv.querySelector('.msg-thread');
+    if (existing && openThreadId === String(m.id)) { closeThread(); return; }
+    const row = feed.querySelector('[data-message-id="' + m.id + '"]');
+    if (!row) return;
+    const view = createThread({
+      kind: 'channel', scopeId: channelId, rootMessage: m,
+      canReply: canInChannel('SEND_MESSAGES') && !mustVerifyToPost(),
+      onPosted: () => { /* the badge refreshes with the next history read */ },
+    });
+    openThreadId = String(m.id);
+    row.after(view.node);
+    view.node.scrollIntoView({ block: 'nearest' });
+  }
+  function closeThread() {
+    const node = conv.querySelector('.msg-thread');
+    if (node) node.remove();
+    openThreadId = null;
   }
 
   function findInsertionPoint(seq) {

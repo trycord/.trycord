@@ -312,6 +312,15 @@ const Api = {
   },
   sendMessage: (channelId, body) =>
     request('POST', '/api/channels/' + encodeURIComponent(channelId) + '/messages', { body }),
+  // Threads. The kind is 'channel' or 'dm'; the two are the same shape over
+  // different tables, so they share these rather than having a pair each.
+  messageThread: (kind, scopeId, messageId) =>
+    request('GET', (kind === 'dm' ? '/api/dms/' : '/api/channels/') + encodeURIComponent(scopeId) +
+      '/messages/' + encodeURIComponent(messageId) + '/thread'),
+  sendThreadReply: (kind, scopeId, content, replyToId) =>
+    kind === 'dm'
+      ? request('POST', '/api/dms/' + encodeURIComponent(scopeId) + '/messages', { body: { content, replyToId } })
+      : request('POST', '/api/channels/' + encodeURIComponent(scopeId) + '/messages', { body: { content, replyToId } }),
   updateMessage: (channelId, messageId, body) =>
     request('PATCH', '/api/channels/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId), { body }),
   deleteMessage: (channelId, messageId) =>

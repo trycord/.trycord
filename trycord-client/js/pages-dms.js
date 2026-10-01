@@ -8,6 +8,7 @@ import {
 } from './ui.js';
 import { avatar, downloadAttachment, emptyState, icon, messageRow } from './components.js';
 import { createAttachTray } from './attach-tray.js';
+import { createThread } from './thread.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
 import { navigate } from './nav.js';
@@ -180,11 +181,15 @@ async function renderDmThread(container, dmId) {
       content: m.content,
       created_at: m.createdAt,
       edited_at: m.editedAt,
+      // messageRow is the channel row and reads the wire names, so the camelCase
+      // a DM message arrives with is mapped here rather than taught two shapes.
+      reply_count: m.replyCount || 0,
       attachments: m.attachments || [],
     }, {
       meId: State.me && State.me.id,
       onDelete: mine ? () => removeDm(dmId, m.id) : null,
       onEdit: mine ? () => editDm(dmId, m) : null,
+      onOpenThread: () => openDmThread(m),
       onDownload: (e, att) => { e.preventDefault(); downloadAttachment(att).catch((ex) => toast(ex.message || 'Cannot download', 'error')); },
     });
     // A direct message had no context menu at all. The community conversation
@@ -206,13 +211,35 @@ async function renderDmThread(container, dmId) {
     return row;
   }
 
+  // One thread open at a time, for the same reason as the channel view: two
+  // inline blocks in one feed is unreadable on a phone.
+  let openDmThreadId = null;
+  function openDmThread(m) {
+    if (openDmThreadId && openDmThreadId !== String(m.id)) closeDmThread();
+    if (openDmThreadId === String(m.id)) { closeDmThread(); return; }
+    const row = feed.querySelector('[data-message-id="' + m.id + '"]');
+    if (!row) return;
+    const view = createThread({
+      kind: 'dm', scopeId: dmId, rootMessage: m,
+      canReply: !mustVerifyToPost(),
+    });
+    openDmThreadId = String(m.id);
+    row.after(view.node);
+    view.node.scrollIntoView({ block: 'nearest' });
+  }
+  function closeDmThread() {
+    const node = conv.querySelector('.msg-thread');
+    if (node) node.remove();
+    openDmThreadId = null;
+  }
+
   // Actions for one direct message.
   //
   // No pin: a DM is in no channel. No moderation entry: there is no community
   // whose permission would grant one, and being able to delete your own message
   // is not authority over anyone else's.
   function dmMessageActions(m, mine) {
-    const items = [];
+    const items = [{ label: 'Reply in thread', onSelect: () => openDmThread(m) }];
     if (m.content) {
       items.push({ label: 'Copy text', onSelect: () => copyText(m.content, 'Message copied.') });
     }
