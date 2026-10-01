@@ -267,6 +267,77 @@ export function profileViewContext(profile, { membership, isSelf } = {}) {
   return out;
 }
 
+/**
+ * The admin console's contextual column.
+ *
+ * The admin surfaces are lists: reports, appeals, users, audit rows. A list fills
+ * a narrow measure and leaves the rest of the window empty, and the questions a
+ * moderator actually asks are not in the list at all - what is waiting, what is
+ * old, what this instance is currently enforcing. Those are the counts and the
+ * rules, read from the same endpoints the section itself uses, so they cannot
+ * disagree with it.
+ *
+ * Nothing here invents a statistic. If a count cannot be read it is omitted
+ * rather than shown as zero, because a zero that means "failed to load" is worse
+ * than no number.
+ */
+export async function adminContext(section) {
+  const out = [];
+  const card = (title, ...children) => block(title, ...children);
+
+  const totals = [];
+  const add = async (label, read) => {
+    try {
+      const n = countOf(await read());
+      if (n !== null) totals.push(fact(label, String(n)));
+    } catch {
+      // Omitted rather than shown as zero: a moderator reading "0 open reports"
+      // when the request failed has been told something false, and the number is
+      // the whole reason this column exists.
+    }
+  };
+  await add('Open reports', () => Api.adminReports({ status: 'open', limit: 200 }));
+  await add('Pending appeals', () => Api.adminAppeals({ status: 'pending', limit: 200 }));
+  await add('Deletion requests', () => Api.adminGdprRequests({ status: 'pending', limit: 200 }));
+
+  if (totals.length) {
+    out.push(card('Waiting on you', list(...totals),
+      para('Counts read from the same endpoints as the section beside them.')));
+  }
+
+  if (section === 'reports' || section === 'appeals' || section === 'audit') {
+    out.push(card('How this list works',
+      para(section === 'audit'
+        ? 'Every action an operator takes is recorded here before it is visible anywhere else, with the actor and the reason.'
+        : 'Entries stay in the queue until an administrator resolves them. Resolving records the decision against your account, so it can be reviewed later.')));
+  }
+
+  if (section === 'gdpr') {
+    out.push(card('What deletion covers',
+      para('A processed request erases the account and its content. Some records are retained by law or for integrity: moderation actions and audit entries, so that a decision made against a person remains defensible after they are gone.')));
+  }
+
+  if (section === 'users' || section === 'communities') {
+    out.push(card('Before you act',
+      para('These lists show what an instance knows about people. Everything you do here is attributed to your account and written to the audit log.')));
+  }
+
+  return out;
+}
+
+// Every one of these endpoints answers with a different envelope. Normalising
+// here means the column does not have to know which is which, and a shape that
+// changes to something unrecognised returns null instead of a misleading number.
+function countOf(res) {
+  if (Array.isArray(res)) return res.length;
+  if (!res || typeof res !== 'object') return null;
+  for (const key of ['items', 'rows', 'reports', 'appeals', 'requests', 'users', 'servers', 'data']) {
+    if (Array.isArray(res[key])) return res[key].length;
+  }
+  if (typeof res.total === 'number') return res.total;
+  return null;
+}
+
 export default {
   privacyContext,
   securityContext,
@@ -276,4 +347,5 @@ export default {
   guideContext,
   profileContext,
   profileViewContext,
+  adminContext,
 };
