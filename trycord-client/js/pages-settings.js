@@ -1,4 +1,6 @@
-// plus the ownership-transfer and danger-zone controls.
+// The community settings surface: overview, appearance, structure, members,
+// roles, invites, moderation, plus the ownership-transfer and danger-zone
+// controls.
 import Api from './api.js';
 import State from './state.js';
 

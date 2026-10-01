@@ -250,6 +250,21 @@ export function openModal({ title, eyebrow, closable, body, footer, closeText = 
   return { close, box };
 }
 
+// An image at full size, in place. Built on openModal rather than as its own
+// overlay so Escape, backdrop-click, focus return and the focus trap are the
+// same behaviour every other dialog has.
+export function openLightbox({ url, alt = '', name = '' }) {
+  const img = el('img', { class: 'lightbox-img', src: url, alt });
+  const body = el('div', { class: 'lightbox' }, img);
+  if (name) body.appendChild(el('p', { class: 'lightbox-name' }, name));
+  const modal = openModal({ body, closable: true, title: name || 'Image' });
+  modal.box.classList.add('modal--lightbox');
+  // A click on the image itself should not close it - only the backdrop around
+  // it, Escape, or the close button.
+  img.addEventListener('click', (e) => e.stopPropagation());
+  return modal;
+}
+
 export function confirmDialog({ title, message, confirmText = 'Confirm', danger = false, onConfirm }) {
   let doClose = () => {};
   const cancelBtn = btn('Cancel', { variant: 'ghost' });

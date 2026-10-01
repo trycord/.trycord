@@ -1,4 +1,7 @@
-// from a fixed vocabulary: there is no HTML box, and the server escapes
+// The admin Pages section: preview an instance's own published pages.
+//
+// The markup is composed from a fixed vocabulary: there is no HTML box, and the
+// server escapes whatever it is given.
 import Api from './api.js';
 import State from './state.js';
 import { esc, el, clear, toast, openModal, confirmDialog } from './ui.js';

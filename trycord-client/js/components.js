@@ -1,6 +1,11 @@
-// never from mock data.
+// Shared presentational pieces: avatars, community marks, message rows,
+// reactions, empty states.
+//
+// These are used by more than one surface, which is the only reason they live
+// here. Everything reads live API data - a component here never from mock
+// data.
 
-import { esc, el, clear, relTime, apiSrc, qs, icon, ICON_PATHS } from './ui.js';
+import { esc, el, clear, relTime, apiSrc, qs, icon, openLightbox, ICON_PATHS } from './ui.js';
 import { peerPresence, can } from './state.js';
 import Api from './api.js';
 
@@ -363,10 +368,18 @@ export function messageRow(msg, opts = {}) {
             if (h) mime = h;
           } catch { /* keep declared mime */ }
           const url = URL.createObjectURL(new Blob([res.buffer], { type: mime }));
-          const link = el('a', { class: 'msg-file image', href: url, target: '_blank', rel: 'noopener', title: att.filename || 'Open image' });
+          const link = el('a', { class: 'msg-file image', href: url, title: att.filename || 'Open image' });
           const img = el('img', { src: url, alt: att.filename || 'attached image', loading: 'lazy' });
           img.addEventListener('load', () => { setTimeout(() => URL.revokeObjectURL(url), 30000); });
           img.addEventListener('error', () => { try { URL.revokeObjectURL(url); } catch { /* ignore */ } holder.replaceWith(fallbackRow()); });
+          // Middle-click and "open in new tab" still have to work, so this stays
+          // an anchor; a plain left click opens the lightbox instead of throwing
+          // the reader out of the conversation to a raw image URL.
+          link.addEventListener('click', (e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+            e.preventDefault();
+            openLightbox({ url, alt: att.filename || 'attached image', name: att.filename || '' });
+          });
           link.appendChild(img);
           holder.replaceWith(link);
         }).catch(() => { holder.replaceWith(fallbackRow()); });

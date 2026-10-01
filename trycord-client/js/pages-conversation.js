@@ -485,11 +485,15 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
   const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('smile'));
   emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
+  const tray = el('div', { class: 'attach-tray', hidden: true });
   composer.appendChild(fileBtn);
   composer.appendChild(fileInput);
   composer.appendChild(ta);
   composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
-  conv.appendChild(composer);
+  // The tray is a sibling of the composer rather than a flex child of it: as a
+  // child it competed with the textarea for the line and collapsed to nothing on
+  // a phone.
+  conv.appendChild(el('div', { class: 'composer-dock' }, tray, composer));
   {
     const me = State.me;
     const locked = !canInChannel('SEND_MESSAGES') ? 'You do not have permission to send messages here.'
@@ -504,49 +508,169 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     }
   }
 
+  // One entry per file the reader has added, in the order they added them. Kept
+  // as rows rather than a bare id list so an upload that is still running, or
+  // that failed, is visible and can be dealt with.
+  const MAX_BYTES = 8 * 1024 * 1024;
   let pending = [];
-  fileBtn.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', async () => {
-    const files = Array.from(fileInput.files || []);
-    if (!files.length) return;
-    for (const f of files) {
-      if (f.size > 8 * 1024 * 1024) { toast('File too large: ' + f.name, 'error'); continue; }
-      try {
-        const res = await Api.uploadAttachment(channelId, f);
-        pending.push(res.attachment.id);
-        toast('Uploaded ' + f.name, 'ok');
-      } catch (ex) { toast(ex.message || 'Upload failed', 'error'); }
+
+  function fmtSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function paintTray() {
+    clear(tray);
+    tray.hidden = pending.length === 0;
+    sendBtn.disabled = !pending.some((p) => p.id) && !ta.value.trim();
+    for (const entry of pending) {
+      const pct = Math.round((entry.progress || 0) * 100);
+      const label = entry.state === 'ready' ? 'Ready'
+        : entry.state === 'error' ? (entry.error || 'Upload failed')
+          : 'Uploading ' + pct + '%';
+      const row = el('div', { class: 'attach-row' + (entry.state === 'error' ? ' attach-row--error' : '') }, [
+        el('span', { class: 'attach-name', title: entry.name }, entry.name),
+        el('span', { class: 'attach-size' }, fmtSize(entry.size)),
+        el('span', { class: 'attach-state' }, label),
+      ]);
+      if (entry.state === 'error') {
+        row.appendChild(el('button', {
+          class: 'btn ghost small', type: 'button',
+          onClick: () => startUpload(entry),
+        }, 'Retry'));
+      }
+      row.appendChild(el('button', {
+        class: 'attach-remove', type: 'button',
+        title: entry.state === 'uploading' ? 'Cancel upload' : 'Remove',
+        'aria-label': 'Remove ' + entry.name,
+        onClick: () => {
+          if (entry.xhr) entry.xhr.abort();
+          pending = pending.filter((p) => p !== entry);
+          paintTray();
+        },
+      }, '×'));
+      // Last, because it spans the full width: anything appended after it would
+      // be pushed onto a third row.
+      row.appendChild(el('div', { class: 'attach-bar' },
+        el('div', { class: 'attach-bar__fill', style: 'width:' + (entry.state === 'ready' ? 100 : pct) + '%' })));
+      tray.appendChild(row);
     }
+  }
+
+  function startUpload(entry) {
+    entry.state = 'uploading';
+    entry.error = null;
+    entry.progress = 0;
+    const up = Api.uploadAttachmentWithProgress(channelId, entry.file, (frac) => {
+      entry.progress = frac;
+      paintTray();
+    });
+    entry.xhr = up;
+    up.promise.then((res) => {
+      entry.id = res && res.attachment && res.attachment.id;
+      entry.state = entry.id ? 'ready' : 'error';
+      if (!entry.id) entry.error = 'Upload failed';
+      entry.xhr = null;
+      paintTray();
+    }).catch((ex) => {
+      // An abort is the reader changing their mind, not a failure, and the row
+      // has usually already been removed by then.
+      if (ex && ex.name === 'AbortError') return;
+      entry.state = 'error';
+      entry.error = ex.message || 'Upload failed';
+      entry.xhr = null;
+      paintTray();
+    });
+  }
+
+  function addFiles(files) {
+    for (const f of files) {
+      if (f.size > MAX_BYTES) { toast('File too large: ' + f.name, 'error'); continue; }
+      pending.push({ file: f, name: f.name, size: f.size, state: 'uploading', progress: 0, id: null });
+    }
+    if (!pending.length) return;
+    paintTray();
+    for (const entry of pending) if (entry.state === 'uploading' && !entry.xhr) startUpload(entry);
+  }
+
+  fileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    addFiles(Array.from(fileInput.files || []));
     fileInput.value = '';
   });
+
+  // Dropping onto the composer, and pasting a screenshot. Both are how people
+  // actually attach a picture, and neither needs the file button.
+  let dragDepth = 0;
+  const setDropping = (on) => composer.classList.toggle('is-dropping', on);
+  conv.addEventListener('dragenter', (e) => {
+    if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+    dragDepth++;
+    setDropping(true);
+  });
+  conv.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  conv.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) setDropping(false);
+  });
+  conv.addEventListener('drop', (e) => {
+    if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+    e.preventDefault();
+    dragDepth = 0;
+    setDropping(false);
+    addFiles(Array.from(e.dataTransfer.files));
+  });
+  ta.addEventListener('paste', (e) => {
+    const items = e.clipboardData && e.clipboardData.files;
+    if (!items || !items.length) return;
+    const files = Array.from(items);
+    if (!files.some((f) => f.type && f.type.startsWith('image/'))) return;
+    e.preventDefault();
+    addFiles(files);
+  });
+  paintTray();
 
   function resize() {
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
   }
-  ta.addEventListener('input', resize);
+  ta.addEventListener('input', () => { resize(); paintTray(); });
 
-  // must not produce two real messages. Mirrors the DM sendLock.
+  // A double submit must not produce two real messages. Mirrors the DM sendLock.
   let sending = false;
   let pendingNonce = null;
   async function send() {
     if (sending) return;
     const content = ta.value.trim();
-    if (!content && !pending.length) return;
-    if (!content) { toast('Add a message or file', 'warn'); return; }
+    // Only files that finished uploading can go on the message. Sending while
+    // one is still in flight would attach nothing for it and silently drop it.
+    const ready = pending.filter((p) => p.id);
+    const busy = pending.some((p) => p.state === 'uploading');
+    if (!content && !ready.length) {
+      if (busy) { toast('Still uploading', 'warn'); return; }
+      return;
+    }
     sending = true;
     sendBtn.setAttribute('aria-busy', 'true');
-    // succeeds. If the POST times out we do not know whether the server
-    // resolves it to the original message instead of writing a second one.
+    // One nonce per attempt, reused across a retry of the same attempt. If the
+    // POST times out we cannot tell whether the server wrote the message, so the
+    // nonce is what stops a retry from posting it twice.
     const clientNonce = pendingNonce || newNonce();
     pendingNonce = clientNonce;
-    const attachmentIds = pending.length ? pending.slice() : undefined;
+    const attachmentIds = ready.length ? ready.map((p) => p.id) : undefined;
     try {
       const saved = await Api.sendMessage(channelId, { content, attachmentIds, clientNonce });
       pendingNonce = null;
       ta.value = '';
+      for (const p of pending) if (p.xhr) p.xhr.abort();
       pending = [];
       resize();
+      paintTray();
       if (saved && saved.id) {
         upsertMessage(saved, { scroll: true });
       } else {
@@ -567,7 +691,8 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   await reload();
   Realtime.join(channelId);
 
-  // absorbed: an id already in the feed is replaced, never duplicated.
+  // An id already in the feed is replaced, never duplicated - which is what
+  // makes this safe to call from both the REST response and the realtime echo.
   function upsertMessage(m, opts = {}) {
     if (loadingHistory) {
       if (m && m.id) pendingLive.set(String(m.id), m);
@@ -594,8 +719,9 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     if (prev) {
       prev.replaceWith(node);
     } else {
-      // commit out of order (especially on MySQL, where the pool does real
-      // deliberately delivers strictly-newer messages that may have been
+      // Realtime and history can commit out of order, especially on MySQL
+      // where the pool does real concurrent writes, so position by seq when we
+      // have it and append when we don't.
       const seq = typeof m.seq === 'number' ? m.seq : null;
       const anchor = seq === null ? null : findInsertionPoint(seq);
       if (anchor) feed.insertBefore(node, anchor);

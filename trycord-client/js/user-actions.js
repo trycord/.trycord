@@ -1,4 +1,7 @@
-// in three places that disagreed. Every action is gated on a real permission
+// The actions you can take on another person, in one place.
+//
+// They used to be written out in three places that disagreed. Every action is
+// gated on a real permission, read fresh for the row it is being built for.
 
 import Api from './api.js';
 import State, { can, currentServerId, isAuthed, isBlocked, refreshBlocks } from './state.js';
