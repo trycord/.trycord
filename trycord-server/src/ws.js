@@ -26,6 +26,7 @@ const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
 const dms = require('./services/dms');
 const uploads = require('./services/uploads');
 const threads = require('./services/threads');
+const replies = require('./services/replies');
 const { nextSeq } = require('./routes/messages');
 
 const TICKET_TTL_MS = 60 * 1000;
@@ -436,6 +437,17 @@ function createGateway(server) {
               ? await uploads.attachToMessage(ids, msg.id, user.id, { channelId: ch.id })
               : [];
             broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
+            // Same reply notification the REST post sends, so the reply behaves
+            // the same however the message was submitted.
+            if (threadRootId) {
+              try {
+                const r = await replies.notifyReply({
+                  kind: 'channel', scopeId: ch.id, rootId: threadRootId,
+                  replyId: msg.id, authorId: user.id,
+                });
+                if (r) sendToUser(r.userId, { type: 'notification', notification: r.notification });
+              } catch { /* a missing notification must not fail the post */ }
+            }
           } else if (data.type === 'dm:join') {
             // Join a DM room to receive its events. Membership verified.
             const seen = await dms.visibleConversation(data.conversationId, user.id);

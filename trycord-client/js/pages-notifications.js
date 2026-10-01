@@ -10,6 +10,7 @@ function describe(n) {
   const who = (n.actor && (n.actor.displayName || n.actor.username)) || 'Someone';
   switch (n.type) {
     case 'mention': return who + ' mentioned you';
+    case 'reply': return who + ' replied to your message';
     case 'dm': return 'New message from ' + who;
     case 'friend_request': return who + ' sent you a friend request';
     case 'friend_accepted': return who + ' accepted your friend request';
@@ -26,8 +27,12 @@ function describe(n) {
 // variable" on every render and took the whole page down - not just the row.
 function destination(n) {
   if (!n || !n.type) return null;
-  if (n.type === 'mention' && n.context && n.context.serverId && n.context.channelId) {
-    return channelPath(n.context.serverId, n.context.channelId);
+  if ((n.type === 'mention' || n.type === 'reply') && n.context) {
+    if (n.context.serverId && n.context.channelId) {
+      return channelPath(n.context.serverId, n.context.channelId);
+    }
+    // A reply inside a direct message: the conversation, not a channel.
+    if (n.context.conversationId) return route('/dms/' + n.context.conversationId);
   }
   if (n.type === 'dm' && n.referenceId) return route('/dms/' + n.referenceId);
   if ((n.type === 'friend_request' || n.type === 'friend_accepted') && n.actor) {
@@ -41,7 +46,7 @@ function destination(n) {
 
 export async function renderNotifications(container) {
   clear(container);
-  renderContextHeader({ title: 'Notifications', sub: 'Mentions, messages and requests' });
+  renderContextHeader({ title: 'Notifications', sub: 'Replies, mentions, messages and requests' });
   const wrap = el('div', { class: 'page atrium' });
   const toolbar = el('div', { class: 'row-line', style: { marginBottom: 'var(--t-d-3)' } });
   const markAll = el('button', { class: 'btn sm', type: 'button' }, 'Mark all read');

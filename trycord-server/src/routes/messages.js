@@ -11,6 +11,7 @@ const memberships = require('../services/memberships');
 const uploads = require('../services/uploads');
 const reactions = require('../services/reactions');
 const threads = require('../services/threads');
+const replies = require('../services/replies');
 const mentions = require('../services/mentions');
 
 let broadcast = () => {};
@@ -233,6 +234,15 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
         try { sendToUser(f.userId, { type: 'notification', notification: f.notification }); } catch { /* ignore */ }
       }
     } catch { /* ignore */ }
+    // A reply tells the author of the message it hangs from. Null unless this
+    // was a reply, and null for your own message.
+    try {
+      const r = await replies.notifyReply({
+        kind: 'channel', scopeId: ch.id, rootId: threadRootId,
+        replyId: msg.id, authorId: req.user.id,
+      });
+      if (r) sendToUser(r.userId, { type: 'notification', notification: r.notification });
+    } catch { /* a missing notification must not fail the post */ }
     res.json(msg);
   } catch (e) { next(e); }
 });
@@ -254,6 +264,12 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
       return fail(res, 'TIMED_OUT', 'you are timed out in this server');
     }
     const fileRows = await db.all('SELECT id FROM attachments WHERE message_id = ?', [msg.id]);
+    // Replies outlive the message they hang from: they are other people's
+    // messages, and one person deleting their own message must not take a
+    // conversation with it. Clearing the link turns each reply back into an
+    // ordinary message rather than leaving it pointing at nothing, which would
+    // make the thread permanently unreachable.
+    await db.run('UPDATE messages SET thread_root_id = NULL WHERE thread_root_id = ?', [msg.id]);
     await db.run('DELETE FROM messages WHERE id = ?', [msg.id]);
     uploads.removeFiles(fileRows.map((r) => r.id));
     broadcast(ch.server_id, ch.id, { type: 'message_deleted', id: msg.id, channel_id: ch.id });

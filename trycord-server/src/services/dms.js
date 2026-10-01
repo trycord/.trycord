@@ -377,6 +377,8 @@ async function remove(userId, conversationId, messageId) {
   // The rows go with the message by cascade; the objects on disk do not, so they
   // are named before the delete. Same order the channel path uses.
   const files = await uploads.getForDmMessage(msg.id);
+  // As in a channel: the replies stay, and become ordinary messages again.
+  await db.run('UPDATE dm_messages SET thread_root_id = NULL WHERE thread_root_id = ?', [msg.id]);
   await db.run('DELETE FROM dm_messages WHERE id = ?', [msg.id]);
   await uploads.removeFiles(files.map((f) => ({
     id: f.id,

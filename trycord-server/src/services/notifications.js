@@ -5,7 +5,7 @@
 const db = require('../db');
 const { now, uuid } = require('../util');
 
-const TYPES = ['dm', 'friend_request', 'friend_accepted', 'mention'];
+const TYPES = ['dm', 'friend_request', 'friend_accepted', 'mention', 'reply'];
 
 async function create(userId, type, actorId, referenceId) {
   if (TYPES.indexOf(type) === -1) throw { code: 'VALIDATION_ERROR', message: 'unknown notification type' };
@@ -86,21 +86,34 @@ async function list(userId, limit, cursor) {
     'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL',
     [userId]
   );
-  // Mention deep links: batch-resolve the referenced message to its
-  // channel/server so the client can jump straight to it. Missing rows
-  // (deleted messages) simply carry no context.
-  const mentionIds = [...new Set(rows.filter((r) => r.type === 'mention' && r.reference_id).map((r) => String(r.reference_id)))];
+  // Deep links: batch-resolve the referenced message so the client can jump
+  // straight to it. Mentions and channel replies resolve to a channel, DM
+  // replies to a conversation. Missing rows (deleted messages) simply carry no
+  // context, and the row still renders.
+  const needsCtx = rows.filter((r) => (r.type === 'mention' || r.type === 'reply') && r.reference_id);
   const ctx = {};
-  if (mentionIds.length) {
-    const placeholders = mentionIds.map(() => '?').join(',');
+  const channelIds = [...new Set(needsCtx.filter((r) => r.type !== 'dm').map((r) => String(r.reference_id)))];
+  if (channelIds.length) {
+    const placeholders = channelIds.map(() => '?').join(',');
     const found = await db.all(
       `SELECT m.id AS mid, m.channel_id, ch.server_id FROM messages m
        JOIN channels ch ON ch.id = m.channel_id
        WHERE m.id IN (${placeholders})`,
-      mentionIds
+      channelIds
     );
     for (const f of found) {
       ctx[String(f.mid)] = { serverId: String(f.server_id), channelId: String(f.channel_id), messageId: String(f.mid) };
+    }
+  }
+  const dmIds = [...new Set(rows.filter((r) => r.type === 'reply' && r.reference_id).map((r) => String(r.reference_id)))];
+  if (dmIds.length) {
+    const placeholders = dmIds.map(() => '?').join(',');
+    const found = await db.all(
+      `SELECT m.id AS mid, m.conversation_id FROM dm_messages m WHERE m.id IN (${placeholders})`,
+      dmIds
+    );
+    for (const f of found) {
+      ctx[String(f.mid)] = { conversationId: String(f.conversation_id), messageId: String(f.mid) };
     }
   }
   return {
@@ -109,7 +122,9 @@ async function list(userId, limit, cursor) {
     unreadCount: unread ? unread.n : 0,
     items: rows.map((r) => {
       const out = shape(r, r.actor_name ? { id: r.actor_id, username: r.actor_name, display_name: r.actor_display } : null);
-      if (r.type === 'mention' && ctx[String(r.reference_id)]) out.context = ctx[String(r.reference_id)];
+      if ((r.type === 'mention' || r.type === 'reply') && ctx[String(r.reference_id)]) {
+        out.context = ctx[String(r.reference_id)];
+      }
       return out;
     }),
     // Cursor for the next older page, or null at the end of the list.
