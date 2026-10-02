@@ -35,6 +35,9 @@ const TICKET_TTL_MS = 60 * 1000;
 const MAX_PER_USER_SOCKETS = 8;
 // 200 KB is generous for JSON chat traffic and far too small to buffer abuse.
 const MAX_PAYLOAD = parseInt(process.env.WS_MAX_PAYLOAD || '', 10) || 200 * 1024;
+// Matches the REST send path. Declared here rather than imported so the socket
+// gateway keeps no dependency on a route module.
+const MAX_CONTENT = 2000;
 const MSG_WINDOW_MS = 10 * 1000;
 const MSG_WINDOW_MAX = 90;
 const MSG_STRIKE_LIMIT = 6;
@@ -393,7 +396,19 @@ function createGateway(server) {
               } catch { /* stay unverified on read failure */ }
               if (!ws.verified) return;
             }
-            const content = String(data.content || '').trim().slice(0, 2000);
+            // Capped, not truncated, for the same reason the REST paths are: a
+            // socket send has to behave identically to an HTTP one, and a
+            // silently shortened message looks like a successful send of
+            // something the writer did not write.
+            const rawContent = String(data.content == null ? '' : data.content).trim();
+            // Refused rather than truncated. Every other rejection in this
+            // handler is a silent return, and the client posts over HTTP, so
+            // this is a defence-in-depth alignment rather than a path it takes:
+            // a socket send must not be the one way to write a message the HTTP
+            // path would reject.
+            if (rawContent.length > MAX_CONTENT) return;
+            const content = rawContent;
+            const suppressEmbeds = data.suppressEmbeds === true;
             const ids = uploads.sanitizeIds(data.attachments);
             if (!content && !ids.length) return;
             const ch = await visibleChannel(ws.channelId, user.id);
@@ -441,7 +456,7 @@ function createGateway(server) {
             broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
             // Same after-the-fact work as the REST post, so a message submitted
             // over the socket behaves identically.
-            if (/https?:\/\//i.test(content)) {
+            if (!suppressEmbeds && /https?:\/\//i.test(content)) {
               embeds.queue({ kind: 'channel', messageId: msg.id }, content).then((cards) => {
                 if (!cards.length) return;
                 broadcast(ch.server_id, ch.id, { type: 'message_embeds', channel_id: ch.id, server_id: ch.server_id, messageId: msg.id, embeds: cards });

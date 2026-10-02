@@ -127,12 +127,17 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(members, { type: 'dm:message', ...msg, conversationId: req.params.id });
 
+    // Opt-out from link previews for this one message, read server-side for the
+    // same reason as the channel path: a flag the server ignores is a control
+    // that only looks like it works.
+    const suppressEmbeds = (req.body || {}).suppressEmbeds === true;
+
     // A link in a direct message gets the same preview a channel link does,
     // resolved after the broadcast so the message is not held on a slow link.
     // The stored text is used rather than the request body, so what is previewed
     // is what was actually written.
     const text = String((msg && msg.content) || '');
-    if (/https?:\/\//i.test(text)) {
+    if (!suppressEmbeds && /https?:\/\//i.test(text)) {
       embeds.queue({ kind: 'dm', messageId: msg.id, conversationId: req.params.id }, text).then((cards) => {
         if (!cards.length) return;
         gateway.broadcastDm(members, {

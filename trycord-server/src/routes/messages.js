@@ -170,6 +170,11 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       return fail(res, 'TIMED_OUT', 'you are timed out in this server');
     }
     const content = readContent((req.body || {}).content);
+
+    // Opt-out from link previews for this one message. Read here rather than
+    // trusted from the client: a flag the server ignores is a toggle that only
+    // looks like it works.
+    const suppressEmbeds = (req.body || {}).suppressEmbeds === true;
     // Attachments and text are independent: a message may carry files
     // alone, text alone, or both — but must carry at least one.
     const ids = uploads.sanitizeIds((req.body || {}).attachmentIds);
@@ -256,7 +261,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     //
     // Link previews resolve after the broadcast so the reader sees the message
     // immediately and the card arrives when it is ready.
-    if (content && /https?:\/\//i.test(content)) {
+    if (content && !suppressEmbeds && /https?:\/\//i.test(content)) {
       embeds.queue({ kind: 'channel', messageId: msg.id }, content).then((cards) => {
         if (!cards.length) return;
         broadcast(ch.server_id, ch.id, { type: 'message_embeds', channel_id: ch.id, server_id: ch.server_id, messageId: msg.id, embeds: cards });
@@ -264,7 +269,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     }
     // A slash command answered by an application in this community.
     if (content && content.charAt(0) === '/') {
-      bots.respond(ch.server_id, ch, content.split(/\s+/)[0]).then((reply) => {
+      bots.respond(ch.server_id, ch, content).then((reply) => {
         if (!reply) return;
         webhooks.emit(ch.server_id, 'command.created', {
           serverId: ch.server_id, channelId: ch.id,

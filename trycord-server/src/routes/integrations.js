@@ -96,12 +96,22 @@ router.get('/apps', auth, resolveServer, requirePerm('MANAGE_SERVER'), async (re
 router.post('/apps', auth, resolveServer, requirePerm('MANAGE_SERVER'),
   auth.requireVerified, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
     try {
+      const body = req.body || {};
       const app = await bots.createApp({
-        serverId: req.server.id, ownerUserId: req.user.id, name: (req.body || {}).name,
+        serverId: req.server.id, ownerUserId: req.user.id, name: body.name,
+        description: body.description, iconUrl: body.iconUrl,
       });
       res.status(201).json({ app });
     } catch (e) { serviceError(res, e); }
   });
+
+router.patch('/apps/:appId', auth, resolveServer, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
+  try {
+    const out = await bots.updateApp(req.params.appId, req.server.id, req.body || {});
+    if (!out) return fail(res, 'NOT_FOUND', 'application not found');
+    res.json({ app: out });
+  } catch (e) { serviceError(res, e); }
+});
 
 router.get('/apps/:appId/commands', auth, resolveServer, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
   try {

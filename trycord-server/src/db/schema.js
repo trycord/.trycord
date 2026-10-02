@@ -313,6 +313,7 @@ function tables(engine) {
       title       VARCHAR(512),
       description TEXT,
       image_url   VARCHAR(512),
+      video_url   VARCHAR(512),
       kind        VARCHAR(32),
       status      VARCHAR(32) NOT NULL DEFAULT 'pending',
       created_at  VARCHAR(64) NOT NULL,
@@ -324,15 +325,27 @@ function tables(engine) {
     // Outgoing webhooks. The secret is hashed because it is a signing key: the
     // plaintext is shown once at creation, which is what lets a rotation
     // invalidate the previous key.
+    // One table for both directions, because both are "a community has
+    // configured an endpoint and a credential for it". The direction decides
+    // which field carries the secret and which way the traffic flows:
+    //   outgoing - this instance POSTs events to url, signing with secret_hash.
+    //   incoming - an external service POSTs to this instance, presenting the
+    //               token in secret_hash as a bearer credential.
+    // url is nullable because an incoming webhook has no destination; it is
+    // the channel that receives. Both were NOT NULL, which made the incoming
+    // direction unrepresentable without a dummy URL.
     `CREATE TABLE IF NOT EXISTS webhooks (
       id          VARCHAR(64) PRIMARY KEY,
       server_id   VARCHAR(64) NOT NULL,
       channel_id  VARCHAR(64),
+      direction   VARCHAR(16) NOT NULL DEFAULT 'outgoing',
       name        VARCHAR(64) NOT NULL,
-      url         VARCHAR(512) NOT NULL,
+      url         VARCHAR(512),
       secret_hash VARCHAR(255) NOT NULL,
       created_by  VARCHAR(64) NOT NULL,
       active      INTEGER NOT NULL DEFAULT 1,
+      use_count   INTEGER NOT NULL DEFAULT 0,
+      last_used_at VARCHAR(64),
       created_at  VARCHAR(64) NOT NULL,
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
       FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE SET NULL,
@@ -355,25 +368,41 @@ function tables(engine) {
 
     // An application that posts as itself. The token is hashed for the same
     // reason as the webhook secret: it is a bearer credential.
+    // updated_at and status are not decoration: an application that cannot post
+    // (its owner lost permission, or it was disabled) has to be able to say so
+    // rather than looking identical to a working one.
     `CREATE TABLE IF NOT EXISTS bot_applications (
       id            VARCHAR(64) PRIMARY KEY,
       owner_user_id VARCHAR(64) NOT NULL,
       server_id     VARCHAR(64) NOT NULL,
       name          VARCHAR(64) NOT NULL,
+      description   VARCHAR(500),
+      icon_url      VARCHAR(512),
+      -- 'active' while the application may post; 'disabled' while an
+      -- administrator has switched it off without deleting its commands.
+      status        VARCHAR(16) NOT NULL DEFAULT 'active',
       token_hash    VARCHAR(255) NOT NULL,
       created_at    VARCHAR(64) NOT NULL,
+      updated_at    VARCHAR(64) NOT NULL,
       FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     )${engine}`,
 
     // Slash commands an application answers.
+    // options is the declared argument list, as JSON text: an array of
+    // { name, type, required, description, choices }. Stored as text rather
+    // than a JSON column so both engines read it the same way, and so a value
+    // that is not valid JSON can be rejected by this service rather than by a
+    // driver-specific parse error.
     `CREATE TABLE IF NOT EXISTS bot_commands (
       id             VARCHAR(64) PRIMARY KEY,
       application_id VARCHAR(64) NOT NULL,
       name           VARCHAR(32) NOT NULL,
       description    VARCHAR(255),
       response       TEXT NOT NULL,
+      options        TEXT,
       created_at     VARCHAR(64) NOT NULL,
+      updated_at     VARCHAR(64) NOT NULL,
       UNIQUE (application_id, name),
       FOREIGN KEY (application_id) REFERENCES bot_applications(id) ON DELETE CASCADE
     )${engine}`,
@@ -781,6 +810,20 @@ const LEGACY_ALTERS = [
   // the constraint here; uniqueness is enforced by a UNIQUE index below.
   ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255)'],
   ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
+  // Embeds, webhooks and applications. Added after the tables existed, so an
+  // instance upgraded from before them needs these; a fresh one gets the columns
+  // from the CREATE above and these are no-ops.
+  ['webhooks', 'direction', "ALTER TABLE webhooks ADD COLUMN direction VARCHAR(16) NOT NULL DEFAULT 'outgoing'"],
+  ['webhooks', 'use_count', 'ALTER TABLE webhooks ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0'],
+  ['webhooks', 'last_used_at', 'ALTER TABLE webhooks ADD COLUMN last_used_at VARCHAR(64)'],
+  ['bot_applications', 'description', 'ALTER TABLE bot_applications ADD COLUMN description VARCHAR(500)'],
+  ['bot_applications', 'icon_url', 'ALTER TABLE bot_applications ADD COLUMN icon_url VARCHAR(512)'],
+  ['bot_applications', 'status', "ALTER TABLE bot_applications ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'active'"],
+  ['bot_applications', 'updated_at', 'ALTER TABLE bot_applications ADD COLUMN updated_at VARCHAR(64)'],
+  ['bot_commands', 'options', 'ALTER TABLE bot_commands ADD COLUMN options TEXT'],
+  ['bot_commands', 'updated_at', 'ALTER TABLE bot_commands ADD COLUMN updated_at VARCHAR(64)'],
+  ['message_embeds', 'video_url', 'ALTER TABLE message_embeds ADD COLUMN video_url VARCHAR(512)'],
+
   ['messages', 'edited_at', 'ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64)'],
   ['dm_messages', 'edited_at', 'ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64)'],
   // Canonical ordering + idempotency. `seq` is a per-channel (per-conversation
@@ -930,6 +973,7 @@ const INDEXES = [
   'CREATE INDEX idx_membership_events ON server_membership_events(server_id, kind, created_at)',
   'CREATE INDEX idx_embeds_message ON message_embeds(message_id)',
   'CREATE INDEX idx_embeds_dm_message ON message_embeds(dm_message_id)',
+  'CREATE UNIQUE INDEX idx_webhooks_incoming ON webhooks(secret_hash)',
   'CREATE INDEX idx_webhooks_server ON webhooks(server_id, active)',
   'CREATE INDEX idx_webhook_deliveries_hook ON webhook_deliveries(webhook_id, created_at)',
   'CREATE INDEX idx_bot_apps_server ON bot_applications(server_id)',

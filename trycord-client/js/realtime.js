@@ -14,7 +14,13 @@ const listeners = {};
 
 function emit(type, payload) {
   for (const fn of listeners[type] || []) {
-    try { fn(payload); } catch { /* listener error must not kill the socket */ }
+    // One broken listener must not take the socket down with it, but it must
+    // not be invisible either: a swallowed error here hid a missing import in a
+    // preview handler for a whole revision, and the only symptom was a card
+    // that never appeared.
+    try { fn(payload); } catch (e) {
+      if (typeof console !== 'undefined' && console.warn) console.warn('[trycord] listener for ' + type + ' failed', e);
+    }
   }
 }
 
