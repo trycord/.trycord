@@ -1787,6 +1787,24 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .row--channel.muted .ch-name { text-decoration: line-through; text-decoration-thickness: 1px; }
 .emoji-btn { color: var(--t-mut); font-size: 1.15rem; padding: 6px 8px; border-radius: var(--t-r-s); background: transparent; }
 .emoji-btn:hover { color: var(--t-txt); background: var(--t-base2); }
+
+/* The link-preview opt-out sits with the other composer controls and reads as
+   "on" rather than as an error. aria-pressed carries the state, so the class is
+   presentation only and the button works without it. */
+.preview-toggle {
+  color: var(--t-mut);
+  padding: 6px 8px;
+  border-radius: var(--t-r-s);
+  background: transparent;
+  display: inline-flex;
+}
+.preview-toggle:hover { color: var(--t-txt); background: var(--t-base2); }
+.preview-toggle.is-on {
+  color: var(--t-accent);
+  background: color-mix(in srgb, var(--t-accent) 14%, transparent);
+}
+.preview-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+.preview-toggle:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
 .popover.emoji-picker {
   display: flex;
   flex-direction: column;
@@ -4613,6 +4631,19 @@ html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width
   padding: var(--t-d-2) var(--t-d-3);
   border-top: 1px solid var(--t-line);
 }
+.embed-card__foot a { color: var(--t-txt2); font-size: var(--t-fs-xs); }
+
+/* A video card is a figure rather than a link, so it has no border-left accent
+   and its media fills the width. preload="none" on the element is what keeps a
+   channel of video links from fetching every file on open; the styling must not
+   reintroduce that by implying an eager load. */
+.embed-card.is-video { padding: 0; border-left-width: 1px; max-width: 46ch; }
+.embed-card.is-video video {
+  display: block;
+  width: 100%;
+  max-height: 340px;
+  background: #000;
+}
 
 /* A link this instance could not fetch is shown, dimmed, rather than dropped:
    silence reads as a typo and gives the reader no way to tell it from one. */
@@ -4738,6 +4769,15 @@ html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width
 .command-row__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .command-row__name { font-family: var(--t-mono); font-weight: 600; }
 .command-row__response { margin: 0; color: var(--t-txt2); }
+/* How the command is typed. Wraps rather than truncating: a usage line that
+   loses its last option reads as though that option does not exist. */
+.command-row__usage {
+  font-family: var(--t-mono);
+  font-size: var(--t-fs-xs);
+  color: var(--t-accent);
+  overflow-wrap: anywhere;
+  padding: 2px 0;
+}
 
 
 /* A webhook endpoint is exactly the string an operator needs to read in full to
@@ -4748,6 +4788,8 @@ html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width
   .embed-card { max-width: none; padding: var(--t-d-2) var(--t-d-3); }
   .embed-card.is-image { max-width: none; }
   .embed-card.is-image img { max-height: 200px; }
+  .embed-card.is-video { max-width: none; }
+  .embed-card.is-video video { max-height: 220px; }
   .command-row { flex-direction: column; align-items: stretch; }
   .stat-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
   .secret-form { flex-direction: column; }

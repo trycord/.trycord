@@ -96,15 +96,24 @@ function appsPanel(ctx) {
 
   const form = el('form', { class: 'secret-form' });
   const name = el('input', { class: 'input', type: 'text', placeholder: 'Reminder bot', maxlength: '64', 'aria-label': 'Application name' });
+  // Optional, and deliberately optional: a working application needs neither.
+  // The icon is checked by the server against the same address guard a preview
+  // uses, so this field cannot be a way to point a reader at a private host.
+  const desc = el('input', { class: 'input', type: 'text', placeholder: 'What it does (optional)', maxlength: '500', 'aria-label': 'Application description' });
+  const icon = el('input', { class: 'input', type: 'url', placeholder: 'Icon URL (optional)', 'aria-label': 'Application icon URL' });
   const add = el('button', { class: 'btn primary', type: 'submit' }, 'Create application');
-  form.append(name, add);
+  form.append(name, desc, icon, add);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const label = name.value.trim();
     if (!label) { toast('An application needs a name.', 'error'); return; }
     try {
-      const res = await Api.createApp(ctx.serverId, label);
-      name.value = '';
+      const res = await Api.createApp(ctx.serverId, {
+        name: label,
+        description: desc.value.trim() || undefined,
+        iconUrl: icon.value.trim() || undefined,
+      });
+      name.value = ''; desc.value = ''; icon.value = '';
       ctx.showAppToken(res.app);
       // Relisted from the server, so what is on screen is what was stored. The
       // optimistic alternative would show an application before the row exists
@@ -128,18 +137,37 @@ function commandEditor(ctx, appId) {
   const cmdName = el('input', { class: 'input', type: 'text', placeholder: 'ping', maxlength: '32', 'aria-label': 'Command name' });
   const cmdResp = el('input', { class: 'input', type: 'text', placeholder: 'Reply sent when someone types /ping', maxlength: '2000', 'aria-label': 'Command reply' });
   const cmdDesc = el('input', { class: 'input', type: 'text', placeholder: 'Description (optional)', maxlength: '255', 'aria-label': 'Command description' });
+  // Declared options, one per line, as name:type. The declaration is what the
+  // server binds arguments against, so a typo here becomes a refusal at send
+  // time rather than a silently ignored argument.
+  const cmdOpts = el('input', {
+    class: 'input', type: 'text', maxlength: '400',
+    placeholder: 'Options: loud:boolean times:number mood:choice(happy,sad)',
+    'aria-label': 'Command options',
+  });
   const save = el('button', { class: 'btn', type: 'submit' }, 'Save command');
-  form.append(cmdName, cmdDesc, cmdResp, save);
+  form.append(cmdName, cmdDesc, cmdResp, cmdOpts, save);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const n = cmdName.value.trim().replace(/^\/+/, '');
     const response = cmdResp.value;
     if (!n || !response) { toast('A command needs a name and a reply.', 'error'); return; }
     try {
+      let options;
+      const spec = cmdOpts.value.trim();
+      if (spec) {
+        options = spec.split(/[,\n]/).map((part) => part.trim()).filter(Boolean).map((part) => {
+          const m = /^([a-z0-9][a-z0-9_-]*)(?::([a-z]+))?(?:\(([^)]*)\))?$/i.exec(part);
+          if (!m) throw new Error('cannot read the option "' + part + '" - use name:type');
+          const o = { name: m[1], type: (m[2] || 'string').toLowerCase() };
+          if (m[3]) o.choices = m[3].split(',').map((c) => c.trim()).filter(Boolean);
+          return o;
+        });
+      }
       await Api.setAppCommand(ctx.serverId, appId, {
-        name: n, response, description: cmdDesc.value.trim() || undefined,
+        name: n, response, description: cmdDesc.value.trim() || undefined, options,
       });
-      cmdName.value = ''; cmdDesc.value = ''; cmdResp.value = '';
+      cmdName.value = ''; cmdDesc.value = ''; cmdResp.value = ''; cmdOpts.value = '';
       await load();
       toast('Command saved.', 'ok');
     } catch (ex) { toast(ex.message || 'Could not save the command.', 'error'); }
@@ -162,6 +190,11 @@ function commandEditor(ctx, appId) {
       const main = el('div', { class: 'command-row__main' });
       main.appendChild(el('code', { class: 'command-row__name' }, '/' + c.name));
       if (c.description) main.appendChild(el('span', { class: 'muted small' }, c.description));
+      if ((c.options || []).length) {
+        const names = c.options.map((o) => (o.required ? '' : '[') + o.name + (o.required ? '' : ']')
+          + (o.type === 'choice' ? '(' + (o.choices || []).join('|') + ')' : '')).join(' ');
+        main.appendChild(el('code', { class: 'command-row__usage' }, '/' + c.name + ' ' + names));
+      }
       main.appendChild(el('p', { class: 'command-row__response' }, c.response));
       row.appendChild(main);
       row.appendChild(dangerButton('Delete', () => {
@@ -347,8 +380,31 @@ export async function renderIntegrations(container, serverId) {
       const card = el('div', { class: 'card' });
       const head = el('div', { class: 'card-head' });
       head.appendChild(el('strong', {}, app.name));
+      if (app.status === 'disabled') head.appendChild(el('span', { class: 'tag warn' }, 'Disabled'));
       head.appendChild(el('span', { class: 'muted small' }, 'created ' + relTime(app.createdAt)));
       card.appendChild(head);
+      if (app.description) card.appendChild(el('p', { class: 'muted small' }, app.description));
+
+      // A disabled application keeps its commands but answers nobody. The button
+      // says which state it is in rather than "toggle", so the label is never
+      // describing the opposite of the current state.
+      const live = el('input', { class: 'switch', type: 'checkbox', id: 'app-' + app.id });
+      live.checked = (app.status || 'active') === 'active';
+      live.addEventListener('change', async () => {
+        try {
+          await Api.updateApp(ctx.serverId, app.id, { status: live.checked ? 'active' : 'disabled' });
+          toast(live.checked ? 'Application enabled.' : 'Application disabled. It will answer nobody.', 'ok');
+          renderAppList(node);
+        } catch (ex) {
+          live.checked = !live.checked;
+          toast(ex.message || 'Could not change the application.', 'error');
+        }
+      });
+      card.appendChild(settingRow({
+        label: 'Answering',
+        hint: 'A disabled application keeps its commands and stops replying to them.',
+        control: live,
+      }));
       card.appendChild(el('p', { class: 'muted small' },
         'Post to /api/bot/channels/{channelId}/messages with this token as a Bearer header.'));
 

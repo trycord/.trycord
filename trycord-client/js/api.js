@@ -441,11 +441,12 @@ joinDiscover: (id) =>
     const qs = q.toString();
     return request('GET', '/api/dms/' + encodeURIComponent(id) + '/messages' + (qs ? '?' + qs : ''));
   },
-  sendDm: (id, content, clientNonce, attachmentIds) =>
+  sendDm: (id, content, clientNonce, attachmentIds, suppressEmbeds) =>
     request('POST', '/api/dms/' + encodeURIComponent(id) + '/messages',
       { body: Object.assign(
         clientNonce ? { content, clientNonce } : { content },
-        attachmentIds && attachmentIds.length ? { attachmentIds } : {}
+        attachmentIds && attachmentIds.length ? { attachmentIds } : {},
+        suppressEmbeds ? { suppressEmbeds: true } : {}
       ) }),
   deleteDm: (id, messageId) =>
     request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId)),
@@ -605,8 +606,11 @@ joinDiscover: (id) =>
 
   apps: (serverId) =>
     request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/apps'),
-  createApp: (serverId, name) =>
-    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/apps', { body: { name } }),
+  createApp: (serverId, body) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/apps',
+      { body: typeof body === 'string' ? { name: body } : body }),
+  updateApp: (serverId, appId, body) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId), { body }),
   deleteApp: (serverId, appId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId)),
   appCommands: (serverId, appId) =>

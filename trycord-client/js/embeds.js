@@ -50,6 +50,33 @@ function imageCard(card) {
   return box;
 }
 
+// A video preview is the file itself, played in place. preload="none" is the
+// point: a channel full of video links would otherwise have every reader's
+// browser fetch every one of them on open, which is the request-amplifier
+// problem the whole fetch-side guard exists to prevent. Nothing loads until the
+// reader presses play.
+function videoCard(card) {
+  const box = el('div', { class: 'embed-card is-video' });
+  const media = el('video', {
+    src: card.videoUrl,
+    controls: true,
+    preload: 'none',
+    playsinline: true,
+    // No referrer: the host must not learn who read the message, and the file
+    // must not learn which page embedded it.
+    referrerPolicy: 'no-referrer',
+  });
+  media.setAttribute('aria-label', card.title || 'Video from ' + hostOf(card.url));
+  const foot = el('div', { class: 'embed-card__foot' });
+  const link = el('a', {
+    href: card.url, target: '_blank', rel: 'noopener noreferrer nofollow',
+  }, hostOf(card.url));
+  foot.appendChild(link);
+  if (card.title) foot.appendChild(el('span', { class: 'embed-card__title' }, card.title));
+  box.append(media, foot);
+  return box;
+}
+
 function linkCard(card) {
   const box = el('a', {
     class: 'embed-card',
@@ -69,6 +96,7 @@ function linkCard(card) {
 export function embedCard(card) {
   if (!card || !card.url) return null;
   if (card.status && card.status !== 'ok') return unavailableCard(card);
+  if (card.kind === 'video' && card.videoUrl) return videoCard(card);
   if (card.kind === 'image' && card.imageUrl) return imageCard(card);
   return linkCard(card);
 }
@@ -96,6 +124,8 @@ export function paintEmbeds(tray, cards) {
 // attached image. The anchor is left in place so middle-click and "open in new
 // tab" keep working.
 export function wireEmbedImages(root) {
+  // Images only. A video card carries its own controls and a real anchor to the
+  // source, so giving it a click-to-lightbox would swallow the play button.
   for (const box of root.querySelectorAll('.embed-card.is-image')) {
     const img = box.querySelector('img');
     if (!img) continue;

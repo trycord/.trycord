@@ -332,7 +332,22 @@ async function renderDmThread(container, dmId) {
   composer.appendChild(fileBtn);
   composer.appendChild(fileInput);
   composer.appendChild(ta);
-  composer.appendChild(el('div', { class: 'composer-actions' }, emojiBtn, sendBtn));
+  // The same per-message opt-out the channel composer has. One control, same
+  // meaning, same server-side enforcement.
+  const previewOff = el('button', {
+    class: 'preview-toggle', type: 'button',
+    title: 'Do not generate link previews for this message',
+    'aria-label': 'Do not generate link previews for this message',
+    'aria-pressed': 'false',
+  }, icon('globe'));
+  previewOff.addEventListener('click', () => {
+    const on = previewOff.getAttribute('aria-pressed') !== 'true';
+    previewOff.setAttribute('aria-pressed', on ? 'true' : 'false');
+    previewOff.classList.toggle('is-on', on);
+    previewOff.title = on ? 'Link previews are off for the next message'
+      : 'Do not generate link previews for this message';
+  });
+  composer.appendChild(el('div', { class: 'composer-actions' }, previewOff, emojiBtn, sendBtn));
   conv.appendChild(el('div', { class: 'composer-dock' }, attachments.node, composer));
   {
     const me = State.me;
@@ -371,8 +386,13 @@ async function renderDmThread(container, dmId) {
     const nonce = pendingNonce || newNonce();
     pendingNonce = nonce;
     try {
-      await Api.sendDm(dmId, content, nonce, attachmentIds);
+      const suppressEmbeds = previewOff.getAttribute('aria-pressed') === 'true';
+      await Api.sendDm(dmId, content, nonce, attachmentIds, suppressEmbeds);
       pendingNonce = null;
+      if (suppressEmbeds) {
+        previewOff.setAttribute('aria-pressed', 'false');
+        previewOff.classList.remove('is-on');
+      }
       ta.value = '';
       attachments.clear();
       ta.style.height = 'auto';
