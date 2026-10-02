@@ -40,6 +40,20 @@ The server serves the API, the web client and the public site on one port
 (`http://localhost:9971` by default). The seed account is `demo` /
 `demo1234` and is for local development only.
 
+It finds the web client next to itself in the layout this repository ships with.
+If your layout is different — a single directory, a checkout of only
+`trycord-server/`, or an image that copies the client somewhere else — point it
+at the directory holding `index.html`:
+
+```
+TRYCORD_CLIENT_DIR=/srv/trycord npm start
+```
+
+A relative value resolves against `trycord-server/`, not against the directory
+you happened to start `node` in. If it is set to something that does not contain
+`index.html`, or is set at all and no client is found, the API still runs and the
+server lists every path it looked at.
+
 ## Checks
 
 ```

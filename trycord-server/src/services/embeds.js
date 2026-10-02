@@ -243,10 +243,17 @@ async function queue(scope, content) {
   const target = scope && scope.kind === 'dm'
     ? { dmMessageId: scope.messageId, conversationId: scope.conversationId }
     : { messageId: scope && scope.messageId };
+  // The duplicate check has to name the column the scope actually uses. Reading
+  // message_id for a direct message matched any DM preview with the same URL,
+  // whatever the message - so the second DM linking the same page produced no
+  // card at all, and only on a database where an earlier one had already been
+  // previewed. It passed in isolation and failed in a suite.
+  const keyCol = target.dmMessageId ? 'dm_message_id' : 'message_id';
+  const keyVal = target.dmMessageId || target.messageId || null;
   for (const url of urls) {
     const existing = await db.get(
-      'SELECT id FROM message_embeds WHERE message_id IS ? AND url = ?',
-      [target.messageId || null, url]
+      'SELECT id FROM message_embeds WHERE ' + keyCol + ' IS ? AND url = ?',
+      [keyVal, url]
     );
     if (existing) continue;
     const id = uuid();
