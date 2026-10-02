@@ -93,8 +93,12 @@ export function icon(name, opts = {}) {
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
   if (opts.size) { svg.setAttribute('width', opts.size); svg.setAttribute('height', opts.size); }
-  if (opts.class) svg.setAttribute('class', opts.class);
-  // SVGElement.className is read-only in WebKit.
+  // A passed class is added to the base one, never swapped for it. An svg with a
+  // viewBox and no box grows to whatever its container offers, and .ui-icon is
+  // the only thing giving one a size - drop it and a small glyph becomes a
+  // full-width block. SVGElement.className is read-only in WebKit, hence
+  // setAttribute.
+  if (opts.class) svg.setAttribute('class', 'ui-icon ' + opts.class);
   else svg.setAttribute('class', 'ui-icon');
   for (const seg of (d || ICON_PATHS.inbox).split(' M').map((p, i) => (i ? 'M' + p : p))) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');

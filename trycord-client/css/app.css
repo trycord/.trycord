@@ -899,11 +899,18 @@ img { max-width: 100%; }
   .settings-nav__toggle-icon { display: inline-flex; color: var(--t-mut); }
   .settings-nav__toggle-icon .ui-icon { width: 15px; height: 15px; }
   .settings-nav__toggle-caret { margin-left: auto; color: var(--t-mut); }
+  /* The caret selector also matches the svg itself, because icon() puts the
+     class straight on the element. Written as a descendant only, it matched
+     nothing, the icon inherited no width, and the disclosure button rendered a
+     712px hamburger. */
+  .settings-nav__toggle-caret,
   .settings-nav__toggle-caret .ui-icon { width: 14px; height: 14px; transform: rotate(90deg); }
+  .settings-nav__toggle[aria-expanded="true"] .settings-nav__toggle-caret,
   .settings-nav__toggle[aria-expanded="true"] .settings-nav__toggle-caret .ui-icon {
     transform: rotate(-90deg);
   }
   /* The caret turns with the disclosure rather than swapping glyphs. */
+  .settings-nav__toggle-caret,
   .settings-nav__toggle-caret .ui-icon { transition: transform var(--t-fast) var(--t-ease); }
 
   .set-row { flex-direction: column; align-items: stretch; gap: var(--t-d-2); }
