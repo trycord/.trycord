@@ -275,6 +275,109 @@ function tables(engine) {
       FOREIGN KEY (uploader_id) REFERENCES users(id)
     )${engine}`,
 
+    // Join and departure history.
+    //
+    // server_members only holds the present: a member who leaves has no row, so
+    // "how many people left" was not answerable at all - the audit log records
+    // moderator actions, not someone clicking leave. This table is append-only
+    // and keeps the history a deleted membership row cannot.
+    `CREATE TABLE IF NOT EXISTS server_membership_events (
+      id         VARCHAR(64) PRIMARY KEY,
+      server_id  VARCHAR(64) NOT NULL,
+      user_id    VARCHAR(64) NOT NULL,
+      kind       VARCHAR(16) NOT NULL,
+      reason     VARCHAR(64),
+      created_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+
+    // --- Extensions: embeds, webhooks, bot applications ---
+    //
+    // Additive: five new tables and nothing existing altered, so a deployment
+    // that has never heard of any of this is unaffected until code uses it.
+
+    // A link preview attached to a message. One row per URL per message, so a
+    // repeated link cannot fan out into repeated network fetches.
+    // Nullable message_id with direct-message columns beside it, for the same
+    // reason attachments has them: a direct message is a row in dm_messages, not
+    // in messages, so a NOT NULL foreign key to messages would make a preview in
+    // a DM an unrepresentable row. Relaxing it changes nothing for existing
+    // rows, and one table beats two that drift apart.
+    `CREATE TABLE IF NOT EXISTS message_embeds (
+      id          VARCHAR(64) PRIMARY KEY,
+      message_id  VARCHAR(64),
+      dm_conversation_id VARCHAR(64),
+      dm_message_id      VARCHAR(64),
+      url         VARCHAR(512) NOT NULL,
+      site_name   VARCHAR(255),
+      title       VARCHAR(512),
+      description TEXT,
+      image_url   VARCHAR(512),
+      kind        VARCHAR(32),
+      status      VARCHAR(32) NOT NULL DEFAULT 'pending',
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_message_id) REFERENCES dm_messages(id) ON DELETE CASCADE
+    )${engine}`,
+
+    // Outgoing webhooks. The secret is hashed because it is a signing key: the
+    // plaintext is shown once at creation, which is what lets a rotation
+    // invalidate the previous key.
+    `CREATE TABLE IF NOT EXISTS webhooks (
+      id          VARCHAR(64) PRIMARY KEY,
+      server_id   VARCHAR(64) NOT NULL,
+      channel_id  VARCHAR(64),
+      name        VARCHAR(64) NOT NULL,
+      url         VARCHAR(512) NOT NULL,
+      secret_hash VARCHAR(255) NOT NULL,
+      created_by  VARCHAR(64) NOT NULL,
+      active      INTEGER NOT NULL DEFAULT 1,
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
+      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE SET NULL,
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )${engine}`,
+
+    // One delivery attempt, kept rather than counted so a failing integration
+    // can be inspected instead of guessed at.
+    `CREATE TABLE IF NOT EXISTS webhook_deliveries (
+      id          VARCHAR(64) PRIMARY KEY,
+      webhook_id  VARCHAR(64) NOT NULL,
+      event_type  VARCHAR(64) NOT NULL,
+      payload     TEXT,
+      status      VARCHAR(32) NOT NULL,
+      status_code INTEGER,
+      error       TEXT,
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
+    )${engine}`,
+
+    // An application that posts as itself. The token is hashed for the same
+    // reason as the webhook secret: it is a bearer credential.
+    `CREATE TABLE IF NOT EXISTS bot_applications (
+      id            VARCHAR(64) PRIMARY KEY,
+      owner_user_id VARCHAR(64) NOT NULL,
+      server_id     VARCHAR(64) NOT NULL,
+      name          VARCHAR(64) NOT NULL,
+      token_hash    VARCHAR(255) NOT NULL,
+      created_at    VARCHAR(64) NOT NULL,
+      FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+
+    // Slash commands an application answers.
+    `CREATE TABLE IF NOT EXISTS bot_commands (
+      id             VARCHAR(64) PRIMARY KEY,
+      application_id VARCHAR(64) NOT NULL,
+      name           VARCHAR(32) NOT NULL,
+      description    VARCHAR(255),
+      response       TEXT NOT NULL,
+      created_at     VARCHAR(64) NOT NULL,
+      UNIQUE (application_id, name),
+      FOREIGN KEY (application_id) REFERENCES bot_applications(id) ON DELETE CASCADE
+    )${engine}`,
+
     // --- Friendships (Phase 2) ---
     `CREATE TABLE IF NOT EXISTS friend_requests (
       id           VARCHAR(64) PRIMARY KEY,
@@ -824,6 +927,13 @@ const INDEXES = [
   'CREATE INDEX idx_messages_created ON messages(created_at)',
   'CREATE INDEX idx_invites_server ON invites(server_id)',
   'CREATE INDEX idx_messages_thread ON messages(thread_root_id, seq)',
+  'CREATE INDEX idx_membership_events ON server_membership_events(server_id, kind, created_at)',
+  'CREATE INDEX idx_embeds_message ON message_embeds(message_id)',
+  'CREATE INDEX idx_embeds_dm_message ON message_embeds(dm_message_id)',
+  'CREATE INDEX idx_webhooks_server ON webhooks(server_id, active)',
+  'CREATE INDEX idx_webhook_deliveries_hook ON webhook_deliveries(webhook_id, created_at)',
+  'CREATE INDEX idx_bot_apps_server ON bot_applications(server_id)',
+  'CREATE INDEX idx_bot_commands_app ON bot_commands(application_id)',
   'CREATE INDEX idx_dm_messages_thread ON dm_messages(thread_root_id, seq)',
   'CREATE INDEX idx_attachments_message ON attachments(message_id)',
   'CREATE INDEX idx_attachments_channel ON attachments(channel_id)',

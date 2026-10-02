@@ -8,6 +8,7 @@ import {
 } from './ui.js';
 import { avatar, downloadAttachment, emptyState, icon, messageRow } from './components.js';
 import { createAttachTray } from './attach-tray.js';
+import { paintEmbeds, wireEmbedImages } from './embeds.js';
 import { applyReplyCount, createReplyCounts, createThread } from './thread.js';
 import { renderContextHeader } from './shell.js';
 import Realtime from './realtime.js';
@@ -187,6 +188,7 @@ async function renderDmThread(container, dmId) {
       // a DM message arrives with is mapped here rather than taught two shapes.
       reply_count: replyCounts.get({ id: m.id, replyCount: m.replyCount }),
       attachments: m.attachments || [],
+      embeds: m.embeds || [],
     }, {
       meId: State.me && State.me.id,
       onDelete: mine ? () => removeDm(dmId, m.id) : null,
@@ -398,6 +400,17 @@ async function renderDmThread(container, dmId) {
   dmSubs = [
     Realtime.on('dm:message', (m) => {
       if (String(m.conversationId) === String(dmId)) appendDmMessage(m);
+    }),
+    Realtime.on('dm:message_embeds', (p) => {
+      // Scoped by conversation, for the same reason the channel handler is
+      // scoped by channel: a frame without one is a bug, and matching every
+      // conversation would put one message's card on another's row.
+      if (String(p.conversationId) !== String(dmId)) return;
+      const node = feed.querySelector('[data-message-id="' + p.messageId + '"]');
+      const tray = node && node.querySelector('.embed-tray');
+      if (!tray) return;
+      paintEmbeds(tray, p.embeds);
+      wireEmbedImages(tray);
     }),
     Realtime.on('dm:message_deleted', (m) => {
       if (String(m.conversationId) === String(dmId)) {

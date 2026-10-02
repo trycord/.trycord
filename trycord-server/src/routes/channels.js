@@ -8,6 +8,7 @@ const channels = require('../services/channels');
 const events = require('../services/events');
 const slugs = require('../services/slugs');
 const permissions = require('../services/permissions');
+const webhooks = require('../services/webhooks');
 
 const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
@@ -44,6 +45,7 @@ router.post('/', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (re
     if (!name || !String(name).trim()) return fail(res, 'VALIDATION_ERROR', 'name required');
     const ch = await channels.create(req.server.id, { name, topic, categoryId });
     events.emit(req.server.id, 'channel_created', { channel: ch });
+    webhooks.emit(req.server.id, 'channel.created', { serverId: req.server.id, channelId: String(ch.id), name: ch.name }).catch(() => {});
     res.json(ch);
   } catch (e) { serviceError(res, e); }
 });
@@ -74,6 +76,7 @@ router.delete('/:channelId', auth.requireVerified, requirePerm('MANAGE_CHANNELS'
     if (!ch) return;
     const out = await channels.remove(req.server.id, ch.id);
     events.emit(req.server.id, 'channel_deleted', { channelId: String(ch.id) });
+    webhooks.emit(req.server.id, 'channel.deleted', { serverId: req.server.id, channelId: String(ch.id) }).catch(() => {});
     res.json(out);
   } catch (e) { serviceError(res, e); }
 });

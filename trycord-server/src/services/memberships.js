@@ -2,6 +2,7 @@
 // Join/leave/kick/ban/timeout go through here — never raw INSERTs in routes.
 const db = require('../db');
 const { now, uuid } = require('../util');
+const webhooks = require('./webhooks');
 const roles = require('./roles');
 const events = require('./events');
 
@@ -148,6 +149,12 @@ async function joinInner(serverId, userId, username, conn) {
     [uuid(), userId, serverId, username, now()]
   );
   await roles.ensureBaseline(serverId, userId, conn);
+  await recordEvent(serverId, userId, 'joined', null, conn);
+  // Best-effort: a community's webhook endpoint being down must not stop someone
+  // joining.
+  if (!conn) {
+    webhooks.emit(serverId, 'member.joined', { serverId, userId }).catch(() => {});
+  }
   return { serverId };
 }
 
@@ -217,17 +224,34 @@ async function assertManageable(serverId, actorId, targetId, verb, conn = db) {
   return srv;
 }
 
-async function removeMembership(serverId, targetId, conn) {
+async function removeMembership(serverId, targetId, conn, reason) {
   await conn.run('DELETE FROM member_roles WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
   await conn.run('DELETE FROM server_members WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
+  // Written before the row goes, so churn is still answerable afterwards.
+  await recordEvent(serverId, targetId, 'left', reason || null, conn);
   invalidateMembership(serverId);
+  if (!conn) {
+    webhooks.emit(serverId, 'member.left', { serverId, userId: targetId, reason: reason || null }).catch(() => {});
+  }
+}
+
+// Churn history. Separate from server_members because a departure deletes that
+// row, and "how many people left" has to survive the deletion.
+async function recordEvent(serverId, userId, kind, reason, conn) {
+  const q = conn || db;
+  try {
+    await q.run(
+      'INSERT INTO server_membership_events (id, server_id, user_id, kind, reason, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [uuid(), serverId, userId, kind, reason, now()]
+    );
+  } catch { /* history is never worth failing a membership change */ }
 }
 
 async function kick(serverId, actorId, targetId) {
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'kicked', t);
     if (!(await get(serverId, targetId, t))) throw { code: 'NOT_A_MEMBER', message: 'user is not a member' };
-    await removeMembership(serverId, targetId, t);
+    await removeMembership(serverId, targetId, t, 'kicked');
     return { ok: true };
   });
   events.emit(serverId, 'member_kicked', { userId: String(targetId) });
@@ -243,7 +267,7 @@ async function leave(serverId, userId) {
     if (srv.owner_id === userId) {
       throw { code: 'OWNER_CANNOT_LEAVE', message: 'the owner cannot leave — transfer ownership or delete the server' };
     }
-    await removeMembership(serverId, userId, t);
+    await removeMembership(serverId, userId, t, 'left');
     return { ok: true };
   });
   events.emit(serverId, 'member_left', { userId: String(userId) });
@@ -259,7 +283,7 @@ async function ban(serverId, actorId, targetId, { reason, minutes } = {}) {
   if (!target) throw { code: 'NOT_FOUND', message: 'user not found' };
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'banned', t);
-    await removeMembership(serverId, targetId, t);
+    await removeMembership(serverId, targetId, t, 'banned');
     await t.run('DELETE FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
     const exp = expiresAt(minutes);
     await t.run(

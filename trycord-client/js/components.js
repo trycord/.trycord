@@ -6,6 +6,7 @@
 // data.
 
 import { esc, el, clear, relTime, apiSrc, qs, icon, openLightbox, ICON_PATHS } from './ui.js';
+import { embedTray, paintEmbeds, wireEmbedImages } from './embeds.js';
 import { peerPresence, can } from './state.js';
 import Api from './api.js';
 
@@ -415,6 +416,14 @@ export function messageRow(msg, opts = {}) {
     }
     body.appendChild(files);
   }
+
+  // Always created, even with no cards: the socket delivers previews after the
+  // message itself, and the tray is where they land. A tray created only when
+  // there are cards would mean the arriving card had nowhere to go.
+  const tray = embedTray(msg.id);
+  paintEmbeds(tray, msg.embeds);
+  wireEmbedImages(tray);
+  body.appendChild(tray);
 
   const reactBar = el('div', { class: 'msg-reactions' });
   paintReactions(reactBar, msg.reactions, opts.onReact);

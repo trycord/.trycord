@@ -425,11 +425,25 @@ img { max-width: 100%; }
    above the content rather than a sidebar beside it. */
 
 /* The width at which the settings frame spends a third track on context rather
-   than centring a form in the middle of the window. 1180px is the point where
-   nav + a readable form + a summary all fit without any of them being squeezed;
-   below it the context is hidden, not moved, because it has nowhere to go that
-   is not underneath the form. */
-:root { --ui-settings-context: 0px; --ui-settings-pane: 780px; }
+   than centring a form in the middle of the window.
+
+   The two frames need different thresholds, because the settings frame carries
+   its own 240px navigation column inside a content column the shell has already
+   spent 240px of sidebar and 260px of member panel on. Counting that up:
+   a readable pane wants 620px, so settings needs
+   620 + 240 (nav) + 320 (context) + gaps ≈ 1228 of content, which is a ~2300px
+   window once the shell's own columns are counted; profile has no nav column
+   and is comfortable at ~1550px. Using one
+   threshold for both - 1180px, as this was - put the context on screen at widths
+   where the pane had 284px left, so the form wrapped one word per line and the
+   heading sat on top of the context. Below a frame's own threshold the context
+   is hidden rather than moved, because it has nowhere to go that is not
+   underneath the form. */
+:root {
+  --ui-settings-context: 0px;
+  --ui-profile-context: 0px;
+  --ui-settings-pane: 780px;
+}
 
 /* One contextual-column mechanism, shared. The settings frame and the profile
    frame have the same shape - content beside a narrow summary - so they use the
@@ -445,7 +459,7 @@ img { max-width: 100%; }
   width: 100%;
 }
 /* The profile carries no settings navigation, so it has no first track. */
-.profile-layout { grid-template-columns: minmax(0, 1fr) var(--ui-settings-context); }
+.profile-layout { grid-template-columns: minmax(0, 1fr) var(--ui-profile-context); }
 
 /* ---- the contextual column --------------------------------------------
    A region that only earns width once there is width to earn it with. The
@@ -474,8 +488,10 @@ img { max-width: 100%; }
    paints outside its own box and lands on top of the pane. The content is kept
    in the DOM and restored by the next breakpoint rather than removed, so a
    window dragged across the threshold does not refetch anything. */
-@media (max-width: 1179px) {
-  .settings-context,
+@media (max-width: 2298px) {
+  .settings-context { display: none; }
+}
+@media (max-width: 1558px) {
   .profile-context { display: none; }
 }
 
@@ -488,7 +504,10 @@ img { max-width: 100%; }
   color: var(--t-mut);
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 1559px) {
+  :root { --ui-profile-context: 320px; }
+}
+@media (min-width: 2299px) {
   :root {
     --ui-settings-context: 320px;
     /* The pane gets wider too, because the cap that keeps a form readable is a
@@ -497,11 +516,17 @@ img { max-width: 100%; }
     --ui-settings-pane: 860px;
   }
 }
-@media (min-width: 1600px) {
-  :root { --ui-settings-context: 380px; --ui-settings-pane: 940px; }
+@media (min-width: 2300px) {
+  :root {
+    --ui-settings-context: 380px; --ui-settings-pane: 940px;
+    --ui-profile-context: 380px;
+  }
 }
-@media (min-width: 2200px) {
-  :root { --ui-settings-context: 420px; --ui-settings-pane: 1080px; }
+@media (min-width: 2900px) {
+  :root {
+    --ui-settings-context: 420px; --ui-settings-pane: 1080px;
+    --ui-profile-context: 420px;
+  }
 }
 
 /* ---- the nav ---- */
@@ -818,7 +843,19 @@ img { max-width: 100%; }
 
 /* ---- narrower: the nav stops being a sidebar ---- */
 
-@media (max-width: 899px) {
+/* Stacked from 1699px, not 899px. The two-column settings frame needs its own
+   240px navigation column plus a pane worth reading, and it sits inside a shell
+   that has already spent 240px of sidebar and up to 260px of member panel. That
+   is ~860px of content, which is a ~1700px window; holding the frame open down
+   to 900px is what left the pane 284px wide and wrapped every heading one word
+   per line. Below the threshold the navigation becomes the disclosure it already
+   has a toggle for, so nothing is lost - it is one tap instead of always-on.
+
+   The threshold is 1699 rather than 1500 so the pane never gets *narrower* as
+   the window widens: stacked, the pane takes the whole content column, so
+   opening the second column has to buy more than it costs. It does, once the
+   context column appears below. */
+@media (max-width: 1699px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--t-d-4); }
 
   /* A disclosure rather than a scroller: a horizontal strip of twenty sections
@@ -4504,4 +4541,216 @@ html[data-fullpage="page-editor"] .view-root { max-width: none; margin: 0; width
 }
 @media (min-width: 3200px) {
   :root { --t-content-width: 1600px; }
+}
+
+/* ==========================================================================
+   Link previews
+   --------------------------------------------------------------------------
+   A card sits inside the message body, aligned to the text rather than to the
+   avatar gutter, because it belongs to the message content rather than to who
+   sent it. Width is capped in ch units so a card reads the same at every column
+   width; the conversation column is already capped upstream, so this is a floor
+   against a narrow phone rather than a second ceiling. */
+.embed-tray {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-2);
+  margin-top: var(--t-d-2);
+}
+/* Present on every message so an arriving preview has somewhere to land, but it
+   must not add a row of dead space to the messages that have no links. */
+.embed-tray:empty { display: none; }
+
+.embed-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 60ch;
+  padding: var(--t-d-3) var(--t-d-4);
+  border: 1px solid var(--t-line);
+  border-left: 3px solid var(--t-accent);
+  border-radius: var(--t-r-s);
+  background: var(--t-base2);
+  color: var(--t-txt);
+  text-decoration: none;
+  overflow: hidden;
+}
+.embed-card:hover { border-color: var(--t-line-hi); background: var(--t-base); }
+.embed-card:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+
+.embed-card__site { font-size: var(--t-fs-xs); color: var(--t-txt2); }
+.embed-card__title {
+  font-weight: 600;
+  line-height: 1.35;
+  /* Two lines then ellipsis: a title is metadata, not the message. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.embed-card__desc {
+  font-size: var(--t-fs-s);
+  color: var(--t-txt2);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.embed-card.is-image { padding: 0; border-left-width: 1px; max-width: 40ch; }
+.embed-card.is-image img {
+  display: block;
+  width: 100%;
+  /* A wide panorama should not turn one message into a full-height scroll. */
+  max-height: 320px;
+  object-fit: cover;
+  background: var(--t-base);
+}
+.embed-card__foot {
+  display: flex;
+  flex-direction: column;
+  padding: var(--t-d-2) var(--t-d-3);
+  border-top: 1px solid var(--t-line);
+}
+
+/* A link this instance could not fetch is shown, dimmed, rather than dropped:
+   silence reads as a typo and gives the reader no way to tell it from one. */
+.embed-card.is-unavailable { border-left-color: var(--t-line-hi); opacity: 0.75; }
+.embed-card.is-unavailable .embed-card__title { font-weight: 500; color: var(--t-txt2); }
+
+/* ==========================================================================
+   Analytics
+   --------------------------------------------------------------------------
+   Tiles are a grid with auto-fit, so the row reflows at any width instead of
+   needing a breakpoint per column count. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--t-d-3);
+}
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--t-d-3) var(--t-d-4);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-s);
+  background: var(--t-base2);
+  min-width: 0;
+}
+.stat-tile__label { font-size: var(--t-fs-xs); color: var(--t-txt2); }
+.stat-tile__value { font-size: var(--t-fs-xl); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat-tile__hint { color: var(--t-txt2); }
+
+.range-picker { display: flex; gap: var(--t-d-2); flex-wrap: wrap; }
+
+.sparkline { display: block; width: 100%; height: 96px; overflow: visible; }
+.sparkline__line {
+  fill: none;
+  stroke: var(--t-accent);
+  stroke-width: 1.5;
+  /* preserveAspectRatio:none stretches the viewBox, so the stroke is redrawn
+     per frame rather than scaled - a scaled one goes heavy at wide widths. */
+  vector-effect: non-scaling-stroke;
+}
+.sparkline__area { fill: var(--t-accent); opacity: 0.12; }
+
+.chart-legend {
+  display: flex;
+  gap: var(--t-d-2);
+  align-items: baseline;
+  margin-top: var(--t-d-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-list { list-style: none; margin: var(--t-d-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--t-d-3); }
+.bar-row { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bar-row__head { display: flex; justify-content: space-between; gap: var(--t-d-3); }
+.bar-row__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-row__value { font-variant-numeric: tabular-nums; color: var(--t-txt2); flex: none; }
+.bar-row__track { height: 6px; border-radius: 999px; background: var(--t-base); overflow: hidden; }
+.bar-row__fill { height: 100%; background: var(--t-accent); border-radius: 999px; }
+
+.streak-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--t-d-3);
+}
+
+/* ==========================================================================
+   Integrations
+   --------------------------------------------------------------------------
+   One column: a webhook URL is long, and a two-column layout would clip it to
+   an ellipsis exactly where the part that matters is. */
+.secret-form { display: flex; gap: var(--t-d-2); flex-wrap: wrap; margin: var(--t-d-3) 0; }
+.secret-form .input { flex: 1 1 180px; min-width: 0; }
+
+.secret-reveal { display: flex; flex-direction: column; gap: var(--t-d-2); }
+.secret-reveal__row { display: flex; gap: var(--t-d-2); }
+.secret-reveal__row .input { flex: 1 1 0; min-width: 0; font-family: var(--t-mono); }
+
+.settings-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-2);
+  padding: var(--t-d-3) var(--t-d-4);
+  margin: var(--t-d-3) 0;
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-s);
+  background: var(--t-base2);
+  font-size: var(--t-fs-s);
+}
+
+.settings-subhead {
+  font-size: var(--t-fs-s);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-txt2);
+  margin: var(--t-d-4) 0 var(--t-d-2);
+}
+
+.delivery-log { margin-top: var(--t-d-2); }
+.delivery-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.delivery-row {
+  display: flex;
+  align-items: center;
+  gap: var(--t-d-3);
+  flex-wrap: wrap;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--t-line);
+}
+.delivery-row code { font-family: var(--t-mono); font-size: var(--t-fs-xs); }
+
+.disclosure { margin-top: var(--t-d-3); }
+.disclosure > summary { cursor: pointer; padding: var(--t-d-2) 0; color: var(--t-txt2); font-size: var(--t-fs-s); }
+.command-editor { display: flex; flex-direction: column; gap: var(--t-d-3); padding-top: var(--t-d-2); }
+.command-list { display: flex; flex-direction: column; gap: var(--t-d-2); }
+.command-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--t-d-3);
+  padding: var(--t-d-3);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-r-s);
+}
+.command-row__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.command-row__name { font-family: var(--t-mono); font-weight: 600; }
+.command-row__response { margin: 0; color: var(--t-txt2); }
+
+
+/* A webhook endpoint is exactly the string an operator needs to read in full to
+   check it, so these are only ever truncated where a container demands it. */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+@media (max-width: 599px) {
+  .embed-card { max-width: none; padding: var(--t-d-2) var(--t-d-3); }
+  .embed-card.is-image { max-width: none; }
+  .embed-card.is-image img { max-height: 200px; }
+  .command-row { flex-direction: column; align-items: stretch; }
+  .stat-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .secret-form { flex-direction: column; }
+  .secret-form .input { flex: 1 1 auto; width: 100%; }
+  .secret-reveal__row { flex-direction: column; }
 }

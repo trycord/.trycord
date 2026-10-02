@@ -92,6 +92,13 @@ export const SETTINGS_IA = {
         { id: 'ownership', label: 'Ownership', icon: 'flag', href: null, match: ['ownership'] },
       ],
     },
+    {
+      group: 'Reach',
+      items: [
+        { id: 'analytics', label: 'Analytics', icon: 'compass', href: null, match: ['analytics'], blurb: 'Activity, channels, members' },
+        { id: 'integrations', label: 'Integrations', icon: 'rocket', href: null, match: ['integrations'], blurb: 'Webhooks, apps, commands' },
+      ],
+    },
   ],
 
   admin: [

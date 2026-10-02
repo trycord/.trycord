@@ -10,6 +10,21 @@ const threads = require('../services/threads');
 const replies = require('../services/replies');
 const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
+const embeds = require('../services/embeds');
+
+// A message body is capped rather than truncated. Slicing to the limit loses
+// whatever the writer typed past it with no indication at all, so a long paste
+// comes back looking like a successful send of something they did not write.
+const MAX_CONTENT = 2000;
+function readContent(raw) {
+  const text = String(raw == null ? '' : raw).trim();
+  if (text.length > MAX_CONTENT) {
+    const e = new Error('message must be ' + MAX_CONTENT + ' characters or fewer');
+    e.code = 'VALIDATION_ERROR';
+    throw e;
+  }
+  return text;
+}
 
 let gateway = { broadcastDm: () => {}, sendToUser: () => {}, isOnline: () => false };
 function setGateway(gw) {
@@ -106,11 +121,26 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
   try {
     const msg = await dms.send(
       req.user.id, req.user.username, req.params.id,
-      (req.body || {}).content, (req.body || {}).clientNonce,
+      readContent((req.body || {}).content), (req.body || {}).clientNonce,
       (req.body || {}).attachmentIds, (req.body || {}).replyToId
     );
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(members, { type: 'dm:message', ...msg, conversationId: req.params.id });
+
+    // A link in a direct message gets the same preview a channel link does,
+    // resolved after the broadcast so the message is not held on a slow link.
+    // The stored text is used rather than the request body, so what is previewed
+    // is what was actually written.
+    const text = String((msg && msg.content) || '');
+    if (/https?:\/\//i.test(text)) {
+      embeds.queue({ kind: 'dm', messageId: msg.id, conversationId: req.params.id }, text).then((cards) => {
+        if (!cards.length) return;
+        gateway.broadcastDm(members, {
+          type: 'dm:message_embeds', conversationId: req.params.id,
+          messageId: msg.id, embeds: cards,
+        });
+      }).catch(() => {});
+    }
     // Notify members who aren't connected right now (persisted; delivered
     // on reconnect). Online members already got the realtime event.
     // A deduped retry must not produce a second notification.
@@ -154,7 +184,7 @@ router.delete('/:id/messages/:messageId', auth.requireVerified, async (req, res,
 // PATCH /api/dms/:id/messages/:messageId — author-only edit.
 router.patch('/:id/messages/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
-    const out = await dms.edit(req.user.id, req.params.id, req.params.messageId, (req.body || {}).content, req.user.username);
+    const out = await dms.edit(req.user.id, req.params.id, req.params.messageId, readContent((req.body || {}).content), req.user.username);
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(members, { type: 'dm:message_updated', ...out, conversationId: out.conversationId });
     res.json(out);

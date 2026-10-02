@@ -28,6 +28,7 @@ import { renderNotifications } from './pages-notifications.js';
 import { renderProfile } from './pages-profile.js';
 import { renderServerRoles } from './pages-roles.js';
 import { renderServerSettings } from './pages-settings.js';
+import { SETTINGS_IA } from './settings-shell.js';
 import { renderServerMembers } from './pages-members.js';
 import { renderNewChannel, renderServerCategories } from './pages-channels.js';
 import { renderHome } from './pages-home.js';
@@ -94,10 +95,14 @@ const COMMUNITY_SUBROUTES = {
   categories: async ({ region, serverId }) => { await renderServerCategories(region, serverId); },
 };
 
-const COMMUNITY_SETTINGS_SECTIONS = [
-  'overview', 'appearance', 'structure', 'members', 'roles',
-  'invites', 'moderation', 'ownership',
-];
+// Derived from the settings information architecture rather than written out
+// again. A second hand-kept list is exactly how /settings/categories ended up
+// working in the sidebar and silently rendering Overview in the router, and the
+// same would happen to the next section added - it would appear in the nav, look
+// correct, and open the wrong page.
+const COMMUNITY_SETTINGS_SECTIONS = new Set(
+  SETTINGS_IA.community.flatMap((g) => g.items).map((i) => i.id)
+);
 
 // Takes the context object whole, the way every other row does. Rows are called
 // as run(ctx) with the context as the single argument, so a row that also
@@ -153,7 +158,7 @@ async function renderCommunity({ region, parts, query, publishRoute }) {
   }
 
   if (what === 'settings') {
-    const section = what4 && COMMUNITY_SETTINGS_SECTIONS.includes(what4) ? what4 : 'overview';
+    const section = what4 && COMMUNITY_SETTINGS_SECTIONS.has(what4) ? what4 : 'overview';
     await renderServerSettings(region, serverId, section);
     renderAllChrome();
     return;
