@@ -46,9 +46,19 @@ export function userToken(user) {
 // used to return '#/c/...', leaving communities on a separate navigation system
 // from the rest of the app - and that hybrid couldn't nest, because the fragment
 // had nowhere to sit once the path was already carrying the mount.
-export function serverPath(serverId, suffix) {
+// Variadic rather than a single suffix. Callers naturally build nested paths -
+// serverPath(id, 'settings', 'analytics') - and a two-argument version silently
+// discarded everything after the second, so every community settings link
+// resolved to /c/<slug>/settings and every section in the sidebar opened
+// Overview. A helper that drops arguments looks exactly like a helper that
+// works.
+export function serverPath(serverId, ...segments) {
   const base = route('/c/' + encodeURIComponent(serverToken(serverId)));
-  return suffix ? base + '/' + suffix : base;
+  // Empty segments are dropped rather than producing a doubled slash: the
+  // overview section is addressed as ('settings', '') because it is /settings
+  // with no trailing section.
+  const tail = segments.filter((s) => s !== undefined && s !== null && s !== '').join('/');
+  return tail ? base + '/' + tail : base;
 }
 
 export function channelPath(serverId, channelId, query) {
