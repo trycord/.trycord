@@ -477,11 +477,26 @@ async function boot() {
   // Silent skipping here is what produces a bare "Cannot GET /" in production,
   // so log explicitly either way.
   let clientDir = null;
-  for (const candidate of [
+  // An explicit location first, so a deployment that arranges its files its own
+  // way does not have to imitate the repository layout to serve a web client.
+  // Relative values resolve against this directory rather than the working
+  // directory, because "where you started node" is not where the server lives.
+  const asked = String(process.env.TRYCORD_CLIENT_DIR || '').trim();
+  const tried = [];
+  const candidates = [];
+  if (asked) candidates.push(path.resolve(__dirname, '..', asked));
+  candidates.push(
     path.join(__dirname, '..', '..', 'trycord-client'),
     path.join(__dirname, '..', 'client'),
     path.join(__dirname, '..', '..', 'trycord-desktop', 'client'),
-  ]) {
+    // A build output copied alongside the server, which is how a single
+    // directory deployment ends up arranged.
+    path.join(__dirname, '..', '..', 'dist', 'app'),
+    path.join(__dirname, '..', 'dist', 'app'),
+    path.join(__dirname, '..', 'public', 'app'),
+  );
+  for (const candidate of candidates) {
+    tried.push(candidate);
     if (fs.existsSync(path.join(candidate, 'index.html'))) {
       clientDir = candidate;
 
@@ -541,8 +556,14 @@ async function boot() {
     }
   }
   if (!clientDir) {
-    console.warn('[warn] web client NOT served: no index.html found next to the server. ' +
-      'Deploy the full repository (with trycord-client/) or ignore this if API-only.');
+    // The paths are listed because "no index.html found next to the server"
+    // tells an operator nothing about where the server actually looked, and
+    // the usual cause is a layout that is fine but different from the one this
+    // file assumes.
+    console.warn('[warn] web client NOT served: no index.html in any of these paths:');
+    for (const t of tried) console.warn('         ' + t);
+    console.warn('         Set TRYCORD_CLIENT_DIR to the directory holding index.html, '
+      + 'or ignore this if this instance is API-only.');
   } else {
     allowClientStaticBackend(clientDir);
   }
