@@ -669,6 +669,22 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   const offUpd = Realtime.on('message_updated', (m) => {
     if (String(m.channel_id) === String(channelId)) upsertMessage(m);
   });
+  // Previews arrive after the message they belong to, so they patch the row
+  // rather than appending anything new. Dropping the event would leave the card
+  // absent until the next reload.
+  const offEmbeds = Realtime.on('message_embeds', (p) => {
+    // Scoped by channel, not "no channel means everywhere": a frame without one
+    // is a bug, and matching every channel would put one message's card on
+    // another's row.
+    if (String(p.channel_id) === String(channelId)) {
+      const node = feed.querySelector('[data-message-id="' + p.messageId + '"]');
+      const tray = node && node.querySelector('.embed-tray');
+      if (!tray) return;
+      paintEmbeds(tray, p.embeds);
+      wireEmbedImages(tray);
+    }
+  });
+
   const offDel = Realtime.on('message_deleted', (m) => {
     if (String(m.channel_id) === String(channelId)) {
       const node = feed.querySelector('[data-message-id="' + m.id + '"]');
@@ -785,7 +801,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   thread.addEventListener('scroll', onScroll, { passive: true });
 
   const cleanup = () => {
-    offMsg(); offUpd(); offDel(); offOpen(); offPin(); offUnpin(); offReact();
+    offMsg(); offUpd(); offDel(); offOpen(); offPin(); offUnpin(); offReact(); offEmbeds();
     thread.removeEventListener('scroll', onScroll);
     if (searchPanel) { searchPanel.remove(); searchPanel = null; }
     Realtime.leaveChannel();

@@ -13,6 +13,8 @@ import { serverPath } from './links.js';
 import { settingsFrame, SETTINGS_IA, findItem } from './settings-shell.js';
 import { contextBlock as block, contextFact as fact, contextList as list, contextPara as para } from './context-column.js';
 import { sectionHead, sectionCard, setNote } from './settings-ui.js';
+import { renderIntegrations } from './pages-integrations.js';
+import { renderAnalytics } from './pages-analytics.js';
 import { navigate, route } from './nav.js';;
 
 // Community sections are addressed relative to the current community, so the
@@ -44,6 +46,10 @@ function linkedSection({ serverId, title, blurb, href, cta, counts }) {
   box.appendChild(el('div', { class: 'card-actions' }, go));
   return box;
 }
+
+// Kept across range changes so the picker does not spring back to 30 days when
+// the section is re-rendered for any other reason.
+let analyticsDays = 30;
 
 async function renderServerSettings(container, serverId, section = 'overview') {
   clear(container);
@@ -282,6 +288,29 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       cta: 'Open the role hierarchy',
       counts: [roleCount + ' role' + (roleCount === 1 ? '' : 's')],
     }));
+    return;
+  }
+
+  // These two are full surfaces in their own right. They render into the same
+  // pane as the settings rows above rather than into the page, so the nav, the
+  // context column and the back link stay identical whichever section is open.
+  if (section === 'integrations') {
+    await renderIntegrations(panel, serverId);
+    return;
+  }
+
+  if (section === 'analytics') {
+    // Re-rendering only the pane on a range change keeps the nav and the
+    // surrounding frame from flickering, and costs one request.
+    await renderAnalytics(panel, serverId, {
+      days: analyticsDays,
+      onRange: async (d) => {
+        analyticsDays = d;
+        const url = serverPath(serverId, 'settings', 'analytics');
+        history.replaceState(null, '', url);
+        await renderAnalytics(panel, serverId, { days: d });
+      },
+    });
     return;
   }
 

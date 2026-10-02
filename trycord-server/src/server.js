@@ -436,10 +436,16 @@ async function boot() {
   app.use('/api/channels/:channelId/messages', require('./routes/messages'));
   app.use('/api', require('./routes/attachments'));
   app.use('/api/servers', require('./routes/servers'));
+  // Scoped community extensions: webhooks, bot applications, analytics. Mounted
+  // under the same prefix as the community routes so they inherit the one
+  // access chain rather than introducing a second.
+  app.use('/api/servers/:serverId', require('./routes/integrations'));
   app.use('/api/invites', inviteRoutes.byCode);
   app.use('/api/discover', require('./routes/discover'));
   app.use('/api/activity', require('./routes/activity'));
   app.use('/api/dms', require('./routes/dms'));
+  // Token-authenticated, not session-authenticated - see the file's header.
+  app.use('/api/bot', require('./routes/bot'));
   app.use('/api/friends', require('./routes/friends'));
   app.use('/api/notifications', require('./routes/notifications'));
   app.use('/api/search', require('./routes/search'));
@@ -478,12 +484,30 @@ async function boot() {
   ]) {
     if (fs.existsSync(path.join(candidate, 'index.html'))) {
       clientDir = candidate;
+
+      // index.html carries the hosted mount in its <base href> and reaches its
+      // assets through relative URLs. Rewriting it here, at the one place the
+      // document is served, is what makes the same build correct on an
+      // origin-root self-host and under /app. Leaving it to the static handler
+      // meant GET / kept the hosted prefix and asked for /app/css/app.css, which
+      // 404s - the application worked on every deep link and not on its own
+      // front door.
+      const sendIndex = (mount, res, next) => {
+        fs.readFile(path.join(candidate, 'index.html'), 'utf8', (err, html) => {
+          if (err) { if (!res.headersSent) next(err); return; }
+          res.setHeader('Cache-Control', 'no-store');
+          res.type('html').send(html.replace(/<base href="[^"]*">/i, `<base href="${mount || ''}/">`));
+        });
+      };
+      app.get(['/', '/index.html'], (req, res, next) => sendIndex(APP_MOUNT, res, next));
+
       // Entry points are never cached (a stale index.html paired with fresh
       // or stale JS/CSS is what renders a blank page). Versioned assets use
       // conditional revalidation instead: browsers revalidate on every load
       // (ETag), so new deploys are picked up immediately without giving up
       // caching entirely.
       app.use(express.static(candidate, {
+        index: false,
         setHeaders(res, filePath) {
           if (/(^|[\\/])(index\.html|config\.js)$/i.test(filePath)) {
             res.setHeader('Cache-Control', 'no-store');
@@ -498,7 +522,9 @@ async function boot() {
       // turns a request for a directory into a 301 to its slash form, and a
       // redirect on a deep link is another hop that can lose the mount.
       if (APP_MOUNT) {
+        app.get(APP_MOUNT + '/', (req, res) => sendIndex(APP_MOUNT, res, () => {}));
         app.use(APP_MOUNT, express.static(candidate, {
+          index: false,
           redirect: false,
           setHeaders(res, filePath) {
             if (/(^|[\\/])(index\.html|config\.js)$/i.test(filePath)) {
@@ -630,7 +656,10 @@ async function boot() {
   require('./routes/friends').setGateway({ sendToUser });
   require('./routes/users').setGateway({ getPresence });
   require('./routes/admin').setGateway({ disconnectUser });
-  require('./services/events').setGateway({ broadcast: broadcastServer, sendToUser, evict: evictUserFromServer });
+  require('./services/events').setGateway({
+    broadcast: broadcastServer, broadcastChannel: broadcast,
+    sendToUser, evict: evictUserFromServer,
+  });
 
   // Trust & Safety: bootstrap platform admins from ADMIN_USERNAMES before
   // the server accepts traffic. Idempotent — re-runs promote any new names
@@ -720,7 +749,11 @@ async function boot() {
       // deep link it was meant to serve - TRYCORD_APP_MOUNT existed, was
       // documented, and did nothing.
       const mount = appMount(req.path);
-      const rest = mount && req.path.length > mount.length ? req.path.slice(mount.length) : '/';
+      // With no mount the path is already relative to the app, so it is used
+      // as-is. Defaulting to '/' instead made the first segment empty, which is
+      // in no prefix list, so every deep link 404ed on an origin-root
+      // deployment while the same build worked under /app.
+      const rest = mount ? req.path.slice(mount.length) || '/' : req.path;
       const seg = rest.split('/').filter(Boolean)[0] || '';
       if (!APP_ROUTE_PREFIXES.has(seg)) return next();
       // The base is stamped per request because the mount point is a deployment
@@ -731,13 +764,18 @@ async function boot() {
       // stylesheet and no script. Always rewritten, including the unmounted case
       // - the file carries the hosted mount for the Cloudflare deployment,
       // which serves it statically with nothing to correct it.
-      fs.readFile(path.join(clientDir, 'index.html'), 'utf8', (err, html) => {
-        if (err) { if (!res.headersSent) next(err); return; }
-        res.status(200)
-          .set('Cache-Control', 'no-store')
-          .type('html')
-          .send(html.replace(/<base href="[^"]*">/i, `<base href="${mount || ''}/">`));
-      });
+      // Same rewriter as the front door, so a deep link and a cold visit cannot
+      // disagree about the mount.
+      const sendIndex = (req, res, next) => {
+        fs.readFile(path.join(clientDir, 'index.html'), 'utf8', (err, html) => {
+          if (err) { if (!res.headersSent) next(err); return; }
+          res.status(200)
+            .set('Cache-Control', 'no-store')
+            .type('html')
+            .send(html.replace(/<base href="[^"]*">/i, `<base href="${mount || ''}/">`));
+        });
+      };
+      sendIndex(req, res, next);
     });
   }
 
@@ -801,6 +839,11 @@ async function boot() {
       await db.run('DELETE FROM password_resets WHERE expires_at < ? OR used_at IS NOT NULL', [new Date().toISOString()]);
       await db.run('DELETE FROM email_verifications WHERE expires_at < ? OR used_at IS NOT NULL', [new Date().toISOString()]);
       await uploads.purgePending();
+      // Link previews for messages posted before embeds existed. Bounded per
+      // pass, so the first run on a large history cannot turn into one very
+      // long request; the next pass picks up where it stopped.
+      const embeds = require('./services/embeds');
+      await embeds.backfill(25);
     } catch { /* shutting down */ }
   };
   await purge();

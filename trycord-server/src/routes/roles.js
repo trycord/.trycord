@@ -6,6 +6,7 @@ const { fail, serviceError } = require('../errors');
 const roles = require('../services/roles');
 const memberships = require('../services/memberships');
 const events = require('../services/events');
+const webhooks = require('../services/webhooks');
 const { PERMISSIONS, effectivePermissions } = require('../services/permissions');
 
 // Role hierarchy: you may only act on roles ranked strictly below your own
@@ -103,6 +104,7 @@ router.post('/', auth.requireVerified, requirePerm('MANAGE_ROLES'), async (req, 
     catch (e) { return serviceError(res, e); }
     const role = await roles.create(req.server.id, { name, permissions, color });
     events.emit(req.server.id, 'role_created', { role });
+    webhooks.emit(req.server.id, 'role.created', { serverId: req.server.id, roleId: String(role.id), name: role.name }).catch(() => {});
     res.json(role);
   } catch (e) { serviceError(res, e); }
 });
@@ -152,6 +154,7 @@ router.delete('/:roleId', auth.requireVerified, requirePerm('MANAGE_ROLES'), asy
     } catch (e) { return serviceError(res, e); }
     const out = await roles.remove(role);
     events.emit(req.server.id, 'role_deleted', { roleId: String(role.id) });
+    webhooks.emit(req.server.id, 'role.deleted', { serverId: req.server.id, roleId: String(role.id) }).catch(() => {});
     res.json(out);
   } catch (e) { serviceError(res, e); }
 });

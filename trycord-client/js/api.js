@@ -586,6 +586,40 @@ joinDiscover: (id) =>
     request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/publish', { body: { confirm } }),
   adminUnpublishPage: (route) =>
     request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/unpublish'),
+  // Community integrations. Webhook secrets and application tokens are returned
+  // once, at creation; nothing here can read either back afterwards, which is
+  // why rotate exists rather than a "show secret" action.
+  webhooks: (serverId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/webhooks'),
+  createWebhook: (serverId, body) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/webhooks', { body }),
+  updateWebhook: (serverId, webhookId, body) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/webhooks/' + encodeURIComponent(webhookId), { body }),
+  rotateWebhookSecret: (serverId, webhookId) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/webhooks/' + encodeURIComponent(webhookId) + '/rotate-secret'),
+  webhookDeliveries: (serverId, webhookId, limit) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/webhooks/' + encodeURIComponent(webhookId) + '/deliveries'
+      + (limit ? '?limit=' + encodeURIComponent(limit) : '')),
+  deleteWebhook: (serverId, webhookId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/webhooks/' + encodeURIComponent(webhookId)),
+
+  apps: (serverId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/apps'),
+  createApp: (serverId, name) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/apps', { body: { name } }),
+  deleteApp: (serverId, appId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId)),
+  appCommands: (serverId, appId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId) + '/commands'),
+  setAppCommand: (serverId, appId, body) =>
+    request('PUT', '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId) + '/commands', { body }),
+  deleteAppCommand: (serverId, appId, commandId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId) + '/commands/' + encodeURIComponent(commandId)),
+
+  analytics: (serverId, days) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/analytics'
+      + (days ? '?days=' + encodeURIComponent(days) : '')),
+
   adminPageRevisions: (route) =>
     request('GET', '/api/admin/pages/' + encodeURIComponent(route) + '/revisions'),
   adminRestorePageRevision: (route, revision) =>

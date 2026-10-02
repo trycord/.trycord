@@ -5,6 +5,20 @@ const db = require('../db');
 const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
+// A message body is capped rather than truncated. Slicing to the limit loses
+// whatever the writer typed past it with no indication at all, so a long paste
+// comes back looking like a successful send of something they did not write.
+const MAX_CONTENT = 2000;
+function readContent(raw) {
+  const text = String(raw == null ? '' : raw).trim();
+  if (text.length > MAX_CONTENT) {
+    const e = new Error('message must be ' + MAX_CONTENT + ' characters or fewer');
+    e.code = 'VALIDATION_ERROR';
+    throw e;
+  }
+  return text;
+}
+
 const { now, uuid, visibleChannel } = require('../util');
 const { hasChannelPermission } = require('../services/permissions');
 const memberships = require('../services/memberships');
@@ -12,6 +26,9 @@ const uploads = require('../services/uploads');
 const reactions = require('../services/reactions');
 const threads = require('../services/threads');
 const replies = require('../services/replies');
+const embeds = require('../services/embeds');
+const webhooks = require('../services/webhooks');
+const bots = require('../services/bots');
 const mentions = require('../services/mentions');
 
 let broadcast = () => {};
@@ -97,6 +114,10 @@ router.get('/', async (req, res, next) => {
     // whether or not anything has been replied to.
     const counts = await threads.replyCounts('channel', ch.id, rows.map((r) => r.id));
     rows.forEach((r) => { r.reply_count = counts[r.id] || 0; });
+    // Previews are resolved after the fact, so a reload is the other way the
+    // reader gets them.
+    const cards = await embeds.listForMessages(rows.map((r) => r.id));
+    rows.forEach((r) => { r.embeds = cards[r.id] || []; });
     await attachEngagement(rows, req.user.id);
     res.json(rows);
   } catch (e) { next(e); }
@@ -148,7 +169,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
       return fail(res, 'TIMED_OUT', 'you are timed out in this server');
     }
-    const content = String((req.body || {}).content || '').trim().slice(0, 2000);
+    const content = readContent((req.body || {}).content);
     // Attachments and text are independent: a message may carry files
     // alone, text alone, or both — but must carry at least one.
     const ids = uploads.sanitizeIds((req.body || {}).attachmentIds);
@@ -191,6 +212,10 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       id: uuid(), channel_id: ch.id, server_id: ch.server_id,
       author_id: req.user.id, user: req.user.username, content, created_at: now(),
       edited_at: null, thread_root_id: threadRootId,
+      // Present and empty rather than absent: the client stores previews per
+      // message id, and a missing key is indistinguishable from a message whose
+      // preview simply never arrived.
+      embeds: [],
     };
 
     // Insert with the canonical sequence, retrying on the (rare) race.
@@ -223,6 +248,34 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       : [];
     await attachEngagement([msg], req.user.id);
     broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
+
+    // Everything below is extra information about a message that has already
+    // been accepted. None of it is allowed to fail the post: a slow link, a dead
+    // webhook endpoint and a command that answers nothing are all reasons the
+    // reader gets a slightly less rich view, not a lost message.
+    //
+    // Link previews resolve after the broadcast so the reader sees the message
+    // immediately and the card arrives when it is ready.
+    if (content && /https?:\/\//i.test(content)) {
+      embeds.queue({ kind: 'channel', messageId: msg.id }, content).then((cards) => {
+        if (!cards.length) return;
+        broadcast(ch.server_id, ch.id, { type: 'message_embeds', channel_id: ch.id, server_id: ch.server_id, messageId: msg.id, embeds: cards });
+      }).catch(() => {});
+    }
+    // A slash command answered by an application in this community.
+    if (content && content.charAt(0) === '/') {
+      bots.respond(ch.server_id, ch, content.split(/\s+/)[0]).then((reply) => {
+        if (!reply) return;
+        webhooks.emit(ch.server_id, 'command.created', {
+          serverId: ch.server_id, channelId: ch.id,
+          command: content.split(/\s+/)[0], messageId: reply.id,
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+    webhooks.emit(ch.server_id, 'message.created', {
+      serverId: ch.server_id, channelId: ch.id,
+      message: { id: msg.id, authorId: msg.author_id, content },
+    }).catch(() => {});
     // @username mentions become durable notifications (+ realtime push),
     // skipped for muted channels inside the helper. Never fails the post.
     try {
@@ -293,7 +346,7 @@ router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, m
     if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
       return fail(res, 'TIMED_OUT', 'you are timed out in this server');
     }
-    const content = String(((req.body || {}).content === null || (req.body || {}).content === undefined) ? '' : req.body.content).trim().slice(0, 2000);
+    const content = readContent((req.body || {}).content);
     if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
     const editedAt = now();
     await db.run('UPDATE messages SET content = ?, edited_at = ? WHERE id = ?', [content, editedAt, msg.id]);

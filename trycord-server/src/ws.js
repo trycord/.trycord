@@ -27,6 +27,8 @@ const dms = require('./services/dms');
 const uploads = require('./services/uploads');
 const threads = require('./services/threads');
 const replies = require('./services/replies');
+const embeds = require('./services/embeds');
+const webhooks = require('./services/webhooks');
 const { nextSeq } = require('./routes/messages');
 
 const TICKET_TTL_MS = 60 * 1000;
@@ -437,6 +439,18 @@ function createGateway(server) {
               ? await uploads.attachToMessage(ids, msg.id, user.id, { channelId: ch.id })
               : [];
             broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
+            // Same after-the-fact work as the REST post, so a message submitted
+            // over the socket behaves identically.
+            if (/https?:\/\//i.test(content)) {
+              embeds.queue({ kind: 'channel', messageId: msg.id }, content).then((cards) => {
+                if (!cards.length) return;
+                broadcast(ch.server_id, ch.id, { type: 'message_embeds', channel_id: ch.id, server_id: ch.server_id, messageId: msg.id, embeds: cards });
+              }).catch(() => {});
+            }
+            webhooks.emit(ch.server_id, 'message.created', {
+              serverId: ch.server_id, channelId: ch.id,
+              message: { id: msg.id, authorId: user.id, content },
+            }).catch(() => {});
             // Same reply notification the REST post sends, so the reply behaves
             // the same however the message was submitted.
             if (threadRootId) {

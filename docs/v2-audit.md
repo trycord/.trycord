@@ -216,17 +216,130 @@ Real, known gaps. None blocks ordinary use.
   mobile hide rule had been attached to the public-page selector chain, so it
   never applied on a channel at all.
 
+## Four additions: embeds, analytics, webhooks, bots
+
+Requested after the A-Z pass. Each is a full stack, not a panel.
+
+**Link previews.** A URL in a message gets a small card, in channels and in
+direct messages alike. The fetch is the whole
+risk, so it lives in one place (`services/embeds`) and obeys a fixed shape:
+HTTP and HTTPS only, no credentials in the URL, a 4s timeout, a 512KB cap, no
+redirect to a private address, and DNS resolved once and checked so a name
+pointing at 127.0.0.1 cannot be used to read the instance's own network. A
+preview is resolved after the broadcast and pushed over the socket, so the
+message appears immediately and the card arrives when it is ready; history
+carries the same cards, which is what a reload reads. A link that could not be
+fetched still shows a card, marked unavailable - silence is indistinguishable
+from a typo. The renderer is one module used by every message surface.
+
+Previews in direct messages needed the same schema decision attachments already
+made: `message_embeds.message_id` is nullable and carries the conversation and
+`dm_message_id` beside it, because a direct message is a row in `dm_messages` and
+a `NOT NULL` foreign key to `messages` would make the row unrepresentable. The
+maintenance backfill that fills in previews for older messages deliberately skips
+direct messages - they are private, and a timer should not go reading them.
+
+**Analytics.** Counted from the rows that already exist rather than from a
+counter table, because a rollup has to be backfilled and disagrees with the
+messages it summarises the moment one is edited or deleted. Totals, a
+zero-filled daily series, message volume, channel and member rankings, and
+posting streaks, all scoped to one community and a bounded window (7/30/90
+days, clamped server-side).
+
+Member churn needed a new table to be answerable at all: a member who leaves
+has no `server_members` row, and the audit log records moderator actions rather
+than someone clicking leave. `server_membership_events` is append-only and
+written as the departure happens. **Consequence: churn figures cover activity
+from the migration onward. History before it is not reconstructable and is not
+invented** - the analytics page reports zero left for a community whose departures
+predate it.
+
+**Webhooks.** HTTPS only, private addresses refused, secret stored hashed and
+shown exactly once at creation and on rotate. Deliveries are HMAC-SHA256 signed
+over the exact body (`x-trycord-signature`) and recorded, with the delivery log
+readable in the UI. Nine event types. The address is re-checked immediately
+before each request, not only when the webhook was saved, because a name that
+was public then can resolve to a private address now.
+
+**Applications and slash commands.** Created by a community administrator, get a
+bearer token shown once and stored hashed, and post through the ordinary message
+pipeline under the application's owner - the same permission check, the same
+broadcast, the same attachment adoption. There is no second way to write a
+message. A slash command posts its configured answer as the application.
+Deleting the application invalidates the token immediately.
+
+## Defects found while verifying the above
+
+Each was found by a failing assertion, confirmed against the running instance,
+and fixed. They are listed because they are the kind of thing a passing test
+suite that never exercised the path would have shipped.
+
+- **SSRF in the webhook validator.** `validateUrl` checked the protocol and the
+  absence of credentials, and its comment claimed it also refused private
+  addresses. It did not: `https://169.254.169.254/hook` was accepted, and the
+  delivery log would have carried the response. The guard is now shared with the
+  preview fetcher (`services/netguard`), so there is one implementation rather
+  than one per caller.
+- **Every deep link 404'd on an origin-root deployment.** The SPA fallback
+  derived the path to match from a value that defaulted to `/`, so the first
+  segment was empty, which is in no prefix list. The same build worked under
+  `/app` and not at its own front door.
+- **The document kept the hosted mount on self-host.** `index.html` carries
+  `<base href="/app/">` and reaches its assets relatively; the rewrite only ran
+  on the deep-link path, so `GET /` asked for `/app/css/app.css` and every asset
+  404'd. Entry points now go through one rewriter.
+- **A channel id was broadcast to every member of the community.**
+  `events.emitChannel` called the gateway's server-room broadcast, which has two
+  parameters, with three - so the channel id went out as the payload.
+- **Previews never arrived over the socket.** `queue()` returned the map
+  `listForMessages` builds, and callers read `.length` on it, so the broadcast
+  never fired. History looked right, which is what made it worth a test that
+  watches the wire.
+- **Bot posts 500'd.** The token middleware assigned the application to
+  `req.app`, which Express reserves for the application instance.
+- **The settings pane was 284px wide at 1600.** The frame nests its own 240px
+  navigation column inside a content column the shell has already spent 240px of
+  sidebar and 260px of member panel on, and the comment claiming 1180px was the
+  point where "nav + a readable form + a summary all fit" was wrong. Thresholds
+  are derived from that arithmetic now, per frame, and the pane never narrows as
+  the window widens without a new column appearing.
+- **Sections appeared in the nav and opened the wrong page.** The router matched
+  settings sections against a hand-kept second list of their names; it is derived
+  from the settings information architecture now.
+- **Departure counts were always zero.** Eight queries destructured into seven
+  names, so the departure total was silently bound to the attachment count.
+- **A long message lost its tail silently.** Content was sliced to 2000
+  characters with no indication, so a long paste came back looking like a
+  successful send of something the writer did not write. It is refused with a
+  message now.
+- **The webhooks and applications lists never refreshed after a create,** so the
+  page looked like it had done nothing.
+
 ## Not verified
 
 Worth knowing before trusting any of the above.
 
 - **No MariaDB instance was reachable while this was built** (`sudo` requires a
   password, so no container). Every migration was verified against SQLite,
-  including against a populated pre-migration database. The MySQL statements are
-  standard guarded DDL and were read back from a live schema, but they have not
-  been executed. A failed `ALTER` warns and the instance still boots: a migration
-  that stops startup is worse than a missing feature.
-- **Visual and interaction checks were headless Chromium only.** No hover, focus
-  order, or real drag pipeline. Drop and paste were exercised with synthetic
-  `DragEvent`/`ClipboardEvent`, which tests the handlers and not the browser's
-  own drag.
+  including against a populated pre-migration database: 43 tables and 67 indexes
+  became 49 and 73 with every row count intact, all 66 declared indexes present,
+  and a second boot a no-op. The MySQL statements are standard guarded DDL and
+  were read back from a live schema, but they have not been executed. A failed
+  `ALTER` warns and the instance still boots: a migration that stops startup is
+  worse than a missing feature.
+- **Visual checks were headless Chromium only**, and this build's headless
+  compositor returns a partially stale frame, so screenshots are evidence about
+  layout rather than proof of it. Layout was verified by measuring the rendered
+  DOM at 1024, 1280, 1440, 1600, 1920, 2200, 2560 and 3440 - pane width,
+  horizontal overflow, and heading/action overlap - not by eye alone. No hover,
+  focus order, or real drag pipeline. Drop and paste were exercised with
+  synthetic `DragEvent`/`ClipboardEvent`, which tests the handlers and not the
+  browser's own drag.
+- **The "unreproduced" UI failure from the previous pass was the harness, not
+  the product.** A console-error assertion failed intermittently, always on a
+  cold instance. Captured, it was `ERR_CONNECTION_REFUSED` and a CORS rejection
+  against `trycord-api.wispbyte.app` - the backend named in `backend.json`,
+  which the shipped client tries before anything points it elsewhere. Two
+  harness faults: a fixed startup delay instead of waiting for the listener, and
+  error collection that began before the harness had configured the backend.
+  Both fixed; the suite is now stable across cold starts.

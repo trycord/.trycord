@@ -6,6 +6,7 @@ const db = require('../db');
 const { now, uuid } = require('../util');
 const uploads = require('./uploads');
 const threads = require('./threads');
+const embeds = require('./embeds');
 
 const MAX_CONTENT = 2000;
 
@@ -220,6 +221,9 @@ async function history(userId, conversationId, { before = null, after = null, li
   // One query for the whole page, the same way the channel history does it.
   const files = await uploads.getForDmMessages(rows.map((m) => m.id));
   const counts = await threads.replyCounts('dm', conversationId, rows.map((m) => m.id));
+  // Previews are resolved after the fact, so history is where a reader who
+  // reloads picks them up. One query for the page, as with the files above.
+  const cards = await embeds.listForMessages(rows.map((m) => m.id), 'dm');
   return rows.map((m) => ({
     id: m.id,
     seq: m.seq === null || m.seq === undefined ? null : Number(m.seq),
@@ -232,6 +236,10 @@ async function history(userId, conversationId, { before = null, after = null, li
     threadRootId: m.thread_root_id || null,
     replyCount: counts[m.id] || 0,
     attachments: files[m.id] || [],
+    // Present and empty rather than absent, for the same reason the channel
+    // history carries it: an arriving card needs a tray, and a missing key is
+    // indistinguishable from a preview that never came.
+    embeds: cards[m.id] || [],
   }));
 }
 

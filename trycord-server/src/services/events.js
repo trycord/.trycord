@@ -3,7 +3,10 @@
 //
 // Two scopes. `emit` goes to everyone in a community; `emitTo` goes to one
 // person's own sockets.
-let gateway = { broadcast: () => {}, sendToUser: () => {}, evict: () => {}, invalidate: () => {} };
+let gateway = {
+  broadcast: () => {}, broadcastChannel: () => {}, sendToUser: () => {},
+  evict: () => {}, invalidate: () => {},
+};
 
 function setGateway(gw) {
   gateway = Object.assign(gateway, gw);
@@ -14,6 +17,21 @@ function setGateway(gw) {
 function emit(serverId, type, payload) {
   try {
     gateway.broadcast(String(serverId), Object.assign({ type }, payload));
+  } catch { /* ignore */ }
+}
+
+// Channel-scoped counterpart of emit(), for anything that happens inside a
+// channel - a message, a deletion, an embed arriving. The server-room path above
+// is for structural changes that belong to no single channel, and a message
+// posted by an application is the same message a user would post, so it takes
+// the same room.
+//
+// A separate gateway entry rather than a reused broadcast(), because the two
+// have different arities: calling the server-room one with three arguments
+// silently ships the channel id to every member as the payload.
+function emitChannel(serverId, channelId, payload) {
+  try {
+    gateway.broadcastChannel(String(serverId), String(channelId), payload);
   } catch { /* ignore */ }
 }
 
@@ -47,4 +65,4 @@ function evict(serverId, userId, reason) {
   } catch { /* ignore */ }
 }
 
-module.exports = { setGateway, emit, emitTo, evict, invalidateMembership };
+module.exports = { setGateway, emit, emitChannel, emitTo, evict, invalidateMembership };
