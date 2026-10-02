@@ -306,10 +306,22 @@ async function boot() {
   ['http://localhost:9971', 'http://127.0.0.1:9971', 'https://trycord.dev'].forEach(addCspOrigin);
   String(process.env.CSP_CONNECT_ORIGINS || '')
     .split(',').map((s) => s.trim()).filter(Boolean).forEach(addCspOrigin);
+  // The scheme and host a request arrived on, or null when it did not arrive
+  // over http(s). Behind a proxy the host header is the one the browser used,
+  // which is the one we want: it is the origin the client is really talking to.
+  function originOf(req) {
+    const host = req.headers && req.headers.host;
+    if (!host || !/^[^\s/]+$/.test(String(host))) return null;
+    const proto = String((req.headers['x-forwarded-proto'] || '').split(',')[0]).trim()
+      || (req.protocol === 'https:' ? 'https' : 'http');
+    if (proto !== 'http' && proto !== 'https') return null;
+    return proto + '://' + host;
+  }
+
   // The served client's own static pin (backend.json) is part of the
   // centralized backend configuration: allow it once the client directory
-  // is located below. Self-hosters repoint the client by editing that one
-  // file — no source changes, no extra env needed for the common case.
+  // is located below. Self-hosters need no edit at all - see the /backend.json
+  // handler below, which repoints that file at whichever instance is serving it.
   function allowClientStaticBackend(clientDir) {
     if (!clientDir) return;
     try {
@@ -515,6 +527,39 @@ async function boot() {
         });
       };
       app.get(['/', '/index.html'], (req, res, next) => sendIndex(APP_MOUNT, res, next));
+
+      // backend.json, repointed at whoever is serving it.
+      //
+      // The shipped file names the official instance so the hosted front end has
+      // something to talk to. A self-hoster deploys this same repository, so
+      // they inherit that name - and because backend.json outranks the serving
+      // origin in the client's resolution order, their client would sign people
+      // in against api.trycord.dev while sitting on their own API. Repointing
+      // the file here makes the rule one line: a client served by a backend
+      // talks to that backend. It holds for the official deployment too, with
+      // no domain written into the client.
+      app.get('/backend.json', (req, res, next) => {
+        fs.readFile(path.join(candidate, 'backend.json'), 'utf8', (err, raw) => {
+          if (err) return next();
+          let json;
+          try { json = JSON.parse(raw); } catch { return next(); }
+          const self = originOf(req);
+          if (!self) return res.type('json').set('Cache-Control', 'no-store').send(raw);
+          // Compare against what the file said before overwriting it, so the
+          // test below is "is this the instance these backups belong to".
+          const wasPinned = cspOriginOf(json.backendUrl);
+          json.backendUrl = self;
+          // Backup origins are spare capacity for the instance they were built
+          // for. When we are that instance, keeping them is failover worth
+          // having. When we are somebody else's - a self-hoster running this
+          // repository - they would quietly walk the client onto the official
+          // network, so they go.
+          if (wasPinned !== self) delete json.fallbackUrls;
+          res.set('Cache-Control', 'no-store')
+            .type('json')
+            .send(JSON.stringify(json, null, 2) + '\n');
+        });
+      });
 
       // Entry points are never cached (a stale index.html paired with fresh
       // or stale JS/CSS is what renders a blank page). Versioned assets use
