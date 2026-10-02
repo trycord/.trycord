@@ -1132,7 +1132,12 @@ async function relaxAttachmentsChannelId(conn) {
   await conn.exec('PRAGMA foreign_keys = OFF');
   try {
     await conn.exec('BEGIN');
-    await conn.exec(`CREATE TABLE attachments_v2 (
+    // A leftover from an interrupted run would make the create below fail on
+    // boot. It is a scratch table by definition - the real one is rebuilt and
+    // renamed over the top of it a few statements later - so discarding one is
+    // always safe.
+    await conn.exec('DROP TABLE IF EXISTS attachments_v2');
+    await conn.exec(`CREATE TABLE IF NOT EXISTS attachments_v2 (
       id          VARCHAR(64) PRIMARY KEY,
       message_id  VARCHAR(64),
       channel_id  VARCHAR(64),
