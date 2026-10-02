@@ -498,7 +498,7 @@ function settingsContext(region) {
     const active = here === s.path || here.startsWith(s.path + '/');
     group.list.appendChild(navRow({
       label: s.label, href: route(s.path), active,
-      onClick: () => { navigate('/' + s.path); },
+      onClick: () => { navigate(s.path); },
     }));
   }
   scroll.appendChild(group);
@@ -527,11 +527,52 @@ function simpleListContext(region, { title, sub, groups }) {
       const active = item.exact ? here === item.path : (here === item.path || here.startsWith(item.path + '/'));
       group.list.appendChild(navRow({
         label: item.label, href: route(item.path), active,
-        onClick: () => { navigate('/' + item.path); },
+        onClick: () => { navigate(item.path); },
       }));
     }
     scroll.appendChild(group);
   }
+}
+
+// Home is a feed across every place, so its sidebar lists the places rather
+// than one of them. It used to fall through to the direct-messages context,
+// which put "No conversations yet" directly beside a full activity feed - the
+// sidebar was describing a different page than the one it sat next to.
+function homeContext(region) {
+  const unreadDms = (State.dms || []).reduce((n, d) => n + (d.unreadCount || 0), 0);
+  const requests = (State.friendsIn || []).length;
+  const notif = State.notifUnread || 0;
+  const places = [
+    { label: 'Home', path: '/home' },
+    { label: 'Direct messages', path: '/dms', count: unreadDms },
+    { label: 'Friends', path: '/friends', count: requests },
+    { label: 'Notifications', path: '/notifications', count: notif },
+  ];
+  simpleListContext(region, {
+    title: 'Home',
+    sub: 'Everywhere you are',
+    groups: [
+      { label: 'Your places', items: places },
+      { label: 'Find', items: [
+        { label: 'Discover communities', path: '/discover' },
+        { label: 'Create a community', path: '/servers/new' },
+      ] },
+    ],
+  });
+
+  // navRow takes a count for the badge; simpleListContext did not pass one
+  // through, so paint the two that can change without a navigation.
+  const scroll = region.querySelector('.ctx-scroll');
+  if (scroll) {
+    const rows = scroll.querySelectorAll('.row--nav');
+    places.forEach((p, i) => {
+      if (p.count > 0 && rows[i]) {
+        rows[i].appendChild(el('span', { class: 'nv-count' }, p.count > 99 ? '99+' : String(p.count)));
+      }
+    });
+  }
+
+  refreshHomeSidebar(region);
 }
 
 function friendsContext(region) {
@@ -624,7 +665,7 @@ function adminContext(region) {
   for (const s of ADMIN_SECTIONS) {
     group.list.appendChild(navRow({
       label: s.label, href: route(s.path), active: adminSectionActive(s, here),
-      onClick: () => { navigate('/' + s.path); },
+      onClick: () => { navigate(s.path); },
     }));
   }
   scroll.appendChild(group);
@@ -639,7 +680,7 @@ function adminContext(region) {
   for (const s of ADMIN_OVERFLOW) {
     more.list.appendChild(navRow({
       label: s.label, href: route(s.path), active: adminSectionActive(s, here),
-      onClick: () => { navigate('/' + s.path); },
+      onClick: () => { navigate(s.path); },
     }));
   }
   scroll.appendChild(more);
@@ -652,6 +693,7 @@ export function sidebarContext() {
   const server = /^\/server\/([^/]+)/.exec(path);
   if (server && server[1]) return { type: 'community', serverId: server[1] };
   if (path === '/dms' || path.startsWith('/dms/')) return { type: 'dms' };
+  if (path === '/' || path === '/home' || path === '/menu') return { type: 'home' };
   if (path.startsWith('/settings') || path.startsWith('/account')) return { type: 'settings' };
   if (path.startsWith('/admin')) return { type: 'admin' };
   if (path.startsWith('/notifications')) return { type: 'notifications' };
@@ -678,6 +720,7 @@ export function renderPlaceNavigation(region) {
   switch (ctx.type) {
     case 'community': return communityContext(region, ctx.serverId);
     case 'dms': return dmsContext(region);
+    case 'home': return homeContext(region);
     case 'settings': return settingsContext(region);
     case 'admin': return adminContext(region);
     case 'friends': return friendsContext(region);
