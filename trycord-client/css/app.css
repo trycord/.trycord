@@ -559,16 +559,26 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   grid-row: 1;
   min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  /* A flex column, not a grid.
+
+     renderAnnouncementBanner() and renderVerifyBanner() both append into
+     #trycord-main, so it has three children rather than the two the markup
+     declares, and the grid auto-placed the extra one into its own implicit track.
+     Measured on a 1440 screen: three columns of 851px, 47px and 279px inside a
+     1176px region, with the header stranded in the third one against the right
+     edge and a band of nothing between it and the conversation.
+
+     A column stack does not care how many children there are or in what order
+     they arrive, so the banners slot in where they belong and the workspace takes
+     the rest. The only grid left is chat-environment's, and that one really is two
+     columns. */
+  display: flex;
+  flex-direction: column;
   background: var(--t-base);
 }
 
-.context-header { grid-column: 1; grid-row: 1; }
-
 .chat-environment {
-  grid-column: 1;
-  grid-row: 2;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: grid;
@@ -889,9 +899,11 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
    6  header
    ========================================================================== */
 
+/* No grid placement here. This rule sits later in the file than the shell's own
+   and still carried grid-column: 3 from when the shell was three columns, so it
+   won on source order and put the header in a track that no longer existed. The
+   parent is a flex column now; the header only needs to not grow. */
 .context-header {
-  grid-column: 3;
-  grid-row: 1;
   flex: 0 0 auto;
   min-height: var(--ui-header);
   display: flex;
