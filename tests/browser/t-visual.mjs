@@ -205,7 +205,10 @@ try {
   // Backend or Updates. Eleven sections, one reachable. The disclosure is right
   // on a phone and wrong on a laptop, so this checks both ends.
   console.log('\n=== every settings section is reachable ===');
-  for (const [w, label] of [[1440, 'desktop'], [820, 'tablet'], [390, 'phone']]) {
+  // 820 is here because the nav once collapsed below 999px, which put a phone
+  // disclosure on a tablet. The threshold has to match the shell's own phone
+  // breakpoint at 600, and this is the width that catches it moving again.
+  for (const [w, label] of [[1440, 'desktop'], [820, 'tablet'], [700, 'small tablet'], [390, 'phone']]) {
     await page.setViewport(w, 900);
     await page.goto(B + '/settings', { waitMs: 2200 });
     await wait(800);
@@ -225,7 +228,7 @@ try {
                  && getComputedStyle(document.querySelector('.settings-nav__groups')).display === 'none',
                labels: visible.map(a => a.textContent.trim()).slice(0, 12) };
     `);
-    if (w === 390) {
+    if (w < 600) {
       // On a phone the disclosure is correct. What matters is that the toggle
       // exists, so the list can be opened at all.
       ok('phone: settings navigation is a disclosure you can open', nav.total > 1, nav);

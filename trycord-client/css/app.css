@@ -701,11 +701,20 @@ img { max-width: 100%; }
      form hard against the navigation with 450px of nothing to its right, so the
      pair read as a page that failed to fill. Centring the pair keeps the measure
      and puts the space on both sides, where it looks deliberate. */
-  @media (min-width: 1000px) and (max-width: 2298px) {
+  @media (min-width: 600px) and (max-width: 2298px) {
     .settings-layout {
       grid-template-columns: var(--ui-sidebar) minmax(0, var(--ui-settings-pane, 780px));
       justify-content: center;
     }
+  }
+
+  /* The member toggle hides a panel that is not on screen at this width. Below
+     600px #member-sidebar is display:none, so the button toggles nothing and costs
+     34px of a header that already has four other actions competing for room - on a
+     360px phone that was 23px of overlap between the channel name and the search
+     button. The member list has its own route on a phone; see the drawer. */
+  @media (max-width: 599px) {
+    .context-actions .member-toggle { display: none; }
   }
 
 .set-head { display: flex; align-items: flex-start; gap: var(--t-d-4); }
@@ -866,10 +875,18 @@ img { max-width: 100%; }
    sections, one of them reachable.
 
    The frame already has the right answer to the real constraint. The pane has its
-   own cap (--ui-settings-pane), so the nav can stay a sidebar and the pane takes
-   whatever is left over. Below 1000px the leftover really is too small to read a
-   form in, and that is where the disclosure earns its place. */
-@media (max-width: 999px) {
+   own cap (--ui-settings-pane), which is a maximum and not a minimum, so the nav
+   can stay a sidebar and the pane takes whatever is left over - shrinking when
+   there is not much.
+
+   The threshold is 599px, matching the shell's own phone breakpoint rather than
+   being argued for separately. That is the whole principle: a surface is a phone
+   surface when the shell says the device is a phone, and a settings nav that
+   collapses at a different width than the navigation around it produces a tablet
+   with a phone's disclosure on it. Between 600px and 999px the pane is 340px at
+   its worst, which is narrow for a form but still a form, and the alternative -
+   a settings screen listing one section out of seven - is worse at every width. */
+@media (max-width: 599px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--t-d-4); }
 
   /* A disclosure rather than a scroller: a horizontal strip of twenty sections
