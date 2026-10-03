@@ -1,6 +1,6 @@
 {
   "name": "trycord-desktop",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "description": "Trycord desktop app: the web client in a native desktop window",
   "author": "Trycord",
   "repository": {
