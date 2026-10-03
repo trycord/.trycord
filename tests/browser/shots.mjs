@@ -109,16 +109,37 @@ async function main() {
               + ' w=' + Math.round(r.width) + ' ' + cs.display
               + ' col=' + cs.gridColumnStart + '/' + cs.gridColumnEnd;
           };
-          return [box('#app'), box('.shell'), box('.app-rail'), box('.main-content'),
+          const tracks = (sel, prop) => {
+            const e = document.querySelector(sel);
+            return e ? sel + ' ' + prop + '=' + getComputedStyle(e)[prop] : '';
+          };
+          const sh = document.getElementById('shell');
+          const NL = String.fromCharCode(10);
+          return [
+            'shell data-layout=' + (sh && sh.dataset.layout)
+              + ' data-members=' + (sh && sh.dataset.members)
+              + ' data-presentation=' + document.documentElement.dataset.presentation,
+            tracks('.shell', 'gridTemplateColumns'),
+            tracks('.main-content', 'gridTemplateColumns'),
+            tracks('.main-content', 'gridTemplateRows'),
+            tracks('.chat-environment', 'gridTemplateColumns'),
+            'rootVar rail=' + getComputedStyle(document.documentElement).getPropertyValue('--ui-rail').trim()
+              + ' members=' + getComputedStyle(document.documentElement).getPropertyValue('--ui-members').trim()
+              + ' shellCols=' + getComputedStyle(document.documentElement).getPropertyValue('--ui-shell-cols').trim(),
+            box('#app'), box('.shell'), box('.app-rail'), box('.main-content'),
             box('.context-header'), box('.chat-environment'), box('.view-root'),
-            box('.member-sidebar'), box('.conversation')].join(String.fromCharCode(10));
+            box('.member-sidebar'), box('.conversation'),
+          ].join(NL);
         `);
         console.log(String(geo).split(String.fromCharCode(10)).map((l) => '      ' + l).join(String.fromCharCode(10)));
-        console.log(
-          '  ' + tag.padEnd(6) + name.padEnd(22) +
-          String(m.chars).padStart(5) + ' chars  ' +
-          (m.overflow ? 'H-OVERFLOW ' + m.w + '/' + m.vw : 'fits')
-        );
+        const m = await page.eval(`
+          const d = document.documentElement;
+          return { chars: document.body.innerText.trim().length,
+                   overflow: d.scrollWidth > window.innerWidth + 1,
+                   scrollW: d.scrollWidth, vw: window.innerWidth };`);
+        console.log('  ' + tag.padEnd(6) + name.padEnd(22)
+          + String(m.chars).padStart(5) + ' chars  '
+          + (m.overflow ? 'H-OVERFLOW ' + m.scrollW + '/' + m.vw : 'fits'));
       }
     }
   } finally {
