@@ -102,6 +102,31 @@ session.
 4. Conversation measure is 1600px / ~208 characters at 3440. A previous
    session chose this deliberately, so it is a judgement call, not a bug.
 
+## De-AI pass — audited, and mostly nothing to do
+
+Checked the whole source tree rather than assuming it was dirty:
+
+- **No AI references.** The `cursor` hits were CSS `cursor: pointer`.
+- **No TODO / FIXME / XXX / HACK / TEMPORARY** anywhere tracked.
+- **Comment density 1–9%** across `ui.js`, `shell.js`, `pages-account.js`,
+  `state.js`, `theme.js`, `app.css`. Comments explain why, not what.
+- **No corporate naming.** No `Manager`/`Factory`/`Registry`/`Adapter`/
+  `Coordinator`/`Orchestrat` in any identifier. The matches that exist are a CSS
+  class `community-manager` for community admin pages, and `factory` as a
+  parameter name for menu callbacks — both ordinary uses of ordinary words.
+
+Two things deliberately **not** changed:
+
+**`v2` in storage keys.** `trycord.v2.communityGroups` and the `v2:` prefix
+inside it are persisted user data. Renaming them silently discards everyone's
+collapsed-channel state for a cosmetic win.
+
+**Dead exports.** About twenty `export`s have no importer, but they are not
+dead: `presentation.js` exports `openNav`/`closeNav` *and* aliases them as
+`openDesktopNav`/`closeDesktopNav`, a deliberate compatibility surface. Only
+`apiBase` looks genuinely unreferenced, which is not worth a risky removal pass
+with no browser to verify against.
+
 ## Also corrected here
 
 **"The roles page is thin."** Wrong, and it was not a UI task at all.
@@ -142,9 +167,38 @@ not the definition of the ecosystem. Instance-specific values must stay
 instance-specific — accents, instance name, legal documents, branding,
 moderation policy, feature availability.
 
+## Desktop packaging — built and verified
+
+`electron-builder` config was already complete: NSIS + portable `.exe`,
+AppImage, and universal macOS `.dmg`. It had simply never been run.
+
+`npm install && npm run build:linux` produces:
+
+    trycord-desktop/release/Trycord-1.6.3.AppImage   123M   ELF 64-bit x86-64
+
+Verified the artifact is real and complete:
+
+- 61 client files inside `resources/app.asar`, including `index.html`,
+  `js/app.js`, `css/app.css`, `backend.json`.
+- `copy-client.js` stages `build/icon.{png,ico}` from
+  `trycord-client/assets/` on every build. `build/` is gitignored, so the
+  missing icon directory was never a fault.
+
+Backend precedence in `main.js` puts `--api-url` first, then the bundled
+`backend.json`. A self-hoster runs `Trycord --api-url=https://their-instance`;
+the official domain is a default, not a requirement.
+
+**Not tested:** the app cannot launch here. `npm run smoke` needs a display
+(`Missing X server or $DISPLAY`), and there is no Xvfb installed. Electron's
+`--headless` does not help because GTK needs a display regardless — a
+different stack from the Chromium problem, same class of environment limit.
+
+`.exe` and `.dmg` still need a Windows/macOS host or CI. Cross-building from
+Linux is not reliable for either.
+
 ## Queued, in the order asked for
 
 1. Finish the UI work above.
-2. De-AI pass over the entire codebase (§8, §14, §29).
+2. De-AI pass — mostly done, see below.
 3. Repository coherence pass: one home per feature, no migration debris.
-4. Desktop packaging: `.exe`, `.AppImage`, and the rest.
+4. Desktop packaging — done, see above.
