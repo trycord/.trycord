@@ -111,8 +111,9 @@ async function main() {
           };
           return [box('#app'), box('.shell'), box('.app-rail'), box('.main-content'),
             box('.context-header'), box('.chat-environment'), box('.view-root'),
-            box('.member-sidebar'), box('.conversation')].join('\n');`);
-        console.log(geo.split('\n').map(l => '      ' + l).join('\n'));
+            box('.member-sidebar'), box('.conversation')].join(String.fromCharCode(10));
+        `);
+        console.log(String(geo).split(String.fromCharCode(10)).map((l) => '      ' + l).join(String.fromCharCode(10)));
         console.log(
           '  ' + tag.padEnd(6) + name.padEnd(22) +
           String(m.chars).padStart(5) + ' chars  ' +
