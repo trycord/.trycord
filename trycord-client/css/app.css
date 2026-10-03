@@ -464,12 +464,28 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
    across pages that have no members at all.
    ========================================================================== */
 
-#root { height: 100%; }
+/* The shell's parent. It has to carry the viewport height itself: the shell is
+   100dvh, so without a full-height parent it sat in an auto-sized block and the
+   leftover width went nowhere - the navigation column took its 264px and the
+   workspace got whatever a shrink-to-fit box decided, which on a 1440 screen was
+   about 440px with 450px of empty shell beside it.
+
+   #root is not a thing; the wrapper is #app.trycord-app. */
+.trycord-app, #app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100dvh;
+  width: 100%;
+}
 
 .shell {
   display: grid;
   grid-template-columns: var(--ui-shell-cols);
   grid-template-rows: minmax(0, 1fr) auto;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
   height: 100dvh;
   background: var(--t-pg);
 }
@@ -492,8 +508,11 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   z-index: 40;
 }
 
-/* Empty landmark kept for the shell's benefit; it has no content of its own. */
-.rail-identity { display: none; }
+/* Two empty landmarks the shell keeps addressable: the identity region and the
+   global navigation. renderCommunities() writes the global destinations into
+   #community-navigation alongside the communities, so both of these hold nothing.
+   Left in the grid they still create tracks, so they are taken out of it. */
+.rail-identity, .rail-global-nav { display: none; }
 
 .app-rail__items {
   grid-column: 1;
