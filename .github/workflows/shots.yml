@@ -1,0 +1,69 @@
+name: Shots
+
+# Photographs every surface at desktop, phone and tablet widths and uploads the
+# PNGs. Separate from Check on purpose: this is how you look at the UI, not how
+# you assert on it, and it should not gate a push.
+#
+# Triggered by hand, or by pushing to a branch named shots/*. Reads the ref it
+# ran on, so you can shoot a branch without merging it first.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'shots/**'
+
+permissions:
+  contents: read
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: trycord-server/package-lock.json
+
+      # The server will not boot without better-sqlite3 installed. Same reason
+      # the Check browser job installs it.
+      - name: Install server dependencies
+        working-directory: trycord-server
+        run: npm ci
+
+      - name: Confirm a browser is available
+        run: (command -v chromium || command -v chromium-browser || command -v google-chrome || command -v google-chrome-stable)
+
+      # Throwaway SQLite and a throwaway signing secret, both generated here.
+      # MAIL_MODE=log is not optional: without it the server reads a local .env,
+      # turns on SMTP verification, and every seeded account stays unverified.
+      - name: Start a server to shoot
+        env:
+          DB_CLIENT: sqlite
+          DB_FILE: /tmp/tc-shots.db
+          PORT: '9975'
+          HOST: 127.0.0.1
+          UPLOAD_DIR: /tmp/tc-shots-uploads
+          MAIL_MODE: log
+          JWT_SECRET: shots0123456789abcdef0123456789abcdef0123456
+          SERVER_HOST_TYPE: express
+        run: |
+          node trycord-server/src/server.js > /tmp/tc-server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:9975/api/health > /dev/null; then echo up; exit 0; fi
+            sleep 1
+          done
+          echo "server did not come up:"; cat /tmp/tc-server.log; exit 1
+
+      - name: Take the screenshots
+        working-directory: tests/browser
+        run: node shots.mjs
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots-${{ github.sha }}
+          path: tests/browser/shots/
+          retention-days: 14
