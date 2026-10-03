@@ -91,11 +91,11 @@ export async function launch({ width = 1440, height = 900, port = 9333, url } = 
   if (!target) target = blank;
   if (!target) {
     proc.kill('SIGKILL');
-    throw new Error('no usable page target');
-  }
-  if (!target) {
-    proc.kill('SIGKILL');
-    throw new Error('chromium did not expose a page');
+    throw new Error(
+      'no usable page target. Chromium is running but exposed no page with a ' +
+      'webSocketDebuggerUrl within 20s. That is a cold or contended runner, not ' +
+      'a fault in the client or the server - retry the job.'
+    );
   }
 
   const ws = new WebSocket(target.webSocketDebuggerUrl);

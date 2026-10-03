@@ -48,7 +48,20 @@ async function main() {
   mkdirSync(OUT, { recursive: true });
   await waitForServer(ORIGIN + '/api/health');
 
-  const page = await launch({ width: 1440, height: 900, port: 9644 });
+  // A cold runner sometimes starts chromium without exposing a page target for a
+  // while. That is the machine, not the client, and losing a whole screenshot set
+  // to it would be the wrong trade - so try again with a different debugging port
+  // before giving up.
+  let page = null;
+  for (let attempt = 1; attempt <= 3 && !page; attempt++) {
+    try {
+      page = await launch({ width: 1440, height: 900, port: 9640 + attempt });
+    } catch (err) {
+      console.warn('  launch attempt ' + attempt + ' failed: ' + err.message);
+      if (attempt === 3) throw err;
+      await wait(3000);
+    }
+  }
   const written = [];
   try {
     const acct = await signedIn(page, ORIGIN, { seedCommunity: true });
