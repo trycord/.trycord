@@ -413,6 +413,25 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 }
 .section-label:first-child { margin-top: 0; }
 
+/* The skip link. It is the first thing in the document and it is only ever seen
+   by a keyboard user, so it is off-screen until focused - not merely visually
+   hidden, which leaves it in the tab order with nothing to indicate where it is. */
+.skip-link {
+  position: absolute;
+  top: 0; left: 0;
+  z-index: 200;
+  padding: var(--t-d-3) var(--t-d-5);
+  border-radius: 0 0 var(--t-r-s) 0;
+  background: var(--t-accent);
+  color: var(--t-accent-ink);
+  font-size: var(--t-fs-s);
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-120%);
+  transition: transform var(--t-fast) var(--t-ease);
+}
+.skip-link:focus { transform: translateY(0); color: var(--t-accent-ink); text-decoration: none; }
+
 .visually-hidden {
   position: absolute;
   width: 1px; height: 1px;
