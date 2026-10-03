@@ -16,9 +16,13 @@ leaves your real database alone:
 ```sh
 cd trycord-server
 DB_CLIENT=sqlite DB_FILE=/tmp/tc-test.db PORT=9975 HOST=127.0.0.1 \
-UPLOAD_DIR=/tmp/tc-uploads MAIL_MODE=log SECRET=testsecret0123456789abcdef \
+UPLOAD_DIR=/tmp/tc-uploads MAIL_MODE=log \
+JWT_SECRET=<32+ random hex> SERVER_HOST_TYPE=express \
   node src/server.js &
 ```
+
+Every instance must supply its own signing secret — there is no default and the
+official one is never shared — and the host type must be stated explicitly.
 
 `MAIL_MODE=log` matters. Without it the local `.env` turns on SMTP email
 verification, every account stays unverified, and the suites fail for reasons
@@ -29,6 +33,30 @@ Then, from this directory:
 ```sh
 node t-sidebar.mjs
 ```
+
+CI runs `t-sidebar.mjs` on every push (`.github/workflows/check.yml`, the
+`browser` job).
+
+## If every suite fails the same way
+
+```
+Error: chromium accepted the tab but never navigated to http://127.0.0.1:9975/.
+```
+
+That is the driver telling you the browser never fetched anything, which is an
+environment fault rather than a product one. Some builds of Chromium on some
+machines open the tab, issue the request, and leave the execution context on
+`about:blank`. To tell the two apart:
+
+```sh
+chromium --headless=new --user-data-dir=$(mktemp -d) \
+  --dump-dom 'data:text/html,<b>ok</b>'      # renders
+chromium --headless=new --user-data-dir=$(mktemp -d) \
+  --dump-dom http://127.0.0.1:9975/backend.json   # empty: the fault
+```
+
+If the `data:` URL renders and the `http:` one does not, it is the browser and
+not the application.
 
 ## Writing one
 
@@ -61,10 +89,14 @@ redirect away, which reads exactly like the form failing to render.
 
 ## The suites
 
-| file | what it covers |
-| --- | --- |
-| `t-sidebar.mjs` | sidebar rows navigate, and each sidebar describes the page beside it |
-| `t-origin-boot.mjs` | the backend origin serves the whole client; the API stays an API |
-| `t-theme.mjs` | the Custom Theme Studio: guided controls, CSS validation, persistence, reset |
-| `t-layout.mjs` | layout measurements across every size the project supports |
-| `t-ui.mjs` | the feature surfaces, driven end to end |
+| file | what it covers | in CI |
+| --- | --- | --- |
+| `t-sidebar.mjs` | sidebar rows navigate, and each sidebar describes the page beside it | yes |
+| `verify-these.md` | fixes made without a browser, and how to check them by hand | — |
+
+Suites written earlier in the project and not yet restored to this directory:
+origin-boot (the backend origin serving the whole client), theme (the Custom
+Theme Studio), layout (measurements at every supported size) and ui (the feature
+surfaces end to end). They were lost with `/tmp` and are worth rewriting against
+`cdp.mjs` — the helper it exports (`waitForServer`, `signedIn`) is what they
+each need, and re-adding them is what keeps that file honest.
