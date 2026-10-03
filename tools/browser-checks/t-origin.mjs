@@ -20,12 +20,15 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 await waitForServer(B + '/api/health');
 
-// Every client route the router knows about, as addresses someone would type.
+// Application routes: the ones the client's router owns. /support and /legal
+// are deliberately absent - they are public pages served from public/, not
+// routes the application handles, so asserting they return the shell would be
+// asserting a bug.
 const ROUTES = [
   '/', '/home', '/menu', '/dms', '/friends', '/notifications', '/discover',
   '/settings', '/settings/privacy', '/settings/security', '/settings/appearance',
   '/account', '/account/sessions', '/admin', '/servers/new',
-  '/invite/6J23FFH4', '/users/someone', '/legal', '/support',
+  '/invite/6J23FFH4', '/users/someone',
   '/c/some-community', '/server/some-community',
   '/c/some-community/channel/some-token',
   '/c/some-community/settings/analytics',
@@ -40,6 +43,17 @@ for (const route of ROUTES) {
   const isShell = /text\/html/.test(type) && /<base href=/.test(body);
   ok('GET ' + route + ' serves the client shell', res.status === 200 && isShell,
     { status: res.status, type });
+}
+
+console.log('\n=== public pages are pages, not the application ===');
+// They must render as themselves. Serving the app shell here would replace a
+// support page with a login screen for someone who needs help signing in.
+for (const route of ['/support', '/legal/terms']) {
+  const res = await fetch(B + route);
+  const body = await res.text();
+  ok('GET ' + route + ' serves its own page, not the app shell',
+    res.status === 200 && /<title>/i.test(body) && !/<base href/i.test(body),
+    { status: res.status, title: (body.match(/<title>[^<]*<\/title>/i) || [])[0] });
 }
 
 console.log('\n=== the API is still an API ===');
@@ -160,6 +174,10 @@ try {
   }
 
   console.log('\n=== a legacy fragment URL still arrives ===');
+  // Signed out first. /invite/ is a session route, so with a stale token left
+  // over from the auth-state checks above the redirect to /login is correct
+  // behaviour and would mask what is actually being tested here.
+  await page.eval(`localStorage.clear(); return 1;`);
   // The fragment never reaches the server, so the client upgrades it on arrival.
   // This is a one-time conversion rather than a second router, and it must not
   // become a dependency: the pathname is what the app actually routes on.
