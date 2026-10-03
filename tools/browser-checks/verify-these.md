@@ -1,13 +1,20 @@
-# Unverified changes
+# Verify these
 
-Fixes made in a session where the browser could not be used, so they are
-correct by construction and static checks, but nobody has seen them render.
+Fixes made while this machine's browser was unusable, so they were correct by
+construction and static checks only. CI now runs the sidebar ones on every push
+and they are green; the rest are still unverified in a browser.
 
-The machine's headless Chromium fetches no `http://` URL at all — not this
-server, not a two-line node server, not `localhost` — while rendering `data:`
-URLs correctly. See `README.md` here for what was tried.
+**Already verified in CI** (36/36 on `2418ef0`, job `Browser checks`):
 
-## Verify these five
+- **Sidebar rows navigate** — every row on `/friends` and `/notifications`
+  exists, throws nothing, stays on this origin, and resolves to a real route.
+- **`/home` describes itself as Home** — not Direct messages, lists all three
+  places, and the sidebar title matches the page title.
+- **The root path behaves like `/home`.**
+
+Still worth a human look, because no check covers them yet.
+
+## Verify these three
 
 ### 1. `icon()` no longer drops the `ui-icon` class — `2f44c90`
 
@@ -20,7 +27,7 @@ caret should be a small rotated chevron at the right of the section header.
 
 Also confirm nothing else grew: any icon that should be ~15–21px.
 
-### 2. Sidebar rows navigate — `9cc30e4`
+### 2. Sidebar rows navigate — `9cc30e4` — **verified in CI**
 
 Rows were calling `navigate('/' + path)` on a path that already began with a
 slash, producing `//friends`, which resolves as a protocol-relative URL and is
@@ -30,7 +37,7 @@ Where to look: `/friends` → click *All friends* and *Add friend*.
 `/notifications` → *All notifications*. Each should navigate, and the console
 should be clean.
 
-### 3. `/home` has a sidebar that describes Home — `9cc30e4`
+### 3. `/home` has a sidebar that describes Home — `9cc30e4` — **verified in CI**
 
 `/home` fell through to the direct-messages context, so the sidebar next to a
 full activity feed read **"Direct messages"** and **"No conversations yet"**.
@@ -56,6 +63,14 @@ permanently on every boot afterwards.
 Already verified three ways: three consecutive boots against one database file,
 49 tables each time, no scratch table left. Nothing further needed unless you
 want to force the interrupted case by killing the server mid-migration.
+
+## Remaining here
+
+Two suites written earlier were lost with `/tmp` and are worth restoring
+against `cdp.mjs`: **origin-boot** (the backend origin serving the whole
+client while the API stays an API) and **theme** (the Custom Theme Studio's
+guided controls, CSS validation, persistence and reset). Both caught real
+faults when they last ran, and neither has run since.
 
 ## If you get a browser back
 
