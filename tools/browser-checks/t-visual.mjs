@@ -53,10 +53,13 @@ try {
     await wait(700);
     const big = await page.eval(`
       const MAX = ${MAX_ICON_PX};
-      return [...document.querySelectorAll('svg')]
+      // Only .ui-icon is an icon. An svg with no such class is a chart or a
+      // logo - the analytics sparkline is 754px wide and is meant to be - and
+      // measuring those against a glyph limit reports the chart as a fault.
+      return [...document.querySelectorAll('svg.ui-icon')]
         .map(s => {
           const r = s.getBoundingClientRect();
-          return { cls: (s.getAttribute('class') || '(none)').slice(0, 44),
+          return { cls: (s.getAttribute('class') || '').slice(0, 44),
                    w: Math.round(r.width), h: Math.round(r.height) };
         })
         // A hidden element has no meaningful size and is not a fault.
