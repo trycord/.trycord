@@ -2287,10 +2287,14 @@ select.input { appearance: auto; }
 
    Capping the column moves the timestamp back to within reading distance of the
    text it belongs to, and centres the lot so the leftover width reads as margin.
-   --t-content-width rather than a new value, because this is the same decision
-   the conversation column already makes. */
+/* 760px, not --t-content-width. That token is 1180px and it is the right measure
+   for a conversation, where the message column is the thing being read. An
+   activity row is one avatar, two lines and a timestamp, and at 1180px the
+   timestamp still landed ~890px from the text it belongs to - the same gap the
+   cap was added to remove, just smaller. A feed row wants the measure of a
+   paragraph. */
 .home-stream > .home-event {
-  max-width: var(--t-content-width);
+  max-width: 760px;
   margin-inline: auto;
 }
 .home-event + .home-event { margin-top: 2px; }
