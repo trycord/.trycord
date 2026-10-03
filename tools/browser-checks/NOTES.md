@@ -93,18 +93,24 @@ session.
 
 ## Open findings
 
-1. `/home`'s activity rows leave ~260px of dead space before the timestamp at
-   1440, because the row stretches the full region.
-2. The roles page is thin — a count, a paragraph, and a button to the
-   hierarchy, in a 900px viewport.
-3. Duplicate channel names are indistinguishable in the sidebar. The API
+1. Duplicate channel names are indistinguishable in the sidebar. The API
    allows them deliberately (`slugs.js`: a collision must never block
    someone). The fix belongs in the UI.
-4. No theme documentation. `docs/` has `selfhosting.md` and `v2-audit.md`.
-5. `.env` declares `DB_CLIENT` twice, `sqlite` then `mysql`. Whichever loader
+2. No theme documentation. `docs/` has `selfhosting.md` and `v2-audit.md`.
+3. `.env` declares `DB_CLIENT` twice, `sqlite` then `mysql`. Whichever loader
    reads last wins.
-6. Conversation measure is 1600px / ~208 characters at 3440. A previous
+4. Conversation measure is 1600px / ~208 characters at 3440. A previous
    session chose this deliberately, so it is a judgement call, not a bug.
+
+## Also corrected here
+
+**"The roles page is thin."** Wrong, and it was not a UI task at all.
+`/c/:id/settings/roles` renders the full editor: an owner row, ranked roles
+with drag handles, colour dots, member counts, a permission editor and a create
+form. What was screenshotted was a community with one role — a new community is
+seeded with exactly one `@everyone` and the owner holds no role — so the page
+was short because the data was short, not because the page is unfinished.
+Worth remembering before treating a sparse screen as a missing feature.
 
 ## Do not "fix" these
 
