@@ -20,15 +20,15 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 await waitForServer(B + '/api/health');
 
-// Application routes: the ones the client's router owns. /support and /legal
-// are deliberately absent - they are public pages served from public/, not
-// routes the application handles, so asserting they return the shell would be
-// asserting a bug.
+// Application routes: the ones the client's router owns. /terms and /privacy are
+// deliberately absent - those are public pages served from public/, not routes
+// the application handles, so asserting they return the shell would be asserting
+// a bug. Note /legal/terms is a different thing and does belong here.
 const ROUTES = [
   '/', '/home', '/menu', '/dms', '/friends', '/notifications', '/discover',
   '/settings', '/settings/privacy', '/settings/security', '/settings/appearance',
   '/account', '/account/sessions', '/admin', '/servers/new',
-  '/invite/6J23FFH4', '/users/someone',
+  '/invite/6J23FFH4', '/users/someone', '/legal/terms', '/legal/privacy',
   '/c/some-community', '/server/some-community',
   '/c/some-community/channel/some-token',
   '/c/some-community/settings/analytics',
@@ -46,9 +46,9 @@ for (const route of ROUTES) {
 }
 
 console.log('\n=== public pages are pages, not the application ===');
-// They must render as themselves. Serving the app shell here would replace a
+// These must render as themselves. Serving the app shell here would replace a
 // support page with a login screen for someone who needs help signing in.
-for (const route of ['/support', '/legal/terms']) {
+for (const route of ['/support', '/terms', '/privacy', '/security', '/status', '/about']) {
   const res = await fetch(B + route);
   const body = await res.text();
   ok('GET ' + route + ' serves its own page, not the app shell',
@@ -174,17 +174,19 @@ try {
   }
 
   console.log('\n=== a legacy fragment URL still arrives ===');
-  // Signed out first. /invite/ is a session route, so with a stale token left
-  // over from the auth-state checks above the redirect to /login is correct
-  // behaviour and would mask what is actually being tested here.
+  // A route that needs no session, so this measures the upgrade rather than the
+  // auth redirect. /invite/ would answer /login for a signed-out reader, which
+  // is correct and would hide what is being checked.
   await page.eval(`localStorage.clear(); return 1;`);
   // The fragment never reaches the server, so the client upgrades it on arrival.
   // This is a one-time conversion rather than a second router, and it must not
   // become a dependency: the pathname is what the app actually routes on.
-  await page.goto(B + '/#/invite/6J23FFH4', { waitMs: 2200 });
+  await page.goto(B + '/#/legal/terms', { waitMs: 2200 });
   const upgraded = await page.eval(`return { path: location.pathname, hash: location.hash };`);
-  ok('a legacy #/ URL is upgraded to a path', upgraded.path === '/invite/6J23FFH4', upgraded);
+  ok('a legacy #/ URL is upgraded to a path', upgraded.path === '/legal/terms', upgraded);
   ok('the fragment is cleared so it cannot come back', !upgraded.hash, upgraded);
+  ok('and it painted the page it names',
+    (await page.eval(`return document.body.innerText.trim().length;`)) > 10, upgraded);
 } finally {
   await page.close();
 }
