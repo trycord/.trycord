@@ -696,6 +696,18 @@ img { max-width: 100%; }
   max-width: var(--ui-settings-pane, 780px);
 }
 
+  /* With the nav back as a sidebar, the pane is the second track and the leftover
+     is whatever the nav and the gap did not use. Left-aligned that put a 780px
+     form hard against the navigation with 450px of nothing to its right, so the
+     pair read as a page that failed to fill. Centring the pair keeps the measure
+     and puts the space on both sides, where it looks deliberate. */
+  @media (min-width: 1000px) and (max-width: 2298px) {
+    .settings-layout {
+      grid-template-columns: var(--ui-sidebar) minmax(0, var(--ui-settings-pane, 780px));
+      justify-content: center;
+    }
+  }
+
 .set-head { display: flex; align-items: flex-start; gap: var(--t-d-4); }
 .set-head__text { min-width: 0; flex: 1 1 auto; }
 .set-head__title {
@@ -839,22 +851,25 @@ img { max-width: 100%; }
   outline-offset: 2px;
 }
 .switch__input:disabled + .switch__track { opacity: 0.5; cursor: not-allowed; }
-
 /* ---- narrower: the nav stops being a sidebar ---- */
 
-/* Stacked from 1699px, not 899px. The two-column settings frame needs its own
-   240px navigation column plus a pane worth reading, and it sits inside a shell
-   that has already spent 240px of sidebar and up to 260px of member panel. That
-   is ~860px of content, which is a ~1700px window; holding the frame open down
-   to 900px is what left the pane 284px wide and wrapped every heading one word
-   per line. Below the threshold the navigation becomes the disclosure it already
-   has a toggle for, so nothing is lost - it is one tap instead of always-on.
+/* Stacked below 1000px, and the threshold is not arbitrary arithmetic.
 
-   The threshold is 1699 rather than 1500 so the pane never gets *narrower* as
-   the window widens: stacked, the pane takes the whole content column, so
-   opening the second column has to buy more than it costs. It does, once the
-   context column appears below. */
-@media (max-width: 1699px) {
+   It was 1699px, on the reasoning that the settings frame sits inside a shell
+   which has already spent 240px of sidebar and up to 260px of member panel, so a
+   240px nav plus a readable pane needs about 1700px. That was the wrong shape of
+   argument. It is a layout that has to fit, not one to be hidden from everyone
+   who does not have the maximum: at 1440px, an ordinary laptop, the nav was
+   collapsed to a 60px strip showing the current section's name and the filter
+   box, so there was no way to reach Security, Privacy, Notifications,
+   Appearance, Backend or Updates without already knowing the URL. Eleven
+   sections, one of them reachable.
+
+   The frame already has the right answer to the real constraint. The pane has its
+   own cap (--ui-settings-pane), so the nav can stay a sidebar and the pane takes
+   whatever is left over. Below 1000px the leftover really is too small to read a
+   form in, and that is where the disclosure earns its place. */
+@media (max-width: 999px) {
   .settings-layout { grid-template-columns: minmax(0, 1fr); gap: var(--t-d-4); }
 
   /* A disclosure rather than a scroller: a horizontal strip of twenty sections
