@@ -13,7 +13,7 @@ web app (WAC) or the desktop shell (DAC).
 - `trycord-client/` — the web client (also shipped inside the desktop app)
 - `trycord-desktop/` — Electron shell around the same client
 - `public/` — the public website and legal pages
-- `tools/browser-checks/` — real-browser checks for the client
+- `tests/browser/` — real-browser checks for the client
 - `docs/` — self-hosting, theming, the desktop app and its launcher, and the
   architecture reference
 
@@ -73,7 +73,7 @@ a duplicate declaration, so it is not a check.
 
 ### Browser checks
 
-`tools/browser-checks/` drives the client in a real Chromium over the DevTools
+`tests/browser/` drives the client in a real Chromium over the DevTools
 protocol — no dependencies, and it does not care which Chromium is installed.
 The failures worth catching are a document that loads but cannot paint, a route
 that resolves to the wrong view, a control that throws; none of that is visible
@@ -92,11 +92,11 @@ UPLOAD_DIR=/tmp/tc-uploads MAIL_MODE=log SECRET=<32+ random hex chars> \
 Then:
 
 ```
-cd tools/browser-checks
+cd tests/browser
 node t-sidebar.mjs
 ```
 
-See `tools/browser-checks/README.md` for the suite list and for writing one.
+See `tests/browser/README.md` for the suite list and for writing one.
 
 ## Desktop app
 
@@ -110,7 +110,8 @@ npm run build:mac        # dmg
 
 Each target builds on its own platform; cross-building from Linux is not
 reliable for Windows or macOS. `npm run build` produces whatever the current
-platform supports.
+platform supports. See `docs/desktop.md` for how it is put together and
+`docs/launcher.md` for the startup and update behaviour.
 
 The packaged app picks its backend at launch, in this order:
 
@@ -126,7 +127,8 @@ is a default rather than a requirement.
 `trycord-server/.env.example` documents every variable. The ones with no
 default, where the server refuses to start without them, are `JWT_SECRET`,
 `SERVER_HOST_TYPE` and the database profile. See `docs/selfhosting.md` for
-deployment, including the nginx topology and the Docker volume layout.
+deployment, including the nginx topology and the Docker volume layout, and
+`docs/architecture.md` for how the system is put together.
 
 ## Deployment
 

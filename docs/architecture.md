@@ -6,7 +6,7 @@ the code alone does not explain. It is reference, not a plan and not a log.
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 18
 client segments are served. The web client is exercised in a real browser by
-`tools/browser-checks/`.
+`tests/browser/`.
 
 ## Architecture
 
@@ -132,14 +132,14 @@ connection error.
 | `cd trycord-server && npm run check` | applies the schema to a throwaway SQLite database and asserts index uniqueness |
 | `npm run check:routes` | every client route is served by the server |
 | `npm run check:client` | parses every web-client file as an ES module and resolves its relative imports |
-| `node tools/browser-checks/t-*.mjs` | drives the client in a real Chromium and asserts on the rendered DOM |
+| `node tests/browser/t-*.mjs` | drives the client in a real Chromium and asserts on the rendered DOM |
 
 `check:client` exists because `node --check` on a `.js` client file reports
 success for a file containing `import` statements even when the body has a
 duplicate declaration. A duplicate `const serverId` reached `main` through it, in
 `44e1ba8`, and the app would not start. It is a syntax gate, not a test suite.
 
-The browser checks need a server to point at; `tools/browser-checks/README.md`
+The browser checks need a server to point at; `tests/browser/README.md`
 has the invocation, and the SQLite incantation that keeps a real database out of
 it. A screenshot proves a page drew. These assert that it drew the right thing,
 from the server, as a signed-in person.

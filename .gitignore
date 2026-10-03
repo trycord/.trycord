@@ -29,3 +29,6 @@ trycord-desktop/build/icon.ico
 .idea/
 .DS_Store
 Thumbs.db
+
+# Screenshots are output, not source.
+tests/browser/shots/

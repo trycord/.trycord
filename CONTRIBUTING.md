@@ -101,28 +101,11 @@ Make sure:
 - [ ] `cd trycord-server && npm run check && npm run check:routes && npm run check:client` passes.
 - [ ] The affected application starts successfully.
 - [ ] The changed functionality works as expected.
-- [ ] For a client change, the affected browser check in `tools/browser-checks/` passes, or a new one covers it.
+- [ ] For a client change, the affected browser check in `tests/browser/` passes, or a new one covers it.
 - [ ] You haven't introduced unnecessary dependencies.
 - [ ] You haven't added unrelated formatting or refactoring.
 - [ ] Commit messages describe the actual changes.
 - [ ] The pull request explains what changed and what was tested.
-
-### Maintenance scripts
-
-`trycord-server/scripts/` holds three tools that enforce comment hygiene. They
-are not part of the build and nothing runs them automatically — they are there
-because the rule is worth keeping and is otherwise only a convention:
-
-| Script | What it does |
-|---|---|
-| `node scripts/comment-audit.js` | reports comments that do not explain a safety decision, a provider quirk, or a deliberate trade-off |
-| `node scripts/strip-comments.js` | removes them; `--apply` to rewrite |
-| `node scripts/strip-banners.js` | removes the `/* ==== title ==== */` section banners; `--apply` to rewrite |
-
-All three report by default and only write with `--apply`, and all three are
-scanners rather than regular expressions: a `//` inside a regex literal or a SQL
-string is not a comment, and a naive stripper deletes the code after it. An
-earlier version did exactly that and broke sixteen files.
 
 ## Deployment
 
