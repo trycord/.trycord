@@ -21,11 +21,18 @@ import { navigate, route } from './nav.js';;
 // href is resolved rather than stored - a stored path would go stale the moment
 // a community is renamed or the URL slug changes.
 //
-// Categories is the exception: it has its own page rather than a settings
-// section, so it points there. Sending it to settings/categories would not be a
-// 404, which is worse - the router would quietly show Overview.
+// Four of them are the exception, and it is the same exception each time: the
+// section already has a full page of its own, so the nav goes there. Members,
+// Roles, Invites and Categories were being pointed at settings/<section>, which
+// renders a card with a paragraph and a button - so reaching the member roster or
+// the role hierarchy cost a click through a dead end that explained what you were
+// about to see instead of showing it. One authoritative surface per section means
+// the teaser is not a thing the reader can get to at all.
 const SECTION_ROUTE = {
   categories: (serverId) => serverPath(serverId, 'categories'),
+  members: (serverId) => serverPath(serverId, 'members'),
+  roles: (serverId) => serverPath(serverId, 'roles'),
+  invites: (serverId) => serverPath(serverId, 'invites'),
 };
 
 function resolveCommunityHref(serverId, id) {
@@ -267,29 +274,11 @@ async function renderServerSettings(container, serverId, section = 'overview') {
     return;
   }
 
-  if (section === 'members') {
-    panel.appendChild(linkedSection({
-      serverId,
-      title: 'Members',
-      blurb: 'Search the roster, assign roles, set nicknames, and remove or ban people. Role assignment respects the hierarchy — you can only hand out roles below your own highest role.',
-      href: route('/members'),
-      cta: 'Open members',
-      counts: [memberCount + ' member' + (memberCount === 1 ? '' : 's'), onlineCount + ' online'],
-    }));
-    return;
-  }
-
-  if (section === 'roles') {
-    panel.appendChild(linkedSection({
-      serverId,
-      title: 'Roles',
-      blurb: 'Roles are ordered, and position is what decides what each member may manage. Drag to reorder; permissions are grouped per role. Roles are assigned by people with Manage Roles - members never pick their own.',
-      href: route('/roles'),
-      cta: 'Open the role hierarchy',
-      counts: [roleCount + ' role' + (roleCount === 1 ? '' : 's')],
-    }));
-    return;
-  }
+  // Members, Roles and Invites used to land here as a card with a paragraph and a
+  // button. Their nav rows point at the real pages instead (see SECTION_ROUTE), so
+  // these branches were unreachable - and an unreachable branch is worse than a
+  // missing one, because the next person to add a nav row gets the teaser back
+  // without knowing it exists.
 
   // These two are full surfaces in their own right. They render into the same
   // pane as the settings rows above rather than into the page, so the nav, the
@@ -311,17 +300,6 @@ async function renderServerSettings(container, serverId, section = 'overview') {
         await renderAnalytics(panel, serverId, { days: d });
       },
     });
-    return;
-  }
-
-  if (section === 'invites') {
-    panel.appendChild(linkedSection({
-      serverId,
-      title: 'Invites',
-      blurb: 'Create and revoke invite links, set use limits and expiry, and copy a link to share.',
-      href: route('/invites'),
-      cta: 'Manage invites',
-    }));
     return;
   }
 
