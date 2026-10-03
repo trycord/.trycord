@@ -77,6 +77,14 @@ try {
   console.log('\n=== the settings caret specifically ===');
   // It only renders above 900px, so the viewport is set rather than assumed.
   await page.setViewport(1440, 900);
+  // Measured at 420px, where the settings nav is a disclosure and the toggle is
+  // actually on screen. It used to be measured at the page's own 1440px viewport,
+  // which is fine only while the nav collapses below that width. When the
+  // threshold moved to 999px the toggle became display:none at 1440 and the caret
+  // measured 0x0 - a real regression reported by a check that had been silently
+  // measuring a hidden element for as long as it had been passing. A geometry
+  // assertion is only worth what its element is actually visible for.
+  await page.setViewport(420, 900);
   await page.goto(B + '/c/' + serverId + '/settings/roles', { waitMs: 2400 });
   await wait(1000);
   const caret = await page.eval(`
@@ -84,13 +92,58 @@ try {
     if (!c) return { present: false };
     const r = c.getBoundingClientRect();
     return { present: true, w: Math.round(r.width), h: Math.round(r.height),
-             hasBase: c.classList.contains('ui-icon') };
+             hasBase: c.classList.contains('ui-icon'),
+             toggleShown: !!document.querySelector('.settings-nav__toggle')
+               && getComputedStyle(document.querySelector('.settings-nav__toggle')).display !== 'none' };
   `);
+  ok('the settings disclosure toggle is visible at 420px', caret.toggleShown, caret);
   ok('the caret is rendered', caret.present, caret);
   if (caret.present) {
     ok('the caret keeps the base class that gives it a size', caret.hasBase, caret);
     ok('the caret is 14px wide, not hundreds', caret.w > 0 && caret.w <= 20, caret);
   }
+  await page.setViewport(1440, 900);
+
+  console.log('\n=== nothing overlays a message on a phone ===');
+  // Three separate faults came from one mistake: a max-width media query
+  // restating a selector the base stylesheet already owned, at equal specificity,
+  // further down the file. On a phone that made every message paint its hover bar
+  // over its own text, and drew the header's action buttons straight through the
+  // channel name. Neither throws and neither fails a syntax check; both are only
+  // visible if something measures the rendered result on a narrow viewport.
+  for (const [w, h] of [[390, 844], [360, 740]]) {
+    await page.setViewport(w, h);
+    await page.goto(B + '/c/' + serverId, { waitMs: 2400 });
+    await wait(700);
+    await page.eval(`const b = document.querySelector('.ctx-channel'); if (b) b.click(); return 1;`);
+    await wait(2400);
+
+    // The bars must be hidden, not merely small.
+    const bars = await page.eval(`
+      const bars = [...document.querySelectorAll('.msg .msg-hoverbar')];
+      return { total: bars.length, visible: bars.filter(b => getComputedStyle(b).display !== 'none').length };
+    `);
+    ok(w + ': no message shows its hover bar untouched (' + bars.visible + '/' + bars.total + ')',
+      bars.total > 0 && bars.visible === 0, bars);
+
+    // And the header's controls must not sit on top of its own title.
+    const head = await page.eval(`
+      const title = document.querySelector('.context-title');
+      const acts = document.querySelector('.context-actions');
+      if (!title || !acts) return { none: true };
+      const t = title.getBoundingClientRect();
+      const a = acts.getBoundingClientRect();
+      return {
+        overlap: Math.round(Math.min(t.right, a.right) - Math.max(t.left, a.left)),
+        titleW: Math.round(t.width),
+        actsRight: Math.round(a.right), vw: window.innerWidth,
+      };
+    `);
+    ok(w + ': the header actions do not overlap the title', !head.none && head.overlap <= 1, head);
+    ok(w + ': the title is not truncated to nothing', !head.none && head.titleW > 40, head);
+    ok(w + ': the actions stay inside the viewport', !head.none && head.actsRight <= head.vw, head);
+  }
+  await page.setViewport(1440, 900);
 
   console.log('\n=== the activity feed has a measure ===');
   for (const width of [1440, 2560]) {
@@ -143,6 +196,43 @@ try {
                  .map(e => e.tagName.toLowerCase() + '.' + (e.className || '').toString().split(' ')[0]) };
     `);
     ok(w + 'x' + h + ': no horizontal overflow', over.scrollW <= over.vw + 1, over);
+  }
+
+  // Settings navigation has to be reachable at every width that can run it.
+  // The nav used to collapse into a phone-style disclosure below 1699px, so an
+  // ordinary 1440px laptop showed one section name, a filter box and a sign-out
+  // link and no route at all to Security, Privacy, Notifications, Appearance,
+  // Backend or Updates. Eleven sections, one reachable. The disclosure is right
+  // on a phone and wrong on a laptop, so this checks both ends.
+  console.log('\n=== every settings section is reachable ===');
+  for (const [w, label] of [[1440, 'desktop'], [820, 'tablet'], [390, 'phone']]) {
+    await page.setViewport(w, 900);
+    await page.goto(B + '/settings', { waitMs: 2200 });
+    await wait(800);
+    const nav = await page.eval(`
+      const items = [...document.querySelectorAll('.settings-nav__item')];
+      const visible = items.filter(a => {
+        if (a.hidden) return false;
+        let n = a;
+        while (n && n !== document.body) {
+          if (getComputedStyle(n).display === 'none') return false;
+          n = n.parentElement;
+        }
+        return true;
+      });
+      return { total: items.length, visible: visible.length,
+               collapsed: !!document.querySelector('.settings-nav__groups')
+                 && getComputedStyle(document.querySelector('.settings-nav__groups')).display === 'none',
+               labels: visible.map(a => a.textContent.trim()).slice(0, 12) };
+    `);
+    if (w === 390) {
+      // On a phone the disclosure is correct. What matters is that the toggle
+      // exists, so the list can be opened at all.
+      ok('phone: settings navigation is a disclosure you can open', nav.total > 1, nav);
+    } else {
+      ok(label + ': all settings sections are on screen without a tap (' + nav.visible + '/' + nav.total + ')',
+        nav.total > 1 && nav.visible === nav.total, nav);
+    }
   }
 } finally {
   await page.close();
