@@ -310,11 +310,12 @@ const PROTECTED_IDS = new Set([
 
 const PROTECTED_CLASSES = new Set([
   'app-rail', 'app-rail__items', 'rail-identity', 'rail-global-nav',
+    'rail-community', 'rail-nav', 'rail-mark',
   'context-sidebar', 'main-content',
   'context-header', 'chat-environment', 'view-root',
   'member-sidebar', 'shell',
   'row', 'row--nav', 'row--dm', 'row--member', 'row--channel',
-  'server-chip', 'channel-category', 'place-header',
+  'channel-category', 'place-header',
   'place-menu', 'place-actions', 'community-actions',
   'member-group', 'msg', 'msg-actions', 'composer',
   'auth-wrap', 'card', 'card--auth', 'form-error', 'form-success', 'btn',
@@ -582,7 +583,10 @@ export function verifyCustomSafety() {
   }
   const route = document.documentElement.dataset.route || '';
   if (route === '/login' || route === '/register') {
-    const card = visibleSize('.auth-box');
+    // .auth-card, not .auth-box: the box was renamed long ago and this check had
+    // been looking for a class that no longer existed, so it failed every custom
+    // theme on sign-in and sign-up and reported a layout fault that was not one.
+    const card = visibleSize('.auth-card');
     if (!card.present || card.display === 'none' || card.width < 200) {
       problems.push('Authentication card is not visibly laid out.');
     }
