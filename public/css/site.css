@@ -185,7 +185,6 @@ button:focus-visible {
 }
 .nav-toggle[aria-expanded="true"] + .site-nav { display: flex; }
 
-.site-main { flex: 1 0 auto; }
 
 .hero {
   padding: clamp(64px, 12vw, 140px) 0;
