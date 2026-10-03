@@ -137,6 +137,11 @@ try {
         overlap: Math.round(Math.min(t.right, a.right) - Math.max(t.left, a.left)),
         titleW: Math.round(t.width),
         actsRight: Math.round(a.right), vw: window.innerWidth,
+        // Enough to say which box is responsible rather than guessing again.
+        titleRight: Math.round(t.right), actsLeft: Math.round(a.left),
+        actsW: Math.round(a.width),
+        buttons: [...acts.children].filter(c => getComputedStyle(c).display !== 'none')
+          .map(c => (c.getAttribute('aria-label') || c.title || c.tagName) + ':' + Math.round(c.getBoundingClientRect().width)),
       };
     `);
     ok(w + ': the header actions do not overlap the title', !head.none && head.overlap <= 1, head);
