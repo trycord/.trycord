@@ -88,6 +88,11 @@ try {
     ['Friends', '/friends'],
     ['Notifications', '/notifications'],
   ]) {
+    // Go back to /home before each one. The first click navigates away, and the
+    // sidebar then belongs to the page just landed on - so without this the
+    // second and third look for their row on a sidebar that has never got one.
+    await page.goto(B + '/home', { waitMs: 2200 });
+    await wait(900);
     page.resetErrors();
     const clicked = await page.eval(`
       const b = [...document.querySelectorAll('#place-navigation button')].find(e => {
