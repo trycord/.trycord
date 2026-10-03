@@ -14,7 +14,7 @@ web app (WAC) or the desktop shell (DAC).
 - `trycord-desktop/` — Electron shell around the same client
 - `public/` — the public website and legal pages
 - `tools/browser-checks/` — real-browser checks for the client
-- `docs/` — self-hosting, and the architecture audit
+- `docs/` — self-hosting, theming, and the architecture reference
 
 ## Quick start
 
