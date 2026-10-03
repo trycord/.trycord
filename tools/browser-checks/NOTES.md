@@ -95,18 +95,46 @@ session.
 
 1. `/home`'s activity rows leave ~260px of dead space before the timestamp at
    1440, because the row stretches the full region.
-2. The generated avatar fallback is a saturated magenta; the identity is
-   ember/orange on near-black.
-3. The roles page is thin — a count, a paragraph, and a button to the
+2. The roles page is thin — a count, a paragraph, and a button to the
    hierarchy, in a 900px viewport.
-4. Duplicate channel names are indistinguishable in the sidebar. The API
+3. Duplicate channel names are indistinguishable in the sidebar. The API
    allows them deliberately (`slugs.js`: a collision must never block
    someone). The fix belongs in the UI.
-5. No theme documentation. `docs/` has `selfhosting.md` and `v2-audit.md`.
-6. `.env` declares `DB_CLIENT` twice, `sqlite` then `mysql`. Whichever loader
+4. No theme documentation. `docs/` has `selfhosting.md` and `v2-audit.md`.
+5. `.env` declares `DB_CLIENT` twice, `sqlite` then `mysql`. Whichever loader
    reads last wins.
-7. Conversation measure is 1600px / ~208 characters at 3440. A previous
+6. Conversation measure is 1600px / ~208 characters at 3440. A previous
    session chose this deliberately, so it is a judgement call, not a bug.
+
+## Do not "fix" these
+
+**Avatar tints.** An earlier note here called the generated avatar colours
+"off-palette" and proposed narrowing them to the ember family. That was wrong
+and the change was reverted. `AVATAR_COLORS` is deliberately theme-neutral and
+deliberately varied: two thirds of it is cool hues, and it matches no theme's
+accent. That is the design. A varied set is how two people are told apart at a
+glance, and tying it to the accent would make every avatar look like the
+accent and destroy that distinction.
+
+It also would not have been the community's to decide. An operator who has
+chosen their own accent through the Custom Theme Studio does not get orange
+avatars imposed on them by shared code.
+
+**Ember is one theme, not the product's identity.** The identity is that a
+community controls its own space, including its own look. Hardening shared
+surfaces toward the ember palette would quietly remove a control the product
+exists to offer.
+
+The correct response to "an avatar looks loud next to ember" is a question
+about the default theme's harmony — not a global palette change.
+
+## The principle, applied
+
+When choosing between two implementations, ask whether it still makes sense
+for someone running their own Trycord instance. `trycord.dev` is one instance,
+not the definition of the ecosystem. Instance-specific values must stay
+instance-specific — accents, instance name, legal documents, branding,
+moderation policy, feature availability.
 
 ## Queued, in the order asked for
 
