@@ -57,6 +57,29 @@ jobs:
       - name: Parse client modules as ES modules
         run: node trycord-server/scripts/check-client-modules.js trycord-client/js
 
+      # A stray brace does not fail a syntax check on the JS, does not fail the
+      # module parse, and does not throw in a browser - it silently moves every
+      # rule after it outside its media query. That is how the hover bar came to be
+      # painted over every message on a phone. Balance is cheap to assert and
+      # impossible to notice by eye once the file is 4800 lines.
+      - name: The stylesheet's braces balance
+        run: |
+          node -e "
+          const fs = require('fs');
+          const s = fs.readFileSync('trycord-client/css/app.css', 'utf8');
+          let d = 0, line = 1, at = 0;
+          for (const c of s) {
+            if (c === '\n') line++;
+            if (c === '{') d++;
+            if (c === '}') { d--; if (d < 0) { at = line; break; } }
+          }
+          if (d !== 0 || at) {
+            console.error('app.css braces are unbalanced: depth ' + d + (at ? ', first extra } at line ' + at : ''));
+            process.exit(1);
+          }
+          console.log('app.css braces balance (' + s.split('\n').length + ' lines)');
+          "
+
   desktop:
     name: Desktop checks (no install needed)
     runs-on: ubuntu-latest
