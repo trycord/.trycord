@@ -39,7 +39,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   const channel = (layout.channels || []).find((c) => String(c.id) === String(channelId));
   const chanName = channel ? channel.name : 'channel';
   const memberToggle = el('button', {
-    class: 'btn icon', type: 'button',
+    class: 'btn icon member-toggle', type: 'button',
     title: membersHidden() ? 'Show member list' : 'Hide member list',
     'aria-label': membersHidden() ? 'Show member list' : 'Hide member list',
     'aria-pressed': membersHidden() ? 'false' : 'true',
