@@ -317,16 +317,19 @@ export function renderCommunities(region) {
   }
 
   // Creation action. Discover is deliberately absent: it is a global
-  const create = el('button', {
-    class: 'rail-nav-item community-action',
-    type: 'button',
-    title: 'Create a community',
-    'aria-label': 'Create a community',
-    dataset: { label: 'Create a community' },
-    onClick: () => { navigate('/servers/new'); },
-  }, el('span', { class: 'rail-nav-icon' }, icon('plus')));
-  region.appendChild(el('div', { class: 'rail-divider' }));
-  region.appendChild(create);
+    // Creation action. Discover is deliberately absent: it is a global
+    const create = el('button', {
+      class: 'rail-nav rail-nav--create',
+      type: 'button',
+      title: 'Create a community',
+      'aria-label': 'Create a community',
+      dataset: { label: 'Create a community' },
+      onClick: () => { navigate('/servers/new'); },
+    },
+    el('span', { class: 'rail-nav__icon' }, icon('plus')),
+    el('span', { class: 'rail-nav__label' }, 'New community'));
+    region.appendChild(el('div', { class: 'rail-sep' }));
+    region.appendChild(create);
 
   // The account control lives at the foot of the global rail rather than inside
   // any one surface's sidebar. It used to be a panel pinned to the bottom of the
