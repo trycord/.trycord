@@ -96,7 +96,7 @@ session.
 1. Duplicate channel names are indistinguishable in the sidebar. The API
    allows them deliberately (`slugs.js`: a collision must never block
    someone). The fix belongs in the UI.
-2. No theme documentation. `docs/` has `selfhosting.md` and `v2-audit.md`.
+2. No theme documentation. `docs/` has `selfhosting.md` and `architecture.md`.
 3. `.env` declares `DB_CLIENT` twice, `sqlite` then `mysql`. Whichever loader
    reads last wins.
 4. Conversation measure is 1600px / ~208 characters at 3440. A previous

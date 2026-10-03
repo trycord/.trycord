@@ -7,7 +7,7 @@ Thanks for stopping by. Trycord is open source, and contributions are welcome. A
 - **Keep changes small and focused.** One concern per pull request. Don't bundle unrelated changes.
 - **Don't break what works.** If you're unsure whether a refactor is safe, discuss it in an issue first or keep the change minimal.
 - **No fabricated content.** Don't add fake contributors, metrics, testimonials, history, or other misleading project information. Commit messages should describe real changes.
-- **Match the existing style.** Trycord currently uses plain JavaScript, IIFEs and `window.*` namespaces in the client, and straightforward Express in the server. Don't introduce new frameworks, build systems, or abstraction layers without discussing them first.
+- **Match the existing style.** The client is plain ES modules with no build step and no framework — it is served to the browser as written. The server is straightforward Express with CommonJS. Don't introduce a new framework, build system, or abstraction layer without discussing it first.
 - **Don't add unnecessary dependencies.** If something can be implemented cleanly using the existing stack, prefer that over introducing another package.
 
 ## Workflow
@@ -98,12 +98,39 @@ This creates a local installer without publishing a release.
 Make sure:
 
 - [ ] The change is focused on one purpose.
+- [ ] `cd trycord-server && npm run check && npm run check:routes && npm run check:client` passes.
 - [ ] The affected application starts successfully.
 - [ ] The changed functionality works as expected.
+- [ ] For a client change, the affected browser check in `tools/browser-checks/` passes, or a new one covers it.
 - [ ] You haven't introduced unnecessary dependencies.
 - [ ] You haven't added unrelated formatting or refactoring.
 - [ ] Commit messages describe the actual changes.
 - [ ] The pull request explains what changed and what was tested.
+
+### Maintenance scripts
+
+`trycord-server/scripts/` holds three tools that enforce comment hygiene. They
+are not part of the build and nothing runs them automatically — they are there
+because the rule is worth keeping and is otherwise only a convention:
+
+| Script | What it does |
+|---|---|
+| `node scripts/comment-audit.js` | reports comments that do not explain a safety decision, a provider quirk, or a deliberate trade-off |
+| `node scripts/strip-comments.js` | removes them; `--apply` to rewrite |
+| `node scripts/strip-banners.js` | removes the `/* ==== title ==== */` section banners; `--apply` to rewrite |
+
+All three report by default and only write with `--apply`, and all three are
+scanners rather than regular expressions: a `//` inside a regex literal or a SQL
+string is not a comment, and a naive stripper deletes the code after it. An
+earlier version did exactly that and broke sixteen files.
+
+## Deployment
+
+The Cloudflare deployment lives in a separate repository,
+`trycord/.trycord-cloudflare`, so the static site build is not entangled with
+the product. The official website and the API are two deployments of the same
+software, which is also why nothing in the client hardcodes the official
+domain — a self-hosted instance serves its own client from its own origin.
 
 ## Reporting bugs
 
