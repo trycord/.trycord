@@ -97,10 +97,22 @@ async function main() {
         const file = OUT + '/' + tag + '-' + name + '.png';
         await page.shot(file);
         written.push(file);
-        const m = await page.eval(`
-          const d = document.documentElement;
-          return { overflow: d.scrollWidth > window.innerWidth + 1, w: d.scrollWidth, vw: window.innerWidth,
-                   chars: document.body.innerText.trim().length };`);
+        // Shell geometry. Guessing at a grid from a screenshot is how three
+        // rounds of "it still looks wrong" happened; this reports the numbers.
+        const geo = await page.eval(`
+          const box = (sel) => {
+            const e = document.querySelector(sel);
+            if (!e) return sel + ' = MISSING';
+            const r = e.getBoundingClientRect();
+            const cs = getComputedStyle(e);
+            return sel + ' x=' + Math.round(r.left) + '..' + Math.round(r.right)
+              + ' w=' + Math.round(r.width) + ' ' + cs.display
+              + ' col=' + cs.gridColumnStart + '/' + cs.gridColumnEnd;
+          };
+          return [box('#app'), box('.shell'), box('.app-rail'), box('.main-content'),
+            box('.context-header'), box('.chat-environment'), box('.view-root'),
+            box('.member-sidebar'), box('.conversation')].join('\n');`);
+        console.log(geo.split('\n').map(l => '      ' + l).join('\n'));
         console.log(
           '  ' + tag.padEnd(6) + name.padEnd(22) +
           String(m.chars).padStart(5) + ' chars  ' +

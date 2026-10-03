@@ -432,6 +432,20 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 }
 .skip-link:focus { transform: translateY(0); color: var(--t-accent-ink); text-decoration: none; }
 
+/* Screen-reader-only. The route announcer uses this and it was unstyled, so every
+   route change printed its announcement as ordinary text across the bottom of the
+   window - which is exactly the thing the element exists to avoid. */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px; height: 1px;
