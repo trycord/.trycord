@@ -150,6 +150,18 @@ and left the failure attributable to the endpoint or its credentials rather than
 to the implementation. That check is no longer in the repository, so nothing pins
 the signer now.
 
+## Theming
+
+Every surface reads its colours from CSS custom properties, so a theme is a set
+of token values rather than a stylesheet swap. `docs/theming.md` covers the
+built-in themes, the Custom studio, what advanced CSS is allowed to change, and
+why the limits exist.
+
+The part worth knowing as an architect: custom CSS is validated by a real parser
+before it is applied, and the result is then measured — a theme that leaves the
+shell hidden or the rail collapsed is rejected and Ember is restored. Neither
+check trusts the CSS text.
+
 ## Known gaps
 
 Real, known gaps. None blocks ordinary use.
