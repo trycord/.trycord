@@ -3861,7 +3861,10 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
      nothing while costing 34px of a header that had no room to spare: at 360px
      four actions and a channel name do not fit, and the search button drew
      through the name. The member list has its own route on a phone. */
-  .context-actions .member-toggle { display: none; }
+  /* !important, because .context-actions button sets display:inline-flex with
+     !important two rules above. Without it this never applies at any width, which
+     is exactly what happened: the rule looked right and did nothing. */
+  .context-actions .member-toggle { display: none !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {
