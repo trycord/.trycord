@@ -3938,7 +3938,19 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
   padding: 0 26px 26px;
   overflow: hidden;
 }
-.card--profile .prof-banner { height: 160px; margin: 0 -26px; border-radius: 0; }
+/* 160px of unbroken brown with nothing in it. It is a live preview of a banner
+   the account may not have, so the space has to stay - but reserving it as a
+   solid fill made every profile look like it had a banner that failed to load.
+   Dashed, and the eye reads an empty slot rather than artwork. has-banner takes
+   the dashes back off once there is an image behind it. */
+.card--profile .prof-banner {
+  height: 160px;
+  margin: 0 -26px;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px dashed var(--t-line);
+}
+.card--profile .prof-banner.has-banner { border-bottom: 0; }
 .card--profile .prof-avatar { margin-top: -34px; }
 .card--profile .prof-avatar .avatar.lg { width: 76px; height: 76px; border: 3px solid var(--t-base); }
 @media (min-width: 901px) {
