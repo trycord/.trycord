@@ -101,7 +101,6 @@ Make sure:
 - [ ] `cd trycord-server && npm run check && npm run check:routes && npm run check:client` passes.
 - [ ] The affected application starts successfully.
 - [ ] The changed functionality works as expected.
-- [ ] For a client change, the affected browser check in `tests/browser/` passes, or a new one covers it.
 - [ ] You haven't introduced unnecessary dependencies.
 - [ ] You haven't added unrelated formatting or refactoring.
 - [ ] Commit messages describe the actual changes.

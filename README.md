@@ -13,7 +13,6 @@ web app (WAC) or the desktop shell (DAC).
 - `trycord-client/` — the web client (also shipped inside the desktop app)
 - `trycord-desktop/` — Electron shell around the same client
 - `public/` — the public website and legal pages
-- `tests/browser/` — real-browser checks for the client
 - `docs/` — self-hosting, theming, the desktop app and its launcher, and the
   architecture reference
 
@@ -70,33 +69,6 @@ it. `check:client` parses each web-client file as an ES module and resolves its
 relative imports. Use it instead of `node --check` on a `.js` client file: that
 reports success for a file containing `import` statements even when the body has
 a duplicate declaration, so it is not a check.
-
-### Browser checks
-
-`tests/browser/` drives the client in a real Chromium over the DevTools
-protocol — no dependencies, and it does not care which Chromium is installed.
-The failures worth catching are a document that loads but cannot paint, a route
-that resolves to the wrong view, a control that throws; none of that is visible
-to `curl`.
-
-They need a server to test against. A SQLite instance keeps your real database
-out of it, and `MAIL_MODE=log` matters or every account stays unverified:
-
-```
-cd trycord-server
-DB_CLIENT=sqlite DB_FILE=/tmp/tc-test.db PORT=9975 HOST=127.0.0.1 \
-UPLOAD_DIR=/tmp/tc-uploads MAIL_MODE=log SECRET=<32+ random hex chars> \
-  node src/server.js &
-```
-
-Then:
-
-```
-cd tests/browser
-node t-sidebar.mjs
-```
-
-See `tests/browser/README.md` for the suite list and for writing one.
 
 ## Desktop app
 

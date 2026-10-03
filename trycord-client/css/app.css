@@ -422,6 +422,24 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 
 /* ==========================================================================
    3  shell
+   --------------------------------------------------------------------------
+   The real structure, which is not the obvious one:
+
+     .shell                grid: rail | main
+       .app-rail           column 1, and it holds BOTH the community list and
+                           the channel list - one navigation column, not two
+         .rail-global-nav     global destinations
+         .app-rail__items    communities
+         .context-sidebar    the current community's channels
+       .main-content       column 2
+         .context-header    the header
+         .chat-environment  grid: view | members
+           .view-root
+           .member-sidebar
+
+   The member panel is inside the workspace rather than a third shell column, so
+   it sits against the conversation it belongs to and does not have to be reserved
+   across pages that have no members at all.
    ========================================================================== */
 
 #root { height: 100%; }
@@ -429,38 +447,91 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .shell {
   display: grid;
   grid-template-columns: var(--ui-shell-cols);
-  grid-template-rows: var(--ui-shell-rows);
+  grid-template-rows: minmax(0, 1fr) auto;
   height: 100dvh;
   background: var(--t-pg);
 }
 
-.main-content {
-  grid-column: 3;
+/* The navigation column. One surface holding communities above channels: a
+   person switching community and a person switching channel are doing the same
+   kind of thing, and putting them in one column makes both obvious. */
+.app-rail {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--ui-rail) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--t-pg);
+  border-right: 1px solid var(--t-line);
+  overflow: hidden;
+  z-index: 40;
+}
+
+.rail-global-nav {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--t-d-1);
+  padding: var(--t-d-3);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid var(--t-line);
+}
+
+.app-rail__items {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--t-d-1);
+  padding: var(--t-d-3) var(--t-d-2);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.context-sidebar {
+  grid-column: 2;
   grid-row: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--t-base2);
+  border-top: 1px solid var(--t-line);
+}
+
+.main-content {
+  grid-column: 2;
+  grid-row: 1;
   min-width: 0;
   min-height: 0;
-  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   background: var(--t-base);
 }
 
-/* The workspace plus the member panel. Only a conversation declares one, so
-   the second track exists exactly where there is something to put in it. */
+.context-header { grid-column: 1; grid-row: 1; }
+
 .chat-environment {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
   min-height: 0;
-  position: relative;
-  z-index: 1;
-}
-.shell[data-layout='channel'] .chat-environment {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 0px;
 }
-.shell[data-members='no'] .chat-environment { display: flex; }
+.shell[data-layout='channel'] .chat-environment { grid-template-columns: minmax(0, 1fr) var(--ui-members); }
 
 .view-root {
-  flex: 1 1 auto;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -479,29 +550,6 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 /* ==========================================================================
    4  rail
    ========================================================================== */
-
-.app-rail {
-  grid-column: 1;
-  grid-row: 1 / -1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--t-pg);
-  border-right: 1px solid var(--t-line);
-  z-index: 40;
-}
-
-.app-rail__items {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--t-d-2);
-  padding: var(--t-d-4) var(--t-d-3);
-  overflow-y: auto;
-  overflow-x: hidden;
-}
 
 /* The rail's own destinations: a glyph over a word. Same reasoning as the
    community tiles, and it is why the rail is 76px rather than 64. */
