@@ -1,0 +1,308 @@
+/* Ember orange on near-black, same tokens as the WAC so both windows read as
+   one product. */
+
+:root {
+  --bg: #0d0b0a;
+  --bg-2: #16110e;
+  --surface: #1c1512;
+  --line: rgba(255, 190, 150, 0.14);
+  --line-strong: rgba(255, 190, 150, 0.28);
+  --text: #fff6ec;
+  --text-2: #e3c9b4;
+  --muted: #a5856d;
+  --ember: #ff8a24;
+  --ember-2: #ff4d1f;
+  --ember-dim: rgba(255, 138, 36, 0.16);
+
+  --sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --fast: 140ms;
+  --slow: 420ms;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  /* The launcher owns no selection and no text cursor; it is a display. */
+  user-select: none;
+  overflow: hidden;
+}
+
+body {
+  /* Lit from above, the same direction as the WAC's ambient glow. */
+  background-image:
+    radial-gradient(120% 80% at 50% -20%, rgba(255, 138, 36, 0.10), transparent 60%),
+    linear-gradient(180deg, var(--bg-2), var(--bg) 55%);
+}
+
+.launcher {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 30px 34px 24px;
+  text-align: center;
+}
+
+/* --- identity ---------------------------------------------------------- */
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* Drawn rather than loaded: a launcher should not wait on an image decode to
+   show a word. Same shape as the rail chip and the app icon. */
+.brand__mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(140deg, var(--ember), var(--ember-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.brand__name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* --- stage ------------------------------------------------------------- */
+
+.stage {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.state {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  animation: state-in var(--slow) var(--ease) both;
+}
+
+.state[hidden] { display: none; }
+
+@keyframes state-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.state__line {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.state__detail {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 18px;
+}
+
+.state__version {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.state__from { color: var(--muted); }
+
+.state__arrow {
+  color: var(--ember);
+  font-family: var(--sans);
+}
+
+.state__to {
+  color: var(--ember);
+  font-weight: 600;
+}
+
+/* --- indicator --------------------------------------------------------- */
+
+/* They stop the moment the work stops. An indicator still moving after the
+   fact is telling a lie. */
+.pulse {
+  display: flex;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.pulse span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ember);
+  opacity: 0.28;
+  animation: pulse 1.15s var(--ease) infinite;
+}
+
+.pulse span:nth-child(2) { animation-delay: 0.14s; }
+.pulse span:nth-child(3) { animation-delay: 0.28s; }
+
+/* "Up to date" should look finished, not still working. */
+.pulse--settled span {
+  animation: none;
+  opacity: 0.85;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.22; transform: translateY(0); }
+  40%      { opacity: 1;    transform: translateY(-2px); }
+}
+
+/* --- progress ---------------------------------------------------------- */
+
+.progress {
+  width: 100%;
+  max-width: 280px;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.progress[hidden] { display: none; }
+
+.progress__track {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 190, 150, 0.12);
+  overflow: hidden;
+}
+
+/* Width comes from the updater's own percentage. */
+.progress__fill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--ember), var(--ember-2));
+  transition: width var(--slow) var(--ease);
+}
+
+/* Only when the updater has said nothing about size. */
+.progress--indeterminate .progress__fill {
+  width: 34%;
+  animation: sweep 1.25s var(--ease) infinite;
+}
+
+@keyframes sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(295%); }
+}
+
+.state__detail [data-bind="percent"] { color: var(--text-2); font-family: var(--mono); }
+.state__detail [data-bind="bytes"] { color: var(--muted); font-family: var(--mono); }
+.state__detail [data-bind="bytes"]::before { content: " · "; }
+
+/* --- actions ----------------------------------------------------------- */
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: background var(--fast) var(--ease),
+              color var(--fast) var(--ease),
+              border-color var(--fast) var(--ease);
+}
+
+.btn:hover { background: #241a16; color: var(--text); }
+.btn:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+
+.btn--primary {
+  background: linear-gradient(140deg, var(--ember), var(--ember-2));
+  border-color: transparent;
+  color: #2a1409;
+}
+
+.btn--primary:hover { filter: brightness(1.06); color: #2a1409; }
+
+/* --- footer ------------------------------------------------------------ */
+
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.foot__version { font-family: var(--mono); letter-spacing: 0.02em; }
+
+.foot__link {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line-strong);
+}
+
+.foot__link:hover { color: var(--text-2); }
+.foot__link:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
+/* --- accessibility ----------------------------------------------------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The words carry every state, so removing the motion loses nothing. */
+@media (prefers-reduced-motion: reduce) {
+  .state { animation: none; }
+  .pulse span { animation: none; opacity: 0.7; }
+  .pulse span:nth-child(1) { opacity: 1; }
+  .progress__fill { transition: none; }
+  .progress--indeterminate .progress__fill { animation: none; width: 100%; opacity: 0.4; }
+}
+
+@media (forced-colors: active) {
+  .btn, .foot__link { border: 1px solid ButtonBorder; }
+  .pulse span { background: ButtonText; }
+  .progress__fill { background: Highlight; }
+}

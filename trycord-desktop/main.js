@@ -21,6 +21,7 @@ const path = require('path');
 const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { initUpdater } = require('./updater');
+const { Launcher, registerLauncherIpc } = require('./launcher');
 
 const API = 'http://localhost:9971';
 
@@ -62,6 +63,28 @@ function bundledBackendPin() {
 }
 
 const launchApiUrl = apiUrlFromArgs(process.argv) || bundledBackendPin();
+
+// One session per machine. A second copy would run its own WebSocket, its own
+// notification handlers and its own updater against the same profile, and the
+// two would fight over localStorage. The second process hands its arguments
+// over and exits.
+//
+// Declared before anything else so it wins over everything that follows.
+const gotLock = app.requestSingleInstanceLock();
+
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const win = mainWin;
+    if (!win || win.isDestroyed()) {
+      if (app.isReady()) createAppWindow();
+      return;
+    }
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  });
+}
 
 // The self-test must observe a deterministic client state: isolate it to a
 // throwaway profile so persisted user data (theme, sessions) cannot affect
@@ -157,6 +180,7 @@ function registerAppProtocol() {
 
 let mainWin = null;
 let updaterApi = null;
+let launcher = null;
 
 function createWindow() {
   const iconPath = path.join(__dirname, 'build', 'icon.ico');
@@ -286,21 +310,62 @@ function createWindow() {
   return win;
 }
 
+// The updater sends to "the window". During startup that is the launcher, so
+// the check happens where a person can see it instead of 8 seconds after a
+// window they are already reading appears.
+function activeWindow() {
+  if (launcher && launcher.win && !launcher.win.isDestroyed()) return launcher.win;
+  return mainWin;
+}
+
 app.whenReady().then(() => {
   registerAppProtocol();
-  createWindow();
-  // Auto-updater: packaged builds only; dev never contacts an update server.
-  // All failures are logged and swallowed — the app always launches.
+
+  // Dev never contacts an update server, so there is nothing to check and the
+  // launcher would only be a screen with nothing to say. Go straight in.
+  const wantsLauncher = app.isPackaged && !process.argv.includes('--smoke-test');
+
+  if (wantsLauncher) {
+    launcher = new Launcher({
+      app,
+      log,
+      onReady: () => {
+        launcher = null;
+        createWindow();
+      },
+      onRetry: () => { if (updaterApi) updaterApi.checkForUpdates('retry'); },
+    });
+    registerLauncherIpc(launcher);
+    launcher.create();
+  } else {
+    createWindow();
+  }
+
+  // Packaged builds only. Every failure is logged and the app still launches.
   try {
-    updaterApi = initUpdater({ app, ipcMain, getWindow: () => mainWin, log });
+    updaterApi = initUpdater({
+      app,
+      ipcMain,
+      getWindow: activeWindow,
+      // Called for every updater event so the launcher can show them.
+      onEvent: (ev) => { if (launcher) launcher.onUpdaterEvent(ev); },
+      // The launcher is the only thing that needs a prompt start; otherwise the
+      // app window owns it and the check stays where it always was.
+      checkOnStart: wantsLauncher,
+      log,
+    });
   } catch (e) {
     log('[updater] init failed (continuing without updates): ' + (e && e.message ? e.message : e));
+    if (launcher) launcher.proceedAnyway();
   }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('window-all-closed', () => {
+  // The launcher closing is a quit, not a window-closed.
+  if (launcher) return;
   if (process.platform !== 'darwin') app.quit();
 });

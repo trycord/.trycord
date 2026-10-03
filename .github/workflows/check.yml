@@ -73,7 +73,26 @@ jobs:
       # genuinely meaningful for them, but they are listed explicitly so a new
       # desktop script cannot skip the gate by being unlisted.
       - name: Syntax-check desktop sources
-        run: for f in trycord-desktop/main.js trycord-desktop/updater.js trycord-desktop/preload.js trycord-desktop/scripts/*.js; do node --check "$f" || exit 1; done
+        run: for f in trycord-desktop/main.js trycord-desktop/updater.js trycord-desktop/preload.js trycord-desktop/launcher.js trycord-desktop/launcher-preload.js trycord-desktop/launcher-renderer.js trycord-desktop/scripts/*.js; do node --check "$f" || exit 1; done
+        # The launcher renderer is loaded by <script src>, not require, so
+        # node --check is the only thing that ever parses it. A missing file
+        # would otherwise fail silently in a packaged build.
+        env:
+          LAUNCHER_HTML: trycord-desktop/launcher.html
+      - name: Every file the launcher loads is listed
+        run: |
+          cd trycord-desktop
+          for f in launcher.css launcher-renderer.js; do
+            grep -q "$f" launcher.html || { echo "launcher.html does not reference $f"; exit 1; }
+          done
+          node -e "
+            const pkg = require('./package.json');
+            const files = pkg.build.files;
+            for (const f of ['launcher.js','launcher-preload.js','launcher-renderer.js','launcher.html','launcher.css']) {
+              if (!files.includes(f)) { console.error('not packaged: ' + f); process.exit(1); }
+            }
+            console.log('launcher files packaged');
+          "
 
   browser:
     name: Browser checks

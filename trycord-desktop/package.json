@@ -37,6 +37,11 @@
       "main.js",
       "updater.js",
       "preload.js",
+      "launcher.js",
+      "launcher-preload.js",
+      "launcher-renderer.js",
+      "launcher.html",
+      "launcher.css",
       "package.json",
       "client/**/*"
     ],

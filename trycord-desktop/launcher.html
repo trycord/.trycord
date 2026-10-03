@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- 'self' rather than 'unsafe-inline': the launcher loads its own two files
+     and nothing else. Written as inline-only it looked tidier and silently
+     blocked both, so the window came up unstyled on a white background. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+<title>Trycord</title>
+<link rel="stylesheet" href="launcher.css">
+</head>
+<body>
+  <main class="launcher" aria-labelledby="brand">
+    <header class="brand">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span class="brand__name" id="brand">Trycord</span>
+    </header>
+
+    <div class="stage">
+      <section class="state" data-state="waiting" hidden>
+        <p class="state__line">Starting Trycord</p>
+        <p class="state__detail" data-bind="detail">Preparing your workspace</p>
+      </section>
+
+      <section class="state" data-state="checking" hidden>
+        <p class="state__line">Checking for updates</p>
+        <div class="pulse" aria-hidden="true"><span></span><span></span><span></span></div>
+      </section>
+
+      <section class="state" data-state="current" hidden>
+        <p class="state__line">Trycord is up to date</p>
+        <div class="pulse pulse--settled" aria-hidden="true"><span></span><span></span><span></span></div>
+      </section>
+
+      <!-- The bar is hidden until the updater reports something. A percentage
+           with no download behind it is worse than no bar. -->
+      <section class="state" data-state="available" hidden>
+        <p class="state__line">Update available</p>
+        <p class="state__version">
+          <span data-bind="from">—</span>
+          <span class="state__arrow" aria-hidden="true">→</span>
+          <span class="state__to" data-bind="to">—</span>
+        </p>
+        <div class="progress" data-bind="progressWrap" hidden>
+          <div class="progress__track"><div class="progress__fill" data-bind="fill"></div></div>
+          <p class="state__detail"><span data-bind="percent"></span><span data-bind="bytes"></span></p>
+        </div>
+      </section>
+
+      <section class="state" data-state="blocked" hidden>
+        <p class="state__line" data-bind="errorLine">Couldn’t check for updates</p>
+        <p class="state__detail" data-bind="errorDetail">Your installed version still works.</p>
+        <div class="actions">
+          <button type="button" class="btn btn--primary" data-action="continue">Continue to Trycord</button>
+          <button type="button" class="btn" data-action="retry">Retry</button>
+        </div>
+      </section>
+    </div>
+
+    <footer class="foot">
+      <span class="foot__version" data-bind="version">Version —</span>
+      <button type="button" class="foot__link" data-action="home">trycord.dev</button>
+    </footer>
+  </main>
+
+  <!-- One live region. The dots are aria-hidden, so what a screen reader hears
+       is the state rather than the decoration. -->
+  <p class="sr-only" role="status" aria-live="polite" data-bind="live"></p>
+
+  <script src="launcher-renderer.js"></script>
+</body>
+</html>

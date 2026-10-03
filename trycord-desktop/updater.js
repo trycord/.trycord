@@ -70,7 +70,7 @@ function shortDetail(e) {
 }
 
 // log(message) — main-process logger injected by main.js.
-function initUpdater({ app, ipcMain, getWindow, log }) {
+function initUpdater({ app, ipcMain, getWindow, onEvent, checkOnStart, log }) {
   const prefs = loadPrefs(app);
   let autoUpdater = null;
   let appVersion = 'unknown';
@@ -109,6 +109,10 @@ function initUpdater({ app, ipcMain, getWindow, log }) {
     await checkForUpdates('manual');
     return true;
   });
+  ipcMain.handle('trycord:updater-recheck', async () => {
+    await checkForUpdates('launcher-retry');
+    return true;
+  });
   ipcMain.handle('trycord:updater-install', () => {
     try {
       if (autoUpdater) autoUpdater.quitAndInstall(false, true);
@@ -118,7 +122,12 @@ function initUpdater({ app, ipcMain, getWindow, log }) {
     return true;
   });
 
+  // Fan the event out to both the window and the launcher. The launcher owns
+  // startup, so it has to see every event even when it is not the window.
   function send(ev) {
+    if (onEvent) {
+      try { onEvent(ev); } catch (e) { /* a listener must not break the flow */ }
+    }
     try {
       const win = getWindow();
       if (win && !win.isDestroyed() && win.webContents) {
@@ -215,10 +224,15 @@ function initUpdater({ app, ipcMain, getWindow, log }) {
     reportError(e, 'updater');
   });
 
-  // Startup check (delayed so the UI paints first). Failures never propagate.
-  setTimeout(() => {
-    checkForUpdates('startup').catch(() => {});
-  }, 8000);
+  // With a launcher, it asks for the check as soon as it is on screen and shows
+  // what happens. Without one, wait so the app paints before the network call.
+  if (checkOnStart) {
+    checkForUpdates('launcher').catch(() => {});
+  } else {
+    setTimeout(() => {
+      checkForUpdates('startup').catch(() => {});
+    }, 8000);
+  }
 
   // Keep autoInstallOnAppQuit in sync when prefs change via IPC.
   setInterval(() => {
