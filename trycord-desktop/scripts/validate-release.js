@@ -36,6 +36,26 @@ if (!/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(String(pkgVersion))) {
   fail('package.json version is not semver: ' + pkgVersion);
 }
 
+// The tag must name the version being built.
+//
+// This check exists because its absence did: a v1.6.4 tag was pushed while
+// package.json still said 1.6.3, so the build produced Trycord-1.6.3.AppImage
+// and the release published under a tag claiming 1.6.4. Every other check in
+// this file passed, because the artifacts were internally consistent - they
+// were simply the wrong version. An updater comparing against those would see
+// a downgrade, and a person reading the tag would be misled.
+//
+// Only enforced when running under Actions, so a local dry-run is not made to
+// care about which ref it happens to be on.
+if (process.env.GITHUB_REF && /^refs\/tags\/v/.test(process.env.GITHUB_REF)) {
+  const tag = process.env.GITHUB_REF.replace('refs/tags/v', '');
+  if (tag !== pkgVersion) {
+    fail('tag ' + process.env.GITHUB_REF + ' does not match package.json version '
+      + pkgVersion + '. Bump package.json to ' + tag + ' before tagging, or tag v'
+      + pkgVersion + ' instead - a release must not publish one version under another\'s name.');
+  }
+}
+
 const installerName = 'Trycord.exe';
 const installerPath = path.join(releaseDir, installerName);
   const ptbName = 'TrycordPTB.exe';
