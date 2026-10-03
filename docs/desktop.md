@@ -116,5 +116,8 @@ after the build, leaving a draft release.
 
 ## Startup
 
-One window, created when the app is ready. No launcher window in the current
-build — see `LAUNCHER.md` for the startup layer added on top of this.
+The launcher window appears first and the app window is not created until it
+opens. `docs/launcher.md` covers that lifecycle, the states, and what happens
+when the update server is unreachable.
+
+Single instance: a second launch focuses the running window and exits.
