@@ -3794,8 +3794,24 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
      truncated title. */
   .context-title {
     max-width: none;
-    flex: 0 1 auto;
+    /* Shrink last, and only as far as needed. Given an equal share of the
+       shrink, the title collapsed to '#…' on a 390px phone while the topic beside
+       it kept its full width - the one thing in the bar nobody is reading on a
+       narrow screen outranked the thing they navigated to. The title is what you
+       need to know where you are; the topic is a nicety, so the topic goes. */
+    flex: 0 0 auto;
+    max-width: 100%;
     min-width: 0;
+  }
+  /* The topic has no claim on a phone header: on a channel it is repeated in full
+     directly below, and on the other surfaces it is a community name already shown
+     in the drawer. It still renders on desktop and tablet. */
+  .context-header .context-sub { display: none; }
+  /* Once the title is the only text left it may still need to ellipsise - a long
+     channel name on a narrow phone genuinely will - but it gets the whole bar to
+     do it in first. */
+  @media (min-width: 600px) {
+    .context-header .context-sub { display: block; }
   }
   /* Clipping the title box is what actually stops the overlap: ellipsis draws
      inside its own overflow, but the box still overlapped the buttons, which sit
