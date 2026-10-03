@@ -139,10 +139,32 @@ export async function launch({ width = 1440, height = 900, port = 9333, url } = 
     width, height, deviceScaleFactor: 1, mobile: false,
   });
 
+  // Chromium refuses to commit a navigation on some machines - it opens the
+  // tab, issues the request, and leaves the execution context on about:blank.
+  // A raw protocol timeout says nothing useful about that, so say it here
+  // instead, once, rather than leaving every suite to fail the same opaque way.
+  let firstNav = true;
+  const navigate = async (url) => {
+    try {
+      await send('Page.navigate', { url });
+    } catch (e) {
+      if (firstNav && /timed out/i.test(e.message)) {
+        throw new Error(
+          'chromium accepted the tab but never navigated to ' + url + '.\n' +
+          'This machine\'s chromium cannot fetch http URLs - a data: URL renders,\n' +
+          'every http request comes back empty. It is not a fault in the client\n' +
+          'or the server. See tools/browser-checks/README.md.'
+        );
+      }
+      throw e;
+    }
+    firstNav = false;
+  };
+
   const api = {
     async goto(url, { waitMs = 1400 } = {}) {
       if (!url || typeof url !== 'string') throw new Error('goto called with ' + url);
-      await send('Page.navigate', { url });
+      await navigate(url);
       await new Promise((r) => setTimeout(r, waitMs));
       return api;
     },
