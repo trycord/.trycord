@@ -461,17 +461,19 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
    --------------------------------------------------------------------------
    The real structure, which is not the obvious one:
 
-     .shell                grid: rail | main
+     #app.trycord-app      the wrapper; carries the viewport height
+     .shell                grid: navigation | main
        .app-rail           column 1, and it holds BOTH the community list and
-                           the channel list - one navigation column, not two
-         .rail-global-nav     global destinations
-         .app-rail__items    communities
+       (grid row 1)        the channel list - one navigation column, not two
+         .rail-identity       empty landmark, display:none
+         .rail-global-nav     empty landmark, display:none
+         .app-rail__items    global destinations + communities
          .context-sidebar    the current community's channels
-       .main-content       column 2
-         .context-header    the header
-         .chat-environment  grid: view | members
-           .view-root
-           .member-sidebar
+       .main-content       column 2, one explicit 1fr column
+         .context-header      row 1, full width
+         .chat-environment    row 2, grid: view | members
+           .view-root         column 1
+           .member-sidebar    column 2, only when data-members="yes"
 
    The member panel is inside the workspace rather than a third shell column, so
    it sits against the conversation it belongs to and does not have to be reserved
@@ -578,6 +580,10 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .shell[data-members='yes'] .chat-environment {
   grid-template-columns: minmax(0, 1fr) var(--ui-members);
 }
+/* A panel with no track renders as a one-pixel sliver: the track collapses and all
+   that is left is the 1px border, which reads as a stray rule down the edge of
+   the workspace. Hidden instead. */
+.shell:not([data-members='yes']) .member-sidebar { display: none; }
 
 .view-root {
   grid-column: 1;
