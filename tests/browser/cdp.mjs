@@ -318,8 +318,12 @@ export async function signedIn(page, origin, { seedCommunity = false } = {}) {
     const s = await j('POST', '/api/servers', { name: 'The Foundry', description: 'Where the thing gets built.' });
     if (s.status >= 300) return { error: s.status };
     const id = s.body.serverId;
-    const mk = async (name, topic) => (await j('POST', '/api/servers/' + id + '/channels', { name, type: 'text', topic })).body;
-    const general = await mk('general', 'Anything and everything');
+    // Creating a community already makes a category and a #general channel. Adding
+    // another channel also called general here produced two rows with the same name
+    // in the sidebar, which reads as a duplicate-navigation bug and is not one.
+    const layout = await j('GET', '/api/servers/' + id + '/channels');
+    const general = (layout.body.channels || [])[0];
+    if (!general) return { error: 'the new community has no channel', id };
     const cid = (c) => c.channelId || c.id;
     const lines = [
       'Morning all - pushed the routing rewrite last night, direct links work now.',
