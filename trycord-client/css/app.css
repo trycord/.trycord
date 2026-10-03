@@ -707,16 +707,6 @@ img { max-width: 100%; }
       justify-content: center;
     }
   }
-
-  /* The member toggle hides a panel that is not on screen at this width. Below
-     600px #member-sidebar is display:none, so the button toggles nothing and costs
-     34px of a header that already has four other actions competing for room - on a
-     360px phone that was 23px of overlap between the channel name and the search
-     button. The member list has its own route on a phone; see the drawer. */
-  @media (max-width: 599px) {
-    .context-actions .member-toggle { display: none; }
-  }
-
 .set-head { display: flex; align-items: flex-start; gap: var(--t-d-4); }
 .set-head__text { min-width: 0; flex: 1 1 auto; }
 .set-head__title {
@@ -3866,6 +3856,12 @@ html[data-route^="/verify-email/"] .mobile-tab-navigation { display: none !impor
     width: 32px !important;
     height: 32px !important;
   }
+  /* The member toggle hides a panel that is not on screen at this width.
+     #member-sidebar is display:none below 600px, so the button was toggling
+     nothing while costing 34px of a header that had no room to spare: at 360px
+     four actions and a channel name do not fit, and the search button drew
+     through the name. The member list has its own route on a phone. */
+  .context-actions .member-toggle { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
