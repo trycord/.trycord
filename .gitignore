@@ -32,3 +32,7 @@ Thumbs.db
 
 # Screenshots are output, not source.
 tests/browser/shots/
+
+# Local-only development tooling. Not part of the repository.
+/tests/
+/.github/
