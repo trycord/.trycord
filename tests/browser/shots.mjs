@@ -99,6 +99,14 @@ async function main() {
         written.push(file);
         // Shell geometry. Guessing at a grid from a screenshot is how three
         // rounds of "it still looks wrong" happened; this reports the numbers.
+        const m0 = await page.eval(`
+          const d0 = document.documentElement;
+          return { chars: document.body.innerText.trim().length,
+                   overflow: d0.scrollWidth > window.innerWidth + 1,
+                   scrollW: d0.scrollWidth, vw: window.innerWidth };`);
+        console.log('  ' + tag.padEnd(6) + name.padEnd(22)
+          + String(m0.chars).padStart(5) + ' chars  '
+          + (m0.overflow ? 'H-OVERFLOW ' + m0.scrollW + '/' + m0.vw : 'fits'));
         const geo = await page.eval(`
           const box = (sel) => {
             const e = document.querySelector(sel);
@@ -131,15 +139,8 @@ async function main() {
             box('.member-sidebar'), box('.conversation'),
           ].join(NL);
         `);
-        console.log(String(geo).split(String.fromCharCode(10)).map((l) => '      ' + l).join(String.fromCharCode(10)));
-        const m = await page.eval(`
-          const d = document.documentElement;
-          return { chars: document.body.innerText.trim().length,
-                   overflow: d.scrollWidth > window.innerWidth + 1,
-                   scrollW: d.scrollWidth, vw: window.innerWidth };`);
-        console.log('  ' + tag.padEnd(6) + name.padEnd(22)
-          + String(m.chars).padStart(5) + ' chars  '
-          + (m.overflow ? 'H-OVERFLOW ' + m.scrollW + '/' + m.vw : 'fits'));
+        console.log(String(geo).split(String.fromCharCode(10)).map((x) => '          ' + x).join(String.fromCharCode(10)));
+
       }
     }
   } finally {
