@@ -138,3 +138,4 @@ jobs:
         run: |
           node t-sidebar.mjs
           node t-visual.mjs
+          node t-origin.mjs
