@@ -132,4 +132,9 @@ jobs:
 
       - name: Run browser checks
         working-directory: tools/browser-checks
-        run: node t-sidebar.mjs
+        # Each suite boots its own Chromium, so they are separate steps: a
+        # crash in one reports against that suite rather than taking the rest
+        # down with it.
+        run: |
+          node t-sidebar.mjs
+          node t-visual.mjs
