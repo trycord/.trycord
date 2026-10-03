@@ -63,7 +63,12 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
+      # shell: bash, so this reads the same on a Windows runner as on Linux.
+      # Without it the default shell is PowerShell, where `ASSETS=$(...)` is not
+      # a command at all - which is why this step failed after the artifacts had
+      # already uploaded, leaving a draft release with assets nobody had checked.
       - name: Validate published update metadata
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           TAG: ${{ github.ref_name }}
