@@ -2269,6 +2269,22 @@ select.input { appearance: auto; }
   backdrop-filter: none;
 }
 .home-event { padding: var(--t-d-4); border-radius: var(--t-r-l); }
+
+/* The feed gets a measure, and the timestamp moves in with it.
+
+   A row is a flex line: the text block takes what is left and the timestamp is
+   pushed to the far edge. Without a cap on the stream, a 1440 screen puts an
+   author name at x=430 and "just now" at x=1300, with 870px of nothing between
+   them. The eye reads that as a gap in the layout rather than as separation.
+
+   Capping the column moves the timestamp back to within reading distance of the
+   text it belongs to, and centres the lot so the leftover width reads as margin.
+   --t-content-width rather than a new value, because this is the same decision
+   the conversation column already makes. */
+.home-stream > .home-event {
+  max-width: var(--t-content-width);
+  margin-inline: auto;
+}
 .home-event + .home-event { margin-top: 2px; }
 .home-stream .empty-state { min-height: min(54dvh, 460px); }
 .home-empty-actions { display: flex; gap: var(--t-d-3); flex-wrap: wrap; justify-content: center; margin-top: var(--t-d-3); }
