@@ -272,19 +272,23 @@ export function renderCommunities(region) {
     { id: 'friends', label: 'Friends', icon: 'users', path: '/friends', badge: () => (State.friendsIn || []).length },
   ];
 
+  // The rail's own destinations carry words, for the same reason communities do:
+  // five glyphs in a column is a puzzle, five labelled rows is a menu.
   const railButton = ({ label, icon: iconName, path, active, badge }) => {
     const btn = el('button', {
-      class: 'rail-nav-item' + (active ? ' active' : ''),
+      class: 'rail-nav' + (active ? ' is-active' : ''),
       type: 'button',
       title: label,
       'aria-label': label,
       'aria-current': active ? 'page' : null,
       dataset: { label },
       onClick: () => { navigate(route(path)); },
-    }, el('span', { class: 'rail-nav-icon' }, icon(iconName)));
+    },
+    el('span', { class: 'rail-nav__icon' }, icon(iconName)),
+    el('span', { class: 'rail-nav__label' }, label));
     const count = badge ? badge() : 0;
     if (count > 0) {
-      btn.appendChild(el('span', { class: 'rail-nav-badge' }, count > 99 ? '99+' : String(count)));
+      btn.appendChild(el('span', { class: 'rail-nav__badge' }, count > 99 ? '99+' : String(count)));
     }
     return btn;
   };
@@ -298,7 +302,7 @@ export function renderCommunities(region) {
 
   const servers = State.servers || [];
   if (servers.length) {
-    region.appendChild(el('div', { class: 'rail-divider' }));
+    region.appendChild(el('div', { class: 'rail-sep' }));
     for (const s of servers) {
       const chip = serverChip(s, {
         active: String(s.id) === String(currentServerId()),

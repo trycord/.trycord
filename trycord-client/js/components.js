@@ -205,21 +205,32 @@ export function navRow({ label, sub, icon, href, active, count, onClick }) {
   return row;
 }
 
+// A community in the rail: the mark, and the community's name under it.
+//
+// The name is the point. The rail used to be glyphs only, which made it a
+// column of shapes to be memorised - a first-time user could not tell which
+// community they were looking at without hovering each one, and the hover
+// tooltip is not a label. The mark carries the community's own colour and icon;
+// the word beneath it says what it is, and it ellipsises rather than truncating
+// mid-glyph.
 export function serverChip(server, { active = false, onClick } = {}) {
+  const name = server.name || 'Community';
   const chip = el('button', {
-    class: 'server-chip' + (active ? ' active' : ''),
+    class: 'rail-community' + (active ? ' is-active' : ''),
     type: 'button',
-    title: server.name || 'Community',
-    'aria-label': server.name || 'Community',
+    title: name,
+    'aria-label': name,
     'aria-current': active ? 'page' : null,
     onClick,
     dataset: { serverId: server.id },
   });
-  // discover but never here. communityMark already resolves icon_url through
-  // the authenticated loader, so use it rather than a second implementation.
-  chip.appendChild(communityMark(server.name || '?', { size: 'community-mark--chip', server }));
-  chip.appendChild(el('span', { class: 'chip-name' }, server.name));
-  if (server.is_owner) chip.appendChild(el('span', { class: 'chip-live', title: 'You own this community' }, icon('star')));
+  const mark = el('span', { class: 'rail-mark' });
+  mark.appendChild(communityMark(name, { server }));
+  chip.appendChild(mark);
+  chip.appendChild(el('span', { class: 'rail-community__name' }, name));
+  if (server.is_owner) {
+    chip.title = name + ' — you own this community';
+  }
   return chip;
 }
 
