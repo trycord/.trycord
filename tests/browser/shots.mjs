@@ -101,6 +101,9 @@ async function main() {
       for (const [name, route] of Object.entries(routes)) {
         if (only.length && !only.includes(name)) continue;
         if (!route) continue;
+        // Cleared before the navigation, so what is read back belongs to this
+        // surface rather than to the one before it.
+        page.resetErrors();
         await page.goto(ORIGIN + route, { waitMs: 2300 });
         await wait(750);
         const file = OUT + '/' + tag + '-' + name + '.png';
@@ -116,6 +119,14 @@ async function main() {
         console.log('  ' + tag.padEnd(6) + name.padEnd(22)
           + String(m0.chars).padStart(5) + ' chars  '
           + (m0.overflow ? 'H-OVERFLOW ' + m0.scrollW + '/' + m0.vw : 'fits'));
+
+        // A surface that paints correctly while throwing on every interaction is
+        // not correct. The driver collects exceptions and console errors the whole
+        // time; nothing was reading them.
+        const errs = await page.errors();
+        for (const e of [...new Set(errs)].slice(0, 4)) {
+  console.log('          JS-ERROR ' + e.slice(0, 160));
+        }
         const geo = await page.eval(`
           const box = (sel) => {
             const e = document.querySelector(sel);
@@ -253,6 +264,46 @@ async function main() {
       if (after.startsWith('route=/c/') && before && after.includes(before)) {
         console.log('          WARNING the sidebar did not change with the community');
       }
+    }
+
+    // Routing is the one thing that has to be right without a screenshot to look
+    // at, so it gets checked by walking it rather than by photographing it.
+    //
+    // Each step states where it ended up and what it can see, because a router that
+    // silently falls back to the home page passes a "did it navigate" assertion that
+    // only looks at the network.
+    {
+      await page.setViewport(1440, 900);
+      const step = async (label, action) => {
+        await action();
+        await wait(900);
+        const m = await page.eval(`
+          const NL = String.fromCharCode(10);
+          const shell = document.getElementById('shell');
+          return [
+            'url=' + location.pathname + location.hash,
+            'shell=' + (shell ? 'yes layout=' + (shell.dataset.layout || '-') : 'MISSING')
+              + ' rails=' + document.querySelectorAll('.rail-nav').length
+              + ' communities=' + document.querySelectorAll('.rail-community').length
+              + ' channels=' + document.querySelectorAll('.ctx-channel').length
+              + ' view=' + (document.querySelector('#view-root') ? document.querySelector('#view-root').children.length + ' child' : 'MISSING'),
+          ].join(NL);`);
+        console.log('  route  ' + label.padEnd(26) + ' ' + String(m).split(String.fromCharCode(10))[0]);
+        for (const l of String(m).split(String.fromCharCode(10)).slice(1)) console.log('          ' + l);
+      };
+
+      await step('open community', () => page.goto(ORIGIN + '/c/' + acct.serverId, { waitMs: 2300 }));
+      await step('open a channel', () => page.eval(`const b = document.querySelector('.ctx-channel'); if (b) b.click(); return 1;`));
+      await step('go to home', () => page.eval(`const b = [...document.querySelectorAll('.rail-nav')].find(x => /home/i.test(x.dataset.label || '')); if (b) b.click(); return 1;`));
+      await step('back', () => page.eval(`history.back(); return 1;`));
+      await step('back again', () => page.eval(`history.back(); return 1;`));
+      await step('forward', () => page.eval(`history.forward(); return 1;`));
+      await step('deep link, cold', () => page.goto(ORIGIN + '/settings/security', { waitMs: 2300 }));
+      await step('reload on that route', () => page.goto(ORIGIN + '/settings/security', { waitMs: 2300 }));
+      await step('unknown route', () => page.goto(ORIGIN + '/nope-not-a-route', { waitMs: 1800 }));
+
+      const hash = await page.eval(`return location.hash || '(none)';`);
+      if (hash !== '(none)') console.log('          WARNING a hash appeared in the URL: ' + hash);
     }
 
     // The auth pages, signed out. Everything else above is captured with a session,
