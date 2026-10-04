@@ -782,11 +782,24 @@ export function renderPlaceNavigation(region) {
   // sidebar. Settings, Admin and a profile carry their own navigation inside the
   // content pane, and painting the shell's sidebar as well is what put the same
   // list on screen twice.
+  // A surface that carries its own navigation inside the content pane must not also
+  // get the shell's. That part was right. What was missing is what happens to the
+  // column afterwards: the track kept its 260px and rendered as an empty dark panel
+  // beside the page, which is 260px of nothing on Discover, Support, the legal
+  // documents and the sign-up form.
+  //
+  // So the track collapses rather than being reserved. The rail keeps the global
+  // destinations, which every surface still needs; only the community column goes.
+  const shell = region.closest('#shell');
   if (!layoutUsesSidebar()) {
     region.dataset.empty = 'true';
+    region.hidden = true;
+    if (shell) shell.classList.add('no-community-nav');
     return;
   }
   delete region.dataset.empty;
+  region.hidden = false;
+  if (shell) shell.classList.remove('no-community-nav');
   const ctx = sidebarContext();
   switch (ctx.type) {
     case 'community': return communityContext(region, ctx.serverId);
