@@ -3775,6 +3775,14 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+/* The owner is the one role that outranks the hierarchy, so it is the one badge
+   allowed to carry the accent. Tinted rather than filled: a solid block here would
+   outrank the page it sits on. */
+.role-badge--owner {
+  border-color: color-mix(in srgb, var(--t-accent) 34%, transparent);
+  background: color-mix(in srgb, var(--t-accent) 12%, transparent);
+  color: var(--t-accent);
+}
 .role-protected { color: var(--t-warn); font-size: var(--t-fs-xxs); }
 .perm-override-row__opts { display: flex; gap: var(--t-d-1); flex: 0 0 auto; }
 .perm-overrides__list { display: grid; gap: var(--t-d-2); }
