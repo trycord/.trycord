@@ -1,5 +1,5 @@
 
-export const DEFAULT_THEME = 'ember';
+export const DEFAULT_THEME = 'trycord';
 
 export const THEMES = [
   { id: 'system', label: 'System', blurb: 'Follows your OS light/dark setting.' },

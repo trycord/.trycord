@@ -73,33 +73,43 @@
      palette spent a step on a surface nothing used and left the two surfaces
      that are actually adjacent - the sidebar and the workspace - barely
      distinguishable. */
-  --t-pg:      #0c0806;   /* behind everything */
-  --t-base:    #141010;   /* the workspace */
-  --t-base2:   #1b1513;   /* rails, sidebars, recessed */
-  --t-elev:    #241a16;   /* raised: cards, composer, menus */
-  --t-hover:   #2e211b;
-  --t-line:    rgba(255, 186, 140, 0.10);
-  --t-line-hi: rgba(255, 186, 140, 0.20);
-  --t-line-max: rgba(255, 186, 140, 0.34);
+  /* Six steps, neutral rather than brown. The previous ramp pushed warm - a
+     #2e211b hover is visibly orange - so the surfaces read as tinted panels rather
+     than as charcoal with an accent sitting on it. The warmth belongs to Ember and
+     to the text, not to every edge between two greys. */
+  --t-pg:    #0a0a0a;   /* behind everything */
+  --t-base:  #101010;   /* the workspace */
+  --t-base2: #151515;   /* rails, sidebars, recessed */
+  --t-elev:  #1b1b1b;   /* raised: cards, composer, menus */
+  --t-hover: #202020;
+  --t-act:   #262626;   /* pressed, and the row a menu is open on */
 
-  --t-txt:     #fff4ea;
-  --t-txt2:    #d9c3b0;
-  --t-mut:     #9a7d69;
-  --t-dim:     #6f5a4b;
+  /* Solid, not a translucent warm white. A border that is a colour in its own
+     right reads the same over every surface it lands on, which is what a border is
+     for; the old value was really an alpha, so it looked different over the
+     workspace than over a raised card. */
+  --t-line:     #292929;
+  --t-line-hi:  #343434;
+  --t-line-max: #454545;
+
+  --t-txt:  #f2f0ea;
+  --t-txt2: #b6b2a8;
+  --t-mut:  #77736b;
+  --t-dim:  #55524d;   /* disabled, and the floor for anything unreadable */
 
   /* Ember. One accent, three intensities. The old theme had accent and
      accent-2 pulling in different directions on the same screen. */
-  --t-accent:      #ff8c3a;
-  --t-accent-hi:   #ffab6b;
-  --t-accent-lo:   #d4611a;
+  --t-accent:      #e8752a;
+  --t-accent-hi:   #ff8a3d;
+  --t-accent-lo:   #b94f16;
   --t-accent-ink:  #1a0c04;
-  --t-glow:        0 0 0 1px rgba(255, 140, 58, 0.34), 0 0 24px -6px rgba(255, 140, 58, 0.42);
+  --t-glow:        0 0 0 1px rgba(232, 117, 42, 0.34), 0 0 24px -6px rgba(232, 117, 42, 0.42);
 
   --t-ok:   #5cc98a;
   --t-warn: #e6b455;
   --t-err:  #e8705f;
 
-  --t-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --t-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --t-mono: ui-monospace, 'Cascadia Code', 'Segoe UI Mono', Consolas, monospace;
 
   /* Type. Seven sizes, and the jump between body and label is a full step
@@ -213,6 +223,7 @@
   --t-base2: #1b1513;
   --t-elev:  #241a16;
   --t-hover: #2e211b;
+  --t-act:   #3a2b23;
   --t-txt:   #fff4ea;
   --t-txt2:  #d9c3b0;
   --t-mut:   #9a7d69;
@@ -221,28 +232,29 @@
   --t-accent-hi:  #ffab6b;
   --t-accent-lo:  #d4611a;
   --t-accent-ink: #1a0c04;
-  --t-line:    rgba(255, 186, 140, 0.10);
-  --t-line-hi: rgba(255, 186, 140, 0.20);
-  --t-line-max: rgba(255, 186, 140, 0.34);
+  --t-line:    #2b2420;
+  --t-line-hi: #3d332c;
+  --t-line-max: #57483e;
 }
 
 :root[data-theme='trycord'] {
-  --t-pg:    #0e0b0a;
-  --t-base:  #16120f;
-  --t-base2: #1d1815;
-  --t-elev:  #27201c;
-  --t-hover: #322823;
-  --t-txt:   #fdf3ea;
-  --t-txt2:  #ddc8b7;
-  --t-mut:   #a08672;
-  --t-dim:   #75604f;
-  --t-accent:     #f5a05a;
-  --t-accent-hi:  #ffc490;
-  --t-accent-lo:  #cf7a35;
-  --t-accent-ink: #1b0f05;
-  --t-line:    rgba(255, 205, 165, 0.10);
-  --t-line-hi: rgba(255, 205, 165, 0.20);
-  --t-line-max: rgba(255, 205, 165, 0.34);
+  --t-pg:    #0a0a0a;
+  --t-base:  #101010;
+  --t-base2: #151515;
+  --t-elev:  #1b1b1b;
+  --t-hover: #202020;
+  --t-act:   #262626;
+  --t-txt:   #f2f0ea;
+  --t-txt2:  #b6b2a8;
+  --t-mut:   #77736b;
+  --t-dim:   #55524d;
+  --t-accent:     #e8752a;
+  --t-accent-hi:  #ff8a3d;
+  --t-accent-lo:  #b94f16;
+  --t-accent-ink: #1a0c04;
+  --t-line:     #292929;
+  --t-line-hi:  #343434;
+  --t-line-max: #454545;
 }
 
 /* Orthocord: the cool option. Neutral charcoal with steel-blue accents, kept
@@ -264,9 +276,10 @@
   --t-ok:   #5cc98a;
   --t-warn: #e0bb63;
   --t-err:  #e8705f;
-  --t-line:    rgba(190, 210, 255, 0.11);
-  --t-line-hi: rgba(190, 210, 255, 0.22);
-  --t-line-max: rgba(190, 210, 255, 0.36);
+  --t-act:      #262832;
+  --t-line:     #2b2d36;
+  --t-line-hi:  #3c3f4a;
+  --t-line-max: #545863;
   --t-glow: 0 0 0 1px rgba(110, 168, 255, 0.32), 0 0 24px -6px rgba(110, 168, 255, 0.40);
 }
 
@@ -289,9 +302,10 @@
   --t-ok:   #63d1a0;
   --t-warn: #e3bd6d;
   --t-err:  #f0758a;
-  --t-line:    rgba(190, 200, 255, 0.10);
-  --t-line-hi: rgba(190, 200, 255, 0.20);
-  --t-line-max: rgba(190, 200, 255, 0.34);
+  --t-act:      #1e2138;
+  --t-line:     #232741;
+  --t-line-hi:  #32375a;
+  --t-line-max: #454b73;
   --t-glow: 0 0 0 1px rgba(167, 139, 250, 0.32), 0 0 24px -6px rgba(167, 139, 250, 0.40);
 }
 
@@ -315,9 +329,10 @@
   --t-ok:   #7ce8a8;
   --t-warn: #ffd166;
   --t-err:  #ff8f7d;
-  --t-line:    rgba(255, 255, 255, 0.28);
-  --t-line-hi: rgba(255, 255, 255, 0.46);
-  --t-line-max: rgba(255, 255, 255, 0.66);
+  --t-act:      #333333;
+  --t-line:     #5c5c5c;
+  --t-line-hi:  #7d7d7d;
+  --t-line-max: #a0a0a0;
   --t-glow: 0 0 0 2px var(--t-accent), 0 0 20px -4px rgba(255, 171, 82, 0.5);
   --t-sh-1: 0 0 0 1px rgba(255, 255, 255, 0.2);
   --t-sh-2: 0 0 0 1px rgba(255, 255, 255, 0.24);
@@ -338,9 +353,10 @@
   --t-base2:   #f7f2eb;
   --t-elev:    #ffffff;
   --t-hover:   #f1e8de;
-  --t-line:    rgba(70, 40, 20, 0.12);
-  --t-line-hi: rgba(70, 40, 20, 0.22);
-  --t-line-max: rgba(70, 40, 20, 0.34);
+  --t-act:      #e9ded1;
+  --t-line:     #e0d5c8;
+  --t-line-hi:  #cbbca9;
+  --t-line-max: #ad9c88;
   --t-txt:     #23150c;
   --t-txt2:    #4d382a;
   --t-mut:     #7d6353;
@@ -1876,7 +1892,7 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
               transform var(--t-fast) var(--t-ease);
 }
 .btn:hover { background: var(--t-hover); border-color: var(--t-line-max); }
-.btn:active { transform: translateY(1px); }
+.btn:active { transform: translateY(1px); background: var(--t-act); }
 .btn.primary {
   border-color: transparent;
   background: var(--t-accent);
