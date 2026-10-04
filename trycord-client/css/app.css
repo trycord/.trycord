@@ -49,6 +49,12 @@
   --ui-header: 56px;
   --ui-page-width: 1240px;
   --t-content-width: 1160px;
+  /* The ceiling for any full-width page column: the reading measure, plus the
+     padding either side of it. It was referenced by .view-root > .page and by the
+     admin console but never declared, so both fell back to `none` - which is
+     why the conversation ignored its own 1480px measure at 2560 and stretched to
+     1932px. */
+  --ui-content-max: 1480px;
   --ui-shell-cols: var(--ui-rail) minmax(0, 1fr);
   --ui-shell-rows: minmax(0, 1fr) auto;
   --ui-drawer-width: min(88vw, 360px);
@@ -322,18 +328,18 @@
    is a cap that rises with the window rather than one fixed number that leaves a
    void on either side of it at every size. */
 @media (min-width: 1800px) {
-  :root { --t-content-width: 1320px; --ui-members: 320px; }
+  :root { --t-content-width: 1320px; --ui-content-max: 1400px; --ui-members: 320px; }
 }
 @media (min-width: 2400px) {
-  :root { --t-content-width: 1480px; --ui-members: 340px; --ui-rail: 288px; }
+  :root { --t-content-width: 1480px; --ui-content-max: 1560px; --ui-members: 340px; --ui-rail: 288px; }
 }
 @media (min-width: 3000px) {
-  :root { --t-content-width: 1640px; --ui-members: 380px; --ui-rail: 304px; }
+  :root { --t-content-width: 1640px; --ui-content-max: 1720px; --ui-members: 380px; --ui-rail: 304px; }
 }
 /* Below 1800 the cap is the reading measure and the leftover is margin, which is
    what it should be on a laptop. */
 @media (max-width: 1799px) and (min-width: 1300px) {
-  :root { --t-content-width: 1160px; --ui-members: 288px; }
+  :root { --t-content-width: 1160px; --ui-content-max: 1240px; --ui-members: 288px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
