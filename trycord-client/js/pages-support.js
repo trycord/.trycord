@@ -127,7 +127,7 @@ export async function renderMyAppeals(container) {
   renderContextHeader({
     title: 'My appeals',
     sub: 'Decisions on actions against your account',
-    actions: el('a', { class: 'btn primary sm', href: route('/support/appeals/new') }, 'New appeal'),
+    actions: [el('a', { class: 'btn primary sm', href: route('/support/appeals/new') }, 'New appeal')],
   });
   clear(container);
   const page = el('div', { class: 'page' });
