@@ -152,6 +152,60 @@ async function main() {
 
       }
     }
+
+    // The navigation open, at the widths where it is not a docked column. On a
+    // phone the community sidebar lives in this drawer, so a screenshot set that
+    // never opens it cannot tell a working mobile shell from a deleted one - which
+    // is exactly how the sidebar went missing once without the pictures showing it.
+    for (const [w, h, tag] of SIZES) {
+      if (w >= 1000) continue;
+      await page.setViewport(w, h);
+      await page.goto(ORIGIN + routes.channel, { waitMs: 2300 });
+      await wait(900);
+      await page.eval(`const b = document.querySelector('.nav-toggle'); if (b) b.click(); return 1;`);
+      await wait(700);
+      const file = OUT + '/' + tag + '-nav-open.png';
+      await page.shot(file);
+      written.push(file);
+
+      // What is actually in the drawer, and whether all of it fits above the fold.
+      const nav = await page.eval(`
+        const NL = String.fromCharCode(10);
+        const rail = document.querySelector('.app-rail');
+        const r = rail ? rail.getBoundingClientRect() : null;
+        const vis = (sel) => {
+          const e = document.querySelector(sel);
+          if (!e) return sel + ' = MISSING';
+          const cs = getComputedStyle(e);
+          const b = e.getBoundingClientRect();
+          return sel + ' ' + cs.display + ' ' + cs.visibility
+            + ' x=' + Math.round(b.left) + '..' + Math.round(b.right)
+            + ' y=' + Math.round(b.top) + '..' + Math.round(b.bottom)
+            + (b.height > 0 ? '' : ' ZERO-H');
+        };
+        const dests = [...document.querySelectorAll('.rail-nav')].map((e) => e.textContent.trim());
+        const comms = [...document.querySelectorAll('.rail-community')].map((e) => e.textContent.trim());
+        const chans = [...document.querySelectorAll('.ctx-channel')].map((e) => e.textContent.trim());
+        const sb = document.querySelector('.context-sidebar');
+        const sbb = sb ? sb.getBoundingClientRect() : null;
+        const scrollable = [...document.querySelectorAll('.app-rail__items, .context-sidebar')]
+          .map((e) => e.scrollHeight > e.clientHeight + 1
+            ? e.className.split(' ')[0] + ' scrolls ' + e.scrollHeight + '/' + e.clientHeight : '');
+        return [
+          'drawer x=' + (r ? Math.round(r.left) + '..' + Math.round(r.right) : '?')
+            + ' y=' + (r ? Math.round(r.top) + '..' + Math.round(r.bottom) : '?'),
+          vis('.app-rail'), vis('.app-rail__items'), vis('.context-sidebar'),
+          'community sidebar box x=' + (sbb ? Math.round(sbb.left) + '..' + Math.round(sbb.right) : '?')
+            + ' y=' + (sbb ? Math.round(sbb.top) + '..' + Math.round(sbb.bottom) : '?'),
+          'destinations(' + dests.length + '): ' + dests.join(' | '),
+          'communities(' + comms.length + '): ' + comms.join(' | '),
+          'channels(' + chans.length + '): ' + chans.join(' | '),
+          scrollable.filter(Boolean).join('; ') || 'everything fits, no inner scroll',
+        ].join(NL);
+      `);
+      console.log('  ' + tag.padEnd(6) + 'nav-open');
+      console.log(String(nav).split(String.fromCharCode(10)).map((x) => '          ' + x).join(String.fromCharCode(10)));
+    }
   } finally {
     await page.close();
   }

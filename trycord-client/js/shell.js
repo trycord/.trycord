@@ -320,7 +320,7 @@ export function renderCommunities(region) {
   }
 
   // Creation action. Discover is deliberately absent: it is a global
-    // Creation action. Discover is deliberately absent: it is a global
+    // destination and gets its own row.
     const create = el('button', {
       class: 'rail-nav rail-nav--create',
       type: 'button',
@@ -330,7 +330,7 @@ export function renderCommunities(region) {
       onClick: () => { navigate('/servers/new'); },
     },
     el('span', { class: 'rail-nav__icon' }, icon('plus')),
-    el('span', { class: 'rail-nav__label' }, 'New community'));
+    el('span', { class: 'rail-nav__label' }, 'New'));
     region.appendChild(el('div', { class: 'rail-sep' }));
     region.appendChild(create);
 
