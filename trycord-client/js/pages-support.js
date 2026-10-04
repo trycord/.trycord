@@ -1,8 +1,9 @@
 
 import Api from './api.js';
-import { esc, el, clear, toast } from './ui.js';
+import { el, clear, icon, toast } from './ui.js';
 import { isAuthed } from './state.js';
 import { route } from './nav.js';
+import { renderContextHeader } from './shell.js';
 
 function actionIdFromQuery() {
   try {
@@ -73,70 +74,146 @@ export async function renderSupport(container) {
   container.appendChild(wrap);
 }
 
+// Appeals are read and written from inside the application, so they are dressed as
+// places in it: the header carries the title and the single action, and the page
+// below is a list of the appeals themselves.
+//
+// They used to borrow the public support document's page classes - the oversized
+// title, the centred column, the web page's measure - which is what made a
+// signed-in page look like somewhere the browser had been sent rather than a place
+// the reader had chosen. The missing strip of chrome around it was not an accident
+// either: a prefix selector was hiding the shell on anything beginning /support,
+// and these two routes begin /support.
+
 const APPEAL_STATUS_LABEL = { OPEN: 'Open', UNDER_REVIEW: 'Under review', APPROVED: 'Approved', DENIED: 'Denied' };
 
+// Enforcement actions arrive as enum values. USER_TIMEOUT printed on a page is a
+// stored value that escaped into the interface; the reader is owed a sentence.
+const ACTION_WORDS = {
+  user_timeout: 'Timed out',
+  user_kick: 'Removed from the community',
+  user_ban: 'Banned',
+  channel_delete: 'Channel deleted',
+  message_delete: 'Message deleted',
+  server_kick: 'Removed from the community',
+  warn: 'Warned',
+  role_remove: 'Role removed',
+};
+
+function actionLabel(a) {
+  const raw = String(a.action_type || '').toLowerCase();
+  if (ACTION_WORDS[raw]) return ACTION_WORDS[raw];
+  // Unknown to this build: readable rather than shouty, and no pretending to a
+  // nicer name than we actually have.
+  const words = raw.replace(/_/g, ' ').trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'Moderation action';
+}
+
+// The empty state has to earn its height. Someone reading "no appeals" either had
+// an action taken and does not know they can appeal it, or had not, and wants to
+// know what one is. So it says both, and offers the next step instead of a
+// sentence telling them to use a button.
+function appealState(glyph, title, body) {
+  const box = el('div', { class: 'state-block' });
+  box.appendChild(el('div', { class: 'es-icon' }, icon(glyph)));
+  box.appendChild(el('div', { class: 'state-block__label' }, title));
+  box.appendChild(el('div', { class: 'state-block__label' }, body));
+  box.appendChild(el('div', { class: 'state-block__actions' },
+    el('a', { class: 'btn primary', href: route('/support/appeals/new') }, 'Appeal a decision')));
+  return box;
+}
+
 export async function renderMyAppeals(container) {
+  renderContextHeader({
+    title: 'My appeals',
+    sub: 'Decisions on actions against your account',
+    actions: el('a', { class: 'btn primary sm', href: route('/support/appeals/new') }, 'New appeal'),
+  });
   clear(container);
-  const wrap = el('div', { class: 'pub-page pub-page--narrow' });
-  const head = el('div', { class: 'pub-section' });
-  head.appendChild(el('h1', { class: 'pub-title' }, 'My appeals'));
-  head.appendChild(el('p', { class: 'pub-lede' }, 'Decisions appear here once reviewed.'));
-  head.appendChild(el('a', { class: 'btn primary', href: route('/support/appeals/new') }, 'New appeal'));
-  wrap.appendChild(head);
-  const list = el('div', { class: 'pub-links' });
-  wrap.appendChild(list);
-  container.appendChild(wrap);
+  const page = el('div', { class: 'page' });
+  const list = el('div', { class: 'stack' });
+  page.appendChild(list);
+  container.appendChild(page);
+
   let items = null;
   try {
     items = await Api.myAppeals();
   } catch (ex) {
-    list.appendChild(el('div', { class: 'form-error' }, ex.message || 'Could not load your appeals.'));
+    list.appendChild(el('div', { class: 'state-block state-block--error' },
+      el('div', { class: 'state-block__label' }, ex.message || 'Could not load your appeals.')));
     return;
   }
+
   if (!items || !items.length) {
-    list.appendChild(el('div', { class: 'empty-state' }, 'No appeals yet. If you received a moderation action, appeal it from the button above.'));
+    list.appendChild(appealState('flag', 'Nothing to appeal',
+      'If an action is taken against your account or a community it comes with an action ID, and you can appeal it from here. Nothing has been actioned against you.'));
     return;
   }
+
   for (const a of items) {
     const row = el('article', { class: 'card card--list' });
     const info = el('div', { class: 'card--list__info' });
-    info.appendChild(el('strong', {}, (a.action_type || 'Moderation action') + ' · ' + (APPEAL_STATUS_LABEL[a.status] || a.status || '')));
-    info.appendChild(el('span', { class: 'muted small' },
-      'Submitted ' + esc(a.created_at || '') + (a.updated_at && a.updated_at !== a.created_at ? ' · updated ' + esc(a.updated_at) : '')));
-    if (a.decision) info.appendChild(el('span', { class: 'muted small' }, 'Decision: ' + esc(a.decision)));
+
+    const head = el('div', { class: 'row-line' });
+    head.appendChild(el('div', { class: 'row-title' }, actionLabel(a)));
+    head.appendChild(el('span', { class: 'status-chip' },
+      APPEAL_STATUS_LABEL[a.status] || a.status || 'Unknown'));
+    info.appendChild(head);
+
+    // The reference is what a reviewer quotes back, and it is the only handle a
+    // reader has on a decision they did not make.
+    const when = 'Submitted ' + String(a.created_at || '').replace('T', ' ').slice(0, 16);
+    info.appendChild(el('div', { class: 'muted small' },
+      when + (a.id ? ' · reference ' + String(a.id).slice(0, 8) : '')));
+
+    if (a.decision) {
+      info.appendChild(el('div', { class: 'small', style: { marginTop: 'var(--t-d-1)' } },
+        String(a.decision)));
+    }
     row.appendChild(info);
     list.appendChild(row);
   }
 }
 
 export function renderNewAppeal(container) {
+  renderContextHeader({
+    title: 'Appeal a decision',
+    sub: 'Every appeal is read by a person on this instance',
+  });
   clear(container);
-  const wrap = el('div', { class: 'pub-page pub-page--narrow' });
-  wrap.appendChild(el('h1', { class: 'pub-title' }, 'Appeal a moderation decision'));
-  wrap.appendChild(el('p', { class: 'pub-lede' },
-    'Enter the action ID from your enforcement notice and explain why it should be reconsidered. You do not need to be signed in.'));
-
-  const section = el('div', { class: 'pub-section' });
-  const card = el('div', { class: 'card' });
-  section.appendChild(card);
-  wrap.appendChild(section);
+  const page = el('div', { class: 'page' });
+  const card = el('div', { class: 'card appeal-form' });
+  page.appendChild(card);
+  container.appendChild(page);
 
   const err = el('div', { class: 'form-error', hidden: true });
   const ok = el('div', { class: 'form-success', hidden: true });
   const actionInput = el('input', {
-    class: 'input', type: 'text', placeholder: 'Action ID (from your notice)',
+    class: 'input', type: 'text', placeholder: 'Action ID from your notice',
     value: actionIdFromQuery(), autocomplete: 'off',
   });
   const reason = el('textarea', {
-    class: 'input', rows: 5, maxlength: 4000,
-    placeholder: 'What happened, in your own words? Be specific — this goes to a human reviewer.',
+    class: 'input', rows: 6, maxlength: 4000,
+    placeholder: 'What happened, and why you think it should be reconsidered.',
   });
-  const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Submit appeal');
-  const form = el('form', {}, err, ok,
-    el('div', { class: 'field' }, el('label', {}, 'Action ID'), actionInput,
-      el('span', { class: 'hint' }, 'Found in your enforcement notice, or pre-filled if you came from sign-in.')),
-    el('div', { class: 'field' }, el('label', {}, 'Your appeal'), reason),
-    submit);
+  const submit = el('button', { class: 'btn primary', type: 'submit' }, 'Submit appeal');
+
+  const clearError = () => {
+    if (!err.hidden) { err.hidden = true; err.textContent = ''; }
+  };
+  actionInput.addEventListener('input', clearError);
+  reason.addEventListener('input', clearError);
+
+  const form = el('form', { class: 'stack' }, err, ok,
+    el('div', { class: 'field' },
+      el('label', {}, 'Action ID'),
+      actionInput,
+      el('span', { class: 'hint' }, 'On the notice you were sent, and filled in for you if you arrived from it.')),
+    el('div', { class: 'field' },
+      el('label', {}, 'Your appeal'),
+      reason,
+      el('span', { class: 'hint' }, 'A person reads this. What happened, in your own words, beats anything formal.')),
+    el('div', { class: 'row-line' }, submit));
 
   let busy = false;
   form.addEventListener('submit', async (e) => {
@@ -145,16 +222,27 @@ export function renderNewAppeal(container) {
     err.hidden = true;
     ok.hidden = true;
     const actionId = actionInput.value.trim();
-    if (!actionId) { err.hidden = false; err.textContent = 'Enter the action ID from your enforcement notice.'; return; }
-    if (!reason.value.trim()) { err.hidden = false; err.textContent = 'Tell the reviewer why this should be reconsidered.'; return; }
+    if (!actionId) {
+      err.hidden = false;
+      err.textContent = 'Enter the action ID from your notice.';
+      actionInput.focus();
+      return;
+    }
+    if (!reason.value.trim()) {
+      err.hidden = false;
+      err.textContent = 'Tell the reviewer why this should be reconsidered.';
+      reason.focus();
+      return;
+    }
     busy = true;
     submit.setAttribute('aria-busy', 'true');
     submit.textContent = 'Submitting…';
     try {
       const res = await Api.submitAppeal({ actionId, reason: reason.value.trim() });
       ok.hidden = false;
-      ok.textContent = 'Appeal received' + (res && res.id ? ' (reference ' + res.id.slice(0, 8) + ').' : '.') +
-        ' A reviewer will look at it as soon as possible.';
+      ok.textContent = 'Appeal received'
+        + (res && res.id ? ' (reference ' + String(res.id).slice(0, 8) + ').' : '.')
+        + ' A reviewer will look at it as soon as they can.';
       form.reset();
       if (isAuthed()) toast('Appeal submitted.', 'ok');
     } catch (ex) {
@@ -168,14 +256,15 @@ export function renderNewAppeal(container) {
   });
 
   card.appendChild(form);
+  // Only offered to someone who can act on the answer. Telling a signed-in reader
+  // they do not need to be signed in is noise on a page they are already inside.
   if (isAuthed()) {
-    card.appendChild(el('p', { class: 'auth-alt' }, el('a', { href: route('/support/appeals') }, 'View my appeals')));
-  } else {
-    card.appendChild(el('p', { class: 'auth-alt' }, 'Signed in? ', el('a', { href: route('/support/appeals') }, 'Track your appeals')));
+    card.appendChild(el('p', { class: 'auth-alt' },
+      el('a', { href: route('/support/appeals') }, 'Back to my appeals')));
   }
-  section.appendChild(card);
-  container.appendChild(wrap);
-  actionInput.focus();
+  // Not when the field is already filled in: focusing an input the reader cannot
+  // see the contents of scrolls the page out from under the notice they just read.
+  if (!actionInput.value) actionInput.focus();
 }
 
 export default { renderSupport, renderMyAppeals, renderNewAppeal };

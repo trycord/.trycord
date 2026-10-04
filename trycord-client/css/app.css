@@ -2142,6 +2142,15 @@ label {
 .empty-state__title { color: var(--t-txt); font-size: var(--t-fs-l); font-weight: 700; }
 .empty-state__body { max-width: 46ch; line-height: 1.6; }
 
+/* A form is read in a column. At full width the answer box ran the whole 1400px of
+   the workspace, which is a comfortable distance for nothing: a reviewer reads
+   paragraphs, not lines that long. The card keeps the app's own surface, border and
+   radius; only its measure changes. */
+.appeal-form {
+  max-width: 640px;
+  padding: var(--t-d-6);
+}
+
 /* ==========================================================================
    11  settings
    ========================================================================== */
@@ -3135,24 +3144,39 @@ html[data-auth-page] .mobile-tab-navigation { display: none; }
   --pub-pad-x: var(--t-d-5);
 }
 
+/* Which surfaces are documents rather than places inside the app: the sign-in and
+   recovery screens, the emailed-link pages, and the legal documents.
+
+   /support matches exactly, and that is the point of the change. It was a prefix,
+   so it also caught /support/appeals and /support/appeals/new - which are not
+   documents at all. My appeals is a signed-in page reached from this instance's own
+   support page, and the prefix rule took the rail, the header and the member panel
+   off it, leaving a full-bleed void with no way back into the app. The reader
+   arrives from a page with a header and lands on one with nothing, and the only way
+   out is the browser's back button.
+
+   The documents keep the chrome-less treatment because they are documents: they
+   carry their own header and footer and are meant to be read rather than
+   navigated. The pages under /support are places in the app, and are dressed as
+   places in the app. */
 html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
         [data-route^='/reset-password'], [data-route^='/verify-email'],
-        [data-route^='/legal'], [data-route^='/support']) { --is-public-page: 1; }
+        [data-route^='/legal'], [data-route='/support']) { --is-public-page: 1; }
 
 html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
         [data-route^='/reset-password'], [data-route^='/verify-email'],
-        [data-route^='/legal'], [data-route^='/support'])
+        [data-route^='/legal'], [data-route='/support'])
   :is(.app-rail, .context-sidebar, .context-header, .member-sidebar, .mobile-tab-navigation) {
   display: none !important;
 }
 html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
         [data-route^='/reset-password'], [data-route^='/verify-email'],
-        [data-route^='/legal'], [data-route^='/support']) .shell {
+        [data-route^='/legal'], [data-route='/support']) .shell {
   grid-template-columns: minmax(0, 1fr);
 }
 html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
         [data-route^='/reset-password'], [data-route^='/verify-email'],
-        [data-route^='/legal'], [data-route^='/support']) .main-content {
+        [data-route^='/legal'], [data-route='/support']) .main-content {
   grid-column: 1;
   width: 100%;
 }
