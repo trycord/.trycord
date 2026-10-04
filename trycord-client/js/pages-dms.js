@@ -1,11 +1,8 @@
 
 import Api from './api.js';
 import { loadingState } from './states.js';
-import State, { refreshDms, refreshFriends, isAuthed, mustVerifyToPost } from './state.js';
-import {
-  attachContextMenu, confirmDialog, copyText, esc, el, clear, plural, toast, relTime,
-  showEmojiPicker, insertAtCursor, openModal, openReportDialog,
-} from './ui.js';
+import State, { refreshDms, refreshFriends, mustVerifyToPost } from './state.js';
+import { attachContextMenu, confirmDialog, copyText, el, clear, plural, toast, relTime, showEmojiPicker, insertAtCursor, openModal, openReportDialog } from './ui.js';
 import { avatar, downloadAttachment, emptyState, icon, messageRow } from './components.js';
 import { createAttachTray } from './attach-tray.js';
 import { paintEmbeds, wireEmbedImages } from './embeds.js';

@@ -2,7 +2,7 @@
 import { TrycordConfig } from './config.js';
 import { applyTheme, watchSystemTheme } from './theme.js';
 import { updateFromViewport, onPresentationChange } from './presentation.js';
-import { hydrate, clearSession, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends, refreshMutes, refreshBlocks, setServerRoomHooks } from './state.js';
+import { hydrate, isAuthed, refreshServers, setOnline, setPresence, refreshNotifications, refreshDms, refreshFriends, refreshMutes, refreshBlocks, setServerRoomHooks } from './state.js';
 import { loadWellbeing } from './privacy-ui.js';
 import Realtime from './realtime.js';
 import Router from './router.js';

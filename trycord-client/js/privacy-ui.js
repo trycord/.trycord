@@ -14,10 +14,7 @@ import Api from './api.js';
 import { loadingState, errorState } from './states.js';
 import State from './state.js';
 import { el, clear, toast, openModal } from './ui.js';
-import {
-  sectionHead, sectionCard, settingRow, toggleRow, selectRow,
-  setEmpty, setNote, dangerButton, setActionRow,
-} from './settings-ui.js';
+import { sectionHead, sectionCard, settingRow, toggleRow, selectRow, setEmpty, setNote, dangerButton } from './settings-ui.js';
 
 // The server's vocabulary. Presence historically stored 'everyone' where the
 // request gates stored 'anyone'; the server now accepts both and canonicalises
