@@ -2239,7 +2239,6 @@ label {
   .settings-pane * { text-align: left; }
   .settings-pane .empty-state,
   .settings-pane .state-block,
-  .settings-pane .atrium { text-align: center; }
 .settings-body { display: flex; flex-direction: column; gap: var(--t-d-5); }
 
 .settings-context, .profile-context { display: none; }
@@ -3863,16 +3862,6 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 
 .empty-state .es-icon { color: var(--t-dim); display: inline-flex; justify-content: center; }
 
-.atrium {
-  min-height: min(62dvh, 560px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--t-d-4);
-  padding: var(--t-d-8) var(--t-d-5);
-  text-align: center;
-}
 
 .auth-wrap { width: min(520px, 100%); margin: 0 auto; }
 .card--auth { padding: var(--t-d-6); }

@@ -12,7 +12,7 @@ export async function renderProfile(container, { id } = {}) {
   clear(container);
   renderContextHeader({ title: 'Profile', sub: 'View a member profile' });
   const frame = el('div', { class: 'profile-layout' });
-  const wrap = el('div', { class: 'page atrium' }, frame);
+  const wrap = el('div', { class: 'page' }, frame);
   // The primary column holds the profile itself. It is capped so the header does
   // not stretch a name across a 3440px window, and the space to its right is a
   // real column with real content rather than empty canvas.
