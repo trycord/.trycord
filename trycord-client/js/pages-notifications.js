@@ -58,8 +58,9 @@ export async function renderNotifications(container) {
       renderNotifications(container);
     } catch (ex) { toast(ex.message || 'Failed', 'error'); }
   });
-  toolbar.appendChild(markAll);
-  wrap.appendChild(toolbar);
+  // Kept out of the tree until there is something unread. 'Mark all read' above an
+  // empty list is a control with nothing to act on, which is worse than no control:
+  // it says there is something to clear when there is not.
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
 
@@ -171,6 +172,11 @@ export async function renderNotifications(container) {
     list.appendChild(emptyState('bell', 'All caught up', 'Mentions, messages and friend activity land here.'));
     loadMoreBtn.hidden = true;
     return;
+  }
+  // Only now, with rows to act on.
+  if (items.some((n) => n && !n.readAt)) {
+    toolbar.insertBefore(markAll, toolbar.firstChild);
+    wrap.insertBefore(toolbar, list);
   }
   for (const n of items) {
     list.appendChild(renderRow(n));

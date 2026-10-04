@@ -410,6 +410,22 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* `hidden` has to win.
+   The user agent stylesheet says [hidden] { display: none }, but any author rule
+   that sets display beats it - so `.btn { display: inline-flex }` turned every
+   `el('button', { hidden: true })` in the application into a visible button. There
+   are over a hundred of those across the account, admin, members and settings
+   pages, plus the ones gating modals, trays and panels.
+
+   It showed on the notifications page, which showed 'Load older' directly above
+   'All caught up': the code correctly hid the button when there was nothing to
+   load, and the stylesheet showed it anyway.
+
+   !important because hidden is a hard statement - this element is not on the page -
+   and there is no legitimate case for a class to override it. Four components had
+   already grown their own `[hidden]` rule to defeat exactly this. */
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   margin: 0;
