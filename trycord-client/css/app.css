@@ -1738,6 +1738,10 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   font-weight: 700;
   text-align: left;
   cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .member-name-btn:hover { color: var(--t-accent); }
 .member-name-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; border-radius: var(--t-r-xs); }
