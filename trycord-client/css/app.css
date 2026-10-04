@@ -58,7 +58,10 @@
      why the conversation ignored its own 1480px measure at 2560 and stretched to
      1932px. */
   --ui-content-max: 1480px;
-  --ui-shell-cols: var(--ui-rail) minmax(0, 1fr);
+  /* Three tracks: rail, community sidebar, workspace. .app-rail spans the first
+     two, because the channel navigation is a child of it in the markup - which is
+     why the region beside the rail existed at all. */
+  --ui-shell-cols: var(--ui-rail) var(--ui-sidebar) minmax(0, 1fr);
   --ui-shell-rows: minmax(0, 1fr) auto;
   --ui-drawer-width: min(88vw, 360px);
   --ui-tabbar-height: 64px;
@@ -522,11 +525,11 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
    the right. Mobile folds them into one drawer, which is a presentation change
    and not a removal. */
 .app-rail {
-  grid-column: 1;
+  grid-column: 1 / span 2;
   grid-row: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--ui-rail) minmax(0, 1fr);
+  grid-template-columns: var(--ui-rail) var(--ui-sidebar);
   grid-template-rows: minmax(0, 1fr);
   background: var(--t-pg);
   border-right: 1px solid var(--t-line);
@@ -566,7 +569,7 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 }
 
 .main-content {
-  grid-column: 2;
+  grid-column: 3;
   grid-row: 1;
   min-width: 0;
   min-height: 0;
@@ -3827,8 +3830,8 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
    grid, so the rail's inner element is what paints it. */
 /* Collapsing the rail removes the whole navigation column, channels included -
    they live in it now. */
-.shell.sidebar-collapsed { --ui-rail: 0px; }
+.shell.sidebar-collapsed { --ui-rail: 0px; --ui-sidebar: 0px; }
 .shell.sidebar-collapsed .app-rail { display: none; }
-.shell.sidebar-collapsed .main-content { grid-column: 1; }
+.shell.sidebar-collapsed .main-content { grid-column: 1 / -1; }
 
 html[data-presentation='mobile'] .nav-toggle { display: inline-flex; }
