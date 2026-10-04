@@ -27,7 +27,7 @@ import { renderMyAppeals, renderNewAppeal, renderSupport } from './pages-support
 import { renderNotifications } from './pages-notifications.js';
 import { renderProfile } from './pages-profile.js';
 import { renderServerRoles } from './pages-roles.js';
-import { renderServerSettings } from './pages-settings.js';
+import { renderServerSettings, COMMUNITY_SECTION_ROUTE } from './pages-settings.js';
 import { SETTINGS_IA } from './settings-shell.js';
 import { renderServerMembers } from './pages-members.js';
 import { renderNewChannel, renderServerCategories } from './pages-channels.js';
@@ -159,6 +159,17 @@ async function renderCommunity({ region, parts, query, publishRoute }) {
 
   if (what === 'settings') {
     const section = what4 && COMMUNITY_SETTINGS_SECTIONS.has(what4) ? what4 : 'overview';
+    // Members, Roles, Invites and Categories have their own page, and the settings
+    // nav points there. A deep link or a stale bookmark to /settings/<one of them>
+    // used to render a card explaining where the section really was; now that the
+    // card is gone it would render nothing at all. So the address is redirected to
+    // the one surface rather than left as a dead end, and the reader ends up where
+    // clicking the nav item would have taken them.
+    const canonical = COMMUNITY_SECTION_ROUTE[section];
+    if (canonical) {
+      navigate(canonical(serverId));
+      return;
+    }
     await renderServerSettings(region, serverId, section);
     renderAllChrome();
     return;

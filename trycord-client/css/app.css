@@ -762,13 +762,13 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 }
   .ctx-switcher__trigger:hover { background: var(--t-hover); color: var(--t-txt); }
   .ctx-switcher__mark { display: none; }
-.ctx-switcher__text { flex: 1 1 auto; min-width: 0; }
+.ctx-switcher__text { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: var(--t-d-3); }
 .ctx-switcher__name {
   font-weight: 700;
   font-size: var(--t-fs-s);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.ctx-switcher__meta { color: var(--t-mut); font-size: var(--t-fs-xxs); }
+.ctx-switcher__meta { flex: 0 0 auto; color: var(--t-dim); font-size: var(--t-fs-xxs); letter-spacing: 0.04em; }
 .ctx-switcher__caret { color: var(--t-mut); flex: 0 0 auto; }
 
 .community-mark {

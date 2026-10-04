@@ -28,7 +28,7 @@ import { navigate, route } from './nav.js';;
 // the role hierarchy cost a click through a dead end that explained what you were
 // about to see instead of showing it. One authoritative surface per section means
 // the teaser is not a thing the reader can get to at all.
-const SECTION_ROUTE = {
+export const COMMUNITY_SECTION_ROUTE = {
   categories: (serverId) => serverPath(serverId, 'categories'),
   members: (serverId) => serverPath(serverId, 'members'),
   roles: (serverId) => serverPath(serverId, 'roles'),
@@ -36,7 +36,7 @@ const SECTION_ROUTE = {
 };
 
 function resolveCommunityHref(serverId, id) {
-  if (SECTION_ROUTE[id]) return SECTION_ROUTE[id](serverId);
+  if (COMMUNITY_SECTION_ROUTE[id]) return COMMUNITY_SECTION_ROUTE[id](serverId);
   return serverPath(serverId, 'settings', id === 'overview' ? '' : id);
 }
 
@@ -275,7 +275,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   }
 
   // Members, Roles and Invites used to land here as a card with a paragraph and a
-  // button. Their nav rows point at the real pages instead (see SECTION_ROUTE), so
+  // button. Their nav rows point at the real pages instead (see COMMUNITY_SECTION_ROUTE), so
   // these branches were unreachable - and an unreachable branch is worse than a
   // missing one, because the next person to add a nav row gets the teaser back
   // without knowing it exists.
