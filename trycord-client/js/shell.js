@@ -1019,7 +1019,7 @@ export function renderMobileTabs(region) {
       onClick: () => { navigate(route(t.path)); },
     });
     btn.appendChild(el('span', { class: 'micon' }, icon(t.icon)));
-    btn.appendChild(el('span', { class: 'mlabel' }, t.label));
+    btn.appendChild(el('span', { class: 'mlabel tab-button__label' }, t.label));
     strip.appendChild(btn);
   }
 
