@@ -77,25 +77,30 @@
      #2e211b hover is visibly orange - so the surfaces read as tinted panels rather
      than as charcoal with an accent sitting on it. The warmth belongs to Ember and
      to the text, not to every edge between two greys. */
-  --t-pg:    #0a0a0a;   /* behind everything */
-  --t-base:  #101010;   /* the workspace */
-  --t-base2: #151515;   /* rails, sidebars, recessed */
-  --t-elev:  #1b1b1b;   /* raised: cards, composer, menus */
-  --t-hover: #202020;
-  --t-act:   #262626;   /* pressed, and the row a menu is open on */
+  /* Warm-black, not neutral grey and not brown. The spread between the red and
+     blue channel is what decides it: 19 reads as brown, 0 reads as cold concrete,
+     and 2-5 reads as a dark room with warm light in it. Surfaces sit at the low
+     end, borders a little higher, because a border is meant to be felt as an edge
+     rather than seen as a colour. */
+  --t-pg:    #0a0a09;   /* behind everything */
+  --t-base:  #111110;   /* the workspace */
+  --t-base2: #171615;   /* rails, sidebars, recessed */
+  --t-elev:  #1e1c1a;   /* raised: cards, composer, menus */
+  --t-hover: #252220;
+  --t-act:   #2d2926;   /* pressed, and the row a menu is open on */
 
-  /* Solid, not a translucent warm white. A border that is a colour in its own
-     right reads the same over every surface it lands on, which is what a border is
-     for; the old value was really an alpha, so it looked different over the
-     workspace than over a raised card. */
-  --t-line:     #292929;
-  --t-line-hi:  #343434;
-  --t-line-max: #454545;
+  /* Warm brown, and solid. A border that is a colour in its own right reads the
+     same over every surface it lands on, which is what a border is for; the old
+     value was really an alpha, so it looked different over the workspace than over
+     a raised card. */
+  --t-line:     #2b2724;
+  --t-line-hi:  #3a3430;
+  --t-line-max: #4b433d;
 
-  --t-txt:  #f2f0ea;
-  --t-txt2: #b6b2a8;
-  --t-mut:  #77736b;
-  --t-dim:  #55524d;   /* disabled, and the floor for anything unreadable */
+  --t-txt:  #f2efe8;
+  --t-txt2: #b8b2a6;
+  --t-mut:  #7d776c;
+  --t-dim:  #5b564e;   /* disabled, and the floor for anything unreadable */
 
   /* Ember. One accent, three intensities. The old theme had accent and
      accent-2 pulling in different directions on the same screen. */
@@ -218,12 +223,12 @@
    what changes is that it is now written down, so the next person editing the
    palette is editing a theme rather than editing a fallback. */
 :root[data-theme='ember'] {
-  --t-pg:    #0c0806;
-  --t-base:  #141010;
-  --t-base2: #1b1513;
-  --t-elev:  #241a16;
-  --t-hover: #2e211b;
-  --t-act:   #3a2b23;
+  --t-pg:    #0c0a08;
+  --t-base:  #151210;
+  --t-base2: #1c1815;
+  --t-elev:  #241f1b;
+  --t-hover: #2e2721;
+  --t-act:   #39302a;
   --t-txt:   #fff4ea;
   --t-txt2:  #d9c3b0;
   --t-mut:   #9a7d69;
@@ -232,29 +237,29 @@
   --t-accent-hi:  #ffab6b;
   --t-accent-lo:  #d4611a;
   --t-accent-ink: #1a0c04;
-  --t-line:    #2b2420;
-  --t-line-hi: #3d332c;
-  --t-line-max: #57483e;
+  --t-line:    #332b25;
+  --t-line-hi: #463a32;
+  --t-line-max: #5f4f44;
 }
 
 :root[data-theme='trycord'] {
-  --t-pg:    #0a0a0a;
-  --t-base:  #101010;
-  --t-base2: #151515;
-  --t-elev:  #1b1b1b;
-  --t-hover: #202020;
-  --t-act:   #262626;
-  --t-txt:   #f2f0ea;
-  --t-txt2:  #b6b2a8;
-  --t-mut:   #77736b;
-  --t-dim:   #55524d;
+  --t-pg:    #0a0a09;
+  --t-base:  #111110;
+  --t-base2: #171615;
+  --t-elev:  #1e1c1a;
+  --t-hover: #252220;
+  --t-act:   #2d2926;
+  --t-txt:   #f2efe8;
+  --t-txt2:  #b8b2a6;
+  --t-mut:   #7d776c;
+  --t-dim:   #5b564e;
   --t-accent:     #e8752a;
   --t-accent-hi:  #ff8a3d;
   --t-accent-lo:  #b94f16;
   --t-accent-ink: #1a0c04;
-  --t-line:     #292929;
-  --t-line-hi:  #343434;
-  --t-line-max: #454545;
+  --t-line:     #2b2724;
+  --t-line-hi:  #3a3430;
+  --t-line-max: #4b433d;
 }
 
 /* Orthocord: the cool option. Neutral charcoal with steel-blue accents, kept
@@ -276,10 +281,10 @@
   --t-ok:   #5cc98a;
   --t-warn: #e0bb63;
   --t-err:  #e8705f;
-  --t-act:      #262832;
-  --t-line:     #2b2d36;
-  --t-line-hi:  #3c3f4a;
-  --t-line-max: #545863;
+  --t-act:      #2b2d36;
+  --t-line:     #2c2e37;
+  --t-line-hi:  #3d404b;
+  --t-line-max: #555964;
   --t-glow: 0 0 0 1px rgba(110, 168, 255, 0.32), 0 0 24px -6px rgba(110, 168, 255, 0.40);
 }
 
@@ -304,8 +309,8 @@
   --t-err:  #f0758a;
   --t-act:      #1e2138;
   --t-line:     #232741;
-  --t-line-hi:  #32375a;
-  --t-line-max: #454b73;
+  --t-line-hi:  #33385b;
+  --t-line-max: #474d76;
   --t-glow: 0 0 0 1px rgba(167, 139, 250, 0.32), 0 0 24px -6px rgba(167, 139, 250, 0.40);
 }
 
@@ -330,9 +335,9 @@
   --t-warn: #ffd166;
   --t-err:  #ff8f7d;
   --t-act:      #333333;
-  --t-line:     #5c5c5c;
-  --t-line-hi:  #7d7d7d;
-  --t-line-max: #a0a0a0;
+  --t-line:     #5e5a55;
+  --t-line-hi:  #807a73;
+  --t-line-max: #a49c93;
   --t-glow: 0 0 0 2px var(--t-accent), 0 0 20px -4px rgba(255, 171, 82, 0.5);
   --t-sh-1: 0 0 0 1px rgba(255, 255, 255, 0.2);
   --t-sh-2: 0 0 0 1px rgba(255, 255, 255, 0.24);
