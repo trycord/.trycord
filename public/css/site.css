@@ -331,7 +331,13 @@ table.plain td { color: var(--txt2); }
   .footer-grid { grid-template-columns: 1fr 1fr; }
 }
 
-@media (max-width: 720px) {
+/* The header stops being a row of links well before the page does.
+   Seven destinations plus the call to action need roughly 900px. Below that they
+   do not fit, and because the row is a nowrap flex with the button last, the
+   failure mode was not wrapping - it was the button being cut off past the right
+   edge, which is what a tablet-width screenshot showed.
+   So the breakpoint follows the measurement instead of a device width. */
+@media (max-width: 900px) {
   :root { --header-h: 56px; }
 
   .site-nav {
@@ -351,8 +357,11 @@ table.plain td { color: var(--txt2); }
   .site-nav a { padding: 12px; }
   .site-nav .btn-open { margin: 6px 0 0; text-align: center; }
   .nav-toggle { display: inline-block; }
+}
 
+@media (max-width: 720px) {
   .footer-grid { grid-template-columns: 1fr; gap: 20px; }
   .hero .cta { flex-direction: column; align-items: stretch; }
   .hero .cta .btn { text-align: center; }
 }
+
