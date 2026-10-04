@@ -43,8 +43,11 @@
      a sidebar. That is what lets both carry a readable label: the old 64px strip
      could only afford a glyph, and the channel list was a separate 240px column
      that had to be collapsed to fit alongside it. */
-  --ui-rail: 264px;
-  --ui-sidebar: 264px;
+  /* The rail is narrow: glyphs and short labels for destinations and communities.
+     The community sidebar beside it is the wide one, because that is where
+     channel names have to be readable. */
+  --ui-rail: 84px;
+  --ui-sidebar: 260px;
   --ui-members: 288px;
   --ui-header: 56px;
   --ui-page-width: 1240px;
@@ -328,13 +331,13 @@
    is a cap that rises with the window rather than one fixed number that leaves a
    void on either side of it at every size. */
 @media (min-width: 1800px) {
-  :root { --t-content-width: 1320px; --ui-content-max: 1400px; --ui-members: 320px; }
+  :root { --t-content-width: 1320px; --ui-content-max: 1400px; --ui-members: 320px; --ui-sidebar: 272px; }
 }
 @media (min-width: 2400px) {
-  :root { --t-content-width: 1480px; --ui-content-max: 1560px; --ui-members: 340px; --ui-rail: 288px; }
+  :root { --t-content-width: 1480px; --ui-content-max: 1560px; --ui-members: 340px; --ui-sidebar: 296px; --ui-rail: 88px; }
 }
 @media (min-width: 3000px) {
-  :root { --t-content-width: 1640px; --ui-content-max: 1720px; --ui-members: 380px; --ui-rail: 304px; }
+  :root { --t-content-width: 1640px; --ui-content-max: 1720px; --ui-members: 380px; --ui-sidebar: 320px; --ui-rail: 92px; }
 }
 /* Below 1800 the cap is the reading measure and the leftover is margin, which is
    what it should be on a laptop. */
@@ -506,54 +509,34 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
    across pages that have no members at all.
    ========================================================================== */
 
-/* The shell's parent. It has to carry the viewport height itself: the shell is
-   100dvh, so without a full-height parent it sat in an auto-sized block and the
-   leftover width went nowhere - the navigation column took its 264px and the
-   workspace got whatever a shrink-to-fit box decided, which on a 1440 screen was
-   about 440px with 450px of empty shell beside it.
+/* Two columns inside the rail element, which is how the markup has always been:
+   #place-navigation.context-sidebar is a child of #app-rail, not a sibling of it.
 
-   #root is not a thing; the wrapper is #app.trycord-app. */
-.trycord-app, #app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 100dvh;
-  width: 100%;
-}
+   Collapsing it to one column and two rows - which is what I did - merged the
+   application rail and the community sidebar into a single surface, so a
+   community's channels sat directly under the global destinations with nothing
+   between them. That is not a styling difference. It is the two navigations
+   becoming one, and it is a structural regression rather than a design choice.
 
-.shell {
-  display: grid;
-  grid-template-columns: var(--ui-shell-cols);
-  grid-template-rows: minmax(0, 1fr) auto;
-  flex: 1 1 auto;
-  width: 100%;
-  min-height: 0;
-  height: 100dvh;
-  background: var(--t-pg);
-}
-
-/* The navigation column: one surface holding communities and channels.
-
-   renderCommunities() writes the global destinations and the community list into
-   the same element, so they are one scroller rather than two regions pretending
-   to be separate. Switching community and switching channel are the same kind of
-   act and they read as one column because of that. */
+   They are separate again: destinations on the left, this community's channels on
+   the right. Mobile folds them into one drawer, which is a presentation change
+   and not a removal. */
 .app-rail {
   grid-column: 1;
   grid-row: 1;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: var(--ui-rail) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   background: var(--t-pg);
   border-right: 1px solid var(--t-line);
   overflow: hidden;
   z-index: 40;
 }
 
-/* Two empty landmarks the shell keeps addressable: the identity region and the
-   global navigation. renderCommunities() writes the global destinations into
-   #community-navigation alongside the communities, so both of these hold nothing.
-   Left in the grid they still create tracks, so they are taken out of it. */
+/* Two empty landmarks the shell keeps addressable. renderCommunities() writes the
+   global destinations into #community-navigation alongside the communities, so both
+   of these hold nothing; left in the grid they still create tracks. */
 .rail-identity, .rail-global-nav { display: none; }
 
 .app-rail__items {
@@ -564,20 +547,22 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   flex-direction: column;
   align-items: stretch;
   gap: var(--t-d-1);
-  padding: var(--t-d-3);
+  padding: var(--t-d-3) var(--t-d-2);
   overflow-y: auto;
   overflow-x: hidden;
 }
 
+/* The community sidebar: its identity, its categories, its channels, its actions.
+   A column of its own, beside the rail rather than underneath it. */
 .context-sidebar {
-  grid-column: 1;
-  grid-row: 2;
+  grid-column: 2;
+  grid-row: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--t-base2);
-  border-top: 1px solid var(--t-line);
+  border-left: 1px solid var(--t-line);
 }
 
 .main-content {
@@ -646,20 +631,24 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 
 /* The rail's own destinations: a glyph and a word, side by side. The column is
    264px now, which is what a label needs and a glyph does not. */
+/* An 84px column, so a destination is a glyph over a short word rather than a
+   glyph over a row. Still a label - a bare glyph column is a shape to memorise -
+   but one that fits. */
 .rail-nav {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--t-d-4);
+  gap: 3px;
   width: 100%;
-  padding: var(--t-d-2) var(--t-d-4);
+  padding: var(--t-d-3) 2px;
   border: 0;
   border-radius: var(--t-r-s);
   background: transparent;
   color: var(--t-mut);
-  font-size: var(--t-fs-s);
-  font-weight: 600;
-  text-align: left;
+  font-size: var(--t-fs-xxs);
+  font-weight: 700;
+  text-align: center;
   transition: background var(--t-fast) var(--t-ease), color var(--t-fast) var(--t-ease);
 }
 .rail-nav:hover { background: var(--t-hover); color: var(--t-txt); }
@@ -667,8 +656,8 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .rail-nav.is-active::before {
   content: '';
   position: absolute;
-  left: 0; top: 50%;
-  width: 3px; height: 18px;
+  left: calc(var(--t-d-2) * -1); top: 50%;
+  width: 3px; height: 22px;
   border-radius: 0 3px 3px 0;
   background: var(--t-accent);
   transform: translateY(-50%);
@@ -677,9 +666,9 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .rail-nav__icon .ui-icon { width: 19px; height: 19px; }
 .rail-nav__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-nav__badge {
-  flex: 0 0 auto;
-  margin-left: auto;
-  min-width: 17px; height: 17px;
+  position: absolute;
+  top: 4px; right: 6px;
+  min-width: 16px; height: 16px;
   padding: 0 5px;
   display: grid; place-items: center;
   border-radius: var(--t-r-full);
@@ -694,17 +683,18 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .rail-community {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--t-d-4);
+  gap: 5px;
   width: 100%;
-  padding: var(--t-d-2) var(--t-d-4);
+  padding: var(--t-d-2) 2px;
   border: 0;
   border-radius: var(--t-r-s);
   background: transparent;
   color: var(--t-txt2);
-  font-size: var(--t-fs-s);
-  font-weight: 600;
-  text-align: left;
+  font-size: var(--t-fs-xxs);
+  font-weight: 700;
+  text-align: center;
   transition: background var(--t-fast) var(--t-ease), color var(--t-fast) var(--t-ease);
 }
 .rail-community:hover { background: var(--t-hover); color: var(--t-txt); }
@@ -712,8 +702,8 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .rail-community.is-active::before {
   content: '';
   position: absolute;
-  left: 0; top: 50%;
-  width: 3px; height: 20px;
+  left: calc(var(--t-d-2) * -1); top: 50%;
+  width: 3px; height: 24px;
   border-radius: 0 3px 3px 0;
   background: var(--t-accent);
   transform: translateY(-50%);
@@ -722,7 +712,7 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .rail-mark {
   display: grid;
   place-items: center;
-  width: 26px; height: 26px;
+  width: 40px; height: 40px;
   flex: 0 0 auto;
   border-radius: var(--t-r-xs);
   overflow: hidden;
@@ -732,7 +722,8 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 .rail-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.rail-community__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-community__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
+.rail-nav__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
 
 .rail-dot {
   flex: 0 0 auto;
@@ -3550,11 +3541,12 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   .shell[data-layout] { --ui-shell-cols: minmax(0, 1fr); --ui-shell-rows: minmax(0, 1fr) auto; }
 
   .main-content { grid-column: 1; grid-row: 1; }
-    /* One drawer, holding communities above channels.
+    /* One drawer, holding destinations above this community's channels.
 
-       These are the two rows of the same element now, so the drawer is the rail
-       and the channel list rides inside it. Two separate slide-over panels in
-       390px was the answer to a structure that no longer exists. */
+       The desktop structure is two columns; here they stack in one panel and
+       scroll together. The community sidebar is not removed on a phone, it is
+       presented as the second half of the drawer - which is what a responsive
+       layout does, as opposed to deleting a region to make room. */
     .app-rail {
       position: fixed;
       inset: 0 auto 0 0;
@@ -3567,16 +3559,30 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
       transform: translateX(-100%);
       visibility: hidden;
       transition: transform var(--t-med) var(--t-ease), visibility var(--t-med);
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
       overflow: hidden;
     }
     .app-rail[data-open='true'] { transform: translateX(0); visibility: visible; }
-    .app-rail__items { padding: var(--t-d-4) var(--t-d-3); }
-    .rail-nav, .rail-community { min-height: var(--t-hit); }
+    /* Full-width rows in the drawer: there is no 84px column to preserve here. */
+    .app-rail__items { grid-column: 1; grid-row: 1; padding: var(--t-d-3); }
+    .rail-nav, .rail-community {
+      flex-direction: row;
+      align-items: center;
+      gap: var(--t-d-4);
+      min-height: var(--t-hit);
+      padding: var(--t-d-2) var(--t-d-4);
+      text-align: left;
+      font-size: var(--t-fs-s);
+    }
+    .rail-mark { width: 28px; height: 28px; }
+    .rail-nav__icon .ui-icon { width: 20px; height: 20px; }
+    .rail-nav__badge { position: static; margin-left: auto; }
     .rail-sep { margin-inline: var(--t-d-3); }
 
-    .context-sidebar { border-top-color: var(--t-line-hi); }
+    .context-sidebar { grid-column: 1; grid-row: 2; border-left: 0; border-top: 1px solid var(--t-line-hi); }
     .ctx-channel { min-height: var(--t-hit); }
     .ctx-switcher__trigger { min-height: 46px; }
     .ctx-filter { margin-inline: var(--t-d-4); width: calc(100% - var(--t-d-6)); }
@@ -3778,17 +3784,22 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 /* --- tablet: the rail narrows, the member panel goes --- */
 
 @media (max-width: 1299px) and (min-width: 1000px) {
-  :root { --ui-rail: 240px; --ui-members: 248px; }
+  :root { --ui-rail: 80px; --ui-sidebar: 240px; --ui-members: 248px; }
 }
 @media (max-width: 999px) and (min-width: 760px) {
-  :root { --ui-rail: 216px; --ui-members: 0px; }
+  :root { --ui-rail: 76px; --ui-sidebar: 216px; --ui-members: 0px; }
 }
 /* A small tablet still gets the labelled rail. The old rule here hid the
    community names and went back to big square marks at 759px and under, which
    put the previous design back in place for a whole class of device. The rail
    narrows instead, and the label ellipsises rather than disappearing. */
 @media (max-width: 759px) and (min-width: 600px) {
-  :root { --ui-rail: 216px; --ui-members: 0px; }
+  :root { --ui-rail: 72px; --ui-sidebar: 196px; --ui-members: 0px; }
+  /* At this width the rail keeps its marks but drops the words under them; the
+     community sidebar still shows every channel name in full. */
+  .rail-nav__label, .rail-community__name { display: none; }
+  .rail-nav, .rail-community { padding: var(--t-d-2); }
+  .rail-mark { width: 38px; height: 38px; }
 }
 @media (max-width: 899px) {
   .ctx-switcher__trigger { min-height: 46px; }
