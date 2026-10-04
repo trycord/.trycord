@@ -902,9 +902,15 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .nav-group__list { display: flex; flex-direction: column; gap: 1px; }
 
 /* A channel row: the glyph is inside a well so a column of channels reads as a
-   column, rather than as loose text with hashes in it. */
-.ctx-channel,
-.row {
+   column, rather than as loose text with hashes in it.
+
+   This used to share its rule with .row, which is a different animal - .row is
+   the three-column list primitive defined further down and it is display: grid,
+   so the two declarations were fighting over one class and the later one won by
+   accident rather than by decision. .row keeps its own definition and its own
+   hover, and marks its current row with .active, which is what the modifiers
+   emit: .row--surface.active, .row--nav.active. Nothing emits .row.is-active. */
+  .ctx-channel {
   position: relative;
   display: flex;
   align-items: center;
@@ -919,14 +925,14 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   text-align: left;
   transition: background var(--t-fast) var(--t-ease), color var(--t-fast) var(--t-ease);
 }
-.ctx-channel:hover, .row:hover { background: var(--t-hover); color: var(--t-txt); }
+  .ctx-channel:hover { background: var(--t-hover); color: var(--t-txt); }
 
-.ctx-channel.is-active, .row.is-active {
+  .ctx-channel.is-active {
   background: color-mix(in srgb, var(--t-accent) 13%, transparent);
   color: var(--t-txt);
   font-weight: 600;
 }
-.ctx-channel.is-active::before, .row.is-active::before {
+  .ctx-channel.is-active::before {
   content: '';
   position: absolute;
   left: 0; top: 50%;
