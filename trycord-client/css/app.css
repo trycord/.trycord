@@ -316,6 +316,26 @@
   --t-inset-glass: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
+/* Wide screens get a wider measure and a wider member panel, because the point of
+   a 2560 or 3440 pixel display is that the workspace uses it. The conversation is
+   still capped - past about 1400px of text a line stops being scannable - but it
+   is a cap that rises with the window rather than one fixed number that leaves a
+   void on either side of it at every size. */
+@media (min-width: 1800px) {
+  :root { --t-content-width: 1320px; --ui-members: 320px; }
+}
+@media (min-width: 2400px) {
+  :root { --t-content-width: 1480px; --ui-members: 340px; --ui-rail: 288px; }
+}
+@media (min-width: 3000px) {
+  :root { --t-content-width: 1640px; --ui-members: 380px; --ui-rail: 304px; }
+}
+/* Below 1800 the cap is the reading measure and the leftover is margin, which is
+   what it should be on a laptop. */
+@media (max-width: 1799px) and (min-width: 1300px) {
+  :root { --t-content-width: 1160px; --ui-members: 288px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

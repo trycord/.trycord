@@ -14,10 +14,19 @@ import { mkdirSync } from 'node:fs';
 const ORIGIN = process.env.TC_ORIGIN || 'http://127.0.0.1:9975';
 const OUT = process.env.TC_SHOTS || new URL('./shots/', import.meta.url).pathname;
 
+// Desktop first and at every width that has ever broken something, because the
+// point of shooting is to catch the one nobody reasoned about. 1280 is a small
+// laptop, 1920 is the common desktop, and 2560/3440 are the ultrawide sizes where
+// a workspace stops expanding and starts leaving voids.
 const SIZES = [
+  [1280, 720, 'desk-1280'],
+  [1920, 1080, 'desk-1920'],
+  [2560, 1440, 'desk-2560'],
+  [3440, 1440, 'desk-3440'],
   [1440, 900, 'desk'],
-  [390, 844, 'phone'],
   [834, 1112, 'tablet'],
+  [390, 844, 'phone'],
+  [360, 740, 'small'],
 ];
 
 // Only routes that exist for a seeded owner. Anything needing a second account
