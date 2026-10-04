@@ -1014,7 +1014,7 @@ export function renderMobileTabs(region) {
   for (const t of tabs) {
     const active = here === t.path || here.startsWith(t.path + '/');
     const btn = el('button', {
-      type: 'button', class: active ? 'active' : '',
+      type: 'button', class: 'tab-button' + (active ? ' active' : ''),
       'aria-current': active ? 'page' : null,
       onClick: () => { navigate(route(t.path)); },
     });

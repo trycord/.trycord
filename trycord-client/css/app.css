@@ -3695,17 +3695,15 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   .mobile-tab-navigation__strip {
     display: flex;
     flex: 1 1 auto;
+    min-width: 0;
     min-height: var(--t-ui-tabbar);
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
   }
   .mobile-tab-navigation__strip::-webkit-scrollbar { display: none; }
   /* Six destinations plus the collapse handle do not fit 390px at the handle's
      minimum, so the strip scrolled and the first tab sat half off the left edge.
      Tabs share the width equally and shrink to fit; the strip only scrolls if a
      viewport is narrow enough that even that is not enough. */
-  .mobile-tab-navigation__strip > button {
+  .mobile-tab-navigation__strip > .tab-button {
     flex: 1 1 0;
     min-width: 0;
     padding: 0 2px;
@@ -3732,7 +3730,6 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-width: var(--t-ui-tabbar);
   border: 0;
   background: transparent;
   color: var(--t-mut);
@@ -3740,8 +3737,11 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   font-weight: 600;
 }
 .tab-button .ui-icon { width: 20px; height: 20px; }
-.tab-button.is-active { color: var(--t-accent); }
-.tab-button.is-active .tab-button__dot { opacity: 1; }
+/* The button is emitted as 'tab-button' + ' active', so the active state is the
+   .active class - .is-active was a rule for a class nothing ever produced, which
+   meant the current tab was never marked. */
+.tab-button.active { color: var(--t-accent); }
+.tab-button.active .tab-button__dot { opacity: 1; }
 .tab-button__dot {
   width: 4px; height: 4px;
   border-radius: var(--t-r-full);
