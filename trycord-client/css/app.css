@@ -739,20 +739,29 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 /* The community switcher at the head of the sidebar: name, member count, and a
    caret that says there is something behind it. */
 .ctx-switcher { padding: var(--t-d-3) var(--t-d-3) 0; }
+/* The rail directly above already names this community in full, with its mark.
+   Repeating it here put two rows carrying the same mark and the same name on one
+   screen. So this is the community's controls, not its identity: a compact bar
+   with its member count and the menu that opens on it. */
 .ctx-switcher__trigger {
   display: flex;
   align-items: center;
-  gap: var(--t-d-3);
+  gap: var(--t-d-2);
   width: 100%;
-  padding: var(--t-d-3);
-  border: 1px solid var(--t-line);
-  border-radius: var(--t-r-m);
-  background: var(--t-base);
-  color: var(--t-txt);
+  padding: var(--t-d-2) var(--t-d-3);
+  border: 0;
+  border-radius: var(--t-r-s);
+  background: transparent;
+  color: var(--t-mut);
+  font-size: var(--t-fs-xxs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   text-align: left;
-  transition: border-color var(--t-fast) var(--t-ease), background var(--t-fast) var(--t-ease);
+  transition: background var(--t-fast) var(--t-ease), color var(--t-fast) var(--t-ease);
 }
-.ctx-switcher__trigger:hover { border-color: var(--t-line-hi); background: var(--t-elev); }
+  .ctx-switcher__trigger:hover { background: var(--t-hover); color: var(--t-txt); }
+  .ctx-switcher__mark { display: none; }
 .ctx-switcher__text { flex: 1 1 auto; min-width: 0; }
 .ctx-switcher__name {
   font-weight: 700;
@@ -1936,6 +1945,7 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .settings-nav__search-clear:hover { background: var(--t-hover); color: var(--t-txt); }
 
 .settings-nav__groups { display: flex; flex-direction: column; gap: var(--t-d-5); }
+  .settings-nav { text-align: left; }
 .settings-nav__heading {
   margin: 0 0 var(--t-d-2);
   color: var(--t-dim);
@@ -1968,12 +1978,21 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .settings-nav__empty { color: var(--t-dim); font-size: var(--t-fs-s); }
 
 .settings-pane {
-  display: flex;
-  flex-direction: column;
-  gap: var(--t-d-6);
-  min-width: 0;
-  max-width: var(--ui-settings-pane, 720px);
-}
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--t-d-6);
+    min-width: 0;
+    max-width: var(--ui-settings-pane, 720px);
+    /* The frame is centred with justify-content, which also centres each item in
+       its own track - so every label, hint and input in the pane came out centred
+       too. Form controls are not centred. */
+    text-align: left;
+  }
+  .settings-pane * { text-align: left; }
+  .settings-pane .empty-state,
+  .settings-pane .state-block,
+  .settings-pane .atrium { text-align: center; }
 .settings-body { display: flex; flex-direction: column; gap: var(--t-d-5); }
 
 .settings-context, .profile-context { display: none; }
@@ -2263,7 +2282,19 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   overflow-y: auto;
   padding: var(--t-d-5) clamp(12px, 2vw, 28px) var(--t-d-7);
 }
-.home-stream > .home-event { max-width: 720px; margin-inline: auto; }
+.home-stream > .home-event { max-width: 760px; margin-inline: auto; }
+/* The time sits in the channel line now rather than in a right-aligned column, so
+   it is separated by a rule instead of by several hundred pixels of nothing. */
+.row-sub__time {
+  margin-left: var(--t-d-3);
+  padding-left: var(--t-d-3);
+  border-left: 1px solid var(--t-line);
+  color: var(--t-dim);
+}
+/* An activity row is a paragraph, not a transcript: top-aligned, and the preview is
+   the thing you read, so it takes the body colour rather than the muted one. */
+.home-event { align-items: start; }
+.home-event .msg-text { color: var(--t-txt); }
 .home-event { padding: var(--t-d-4); border-radius: var(--t-r-m); cursor: pointer; }
 .home-event:hover { background: var(--t-base2); }
 .home-event + .home-event { margin-top: var(--t-d-1); }
