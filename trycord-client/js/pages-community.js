@@ -2,7 +2,7 @@ import Api from './api.js';
 import State from './state.js';
 
 import { peerPresence, refreshServers, setViewRefresh } from './state.js';
-import { clear, el, esc, toast } from './ui.js';
+import { clear, el, esc, plural, toast } from './ui.js';
 import { avatar, communityBannerUrl, communityMark, emptyState, loadAuthedImage } from './components.js';
 import { renderAllChrome, renderContextHeader, currentRoute } from './shell.js';;
 import { renderMemberList } from './pages-members.js';
@@ -21,8 +21,8 @@ async function renderServerLanding(container, serverId) {
     container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community'));
     return;
   }
-  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + (server.member_count || 0) + ' members' });
-    const wrap = el('div', { class: 'page atrium' });
+  renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + plural(server.member_count || 0, 'member') });
+    const wrap = el('div', { class: 'page' });
     const onlineCount = (State.members || []).filter((m) => peerPresence(m.user_id || m.id) === 'online').length;
     const banner = communityBannerUrl(server);
     if (banner) {
@@ -41,9 +41,9 @@ async function renderServerLanding(container, serverId) {
   if (server.description) heroText.appendChild(el('p', { class: 'muted' }, server.description));
   const stats = el('div', { class: 'stat-inline' });
   stats.appendChild(el('span', {}, String(server.member_count || 0) + ' members · ' + String(onlineCount) + ' online'));
-  stats.appendChild(el('span', {}, String(server.channel_count || 0) + ' channels'));
-  stats.appendChild(el('span', {}, String(server.role_count || 0) + ' roles'));
-  if (server.message_count != null) stats.appendChild(el('span', {}, String(server.message_count) + ' messages'));
+  stats.appendChild(el('span', {}, plural(server.channel_count || 0, 'channel')));
+  stats.appendChild(el('span', {}, plural(server.role_count || 0, 'role')));
+  if (server.message_count != null) stats.appendChild(el('span', {}, plural(server.message_count, 'message')));
   heroText.appendChild(stats);
   hero.appendChild(heroText);
   wrap.appendChild(hero);
@@ -146,7 +146,7 @@ async function renderNewServer(container, serverId) {
 async function renderMenu(container) {
   clear(container);
   renderContextHeader({ title: 'Menu', sub: 'Everywhere in Trycord' });
-  const wrap = el('div', { class: 'page atrium' });
+  const wrap = el('div', { class: 'page' });
   const me = State.me || {};
   const acct = el('button', { class: 'row', type: 'button', onClick: () => { navigate('/settings'); } });
   acct.appendChild(avatar(me, { size: 'sm', withPresence: true }));

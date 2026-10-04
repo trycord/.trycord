@@ -119,7 +119,7 @@ async function renderServerCategories(container, serverId) {
   try { ({ detail: server } = await ensureServer(serverId)); }
   catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
   renderContextHeader({ title: 'Categories', sub: server.name });
-  const wrap = el('div', { class: 'page atrium community-manager' });
+  const wrap = el('div', { class: 'page community-manager' });
   if (!can('MANAGE_CHANNELS')) { wrap.appendChild(el('div', { class: 'form-error' }, 'You need Manage Channels permission to edit categories.')); container.appendChild(wrap); return; }
   const createRow = el('div', { class: 'community-manager__toolbar' });
   const input = el('input', { class: 'input', type: 'text', maxlength: 64, placeholder: 'New category name' });

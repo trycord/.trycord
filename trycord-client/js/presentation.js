@@ -104,6 +104,16 @@ function drawerKeys(e) {
 
 export function wireNav() {
   document.addEventListener('keydown', drawerKeys);
+  // Tapping the dimmed area beside the drawer is how a drawer gets closed on a
+  // phone - more often than the gesture, and the only way for anyone using a
+  // pointer with a keyboard-free setup. Escape and the swipe are alternatives to
+  // this, not replacements for it: without it the scrim is a picture of a door.
+  const backdrop = document.getElementById('desktop-backdrop');
+  if (backdrop) {
+    backdrop.addEventListener('click', () => {
+      if (isNavOpen()) closeNav();
+    });
+  }
 }
 
 

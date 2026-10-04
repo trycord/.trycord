@@ -1043,6 +1043,14 @@ export function insertAtCursor(field, text) {
 }
 
 
+// A count and its noun. `plural('member')` reads better at the call site than
+// `n + ' member' + (n === 1 ? '' : 's')`, and it cannot be got wrong by forgetting
+// the ternary.
+export function plural(n, one, many) {
+  return n + ' ' + (n === 1 ? one : (many || one + 's'));
+}
+
+
 export function relTime(iso) {
   if (!iso) return '';
   const d = new Date(iso);

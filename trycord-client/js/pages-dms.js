@@ -24,7 +24,7 @@ function dropDmSubs() {
 async function renderDmList(container) {
   clear(container);
   renderContextHeader({ title: 'Direct messages', sub: 'People you talk to' });
-  const wrap = el('div', { class: 'page atrium' });
+  const wrap = el('div', { class: 'page' });
   let dms = State.dms;
   try { dms = await refreshDms(); } catch { /* non-fatal */ }
 
@@ -464,7 +464,7 @@ export function leaveDm() {
 async function renderFriends(container) {
   clear(container);
   renderContextHeader({ title: 'Friends', sub: 'People you know here' });
-  const wrap = el('div', { class: 'page atrium' });
+  const wrap = el('div', { class: 'page' });
   await refreshFriends();
 
   const addRow = el('div', { class: 'row-line' });

@@ -19,7 +19,7 @@ async function renderInvites(container, serverId) {
     return;
   }
   renderContextHeader({ title: 'Invites', sub: server.name });
-  const wrap = el('div', { class: 'page atrium community-manager' });
+  const wrap = el('div', { class: 'page community-manager' });
 
   const createBtn = el('button', { class: 'btn primary', type: 'button' }, 'Create invite');
   const maxUses = el('input', { class: 'input', type: 'number', min: 1, max: 100, value: '1', style: { width: '70px' }, title: 'Max uses' });
