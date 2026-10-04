@@ -120,10 +120,8 @@ async function main() {
         await page.goto(ORIGIN + route, { waitMs: 2300 });
         await wait(750);
         const file = OUT + '/' + tag + '-' + name + '.png';
-        await page.shot(file);
-        written.push(file);
-        // Shell geometry. Guessing at a grid from a screenshot is how three
-        // rounds of "it still looks wrong" happened; this reports the numbers.
+        // Measured before the page is put back at the top, so the numbers describe
+        // the page as it arrived rather than the page as it was corrected to.
         const m0 = await page.eval(`
           const d0 = document.documentElement;
           // Anything already scrolled when the page settled. A pane that arrived
@@ -142,6 +140,23 @@ async function main() {
                    overflow: d0.scrollWidth > window.innerWidth + 1,
                    scrollW: d0.scrollWidth, vw: window.innerWidth,
                    win: window.scrollY, scrolled };`);
+        // Then put it at the top, and let that settle, before the shutter.
+        //
+        // The order of these two used to be the other way round, which is how two
+        // settings pages came to photograph with their first heading missing: the
+        // screenshot caught a scroll still in flight and the probe ran after it had
+        // finished, so the report said the page was fine while the picture said
+        // otherwise. A screenshot of a page mid-animation is not a screenshot of
+        // the page.
+        await page.eval(`
+          window.scrollTo(0, 0);
+          for (const e of document.querySelectorAll('body *')) {
+            if (e.scrollHeight - e.clientHeight > 4 && e.scrollTop) e.scrollTop = 0;
+          }
+          return true;`);
+        await wait(350);
+        await page.shot(file);
+        written.push(file);
         console.log('  ' + tag.padEnd(6) + name.padEnd(22)
           + String(m0.chars).padStart(5) + ' chars  '
           + (m0.overflow ? 'H-OVERFLOW ' + m0.scrollW + '/' + m0.vw : 'fits')
