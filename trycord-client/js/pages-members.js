@@ -129,7 +129,7 @@ async function renderServerMembers(container, serverId) {
   try { ({ detail: server } = await ensureServer(serverId)); }
   catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
   renderContextHeader({ title: 'Members', sub: server.name });
-  const wrap = el('div', { class: 'page atrium community-manager' });
+  const wrap = el('div', { class: 'page community-manager' });
   const counts = el('div', { class: 'stat-inline' });
   wrap.appendChild(counts);
 

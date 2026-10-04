@@ -1,6 +1,6 @@
 
 import Api from './api.js';
-import { esc, el, clear, toast } from './ui.js';
+import { esc, el, clear, plural, toast } from './ui.js';
 import State, { refreshServers, isAuthed } from './state.js';
 import { renderContextHeader } from './shell.js';
 import { communityMark } from './components.js';
@@ -30,7 +30,7 @@ function serverCard(s, onClick) {
   const m = el('div', { class: 'row-main' });
   m.appendChild(el('div', { class: 'row-title' }, s.name));
   m.appendChild(el('div', { class: 'row-sub' }, esc(s.description || 'No description')));
-  m.appendChild(el('div', { class: 'row-sub' }, (s.member_count || 0) + ' members · ' + (s.channel_count || 0) + ' channels'));
+  m.appendChild(el('div', { class: 'row-sub' }, plural(s.member_count || 0, 'member') + ' · ' + plural(s.channel_count || 0, 'channel')));
   btn.appendChild(m);
   c.appendChild(btn);
   return c;
@@ -40,7 +40,7 @@ export async function renderBrowse(container, { previewId } = {}) {
   clear(container);
   renderContextHeader({ title: 'Discover', sub: 'Public communities on this instance' });
 
-  const wrap = el('div', { class: 'page atrium' });
+  const wrap = el('div', { class: 'page' });
 
   const searchRow = el('div', { class: 'row-line' });
   const input = el('input', {
@@ -73,7 +73,7 @@ export async function renderBrowse(container, { previewId } = {}) {
     previewPane.appendChild(el('h2', {}, esc(detail.name)));
     previewPane.appendChild(el('p', { class: 'muted' }, esc(detail.description || 'No description')));
     previewPane.appendChild(el('p', { class: 'muted small' },
-      (detail.member_count || 0) + ' members'));
+      plural(detail.member_count || 0, 'member')));
     const ch = el('div', { class: 'stack' });
     for (const c of detail.channels || []) {
       ch.appendChild(el('div', { class: 'row row--channel', style: { marginLeft: 0, width: '100%' } },

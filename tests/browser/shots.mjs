@@ -205,6 +205,54 @@ async function main() {
       `);
       console.log('  ' + tag.padEnd(6) + 'nav-open');
       console.log(String(nav).split(String.fromCharCode(10)).map((x) => '          ' + x).join(String.fromCharCode(10)));
+
+      // Closing has to work as well as opening, or the drawer is a trap. Click the
+      // scrim the way a person does and check the navigation went away and the
+      // conversation underneath is whole again.
+      await page.eval(`const b = document.querySelector('.nav-backdrop'); if (b) b.click(); return 1;`);
+      await wait(700);
+      const closed = await page.eval(`
+        const rail = document.querySelector('.app-rail');
+        const b = rail ? rail.getBoundingClientRect() : null;
+        const header = document.querySelector('.context-header');
+        const hb = header ? header.getBoundingClientRect() : null;
+        return 'closed: rail x=' + (b ? Math.round(b.left) : '?')
+          + ' width=' + (b ? Math.round(b.width) : '?')
+          + ' | header x=' + (hb ? Math.round(hb.left) : '?')
+          + ' w=' + (hb ? Math.round(hb.width) : '?')
+          + ' | scrim=' + (document.querySelector('.nav-backdrop') ? 'present' : 'gone')
+          + ' | composer=' + (document.querySelector('.composer') ? 'present' : 'MISSING')
+          + ' | messages=' + document.querySelectorAll('.msg').length
+          + ' | overflow=' + (document.documentElement.scrollWidth > window.innerWidth + 1);
+      `);
+      console.log('          ' + closed);
+
+      // Switching community from the drawer: the sidebar under it has to become the
+      // new community's, not the old one's with a new name on it.
+      const before = await page.eval(`
+        const sb = document.querySelector('.context-sidebar');
+        return (sb ? sb.textContent.replace(/\\s+/g, ' ').trim().slice(0, 90) : 'MISSING');`);
+      await page.eval(`const b = document.querySelector('.nav-toggle'); if (b) b.click(); return 1;`);
+      await wait(600);
+      const switched = await page.eval(`
+        const comms = [...document.querySelectorAll('.rail-community')];
+        const other = comms.find((e) => !e.classList.contains('is-active') && !e.classList.contains('rail-nav'));
+        if (!other) return 'only one community seeded, switching not exercised';
+        other.click();
+        return 'clicked ' + other.textContent.trim();`);
+      await wait(1800);
+      const after = await page.eval(`
+        const sb = document.querySelector('.context-sidebar');
+        const rail = document.querySelector('.app-rail');
+        return 'route=' + location.pathname
+          + ' | rail=' + getComputedStyle(rail).display
+          + ' | sidebar=' + (sb ? sb.textContent.replace(/\\s+/g, ' ').trim().slice(0, 90) : 'MISSING');`);
+      console.log('          switch: ' + switched);
+      console.log('            before: ' + before);
+      console.log('            after:  ' + after);
+      if (after.startsWith('route=/c/') && before && after.includes(before)) {
+        console.log('          WARNING the sidebar did not change with the community');
+      }
     }
   } finally {
     await page.close();

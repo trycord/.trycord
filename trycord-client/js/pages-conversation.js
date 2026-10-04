@@ -863,7 +863,7 @@ async function renderChannelPins(container, serverId, channelId) {
   const back = el('button', { class: 'btn ghost sm', type: 'button' }, '← Back to #' + (channel ? channel.name : 'channel'));
   back.addEventListener('click', () => { navigate(channelPath(serverId, channelId)); });
   renderContextHeader({ title: 'Pinned messages', sub: '#' + (channel ? channel.name : 'channel'), icon: 'star', actions: [back] });
-  const wrap = el('div', { class: 'page atrium' });
+  const wrap = el('div', { class: 'page' });
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
   container.appendChild(wrap);
