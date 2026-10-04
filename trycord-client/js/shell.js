@@ -645,9 +645,6 @@ function simpleListContext(region, { title, sub, groups }) {
     refreshHomeSidebar(region);
   }
 
-  refreshHomeSidebar(region);
-}
-
 
 function friendsContext(region) {
   const requests = (State.friendsIn || []).length;
