@@ -2452,6 +2452,149 @@ label {
   padding: var(--t-d-5) clamp(12px, 2vw, 28px) var(--t-d-7);
 }
 .home-stream > .home-event { max-width: 760px; margin-inline: auto; }
+
+/* ---- Home, as an overview rather than a transcript ------------------------
+   Two columns: the conversations themselves on the left at a readable width, and
+   the things that want a decision on the right. The old page put one message per
+   row down the middle of a very wide screen, so the content occupied a quarter of
+   the width and the rest was empty - not because the page was narrow but because
+   nothing was arranged into it. */
+.home-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  align-items: start;
+  gap: var(--t-d-5);
+  padding: var(--t-d-5) clamp(12px, 2vw, 28px) var(--t-d-7);
+}
+.home-primary { min-width: 0; display: flex; flex-direction: column; gap: var(--t-d-5); }
+.home-aside {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-d-4);
+  position: sticky;
+  top: 0;
+}
+
+.home-greeting { margin-bottom: var(--t-d-5); }
+.home-greeting__title { margin: 0; font-size: var(--t-fs-xl); font-weight: 700; letter-spacing: -0.02em; }
+.home-greeting__sub { margin: var(--t-d-1) 0 0; color: var(--t-mut); font-size: var(--t-fs-s); }
+
+/* A section is a heading and a list. Not a card: the rhythm comes from the gap
+   between sections, so putting a border around each one would only add edges
+   without adding structure. */
+.home-section { min-width: 0; }
+.home-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--t-d-3);
+  padding-bottom: var(--t-d-2);
+  margin-bottom: var(--t-d-2);
+  border-bottom: 1px solid var(--t-line);
+}
+.home-section__title {
+  margin: 0;
+  font-size: var(--t-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t-txt2);
+}
+.home-section__hint { color: var(--t-dim); font-size: var(--t-fs-xxs); }
+.home-section .empty-state { min-height: 0; padding: var(--t-d-6) var(--t-d-4); }
+
+.home-conversations { display: flex; flex-direction: column; gap: 1px; }
+/* One conversation, one row. The preview is what you would read before deciding
+   to open it, so it is the loudest line; the place and the author are context for
+   it and sit above, quieter. */
+.home-conversation {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  padding: var(--t-d-3) var(--t-d-3);
+  border-radius: var(--t-r-s);
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.home-conversation:hover { background: var(--t-base2); }
+.home-conversation.is-unread { background: color-mix(in srgb, var(--t-accent) 6%, transparent); }
+.home-conversation.is-unread:hover { background: color-mix(in srgb, var(--t-accent) 10%, var(--t-base2)); }
+.home-conversation.is-unread .row-title { color: var(--t-txt); font-weight: 700; }
+.home-conversation__hash {
+  display: grid;
+  place-items: center;
+  width: var(--t-avatar-md);
+  height: var(--t-avatar-md);
+  flex: 0 0 auto;
+  border-radius: var(--t-r-s);
+  background: var(--t-base2);
+  color: var(--t-dim);
+  font-size: var(--t-fs-s);
+}
+.home-conversation:hover .home-conversation__hash { color: var(--t-txt2); }
+.home-conversation__preview {
+  margin-top: 2px;
+  color: var(--t-txt);
+  font-size: var(--t-fs-s);
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-conversation__dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-left: var(--t-d-2);
+  border-radius: var(--t-r-full);
+  background: var(--t-accent);
+  vertical-align: middle;
+}
+
+/* What wants a decision, phrased as why. */
+.home-attention { display: flex; flex-direction: column; gap: 1px; }
+.home-attention__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--t-d-2);
+  width: 100%;
+  padding: var(--t-d-2);
+  border: 0;
+  border-radius: var(--t-r-s);
+  background: transparent;
+  color: var(--t-txt2);
+  text-align: left;
+  font-size: var(--t-fs-xs);
+  cursor: pointer;
+}
+.home-attention__row:hover { background: var(--t-base2); color: var(--t-txt); }
+.home-attention__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-attention__text strong { color: var(--t-txt); font-weight: 600; }
+.home-attention__time { flex: 0 0 auto; color: var(--t-dim); font-size: var(--t-fs-xxs); font-variant-numeric: tabular-nums; }
+
+.home-communities { display: flex; flex-direction: column; gap: 1px; }
+.home-community {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--t-d-3);
+  width: 100%;
+  padding: var(--t-d-2);
+  border: 0;
+  border-radius: var(--t-r-s);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.home-community:hover { background: var(--t-base2); }
 /* The time sits in the channel line now rather than in a right-aligned column, so
    it is separated by a rule instead of by several hundred pixels of nothing. */
 .row-sub__time {
@@ -3737,6 +3880,14 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
      tab bar exists only below 600px and used to sit in a second 599px query
      with its base rule stranded between the two, so the rule that hides it
      and the rule that shows it were 20 lines apart with nothing joining them. */
+  @media (max-width: 899px) {
+    /* Two columns stop being two columns before they stop fitting. Below this the
+       aside stacks under the conversations instead of squeezing them, because a
+       320px rail beside a narrow conversation list leaves nothing to read. */
+    .home-layout { grid-template-columns: minmax(0, 1fr); gap: var(--t-d-4); }
+    .home-aside { position: static; }
+  }
+
   @media (max-width: 599px) {
   :root {
     --ui-shell-cols: minmax(0, 1fr);
