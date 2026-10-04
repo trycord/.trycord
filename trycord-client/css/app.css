@@ -3639,7 +3639,25 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 
 /* --- below 600px: a phone is a different layout, not a squeezed desktop -- */
 
-@media (max-width: 599px) {
+.mobile-tab-navigation {
+  display: none;
+  grid-column: 1;
+  grid-row: 2;
+  flex-direction: column;
+  min-height: calc(var(--t-ui-tabbar) + var(--t-ui-tabbar-handle) + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--t-base) 96%, transparent);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid var(--t-line);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+  position: relative;
+}
+
+  /* The phone shell, and the tab bar that belongs to it, in one place. The
+     tab bar exists only below 600px and used to sit in a second 599px query
+     with its base rule stranded between the two, so the rule that hides it
+     and the rule that shows it were 20 lines apart with nothing joining them. */
+  @media (max-width: 599px) {
   :root {
     --ui-shell-cols: minmax(0, 1fr);
     --ui-shell-rows: minmax(0, 1fr) auto;
@@ -3810,25 +3828,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   @keyframes tc-sheet { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
 
   .toast-region { left: var(--t-d-3); right: var(--t-d-3); bottom: calc(var(--t-ui-tabbar) + var(--t-d-5)); max-width: none; }
-}
 
-/* --- the phone tab bar: primary navigation, thumb height --- */
-
-.mobile-tab-navigation {
-  display: none;
-  grid-column: 1;
-  grid-row: 2;
-  flex-direction: column;
-  min-height: calc(var(--t-ui-tabbar) + var(--t-ui-tabbar-handle) + env(safe-area-inset-bottom));
-  background: color-mix(in srgb, var(--t-base) 96%, transparent);
-  backdrop-filter: blur(18px);
-  border-top: 1px solid var(--t-line);
-  padding-bottom: env(safe-area-inset-bottom);
-  z-index: 50;
-  position: relative;
-}
-
-@media (max-width: 599px) {
   .mobile-tab-navigation { display: flex; flex: 0 0 auto; align-items: stretch; }
   .mobile-tab-navigation[data-collapsed='true'] {
     min-height: calc(var(--t-ui-tabbar-handle) + env(safe-area-inset-bottom));
@@ -3863,7 +3863,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
     display: inline-flex; align-items: center; justify-content: center;
     border: 0; background: transparent; color: var(--t-mut);
   }
-}
+  }
 
 .tab-button {
   display: flex;
