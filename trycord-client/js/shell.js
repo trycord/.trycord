@@ -4,7 +4,7 @@ import { avatar, icon, navRow, serverChip, navGroup } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, clearSession, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
 import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
-import { serverPath } from './links.js';
+import { channelPath, serverPath } from './links.js';
 import { SETTINGS_IA } from './settings-shell.js';
 import { navigate, route } from './nav.js';
 import { layoutUsesSidebar, layoutUsesMembers } from './layout.js';
@@ -561,7 +561,10 @@ function simpleListContext(region, { title, sub, groups }) {
     if (!g || !g.items.length) continue;
     const group = navGroup({ label: g.label });
     for (const item of g.items) {
-      const active = item.exact ? here === item.path : (here === item.path || here.startsWith(item.path + '/'));
+      // A row with no destination is still information - it is a fact the reader was
+      // shown - but it must not become a link that throws when the route is compared.
+      const dest = item.path || '';
+      const active = !!dest && (item.exact ? here === dest : (here === dest || here.startsWith(dest + '/')));
       group.list.appendChild(navRow({
         label: item.label, href: route(item.path), active,
         onClick: () => { navigate(item.path); },
@@ -582,41 +585,64 @@ function simpleListContext(region, { title, sub, groups }) {
 //
 // What belongs here is the thing the rail cannot say: which communities this
 // person is in, and where the unread is.
-function homeContext(region) {
-  const servers = State.servers || [];
-  const unreadFor = (id) => {
-    const dm = (State.dms || []).filter((d) => String(d.serverId || d.server_id) === String(id));
-    const mentions = (State.unreadMentions && State.unreadMentions[id]) || 0;
-    return dm.reduce((n, d) => n + (d.unreadCount || 0), 0) + mentions;
-  };
-  const mine = servers.map((sv) => ({
-    label: sv.name || 'Community',
-    path: serverPath(sv.id),
-    count: unreadFor(sv.id),
-  }));
+  // Home's sidebar used to list your communities, which the rail now does as well,
+  // so the same community appeared twice on one screen - once as a place to go and
+  // once as a duplicate of the place beside it. The rail is the navigation; this
+  // panel is for what the rail has no room for: finding somewhere else to be, and
+  // what is waiting for you.
+  function homeContext(region) {
+    const servers = State.servers || [];
+    const attention = [
+      ...(State.notifications || [])
+        .filter((n) => n && (n.type === 'mention' || n.type === 'reply'))
+        .slice(0, 5)
+        .map((n) => {
+          const who = (n.actor && (n.actor.displayName || n.actor.username)) || 'Someone';
+          const what = n.type === 'mention' ? 'mentioned you' : 'replied to you';
+          const where = n.context && n.context.channelName ? ' in #' + n.context.channelName : '';
+          // A mention or a reply has somewhere to go: the channel it happened in, or
+          // the conversation when it was a direct message. A row that cannot be
+          // opened is not a navigation item, and passing a null path into the list
+          // helper below used to throw on the startsWith.
+          let path = null;
+          if (n.context && n.context.serverId && n.context.channelId) {
+            path = channelPath(n.context.serverId, n.context.channelId);
+          } else if (n.context && n.context.conversationId) {
+            path = '/dms/' + n.context.conversationId;
+          } else if (n.type === 'reply' || n.type === 'mention') {
+            path = '/notifications';
+          }
+          return { label: who + ' ' + what + where, path };
+        }),
+      ...(State.dms || [])
+        .filter((d) => (d.unreadCount || 0) > 0)
+        .slice(0, 5)
+        .map((d) => ({
+          label: (d.peer && (d.peer.displayName || d.peer.username)) || 'Someone',
+          path: '/dms/' + d.id,
+          count: d.unreadCount,
+        })),
+    ];
+    const requests = (State.friendsIn || []).length;
 
-  simpleListContext(region, {
-    title: 'Your communities',
-    sub: servers.length ? servers.length + ' joined' : 'None yet',
-    groups: [
-      { label: 'Communities', items: mine },
-      { label: 'Find', items: [
-        { label: 'Discover communities', path: '/discover' },
-        { label: 'Create a community', path: '/servers/new' },
-      ] },
-    ],
-  });
+    const groups = [{ label: 'Find', items: [
+      { label: 'Discover communities', path: '/discover' },
+      { label: 'Create a community', path: '/servers/new' },
+    ] }];
+    if (attention.length) groups.unshift({ label: 'Waiting for you', items: attention });
+    if (requests) {
+      groups.unshift({ label: 'Friends', items: [
+        { label: requests + (requests === 1 ? ' friend request' : ' friend requests'), path: '/friends' },
+      ] });
+    }
 
-  // Unread changes without a navigation, so it is painted here rather than only
-  // at render time.
-  const scroll = region.querySelector('.ctx-scroll');
-  if (scroll) {
-    const rows = scroll.querySelectorAll('.row--nav');
-    mine.forEach((m, i) => {
-      if (m.count > 0 && rows[i]) {
-        rows[i].appendChild(el('span', { class: 'nv-count' }, m.count > 99 ? '99+' : String(m.count)));
-      }
+    simpleListContext(region, {
+      title: servers.length ? 'Your places' : 'Get started',
+      sub: servers.length ? servers.length + ' joined' : 'No communities yet',
+      groups,
     });
+
+    refreshHomeSidebar(region);
   }
 
   refreshHomeSidebar(region);
