@@ -254,6 +254,41 @@ async function main() {
         console.log('          WARNING the sidebar did not change with the community');
       }
     }
+
+    // The auth pages, signed out. Everything else above is captured with a session,
+    // which means /login and /register redirect to the app and the screenshots were
+    // of the home page under those two names. The sign-in form is the first thing
+    // anyone sees and the last thing that gets looked at, which is how a rule that
+    // named a class the markup stopped using went unnoticed there.
+    for (const [w, h, tag] of SIZES) {
+      if (![1440, 390].includes(w)) continue;
+      await page.setViewport(w, h);
+      await page.eval(`localStorage.removeItem('trycord.token'); return 1;`);
+      for (const route of ['/login', '/register']) {
+        await page.goto(ORIGIN + route, { waitMs: 1800 });
+        await wait(700);
+        const file = OUT + '/' + tag + '-auth' + route.replace('/', '-') + '.png';
+        await page.shot(file);
+        written.push(file);
+        const form = await page.eval(`
+          const NL = String.fromCharCode(10);
+          const card = document.querySelector('.auth-card, .auth-box, .card--auth');
+          const f = document.querySelector('.auth-form');
+          const b = card ? card.getBoundingClientRect() : null;
+          return [
+            'route=' + location.pathname
+              + ' | card=' + (card ? card.className : 'MISSING')
+              + ' w=' + (b ? Math.round(b.width) : '?')
+              + ' h=' + (b ? Math.round(b.height) : '?'),
+            'fields=' + document.querySelectorAll('.auth-form input, .auth-form select').length
+              + ' submit=' + document.querySelectorAll('.auth-form button[type="submit"]').length
+              + ' | text=' + JSON.stringify((document.body.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 70)),
+          ].join(NL);
+        `);
+        console.log('  ' + tag.padEnd(6) + 'auth' + route.replace('/', '-'));
+        console.log(String(form).split(String.fromCharCode(10)).map((x) => '          ' + x).join(String.fromCharCode(10)));
+      }
+    }
   } finally {
     await page.close();
   }

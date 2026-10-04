@@ -366,7 +366,7 @@ function renderMemberList(wrap, serverId) {
       avatarUrl: m.avatar_url,
       roles: m.roles,
     };
-    const nameEl = userNameButton(member, { className: 'row-title', serverId });
+    const nameEl = userNameButton(member, { className: 'member-name-btn', serverId });
     mm.appendChild(nameEl);
     const sub = m.nickname
       ? '@' + (m.username || '') + (m.display_name && m.display_name !== m.username ? ' · ' + m.display_name : '')
