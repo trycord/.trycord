@@ -12,7 +12,6 @@ import { ensureServer } from './workspace-shared.js';
 import { serverPath } from './links.js';
 import { settingsFrame, SETTINGS_IA, findItem } from './settings-shell.js';
 import { contextBlock as block, contextFact as fact, contextList as list, contextPara as para } from './context-column.js';
-import { sectionHead, sectionCard, setNote } from './settings-ui.js';
 import { renderIntegrations } from './pages-integrations.js';
 import { renderAnalytics } from './pages-analytics.js';
 import { navigate, route } from './nav.js';;

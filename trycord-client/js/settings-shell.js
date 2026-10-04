@@ -11,7 +11,6 @@
 // aliases. Sections are described by data, so adding one is a data change.
 import { el, clear } from './ui.js';
 import { icon } from './components.js';
-import { serverPath } from './links.js';
 import { route } from './nav.js';
 
 // Groups, not a flat list. A flat list of eight destinations is a wall; the

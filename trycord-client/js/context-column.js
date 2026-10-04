@@ -13,7 +13,6 @@
 import Api from './api.js';
 import State from './state.js';
 import { el } from './ui.js';
-import { sectionCard, settingRow } from './settings-ui.js';
 import { serverPath } from './links.js';
 import { route } from './nav.js';
 

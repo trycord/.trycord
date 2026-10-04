@@ -1,11 +1,10 @@
 
-import { esc, el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, showContextMenu, attachMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
+import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
 import { avatar, icon, navRow, serverChip, navGroup } from './components.js';
 import Api from './api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, clearSession, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from './state.js';
-import { toggleDesktopNav, isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
+import { isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentation.js';
 import { channelPath, serverPath } from './links.js';
-import { SETTINGS_IA } from './settings-shell.js';
 import { navigate, route } from './nav.js';
 import { layoutUsesSidebar, layoutUsesMembers } from './layout.js';
 import { renderCommunityContext } from './community-nav.js';

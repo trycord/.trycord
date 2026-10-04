@@ -1,6 +1,6 @@
 
 import Api from './api.js';
-import { esc, el, clear, toast, qs } from './ui.js';
+import { esc, el, clear, toast } from './ui.js';
 import State, { applyAuth, isAuthed, clearSession } from './state.js';
 import { renderContextHeader } from './shell.js';
 import { TrycordConfig, BACKEND_URL } from './config.js';

@@ -6,7 +6,7 @@
 // an outbound request, and letting every reader fire one would turn opening a
 // channel into a request amplifier against whatever host is linked.
 
-import { el, icon, openLightbox } from './ui.js';
+import { el, openLightbox } from './ui.js';
 
 // A preview the server could not fetch still gets a card. Silently dropping it
 // makes the link look like a typo rather than a page this instance could not

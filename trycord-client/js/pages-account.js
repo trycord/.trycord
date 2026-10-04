@@ -6,8 +6,8 @@
 // difference between an account that looks protected and one that is.
 
 import Api from './api.js';
-import State, { clearSession, refreshServers, refreshFriends, mustVerifyToPost, isMuted, setMuted } from './state.js';
-import { esc, el, clear, toast, confirmDialog } from './ui.js';
+import State, { clearSession, refreshFriends, mustVerifyToPost, setMuted } from './state.js';
+import { el, clear, toast, confirmDialog } from './ui.js';
 import { avatar, loadAuthedImage, invalidateAuthedImage } from './components.js';
 import { renderContextHeader, renderAllChrome, clearAnnouncements } from './shell.js';
 import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';

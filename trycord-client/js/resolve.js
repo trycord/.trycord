@@ -3,7 +3,7 @@
 // Not in the router: the table needs these and the router needs the table.
 
 import Api from './api.js';
-import { el, clear } from './ui.js';
+import { el } from './ui.js';
 
 // A slug is a display convenience, not an identity. An unresolvable one says so
 // plainly rather than rendering an empty page that looks like a broken app.

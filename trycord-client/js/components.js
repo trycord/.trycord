@@ -5,7 +5,7 @@
 // here. Everything reads live API data - a component here never from mock
 // data.
 
-import { esc, el, clear, relTime, apiSrc, qs, icon, openLightbox, ICON_PATHS } from './ui.js';
+import { esc, el, clear, relTime, apiSrc, icon, openLightbox, ICON_PATHS } from './ui.js';
 import { embedTray, paintEmbeds, wireEmbedImages } from './embeds.js';
 import { peerPresence, can } from './state.js';
 import Api from './api.js';
