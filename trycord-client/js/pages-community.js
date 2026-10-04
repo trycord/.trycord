@@ -40,10 +40,16 @@ async function renderServerLanding(container, serverId) {
   heroText.appendChild(el('h2', { class: 'community-hero__name' }, server.name || 'Community'));
   if (server.description) heroText.appendChild(el('p', { class: 'muted' }, server.description));
   const stats = el('div', { class: 'stat-inline' });
-  stats.appendChild(el('span', {}, String(server.member_count || 0) + ' members · ' + String(onlineCount) + ' online'));
-  stats.appendChild(el('span', {}, plural(server.channel_count || 0, 'channel')));
-  stats.appendChild(el('span', {}, plural(server.role_count || 0, 'role')));
-  if (server.message_count != null) stats.appendChild(el('span', {}, plural(server.message_count, 'message')));
+  stats.appendChild(el('span', {}, plural(server.member_count || 0, 'member') + ' · ' + onlineCount + ' online'));
+  const detail = [
+    [server.channel_count, 'channel'],
+    [server.role_count, 'role'],
+  ];
+  if (server.message_count != null) detail.push([server.message_count, 'message']);
+  // Dots between the pairs, and a dot before the last one: '1 member · 1 channel
+  // · 1 role · 7 messages' rather than three dots and a gap that reads as two
+  // unrelated lists.
+  stats.appendChild(el('span', {}, detail.map(([n, w]) => plural(n, w)).join(' · ')));
   heroText.appendChild(stats);
   hero.appendChild(heroText);
   wrap.appendChild(hero);

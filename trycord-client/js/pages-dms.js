@@ -3,7 +3,7 @@ import Api from './api.js';
 import { loadingState } from './states.js';
 import State, { refreshDms, refreshFriends, isAuthed, mustVerifyToPost } from './state.js';
 import {
-  attachContextMenu, confirmDialog, copyText, esc, el, clear, toast, relTime,
+  attachContextMenu, confirmDialog, copyText, esc, el, clear, plural, toast, relTime,
   showEmojiPicker, insertAtCursor, openModal, openReportDialog,
 } from './ui.js';
 import { avatar, downloadAttachment, emptyState, icon, messageRow } from './components.js';
@@ -24,32 +24,27 @@ function dropDmSubs() {
 async function renderDmList(container) {
   clear(container);
   renderContextHeader({ title: 'Direct messages', sub: 'People you talk to' });
-  const wrap = el('div', { class: 'page' });
+  // The sidebar beside this already carries the filter, the New message action and
+  // the list of conversations. Repeating all three in the workspace put the same
+  // words on screen twice - the sidebar head said 'Direct messages / Your
+  // conversations', the context header said it again, and 'No conversations yet'
+  // appeared in both places at once.
+  //
+  // So the workspace carries the thread, and when there is nothing yet it says how
+  // to start one. Picking a conversation is the sidebar's job and stays there.
+  const wrap = el('div', { class: 'page page--quiet' });
   let dms = State.dms;
   try { dms = await refreshDms(); } catch { /* non-fatal */ }
+  dms = dms || [];
 
-  if (!dms || !dms.length) {
-    wrap.appendChild(emptyState('mail', 'No conversations yet',
-      'Start a chat from a user\'s profile or send a friend a message.'));
+  if (!dms.length) {
+    wrap.appendChild(emptyState('mail', 'Nobody to talk to yet',
+      'Open someone\'s profile in a community and send them a message, or add a friend and start from there.'));
   } else {
-    for (const dm of dms) {
-      const r = el('button', {
-        class: 'row row--surface', type: 'button',
-        dataset: { dmId: dm.id },
-        onClick: () => { navigate('/dms/' + dm.id); },
-      });
-      r.appendChild(avatar(dm.peer, { withPresence: true }));
-      const m = el('div', { class: 'row-main' });
-      const t = el('span', { class: 'row-title' }, dm.peer.displayName || dm.peer.username);
-      m.appendChild(t);
-      m.appendChild(el('div', { class: 'row-sub' },
-        dm.lastMessage ? esc(dm.lastMessage.content.slice(0, 100)) : 'Say hello'));
-      r.appendChild(m);
-      r.appendChild(el('span', { class: 'row-meta' },
-        (dm.lastMessage ? relTime(dm.lastMessage.createdAt) : '') +
-        (dm.unreadCount ? ' · ' + dm.unreadCount + ' unread' : '')));
-      wrap.appendChild(r);
-    }
+    // The list is beside this. Saying so beats leaving an empty pane that reads as
+    // a page that failed to load.
+    wrap.appendChild(el('div', { class: 'page-hint' },
+      plural(dms.length, 'conversation') + ' - pick one from the list beside this.'));
   }
   container.appendChild(wrap);
 }
