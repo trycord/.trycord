@@ -2554,7 +2554,11 @@ label {
 /* One conversation, one row. The preview is what you would read before deciding
    to open it, so it is the loudest line; the place and the author are context for
    it and sit above, quieter. */
-.home-conversation {
+/* Qualified with .row because .row is declared further down the file and would
+   otherwise win on source order at equal specificity - which it did, putting
+   align-items: center back and dropping the channel glyph below the title it
+   belongs to. */
+.row.home-conversation {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   padding: var(--t-d-3) var(--t-d-3);
@@ -2565,10 +2569,10 @@ label {
   cursor: pointer;
   color: inherit;
 }
-.home-conversation:hover { background: var(--t-base2); }
-.home-conversation.is-unread { background: color-mix(in srgb, var(--t-accent) 6%, transparent); }
-.home-conversation.is-unread:hover { background: color-mix(in srgb, var(--t-accent) 10%, var(--t-base2)); }
-.home-conversation.is-unread .row-title { color: var(--t-txt); font-weight: 700; }
+.row.home-conversation:hover { background: var(--t-base2); }
+.row.home-conversation.is-unread { background: color-mix(in srgb, var(--t-accent) 6%, transparent); }
+.row.home-conversation.is-unread:hover { background: color-mix(in srgb, var(--t-accent) 10%, var(--t-base2)); }
+.row.home-conversation.is-unread .row-title { color: var(--t-txt); font-weight: 700; }
 .home-conversation__hash {
   display: grid;
   place-items: center;

@@ -48,6 +48,19 @@ const SURFACES = {
   members: null,
   'community-bans': null,
   invite: null,
+  // These were never photographed, which is the same mistake as never signing out:
+  // a page nobody looked at is a page whose problems nobody knows about.
+  notifications: '/notifications',
+  friends: '/friends',
+  discover: '/discover',
+  'settings-backend': '/settings/backend',
+  'settings-updates': '/settings/updates',
+  support: '/support',
+  appeals: '/support/appeals',
+  'legal-terms': '/legal/terms',
+  'legal-privacy': '/legal/privacy',
+  forgot: '/forgot',
+  menu: '/menu',
 };
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
