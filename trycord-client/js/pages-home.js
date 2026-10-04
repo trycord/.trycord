@@ -49,10 +49,14 @@ export async function renderHome(container) {
       row.appendChild(avatar({ username: a.author_name, displayName: a.author_display }, { withPresence: false }));
       const main = el('div', { class: 'row-main' });
       main.appendChild(el('div', { class: 'row-title' }, a.author_display || a.author_name));
-      main.appendChild(el('div', { class: 'row-sub' }, '#' + esc(a.channel_name) + ' in ' + esc(a.server_name)));
+      // The time belongs with the channel line, not in a column of its own. As a
+      // right-aligned meta column it sat ~700px from the text it belonged to on a
+      // wide screen, because a one-line activity row leaves all that slack empty.
+      main.appendChild(el('div', { class: 'row-sub' },
+        '#' + esc(a.channel_name) + ' in ' + esc(a.server_name)
+        + el('span', { class: 'row-sub__time' }, relTime(a.created_at || a.createdAt))));
       main.appendChild(el('div', { class: 'msg-text' }, a.content ? esc(a.content.slice(0, 180)) : 'Attachment'));
       row.appendChild(main);
-      row.appendChild(el('span', { class: 'row-meta' }, relTime(a.created_at || a.createdAt)));
       stream.appendChild(row);
       continue;
     }
@@ -65,10 +69,11 @@ export async function renderHome(container) {
     row.appendChild(avatar(dm.peer, { withPresence: true }));
     const main = el('div', { class: 'row-main' });
     main.appendChild(el('div', { class: 'row-title' }, dm.peer.displayName || dm.peer.username));
-    main.appendChild(el('div', { class: 'row-sub' }, 'Direct message'));
+    main.appendChild(el('div', { class: 'row-sub' },
+      'Direct message'
+      + el('span', { class: 'row-sub__time' }, relTime(dm.lastMessage.createdAt || dm.lastMessage.created_at))));
     main.appendChild(el('div', { class: 'msg-text' }, esc(dm.lastMessage.content.slice(0, 180))));
     row.appendChild(main);
-    row.appendChild(el('span', { class: 'row-meta' }, relTime(dm.lastMessage.createdAt || dm.lastMessage.created_at)));
     if (dm.unreadCount) row.appendChild(el('span', { class: 'nv-count' }, dm.unreadCount));
     stream.appendChild(row);
   }

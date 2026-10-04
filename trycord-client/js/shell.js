@@ -545,21 +545,31 @@ function simpleListContext(region, { title, sub, groups }) {
 // than one of them. It used to fall through to the direct-messages context,
 // which put "No conversations yet" directly beside a full activity feed - the
 // sidebar was describing a different page than the one it sat next to.
+// Home's sidebar lists the reader's communities, not the five destinations the
+// rail already shows directly above it. It repeated Home, Direct messages, Friends
+// and Notifications here as well, so on the Home screen every one of them appeared
+// twice with two different active states competing for the same row.
+//
+// What belongs here is the thing the rail cannot say: which communities this
+// person is in, and where the unread is.
 function homeContext(region) {
-  const unreadDms = (State.dms || []).reduce((n, d) => n + (d.unreadCount || 0), 0);
-  const requests = (State.friendsIn || []).length;
-  const notif = State.notifUnread || 0;
-  const places = [
-    { label: 'Home', path: '/home' },
-    { label: 'Direct messages', path: '/dms', count: unreadDms },
-    { label: 'Friends', path: '/friends', count: requests },
-    { label: 'Notifications', path: '/notifications', count: notif },
-  ];
+  const servers = State.servers || [];
+  const unreadFor = (id) => {
+    const dm = (State.dms || []).filter((d) => String(d.serverId || d.server_id) === String(id));
+    const mentions = (State.unreadMentions && State.unreadMentions[id]) || 0;
+    return dm.reduce((n, d) => n + (d.unreadCount || 0), 0) + mentions;
+  };
+  const mine = servers.map((sv) => ({
+    label: sv.name || 'Community',
+    path: serverPath(sv.id),
+    count: unreadFor(sv.id),
+  }));
+
   simpleListContext(region, {
-    title: 'Home',
-    sub: 'Everywhere you are',
+    title: 'Your communities',
+    sub: servers.length ? servers.length + ' joined' : 'None yet',
     groups: [
-      { label: 'Your places', items: places },
+      { label: 'Communities', items: mine },
       { label: 'Find', items: [
         { label: 'Discover communities', path: '/discover' },
         { label: 'Create a community', path: '/servers/new' },
@@ -567,20 +577,21 @@ function homeContext(region) {
     ],
   });
 
-  // navRow takes a count for the badge; simpleListContext did not pass one
-  // through, so paint the two that can change without a navigation.
+  // Unread changes without a navigation, so it is painted here rather than only
+  // at render time.
   const scroll = region.querySelector('.ctx-scroll');
   if (scroll) {
     const rows = scroll.querySelectorAll('.row--nav');
-    places.forEach((p, i) => {
-      if (p.count > 0 && rows[i]) {
-        rows[i].appendChild(el('span', { class: 'nv-count' }, p.count > 99 ? '99+' : String(p.count)));
+    mine.forEach((m, i) => {
+      if (m.count > 0 && rows[i]) {
+        rows[i].appendChild(el('span', { class: 'nv-count' }, m.count > 99 ? '99+' : String(m.count)));
       }
     });
   }
 
   refreshHomeSidebar(region);
 }
+
 
 function friendsContext(region) {
   const requests = (State.friendsIn || []).length;
