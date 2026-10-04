@@ -2771,11 +2771,25 @@ label {
 .auth-background {
   position: fixed;
   inset: 0;
-  background-image: url('/assets/trycord-login-bg.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  box-shadow: inset 0 0 0 100vmax rgba(18, 17, 21, 0.64);
+  /* Two layers. The photograph is two panels - abstract geometry on the left, the
+     wordmark on the right - and the card is centred and 880px wide, so the wordmark
+     lands behind it at every viewport and leaves its last two letters stranded in
+     the open beside it: a 'to' at 1440, and an 'e' and an 'S' on a phone where
+     cover crops the middle and strands more.
+
+     So the scrim on top is not flat. It is nearly clear over the geometry and
+     opaque by the time the lettering starts, which retires the wordmark without
+     flattening the part of the picture worth having. Anchoring left keeps the
+     geometry under the card rather than half off the edge. */
+  background-image:
+    linear-gradient(90deg,
+      rgba(18, 17, 21, 0.50) 0%,
+      rgba(18, 17, 21, 0.78) 42%,
+      rgba(18, 17, 21, 0.97) 60%),
+    url('/assets/trycord-login-bg.png');
+  background-size: cover, cover;
+  background-position: left center, left center;
+  background-repeat: no-repeat, no-repeat;
 }
 .auth-page__inner {
   position: relative;
@@ -2831,19 +2845,6 @@ html[data-auth-page] .mobile-tab-navigation { display: none; }
   .auth-secondary { border-left: 0; border-top: 1px solid var(--t-line-hi); }
   .auth-footer { flex-direction: column; align-items: center; text-align: center; }
   .auth-page__inner { gap: var(--t-d-5); padding: var(--t-d-5) var(--t-d-4) var(--t-d-7); }
-
-  /* The background is two panels: abstract geometry on the left, the wordmark on
-     the right. Below about 800px cover crops its middle, which left a couple of
-     letters from the wordmark stranded at the edge with the rest of the word
-     hidden behind the card - a stray 'to' on a tablet, an 'e' and an 'S' on a
-     phone. Anchoring left puts the geometry under the card instead, and the heavier
-     scrim puts the lettering out of reach on the widths where the crop still catches
-     any of it. The page shows the brand at the top either way, so the only thing
-     lost is the stray letter. */
-  .auth-background {
-    background-position: left center;
-    box-shadow: inset 0 0 0 100vmax rgba(18, 17, 21, 0.88);
-  }
 }
 
 
