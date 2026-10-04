@@ -14,9 +14,18 @@ import Api from './api.js';
 // icons already import from this file.
 export { icon, ICON_PATHS };
 
+// Fallback marks for accounts with no avatar. The hash still decides which one -
+// the same person is always the same colour, which is the part that helps - but
+// every entry is a dark, low-saturation warm tone, so a screen full of accounts
+// without pictures reads as one product instead of as a bag of sweets.
+//
+// The previous ten were blue, violet, magenta and mint at full strength. On a
+// near-black warm surface they were the loudest thing on the page, and Ember
+// stopped being the only saturated colour in the interface, which is the one thing
+// it cannot be if it is going to mean anything.
 const AVATAR_COLORS = [
-  '#6ea8fe', '#8b5cf6', '#58c97a', '#e2b03c', '#e06a5e',
-  '#59c2c9', '#ef7b54', '#9f8bef', '#66c87f', '#d6619d',
+  '#4a3f36', '#3f463c', '#4d4438', '#453a3a', '#3a4046',
+  '#524a3f', '#414839', '#4a3f42', '#3e4540', '#514535',
 ];
 
 export function hashColor(str) {
