@@ -1894,6 +1894,21 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .select option { background: var(--t-elev); color: var(--t-txt); }
 
 .field { display: flex; flex-direction: column; gap: var(--t-d-2); max-width: 620px; }
+/* Ninety-one of them are emitted as a bare <label> with no class on it, and until
+   this there was no rule for the element either, so each one inherited whatever
+   font-size happened to be around it. On the sign-in page that showed: 'Username'
+   beside the form came out small and muted while 'Backend URL' in the instance panel
+   next to it, inheriting from a different parent, came out larger and brighter - two
+   captions for two fields, styled by whatever was nearest.
+
+   This is the plain readable caption. .field__label below is the uppercase variant
+   for the panels that want it, and it still wins where it is applied. */
+label {
+  color: var(--t-txt2);
+  font-size: var(--t-fs-s);
+  font-weight: 600;
+  line-height: 1.4;
+}
 .field__label { font-size: var(--t-fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--t-mut); }
 .field__hint { color: var(--t-dim); font-size: var(--t-fs-xs); line-height: 1.5; }
 .field__error, .form-error {
@@ -2816,6 +2831,19 @@ html[data-auth-page] .mobile-tab-navigation { display: none; }
   .auth-secondary { border-left: 0; border-top: 1px solid var(--t-line-hi); }
   .auth-footer { flex-direction: column; align-items: center; text-align: center; }
   .auth-page__inner { gap: var(--t-d-5); padding: var(--t-d-5) var(--t-d-4) var(--t-d-7); }
+
+  /* The background is two panels: abstract geometry on the left, the wordmark on
+     the right. Below about 800px cover crops its middle, which left a couple of
+     letters from the wordmark stranded at the edge with the rest of the word
+     hidden behind the card - a stray 'to' on a tablet, an 'e' and an 'S' on a
+     phone. Anchoring left puts the geometry under the card instead, and the heavier
+     scrim puts the lettering out of reach on the widths where the crop still catches
+     any of it. The page shows the brand at the top either way, so the only thing
+     lost is the stray letter. */
+  .auth-background {
+    background-position: left center;
+    box-shadow: inset 0 0 0 100vmax rgba(18, 17, 21, 0.88);
+  }
 }
 
 
