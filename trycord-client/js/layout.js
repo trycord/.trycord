@@ -5,7 +5,9 @@
 // the content pane while the shell reserved a sidebar beside it, so the same list
 // appeared twice with the useful part in the middle.
 //
-// A surface declares the shape it needs; the CSS decides the measurements.
+// A surface declares the shape it needs, in the page registry, and the CSS decides
+// the measurements. Which path gets which shape used to be a second prefix table
+// here; it is now a field on the page, so the two cannot disagree.
 //
 // Always three tracks, even where the middle one is zero - the sidebar collapse
 // animates by interpolating track lengths, which a shorter list can't do. So a
@@ -73,53 +75,7 @@ export function layoutUsesMembers(name) {
   return layoutFor(name || currentLayout()).members;
 }
 
-// Data rather than branches inside the renderer. Order matters - the prefixes
-// above are more specific than the fallbacks below them.
-const BY_PREFIX = [
-  ['/settings/', 'settings'],
-  ['/settings', 'settings'],
-  ['/account/', 'settings'],
-  ['/account', 'settings'],
-  ['/admin', 'admin'],
-  ['/legal/', 'plain'],
-  ['/support', 'plain'],
-  ['/servers/new', 'plain'],
-  ['/invite/', 'plain'],
-  ['/verify-email/', 'plain'],
-  ['/discover', 'plain'],
-  // The directory lists every community and every channel itself, so a sidebar
-  // beside it repeated the rail's own list a third time on one screen.
-  ['/menu', 'plain'],
-  ['/users/', 'profile'],
-];
-
-export function layoutForPath(path) {
-  const p = String(path || '/');
-
-  for (const [prefix, layout] of BY_PREFIX) {
-    if (p === prefix || p.startsWith(prefix)) return layout;
-  }
-
-  // A community is a channel surface all the way in, including its own settings
-  // and roles pages - that's the community's structure, sitting beside the
-  // channels it describes.
-  if (/^\/(?:c|server)\//.test(p)) return 'channel';
-
-  if (p === '/dms' || p.startsWith('/dms/')) return 'list';
-  if (p.startsWith('/friends') || p.startsWith('/notifications')) return 'list';
-  // /menu is not here: it is in the table above, as a plain surface.
-  if (p === '/' || p.startsWith('/home')) return 'list';
-
-  return 'plain';
-}
-
 export default {
-  LAYOUTS,
-  DEFAULT_LAYOUT,
-  setLayout,
-  currentLayout,
-  layoutFor,
-  layoutForPath,
-  layoutUsesSidebar,
-  layoutUsesMembers,
+  LAYOUTS, DEFAULT_LAYOUT, setLayout, currentLayout,
+  layoutFor, layoutUsesSidebar, layoutUsesMembers,
 };

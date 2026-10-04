@@ -16,7 +16,7 @@ import { TrycordConfig } from './config.js';
 import { statusChip } from './pages-admin.js';
 import Realtime from './realtime.js';
 import { settingsFrame, blurbFor, findItem } from './settings-shell.js';
-import { setCleanup } from './resolve.js';
+import { onCleanup } from './pages/teardown.js';
 import { loadingState, errorState } from './states.js';
 import {
   privacyContext, securityContext, notificationsContext,
@@ -1210,16 +1210,16 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   }
 
   await fillContext(frame, context, tab);
-  setCleanup(releaseRemote);
+  onCleanup(releaseRemote);
 }
 
 // Listeners registered for the life of the current route.
 //
-// Collected rather than chained so that several sections can each subscribe and
-// one teardown removes them all. They are handed to setCleanup when the render
-// finishes, because setCleanup() replaces whatever was registered before it:
-// subscribing directly would leak the previous route's listeners, each of which
-// repaints a tree that is no longer in the document.
+// Collected rather than chained so several sections can each subscribe and one
+// teardown removes them all. They are handed to onCleanup when the render finishes,
+// which is a list rather than a single slot - subscribing straight from a section
+// would work, but collecting them here means one place to look when a repaint goes
+// wrong.
 const remoteWatchers = [];
 
 function registerRemote(kind, host, repaint) {

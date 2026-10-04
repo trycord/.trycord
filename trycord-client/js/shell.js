@@ -7,6 +7,7 @@ import { isDesktopNavOpen, openDesktopNav, closeDesktopNav } from './presentatio
 import { channelPath, serverPath } from './links.js';
 import { navigate, route } from './nav.js';
 import { layoutUsesSidebar, layoutUsesMembers } from './layout.js';
+import { matchRoute, railPages, mobilePages } from './pages/registry.js';
 import { renderCommunityContext } from './community-nav.js';
 
 // wiring, so a menu can never exist on one input method and be missing on
@@ -266,13 +267,21 @@ export function renderCommunities(region) {
   // `short` is what the 84px rail prints under the glyph; `label` is the full
   // name, still used for the title, the aria-label and the tooltip. At 84px
   // 'Direct messages' truncates to 'Direct me...', which is worse than useless.
-  const globalItems = [
-    { id: 'home', label: 'Home', short: 'Home', icon: 'home', path: '/home' },
-    { id: 'dms', label: 'Direct messages', short: 'Messages', icon: 'mail', path: '/dms' },
-    { id: 'notifications', label: 'Notifications', short: 'Alerts', icon: 'bell', path: '/notifications', badge: () => State.notifUnread },
-    { id: 'discover', label: 'Discover', short: 'Discover', icon: 'search', path: '/discover' },
-    { id: 'friends', label: 'Friends', short: 'Friends', icon: 'users', path: '/friends', badge: () => (State.friendsIn || []).length },
-  ];
+  // The rail's destinations come from the registry, which is also what the route
+  // table and the phone tab bar read. This list used to be a fourth copy of the
+  // same five rows, which is how Discover ended up in the rail and nowhere else.
+  const badgeFor = {
+    notifications: () => State.notifUnread,
+    friends: () => (State.friendsIn || []).length,
+  };
+  const globalItems = railPages().map((page) => ({
+    id: page.id,
+    label: page.nav.label,
+    short: page.nav.short,
+    icon: page.nav.icon,
+    path: page.path,
+    badge: badgeFor[page.id],
+  }));
 
   // The rail's own destinations carry words, for the same reason communities do:
   // five glyphs in a column is a puzzle, five labelled rows is a menu.
@@ -649,20 +658,24 @@ const ADMIN_OVERFLOW = [
 
 const adminSectionActive = (s, route) => (s.exact ? route === s.path : (route === s.path || route.startsWith(s.path + '/')));
 
+// Which sidebar the shell paints, asked of the page registry rather than guessed
+// from the path.
+//
+// This used to be eleven route comparisons in a row, which is a second opinion on
+// what page you are on and had already drifted: three of the types it returned -
+// discover, support and profile - no longer had a case to render them, so they
+// silently fell through to the messages list. The registry already knows, per page,
+// whether it has a contextual sidebar and which one.
 export function sidebarContext() {
-  const path = currentRoute() || '';
-  const server = /^\/server\/([^/]+)/.exec(path);
-  if (server && server[1]) return { type: 'community', serverId: server[1] };
-  if (path === '/dms' || path.startsWith('/dms/')) return { type: 'dms' };
-  if (path === '/' || path === '/home' || path === '/menu') return { type: 'home' };
-  if (path.startsWith('/settings') || path.startsWith('/account')) return { type: 'settings' };
-  if (path.startsWith('/admin')) return { type: 'admin' };
-  if (path.startsWith('/notifications')) return { type: 'notifications' };
-  if (path.startsWith('/friends')) return { type: 'friends' };
-  if (path.startsWith('/discover')) return { type: 'discover' };
-  if (path.startsWith('/support') || path.startsWith('/legal')) return { type: 'support' };
-  if (path.startsWith('/users/')) return { type: 'profile', userId: path.split('/')[2] };
-  return { type: 'dms' };
+  const hit = matchRoute(currentRoute() || '/');
+  if (!hit || !hit.page.sidebar) return { type: 'dms' };
+  return {
+    type: hit.page.sidebar,
+    // A community's channels and a person's profile are both addressed by an id,
+    // and both are the only thing the sidebar needs to know about them.
+    serverId: hit.params.id || null,
+    userId: hit.params.id || null,
+  };
 }
 
 export function renderPlaceNavigation(region) {
@@ -973,13 +986,15 @@ export function renderMobileTabs(region) {
   // `path` is the route the app compares against, `href` is where it actually
   // goes. They differ wherever the app is mounted under a subpath, so the active
   // test has to use one and the navigation the other.
-  const tabs = [
-    { id: 'home', label: 'Home', icon: 'home', path: '/home' },
-    { id: 'dms', label: 'DMs', icon: 'mail', path: '/dms' },
-    { id: 'friends', label: 'Friends', icon: 'users', path: '/friends' },
-    { id: 'notifications', label: 'Alerts', icon: 'bell', path: '/notifications' },
-    { id: 'menu', label: 'Menu', icon: 'menu', path: '/menu' },
-  ];
+  // The same destinations the rail offers, narrowed for a phone. It used to be a
+  // separate list with its own wording - 'DMs' here against 'Messages' there - and
+  // its own idea of what exists: Menu was in this list and not in the rail's.
+  const tabs = mobilePages().map((page) => ({
+    id: page.id,
+    label: page.nav.tabLabel || page.nav.short,
+    icon: page.nav.icon,
+    path: page.path,
+  }));
   const strip = el('div', { class: 'mobile-tab-navigation__strip' });
   for (const t of tabs) {
     const active = here === t.path || here.startsWith(t.path + '/');

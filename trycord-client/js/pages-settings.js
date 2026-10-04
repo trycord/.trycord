@@ -10,7 +10,8 @@ import { communityMark, invalidateAuthedImage, loadAuthedImage } from './compone
 import { renderContextHeader } from './shell.js';
 import { ensureServer } from './workspace-shared.js';
 import { serverPath } from './links.js';
-import { settingsFrame, SETTINGS_IA, findItem } from './settings-shell.js';
+import { settingsFrame, findItem } from './settings-shell.js';
+import { scopeHasTab } from './pages/registry.js';
 import { contextBlock as block, contextFact as fact, contextList as list, contextPara as para } from './context-column.js';
 import { renderIntegrations } from './pages-integrations.js';
 import { renderAnalytics } from './pages-analytics.js';
@@ -68,8 +69,9 @@ async function renderServerSettings(container, serverId, section = 'overview') {
       "You need permission to manage this community's settings."));
     return;
   }
-  const known = SETTINGS_IA.community.flatMap((g) => g.items).map((i) => i.id);
-  if (!known.includes(section)) section = 'overview';
+  // An unknown section is not an error, it is the overview: a stale bookmark to a
+  // section that no longer exists should land somewhere rather than nowhere.
+  if (!scopeHasTab('community', section)) section = 'overview';
   const item = findItem('community', section);
   renderContextHeader({ title: 'Settings', sub: item && item.blurb ? item.blurb : server.name });
 

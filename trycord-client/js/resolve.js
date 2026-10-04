@@ -40,24 +40,20 @@ export async function resolveChannelToken(serverId, token) {
 }
 
 // Realtime subscriptions and the DM presence heartbeat both outlive the view that
-// started them, and a community event repainting the view you just left is how
-// a channel jumps out from under you.
-let lastCleanup = null;
-let onViewRefreshCleared = null;
+// started them, and a community event repainting the view you just left is how a
+// channel jumps out from under you. So the router hands this the one function that
+// can stop them, rather than the registry of realtime rooms reaching into state.
+let clearViewRefreshFn = null;
 
-// Supplied by the router, which owns the realtime repaint subscription.
 export function setViewRefreshCleaner(fn) {
-  onViewRefreshCleared = fn;
+  clearViewRefreshFn = fn;
 }
 
-export function runCleanup() {
-  if (lastCleanup) { try { lastCleanup(); } catch { /* ignore */ } lastCleanup = null; }
-  try { if (onViewRefreshCleared) onViewRefreshCleared(); } catch { /* ignore */ }
+export function clearViewRefreshNow() {
+  if (clearViewRefreshFn) clearViewRefreshFn();
 }
 
-export function setCleanup(fn) {
-  runCleanup();
-  lastCleanup = fn;
-}
-
-export default { renderRouteError, resolveCommunity, resolveChannelToken, runCleanup, setCleanup, setViewRefreshCleaner };
+export default {
+  renderRouteError, resolveCommunity, resolveChannelToken,
+  setViewRefreshCleaner, clearViewRefreshNow,
+};

@@ -35,8 +35,7 @@ for (const rel of DIRS) {
     console.error('missing directory: ' + dir);
     process.exit(1);
   }
-  for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
-    const p = path.join(dir, name);
+  for (const p of jsFilesUnder(dir)) {
     // A test or fixture is not shipped to a browser, so a top-level await or a
     // CommonJS require in one is legitimate. Only shipped modules are held to
     // browser-module rules, and every file in trycord-client/js is shipped.
@@ -79,11 +78,25 @@ function exportsOf(src) {
   return { names, hasDefault };
 }
 
+// Every .js file under a directory, recursively. The client grew a pages/
+// subdirectory and a flat readdir indexed none of it, so a page module importing a
+// sibling was reported as "module not found" for a file sitting right there.
+function jsFilesUnder(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.name === 'node_modules') continue;
+    if (entry.isDirectory()) out.push(...jsFilesUnder(full));
+    else if (entry.name.endsWith('.js')) out.push(full);
+  }
+  return out.sort();
+}
+
+
 const reexports = new Map();
 for (const rel of DIRS) {
   const dir = path.resolve(REPO, rel);
-  for (const name of fs.readdirSync(dir).filter((f) => f.endsWith('.js'))) {
-    const p = path.join(dir, name);
+  for (const p of jsFilesUnder(dir)) {
     const src = fs.readFileSync(p, 'utf8');
     const info = exportsOf(src);
     info.star = [...src.matchAll(/^export\s+\*\s+from\s+['"](\.[^'"]+)['"]/gm)].map((m) => m[1]);
