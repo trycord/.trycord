@@ -721,6 +721,48 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 
 /* The rail's own destinations: a glyph and a word, side by side. The column is
    264px now, which is what a label needs and a glyph does not. */
+/* The mark. Small, at the top, and the only place the logo appears in the shell -
+   it anchors the rail rather than advertising in it. */
+.rail-brand {
+  display: flex;
+  justify-content: center;
+  padding: var(--t-d-3) 0 var(--t-d-2);
+}
+.rail-mark-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--t-r-s);
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--t-ease), transform var(--t-fast) var(--t-ease);
+}
+.rail-mark-btn:hover { background: var(--t-hover); transform: translateY(-1px); }
+.rail-mark-btn:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.rail-mark-btn__img { width: 26px; height: 26px; object-fit: contain; display: block; border-radius: var(--t-r-xs); }
+
+/* Two navigations. The heading is the distinction: 'Yours' and 'Places' are the
+   two questions the rail answers, and a reader can tell at a glance which kind of
+   row they are looking at without the column being wide enough for a label. */
+.rail-section { display: flex; flex-direction: column; gap: var(--t-d-1); }
+.rail-section--communities { margin-top: var(--t-d-3); padding-top: var(--t-d-2); border-top: 1px solid var(--t-line); }
+.rail-section__label {
+  padding: 0 var(--t-d-2);
+  color: var(--t-dim);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-group { display: flex; flex-direction: column; gap: 2px; }
+
 /* An 84px column, so a destination is a glyph over a short word rather than a
    glyph over a row. Still a label - a bare glyph column is a shape to memorise -
    but one that fits. */

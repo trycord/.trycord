@@ -296,16 +296,51 @@ export function renderCommunities(region) {
     return btn;
   };
 
+  // The mark is the anchor for the whole rail: it says which product this is, and
+  // it is the way back to the start from anywhere. The application had none at all -
+  // the sign-in page had one and the shell did not.
+  const mark = el('button', {
+    class: 'rail-mark-btn',
+    type: 'button',
+    title: 'Trycord',
+    'aria-label': 'Trycord home',
+    onClick: () => { navigate(route('/home')); },
+  }, el('img', { class: 'rail-mark-btn__img', src: '/assets/trycord-logo.png', alt: '' }));
+  region.appendChild(el('div', { class: 'rail-brand' }, mark));
+
+  // Two navigations, not one list. Where you are in Trycord, and which places you
+  // are in, are different questions, and the rail answered both with one
+  // undifferentiated column separated by a rule - so a community looked like just
+  // another global destination. They are separate regions now, each with its own
+  // heading. The distinction survives 84px because it is carried by the grouping
+  // rather than by a word that would not fit.
+  const globalGroup = el('nav', { class: 'rail-group', 'aria-label': 'Your Trycord' });
   for (const item of globalItems) {
-    region.appendChild(railButton({
+    globalGroup.appendChild(railButton({
       label: item.label, short: item.short, icon: item.icon, path: item.path, badge: item.badge,
       active: here === item.path || here.startsWith(item.path + '/'),
     }));
   }
+  region.appendChild(el('div', { class: 'rail-section' },
+    el('div', { class: 'rail-section__label' }, 'Yours'),
+    globalGroup));
+
+  // Creation action. Discover is deliberately absent: it is a global destination
+  // and already has a row above.
+  const create = el('button', {
+    class: 'rail-nav rail-nav--create',
+    type: 'button',
+    title: 'Create a community',
+    'aria-label': 'Create a community',
+    dataset: { label: 'Create a community' },
+    onClick: () => { navigate('/servers/new'); },
+  },
+  el('span', { class: 'rail-nav__icon' }, icon('plus')),
+  el('span', { class: 'rail-nav__label' }, 'New'));
 
   const servers = State.servers || [];
+  const communityGroup = el('nav', { class: 'rail-group', 'aria-label': 'Your communities' });
   if (servers.length) {
-    region.appendChild(el('div', { class: 'rail-sep' }));
     for (const s of servers) {
       const chip = serverChip(s, {
         active: String(s.id) === String(currentServerId()),
@@ -315,24 +350,16 @@ export function renderCommunities(region) {
       attachContextMenu(chip, serverChipMenuFor(s), {
         target: (node) => ({ type: 'community', id: String(s.id) }),
       });
-      region.appendChild(chip);
+      communityGroup.appendChild(chip);
     }
   }
-
-  // Creation action. Discover is deliberately absent: it is a global
-    // destination and gets its own row.
-    const create = el('button', {
-      class: 'rail-nav rail-nav--create',
-      type: 'button',
-      title: 'Create a community',
-      'aria-label': 'Create a community',
-      dataset: { label: 'Create a community' },
-      onClick: () => { navigate('/servers/new'); },
-    },
-    el('span', { class: 'rail-nav__icon' }, icon('plus')),
-    el('span', { class: 'rail-nav__label' }, 'New'));
-    region.appendChild(el('div', { class: 'rail-sep' }));
-    region.appendChild(create);
+  // Shown whether or not there are any yet: on a new account this is where the
+  // empty list admits it, and where the action that fills it lives.
+  communityGroup.appendChild(create);
+  region.appendChild(el('div', { class: 'rail-section rail-section--communities' },
+    el('div', { class: 'rail-section__label' },
+      servers.length ? servers.length + (servers.length === 1 ? ' place' : ' places') : 'Places'),
+    communityGroup));
 
   // The account control lives at the foot of the global rail rather than inside
   // any one surface's sidebar. It used to be a panel pinned to the bottom of the
