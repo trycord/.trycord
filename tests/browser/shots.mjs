@@ -261,7 +261,11 @@ async function main() {
       console.log('          switch: ' + switched);
       console.log('            before: ' + before);
       console.log('            after:  ' + after);
-      if (after.startsWith('route=/c/') && before && after.includes(before)) {
+      // Only meaningful when there was a second community to switch to. With one
+      // seeded there is nothing to click, and warning about it every run trains
+      // you to ignore the warning.
+      if (!/only one community/.test(switched) && after.startsWith('route=/c/')
+          && before && after.includes(before)) {
         console.log('          WARNING the sidebar did not change with the community');
       }
     }
@@ -301,6 +305,20 @@ async function main() {
       await step('deep link, cold', () => page.goto(ORIGIN + '/settings/security', { waitMs: 2300 }));
       await step('reload on that route', () => page.goto(ORIGIN + '/settings/security', { waitMs: 2300 }));
       await step('unknown route', () => page.goto(ORIGIN + '/nope-not-a-route', { waitMs: 1800 }));
+      // 'shell=MISSING' on its own does not say whether the route fell back to home
+      // or tore the app down, and those are very different bugs. Say what is on
+      // screen.
+      const unknown = await page.eval(`
+        return 'text=' + JSON.stringify((document.body.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 120))
+          + ' | authPage=' + (document.documentElement.hasAttribute('data-auth-page') ? 'yes' : 'no')
+          + ' | token=' + (localStorage.getItem('trycord.token') ? 'present' : 'gone');`);
+      console.log('          ' + unknown);
+      // The route walk is the last thing that runs before the signed-out capture, so
+      // anything it throws was being collected and never printed.
+      for (const e of [...new Set(await page.errors())].slice(0, 5)) {
+        console.log('          JS-ERROR ' + e.slice(0, 160));
+      }
+      page.resetErrors();
 
       const hash = await page.eval(`return location.hash || '(none)';`);
       if (hash !== '(none)') console.log('          WARNING a hash appeared in the URL: ' + hash);
