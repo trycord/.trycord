@@ -87,6 +87,9 @@ const BY_PREFIX = [
   ['/invite/', 'plain'],
   ['/verify-email/', 'plain'],
   ['/discover', 'plain'],
+  // The directory lists every community and every channel itself, so a sidebar
+  // beside it repeated the rail's own list a third time on one screen.
+  ['/menu', 'plain'],
   ['/users/', 'profile'],
 ];
 
@@ -104,7 +107,8 @@ export function layoutForPath(path) {
 
   if (p === '/dms' || p.startsWith('/dms/')) return 'list';
   if (p.startsWith('/friends') || p.startsWith('/notifications')) return 'list';
-  if (p.startsWith('/menu') || p === '/' || p.startsWith('/home')) return 'list';
+  // /menu is not here: it is in the table above, as a plain surface.
+  if (p === '/' || p.startsWith('/home')) return 'list';
 
   return 'plain';
 }
