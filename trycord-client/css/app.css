@@ -2778,14 +2778,16 @@ label {
      cover crops the middle and strands more.
 
      So the scrim on top is not flat. It is nearly clear over the geometry and
-     opaque by the time the lettering starts, which retires the wordmark without
-     flattening the part of the picture worth having. Anchoring left keeps the
-     geometry under the card rather than half off the edge. */
+     solid by the time the lettering starts, which retires the wordmark without
+     flattening the part of the picture worth having. Solid rather than nearly
+     solid: the lettering is bright orange on near-black, and three percent of it
+     still reads as a word. Anchoring left keeps the geometry under the card rather
+     than half off the edge. */
   background-image:
     linear-gradient(90deg,
       rgba(18, 17, 21, 0.50) 0%,
-      rgba(18, 17, 21, 0.78) 42%,
-      rgba(18, 17, 21, 0.97) 60%),
+      rgba(18, 17, 21, 0.86) 40%,
+      #121115 58%),
     url('/assets/trycord-login-bg.png');
   background-size: cover, cover;
   background-position: left center, left center;
