@@ -494,23 +494,61 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
    The real structure, which is not the obvious one:
 
      #app.trycord-app      the wrapper; carries the viewport height
-     .shell                grid: navigation | main
-       .app-rail           column 1, and it holds BOTH the community list and
-       (grid row 1)        the channel list - one navigation column, not two
+     .shell                grid: rail | community sidebar | workspace
+       .app-rail           columns 1-2, and it holds BOTH the community list and
+       (grid row 1)        the channel list - one navigation area, laid out in two
          .rail-identity       empty landmark, display:none
          .rail-global-nav     empty landmark, display:none
-         .app-rail__items    global destinations + communities
-         .context-sidebar    the current community's channels
-       .main-content       column 2, one explicit 1fr column
-         .context-header      row 1, full width
-         .chat-environment    row 2, grid: view | members
+         .app-rail__items    global destinations + communities    (column 1)
+         .context-sidebar    this community's channels            (column 2)
+       .main-content       column 3
+         .context-header      full width
+         .chat-environment    grid: view | members
            .view-root         column 1
            .member-sidebar    column 2, only when data-members="yes"
+       .mobile-tab-navigation  row 2, phones only
 
    The member panel is inside the workspace rather than a third shell column, so
    it sits against the conversation it belongs to and does not have to be reserved
    across pages that have no members at all.
    ========================================================================== */
+
+/* The shell's parent. It has to carry the viewport height itself: the shell is
+   100dvh, so without a full-height parent it sat in an auto-sized block and the
+   leftover width went nowhere - the navigation column took its width and the
+   workspace got whatever a shrink-to-fit box decided, which on a 1440 screen was
+   about 440px with 450px of empty shell beside it.
+
+   #root is not a thing; the wrapper is #app.trycord-app. */
+.trycord-app, #app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100dvh;
+  width: 100%;
+}
+
+/* Three columns and two rows:
+
+     rail | community sidebar | workspace
+                                  context header
+                                  chat environment (view | members)
+                                  mobile tab bar          <- row 2, spans
+
+   .app-rail spans columns 1 and 2 because the channel navigation is a child of
+   it in the markup. Everything in the left half of the screen is therefore one
+   grid area that lays itself out in two, which is why the region beside the rail
+   existed in the first place. */
+.shell {
+  display: grid;
+  grid-template-columns: var(--ui-shell-cols);
+  grid-template-rows: var(--ui-shell-rows);
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  height: 100dvh;
+  background: var(--t-pg);
+}
 
 /* Two columns inside the rail element, which is how the markup has always been:
    #place-navigation.context-sidebar is a child of #app-rail, not a sibling of it.
