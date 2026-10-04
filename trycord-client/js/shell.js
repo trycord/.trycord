@@ -445,7 +445,10 @@ function communityContext(region, sid) {
 
 function dmsContext(region) {
   const here = currentRoute();
-  region.appendChild(pageHeader('Direct messages', 'Your conversations'));
+  // 'Conversations', not 'Direct messages': the page header directly to the right
+  // already says Direct messages, and a second title a different width away with a
+  // different subtitle under it reads as two things disagreeing about what this is.
+  region.appendChild(pageHeader('Conversations'));
 
   const scroll = el('div', { class: 'ctx-scroll' });
   region.appendChild(scroll);
@@ -464,8 +467,12 @@ function dmsContext(region) {
       ? dms.filter((d) => String((d.peer && (d.peer.displayName || d.peer.username)) || '').toLowerCase().includes(query))
       : dms;
     if (!shown.length) {
+      // A list says whether it is empty. The pane beside it says what to do about
+      // it, in full sentences, with the reason. Both were doing both jobs, so the
+      // same advice appeared twice on one screen - once here in a 216px column
+      // where it did not fit, and once beside it where it did.
       listBox.appendChild(el('div', { class: 'ctx-empty' },
-        dms.length ? 'No conversations match.' : 'No conversations yet. Start one from a profile.'));
+        dms.length ? 'No conversations match.' : 'Nothing here yet'));
       return;
     }
     for (const dm of shown) {
@@ -515,41 +522,6 @@ function dmsContext(region) {
   refreshHomeSidebar(region);
 }
 
-
-const SETTINGS_SECTIONS = [
-  { id: 'profile', label: 'My Account', path: '/settings' },
-  { id: 'security', label: 'Security', path: '/settings/security' },
-  { id: 'appearance', label: 'Appearance', path: '/settings/appearance' },
-  { id: 'backend', label: 'Backend', path: '/settings/backend' },
-  { id: 'updates', label: 'Updates', path: '/settings/updates' },
-];
-
-function settingsContext(region) {
-  const here = currentRoute();
-  region.appendChild(pageHeader('Settings', 'Your account and preferences'));
-  const scroll = el('div', { class: 'ctx-scroll' });
-  region.appendChild(scroll);
-
-  const group = navGroup({ label: 'Settings' });
-  for (const s of SETTINGS_SECTIONS) {
-    const active = here === s.path || here.startsWith(s.path + '/');
-    group.list.appendChild(navRow({
-      label: s.label, href: route(s.path), active,
-      onClick: () => { navigate(s.path); },
-    }));
-  }
-  scroll.appendChild(group);
-
-  if (State.me && State.me.isAdmin) {
-    const admin = navGroup({ label: 'Administration' });
-    admin.list.appendChild(navRow({
-      label: 'Admin console', href: route('/admin'), active: here.startsWith('/admin'),
-      onClick: () => { navigate('/admin'); },
-    }));
-    scroll.appendChild(admin);
-  }
-
-}
 
 
 function simpleListContext(region, { title, sub, groups }) {
@@ -668,96 +640,15 @@ function notificationsContext(region) {
   });
 }
 
-function discoverContext(region) {
-  simpleListContext(region, {
-    title: 'Discover',
-    sub: 'Communities on this instance',
-    groups: [{ label: 'Browse', items: [
-      { label: 'Discover communities', path: '/discover', exact: true },
-    ] }, { label: 'Create', items: [
-      { label: 'Create a community', path: '/servers/new', exact: true },
-    ] }],
-  });
-}
-
 // Privacy Policy are full document loads at /terms and /privacy, not hash
-function supportContext(region) {
-  simpleListContext(region, {
-    title: 'Support',
-    sub: 'Help and appeals',
-    groups: [{ label: 'Support', items: [
-      { label: 'Support home', path: '/support', exact: true },
-      { label: 'Appeal a decision', path: '/support/appeals/new', exact: true },
-    ] }, { label: 'Your appeals', items: [
-      { label: 'My appeals', path: '/support/appeals', exact: true },
-    ] }],
-  });
-}
-
-function profileContext(region, userId) {
-  simpleListContext(region, {
-    title: 'Profile',
-    sub: userId ? 'User profile' : 'Your profile',
-    groups: [{ label: 'You', items: [
-      { label: 'Your profile', path: '/users/' + (State.me && State.me.id), exact: true },
-      { label: 'Edit profile', path: '/settings', exact: true },
-    ] }],
-  });
-}
-
 // queue - an admin reaches it deliberately, not while triaging - so it lives
 // current destination is never hidden behind a collapsed control.
-const ADMIN_SECTIONS = [
-  { label: 'Overview', path: '/admin', exact: true },
-  { label: 'Users', path: '/admin/users' },
-  { label: 'Communities', path: '/admin/communities' },
-  { label: 'Reports', path: '/admin/reports' },
-  { label: 'Appeals', path: '/admin/appeals' },
-  { label: 'GDPR requests', path: '/admin/gdpr' },
-  // The site builder. It was reachable only by typing the URL or by arriving
-  // from the account menu, because nothing in the navigation pointed at it -
-  // the router and the page's own tab bar had it, the sidebar did not.
-  { label: 'Pages', path: '/admin/pages' },
-  { label: 'Audit log', path: '/admin/audit' },
-];
 
 const ADMIN_OVERFLOW = [
   { label: 'Announcements', path: '/admin/announcements' },
 ];
 
 const adminSectionActive = (s, route) => (s.exact ? route === s.path : (route === s.path || route.startsWith(s.path + '/')));
-
-function adminContext(region) {
-  const here = currentRoute();
-  region.appendChild(pageHeader('Administration', 'Moderation and platform health'));
-  const scroll = el('div', { class: 'ctx-scroll' });
-  region.appendChild(scroll);
-  const group = navGroup({ label: 'Console' });
-  for (const s of ADMIN_SECTIONS) {
-    group.list.appendChild(navRow({
-      label: s.label, href: route(s.path), active: adminSectionActive(s, here),
-      onClick: () => { navigate(s.path); },
-    }));
-  }
-  scroll.appendChild(group);
-
-  const activeOverflow = ADMIN_OVERFLOW.find((s) => adminSectionActive(s, here));
-  const more = navGroup({
-    label: activeOverflow ? activeOverflow.label : 'More',
-    collapsible: true,
-    collapsed: !activeOverflow,
-    id: 'admin-overflow',
-  });
-  for (const s of ADMIN_OVERFLOW) {
-    more.list.appendChild(navRow({
-      label: s.label, href: route(s.path), active: adminSectionActive(s, here),
-      onClick: () => { navigate(s.path); },
-    }));
-  }
-  scroll.appendChild(more);
-
-}
-
 
 export function sidebarContext() {
   const path = currentRoute() || '';
@@ -801,17 +692,26 @@ export function renderPlaceNavigation(region) {
   region.hidden = false;
   if (shell) shell.classList.remove('no-community-nav');
   const ctx = sidebarContext();
+// Five of the ten arms below could not run, and the reason is worth writing down.
+//
+// A surface whose layout has no sidebar - settings, admin, discover, support,
+// profile, and every plain page - returns from renderPlaceNavigation before this
+// switch is reached, so its arm here was unreachable. The surfaces that do need a
+// navigation column build it themselves in context-column.js, where the page and
+// its column live together. Discover had a discoverContext written for it and it
+// had never painted anything, which is why the column beside Discover sat empty
+// through several rounds of looking at it.
+//
+// So the arms are now exactly the surfaces that have a sidebar. Adding one is a
+// layout change and an arm here, in that order; a surface whose layout says
+// sidebar:false must not grow an arm, because that will look right in review and
+// never run.
   switch (ctx.type) {
     case 'community': return communityContext(region, ctx.serverId);
     case 'dms': return dmsContext(region);
     case 'home': return homeContext(region);
-    case 'settings': return settingsContext(region);
-    case 'admin': return adminContext(region);
     case 'friends': return friendsContext(region);
     case 'notifications': return notificationsContext(region);
-    case 'discover': return discoverContext(region);
-    case 'support': return supportContext(region);
-    case 'profile': return profileContext(region, ctx.userId);
     default: return dmsContext(region);
   }
 }

@@ -186,11 +186,18 @@ async function renderServerRoles(container, serverId) {
     clear(list);
     // The owner outranks every role and is not a role row, so it gets a
     const ownerName = (State.serverDetail && (State.serverDetail.owner_username || State.serverDetail.owner_name)) || 'Owner';
+    // The owner is named by a badge beside the name, not written into the rank
+    // column. That column is 26px wide because it holds a position number, and
+    // six letters of OWNER were wider than it: right-aligned, the overflow ran
+    // backwards and the word landed on top of the owner's name.
+    const ownerNameCell = el('span', { class: 'role-row__name' });
+    ownerNameCell.appendChild(el('span', {}, ownerName));
+    ownerNameCell.appendChild(el('span', { class: 'role-badge role-badge--owner' }, 'Owner'));
     list.appendChild(el('div', { class: 'role-row role-row--owner' },
       el('span', { class: 'role-row__handle' }),
-      el('span', { class: 'role-row__rank' }, 'OWNER'),
-      el('span', { class: 'role-row__name' }, ownerName),
-      el('span', { class: 'role-row__meta' }, 'Highest · not reorderable')));
+      el('span', { class: 'role-row__rank' }, '\u2014'),
+      ownerNameCell,
+      el('span', { class: 'role-row__meta' }, 'Cannot be reordered')));
 
     const all = ordered();
     all.forEach((role, idx) => {
@@ -218,7 +225,12 @@ async function renderServerRoles(container, serverId) {
       const nameEl = el('span', {}, role.name || 'Role');
       if (colour) nameEl.style.color = colour;
       nameCell.appendChild(nameEl);
-      if (role.is_default) nameCell.appendChild(el('span', { class: 'role-badge' }, '@everyone'));
+      // Only worth saying when the role has been renamed off its default name; if
+      // it is still called @everyone the badge is the name again, in different
+      // letters, in the one column this list cannot spare.
+      if (role.is_default && !/^@?everyone$/i.test(String(role.name || ''))) {
+        nameCell.appendChild(el('span', { class: 'role-badge' }, 'everyone'));
+      }
       row.appendChild(nameCell);
 
       const n = memberCount(role.id);
