@@ -198,6 +198,34 @@
    Theme is a palette swap, never a layout change. */
 
 /* Trycord: charcoal depth, a warmer and less saturated ember than Ember. */
+/* Ember is DEFAULT_THEME in theme.js and is offered in the picker, and until now
+   it had no block here at all. Every element carrying data-theme="ember" therefore
+   fell through to the bare :root values above and rendered whatever those happened
+   to be - so the product's default theme was an absence rather than a decision, and
+   the brand Trycord theme below was never the one anybody saw first.
+
+   These are the :root values restated exactly. Nothing about the rendering changes;
+   what changes is that it is now written down, so the next person editing the
+   palette is editing a theme rather than editing a fallback. */
+:root[data-theme='ember'] {
+  --t-pg:    #0c0806;
+  --t-base:  #141010;
+  --t-base2: #1b1513;
+  --t-elev:  #241a16;
+  --t-hover: #2e211b;
+  --t-txt:   #fff4ea;
+  --t-txt2:  #d9c3b0;
+  --t-mut:   #9a7d69;
+  --t-dim:   #6f5a4b;
+  --t-accent:     #ff8c3a;
+  --t-accent-hi:  #ffab6b;
+  --t-accent-lo:  #d4611a;
+  --t-accent-ink: #1a0c04;
+  --t-line:    rgba(255, 186, 140, 0.10);
+  --t-line-hi: rgba(255, 186, 140, 0.20);
+  --t-line-max: rgba(255, 186, 140, 0.34);
+}
+
 :root[data-theme='trycord'] {
   --t-pg:    #0e0b0a;
   --t-base:  #16120f;
