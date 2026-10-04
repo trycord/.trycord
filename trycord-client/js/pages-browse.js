@@ -1,6 +1,6 @@
 
 import Api from './api.js';
-import { esc, el, clear, plural, toast } from './ui.js';
+import { esc, el, clear, icon, plural, toast } from './ui.js';
 import State, { refreshServers, isAuthed } from './state.js';
 import { renderContextHeader } from './shell.js';
 import { communityMark } from './components.js';
@@ -104,10 +104,23 @@ export async function renderBrowse(container, { previewId } = {}) {
     clear(listPane);
     try {
       const items = await fetchPage(0);
-      resultMeta.textContent = total ? total + (total === 1 ? ' community' : ' communities') : 'No results';
+      const searching = String(query || '').trim().length > 0;
+      // One statement about the result, not two. 'No results' in the meta line and
+      // 'Nothing here' in the panel said the same thing twice, in two different
+      // voices, directly above each other.
+      resultMeta.textContent = items.length
+        ? total + (total === 1 ? ' community' : ' communities')
+        : (searching ? 'No matches' : '');
       if (!items.length) {
+        // An honest distinction: a search that found nothing is not the same as an
+        // instance with nothing public on it, and the copy should say which happened.
         listPane.appendChild(el('div', { class: 'empty-state' },
-          el('div', { class: 'es-icon' }, '◫'), el('div', {}, 'Nothing here'), el('div', {}, 'Try a different search.')));
+          el('div', { class: 'es-icon' }, icon(searching ? 'search' : 'globe')),
+          el('div', { class: 'empty-state__title' },
+            searching ? 'Nothing matched that search' : 'No public communities here'),
+          el('div', { class: 'empty-state__body' }, searching
+            ? 'This instance has communities, just not ones matching that. Try a different word.'
+            : 'This instance has not published any communities for anyone to discover. Ones you create stay private until you make them public.')));
       } else {
         for (const s of items) {
           listPane.appendChild(serverCard(s, () => showPreview(s.id)));

@@ -660,6 +660,12 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 
 /* The community sidebar: its identity, its categories, its channels, its actions.
    A column of its own, beside the rail rather than underneath it. */
+/* A surface with no community navigation - Discover, Support, the legal documents,
+   the sign-up form - gives the track back rather than holding 260px of empty panel
+   beside the page. The rail beside it keeps the global destinations. */
+.shell.no-community-nav .app-rail { grid-template-columns: var(--ui-rail) 0px; }
+.shell.no-community-nav .app-rail__items { grid-column: 1 / -1; }
+
 .context-sidebar {
   grid-column: 2;
   grid-row: 1;
