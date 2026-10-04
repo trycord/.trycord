@@ -2279,6 +2279,15 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 .page-head__main h1 { margin: 0; font-size: var(--t-fs-xl); letter-spacing: -0.02em; }
 .page-title { margin: 0 0 var(--t-d-1); font-size: var(--t-fs-xl); letter-spacing: -0.02em; }
 
+/* A page that is mostly one deliberate absence - no conversations yet, nothing
+   pinned - does not need the full page padding above an empty state that already
+   has its own. */
+.page--quiet { padding-top: var(--t-d-4); }
+
+/* Where the thing you want is, when it is not in this pane. Saying so beats an
+   empty pane that reads as a page which failed to load. */
+.page-hint { color: var(--t-dim); font-size: var(--t-fs-s); }
+
 .community-manager { width: min(var(--ui-page-width), 100%); margin: 0 auto; }
 .community-manager__toolbar {
   display: flex;
