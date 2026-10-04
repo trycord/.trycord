@@ -662,9 +662,23 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
    A column of its own, beside the rail rather than underneath it. */
 /* A surface with no community navigation - Discover, Support, the legal documents,
    the sign-up form - gives the track back rather than holding 260px of empty panel
-   beside the page. The rail beside it keeps the global destinations. */
-.shell.no-community-nav .app-rail { grid-template-columns: var(--ui-rail) 0px; }
-.shell.no-community-nav .app-rail__items { grid-column: 1 / -1; }
+   beside the page. The rail beside it keeps the global destinations.
+
+   The track to give back is the shell's second column, not the rail's own
+   sub-grid. .app-rail spans shell columns 1 to 2, so shrinking the sub-grid inside
+   it changed nothing above it: the shell still reserved 260px and the page still
+   began there, with an invisible gap where the panel used to be - which is worse
+   than the empty panel, because at least that one looked deliberate.
+
+   Only --ui-shell-cols is overridden, never --ui-sidebar. The settings layout
+   builds its own navigation column out of that variable, and Settings is one of
+   the surfaces that has no shell sidebar; zeroing the variable would have taken
+   the settings navigation with it.
+
+   Below 600px the shell is a single column and the rail is a drawer, and the
+   media query's .shell[data-layout] rule is later in the file at equal
+   specificity, so it takes over there. */
+.shell.no-community-nav { --ui-shell-cols: var(--ui-rail) 0px minmax(0, 1fr); }
 
 .context-sidebar {
   grid-column: 2;
