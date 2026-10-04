@@ -1033,9 +1033,14 @@ export function renderContextHeader({ title, sub, icon: iconGlyph, actions } = {
   if (sub) titles.appendChild(el('div', { class: 'context-sub' }, sub));
   header.appendChild(titles);
 
+  // Accepts one node or a list of them. Nineteen page modules call this, and
+  // passing a bare element where a list was expected threw on the for-of, which
+  // took the entire surface down to the error screen over one header button.
+  // Normalised here so that cannot happen again.
+  const list = actions == null ? [] : (Array.isArray(actions) ? actions : [actions]);
   const acts = el('div', { class: 'context-actions' });
-  for (const a of actions || []) acts.appendChild(a);
-  if (actions && actions.length) header.appendChild(acts);
+  for (const a of list) if (a) acts.appendChild(a);
+  if (acts.childNodes.length) header.appendChild(acts);
 
 }
 
