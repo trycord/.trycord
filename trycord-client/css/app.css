@@ -2055,7 +2055,78 @@ label {
   font-size: var(--t-fs-xs);
 }
 
-.switch { position: relative; display: inline-flex; align-items: center; flex: 0 0 auto; }
+.switch { position: relative; display: inline-flex; align-items: center; gap: var(--t-d-3); flex: 0 0 auto; }
+
+/* A switch is a checkbox taken out of the flow plus something drawn in its place.
+   The hiding is deliberate - .switch input below - so whatever draws the track is
+   the only part of it anyone ever sees.
+
+   Two shapes are in use. settings-ui builds the track explicitly as a
+   .switch__track child. Five other call sites did not, and two more put the class
+   on a bare <input> with no styling at all. So a switch built the second way had
+   no appearance whatsoever: community visibility and the bots-only filter were a
+   line of text you could click, with nothing in front of it, and integrations
+   showed a native checkbox among styled toggles. A setting you are able to change
+   but not able to see is worse than one that is missing, because it looks present.
+
+   The track is a pseudo-element, so the class carries its own appearance and a
+   caller cannot forget it, and it stands down when a real .switch__track is present
+   so the styled helper does not end up drawing two. */
+.switch:not(:has(.switch__track))::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 40px;
+  height: 22px;
+  border: 1px solid var(--t-line-hi);
+  border-radius: var(--t-r-full);
+  background:
+    radial-gradient(circle at 11px 50%, var(--t-mut) 0 8px, transparent 8px),
+    var(--t-base2);
+  transition: background var(--t-fast) var(--t-ease), border-color var(--t-fast) var(--t-ease);
+}
+.switch:has(input:checked):not(:has(.switch__track))::before {
+  border-color: transparent;
+  background:
+    radial-gradient(circle at 29px 50%, #fff 0 8px, transparent 8px),
+    var(--t-accent);
+}
+.switch:not(:has(.switch__track)):has(input:focus-visible)::before {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
+.switch:not(:has(.switch__track)):has(input:disabled)::before { opacity: 0.5; }
+
+/* The bare <input class="switch"> shape: same switch, drawn on the control itself
+   rather than on a label around it. */
+input.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 40px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--t-line-hi);
+  border-radius: var(--t-r-full);
+  background: var(--t-base2);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--t-ease), border-color var(--t-fast) var(--t-ease);
+}
+input.switch::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--t-r-full);
+  background: var(--t-mut);
+  transition: transform var(--t-med) var(--t-ease), background var(--t-fast) var(--t-ease);
+}
+input.switch:checked { background: var(--t-accent); border-color: transparent; }
+input.switch:checked::before { transform: translateX(18px); background: #fff; }
+input.switch:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+input.switch:disabled { opacity: 0.5; cursor: default; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .switch__track {
   width: 40px; height: 22px;
