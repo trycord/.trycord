@@ -264,17 +264,20 @@ export function renderCommunities(region) {
   // `path` is what the router reports, `href` is where the browser goes. They are
   // different strings wherever the app is mounted under a subpath, so the active
   // test has to use the first and the navigation the second.
+  // `short` is what the 84px rail prints under the glyph; `label` is the full
+  // name, still used for the title, the aria-label and the tooltip. At 84px
+  // 'Direct messages' truncates to 'Direct me...', which is worse than useless.
   const globalItems = [
-    { id: 'home', label: 'Home', icon: 'home', path: '/home' },
-    { id: 'dms', label: 'Direct messages', icon: 'mail', path: '/dms' },
-    { id: 'notifications', label: 'Notifications', icon: 'bell', path: '/notifications', badge: () => State.notifUnread },
-    { id: 'discover', label: 'Discover', icon: 'search', path: '/discover' },
-    { id: 'friends', label: 'Friends', icon: 'users', path: '/friends', badge: () => (State.friendsIn || []).length },
+    { id: 'home', label: 'Home', short: 'Home', icon: 'home', path: '/home' },
+    { id: 'dms', label: 'Direct messages', short: 'Messages', icon: 'mail', path: '/dms' },
+    { id: 'notifications', label: 'Notifications', short: 'Alerts', icon: 'bell', path: '/notifications', badge: () => State.notifUnread },
+    { id: 'discover', label: 'Discover', short: 'Discover', icon: 'search', path: '/discover' },
+    { id: 'friends', label: 'Friends', short: 'Friends', icon: 'users', path: '/friends', badge: () => (State.friendsIn || []).length },
   ];
 
   // The rail's own destinations carry words, for the same reason communities do:
   // five glyphs in a column is a puzzle, five labelled rows is a menu.
-  const railButton = ({ label, icon: iconName, path, active, badge }) => {
+  const railButton = ({ label, short, icon: iconName, path, active, badge }) => {
     const btn = el('button', {
       class: 'rail-nav' + (active ? ' is-active' : ''),
       type: 'button',
@@ -285,7 +288,7 @@ export function renderCommunities(region) {
       onClick: () => { navigate(route(path)); },
     },
     el('span', { class: 'rail-nav__icon' }, icon(iconName)),
-    el('span', { class: 'rail-nav__label' }, label));
+    el('span', { class: 'rail-nav__label' }, short || label));
     const count = badge ? badge() : 0;
     if (count > 0) {
       btn.appendChild(el('span', { class: 'rail-nav__badge' }, count > 99 ? '99+' : String(count)));
@@ -295,7 +298,7 @@ export function renderCommunities(region) {
 
   for (const item of globalItems) {
     region.appendChild(railButton({
-      label: item.label, icon: item.icon, path: item.path, badge: item.badge,
+      label: item.label, short: item.short, icon: item.icon, path: item.path, badge: item.badge,
       active: here === item.path || here.startsWith(item.path + '/'),
     }));
   }
