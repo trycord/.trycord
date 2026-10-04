@@ -1142,7 +1142,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     footer,
     contentClass: 'settings-body',
   });
-  const wrap = el('div', { class: 'page atrium' }, frame);
+  const wrap = el('div', { class: 'page' }, frame);
   const body = pane;
 
   // In the document before anything is awaited. Appending at the end meant every

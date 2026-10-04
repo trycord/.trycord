@@ -533,7 +533,7 @@ export async function renderAdminPages(container, { route } = {}) {
   // Same frame as every other admin section, so Pages is not the one surface
   // with the nav stacked above the content instead of beside it.
   const { frame, pane: body } = settingsFrame({ scope: 'admin', active: 'pages', contentClass: 'settings-body' });
-  const wrap = el('div', { class: 'page atrium' }, frame);
+  const wrap = el('div', { class: 'page' }, frame);
   wrap.appendChild(sectionHead('Pages', 'Public pages an editor can change.'));
   body.appendChild(el('p', { class: 'muted small' },
     'These pages ship as templates. The sections describing what the software does are accurate everywhere; '
