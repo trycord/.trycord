@@ -3701,7 +3701,21 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
     scrollbar-width: none;
   }
   .mobile-tab-navigation__strip::-webkit-scrollbar { display: none; }
-  .mobile-tab-navigation__strip > button { flex: 1 0 auto; min-width: var(--t-ui-tabbar); }
+  /* Six destinations plus the collapse handle do not fit 390px at the handle's
+     minimum, so the strip scrolled and the first tab sat half off the left edge.
+     Tabs share the width equally and shrink to fit; the strip only scrolls if a
+     viewport is narrow enough that even that is not enough. */
+  .mobile-tab-navigation__strip > button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 2px;
+  }
+  .tab-button__label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .mobile-tab-navigation__toggle {
     flex: 0 0 auto;
@@ -3725,7 +3739,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   font-size: var(--t-fs-xxs);
   font-weight: 600;
 }
-.tab-button .ui-icon { width: 21px; height: 21px; }
+.tab-button .ui-icon { width: 20px; height: 20px; }
 .tab-button.is-active { color: var(--t-accent); }
 .tab-button.is-active .tab-button__dot { opacity: 1; }
 .tab-button__dot {
