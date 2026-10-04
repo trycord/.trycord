@@ -126,12 +126,27 @@ async function main() {
         // rounds of "it still looks wrong" happened; this reports the numbers.
         const m0 = await page.eval(`
           const d0 = document.documentElement;
+          // Anything already scrolled when the page settled. A pane that arrived
+          // scrolled photographs as a page whose first heading is missing, which
+          // reads as content hidden under the header and is not that at all - the
+          // only way to tell the two apart is to be told the scroll offsets.
+          const scrolled = [];
+          for (const e of document.querySelectorAll('body *')) {
+            if (e.scrollTop > 1 && e.scrollHeight - e.clientHeight > 4) {
+              const tag = e.id ? '#' + e.id : '.' + String(e.className || '').trim().split(/\s+/)[0];
+              scrolled.push(tag + '=' + e.scrollTop);
+              if (scrolled.length === 3) break;
+            }
+          }
           return { chars: document.body.innerText.trim().length,
                    overflow: d0.scrollWidth > window.innerWidth + 1,
-                   scrollW: d0.scrollWidth, vw: window.innerWidth };`);
+                   scrollW: d0.scrollWidth, vw: window.innerWidth,
+                   win: window.scrollY, scrolled };`);
         console.log('  ' + tag.padEnd(6) + name.padEnd(22)
           + String(m0.chars).padStart(5) + ' chars  '
-          + (m0.overflow ? 'H-OVERFLOW ' + m0.scrollW + '/' + m0.vw : 'fits'));
+          + (m0.overflow ? 'H-OVERFLOW ' + m0.scrollW + '/' + m0.vw : 'fits')
+          + (m0.win ? '  WIN-SCROLL ' + m0.win : '')
+          + (m0.scrolled && m0.scrolled.length ? '  SCROLLED ' + m0.scrolled.join(' ') : ''));
 
         // A surface that paints correctly while throwing on every interaction is
         // not correct. The driver collects exceptions and console errors the whole
