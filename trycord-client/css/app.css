@@ -3550,7 +3550,14 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
    One language for "not yet", "nothing here" and "that failed". A loading
    surface reads as a surface rather than as an empty one. */
 
+/* A state is something short being said in the middle of a large empty area.
+   Letting the box take the full width of the workspace drew a 1200px border around
+   three lines of text, which reads as a panel waiting for content rather than as an
+   answer. Bounded to a measure and centred, so the border encloses the sentence and
+   not the absence. */
 .state-block {
+  max-width: 620px;
+  margin-inline: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
