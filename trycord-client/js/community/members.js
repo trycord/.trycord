@@ -4,6 +4,7 @@ import State from '../state.js';
 import { can, enterServer, peerPresence, refreshBans, setViewRefresh } from '../state.js';
 import { clear, confirmDialog, el, openModal, relTime, toast, attachContextMenu } from '../ui.js';
 import { avatar, emptyState } from '../components.js';
+import { errorState } from '../states.js';
 import { renderContextHeader, memberActions } from '../shell.js';
 import { openRoleAssignModal, rolePill } from '../role-assignment.js';
 import { userNameButton } from '../user-actions.js';
@@ -152,11 +153,23 @@ async function renderServerMembers(container, serverId) {
   const list = el('div', { class: 'community-list' });
   wrap.appendChild(list);
   const banSection = el('div', {});
+  let bansFailed = false;
   wrap.appendChild(banSection);
 
   const reload = async () => {
     await ensureServer(serverId);
-    if (can('BAN_MEMBERS')) { try { await refreshBans(); } catch { /* bans stay stale-empty */ } }
+    if (can('BAN_MEMBERS')) {
+      try {
+        await refreshBans();
+        bansFailed = false;
+      } catch {
+        // Keeping the previous value is right - a stale ban list is still a real
+        // one - but on a first load there is no previous value, and paint() then
+        // renders 'No active bans.' That is a moderator being told nobody is
+        // banned when the request is what would have told them so.
+        bansFailed = !(State.bans && State.bans.length);
+      }
+    }
     paint();
   };
   setViewRefresh(() => { reload().catch(() => {}); });
@@ -309,7 +322,9 @@ async function renderServerMembers(container, serverId) {
     clear(banSection);
     if (can('BAN_MEMBERS')) {
       banSection.appendChild(el('div', { class: 'section-label' }, 'Banned (' + (State.bans || []).length + ')'));
-      if (!(State.bans || []).length) {
+      if (bansFailed) {
+        banSection.appendChild(errorState('Could not load bans.', reload));
+      } else if (!(State.bans || []).length) {
         banSection.appendChild(el('p', { class: 'muted small' }, 'No active bans.'));
       }
       const blist = el('div', { class: 'community-list' });
