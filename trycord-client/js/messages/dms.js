@@ -1,6 +1,6 @@
 
 import Api from '../api.js';
-import { loadingState } from '../states.js';
+import { errorState, loadingState } from '../states.js';
 import State, { refreshDms, refreshFriends, mustVerifyToPost } from '../state.js';
 import { attachContextMenu, confirmDialog, copyText, el, clear, plural, toast, relTime, showEmojiPicker, insertAtCursor, openModal, openReportDialog } from '../ui.js';
 import { avatar, downloadAttachment, emptyState, icon, messageRow } from '../components.js';
@@ -30,11 +30,22 @@ async function renderDmList(container) {
   // So the workspace carries the thread, and when there is nothing yet it says how
   // to start one. Picking a conversation is the sidebar's job and stays there.
   const wrap = el('div', { class: 'page page--quiet' });
+  // State.dms is the last known list, so a failed refresh can still fall back to
+  // it. What it cannot do is fall back to the empty state below and claim there
+  // are no conversations: on a cold load that cache is empty too, and the
+  // reader is told to go and start a conversation they may already have nine of.
   let dms = State.dms;
-  try { dms = await refreshDms(); } catch { /* non-fatal */ }
+  let loadFailed = false;
+  try {
+    dms = await refreshDms();
+  } catch {
+    loadFailed = !(dms && dms.length);
+  }
   dms = dms || [];
 
-  if (!dms.length) {
+  if (!dms.length && loadFailed) {
+    wrap.appendChild(errorState('Could not load your conversations.', () => renderDmList(container)));
+  } else if (!dms.length) {
     wrap.appendChild(emptyState('mail', 'Nobody to talk to yet',
       'Open someone\'s profile in a community and send them a message, or add a friend and start from there.'));
   } else {
@@ -476,8 +487,18 @@ async function renderFriends(container) {
   async function doFind() {
     const q = input.value.trim();
     if (q.length < 2) return;
-    let items = [];
-    try { items = await Api.searchUsers(q); } catch { /* non-fatal */ }
+    let items;
+    try {
+      items = await Api.searchUsers(q);
+    } catch (ex) {
+      // "No users found" after a failed request is the worst version of this:
+      // it reads as confirmation that the person you are looking for does not
+      // exist, which is the one conclusion a search must never draw for you.
+      clear(resultsPane);
+      resultsPane.appendChild(errorState('Search is not working right now.', doFind,
+        { detail: (ex && ex.message) || '' }));
+      return;
+    }
     clear(resultsPane);
     if (!items.length) {
       resultsPane.appendChild(emptyState('search', 'No users found', 'Try a different name.'));
