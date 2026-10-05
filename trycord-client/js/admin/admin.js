@@ -43,6 +43,18 @@ export function statusChip(status, text) {
 }
 
 // server's own message so we never fabricate a cause.
+// render() handles its own fetch failure, so this is only reached if it throws for
+// some other reason. Left unhandled, that rejection vanished and the reader was
+// left looking at the previous filter's rows under the label of the new filter -
+// reports, appeals and audit entries, all read as something other than what was on
+// screen.
+function reportListFailure(listWrap) {
+  return (ex) => {
+    clear(listWrap);
+    listWrap.appendChild(el('p', { class: 'form-error' }, adminError(ex, 'Could not load that list.')));
+  };
+}
+
 function adminError(ex, fallback) {
   const code = ex && ex.code;
   if (code === 'AUTH_REQUIRED') return 'You need to sign in to perform this action.';
@@ -160,7 +172,7 @@ async function renderUsers(body, show, seq) {
     const refresh = () => render(search.value.trim());
     for (const u of found) listWrap.appendChild(userRow(u, refresh));
   };
-  search.addEventListener('input', debounced(() => render(search.value.trim())));
+  search.addEventListener('input', debounced(() => render(search.value.trim()).catch(reportListFailure(listWrap))));
   await render(search.value.trim());
 }
 
@@ -292,7 +304,7 @@ async function renderCommunities(body, show, seq) {
     const refresh = () => render(search.value.trim());
     for (const s of found) listWrap.appendChild(serverRow(s, refresh));
   };
-  search.addEventListener('input', debounced(() => render(search.value.trim())));
+  search.addEventListener('input', debounced(() => render(search.value.trim()).catch(reportListFailure(listWrap))));
   await render(search.value.trim());
 }
 
@@ -473,13 +485,23 @@ async function renderReports(body, show, seq) {
   const listWrap = el('div', { class: 'admin-list' });
   show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (status) => {
-    const found = await Api.adminReports({ status });
-    if (seq !== adminSeq) return;
+    listWrap.setAttribute('aria-busy', 'true');
     clear(listWrap);
-    if (!found || !found.length) { listWrap.appendChild(emptyState('', 'No reports here.', 'Change the filter to see other cases.')); return; }
-    for (const r of found) listWrap.appendChild(reportRow(r, () => render(sel.value)));
+    try {
+      const found = await Api.adminReports({ status });
+      if (seq !== adminSeq) return;
+      if (!found || !found.length) {
+        listWrap.appendChild(emptyState('', 'No reports here.', 'Change the filter to see other cases.'));
+        return;
+      }
+      for (const r of found) listWrap.appendChild(reportRow(r, () => render(sel.value)));
+    } catch (ex) {
+      listWrap.appendChild(el('p', { class: 'form-error' }, adminError(ex, 'Could not load reports.')));
+    } finally {
+      listWrap.removeAttribute('aria-busy');
+    }
   };
-  sel.addEventListener('change', () => render(sel.value));
+  sel.addEventListener('change', () => render(sel.value).catch(reportListFailure(listWrap)));
   await render(sel.value);
 }
 
@@ -611,7 +633,7 @@ async function renderGdpr(sec) {
       listWrap.removeAttribute('aria-busy');
     }
   };
-  sel.addEventListener('change', () => render(sel.value));
+  sel.addEventListener('change', () => render(sel.value).catch(reportListFailure(listWrap)));
   await render(sel.value);
 }
 
@@ -674,13 +696,23 @@ async function renderAppeals(body, show, seq) {
   const listWrap = el('div', { class: 'admin-list' });
   show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (status) => {
-    const found = await Api.adminAppeals({ status });
-    if (seq !== adminSeq) return;
+    listWrap.setAttribute('aria-busy', 'true');
     clear(listWrap);
-    if (!found || !found.length) { listWrap.appendChild(emptyState('', 'No appeals here.', 'Change the filter to see other cases.')); return; }
-    for (const a of found) listWrap.appendChild(appealRow(a, () => render(sel.value)));
+    try {
+      const found = await Api.adminAppeals({ status });
+      if (seq !== adminSeq) return;
+      if (!found || !found.length) {
+        listWrap.appendChild(emptyState('', 'No appeals here.', 'Change the filter to see other cases.'));
+        return;
+      }
+      for (const a of found) listWrap.appendChild(appealRow(a, () => render(sel.value)));
+    } catch (ex) {
+      listWrap.appendChild(el('p', { class: 'form-error' }, adminError(ex, 'Could not load appeals.')));
+    } finally {
+      listWrap.removeAttribute('aria-busy');
+    }
   };
-  sel.addEventListener('change', () => render(sel.value));
+  sel.addEventListener('change', () => render(sel.value).catch(reportListFailure(listWrap)));
   await render(sel.value);
 }
 
@@ -711,13 +743,23 @@ async function renderAudit(body, show, seq) {
   const listWrap = el('div', { class: 'admin-list' });
   show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (action) => {
-    const found = await Api.adminAudit({ action });
-    if (seq !== adminSeq) return;
+    listWrap.setAttribute('aria-busy', 'true');
     clear(listWrap);
-    if (!found || !found.length) { listWrap.appendChild(emptyState('', 'No audit entries.', 'Try a different action filter.')); return; }
-    for (const a of found) listWrap.appendChild(auditRow(a));
+    try {
+      const found = await Api.adminAudit({ action });
+      if (seq !== adminSeq) return;
+      if (!found || !found.length) {
+        listWrap.appendChild(emptyState('', 'No audit entries.', 'Try a different action filter.'));
+        return;
+      }
+      for (const a of found) listWrap.appendChild(auditRow(a));
+    } catch (ex) {
+      listWrap.appendChild(el('p', { class: 'form-error' }, adminError(ex, 'Could not load audit entries.')));
+    } finally {
+      listWrap.removeAttribute('aria-busy');
+    }
   };
-  search.addEventListener('input', debounced(() => render(search.value.trim().toUpperCase())));
+  search.addEventListener('input', debounced(() => render(search.value.trim().toUpperCase()).catch(reportListFailure(listWrap))));
   await render(search.value.trim().toUpperCase());
 }
 
