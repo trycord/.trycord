@@ -1,12 +1,12 @@
 // Invite management for a community: create, copy, revoke.
-import Api from './api.js';
+import Api from '../api.js';
 
-import { can } from './state.js';
-import { attachContextMenu, clear, copyText, el, relTime, toast } from './ui.js';
-import { emptyState } from './components.js';
-import { renderContextHeader } from './shell.js';
-import { TrycordConfig } from './config.js';
-import { ensureServer } from './workspace-shared.js';
+import { can } from '../state.js';
+import { attachContextMenu, clear, copyText, el, relTime, toast } from '../ui.js';
+import { emptyState } from '../components.js';
+import { renderContextHeader } from '../shell.js';
+import { TrycordConfig } from '../config.js';
+import { ensureServer } from '../workspace-shared.js';
 
 async function renderInvites(container, serverId) {
   clear(container);

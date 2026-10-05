@@ -1,12 +1,12 @@
-import Api from './api.js';
-import State, { peerPresence, refreshServers, setViewRefresh } from './state.js';
-import { clear, el, esc, icon, plural, toast } from './ui.js';
-import { avatar, communityBannerUrl, communityMark, emptyState, loadAuthedImage, navRow } from './components.js';
-import { renderAllChrome, renderContextHeader, currentRoute } from './shell.js';
-import { renderMemberList } from './pages-members.js';
-import { ensureServer } from './workspace-shared.js';
-import { channelPath, serverPath } from './links.js';
-import { navigate } from './nav.js';
+import Api from '../api.js';
+import State, { peerPresence, refreshServers, setViewRefresh } from '../state.js';
+import { clear, el, esc, icon, plural, toast } from '../ui.js';
+import { avatar, communityBannerUrl, communityMark, emptyState, loadAuthedImage, navRow } from '../components.js';
+import { renderAllChrome, renderContextHeader, currentRoute } from '../shell.js';
+import { renderMemberList } from './members.js';
+import { ensureServer } from '../workspace-shared.js';
+import { channelPath, serverPath } from '../links.js';
+import { navigate } from '../nav.js';
 
 async function renderServerLanding(container, serverId) {
   clear(container);

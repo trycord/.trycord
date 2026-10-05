@@ -1,21 +1,21 @@
 // The community settings surface: overview, appearance, structure, members,
 // roles, invites, moderation, plus the ownership-transfer and danger-zone
 // controls.
-import Api from './api.js';
-import State from './state.js';
+import Api from '../api.js';
+import State from '../state.js';
 
-import { can, leaveServerContext, peerPresence, refreshServers, setViewRefresh } from './state.js';
-import { clear, confirmDialog, el, relTime, toast } from './ui.js';
-import { communityMark, invalidateAuthedImage, loadAuthedImage } from './components.js';
-import { renderContextHeader } from './shell.js';
-import { ensureServer } from './workspace-shared.js';
-import { serverPath } from './links.js';
-import { settingsFrame, findItem } from './settings-shell.js';
-import { scopeHasTab } from './pages/registry.js';
-import { contextBlock as block, contextFact as fact, contextList as list, contextPara as para } from './context-column.js';
-import { renderIntegrations } from './pages-integrations.js';
-import { renderAnalytics } from './pages-analytics.js';
-import { navigate, route } from './nav.js';;
+import { can, leaveServerContext, peerPresence, refreshServers, setViewRefresh } from '../state.js';
+import { clear, confirmDialog, el, relTime, toast } from '../ui.js';
+import { communityMark, invalidateAuthedImage, loadAuthedImage } from '../components.js';
+import { renderContextHeader } from '../shell.js';
+import { ensureServer } from '../workspace-shared.js';
+import { serverPath } from '../links.js';
+import { settingsFrame, findItem } from '../settings-shell.js';
+import { scopeHasTab } from '../pages/registry.js';
+import { contextBlock as block, contextFact as fact, contextList as list, contextPara as para } from '../context-column.js';
+import { renderIntegrations } from './integrations.js';
+import { renderAnalytics } from './analytics.js';
+import { navigate, route } from '../nav.js';;
 
 // Community sections are addressed relative to the current community, so the
 // href is resolved rather than stored - a stored path would go stale the moment

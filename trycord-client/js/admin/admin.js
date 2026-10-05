@@ -2,30 +2,19 @@
 //
 // Every section renders what the API returns and never fabricates privileges.
 
-import Api from './api.js';
-import { loadingState } from './states.js';
-import State from './state.js';
-import { esc, el, btn, clear, toast, openModal, confirmDialog, relTime, fullTime } from './ui.js';
-import { initialOf, emptyState } from './components.js';
-import { renderContextHeader } from './shell.js';
-import { settingsNav, settingsFrame } from './settings-shell.js';
-import { adminContext } from './context-column.js';
-import { navigate, route } from './nav.js';;
+import Api from '../api.js';
+import { loadingState } from '../states.js';
+import State from '../state.js';
+import { esc, el, btn, clear, toast, openModal, confirmDialog, relTime, fullTime } from '../ui.js';
+import { initialOf, emptyState } from '../components.js';
+import { renderContextHeader } from '../shell.js';
+import { settingsNav, settingsFrame } from '../settings-shell.js';
+import { adminContext } from '../context-column.js';
+import { navigate, route } from '../nav.js';;
 
 const REPORT_STATUSES = ['OPEN', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'];
 const APPEAL_STATUSES = ['OPEN', 'UNDER_REVIEW', 'APPROVED', 'DENIED'];
 
-const SECTIONS = [
-  { id: 'overview', label: 'Overview', href: route('/admin') },
-  { id: 'users', label: 'Users', href: route('/admin/users') },
-  { id: 'communities', label: 'Communities', href: route('/admin/communities') },
-  { id: 'reports', label: 'Reports', href: route('/admin/reports') },
-  { id: 'appeals', label: 'Appeals', href: route('/admin/appeals') },
-  { id: 'gdpr', label: 'GDPR requests', href: route('/admin/gdpr') },
-  { id: 'pages', label: 'Pages', href: route('/admin/pages') },
-  { id: 'audit', label: 'Audit log', href: route('/admin/audit') },
-  { id: 'announcements', label: 'Announcements', href: route('/admin/announcements') },
-];
 
 // captured sequence before touching the DOM so a slow response never writes
 let adminSeq = 0;
@@ -848,7 +837,6 @@ export function renderAdminNav(current) {
 
 export async function renderAdmin(container, { section = 'overview' } = {}) {
   clear(container);
-  const meta = SECTIONS.find((s) => s.id === section) || SECTIONS[0];
   renderContextHeader({ title: 'Admin', sub: 'Platform trust, safety, and enforcement' });
 
   // The section title is the pane's heading rather than a page-level h1, so the

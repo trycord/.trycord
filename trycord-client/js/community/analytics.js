@@ -9,9 +9,9 @@
 // from the messages the client happens to have, so a chart and its totals can
 // never disagree, and a quiet day is a zero rather than a gap.
 
-import Api from './api.js';
-import { clear, el, relTime } from './ui.js';
-import { sectionHead, sectionCard, setEmpty } from './settings-ui.js';
+import Api from '../api.js';
+import { clear, el, relTime } from '../ui.js';
+import { sectionHead, sectionCard, setEmpty } from '../settings-ui.js';
 
 const RANGES = [
   { days: 7, label: '7 days' },
