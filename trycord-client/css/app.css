@@ -904,19 +904,6 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 }
 .rail-nav__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
 
-.rail-dot {
-  flex: 0 0 auto;
-  width: 8px; height: 8px;
-  border-radius: var(--t-r-full);
-  background: var(--t-err);
-}
-.rail-community.has-mention .rail-dot { background: var(--t-accent); box-shadow: var(--t-glow); }
-
-.rail-sep {
-  height: 1px;
-  margin: var(--t-d-3) var(--t-d-4);
-  background: var(--t-line);
-}
 
 /* ==========================================================================
    5  context sidebar
@@ -1818,43 +1805,7 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   border-left: 1px solid var(--t-line);
 }
 
-.member-head {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--t-d-2);
-  padding: var(--t-d-4) var(--t-d-4) var(--t-d-3);
-  border-bottom: 1px solid var(--t-line);
-}
-.member-head__title { color: var(--t-dim); font-size: var(--t-fs-xxs); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
-.member-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--t-d-3) var(--t-d-3) var(--t-d-6); }
-
 .member-group { margin-bottom: var(--t-d-4); }
-.member-group__head {
-  margin: 0 0 var(--t-d-2);
-  padding: 0 var(--t-d-2);
-  color: var(--t-dim);
-  font-size: var(--t-fs-xxs);
-  font-weight: 800;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-}
-
-.member-row {
-  display: flex;
-  align-items: center;
-  gap: var(--t-d-3);
-  width: 100%;
-  padding: 5px var(--t-d-2);
-  border: 0;
-  border-radius: var(--t-r-s);
-  background: transparent;
-  text-align: left;
-}
-.member-row:hover { background: var(--t-hover); }
-.member-row__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t-txt2); font-size: var(--t-fs-s); }
-.member-row.is-offline .member-row__name { color: var(--t-dim); }
 .member-name-line { display: flex; align-items: center; gap: var(--t-d-2); min-width: 0; }
 .member-name-line strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The name in a member row is a button - it opens the user card on click and the
@@ -1900,18 +1851,6 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
 
 /* Presence as a corner dot, not a ring: a ring competes with the avatar's
    own edge and both read as noise at 28px. */
-.avatar__presence {
-  position: absolute;
-  right: -1px; bottom: -1px;
-  width: 11px; height: 11px;
-  border: 2px solid var(--t-base2);
-  border-radius: var(--t-r-full);
-  background: var(--t-dim);
-}
-.avatar__presence.is-online { background: var(--t-ok); }
-.avatar__presence.is-idle { background: var(--t-warn); }
-.avatar__presence.is-dnd { background: var(--t-err); }
-
 .role-color-dot {
   display: inline-block;
   width: 9px; height: 9px;
@@ -2028,17 +1967,15 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
    next to it, inheriting from a different parent, came out larger and brighter - two
    captions for two fields, styled by whatever was nearest.
 
-   This is the plain readable caption. .field__label below is the uppercase variant
-   for the panels that want it, and it still wins where it is applied. */
+   This is the plain readable caption, and now the only one. There used to be an
+   uppercase .field__label variant for panels that wanted it; nothing applied it. */
 label {
   color: var(--t-txt2);
   font-size: var(--t-fs-s);
   font-weight: 600;
   line-height: 1.4;
 }
-.field__label { font-size: var(--t-fs-xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--t-mut); }
-.field__hint { color: var(--t-dim); font-size: var(--t-fs-xs); line-height: 1.5; }
-.field__error, .form-error {
+.form-error {
   padding: var(--t-d-3) var(--t-d-4);
   border: 1px solid color-mix(in srgb, var(--t-err) 40%, transparent);
   border-radius: var(--t-r-s);
@@ -2522,9 +2459,6 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
   gap: var(--t-d-5);
   padding: var(--t-d-6) var(--t-d-6) var(--t-d-8);
 }
-.page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--t-d-5); flex-wrap: wrap; }
-.page-head__main { min-width: 0; }
-.page-head__main h1 { margin: 0; font-size: var(--t-fs-xl); letter-spacing: -0.02em; }
 .page-title { margin: 0 0 var(--t-d-1); font-size: var(--t-fs-xl); letter-spacing: -0.02em; }
 
 /* A page that is mostly one deliberate absence - no conversations yet, nothing
@@ -3409,8 +3343,6 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   background: var(--t-dim);
 }
 .presence-dot.online { background: var(--t-ok); }
-.presence-dot.idle { background: var(--t-warn); }
-.presence-dot.dnd { background: var(--t-err); }
 .avatar .presence-dot {
   position: absolute;
   right: -1px; bottom: -1px;
@@ -4119,8 +4051,6 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
     .rail-mark { width: 28px; height: 28px; }
     .rail-nav__icon .ui-icon { width: 20px; height: 20px; }
     .rail-nav__badge { position: static; margin-left: auto; }
-    .rail-sep { margin-inline: var(--t-d-3); }
-
     .context-sidebar { grid-column: 1; grid-row: 2; border-left: 0; border-top: 1px solid var(--t-line-hi); }
     .ctx-channel { min-height: var(--t-hit); }
     .ctx-switcher__trigger { min-height: 46px; }
