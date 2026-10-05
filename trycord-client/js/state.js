@@ -1,3 +1,4 @@
+import { storage } from './config.js';
 // Central application state. Holds the authenticated session as revealed by
 
 import Api, { token, setToken } from './api.js';
@@ -215,8 +216,12 @@ async function loadServer(serverId) {
   state.channelPermissions = null;
   state.roles = roles || [];
   state.lastServerId = serverId;
-  try { localStorage.setItem(LS_SERVER_ID, serverId); } catch { /* ignore */ }
-  try { serverRoomHooks.join(serverId); } catch { /* ignore */ }
+  storage(() => localStorage.setItem(LS_SERVER_ID, serverId));
+  // A failure here means the socket was never told which community we are looking
+  // at, so its live messages will not arrive. Worth a reconnect rather than a
+  // crash, and the surface being shown renders its own empty state until the room
+  // hook succeeds. Switching community calls this again.
+  try { serverRoomHooks.join(serverId); } catch { /* not joined */ }
   try {
     const ids = (members || []).map((m) => m.user_id || m.id).filter(Boolean).slice(0, 100);
     if (ids.length) {
@@ -268,7 +273,7 @@ export function leaveServerContext() {
   state.lastServerId = null;
   // session; the next enterServer() repopulates it from a fresh snapshot.
   state.presence.clear();
-  try { localStorage.removeItem(LS_SERVER_ID); } catch { /* ignore */ }
+  storage(() => localStorage.removeItem(LS_SERVER_ID));
 }
 
 export async function refreshDms() {
