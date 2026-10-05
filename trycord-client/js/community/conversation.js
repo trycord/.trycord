@@ -11,7 +11,6 @@ import { paintEmbeds, wireEmbedImages } from '../embeds.js';
 import { applyReplyCount, createReplyCounts, createThread } from '../thread.js';
 import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from '../shell.js';
 import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from '../workspace-shared.js';
-import { TrycordConfig } from '../config.js';
 import { serverPath, channelPath, absoluteChannelUrl } from '../links.js';
 import { navigate } from '../nav.js';
 import { presentationMode } from '../presentation.js';
@@ -341,6 +340,9 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   // permalink copied after switching communities pointed at a channel id
   // belonging to a different one - a link that either 404s or, when slugs
   // collide across communities, resolves somewhere the author never intended.
+  // The hover card and the "Copy message link" action both want a permalink to the
+  // same message, and only one of them has the message in hand, so it is built
+  // here rather than at either call site.
   function msgLink(m) {
     return absoluteChannelUrl(serverId, channelId, m.id);
   }
@@ -796,7 +798,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
               { sep: true },
               { label: 'Copy message text', onSelect: () => copyText(String(h.content || ''), 'Message copied.') },
               { label: 'Copy message link', onSelect: () => copyText(
-                TrycordConfig.backendUrl().replace(/\/+$/, '') + '/' + dest.replace(/^#\//, ''), 'Message link copied.') },
+                msgLink(h), 'Message link copied.') },
               { sep: true },
               { label: 'Report message', danger: true, onSelect: () => openReportDialog({
                 targetType: 'message',
