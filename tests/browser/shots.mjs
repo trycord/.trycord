@@ -85,6 +85,7 @@ async function main() {
     }
   }
   const written = [];
+  const faulted = [];
 
   // The first thing this suite does is sign in, and a failure there is reported as
   // "no field for #reg-username" - which says the form was missing, not that the
@@ -164,7 +165,14 @@ async function main() {
           return { chars: document.body.innerText.trim().length,
                    overflow: d0.scrollWidth > window.innerWidth + 1,
                    scrollW: d0.scrollWidth, vw: window.innerWidth,
-                   win: window.scrollY, scrolled };`);
+                   win: window.scrollY, scrolled,
+                   // The two surfaces that mean a page did not render. Collecting
+                   // console errors is not enough on its own: a page can throw, be
+                   // caught by the shell's boundary, and photograph perfectly as a
+                   // tidy error card with a working layout and no overflow. So the
+                   // card itself is the failure signal.
+                   faulted: /Trycord could not start|Unable to load this view/.test(
+                     document.body.innerText || '') };`);
         // Then put it at the top, and let that settle, before the shutter.
         //
         // The order of these two used to be the other way round, which is how two
@@ -186,7 +194,9 @@ async function main() {
           + String(m0.chars).padStart(5) + ' chars  '
           + (m0.overflow ? 'H-OVERFLOW ' + m0.scrollW + '/' + m0.vw : 'fits')
           + (m0.win ? '  WIN-SCROLL ' + m0.win : '')
-          + (m0.scrolled && m0.scrolled.length ? '  SCROLLED ' + m0.scrolled.join(' ') : ''));
+          + (m0.scrolled && m0.scrolled.length ? '  SCROLLED ' + m0.scrolled.join(' ') : '')
+          + (m0.faulted ? '  PAGE-FAULT' : ''));
+        if (m0.faulted) faulted.push(tag + '/' + name);
 
         // A surface that paints correctly while throwing on every interaction is
         // not correct. The driver collects exceptions and console errors the whole
@@ -430,6 +440,14 @@ async function main() {
     await page.close();
   }
   console.log('\nwrote ' + written.length + ' screenshots to ' + OUT);
+  if (faulted.length) {
+    // An error card photographs tidily: correct layout, no overflow, nothing to
+    // complain about visually. Which is exactly why a page that threw could sit
+    // here being mistaken for a finished design. Listed, and the run fails.
+    console.error('\n' + faulted.length + ' surface(s) rendered an error card instead of a page:');
+    for (const f of faulted) console.error('  ' + f);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((err) => {

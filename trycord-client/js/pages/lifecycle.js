@@ -25,6 +25,9 @@ import { clearViewRefreshNow } from '../resolve.js';
 // that the router starts would be a cycle for the sake of one call.
 let lastPath = '/';
 
+const splitSegments = (path) => String(path || '')
+  .split('?')[0].split('/').filter(Boolean).map(decodeURIComponent);
+
 function clearAuthPages() {
   for (const stray of document.querySelectorAll('body > .auth-page')) stray.remove();
 }
@@ -101,6 +104,12 @@ export async function mount(path, query = {}) {
 
   const ctx = {
     region, path, params, rest, query, page,
+    // The path's segments, decoded. `params` is what the registry's pattern
+    // matched and `rest` is what is left over; a handler that has to walk the
+    // address itself - the community tree does, because a channel's id is only
+    // known after a lookup - wants the segments. It was missing from the first
+    // version of this, and every community route threw on parts[0].
+    parts: splitSegments(path),
     publishRoute: (next) => setNavRoute(() => next),
     onCleanup,
   };
