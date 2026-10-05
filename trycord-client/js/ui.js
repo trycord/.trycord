@@ -231,7 +231,7 @@ export function openModal({ title, eyebrow, closable, body, footer, closeText = 
     backdrop.remove();
     document.removeEventListener('keydown', onKey);
     if (prevFocus && prevFocus !== document.body && typeof prevFocus.focus === 'function') {
-      try { prevFocus.focus(); } catch { /* ignore */ }
+      focusQuietly(prevFocus)
     }
   }
   function onKey(e) {
@@ -623,7 +623,7 @@ export function showContextMenu(clientX, clientY, items, opts = {}) {
   };
 
   const first = itemsOf(pop)[0];
-  if (first) { try { first.focus({ preventScroll: true }); } catch { /* ignore */ } }
+  if (first) { focusQuietly(first, { preventScroll: true }) }
   return { pop, hide: closeContextMenu };
 }
 
@@ -711,13 +711,41 @@ export function attachContextMenu(el, factory, opts = {}) {
   };
 }
 
+// Focus, without making it a problem when we cannot.
+//
+// The node is usually something the reader has just interacted with, which means it
+// can already be gone: a popup closed, a re-render replaced it, a route change
+// dismissed the dialog underneath the caret. Focusing a detached node throws in some
+// engines. The only thing lost by not focusing is where the caret was, which is not
+// worth an exception over - the alternative is every close handler being wrapped.
+export function focusQuietly(node, opts) {
+  if (!node || typeof node.focus !== 'function') return;
+  try {
+    node.focus(opts);
+  } catch {
+    // Detached, or an engine that objects. Moving on.
+  }
+}
+
 export function closeContextMenu() {
   closeFrom(0);
   menuStack = [];
-  if (menuCleanup) { try { menuCleanup(); } catch { /* ignore */ } menuCleanup = null; }
-  // this on menuCleanup - which only showContextMenu sets - left Escape unable
+  // These two cleanups are guarded separately, and that is the point. A caller that
+  // threw out of menuCleanup - only showContextMenu sets one - used to stop this
+  // function before the loop below ran, which left the popovers in the document and
+  // left Escape unable to close them: a menu that could be opened and not dismissed.
+  // A cleanup that fails is a leak. It is not a reason to leak more.
+  if (menuCleanup) {
+    try {
+      menuCleanup();
+    } catch {
+      // Dropped. The popovers still have to go.
+    }
+    menuCleanup = null;
+  }
+
   for (const pop of Array.from(document.querySelectorAll('.popover.user-card, .popover.emoji-picker, .ctx-scrim'))) {
-    try { if (pop._ctxCleanup) pop._ctxCleanup(); } catch { /* ignore */ }
+    try { if (pop._ctxCleanup) pop._ctxCleanup(); } catch { /* the node goes regardless */ }
     pop.remove();
   }
 }
@@ -856,7 +884,7 @@ export function openReportDialog({ targetType, targetId, title, subtitle, onSubm
       go.disabled = false;
     }
   });
-  setTimeout(() => { try { details.focus(); } catch { /* ignore */ } }, 50);
+  setTimeout(() => { focusQuietly(details) }, 50);
   return modal;
 }
 
@@ -1039,7 +1067,7 @@ export function insertAtCursor(field, text) {
   } catch {
     field.value += text;
   }
-  try { field.focus(); } catch { /* ignore */ }
+  focusQuietly(field)
 }
 
 
