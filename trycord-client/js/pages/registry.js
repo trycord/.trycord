@@ -1,66 +1,52 @@
 // The page registry: one entry per destination in Trycord.
 //
-// This replaces six lists that each answered part of "where can I go, and what is
-// this screen called". They were:
-//
-//   routes.js ROUTES                  which renderer runs for a path
-//   layout.js BY_PREFIX               which shell layout a path gets
-//   shell.js sidebarContext()         which sidebar a path gets
-//   shell.js globalItems              the rail's destinations
-//   shell.js mobileTabs               the phone tab bar
-//   settings-shell.js SETTINGS_IA     the settings and admin navigation
-//   pages-admin.js SECTIONS           admin section titles
-//
-// None of them agreed with the others, and two of them could not: the admin nav
-// came from SETTINGS_IA.admin while the admin page title came from SECTIONS, two
-// lists holding the same nine ids in a different order. Add a section to the nav
-// and the title silently fell back to Overview, which is the kind of thing that
-// gets noticed by a user rather than by a test.
-//
-// So the answers live here once. Layout, sidebar and navigation are now *derived*
-// from the matched page rather than decided again by whoever is asking.
+// There used to be six lists, each answering part of "where can I go and what is
+// this screen called" - the route table, a layout prefix table, a sidebar context
+// classifier, the rail's destinations, the phone tab bar's, and the settings
+// information architecture. They had drifted: the admin navigation came from
+// SETTINGS_IA.admin while the admin page's title came from a second list holding the
+// same nine sections in a different order, so adding one to the nav left the title
+// silently reading Overview. Layout, sidebar and navigation are derived from the
+// matched page now rather than decided again by whoever is asking.
 //
 // A page looks like:
 //
 //   {
-//     id,        stable identity. Referenced by nav, tests and the shell; never a
-//                route string, because routes change and identities should not.
-//     path,      the address. May contain :params. Two paths may resolve to one
-//                page; the first is canonical and the rest are aliases.
-//     aliases,   older spellings that must keep working. /account/* predates
-//                /settings/* and is still in bookmarks.
-//     access,    'guest'   signed out only, sends a signed-in reader on
-//                'session' needs a session
-//                'public'  either
-//     layout,    which shell layout: channel | list | settings | admin | profile | plain
-//     sidebar,   which contextual nav the shell paints, or null for a surface that
-//                carries its own navigation inside its content
-//     scope,     for the scoped navigations: 'account' | 'community' | 'admin'
-//     group,     the heading this destination sits under inside its scope
-//     label,     what the navigation calls it
-//     icon,      glyph name from ui.js ICON_PATHS
-//     order,     position inside the scope. Not the array order - a page with no
-//                order still belongs to its scope, it just sorts last.
-//     blurb,     the line under the title when this is the current page
-//     tabs,      which tab ids also mean this page. The settings tree has always
-//                had several addresses for one screen (/settings/sessions and
-//                /settings/password both mean Security); this is that aliasing,
-//                stated once.
-//     nav,       presentation. `rail` and `mobile` say whether this destination
-//                appears in the desktop rail and the phone tab bar. Presentation
-//                may differ; identity does not.
-//     hidden     true keeps a page routable but out of every navigation
+//     id,      stable identity. Referenced by navigation and by tests; never a route
+//              string, because routes change and identities should not.
+//     path,    the address. May contain :params. Legacy spellings are rewritten to
+//              the current one before matching rather than kept as parallel entries,
+//              so /account/* reaches the page that answers to it and cannot drift.
+//     access,  'guest'   signed out only; a signed-in reader is sent elsewhere
+//              'session' needs a session
+//              'public'  either
+//     layout,  which shell layout: channel | list | settings | admin | profile | plain
+//     sidebar, which contextual nav the shell paints, or null for a surface that
+//              carries its own navigation inside its content
+//     scope,   for the scoped navigations: 'account' | 'community' | 'admin'
+//     group,   the heading it sits under inside its scope
+//     label,   what the navigation calls it
+//     icon,    glyph name from ui.js ICON_PATHS
+//     order,   position within the scope. Not the array order - a page with no order
+//              still belongs to its scope, it just sorts last.
+//     blurb,   the line under the title when this is the current page
+//     tabs,    every tab id that means this page. The settings tree has always had
+//              more addresses than screens; /settings/sessions and /settings/password
+//              are both Security.
+//     nav,     presentation. `rail` and `mobile` say whether this destination appears
+//              in the desktop rail and the phone tab bar. Presentation may differ
+//              between them; identity does not.
+//     hidden   true keeps a page routable but out of every navigation
 //   }
 //
-// Matching is longest-prefix-wins with segment awareness, which is what routes.js
-// already did and is worth keeping: the order of this array is a reading
-// convenience, not a correctness requirement, and moving an entry cannot silently
-// change what a URL means.
+// Matching is longest-prefix-wins on segment boundaries, which the old route table
+// already did and is worth keeping: the order of this array is a reading convenience,
+// not a correctness requirement, so moving an entry cannot change what a URL means.
 //
-// Deliberately not here: the renderer. Binding a registry entry to a renderer
-// would make every navigation consumer import all nineteen page modules to read a
-// label, and pages import the shell, which reads this file - a cycle. The binding
-// lives in handlers.js, keyed by id.
+// Deliberately not here: the renderer. Binding one to a registry entry would make
+// every navigation consumer - the rail, the sidebar, the settings nav, the tab bar -
+// import all nineteen page modules to read a label, and those modules import the
+// shell, which reads this file. The binding lives in handlers.js, keyed by id.
 
 const p = (id, path, rest) => ({ id, path, access: 'session', layout: 'list', sidebar: null, ...rest });
 
