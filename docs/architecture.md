@@ -128,14 +128,32 @@ connection error.
 
 | Command | What it covers |
 |---|---|
-| `cd trycord-server && npm run check` | applies the schema to a throwaway SQLite database and asserts index uniqueness |
+| `cd trycord-server && npm run check` | schema against a throwaway SQLite database, index uniqueness, client routes served by the server, every client module parsed with its imports resolved, every client singleton bound |
 | `npm run check:routes` | every client route is served by the server |
-| `npm run check:client` | parses every web-client file as an ES module and resolves its relative imports |
+| `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
+| `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
 
-`check:client` exists because `node --check` on a `.js` client file reports
-success for a file containing `import` statements even when the body has a
-duplicate declaration. A duplicate `const serverId` reached `main` through it, in
-`44e1ba8`, and the app would not start. It is a syntax gate, not a test suite.
+`check:client` exists because `node --check` on a `.js` client file reports success
+for a file containing `import` statements even when the body has a duplicate
+declaration. A duplicate `const serverId` reached `main` through it, in `44e1ba8`,
+and the app would not start.
+
+`check:client-singletons` exists because all four of the above passed while every
+settings page was rendering the shell's error card. A refactor had removed
+`import Api from` from every file in a directory rather than from the files that
+did not use it, and `profile.js` went on calling `Api` ten times. The syntax was
+valid, the imports that remained all resolved, and the module parsed. It is narrow
+on purpose: a general "identifier used but not declared" pass produces hundreds of
+false positives from dynamic `import()` destructuring, and a check that cries wolf
+does not get run.
+
+**None of these execute anything.** A syntax gate is not a test suite, and three
+separate breakages in one refactor passed all of them. What catches those is the
+screenshot suite, which walks the signed-out pages before it signs in, reports
+where the browser ended up and what the console said, treats the shell's error card
+as a failure on any surface — it photographs as a tidy card with a correct layout
+and no overflow, so nothing else would notice — and fails the run listing every
+surface that produced one.
 
 
 A live S3 round trip has never completed. The signer was pinned against the AWS
@@ -143,6 +161,43 @@ A live S3 round trip has never completed. The signer was pinned against the AWS
 and left the failure attributable to the endpoint or its credentials rather than
 to the implementation. That check is no longer in the repository, so nothing pins
 the signer now.
+
+## The client: pages and navigation
+
+One file says what a page *is*: `trycord-client/js/pages/registry.js`. A page
+declares its identity, its address, who may be there, which shell layout it wants,
+whether it has a contextual sidebar, and — for the scoped navigations — its scope,
+group, label, icon, order and blurbs.
+
+Everything else asks that file rather than deciding for itself:
+
+- the router resolves an address to a page
+- `pages/lifecycle.js` runs the previous page's teardown, gates access, calls the
+  renderer, paints the chrome afterwards and catches what the renderer throws
+- the rail, the phone tab bar, the settings navigation and the admin navigation all
+  read the same definitions
+
+That is the point of it. There used to be six lists each answering part of "where
+can I go and what is this screen called" — the route table, a layout prefix table,
+a sidebar context classifier, the rail's destinations, the phone tab bar's
+destinations, and the settings information architecture — and they did not agree.
+The admin navigation came from one list while the admin page's title came from
+another holding the same nine sections in a different order; the sidebar classifier
+returned three page types whose renderers had been deleted, so they fell through to
+the messages list.
+
+Matching is longest-prefix-wins on segment boundaries, with `:params`. The order of
+the registry array is a reading convenience, not a correctness requirement: moving
+an entry cannot change what a URL means. Legacy spellings are rewritten before
+matching rather than kept as parallel entries, so `/account/*` and `/admin/servers`
+reach the page that answers to them and cannot drift from it.
+
+A renderer lives next to its own domain — `community/`, `account/`, `admin/`,
+`messages/`, `global/`, `profile/`, `discovery/`, `support/`, `public/` — and binds
+to a page id in `pages/handlers.js`. Renderers are kept out of the registry because
+the rail, the sidebar and the settings navigation would otherwise have to import
+every page module to read a label, and those modules import the shell, which reads
+the registry.
 
 ## Theming
 

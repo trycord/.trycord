@@ -81,7 +81,10 @@ async function renderServerSettings(container, serverId, section = 'overview') {
     resolve: (id) => resolveCommunityHref(serverId, id),
     contentClass: 'settings-body',
   });
-  const wrap = el('div', { class: 'page roles-page' }, frame);
+  // Not 'roles-page', which this picked up when it was copied out of the roles
+  // page: that class restates .page and differs only in a gap, which cannot
+  // apply to a wrapper holding a single frame.
+  const wrap = el('div', { class: 'page' }, frame);
   const panel = pane;
   container.appendChild(wrap);
 
