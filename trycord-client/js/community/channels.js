@@ -9,6 +9,7 @@ import { openOverrideEditor } from '../permission-overrides.js';
 import { ensureServer } from '../workspace-shared.js';
 import { channelPath } from '../links.js';
 import { navigate } from '../nav.js';
+import { onStale } from '../states.js';
 
 function openChannelEditor(serverId, ch, cats, onDone) {
   const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: ch.name || '' });
@@ -127,7 +128,7 @@ async function renderServerCategories(container, serverId) {
   createRow.append(input, add); wrap.appendChild(createRow);
   const list = el('div', { class: 'community-list' }); wrap.appendChild(list);
   const reload = async () => { await ensureServer(serverId); paint(); };
-  setViewRefresh(() => { reload().catch(() => {}); });
+  setViewRefresh(() => { reload().catch(onStale('Channels')); });
   const paint = () => {
     clear(list);
     const cats = [...(State.channels.categories || [])].sort((a, b) => Number(a.position || 0) - Number(b.position || 0));

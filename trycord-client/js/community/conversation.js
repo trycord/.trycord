@@ -1,5 +1,5 @@
 import Api from '../api.js';
-import { loadingState } from '../states.js';
+import { loadingState, onStale} from '../states.js';
 import State from '../state.js';
 import Realtime from '../realtime.js';
 
@@ -904,7 +904,7 @@ async function renderChannelPins(container, serverId, channelId) {
   });
   container._cleanup = () => { offPin(); offUnpin(); Realtime.leaveChannel(); };
   Realtime.join(channelId);
-  setViewRefresh(() => { paint().catch(() => {}); });
+  setViewRefresh(() => { paint().catch(onStale('This conversation')); });
   await paint();
   renderAllChrome();
 }
