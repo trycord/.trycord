@@ -7,6 +7,7 @@ import State from '../state.js';
 import { can, leaveServerContext, peerPresence, refreshServers, setViewRefresh } from '../state.js';
 import { clear, confirmDialog, el, relTime, toast } from '../ui.js';
 import { communityMark, invalidateAuthedImage, loadAuthedImage } from '../components.js';
+import { onStale } from '../states.js';
 import { renderContextHeader } from '../shell.js';
 import { ensureServer } from '../workspace-shared.js';
 import { serverPath } from '../links.js';
@@ -99,7 +100,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   });
 
   const reload = async () => { await ensureServer(serverId); };
-  setViewRefresh(() => { reload().catch(() => {}); });
+  setViewRefresh(() => { reload().catch(onStale('This page')); });
 
   const memberCount = (State.members || []).length;
   const channelCount = ((State.channels && State.channels.channels) || []).length;

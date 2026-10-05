@@ -6,7 +6,7 @@ import { renderAllChrome, renderContextHeader, currentRoute } from '../shell.js'
 import { renderMemberList } from './members.js';
 import { ensureServer } from '../workspace-shared.js';
 import { channelPath, serverPath } from '../links.js';
-import { errorState } from '../states.js';
+import { errorState, onStale} from '../states.js';
 import { navigate } from '../nav.js';
 
 async function renderServerLanding(container, serverId) {
@@ -90,7 +90,7 @@ async function renderServerLanding(container, serverId) {
   wrap.appendChild(el('div', { class: 'section-label' }, 'Members'));
   renderMemberList(wrap, serverId);
   container.appendChild(wrap);
-  setViewRefresh(() => { renderServerLanding(container, serverId).catch(() => {}); });
+  setViewRefresh(() => { renderServerLanding(container, serverId).catch(onStale('This community')); });
   renderAllChrome();
 }
 

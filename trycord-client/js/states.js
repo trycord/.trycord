@@ -69,4 +69,27 @@ export function paintState(host, kind, payload) {
   return node;
 }
 
-export default { loadingState, emptyMessage, errorState, paintState };
+// repaintView() invokes the refresh function without awaiting it, so a rejection has
+// nowhere to go. Six call sites answered that with .catch(() => {}), which does
+// stop the unhandled rejection and does nothing else: the panel quietly stops
+// updating, and a panel that has stopped updating looks exactly like a panel where
+// nothing changed. A role moved, a channel was renamed, and the member list went on
+// showing the old one with no hint that it had.
+//
+// Warned once per window rather than per event. repaintView fires on realtime
+// messages, and a listener that complains about each one is worse than one that
+// complains once.
+const STALE_WARN_WINDOW = 30000;
+let lastStaleWarning = 0;
+
+export function onStale(what) {
+  return (ex) => {
+    const now = Date.now();
+    if (now - lastStaleWarning < STALE_WARN_WINDOW) return;
+    lastStaleWarning = now;
+    const why = (ex && ex.message) ? ': ' + ex.message : '.';
+    toast(what + ' could not be refreshed' + why, 'warn');
+  };
+}
+
+export default { loadingState, emptyMessage, errorState, paintState, onStale };

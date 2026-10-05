@@ -11,6 +11,7 @@ import { assignableRoleTest, myTopPosition, openRoleAssignModal } from '../role-
 import { ensureServer } from '../workspace-shared.js';
 import { serverPath } from '../links.js';
 import { navigate } from '../nav.js';
+import { onStale } from '../states.js';
 
 function roleColor(role) {
   return /^#[0-9a-f]{6}$/i.test((role && role.color) || '') ? role.color : null;
@@ -180,7 +181,7 @@ async function renderServerRoles(container, serverId) {
   let dragId = null;
 
   const reload = async () => { await ensureServer(serverId); };
-  setViewRefresh(() => { reload().catch(() => {}); });
+  setViewRefresh(() => { reload().catch(onStale('Roles')); });
 
   const paint = () => {
     clear(list);
