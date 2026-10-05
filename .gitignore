@@ -33,6 +33,20 @@ Thumbs.db
 # Screenshots are output, not source.
 tests/browser/shots/
 
-# Local-only development tooling. Not part of the repository.
 /tests/
-/.github/
+
+# .github/ is not ignored. It held four workflows - check, publish-docker,
+# release-desktop and the screenshot pipeline - and none of them were tracked, so
+# the project had no CI on its default branch at all: no checks on a push, no Docker
+# publishing, no desktop releases. A workflow file that is not in the repository is
+# a file that never runs for anyone else.
+#
+# publish-docker.yml is the exception and stays untracked until someone decides.
+# It builds and pushes an image on *every* push to main, so tracking it would start
+# publishing images for every commit from now on rather than resuming something that
+# had been switched off deliberately. That is a decision about their infrastructure,
+# not a cleanup.
+
+# See above. Builds and pushes an image on every push to main, so it stays out
+# until that is a decision someone makes on purpose rather than by accident.
+/.github/workflows/publish-docker.yml
