@@ -15,15 +15,20 @@ export function renderPrivacySocial(body) {
   const incoming = State.friendsIn || [];
   const friends = State.friends || [];
 
+  // 'None waiting' is an answer, and after a failed fetch it is one nobody made.
   const reqRow = settingRow({
     label: 'Friend requests',
-    hint: incoming.length ? incoming.length + ' waiting for a reply' : 'None waiting',
+    hint: incoming.length ? incoming.length + ' waiting for a reply'
+      : State.friendsLoaded ? 'None waiting'
+      : 'Could not be loaded',
     control: incoming.length
       ? el('button', {
         class: 'btn sm', type: 'button',
         onClick: () => { navigate('/friends'); },
       }, 'Review')
-      : el('span', { class: 'muted small' }, 'None'),
+      : State.friendsLoaded
+        ? el('span', { class: 'muted small' }, 'None')
+        : el('span', { class: 'muted small' }, 'Unknown'),
   });
   card.appendChild(reqRow);
 
@@ -76,7 +81,9 @@ export function renderPrivacySocial(body) {
   }
 
   if (!incoming.length && !friends.length) {
-    card.appendChild(setEmpty('No requests and no friends yet. People you talk to appear here.'));
+    card.appendChild(State.friendsLoaded
+      ? setEmpty('No requests and no friends yet. People you talk to appear here.')
+      : setEmpty('Your friends could not be loaded. This is not the same as having none.'));
   }
 
   body.appendChild(card);

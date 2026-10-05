@@ -19,7 +19,11 @@ export function renderNotificationsSettings(body) {
     { variant: 'ghost' });
 
   if (!ids.length) {
-    card.appendChild(setEmpty('No muted channels. Mute one from its channel menu.'));
+    // The list is empty either because nothing is muted or because the fetch that
+    // would have said which failed. Only one of those is worth acting on.
+    card.appendChild(setEmpty(State.mutesLoaded
+      ? 'No muted channels. Mute one from its channel menu.'
+      : 'Your muted channels could not be loaded.'));
     card.appendChild(setActionRow(alerts));
   } else {
     card.appendChild(settingRow({

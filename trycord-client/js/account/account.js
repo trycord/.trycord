@@ -6,7 +6,7 @@
 // theme picker does not mean opening the deletion-request panel.
 
 import Api from '../api.js';
-import State, { refreshFriends } from '../state.js';
+import State, { refreshFriends, refreshMutes } from '../state.js';
 import { el, clear } from '../ui.js';
 import { renderContextHeader } from '../shell.js';
 import { renderBackendSelector } from '../public/public.js';
@@ -68,14 +68,14 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   // Friends and mutes are needed by the two new sections. They are already
   // loaded on sign-in, so this only covers a deep link straight into them.
   if (tab === 'privacy' || tab === 'notifications') {
-    try {
-      await Promise.all([
-        State.friends ? Promise.resolve() : refreshFriends(),
-        State.mutedChannels && State.mutedChannels.size ? Promise.resolve() : Api.mutes().then((ids) => {
-          State.mutedChannels = new Set((ids || []).map(String));
-        }).catch(() => {}),
-      ]);
-    } catch { /* the section renders an empty state instead */ }
+    await Promise.all([
+      State.friendsLoaded ? Promise.resolve() : refreshFriends(),
+      State.mutesLoaded ? Promise.resolve() : refreshMutes(),
+    ]).catch(() => {
+      // Not fatal, and deliberately not silent either: the sections below check
+      // friendsLoaded/mutesLoaded and say the list could not be loaded rather than
+      // that there is nothing in it.
+    });
   }
 
   if (tab === 'appearance') {
