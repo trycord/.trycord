@@ -1,11 +1,11 @@
 import State, {
   refreshServers, refreshActivity, refreshDms, refreshNotifications, refreshFriends,
-} from './state.js';
-import { esc, el, clear, plural, relTime } from './ui.js';
-import { avatar, communityMark, emptyState } from './components.js';
-import { renderContextHeader } from './shell.js';
-import { channelPath } from './links.js';
-import { navigate } from './nav.js';
+} from '../state.js';
+import { esc, el, clear, plural, relTime } from '../ui.js';
+import { avatar, communityMark, emptyState } from '../components.js';
+import { renderContextHeader } from '../shell.js';
+import { channelPath } from '../links.js';
+import { navigate } from '../nav.js';
 
 // Home is where you start, so it answers four questions and then stops: what needs
 // me, what am I in the middle of, what am I part of, and where do I go next.

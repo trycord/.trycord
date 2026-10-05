@@ -5,29 +5,29 @@
 // state, because these are the settings where a stale local answer is the
 // difference between an account that looks protected and one that is.
 
-import Api from './api.js';
-import State, { clearSession, refreshFriends, mustVerifyToPost, setMuted } from './state.js';
-import { el, clear, toast, confirmDialog } from './ui.js';
-import { avatar, loadAuthedImage, invalidateAuthedImage } from './components.js';
-import { renderContextHeader, renderAllChrome, clearAnnouncements } from './shell.js';
-import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from './theme.js';
-import { renderBackendSelector } from './pages-public.js';
-import { TrycordConfig } from './config.js';
-import { statusChip } from './pages-admin.js';
-import Realtime from './realtime.js';
-import { settingsFrame, blurbFor, findItem } from './settings-shell.js';
-import { onCleanup } from './pages/teardown.js';
-import { loadingState, errorState } from './states.js';
+import Api from '../api.js';
+import State, { clearSession, refreshFriends, mustVerifyToPost, setMuted } from '../state.js';
+import { el, clear, toast, confirmDialog } from '../ui.js';
+import { avatar, loadAuthedImage, invalidateAuthedImage } from '../components.js';
+import { renderContextHeader, renderAllChrome, clearAnnouncements } from '../shell.js';
+import { THEMES, getTheme, setTheme, loadPalette, savePalette, applyCustomPalette, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, loadCustomTheme, saveCustomTheme, serializeCustomTheme, parseCustomTheme, validateCustomCss, applyCustomTheme, recoverToEmber } from '../theme.js';
+import { renderBackendSelector } from '../public/public.js';
+import { TrycordConfig } from '../config.js';
+import { statusChip } from '../admin/admin.js';
+import Realtime from '../realtime.js';
+import { settingsFrame, blurbFor, findItem } from '../settings-shell.js';
+import { onCleanup } from '../pages/teardown.js';
+import { loadingState, errorState } from '../states.js';
 import {
   privacyContext, securityContext, notificationsContext,
   appearanceContext, backendContext, guideContext, profileContext,
-} from './context-column.js';
+} from '../context-column.js';
 import {
   watchForRemoteChanges,
   renderPrivacySection, renderNotificationPrefsSection,
-} from './privacy-ui.js';
-import { sectionHead, sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from './settings-ui.js';
-import { navigate } from './nav.js';
+} from '../privacy-ui.js';
+import { sectionHead, sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from '../settings-ui.js';
+import { navigate } from '../nav.js';
 
 // Sign-out lives under the sections rather than beside them. In the pill row it
 // was the last item in a wrapping flex line, so it looked like one more section

@@ -11,9 +11,9 @@
 // create or rotate it, and the UI never pretends otherwise by offering to reveal
 // a stored one.
 
-import Api from './api.js';
-import { clear, confirmDialog, el, openModal, relTime, toast } from './ui.js';
-import { sectionHead, sectionCard, settingRow, dangerZone, dangerRow, dangerButton, setEmpty } from './settings-ui.js';
+import Api from '../api.js';
+import { clear, confirmDialog, el, openModal, relTime, toast } from '../ui.js';
+import { sectionHead, sectionCard, settingRow, dangerZone, dangerRow, dangerButton, setEmpty } from '../settings-ui.js';
 
 const EVENT_LABELS = {
   'message.created': 'Message posted',

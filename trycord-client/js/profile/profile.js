@@ -1,12 +1,12 @@
 
-import Api from './api.js';
-import State, { refreshFriends, refreshBlocks, currentServerId } from './state.js';
-import { el, clear, toast } from './ui.js';
-import { avatar, loadAuthedImage } from './components.js';
-import { renderContextHeader } from './shell.js';
-import { fullTime } from './ui.js';
-import { navigate } from './nav.js';
-import { profileViewContext } from './context-column.js';
+import Api from '../api.js';
+import State, { refreshFriends, refreshBlocks, currentServerId } from '../state.js';
+import { el, clear, toast } from '../ui.js';
+import { avatar, loadAuthedImage } from '../components.js';
+import { renderContextHeader } from '../shell.js';
+import { fullTime } from '../ui.js';
+import { navigate } from '../nav.js';
+import { profileViewContext } from '../context-column.js';
 
 export async function renderProfile(container, { id } = {}) {
   clear(container);

@@ -2,13 +2,13 @@
 //
 // The markup is composed from a fixed vocabulary: there is no HTML box, and the
 // server escapes whatever it is given.
-import Api from './api.js';
-import { el, clear, toast, openModal, confirmDialog } from './ui.js';
-import { emptyState } from './components.js';
-import { renderContextHeader } from './shell.js';
-import { settingsFrame } from './settings-shell.js';
-import { sectionHead } from './settings-ui.js';
-import { navigate } from './nav.js';
+import Api from '../api.js';
+import { el, clear, toast, openModal, confirmDialog } from '../ui.js';
+import { emptyState } from '../components.js';
+import { renderContextHeader } from '../shell.js';
+import { settingsFrame } from '../settings-shell.js';
+import { sectionHead } from '../settings-ui.js';
+import { navigate } from '../nav.js';
 
 const BLOCK_TYPES = [
   { type: 'heading', label: 'Heading', make: () => ({ type: 'heading', level: 2, text: 'Section' }) },

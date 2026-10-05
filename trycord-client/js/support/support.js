@@ -1,9 +1,9 @@
 
-import Api from './api.js';
-import { el, clear, icon, toast } from './ui.js';
-import { isAuthed } from './state.js';
-import { route } from './nav.js';
-import { renderContextHeader } from './shell.js';
+import Api from '../api.js';
+import { el, clear, icon, toast } from '../ui.js';
+import { isAuthed } from '../state.js';
+import { route } from '../nav.js';
+import { renderContextHeader } from '../shell.js';
 
 function actionIdFromQuery() {
   try {

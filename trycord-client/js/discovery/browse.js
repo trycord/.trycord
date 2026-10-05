@@ -1,10 +1,10 @@
 
-import Api from './api.js';
-import { esc, el, clear, icon, plural, toast } from './ui.js';
-import { refreshServers, isAuthed } from './state.js';
-import { renderContextHeader } from './shell.js';
-import { communityMark } from './components.js';
-import { navigate } from './nav.js';
+import Api from '../api.js';
+import { esc, el, clear, icon, plural, toast } from '../ui.js';
+import { refreshServers, isAuthed } from '../state.js';
+import { renderContextHeader } from '../shell.js';
+import { communityMark } from '../components.js';
+import { navigate } from '../nav.js';
 
 let page = 1;
 let pages = 1;

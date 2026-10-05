@@ -1,20 +1,20 @@
-import Api from './api.js';
-import { loadingState } from './states.js';
-import State from './state.js';
-import Realtime from './realtime.js';
+import Api from '../api.js';
+import { loadingState } from '../states.js';
+import State from '../state.js';
+import Realtime from '../realtime.js';
 
-import { can, canInChannel, isMuted, mustVerifyToPost, refreshMutes, setChannelPermissions, setMuted, setViewRefresh } from './state.js';
-import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDialog, relTime, showContextMenu, attachContextMenu, showEmojiPicker, toast } from './ui.js';
-import { downloadAttachment, emptyState, icon, messageRow, paintReactions } from './components.js';
-import { createAttachTray } from './attach-tray.js';
-import { paintEmbeds, wireEmbedImages } from './embeds.js';
-import { applyReplyCount, createReplyCounts, createThread } from './thread.js';
-import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from './shell.js';
-import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from './workspace-shared.js';
-import { TrycordConfig } from './config.js';
-import { serverPath, channelPath, absoluteChannelUrl } from './links.js';
-import { navigate } from './nav.js';
-import { presentationMode } from './presentation.js';
+import { can, canInChannel, isMuted, mustVerifyToPost, refreshMutes, setChannelPermissions, setMuted, setViewRefresh } from '../state.js';
+import { clear, confirmDialog, copyText, el, esc, insertAtCursor, openReportDialog, relTime, showContextMenu, attachContextMenu, showEmojiPicker, toast } from '../ui.js';
+import { downloadAttachment, emptyState, icon, messageRow, paintReactions } from '../components.js';
+import { createAttachTray } from '../attach-tray.js';
+import { paintEmbeds, wireEmbedImages } from '../embeds.js';
+import { applyReplyCount, createReplyCounts, createThread } from '../thread.js';
+import { membersHidden, renderAllChrome, renderContextHeader, toggleMembers } from '../shell.js';
+import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } from '../workspace-shared.js';
+import { TrycordConfig } from '../config.js';
+import { serverPath, channelPath, absoluteChannelUrl } from '../links.js';
+import { navigate } from '../nav.js';
+import { presentationMode } from '../presentation.js';
 
 async function renderChannel(container, serverId, channelId, opts = {}) {
   clear(container);

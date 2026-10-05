@@ -1,10 +1,10 @@
-import Api from './api.js';
-import State, { refreshNotifications } from './state.js';
-import { attachContextMenu, copyText, el, clear, toast, relTime } from './ui.js';
-import { emptyState, avatar } from './components.js';
-import { renderContextHeader, renderAllChrome } from './shell.js';
-import { channelPath } from './links.js';
-import { navigate, route } from './nav.js';
+import Api from '../api.js';
+import State, { refreshNotifications } from '../state.js';
+import { attachContextMenu, copyText, el, clear, toast, relTime } from '../ui.js';
+import { emptyState, avatar } from '../components.js';
+import { renderContextHeader, renderAllChrome } from '../shell.js';
+import { channelPath } from '../links.js';
+import { navigate, route } from '../nav.js';
 
 function describe(n) {
   const who = (n.actor && (n.actor.displayName || n.actor.username)) || 'Someone';

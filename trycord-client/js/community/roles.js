@@ -1,16 +1,16 @@
 // The role hierarchy: ordering, permissions, and the per-channel /
 // per-category permission override editor.
-import Api from './api.js';
-import State from './state.js';
+import Api from '../api.js';
+import State from '../state.js';
 
-import { can, setViewRefresh } from './state.js';
-import { clear, confirmDialog, copyText, el, toast, attachContextMenu } from './ui.js';
-import { renderContextHeader } from './shell.js';
-import { groupPermissions, humanizePerm } from './permission-groups.js';
-import { assignableRoleTest, myTopPosition, openRoleAssignModal } from './role-assignment.js';
-import { ensureServer } from './workspace-shared.js';
-import { serverPath } from './links.js';
-import { navigate } from './nav.js';
+import { can, setViewRefresh } from '../state.js';
+import { clear, confirmDialog, copyText, el, toast, attachContextMenu } from '../ui.js';
+import { renderContextHeader } from '../shell.js';
+import { groupPermissions, humanizePerm } from '../permission-groups.js';
+import { assignableRoleTest, myTopPosition, openRoleAssignModal } from '../role-assignment.js';
+import { ensureServer } from '../workspace-shared.js';
+import { serverPath } from '../links.js';
+import { navigate } from '../nav.js';
 
 function roleColor(role) {
   return /^#[0-9a-f]{6}$/i.test((role && role.color) || '') ? role.color : null;

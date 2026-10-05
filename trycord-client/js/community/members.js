@@ -1,14 +1,14 @@
-import Api from './api.js';
-import State from './state.js';
+import Api from '../api.js';
+import State from '../state.js';
 
-import { can, enterServer, peerPresence, refreshBans, setViewRefresh } from './state.js';
-import { clear, confirmDialog, el, openModal, relTime, toast, attachContextMenu } from './ui.js';
-import { avatar, emptyState } from './components.js';
-import { renderContextHeader, memberActions } from './shell.js';
-import { openRoleAssignModal, rolePill } from './role-assignment.js';
-import { userNameButton } from './user-actions.js';
-import { ensureServer } from './workspace-shared.js';
-import { navigate } from './nav.js';
+import { can, enterServer, peerPresence, refreshBans, setViewRefresh } from '../state.js';
+import { clear, confirmDialog, el, openModal, relTime, toast, attachContextMenu } from '../ui.js';
+import { avatar, emptyState } from '../components.js';
+import { renderContextHeader, memberActions } from '../shell.js';
+import { openRoleAssignModal, rolePill } from '../role-assignment.js';
+import { userNameButton } from '../user-actions.js';
+import { ensureServer } from '../workspace-shared.js';
+import { navigate } from '../nav.js';
 
 function memberTopRole(m) {
   const roles = Array.isArray(m.roles) ? m.roles : [];

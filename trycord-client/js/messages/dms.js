@@ -1,15 +1,15 @@
 
-import Api from './api.js';
-import { loadingState } from './states.js';
-import State, { refreshDms, refreshFriends, mustVerifyToPost } from './state.js';
-import { attachContextMenu, confirmDialog, copyText, el, clear, plural, toast, relTime, showEmojiPicker, insertAtCursor, openModal, openReportDialog } from './ui.js';
-import { avatar, downloadAttachment, emptyState, icon, messageRow } from './components.js';
-import { createAttachTray } from './attach-tray.js';
-import { paintEmbeds, wireEmbedImages } from './embeds.js';
-import { applyReplyCount, createReplyCounts, createThread } from './thread.js';
-import { renderContextHeader } from './shell.js';
-import Realtime from './realtime.js';
-import { navigate } from './nav.js';
+import Api from '../api.js';
+import { loadingState } from '../states.js';
+import State, { refreshDms, refreshFriends, mustVerifyToPost } from '../state.js';
+import { attachContextMenu, confirmDialog, copyText, el, clear, plural, toast, relTime, showEmojiPicker, insertAtCursor, openModal, openReportDialog } from '../ui.js';
+import { avatar, downloadAttachment, emptyState, icon, messageRow } from '../components.js';
+import { createAttachTray } from '../attach-tray.js';
+import { paintEmbeds, wireEmbedImages } from '../embeds.js';
+import { applyReplyCount, createReplyCounts, createThread } from '../thread.js';
+import { renderContextHeader } from '../shell.js';
+import Realtime from '../realtime.js';
+import { navigate } from '../nav.js';
 
 let activeDmId = null;
 let dmSubs = [];
