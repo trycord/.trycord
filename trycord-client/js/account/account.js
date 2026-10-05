@@ -5,6 +5,7 @@
 // security, privacy, notifications, appearance, backend, updates - so changing the
 // theme picker does not mean opening the deletion-request panel.
 
+import Api from '../api.js';
 import State, { refreshFriends } from '../state.js';
 import { el, clear } from '../ui.js';
 import { renderContextHeader } from '../shell.js';

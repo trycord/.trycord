@@ -4,6 +4,7 @@
 // is its own page; keeping them in one file meant opening the whole settings
 // surface to change the appearance picker.
 
+import Api from '../api.js';
 import State, { setMuted } from '../state.js';
 import { el, clear, toast } from '../ui.js';
 import { sectionHead, sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from '../settings-ui.js';
