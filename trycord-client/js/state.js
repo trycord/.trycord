@@ -32,6 +32,7 @@ const state = {
   friendsOut: [],      // outgoing requests
   notifUnread: 0,
   mutedChannels: new Set(), // channel ids with notifications suppressed
+    mutesLoaded: false,     // as friendsLoaded, for mutedChannels
   blockedUsers: new Set(), // user ids this reader has blocked
   activity: [],
   online: false,       // WS connected?
@@ -287,6 +288,7 @@ export async function refreshFriends() {
   state.friends = Array.isArray(friends) ? friends : [];
   state.friendsIn = (reqs && reqs.incoming) || [];
   state.friendsOut = (reqs && reqs.outgoing) || [];
+  state.friendsLoaded = true;
   return state;
 }
 
@@ -304,11 +306,15 @@ export function refreshNotifications() {
   return notifInFlight;
 }
 
+// Never clears the flag once set. A refresh that fails later leaves a list that is
+// stale rather than absent, and stale beats absent - only the never-loaded case is
+// one a surface has to warn about.
 export async function refreshMutes() {
   try {
     const ids = await Api.mutes();
     state.mutedChannels = new Set((ids || []).map(String));
-  } catch { /* non-fatal: keep last known set */ }
+    state.mutesLoaded = true;
+  } catch { /* keep the last known set */ }
   return state.mutedChannels;
 }
 
