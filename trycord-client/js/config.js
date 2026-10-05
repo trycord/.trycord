@@ -133,17 +133,30 @@ function isLocalContext() {
   }
 }
 
+// Reading or writing a setting can throw outright rather than return null: Safari
+// in private mode, a browser with storage switched off, a full quota. None of those
+// are worth failing a page over and none can be fixed from here, so the answer is
+// whatever was there before and the caller carries on.
+function storage(fn, fallback = null) {
+  try {
+    return fn();
+  } catch {
+    return fallback;
+  }
+}
+
 function resolveBackend() {
   try {
     const fromQuery = new URLSearchParams(window.location.search).get('api');
     const v = plausibleUrl(fromQuery);
     if (v) return { url: v, source: 'launch argument' };
-  } catch { /* ignore */ }
+  } catch {
+    // Not a setting - a URL constructor, and a malformed ?api= is the reader's
+    // typo rather than our problem. Fall through to the next source.
+  }
 
-  try {
-    const saved = plausibleUrl(localStorage.getItem(LS_BACKEND));
-    if (saved) return { url: saved, source: 'saved setting' };
-  } catch { /* ignore */ }
+  const saved = storage(() => plausibleUrl(localStorage.getItem(LS_BACKEND)));
+  if (saved) return { url: saved, source: 'saved setting' };
 
   if (staticBackend) return { url: staticBackend, source: 'backend.json' };
 
@@ -231,7 +244,7 @@ export const TrycordConfig = {
       if (!probe.ok) continue;
       staticBackend = candidate;
       failoverNotice = { from: current, to: candidate, name: probe.name || candidate };
-      try { localStorage.setItem(LS_BACKEND, candidate); } catch { /* ignore */ }
+      storage(() => localStorage.setItem(LS_BACKEND, candidate));
       return failoverNotice;
     }
     return null;
@@ -243,7 +256,7 @@ export const TrycordConfig = {
     failoverNotice = null;
     staticBackend = configuredBackend;
     if (staticBackend) {
-      try { localStorage.setItem(LS_BACKEND, staticBackend); } catch { /* ignore */ }
+      storage(() => localStorage.setItem(LS_BACKEND, staticBackend));
     } else {
       TrycordConfig.resetBackend();
     }
@@ -307,15 +320,15 @@ export const TrycordConfig = {
 
   setApiUrl(url) {
     const v = plausibleUrl(url);
-    try {
+    storage(() => {
       if (v) localStorage.setItem(LS_BACKEND, v);
       else localStorage.removeItem(LS_BACKEND);
-    } catch { /* ignore */ }
+    });
     return v;
   },
 
   resetBackend() {
-    try { localStorage.removeItem(LS_BACKEND); } catch { /* ignore */ }
+    storage(() => localStorage.removeItem(LS_BACKEND));
   },
 
   // Trycord API (answers /api/instance with JSON). Never throws — returns
