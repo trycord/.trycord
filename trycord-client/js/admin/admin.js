@@ -732,7 +732,7 @@ async function renderAnnouncements(body, show, seq) {
     el('option', { value: 'warning' }, 'Warning'),
     el('option', { value: 'critical' }, 'Critical'));
   const linkLabel = el('input', { class: 'input', type: 'text', maxlength: 64, placeholder: 'Link text (optional)' });
-  const linkHref = el('input', { class: 'input', type: 'text', placeholder: '/#/support' });
+  const linkHref = el('input', { class: 'input', type: 'text', placeholder: '/support' });
   const expires = el('input', { class: 'input', type: 'datetime-local' });
   const err = el('div', { class: 'form-error', hidden: true });
   const save = el('button', { class: 'btn primary', type: 'button' }, 'Publish banner');
@@ -743,7 +743,7 @@ async function renderAnnouncements(body, show, seq) {
     el('div', { class: 'field' }, el('label', {}, 'Level'), level),
     el('div', { class: 'field' }, el('label', {}, 'Link label'), linkLabel),
     el('div', { class: 'field' }, el('label', {}, 'Link'), linkHref,
-      el('span', { class: 'hint' }, 'Relative path only, e.g. /#/support. Leave empty for no link.')),
+      el('span', { class: 'hint' }, 'An in-app path, e.g. /support. Leave empty for no link.')),
     el('div', { class: 'field' }, el('label', {}, 'Expires'), expires,
       el('span', { class: 'hint' }, 'Optional. Leave empty to run until you retire it.')),
     err,

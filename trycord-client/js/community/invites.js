@@ -4,9 +4,10 @@ import Api from '../api.js';
 import { can } from '../state.js';
 import { attachContextMenu, clear, copyText, el, relTime, toast } from '../ui.js';
 import { emptyState } from '../components.js';
+import { errorState } from '../states.js';
 import { renderContextHeader } from '../shell.js';
-import { TrycordConfig } from '../config.js';
 import { ensureServer } from '../workspace-shared.js';
+import { route } from '../nav.js';
 
 async function renderInvites(container, serverId) {
   clear(container);
@@ -34,14 +35,30 @@ async function renderInvites(container, serverId) {
 
   async function reload() {
     clear(listPane);
-    let invites = [];
-    try { invites = await Api.invites(serverId); } catch { /* ignore */ }
+    let invites;
+    try {
+      invites = await Api.invites(serverId);
+    } catch (ex) {
+      // Swallowing this and falling through to the empty state below said
+      // "no invites yet" when the truth was that the list could not be
+      // fetched. Someone reading that would conclude they had revoked or
+      // never created any, which is a different problem with a different fix.
+      listPane.appendChild(errorState('Could not load invites.', reload, {
+        detail: (ex && ex.message) || '',
+      }));
+      return;
+    }
     if (!invites.length) {
       listPane.appendChild(emptyState('compass', 'No invites yet', 'Create one above to share a link.'));
       return;
     }
     for (const inv of invites) {
-      const link = TrycordConfig.backendUrl().replace(/\/+$/, '') + '/#/invite/' + inv.code;
+      // This link is read by people who are neither signed in nor in this
+      // community, so it has to be absolute. location.origin rather than the
+      // configured API base: on an instance whose API lives somewhere else, that
+      // base handed out the API. And route() rather than a literal '/app/',
+      // because a self-hoster serves the app from the root.
+      const link = location.origin + route('/invite/' + encodeURIComponent(inv.code));
       const row = el('div', { class: 'row' });
       // A revoked invite is already spent, so it offers no actions. Saying so
       attachContextMenu(row, () => (inv.revoked ? [
