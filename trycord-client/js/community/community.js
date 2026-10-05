@@ -6,6 +6,7 @@ import { renderAllChrome, renderContextHeader, currentRoute } from '../shell.js'
 import { renderMemberList } from './members.js';
 import { ensureServer } from '../workspace-shared.js';
 import { channelPath, serverPath } from '../links.js';
+import { errorState } from '../states.js';
 import { navigate } from '../nav.js';
 
 async function renderServerLanding(container, serverId) {
@@ -223,7 +224,23 @@ async function renderMenu(container) {
   const communities = section('Your communities');
 
   let servers = [];
-  try { servers = await refreshServers(); } catch { /* offline: the section says so */ }
+  let loadFailed = false;
+  try {
+    servers = await refreshServers();
+  } catch {
+    // The comment this replaces claimed the section below says so. It said the
+    // opposite: "You are not in any communities yet", with a button to go and
+    // find some. Being offline is the one situation where that advice is least
+    // useful and most likely to be acted on.
+    loadFailed = true;
+  }
+
+  if (loadFailed) {
+    communities.appendChild(errorState('Could not load your communities.', () => renderMenu(container),
+      { detail: 'Everything above this section works without them.' }));
+    renderAllChrome();
+    return;
+  }
 
   if (!servers.length) {
     communities.appendChild(el('p', { class: 'muted small' },

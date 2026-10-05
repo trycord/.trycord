@@ -64,6 +64,16 @@ export async function renderNotifications(container) {
   const list = el('div', { class: 'stack' });
   wrap.appendChild(list);
 
+  // Opening a notification is the point; marking it read rides along. Neither
+  // this nor the row click wants a toast when it fails - being told the mark
+  // failed, after being taken where they asked to go anyway, is noise. The
+  // unread badge is stale until the next refresh, which happens on every
+  // realtime notification anyway.
+  const settleRead = async (id) => {
+    try { await Api.readNotification(id); } catch { /* badge stays until next refresh */ }
+    try { await refreshNotifications(); } catch { /* same */ }
+  };
+
   const notifActions = (n, dest) => {
     const items = [];
     const markRead = async () => {
@@ -78,8 +88,7 @@ export async function renderNotifications(container) {
 
     if (dest) {
       items.push({ label: 'Go to', desc: 'Open where this happened', onSelect: async () => {
-        try { await Api.readNotification(n.id); } catch { /* non-fatal */ }
-        try { await refreshNotifications(); } catch { /* non-fatal */ }
+        await settleRead(n.id);
         renderAllChrome();
         navigate(dest);
       } });
@@ -113,8 +122,7 @@ export async function renderNotifications(container) {
     if (!n.readAt) row.appendChild(el('span', { class: 'unread-dot', title: 'Unread' }));
     if (dest) {
       row.addEventListener('click', async () => {
-        try { await Api.readNotification(n.id); } catch { /* non-fatal */ }
-        try { await refreshNotifications(); } catch { /* non-fatal */ }
+        await settleRead(n.id);
         renderAllChrome();
         navigate(dest);
       });
