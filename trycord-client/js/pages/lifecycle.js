@@ -20,6 +20,11 @@ import { el, clear, qs } from '../ui.js';
 import { onCleanup, runTeardowns } from './teardown.js';
 import { clearViewRefreshNow } from '../resolve.js';
 
+// Retry re-mounts the address that failed. It is remembered here rather than
+// reached through the router, because importing the router back into the module
+// that the router starts would be a cycle for the sake of one call.
+let lastPath = '/';
+
 function clearAuthPages() {
   for (const stray of document.querySelectorAll('body > .auth-page')) stray.remove();
 }
@@ -42,10 +47,10 @@ export function resolve(path) {
  * page must not take the application with it.
  */
 export async function mount(path, query = {}) {
+  lastPath = path;
   const region = qs('#view-root');
   if (!region) return null;
 
-  lastPath = path;
   const { page, params, rest } = resolve(path);
   document.documentElement.dataset.route = path || '/';
   delete document.documentElement.dataset.authPage;
