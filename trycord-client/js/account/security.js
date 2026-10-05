@@ -9,6 +9,8 @@ import Realtime from '../realtime.js';
 import State, { clearSession } from '../state.js';
 import { el, clear, toast, confirmDialog } from '../ui.js';
 import { navigate } from '../nav.js';
+import { loadingState, errorState } from '../states.js';
+import { sectionCard, settingRow, setEmpty, dangerButton } from '../settings-ui.js';
 
 export function renderPasswordSection(wrap, container, tab) {
   wrap.appendChild(el('div', { class: 'section-label' }, 'Password'));
@@ -219,6 +221,55 @@ export function renderSessionsSection(wrap) {
   });
   wrap.appendChild(el('div', { class: 'row-line' }, revokeOthers, revokeAll));
   wrap.appendChild(el('p', { class: 'muted small' }, 'Token-based sessions expire after 7 days or when revoked.'));
+}
+
+// Loaded here rather than by the caller: the sessions list is the only
+// thing that has to wait on it, and it is called from exactly one place.
+async function loadSessions(host) {
+  clear(host);
+  host.appendChild(loadingState('Loading your sessions'));
+  let sessions;
+  try {
+    const res = await Api.sessions();
+    sessions = res.sessions || [];
+  } catch (ex) {
+    clear(host);
+    host.appendChild(errorState(ex.message || 'Could not load your sessions.', () => {
+      loadSessions(host);
+    }));
+    return;
+  }
+  clear(host);
+  if (!sessions.length) {
+    host.appendChild(setEmpty('No sessions.'));
+    return;
+  }
+  const card = sectionCard();
+  for (const s of sessions) {
+    const label = s.label || 'Unknown device';
+    const hint = s.current
+      ? 'This device'
+      : [
+        s.lastSeenAt ? 'Last active ' + new Date(s.lastSeenAt).toLocaleString() : null,
+        s.ip ? 'from ' + s.ip : null,
+      ].filter(Boolean).join(' ');
+    // The current session has no revoke button: revoking it is "sign out", which
+    // the page already offers, and offering it here too only puts a way to lose
+    // the current session where losing it is surprising.
+    const control = s.current ? null : dangerButton('Sign out', async () => {
+      control.disabled = true;
+      try {
+        await Api.revokeSession(s.jti);
+        toast(label + ' signed out.', 'ok');
+        loadSessions(host);
+      } catch (ex) {
+        toast(ex.message || 'Could not sign that session out.', 'error');
+        control.disabled = false;
+      }
+    }, { variant: 'ghost' });
+    card.appendChild(settingRow({ label, hint, control }));
+  }
+  host.appendChild(card);
 }
 
 export default { renderPasswordSection, renderTwoFactorSection, renderSessionsSection };
