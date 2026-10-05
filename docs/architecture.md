@@ -148,12 +148,26 @@ false positives from dynamic `import()` destructuring, and a check that cries wo
 does not get run.
 
 **None of these execute anything.** A syntax gate is not a test suite, and three
-separate breakages in one refactor passed all of them. What catches those is the
-screenshot suite, which walks the signed-out pages before it signs in, reports
-where the browser ended up and what the console said, treats the shell's error card
-as a failure on any surface — it photographs as a tidy card with a correct layout
-and no overflow, so nothing else would notice — and fails the run listing every
-surface that produced one.
+separate breakages in one refactor passed all of them.
+
+What catches those is the screenshot suite: it walks the signed-out pages before it
+signs in, reports where the browser ended up and what the console said, treats the
+shell's error card as a failure on any surface — it photographs as a tidy card with
+a correct layout and no overflow, so nothing else would notice — and fails the run
+listing every surface that produced one.
+
+It is not on `main`, deliberately. It lives on a `shots/*` branch, because it is
+scaffolding for UI work rather than something every push should pay for.
+
+**As of `4c9769e` it has not run once, and neither has anything else.** GitHub
+Actions has accepted the `check` workflow and left every run queued — no runner
+picked them up, for over an hour, across seven pushes. The workflows ask for
+`ubuntu-latest` and the repository has no self-hosted runners registered, so the
+label resolves; the billing endpoint is not readable with a repository token, so
+whether this is exhausted Actions minutes, Actions disabled at the account level, or
+a queue on GitHub's side is not determinable from here. Everything in this table is
+currently verified by running `npm run check` locally, and nothing is verified by
+running the application.
 
 
 A live S3 round trip has never completed. The signer was pinned against the AWS
