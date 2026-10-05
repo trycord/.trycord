@@ -137,7 +137,7 @@ function isLocalContext() {
 // in private mode, a browser with storage switched off, a full quota. None of those
 // are worth failing a page over and none can be fixed from here, so the answer is
 // whatever was there before and the caller carries on.
-function storage(fn, fallback = null) {
+export function storage(fn, fallback = null) {
   try {
     return fn();
   } catch {

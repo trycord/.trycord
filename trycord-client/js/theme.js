@@ -1,3 +1,4 @@
+import { storage } from './config.js';
 
 // The only thing this module needs from anywhere: the page registry, so the
 // custom-theme checks can ask what kind of page they are looking at. registry.js
@@ -90,7 +91,7 @@ export function setTheme(name) {
     clearCustomInline();
   }
   document.documentElement.setAttribute('data-theme', resolveTheme(name));
-  try { localStorage.setItem(LS_THEME, name); } catch { /* ignore */ }
+  storage(() => localStorage.setItem(LS_THEME, name));
   return name;
 }
 
@@ -123,22 +124,22 @@ export function loadPalette() {
 
 export function loadCustomTheme() {
   let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(LS_CUSTOM_TOKENS) || 'null'); } catch { /* ignore */ }
+  saved = storage(() => JSON.parse(localStorage.getItem(LS_CUSTOM_TOKENS) || 'null'));
   const legacy = loadPalette();
   const tokens = Object.assign({}, DEFAULT_CUSTOM_TOKENS, saved || {}, {
     accent: (saved && saved.accent) || legacy.accent || DEFAULT_CUSTOM_TOKENS.accent,
     tone: (saved && saved.tone) || legacy.tone || DEFAULT_CUSTOM_TOKENS.tone,
   });
   let css = '';
-  try { css = localStorage.getItem(LS_CUSTOM_CSS) || ''; } catch { /* ignore */ }
+  css = storage(() => localStorage.getItem(LS_CUSTOM_CSS) || '');
   return { tokens, css };
 }
 
 export function saveCustomTheme(state) {
   const tokens = Object.assign({}, DEFAULT_CUSTOM_TOKENS, (state && state.tokens) || {});
-  try { localStorage.setItem(LS_CUSTOM_TOKENS, JSON.stringify(tokens)); } catch { /* ignore */ }
-  try { localStorage.setItem(LS_PALETTE, JSON.stringify({ accent: tokens.accent, tone: tokens.tone })); } catch { /* ignore */ }
-  try { localStorage.setItem(LS_CUSTOM_CSS, String((state && state.css) || '')); } catch { /* ignore */ }
+  storage(() => localStorage.setItem(LS_CUSTOM_TOKENS, JSON.stringify(tokens)));
+  storage(() => localStorage.setItem(LS_PALETTE, JSON.stringify({ accent: tokens.accent, tone: tokens.tone })));
+  storage(() => localStorage.setItem(LS_CUSTOM_CSS, String((state && state.css) || '')));
   return { tokens, css: String((state && state.css) || '') };
 }
 
@@ -156,7 +157,7 @@ export function parseCustomTheme(text) {
 }
 
 export function savePalette(p) {
-  try { localStorage.setItem(LS_PALETTE, JSON.stringify(p)); } catch { /* ignore */ }
+  storage(() => localStorage.setItem(LS_PALETTE, JSON.stringify(p)));
 }
 
 function hexToHsl(hex) {
@@ -257,9 +258,29 @@ export function applyCustomPalette(p) {
 }
 
 // ---- Guided token application -------------------------------------------
+//
+// Everything from here to the end of the custom-theme path swallows its errors on
+// purpose. A theme is authored by hand, so a broken one is a normal thing to
+// encounter rather than an exceptional one, and the correct response to it is to
+// carry on with the theme that did apply and let verifyCustomSafety() put Ember
+// back if the shell did not survive. Letting an exception here escape would take
+// the whole application down over somebody's accent colour.
+//
+// So a bare catch below means 'this step failed, keep going', not 'this does not
+// matter'. Where the reason is not obvious from the code it is written out.
 
+// Writing an inline custom property can throw - an invalid value reaches the CSS
+// parser as an empty declaration, and some older engines throw outright on a
+// custom property they do not recognise. None of that is worth taking the page
+// down over: a token that will not apply is a theme that looks slightly wrong,
+// which is precisely what the recovery path is for.
 function setInline(name, value) {
-  try { document.documentElement.style.setProperty(name, value); } catch { /* ignore */ }
+  try {
+    document.documentElement.style.setProperty(name, value);
+  } catch {
+    // Dropped. verifyCustomSafety() measures the result and falls back to Ember if
+    // the shell did not survive it.
+  }
 }
 
 export function clearCustomInline() {
@@ -607,7 +628,7 @@ export function recoverToEmber() {
   clearCustomCss();
   clearCustomInline();
   document.documentElement.setAttribute('data-theme', DEFAULT_THEME);
-  try { localStorage.setItem(LS_THEME, DEFAULT_THEME); } catch { /* ignore */ }
+  storage(() => localStorage.setItem(LS_THEME, DEFAULT_THEME));
   return DEFAULT_THEME;
 }
 
