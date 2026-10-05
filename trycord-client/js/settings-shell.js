@@ -27,6 +27,14 @@ import { scopeNav } from './pages/registry.js';
 // href is optional per scope: community sections are addressed relative to the
 // current community, so the caller supplies a resolver rather than every item
 // hard-coding a path that would go stale.
+// One icon name in the registry is a word rather than a glyph. Kept here rather
+// than corrected in the registry so the page definitions stay readable as English.
+const ICON_ALIASES = { megaphone: 'bell' };
+
+function iconFor(name) {
+  return icon(ICON_ALIASES[name] || name);
+}
+
 // A section with a path is addressed by it; a community section has none and is
 // addressed relative to whichever community is open, which the caller resolves.
 export function resolveHref(item, resolve) {
