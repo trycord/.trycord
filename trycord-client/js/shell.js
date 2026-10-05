@@ -1,3 +1,4 @@
+import { storage } from './config.js';
 
 import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
 import { avatar, icon, navRow, serverChip, navGroup } from './components.js';
@@ -749,7 +750,7 @@ export function isSidebarCollapsed() {
 
 export function toggleSidebar() {
   const next = !isSidebarCollapsed();
-  try { localStorage.setItem(LS_SIDEBAR_COLLAPSED, next ? '1' : '0'); } catch { /* ignore */ }
+  storage(() => localStorage.setItem(LS_SIDEBAR_COLLAPSED, next));
   applySidebarState();
 }
 
@@ -964,7 +965,7 @@ export function isTabBarHidden() {
 }
 
 export function setTabBarHidden(hidden) {
-  try { localStorage.setItem(LS_TABBAR_HIDDEN, hidden ? '1' : '0'); } catch { /* ignore */ }
+  storage(() => localStorage.setItem(LS_TABBAR_HIDDEN, hidden));
   const bar = qs('#mobile-tab-navigation');
   // The attribute lives on the bar, and the narrow layout's grid gives the bar
   // its own auto track, so collapsing it hands the height straight back to the
@@ -1039,7 +1040,10 @@ function paintRegion(fn) {
   try {
     fn();
   } catch (e) {
-    try { console.error('[trycord] chrome region failed', e); } catch { /* ignore */ }
+    // Some embedders run with no console at all - a locked-down webview, an
+    // Electron renderer with node integration off. Losing the log line is the
+    // entire cost of catching here, and not catching it takes the chrome down.
+    try { console.error('[trycord] chrome region failed', e); } catch { /* no console */ }
   }
 }
 
