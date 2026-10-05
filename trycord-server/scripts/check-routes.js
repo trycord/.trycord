@@ -16,9 +16,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const ROOT = path.join(__dirname, '..');
-const CLIENT_ROUTES = path.join(ROOT, '..', 'trycord-client', 'js', 'routes.js');
+const CLIENT_PAGES = path.join(ROOT, '..', 'trycord-client', 'js', 'pages', 'registry.js');
 const SERVER = path.join(ROOT, 'src', 'server.js');
 
 // Prefixes the server answers with the shell even though no client route uses
@@ -27,13 +28,18 @@ const SERVER = path.join(ROOT, 'src', 'server.js');
 // not a disagreement.
 const SERVER_ONLY = new Set(['channel', 'message', 'profile', 'account', 'home', 'settings']);
 
-function clientSegments() {
-  const src = fs.readFileSync(CLIENT_ROUTES, 'utf8');
-  const prefixes = [...src.matchAll(/prefix:\s*'(\/[^']*?)'/g)].map((m) => m[1]);
-  if (!prefixes.length) throw new Error('no route prefixes found in routes.js');
+// Imported rather than pattern-matched out of the source. This used to grep
+// routes.js for `prefix: '...'` literals, which meant the check was really
+// asserting that a file it had been taught to read still had the shape it expected
+// - and when the routes moved into the page registry it failed by opening a file
+// that no longer existed, which says nothing about routes.
+async function clientSegments() {
+  const mod = await import(pathToFileURL(CLIENT_PAGES).href);
+  const pages = mod.PAGES || [];
+  if (!pages.length) throw new Error('no pages found in the registry');
   return new Set(
-    prefixes
-      .map((p) => p.split('/').filter(Boolean)[0])
+    pages
+      .map((page) => String(page.path || '').split('/').filter(Boolean)[0])
       .filter(Boolean)
   );
 }
@@ -45,7 +51,9 @@ function serverSegments() {
   return new Set([...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
 }
 
-const client = clientSegments();
+
+(async () => {
+const client = await clientSegments();
 const server = serverSegments();
 
 const missing = [...client].filter((s) => !server.has(s)).sort();
@@ -67,3 +75,4 @@ if (missing.length || orphaned.length) {
 console.log(
   'route check passed (' + client.size + ' client segments, all served by the server)'
 );
+})();

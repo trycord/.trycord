@@ -1,4 +1,9 @@
 
+// The only thing this module needs from anywhere: the page registry, so the
+// custom-theme checks can ask what kind of page they are looking at. registry.js
+// imports nothing, so this cannot become a cycle however many modules import theme.js.
+import { matchRoute } from './pages/registry.js';
+
 export const DEFAULT_THEME = 'trycord';
 
 export const THEMES = [
@@ -581,8 +586,12 @@ export function verifyCustomSafety() {
   for (const sel of ['#modal-root', '#popover-root', '#toast-root', '#connection-status']) {
     if (!document.querySelector(sel)) problems.push('Required surface `' + sel + '` is missing.');
   }
-  const route = document.documentElement.dataset.route || '';
-  if (route === '/login' || route === '/register') {
+  // Asked of the page registry rather than compared against two route strings.
+  // 'guest' is what sign-in, sign-up, password recovery and the emailed-link pages
+  // all are, so this covers the two the old comparison missed, and it keeps working
+  // when the app is mounted under a prefix or a page is renamed.
+  const hit = matchRoute(document.documentElement.dataset.route || '/');
+  if (hit && hit.page.access === 'guest') {
     // .auth-card, not .auth-box: the box was renamed long ago and this check had
     // been looking for a class that no longer existed, so it failed every custom
     // theme on sign-in and sign-up and reported a layout fault that was not one.
