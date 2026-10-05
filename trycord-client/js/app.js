@@ -73,14 +73,20 @@ async function boot() {
       presencePaint = setTimeout(() => renderAllChrome(), 750);
     });
     Realtime.connect();
-    refreshServers().catch(() => {});
-    refreshNotifications().catch(() => {});
-    refreshDms().catch(() => {});
-    refreshFriends().catch(() => {});
-    refreshMutes().catch(() => {});
-    refreshBlocks().catch(() => {});
-    loadAnnouncements().catch(() => {});
-    loadWellbeing().catch(() => {});
+    // Warm the caches, then let go. None of these gate the boot: the surface a
+    // reader lands on fetches what it needs itself, and reports it if that fails.
+    // Making the boot wait would mean an unreachable server keeps the app from
+    // starting, which is the opposite of what you want - and the connection
+    // indicator below is already how being offline gets said out loud.
+    const warm = (p) => p.catch(() => {});
+    warm(refreshServers());
+    warm(refreshNotifications());
+    warm(refreshDms());
+    warm(refreshFriends());
+    warm(refreshMutes());
+    warm(refreshBlocks());
+    warm(loadAnnouncements());
+    warm(loadWellbeing());
   } else if (!isAuthed()) {
     // No session: show the public/auth flow on the active shell.
     renderAllChrome();
