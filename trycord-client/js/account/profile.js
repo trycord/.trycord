@@ -4,6 +4,7 @@
 // is its own page; keeping them in one file meant opening the whole settings
 // surface to change the appearance picker.
 
+import Api from '../api.js';
 import State, { mustVerifyToPost } from '../state.js';
 import { el, clear, toast, confirmDialog } from '../ui.js';
 import { avatar, loadAuthedImage, invalidateAuthedImage } from '../components.js';

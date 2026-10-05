@@ -4,6 +4,8 @@
 // is its own page; keeping them in one file meant opening the whole settings
 // surface to change the appearance picker.
 
+import Api from '../api.js';
+import Realtime from '../realtime.js';
 import State, { clearSession } from '../state.js';
 import { el, clear, toast, confirmDialog } from '../ui.js';
 import { navigate } from '../nav.js';
