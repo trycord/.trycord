@@ -1113,21 +1113,6 @@ function renderDeletionSection(wrap) {
     });
 }
 
-function renderDangerZone(wrap) {
-  wrap.appendChild(el('div', { class: 'section-label danger' }, 'Danger zone'));
-  const logoutBtn = el('button', { class: 'btn danger', type: 'button' }, 'Sign out');
-  logoutBtn.addEventListener('click', async () => {
-    try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
-    // reconnecting (and reusing a dead token) after sign-out.
-    try { Realtime.disconnect(); } catch { /* ignore */ }
-    clearAnnouncements();
-    clearSession();
-    navigate('/login');
-  });
-  wrap.appendChild(el('p', { class: 'muted small' }, 'Sign out on this device. Use Security to sign out everywhere.'));
-  wrap.appendChild(el('div', { class: 'row-line' }, logoutBtn));
-}
-
 export async function renderAccount(container, { tab = 'profile' } = {}) {
   clear(container);
   const item = findItem('account', tab);
@@ -1206,7 +1191,6 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderProfileEditor(body);
     renderExportSection(body);
     renderDeletionSection(body);
-    renderDangerZone(body);
   }
 
   await fillContext(frame, context, tab);
