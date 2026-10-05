@@ -85,6 +85,31 @@ async function main() {
     }
   }
   const written = [];
+
+  // The first thing this suite does is sign in, and a failure there is reported as
+  // "no field for #reg-username" - which says the form was missing, not that the
+  // page re-rendered underneath the driver or that the console was full of errors.
+  // Walking the two addresses a signed-out reader sees, and printing whatever the
+  // console said, turns that into an actual diagnosis.
+  page.resetErrors();
+  for (const route of ['/', '/register']) {
+    await page.goto(ORIGIN + route, { waitMs: 1600 });
+    await wait(600);
+    const seen = await page.eval(`
+      const reg = document.querySelector('#reg-username');
+      const card = document.querySelector('.auth-card');
+      return {
+        path: location.pathname,
+        title: (document.querySelector('.context-title') || {}).textContent || '',
+        hasRegisterField: !!reg,
+        hasAuthCard: !!card,
+        bodyStart: (document.body.innerText || '').trim().slice(0, 120),
+      };`);
+    console.log('  PREAUTH ' + route + ' -> ' + JSON.stringify(seen));
+  }
+  for (const e of await page.errors()) console.log('  PREAUTH JS-ERROR ' + e);
+  page.resetErrors();
+
   try {
     const acct = await signedIn(page, ORIGIN, { seedCommunity: true });
     if (!acct.serverId) throw new Error('could not seed a community: ' + JSON.stringify(acct.seed));
