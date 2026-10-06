@@ -229,6 +229,16 @@ lets the wrong person in, or a write that never reaches the database. It takes a
 twenty seconds, most of which is waiting for the server to come up, and it is a separate
 job in CI rather than part of `npm run check`.
 
+**It refuses to run against anything but its own file, and that guard is not
+decoration.** The repository's `.env` carries `DB_CLIENT` twice — `sqlite`, then
+`mysql` — so the last one wins and a bare checkout resolves to a remote database.
+Setting `DB_CLIENT` is what makes a run local; setting only `DB_FILE` is not, which is
+how two accounts, a community and its channels once appeared in a live database. The
+check now asks `src/db/config.js` what the server will resolve to, using the exact
+environment the server will be given, and stops if the answer is anything but its own
+throwaway file. Removing `DB_CLIENT` from it makes it refuse, which is how that guard
+was tested.
+
 What it does **not** cover is the browser. It asserts that `/settings/privacy` comes
 back as the application document, because that is what makes a bookmark survive a
 refresh, but nothing in this repository loads the client in a browser and looks at it.
