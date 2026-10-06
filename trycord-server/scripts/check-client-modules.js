@@ -20,6 +20,8 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+const { stripCommentsOnly } = require('./strip-comments.mjs');
+
 const REPO = path.join(__dirname, '..', '..');
 const DIRS = process.argv.length > 2 ? process.argv.slice(2) : ['trycord-client/js'];
 
@@ -28,6 +30,7 @@ const probe = path.join(tmp, 'probe.mjs');
 let checked = 0;
 const broken = [];
 const allSources = new Map();
+const stripped = new Map();
 
 for (const rel of DIRS) {
   const dir = path.resolve(REPO, rel);
@@ -41,6 +44,7 @@ for (const rel of DIRS) {
     // browser-module rules, and every file in trycord-client/js is shipped.
     const src = fs.readFileSync(p, 'utf8');
     allSources.set(p, src);
+    stripped.set(p, stripCommentsOnly(src));
     fs.copyFileSync(p, probe);
     const r = spawnSync(process.execPath, ['--check', probe], { encoding: 'utf8' });
     checked++;
@@ -120,7 +124,8 @@ function provides(p, name, seen) {
 }
 
 const unresolved = [];
-for (const [file, src] of allSources) {
+for (const [file] of allSources) {
+  const src = stripped.get(file);
   const dir = path.dirname(file);
   for (const m of src.matchAll(/import\s+([\s\S]*?)\s+from\s*['"](\.[^'"]+)['"]/g)) {
     const clause = m[1].trim();
