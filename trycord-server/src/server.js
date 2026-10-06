@@ -43,15 +43,16 @@ function apiOriginOnly(value) {
 // Empty means the client is served from the origin root, which is the ordinary
 // self-hosted case.
 const APP_MOUNT = (process.env.TRYCORD_APP_MOUNT || '').trim().replace(/\/+$/, '');
-// §11 host type is validated strictly: exactly "express" (direct exposure)
-// or "nginx" (reverse-proxy deployment). Anything else is a hard startup
-// error — never silently fall back to a different topology.
+// Validated strictly: exactly "express" (direct exposure) or "nginx"
+// (reverse-proxy deployment). Anything else is a hard startup error - never
+// silently fall back to a different topology, which is how an instance ends up
+// bound to a public interface nobody chose.
 const HOST_TYPE = String(process.env.SERVER_HOST_TYPE || '').trim().toLowerCase();
 if (HOST_TYPE && HOST_TYPE !== 'express' && HOST_TYPE !== 'nginx') {
   throw new Error('Invalid SERVER_HOST_TYPE. Expected "express" or "nginx".');
 }
 const nginxMode = HOST_TYPE === 'nginx';
-// §14/normal bind: in nginx mode the public listener is nginx, so Express
+// Normal bind: in nginx mode the public listener is nginx, so Express
 // binds loopback unless the deployment explicitly requires another interface.
 // In express mode keep the existing direct-exposure default. dotenv injects
 // HOST from .env, so the per-mode default only applies when HOST is unset.
@@ -193,7 +194,7 @@ async function boot() {
   }
   const inst = instanceConfig();
   console.log('[info] host type: ' + (nginxMode ? 'nginx (reverse proxy in front of :' + PORT + ')' : 'express (direct)'));
-  // §12 mode-specific validation: surface obviously inconsistent topology at
+  // Mode-specific validation: surface obviously inconsistent topology at
   // boot instead of failing later at request time.
   if (nginxMode) {
     if (inst.publicUrl) {
@@ -241,7 +242,7 @@ async function boot() {
 
   const app = express();
   const server = http.createServer(app);
-  // §76 proxy trust is deliberate and narrow: only a proxy on the loopback
+  // Proxy trust is deliberate and narrow: only a proxy on the loopback
   // interface (nginx on the same host, which fronts Cloudflare in the
   // documented production layout) may supply X-Forwarded-* headers. Arbitrary
   // clients can never spoof their remote address, so rate limiting and
@@ -882,7 +883,7 @@ async function boot() {
     const status = (err && (err.statusCode || err.status)) || 500;
     // Client-side problems surface as proper 4xx (body-parser rejects with
     // 413/400 for oversized or malformed JSON). Everything else stays a
-    // generic 500 — never stack traces, queries, or internals (§79).
+    // generic 500 — never stack traces, queries, or internals.
     if (status >= 400 && status < 500) {
       const code = err && err.type === 'entity.too.large' ? 'PAYLOAD_TOO_LARGE'
         : err && err.type === 'entity.parse.failed' ? 'BAD_JSON'
