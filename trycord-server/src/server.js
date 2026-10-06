@@ -683,14 +683,16 @@ async function boot() {
     app.get('/support', editablePage('support.html', 'support'));
     app.get('/security', editablePage('security.html', 'security'));
     app.get('/about', publicPage('about.html'));
+    // /support and /security are registered once each, above, as editable pages.
+    // They used to be listed again further down as plain files, and Express takes
+    // the first match - so the second registration was unreachable code that read
+    // like the authoritative one.
     // Contact was merged into Support: /contact redirects rather than 404ing,
     // so existing inbound links and bookmarks keep working.
     app.get('/contact', (req, res) => res.redirect(301, '/support'));
-    app.get('/support', publicPage('support.html'));
     app.get('/features', publicPage('features.html'));
     app.get('/docs', publicPage('documentation.html'));
     app.get('/download', publicPage('download.html'));
-    app.get('/security', publicPage('security.html'));
     app.get('/status', publicPage('status.html'));
     app.get('/welcome', publicPage('home.html'));
     app.get('/404', publicPage('404.html'));
