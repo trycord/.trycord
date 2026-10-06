@@ -96,10 +96,16 @@ export const PAGES = [
     sidebar: 'community',
     hidden: true,
   }),
+  // The same destination under its other address. /c/<slug> is what a reader shares;
+  // /server/<id> is what the app builds and what every sub-page below hangs off. One
+  // page with two spellings, so it says so: otherwise "which page is this" has two
+  // answers for one URL, and a comparison written against the wrong one silently stops
+  // matching rather than failing loudly.
   p('community.legacy', '/server/:id', {
     layout: 'channel',
     sidebar: 'community',
     hidden: true,
+    aliasOf: 'community',
   }),
   p('community.channel', '/server/:id/channel/:channel', {
     layout: 'channel',

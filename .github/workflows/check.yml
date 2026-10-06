@@ -69,6 +69,39 @@ jobs:
         working-directory: backend
         run: npm run check:flows
 
+  render:
+    name: Render checks (jsdom)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # jsdom is a devDependency, so npm ci brings it. It is deliberately not in
+      # dependencies: nothing Trycord ships needs it. It is here so the client can be
+      # rendered by something other than a browser.
+      - name: Install server dependencies
+        working-directory: backend
+        run: npm ci
+
+      # Every other job reads source. This one boots a real backend on a throwaway
+      # database, loads the real index.html into jsdom, imports the real client modules
+      # and visits every route in the registry the way a reader would - through the
+      # router, with real seeded rows behind the :id segments.
+      #
+      # It exists because nothing else could see a page render. Chromium is installed
+      # where this has run but never completes an http request there, so a page that
+      # rendered nothing was only ever discoverable by reading the code that draws it.
+      - name: Render every route
+        working-directory: backend
+        run: npm run check:render
+
   client:
     name: Client checks
     runs-on: ubuntu-latest
