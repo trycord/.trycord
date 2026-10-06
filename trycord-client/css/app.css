@@ -2249,6 +2249,11 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
   .settings-pane .state-block,
 .settings-body { display: flex; flex-direction: column; gap: var(--t-d-5); }
 
+/* The tab's own column, below the heading. Same rule as .settings-body because it
+   now holds what .settings-body used to: the heading sits beside it, not above it,
+   so the pane keeps one gap between them and this keeps the rest. */
+.settings-tab { display: flex; flex-direction: column; gap: var(--t-d-5); }
+
 .settings-context, .profile-context { display: none; }
 
 .set-head { display: flex; align-items: flex-start; gap: var(--t-d-4); }

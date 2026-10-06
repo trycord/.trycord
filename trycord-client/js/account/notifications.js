@@ -7,11 +7,10 @@
 import Api from '../api.js';
 import State, { setMuted } from '../state.js';
 import { el, clear, toast } from '../ui.js';
-import { sectionHead, sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from '../settings-ui.js';
+import { sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from '../settings-ui.js';
 import { navigate } from '../nav.js';
 
 export function renderNotificationsSettings(body) {
-  body.appendChild(sectionHead('Notifications', 'Channels that will not raise an alert.'));
   const ids = [...(State.mutedChannels || [])];
   const card = sectionCard();
 
