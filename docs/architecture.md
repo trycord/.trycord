@@ -159,15 +159,15 @@ listing every surface that produced one.
 It is not on `main`, deliberately. It lives on a `shots/*` branch, because it is
 scaffolding for UI work rather than something every push should pay for.
 
-**As of `4c9769e` it has not run once, and neither has anything else.** GitHub
-Actions has accepted the `check` workflow and left every run queued — no runner
-picked them up, for over an hour, across seven pushes. The workflows ask for
-`ubuntu-latest` and the repository has no self-hosted runners registered, so the
-label resolves; the billing endpoint is not readable with a repository token, so
-whether this is exhausted Actions minutes, Actions disabled at the account level, or
-a queue on GitHub's side is not determinable from here. Everything in this table is
-currently verified by running `npm run check` locally, and nothing is verified by
-running the application.
+`check.yml` runs the first three of these on every push to `main`. It has a fourth
+job, browser, that could never have passed: it runs with `working-directory:
+tests/browser`, and `/tests/` is gitignored as local-only tooling, so the directory
+does not exist in a fresh clone and bash fails before the first suite starts. It went
+unnoticed because `check.yml` was itself untracked — nothing had ever run it. That job
+has been removed, with the reason left where it was.
+
+Browser verification is therefore the screenshot suite and nothing else, on the
+`shots/*` branch, where the scripts it needs are actually present.
 
 
 A live S3 round trip has never completed. The signer was pinned against the AWS
