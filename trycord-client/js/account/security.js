@@ -12,7 +12,7 @@ import { navigate } from '../nav.js';
 import { loadingState, errorState } from '../view-states.js';
 import { sectionCard, settingRow, setEmpty, dangerButton } from '../settings-ui.js';
 
-export function renderPasswordSection(wrap, container, tab) {
+export function renderPasswordSection(wrap, repaint) {
   wrap.appendChild(el('div', { class: 'section-label' }, 'Password'));
   wrap.appendChild(el('p', { class: 'muted small' }, 'Changing your password signs out every other session immediately. This device stays signed in.'));
   const err = el('div', { class: 'form-error', hidden: true });
@@ -33,8 +33,7 @@ export function renderPasswordSection(wrap, container, tab) {
       State.token = res.token;
       localStorage.setItem('trycord.token', res.token);
       State.me = res.user;
-      clear(container);
-      renderAccount(container, { tab });
+      repaint();
       toast('Password changed. Other sessions signed out.', 'ok');
     } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
   });

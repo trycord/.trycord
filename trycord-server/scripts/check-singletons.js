@@ -12,11 +12,11 @@
 //
 // The earlier general version of this produced hundreds of false positives from
 // dynamic import() destructuring. The noise here is controlled by scanning comments
-// with a real tokenizer (strip-comments.js), binding every declaration and parameter
+// with a real tokenizer (strip-comments.mjs), binding every declaration and parameter
 // at any depth, and allowing the language and the browser through by name.
 import fs from 'node:fs';
 import path from 'node:path';
-import { stripComments } from './strip-comments.js';
+import { stripComments } from './strip-comments.mjs';
 
 // ES module, so no __dirname. The repo root is two levels up from trycord-server.
 const HERE = path.dirname(new URL(import.meta.url).pathname);
@@ -53,7 +53,7 @@ const problems = [];
 for (const file of files) {
   const src = fs.readFileSync(file, 'utf8');
   // Comments and string bodies go, via a scanner rather than a regex. See
-  // strip-comments.js for the two regex attempts that ate this codebase.
+  // strip-comments.mjs for the two regex attempts that ate this codebase.
   const code = stripComments(src);
 
   // Everything this file brought in, or declared.

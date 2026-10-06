@@ -5,7 +5,7 @@
 //
 // The failure case is why this exists: a bare catch used to leave the surface
 // blank, and a blank pane is indistinguishable from a slow network.
-import { el, clear } from './ui.js';
+import { clear, el, toast } from './ui.js';
 import { emptyState } from './components.js';
 
 // Reserves its own height so content doesn't jump in, and announces itself.

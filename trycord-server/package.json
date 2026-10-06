@@ -23,11 +23,12 @@
     "start": "node src/server.js",
     "seed": "node scripts/seed.js",
     "migrate": "node scripts/migrate.js",
-    "check": "node scripts/check.js && node scripts/check-routes.js && node scripts/check-server-routes.js && node scripts/check-client-modules.js && node scripts/check-singletons.js",
+    "check": "node scripts/check.js && node scripts/check-routes.js && node scripts/check-server-routes.js && node scripts/check-client-modules.js && node scripts/check-client-bindings.js && node scripts/check-singletons.js",
     "check:routes": "node scripts/check-routes.js",
     "check:client": "node scripts/check-client-modules.js",
     "check:client-singletons": "node scripts/check-singletons.js",
-    "check-server-routes": "node scripts/check-server-routes.js"
+    "check-server-routes": "node scripts/check-server-routes.js",
+    "check:client-bindings": "node scripts/check-client-bindings.js"
   },
   "license": "MIT",
   "dependencies": {
