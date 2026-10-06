@@ -7,7 +7,7 @@
 import Api from '../api.js';
 import Realtime from '../realtime.js';
 import State, { clearSession } from '../state.js';
-import { el, clear, toast, confirmDialog } from '../ui.js';
+import { el, clear, toast, confirmDialog, passwordDialog } from '../ui.js';
 import { navigate } from '../nav.js';
 import { loadingState, errorState } from '../states.js';
 import { sectionCard, settingRow, setEmpty, dangerButton } from '../settings-ui.js';
@@ -72,12 +72,16 @@ export function renderTwoFactorSection(wrap) {
       'Require a 6-digit code from an authenticator app in addition to your password. '
       + 'A stolen password alone will not be enough to sign in.'));
     const start = el('button', { class: 'btn primary', type: 'button' }, 'Set up two-factor');
-    start.addEventListener('click', () => {
+    start.addEventListener('click', async () => {
       err.hidden = true;
       start.setAttribute('aria-busy', 'true');
       // The password is re-confirmed server-side on every management call: a
       // stolen session token must not be enough to turn the factor off.
-      const pw = prompt('Confirm your password');
+      const pw = await passwordDialog({
+        title: 'Confirm your password',
+        message: 'Two-factor setup asks for your password again, so a stolen session token is not enough on its own.',
+        confirmText: 'Continue',
+      });
       if (pw === null) { start.removeAttribute('aria-busy'); return; }
       Api.twoFactorSetup({ password: pw })
         .then((setup) => { clear(host); renderConfirm(host, setup); })
@@ -104,7 +108,10 @@ export function renderTwoFactorSection(wrap) {
       e.preventDefault();
       err.hidden = true;
       try {
-        const pw = prompt('Confirm your password');
+        const pw = await passwordDialog({
+          title: 'Confirm your password',
+          confirmText: 'Turn on two-factor',
+        });
         if (pw === null) return;
         const out = await Api.twoFactorEnable({ password: pw, code: code.value.trim() });
         clear(host);
