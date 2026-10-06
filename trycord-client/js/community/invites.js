@@ -4,7 +4,7 @@ import Api from '../api.js';
 import { can } from '../state.js';
 import { attachContextMenu, clear, copyText, el, relTime, toast } from '../ui.js';
 import { emptyState } from '../components.js';
-import { errorState } from '../states.js';
+import { errorState } from '../view-states.js';
 import { renderContextHeader } from '../shell.js';
 import { ensureServer } from '../workspace-shared.js';
 import { route } from '../nav.js';

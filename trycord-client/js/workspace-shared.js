@@ -4,7 +4,7 @@ import Realtime from './realtime.js';
 
 import { currentServerId, enterServer, isAuthed, leaveServerContext, refreshServerView } from './state.js';
 import { showEmojiPicker, toast } from './ui.js';
-import { onStale } from './states.js';
+import { onStale } from './view-states.js';
 import { renderAllChrome, currentRoute } from './shell.js';
 import { navigate } from './nav.js';
 

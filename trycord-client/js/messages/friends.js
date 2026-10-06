@@ -4,7 +4,7 @@
 // Split out of the 655-line module for the same reason as dm-thread.js.
 
 import Api from '../api.js';
-import { errorState } from '../states.js';
+import { errorState } from '../view-states.js';
 import State, { refreshFriends } from '../state.js';
 import { attachContextMenu, copyText, el, clear, toast, relTime } from '../ui.js';
 import { avatar, emptyState } from '../components.js';

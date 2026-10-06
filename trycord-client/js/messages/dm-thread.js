@@ -6,7 +6,7 @@
 // renders somebody's friend requests.
 
 import Api from '../api.js';
-import { loadingState } from '../states.js';
+import { loadingState } from '../view-states.js';
 import State, { mustVerifyToPost } from '../state.js';
 import { attachContextMenu, confirmDialog, copyText, el, clear, toast, showEmojiPicker, insertAtCursor, openModal, openReportDialog } from '../ui.js';
 import { downloadAttachment, icon, messageRow } from '../components.js';

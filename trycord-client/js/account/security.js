@@ -9,7 +9,7 @@ import Realtime from '../realtime.js';
 import State, { clearSession } from '../state.js';
 import { el, clear, toast, confirmDialog, passwordDialog } from '../ui.js';
 import { navigate } from '../nav.js';
-import { loadingState, errorState } from '../states.js';
+import { loadingState, errorState } from '../view-states.js';
 import { sectionCard, settingRow, setEmpty, dangerButton } from '../settings-ui.js';
 
 export function renderPasswordSection(wrap, container, tab) {

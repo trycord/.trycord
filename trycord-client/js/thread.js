@@ -13,7 +13,7 @@
 import Api from './api.js';
 import { el, clear, insertAtCursor, showEmojiPicker, toast } from './ui.js';
 import { icon } from './components.js';
-import { loadingState, errorState } from './states.js';
+import { loadingState, errorState } from './view-states.js';
 import { replyBadge } from './components.js';
 
 // Reply counts, kept per message for the life of the view.

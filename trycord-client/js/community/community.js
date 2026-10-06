@@ -6,7 +6,7 @@ import { renderAllChrome, renderContextHeader, currentRoute } from '../shell.js'
 import { renderMemberList } from './members.js';
 import { ensureServer } from '../workspace-shared.js';
 import { channelPath, serverPath } from '../links.js';
-import { errorState, onStale} from '../states.js';
+import { errorState, onStale} from '../view-states.js';
 import { navigate } from '../nav.js';
 
 async function renderServerLanding(container, serverId) {
