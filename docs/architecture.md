@@ -169,6 +169,16 @@ has been removed, with the reason left where it was.
 Browser verification is therefore the screenshot suite and nothing else, on the
 `shots/*` branch, where the scripts it needs are actually present.
 
+It also cannot be run locally, which is worth recording because it has been
+re-investigated more than once. Chromium is installed and renders `data:` and
+`file://` URLs correctly, and the server answers on `http://127.0.0.1:9971` from the
+shell, but Chromium's own network service cannot open an `http://` connection here at
+all — the document comes back empty with nothing on stderr. `--no-sandbox`,
+`--single-process`, `--headless=new` and `--disable-features=NetworkServiceInProcess2`
+were each tried and each returns empty. Serving the client over `file://` instead does
+not help: the entry point is `<script type="module">`, and ES modules are blocked by
+CORS from a `null` origin, so nothing executes. The constraint is environmental.
+
 
 A live S3 round trip has never completed. The signer was pinned against the AWS
 `aws-sig-v4-test-suite` vectors at the time, which proved the algorithm correct
