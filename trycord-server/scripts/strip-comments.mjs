@@ -16,10 +16,29 @@
 //
 // Twenty lines of character-by-character scanning is cheaper than debugging that
 // twice more.
+//
+// It still had one hole, which took out the two checks that depend on it. A regex
+// literal was read as code, so the quotes inside one opened a string that ran until
+// the next quote somewhere further down:
+//
+//   const re = /\bhttps?:\/\/[^\s<>"']+/gi;      (src/services/embeds.js:35)
+//
+// The `"` in that character class started a string, which blanked 130 lines including
+// the function definition three lines below the one that opened it. So the scanner now
+// recognises regex literals, which means deciding whether a `/` divides or begins one.
+// The rule used is the usual one: a `/` begins a regex where an operand cannot already
+// have ended - after an opening bracket, a comma, an operator, or the start of input.
 export function stripComments(src) {
   let out = '';
   let i = 0;
   const n = src.length;
+
+  // The last non-whitespace character emitted, which is what makes the regex/division
+  // decision. Reset by nothing: comments and strings both leave code position intact.
+  let prev = '';
+
+  const startsOperand = (last) =>
+    last === '' || '(,=:[!&|?{};+-*%~^<>'.includes(last);
 
   while (i < n) {
     const c = src[i];
@@ -36,6 +55,25 @@ export function stripComments(src) {
       }
       out += '  ';
       i += 2;
+      continue;
+    }
+    // A regex literal, blanked like a string so its quotes cannot open one. A '/'
+    // inside a character class is literal, which is why [ ... ] is tracked.
+    if (c === '/' && startsOperand(prev)) {
+      let inClass = false;
+      out += ' ';
+      i++;
+      while (i < n) {
+        if (src[i] === '\\') { out += '  '; i += 2; continue; }
+        if (src[i] === '\n') break;          // an unterminated regex, not a regex
+        if (src[i] === '[') inClass = true;
+        else if (src[i] === ']') inClass = false;
+        else if (src[i] === '/' && !inClass) { out += ' '; i++; break; }
+        out += ' ';
+        i++;
+      }
+      // Flags after the closing slash are kept - they are short and harmless.
+      while (i < n && /[a-z]/.test(src[i])) { out += src[i]; i++; }
       continue;
     }
     if (c === '"' || c === "'" || c === '`') {
@@ -65,6 +103,7 @@ export function stripComments(src) {
       i++;
       continue;
     }
+    if (!/\s/.test(c)) prev = c;
     out += c;
     i++;
   }
