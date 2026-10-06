@@ -110,6 +110,36 @@ jobs:
         working-directory: backend
         run: npm run check:realtime
 
+  shots:
+    name: Screenshots (real browser)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # No npm install on purpose. Nothing in scripts/browser/ imports a package - it
+      # speaks CDP over the browser's own WebSocket - so the only thing needed is
+      # whatever Chromium the runner image already has.
+      - name: Photograph every surface at eight widths
+        working-directory: backend
+        run: npm run check:shots
+
+      # The screenshots are the point. This step uploads them whether or not the run
+      # above skipped: a machine whose browser cannot load http photographs nothing,
+      # and an artifact directory that is empty says so more clearly than a green tick.
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: backend/shots
+          if-no-files-found: warn
+
   client:
     name: Client checks
     runs-on: ubuntu-latest
