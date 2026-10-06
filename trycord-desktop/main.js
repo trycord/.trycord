@@ -1,5 +1,5 @@
 // Trycord desktop window (Electron access point).
-// Loads the bundled web client (client/, copied from trycord-client at build).
+// Loads the bundled web client (client/, copied from frontend at build).
 // Backend precedence at launch:
 //   1. --api-url=<url> startup argument (dev/smoke/self-host default route)
 //   2. Bundled client/backend.json pin (the production backend for end users)
@@ -49,7 +49,7 @@ function bundledBackendPin() {
   // Returns a plausible http(s) URL or null — never throws.
   const candidates = [
     path.join(__dirname, 'client', 'backend.json'),
-    path.join(__dirname, '..', 'trycord-client', 'backend.json'),
+    path.join(__dirname, '..', 'frontend', 'backend.json'),
   ];
   for (const file of candidates) {
     try {
@@ -134,7 +134,7 @@ protocol.registerSchemesAsPrivileged([
 function clientDir() {
   const bundled = path.join(__dirname, 'client');
   if (fs.existsSync(path.join(bundled, 'index.html'))) return bundled;
-  return path.join(__dirname, '..', 'trycord-client');
+  return path.join(__dirname, '..', 'frontend');
 }
 
 function clientEntry() {
@@ -278,7 +278,7 @@ function createWindow() {
           process.exitCode = 1;
         }
         // Ember default page token (--t-pg #130b07). Keep in sync with
-        // the Ember block in trycord-client/css/app.css.
+        // the Ember block in frontend/css/app.css.
         if (!String(out).includes('body-bg=rgb(19, 11, 7)')) {
           console.log('[smoke] FAIL design tokens did not apply');
           process.exitCode = 1;

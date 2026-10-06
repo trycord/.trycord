@@ -3,14 +3,14 @@
 # Trycord - single-container self-hosting image.
 #
 # The server process is the whole deployment: it serves the web client
-# (trycord-client), the public/legal site (public/), the REST API and the
+# (frontend), the public/legal site (public/), the REST API and the
 # WebSocket gateway on one port. There is no separate frontend container to
 # wire up, which is the whole point of the "easy" path.
 #
 # Layout inside the image mirrors the repository layout on purpose:
 #
-#   /app/trycord-server   application code, node_modules, dev.db
-#   /app/trycord-client   static web client
+#   /app/backend   application code, node_modules, dev.db
+#   /app/frontend   static web client
 #   /app/public           public site, terms.html, privacy.html
 #   /data                 SQLite database + WAL sidecars      <- volume
 #   /app/uploads          user uploads                        <- volume
@@ -29,11 +29,11 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /build/trycord-server
+WORKDIR /build/backend
 
 # Copy manifests first so the dependency layer is cached until a dependency
 # actually changes, not on every source edit.
-COPY trycord-server/package.json trycord-server/package-lock.json* ./
+COPY backend/package.json backend/package-lock.json* ./
 RUN npm ci --omit=dev --no-audit --no-fund || npm install --omit=dev --no-audit --no-fund
 
 # ---------------------------------------------------------------------------
@@ -57,20 +57,20 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY --from=deps /build/trycord-server/node_modules ./trycord-server/node_modules
-COPY trycord-server/package.json       ./trycord-server/
-COPY trycord-server/src                 ./trycord-server/src
-COPY trycord-server/scripts             ./trycord-server/scripts
-COPY trycord-client                     ./trycord-client
+COPY --from=deps /build/backend/node_modules ./backend/node_modules
+COPY backend/package.json       ./backend/
+COPY backend/src                 ./backend/src
+COPY backend/scripts             ./backend/scripts
+COPY frontend                     ./frontend
 COPY public                             ./public
 
 # Writable state. The SQLite file and WAL sidecars land in /data; uploads in
 # /app/uploads. Both are declared as volumes in compose so they survive
 # `docker compose down` and image upgrades.
 RUN mkdir -p /data /app/uploads \
- && chown -R node:node /data /app/uploads /app/trycord-server
+ && chown -R node:node /data /app/uploads /app/backend
 
-WORKDIR /app/trycord-server
+WORKDIR /app/backend
 USER node
 
 EXPOSE 9971

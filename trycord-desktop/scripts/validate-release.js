@@ -134,27 +134,27 @@ if (metaPath_ !== expectedPath) {
 // silently point at different backends. backend.json wins over the
 // config.js default at runtime, so drift here is a live misroute.
 (function checkBackendPin() {
-  const clientDir = path.join(root, '..', 'trycord-client');
+  const clientDir = path.join(root, '..', 'frontend');
   const backendJson = path.join(clientDir, 'backend.json');
   const configJs = path.join(clientDir, 'js', 'config.js');
-  if (!fs.existsSync(backendJson)) fail('missing trycord-client/backend.json (production backend pin)');
+  if (!fs.existsSync(backendJson)) fail('missing frontend/backend.json (production backend pin)');
   let pin;
   try {
     pin = JSON.parse(fs.readFileSync(backendJson, 'utf8')).backendUrl;
   } catch (e) {
-    fail('trycord-client/backend.json is not valid JSON: ' + (e && e.message ? e.message : e));
+    fail('frontend/backend.json is not valid JSON: ' + (e && e.message ? e.message : e));
   }
   if (!/^https:\/\//i.test(String(pin || '').trim())) {
-    fail('trycord-client/backend.json backendUrl must be an https URL, got: ' + pin);
+    fail('frontend/backend.json backendUrl must be an https URL, got: ' + pin);
   }
   let configSrc = '';
   try {
     configSrc = fs.readFileSync(configJs, 'utf8');
   } catch (e) {
-    fail('cannot read trycord-client/js/config.js: ' + (e && e.message ? e.message : e));
+    fail('cannot read frontend/js/config.js: ' + (e && e.message ? e.message : e));
   }
   const m = configSrc.match(/DEFAULT_BACKEND_URL\s*=\s*'([^']+)'/);
-  if (!m) fail('DEFAULT_BACKEND_URL not found in trycord-client/js/config.js');
+  if (!m) fail('DEFAULT_BACKEND_URL not found in frontend/js/config.js');
   const norm = (u) => String(u).trim().replace(/\/+$/, '').toLowerCase();
   if (norm(pin) !== norm(m[1])) {
     fail(`backend pin drift: backend.json (${pin}) != config.js default (${m[1]})`);

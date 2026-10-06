@@ -183,8 +183,8 @@ reverse-proxy limits, and available disk space.
 This policy covers the Trycord project and its official source code,
 including:
 
-- `trycord-server`
-- `trycord-client`
+- `backend`
+- `frontend`
 - `trycord-desktop`
 - Official deployment configuration
 

@@ -220,7 +220,7 @@ cd /opt/trycord
 ### 3. Install dependencies
 
 ```bash
-cd /opt/trycord/trycord-server
+cd /opt/trycord/backend
 npm ci --omit=dev
 ```
 
@@ -237,26 +237,26 @@ Minimum viable `.env`:
 JWT_SECRET=<paste the generated secret>
 PORT=9971
 DB_CLIENT=sqlite
-DB_FILE=/opt/trycord/trycord-server/data/trycord.db
+DB_FILE=/opt/trycord/backend/data/trycord.db
 UPLOAD_DIR=/opt/trycord/uploads
 TRYCORD_INSTANCE_ID=my-instance
 TRYCORD_NAME=My Trycord
 ```
 
-`DB_FILE` is resolved relative to `trycord-server/` when it is not absolute.
+`DB_FILE` is resolved relative to `backend/` when it is not absolute.
 Put it somewhere you will remember to back up.
 
 `UPLOAD_DIR` holds avatars, community icons and message attachments. It
-defaults to `uploads/` inside `trycord-server/`, which is fine for a quick
+defaults to `uploads/` inside `backend/`, which is fine for a quick
 trial but puts user data inside the application tree. Point it somewhere
 outside the checkout so an upgrade or redeploy cannot touch it.
 
 ### 5. Create the data directory and first run
 
 ```bash
-sudo mkdir -p /opt/trycord/uploads /opt/trycord/trycord-server/data
+sudo mkdir -p /opt/trycord/uploads /opt/trycord/backend/data
 sudo chown -R trycord:trycord /opt/trycord
-cd /opt/trycord/trycord-server
+cd /opt/trycord/backend
 node src/server.js
 ```
 
@@ -281,14 +281,14 @@ Wants=network-online.target
 Type=simple
 User=trycord
 Group=trycord
-WorkingDirectory=/opt/trycord/trycord-server
-EnvironmentFile=/opt/trycord/trycord-server/.env
+WorkingDirectory=/opt/trycord/backend
+EnvironmentFile=/opt/trycord/backend/.env
 ExecStart=/usr/bin/node src/server.js
 Restart=on-failure
 RestartSec=5
 # The uploads directory lives outside the working directory, so it has to be
 # writable explicitly.
-ReadWritePaths=/opt/trycord/uploads /opt/trycord/trycord-server/data
+ReadWritePaths=/opt/trycord/uploads /opt/trycord/backend/data
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
@@ -363,7 +363,7 @@ for sensitivity to region, object and expiry, but it has not been run against
 a live endpoint in CI:
 
 ```bash
-cd trycord-server
+cd backend
 node scripts/storage-migrate.js --dry-run
 ```
 

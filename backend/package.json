@@ -1,0 +1,52 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "description": "Trycord backend: REST API, realtime WebSocket gateway, and the static server for the web client",
+  "main": "src/server.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trycord/.trycord.git",
+    "directory": "backend"
+  },
+  "bugs": {
+    "url": "https://github.com/trycord/.trycord/issues"
+  },
+  "homepage": "https://github.com/trycord/.trycord#readme",
+  "keywords": [
+    "chat",
+    "self-hosted",
+    "websocket",
+    "community"
+  ],
+  "author": "Trycord",
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node scripts/seed.js",
+    "migrate": "node scripts/migrate.js",
+    "check": "node scripts/check.js && node scripts/check-routes.js && node scripts/check-server-routes.js && node scripts/check-server-bindings.js && node scripts/check-client-modules.js && node scripts/check-client-bindings.js && node scripts/check-client-load.js && node scripts/check-singletons.js",
+    "check:routes": "node scripts/check-routes.js",
+    "check:client": "node scripts/check-client-modules.js",
+    "check:client-singletons": "node scripts/check-singletons.js",
+    "check-server-routes": "node scripts/check-server-routes.js",
+    "check:client-bindings": "node scripts/check-client-bindings.js",
+    "check:server-bindings": "node scripts/check-server-bindings.js",
+    "check:flows": "node scripts/check-flows.js",
+    "check:client-load": "node scripts/check-client-load.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
+    "mysql2": "^3.11.0",
+    "nodemailer": "^10.0.10",
+    "ws": "^8.21.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: trycord-server
+        working-directory: backend
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: trycord-server/package-lock.json
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -50,10 +50,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: trycord-server/package-lock.json
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install server dependencies
-        working-directory: trycord-server
+        working-directory: backend
         run: npm ci
 
       # The only job that runs the application. Everything else reads source: it parses
@@ -66,7 +66,7 @@ jobs:
       # It needs the web client on disk to serve, because some of its assertions are
       # about what a browser gets back.
       - name: Flow checks
-        working-directory: trycord-server
+        working-directory: backend
         run: npm run check:flows
 
   client:
@@ -81,19 +81,19 @@ jobs:
         with:
           node-version: 22
 
-      # NOT `node --check trycord-client/js/*.js`: that reports success for a
+      # NOT `node --check frontend/js/*.js`: that reports success for a
       # .js file containing import statements even when the body has a duplicate
       # declaration, so it is not a check. A duplicate `const serverId` shipped
       # to main through it in 44e1ba8. This parses each module as a module.
       - name: Parse client modules as ES modules
-        run: node trycord-server/scripts/check-client-modules.js trycord-client/js
+        run: node backend/scripts/check-client-modules.js frontend/js
 
       # Imports every client module, which is the only step that evaluates client code.
       # `export { esc, el } from './dom.js'` re-exports without binding a local name, so
       # every importer resolved, the file parsed, and the application still died on its
       # first line. Nothing that reads source can see that; importing the module can.
       - name: Load client modules against a stub DOM
-        run: node trycord-server/scripts/check-client-load.js
+        run: node backend/scripts/check-client-load.js
 
 
   desktop:

@@ -15,29 +15,29 @@ The eleven questions worth being able to answer without searching.
 
 | | |
 |---|---|
-| Routing | `trycord-client/js/router.js` - parses `location`, calls `mount`. Longest-prefix matching, no hash. |
-| Page definitions | `trycord-client/js/pages/registry.js` - the one source of truth for every page, route and nav entry. |
+| Routing | `frontend/js/router.js` - parses `location`, calls `mount`. Longest-prefix matching, no hash. |
+| Page definitions | `frontend/js/pages/registry.js` - the one source of truth for every page, route and nav entry. |
 | Navigation | Derived from that registry: `shell.js` for the rail and tab bar, `settings-shell.js` for settings and admin, `community-nav.js` for the community sidebar. Presentation differs; identity does not. |
-| Renderers | `trycord-client/js/pages/handlers.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
-| Lifecycle | `trycord-client/js/pages/lifecycle.js` - mount, teardown, access gate, per-page error isolation. |
-| Authentication state | `trycord-client/js/state.js`. The token is in `api.js`; everything else reads `State.me`. |
+| Renderers | `frontend/js/pages/handlers.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
+| Lifecycle | `frontend/js/pages/lifecycle.js` - mount, teardown, access gate, per-page error isolation. |
+| Authentication state | `frontend/js/state.js`. The token is in `api.js`; everything else reads `State.me`. |
 | Client-side permissions | `state.js#can`, mirrored from `services/permissions.js`. **Display only** - the server decides. |
 | Server-side authorization | `middleware/serverAccess.js` - `resolveServer`, `requireMember`, `requirePerm`, `requireOwner`. Routes declare their own level. |
-| Themes | `trycord-client/js/theme.js` over the `--t-*` tokens in `css/app.css`. Built-in themes are `[data-theme]` blocks; custom ones are verified and kept working. |
-| API calls | `trycord-client/js/api.js`. One `request()`, no per-feature clients. |
+| Themes | `frontend/js/theme.js` over the `--t-*` tokens in `css/app.css`. Built-in themes are `[data-theme]` blocks; custom ones are verified and kept working. |
+| API calls | `frontend/js/api.js`. One `request()`, no per-feature clients. |
 | Message state | `messages/dm-thread.js` and `community/conversation.js`, each owning its own feed and subscriptions, torn down on the way out. |
 | Community context | `state.js` - `currentServerId`, plus `workspace-shared.js` for the realtime wiring that keeps it fresh. |
 | Database access | `db/index.js`, which is the only module that speaks SQL dialect. |
 | Notification preferences, quiet hours, sessions | `services/prefs.js`, `services/wellbeing.js`, `services/sessions.js` - each its own module, not three more things inside `services/privacy.js`. |
-| Instance configuration | `db/config.js` and the `instanceConfig()` in `server.js`. Every deployment fact is an environment variable, documented in `trycord-server/.env.example`. |
+| Instance configuration | `db/config.js` and the `instanceConfig()` in `server.js`. Every deployment fact is an environment variable, documented in `backend/.env.example`. |
 | Self-hosting | `docs/selfhosting.md`. No product code requires Trycord's own infrastructure: the client defaults to it but every value is overridable, and a client served by a backend is repointed at that backend. |
 
 ## Architecture
 
 ```
 Trycord
-├── trycord-server    authoritative backend: API, WebSocket, auth, storage
-├── trycord-client    WAC, the web client
+├── backend    authoritative backend: API, WebSocket, auth, storage
+├── frontend    WAC, the web client
 ├── trycord-desktop   DAC, an Electron shell that bundles the same client
 └── public            the public site, separate from the authenticated app
 ```
@@ -153,7 +153,7 @@ connection error.
 
 | Command | What it covers |
 |---|---|
-| `cd trycord-server && npm run check` | schema against a throwaway SQLite database, index uniqueness, client routes served by the server, every client module parsed with its imports resolved, every client singleton bound |
+| `cd backend && npm run check` | schema against a throwaway SQLite database, index uniqueness, client routes served by the server, every client module parsed with its imports resolved, every client singleton bound |
 | `npm run check:routes` | every client route is served by the server |
 | `npm run check-server-routes` | no route is registered twice in one server module |
 | `npm run check:flows` | **runs the application** - boots a server and drives real flows |
@@ -282,7 +282,7 @@ the signer now.
 
 ## The client: pages and navigation
 
-One file says what a page *is*: `trycord-client/js/pages/registry.js`. A page
+One file says what a page *is*: `frontend/js/pages/registry.js`. A page
 declares its identity, its address, who may be there, which shell layout it wants,
 whether it has a contextual sidebar, and — for the scoped navigations — its scope,
 group, label, icon, order and blurbs.
@@ -348,5 +348,5 @@ Real, known gaps. None blocks ordinary use.
 - **Email verification and password reset need a working SMTP transport.**
 - **Full-text search is prefix-based.** There is no index and no ranking.
 - **`docs/selfhosting.md` is a deployment narrative, not a variable reference.**
-  Every variable is documented in `trycord-server/.env.example`.
+  Every variable is documented in `backend/.env.example`.
 - **Attachment progress, cancel and retry, drop and paste, and a lightbox.**

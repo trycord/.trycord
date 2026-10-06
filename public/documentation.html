@@ -62,7 +62,7 @@
       </ul>
 
       <h2 id="server">Running the server</h2>
-      <p>From <code>trycord-server/</code>:</p>
+      <p>From <code>backend/</code>:</p>
       <pre><code>copy .env.example .env   # then edit .env</code></pre>
       <p>The server refuses to start without two things: a <code>JWT_SECRET</code> and a database. Generate a secret with:</p>
       <pre><code>node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code></pre>
@@ -88,7 +88,7 @@ DB_FILE=./dev.db</code></pre>
       <h2 id="config">Configuration reference</h2>
       <p>
         Every setting is an environment variable documented in
-        <code>trycord-server/.env.example</code>. Highlights:
+        <code>backend/.env.example</code>. Highlights:
       </p>
       <table class="plain">
         <thead>
@@ -111,7 +111,7 @@ DB_FILE=./dev.db</code></pre>
 
       <h2 id="client">The web client</h2>
       <p>
-        The client lives in <code>trycord-client/</code> and resolves its API
+        The client lives in <code>frontend/</code> and resolves its API
         origin at runtime with a strict precedence: a <code>?api=</code> query
         parameter, a saved setting, the server-pinned runtime config, the page's
         own origin, and finally <code>http://localhost:9971</code>. You can point
@@ -166,7 +166,7 @@ npm run smoke         # quick headless smoke test of the packaged app</code></pr
       </p>
 
       <h2 id="tests">Testing</h2>
-      <p>From <code>trycord-server/scripts/</code>:</p>
+      <p>From <code>backend/scripts/</code>:</p>
       <pre><code>node check.js            # general checks
 node test-regression.js  # API regression suite
 node test-trustsafety.js # trust &amp; safety flows
