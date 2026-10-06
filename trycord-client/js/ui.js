@@ -9,13 +9,22 @@
 
 import { TrycordConfig } from './config.js';
 
+// Imported, then exported again, rather than exported directly. `export { x } from
+// './y.js'` re-exports without creating a local binding, so anything below that uses
+// esc, el, clear, icon, qs, focusQuietly or closeContextMenu - including this file's
+// own default export - was reading a name that does not exist in this scope.
+import {
+  esc, ICON_PATHS, icon, el, clear, clearAndRebuild, qs, qsa, focusQuietly,
+} from './ui/dom.js';
+import {
+  attachMenu, showContextMenu, attachContextMenu, closeContextMenu,
+} from './ui/menus.js';
+
 // Re-exported so `import { el, attachMenu } from '../ui.js'` keeps working.
 export {
   esc, ICON_PATHS, icon, el, clear, clearAndRebuild, qs, qsa, focusQuietly,
-} from './ui/dom.js';
-export { attachMenu, showContextMenu, attachContextMenu, closeContextMenu } from './ui/menus.js';
-
-
+};
+export { attachMenu, showContextMenu, attachContextMenu, closeContextMenu };
 
 export function toast(message, kind = 'info', timeout = 4200) {
   const root = qs('#toast-root');

@@ -81,6 +81,7 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client', 'js');
     const code = stripComments(text.slice(bodyStart));
 
     const defined = new Set();
+    const reexportedOnly = new Set();
 
     for (const m of imports) {
       const clause = m[1];
@@ -91,6 +92,29 @@ const CLIENT = path.join(__dirname, '..', '..', 'trycord-client', 'js');
           const name = n.trim().split(/\s+as\s+/).pop().trim();
           if (name) defined.add(name);
         }
+      }
+    }
+
+    // `export { a, b } from './x.js'` re-exports without creating a local binding. A
+    // module that re-exports a name and then uses it is reading a variable that does not
+    // exist in its own scope, which is a ReferenceError the moment that line runs - and
+    // invisible to the check above, because the name really is exported, just not from
+    // here. ui.js did exactly this: it re-exported esc and el, then named both in its
+    // own default export, and the application failed to start.
+    //
+    // Checked directly rather than through `unique`, because a re-exported name has two
+    // homes and is excluded from that map by design.
+    for (const m of text.matchAll(/^export\s*\{([^}]*)\}\s*from\s*'[^']+';/gm)) {
+      for (const n of m[1].split(',')) {
+        const name = n.trim().split(/\s+as\s+/).pop().trim();
+        if (!name || defined.has(name)) continue;
+        if (!new RegExp(`(?<![\\w.$])${name}\\b`).test(code)) continue;
+        findings.push({
+          file,
+          name,
+          home: 're-exported from another module without a local binding',
+          line: bodyStart + code.slice(0, code.search(new RegExp(`(?<![\\w.$])${name}\\b`))).split('\n').length,
+        });
       }
     }
 
