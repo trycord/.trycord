@@ -164,13 +164,44 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     }
   }
 
+  // Declared before both users: catchUp sets it, reload() drops it when it empties
+  // the feed, and a function hoisted above its declaration would not see it.
+  let gapBar = null;
+
   async function catchUp() {
     if (!highSeq) return;
     try {
       const missed = await Api.messages(channelId, { after: highSeq, limit: HISTORY_PAGE });
+      // Cleared before the early return below, not after: a catch-up that succeeds
+      // and finds nothing is a complete answer, and leaving the marker up would
+      // claim messages are missing when the server just said there were none.
+      markGap(null);
       if (!Array.isArray(missed) || !missed.length) return;
       for (const m of missed) upsertMessage(m, { scroll: false });
-    } catch { /* offline: the next reconnect will try again */ }
+    } catch (ex) {
+      markGap(ex);
+    }
+  }
+
+  // A failed catch-up means this feed is no longer the channel. The comment this
+  // replaces said the next reconnect would try again, which is true only when the
+  // socket reconnects - and a server that fails one request does not reconnect.
+  // In between, someone is reading a conversation that has quietly stopped being
+  // current, with nothing on screen to say so, which is the worst thing a message
+  // list can do.
+  //
+  // One marker, not one per failure: catchUp runs on every reconnect and on every
+  // 'open', and a feed that grows a bar each time is a feed nobody trusts.
+  function markGap(ex) {
+    if (gapBar) { gapBar.line.remove(); gapBar.btn.remove(); gapBar = null; }
+    if (!ex) return;
+    const line = el('div', { class: 'form-error' },
+      (ex.message ? ex.message + ' - ' : '') + 'some messages may be missing from this conversation.');
+    const btn = el('button', { class: 'btn sm', type: 'button' }, 'Load them');
+    btn.addEventListener('click', () => catchUp());
+    feed.appendChild(line);
+    feed.appendChild(btn);
+    gapBar = { line, btn };
   }
 
   let loadingHistory = false;
@@ -181,6 +212,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     const seq = ++reloadSeq;
     loadingHistory = true;
     pendingLive.clear();
+    gapBar = null;
     clear(feed);
     feed.appendChild(loadingState('Loading messages'));
     let msgs = [];
