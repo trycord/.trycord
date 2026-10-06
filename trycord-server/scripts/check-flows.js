@@ -73,12 +73,17 @@ async function waitForHealth(child, attempts) {
   const uploadDir = path.join(tmp, 'uploads');
   fs.mkdirSync(uploadDir);
 
-  // The instance's own .env must not leak in: dotenv would otherwise point this at
-  // whatever the developer's local configuration says, and the assertions below would
-  // be testing that instead.
+  // This check creates two accounts - flowuser and outsider - because half of what it
+  // asserts is about who may see what, and that needs two identities. They exist only
+  // in the throwaway database below, which is deleted on the way out.
+  //
+  // The server loads the repository's .env, which sets DB_FILE=./dev.db. dotenv does
+  // not overwrite a variable that is already set, so the DB_FILE passed below wins -
+  // but that is a property of dotenv rather than of this script, so it is checked
+  // afterwards instead of assumed. A check that quietly wrote accounts into a
+  // developer's real database would be worse than no check at all.
   const env = { ...process.env };
   delete env.DATABASE_URL;
-  delete env.DB_FILE;
   delete env.JWT_SECRET;
   delete env.ALLOW_TEST_HOOKS;
 
@@ -247,6 +252,13 @@ async function waitForHealth(child, attempts) {
       peekCommunity.status === 403 && code(peekCommunity) === 'NOT_A_MEMBER', 'status ' + peekCommunity.status);
     const peekMessages = await call('GET', '/api/channels/' + cid + '/messages?limit=5', undefined, other);
     ok("one account cannot read another's messages", peekMessages.status === 403);
+
+    console.log('\n  the test data went where it was supposed to');
+    // flowuser and outsider exist in the file this run created, and the file is gone
+    // before the process exits. If the server had opened a database somewhere else, the
+    // first of these fails, because this file would be untouched.
+    ok('the throwaway database exists and was written to',
+      fs.existsSync(dbFile) && fs.statSync(dbFile).size > 0);
 
     console.log('\n  routing and static files');
     const root = await call('GET', '/');
