@@ -34,7 +34,8 @@
     "check:client-load": "node scripts/check-client-load.js",
     "check:render": "node scripts/check-render.js",
     "check:headings": "node scripts/check-client-headings.js",
-    "check:realtime": "node scripts/check-realtime.js"
+    "check:realtime": "node scripts/check-realtime.js",
+    "check:shots": "node scripts/browser/shoot.js"
   },
   "license": "MIT",
   "dependencies": {

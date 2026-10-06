@@ -57,3 +57,7 @@ tests/browser/shots/
 # reference a directory that does not exist, which is the same mistake the browser
 # job in check.yml was making.
 /.github/workflows/shots.yml
+
+# Screenshots from backend/scripts/browser/shots.mjs. Generated on every run and
+# uploaded as a CI artifact; nothing to commit.
+backend/shots/
