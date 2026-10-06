@@ -7,7 +7,7 @@ import State from '../state.js';
 import { can, leaveServerContext, peerPresence, refreshServers, setViewRefresh } from '../state.js';
 import { clear, confirmDialog, el, relTime, toast } from '../ui.js';
 import { communityMark, invalidateAuthedImage, loadAuthedImage } from '../components.js';
-import { onStale } from '../states.js';
+import { onStale } from '../view-states.js';
 import { renderContextHeader } from '../shell.js';
 import { ensureServer } from '../workspace-shared.js';
 import { serverPath } from '../links.js';

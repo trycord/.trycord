@@ -9,7 +9,7 @@ import { openOverrideEditor } from '../permission-overrides.js';
 import { ensureServer } from '../workspace-shared.js';
 import { channelPath } from '../links.js';
 import { navigate } from '../nav.js';
-import { onStale } from '../states.js';
+import { onStale } from '../view-states.js';
 
 function openChannelEditor(serverId, ch, cats, onDone) {
   const name = el('input', { class: 'input', type: 'text', maxlength: 32, value: ch.name || '' });

@@ -3,7 +3,7 @@
 // separate modules - see dm-thread.js and friends.js.
 
 
-import { errorState } from '../states.js';
+import { errorState } from '../view-states.js';
 import State, { refreshDms } from '../state.js';
 import { el, clear, plural } from '../ui.js';
 import { emptyState } from '../components.js';

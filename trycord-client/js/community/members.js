@@ -4,7 +4,7 @@ import State from '../state.js';
 import { can, enterServer, peerPresence, refreshBans, setViewRefresh } from '../state.js';
 import { clear, confirmDialog, el, openModal, relTime, toast, attachContextMenu } from '../ui.js';
 import { avatar, emptyState } from '../components.js';
-import { errorState, onStale} from '../states.js';
+import { errorState, onStale} from '../view-states.js';
 import { renderContextHeader, memberActions } from '../shell.js';
 import { openRoleAssignModal, rolePill } from '../role-assignment.js';
 import { userNameButton } from '../user-actions.js';

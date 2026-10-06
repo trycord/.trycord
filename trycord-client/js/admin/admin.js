@@ -3,7 +3,7 @@
 // Every section renders what the API returns and never fabricates privileges.
 
 import Api from '../api.js';
-import { loadingState } from '../states.js';
+import { loadingState } from '../view-states.js';
 import State from '../state.js';
 import { esc, el, btn, clear, toast, openModal, confirmDialog, relTime, fullTime } from '../ui.js';
 import { initialOf, emptyState } from '../components.js';

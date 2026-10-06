@@ -11,7 +11,7 @@
 // question.
 
 import Api from './api.js';
-import { loadingState, errorState } from './states.js';
+import { loadingState, errorState } from './view-states.js';
 import State from './state.js';
 import { el, clear, toast, openModal } from './ui.js';
 import { sectionHead, sectionCard, settingRow, toggleRow, selectRow, setEmpty, setNote, dangerButton } from './settings-ui.js';

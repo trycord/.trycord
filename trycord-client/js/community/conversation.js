@@ -1,5 +1,5 @@
 import Api from '../api.js';
-import { loadingState, onStale} from '../states.js';
+import { loadingState, onStale} from '../view-states.js';
 import State from '../state.js';
 import Realtime from '../realtime.js';
 
