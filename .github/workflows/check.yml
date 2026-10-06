@@ -102,6 +102,14 @@ jobs:
         working-directory: backend
         run: npm run check:render
 
+      # Two accounts, two sockets, one message. Every other check drives HTTP, so
+      # nothing else can tell "the event reached the sender" from "the event reached
+      # the room" - and an event emitted to nobody looks identical to a working one
+      # until two people are in the channel.
+      - name: Realtime, with two clients
+        working-directory: backend
+        run: npm run check:realtime
+
   client:
     name: Client checks
     runs-on: ubuntu-latest

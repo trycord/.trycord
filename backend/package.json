@@ -33,7 +33,8 @@
     "check:flows": "node scripts/check-flows.js",
     "check:client-load": "node scripts/check-client-load.js",
     "check:render": "node scripts/check-render.js",
-    "check:headings": "node scripts/check-client-headings.js"
+    "check:headings": "node scripts/check-client-headings.js",
+    "check:realtime": "node scripts/check-realtime.js"
   },
   "license": "MIT",
   "dependencies": {
