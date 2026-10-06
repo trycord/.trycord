@@ -96,7 +96,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderUpdates(body);
   } else if (tab === 'security' || tab === 'password' || tab === 'sessions') {
     // Legacy password/sessions routes render the unified Security page.
-    renderPasswordSection(body, container, 'security');
+    renderPasswordSection(body, () => renderAccount(container, { tab }));
     renderTwoFactorSection(body);
     renderSessionsSection(body);
   } else if (tab === 'backend') {

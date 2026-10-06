@@ -6,7 +6,7 @@
 
 import Api from '../api.js';
 import State, { refreshFriends } from '../state.js';
-import { el, toast, confirmDialog } from '../ui.js';
+import { el, toast, confirmDialog, clearAndRebuild } from '../ui.js';
 import { sectionCard, settingRow, setEmpty, dangerButton } from '../settings-ui.js';
 import { navigate } from '../nav.js';
 

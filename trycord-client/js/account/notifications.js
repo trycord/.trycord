@@ -6,7 +6,7 @@
 
 import Api from '../api.js';
 import State, { setMuted } from '../state.js';
-import { el, clear, toast } from '../ui.js';
+import { clear, clearAndRebuild, el, toast } from '../ui.js';
 import { sectionCard, settingRow, setEmpty, setNote, dangerButton, setActionRow } from '../settings-ui.js';
 import { navigate } from '../nav.js';
 
@@ -55,10 +55,4 @@ export function renderNotificationsSettings(body) {
   body.appendChild(setNote('Muting is per channel and syncs to every device you sign in on.'));
 }
 
-export function clearAndRebuild(body) {
-  const scroll = body.scrollTop;
-  clear(body);
-  return Object.assign(body, { scrollTop: scroll });
-}
-
-export default { renderNotificationsSettings, clearAndRebuild };
+export default { renderNotificationsSettings };

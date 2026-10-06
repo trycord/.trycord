@@ -131,6 +131,18 @@ export function el(tag, attrs, ...children) {
   return node;
 }
 
+// Clear a container without losing where the reader was. Used by the settings tabs,
+// which rebuild themselves in place after an action rather than re-rendering the
+// page - a list that jumps back to the top after every accept is disorienting.
+//
+// This lived in account/notifications.js, which is how account/privacy.js came
+// to call it across a tab boundary without importing it.
+export function clearAndRebuild(container) {
+  const scrollTop = container.scrollTop;
+  clear(container);
+  return Object.assign(container, { scrollTop });
+}
+
 export function clear(node) {
   while (node && node.firstChild) node.removeChild(node.firstChild);
   return node;
