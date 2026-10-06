@@ -56,7 +56,19 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     contentClass: 'settings-body',
   });
   const wrap = el('div', { class: 'page' }, frame);
-  const body = pane;
+
+  // The pane's heading, from the same registry entry the nav and the context header
+  // read. Two tabs were carrying a hand-typed sectionHead instead, and one of them
+  // described the tab differently from the nav above it - "Channels that will not
+  // raise an alert" against "Muted channels and alerts" - which is the drift this
+  // arrangement exists to prevent.
+  //
+  // In its own element rather than at the head of the pane, because the tabs re-render
+  // themselves in place: the security tab clears the pane body to swap its two-factor
+  // state, and a heading appended above that would be taken with it.
+  if (item) pane.appendChild(sectionHead(item.label, item.blurb || ''));
+  const body = el('div', { class: 'settings-tab' });
+  pane.appendChild(body);
 
   // In the document before anything is awaited. Appending at the end meant every
   // loading state below was built into a detached tree, so it was never painted:
@@ -88,7 +100,6 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     renderTwoFactorSection(body);
     renderSessionsSection(body);
   } else if (tab === 'backend') {
-    body.appendChild(sectionHead('Backend', 'Which instance this device talks to.'));
     body.appendChild(setNote('Switching instances signs you out here first.'));
     const backendBox = sectionCard();
     renderBackendSelector(backendBox);
