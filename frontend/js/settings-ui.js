@@ -33,27 +33,45 @@ export function sectionCard(...children) {
   return card;
 }
 
+// Row ids are generated so a caller only has to supply one when it needs to point at
+// this row from somewhere else.
+let rowSeq = 0;
+
 // One setting: a label with an optional hint on the left, a control on the
 // right. Below 620px the control drops under the label, because a 130px-wide
 // select beside a sentence is unusable on a phone.
 export function settingRow({ label, hint, control, danger = false, id }) {
   const row = el('div', { class: 'set-row' + (danger ? ' is-danger' : '') });
   const text = el('div', { class: 'set-row__text' });
-  const l = el('div', { class: 'set-row__label' }, label);
-  if (id) l.id = id;
+
+  // The visible text is the control's name, not decoration beside it.
+  //
+  // This row used to render the text as a div and then, when the caller passed an id,
+  // put that same id on the first control inside it - which associates nothing, because
+  // association needs a <label for>. So every toggle in Settings reached a screen reader
+  // as an unlabelled checkbox: a list of switches with nothing saying what any of them
+  // switches. The hint below carried the explanation and was not part of the name.
+  const field = control
+    ? (control.matches && control.matches('input, select, textarea')
+        ? control
+        : control.querySelector && control.querySelector('input, select, textarea'))
+    : null;
+  const fieldId = id || (field ? 'set-row-' + (++rowSeq) : null);
+
+  const l = fieldId
+    ? el('label', { class: 'set-row__label', for: fieldId }, label)
+    : el('div', { class: 'set-row__label' }, label);
+  if (id && !fieldId) l.id = id;
   text.appendChild(l);
   if (hint) text.appendChild(el('div', { class: 'set-row__hint' }, hint));
   row.appendChild(text);
+
   if (control) {
     const c = el('div', { class: 'set-row__control' });
     for (const n of [control].flat(Infinity)) if (n) c.appendChild(n);
     row.appendChild(c);
   }
-  if (id && control && control.id === undefined && control.setAttribute) {
-    // Associates the label with the first form control inside it.
-    const first = control.matches && control.matches('input, select, textarea') ? control : control.querySelector('input, select, textarea');
-    if (first) first.id = id;
-  }
+  if (field && fieldId && !field.id) field.id = fieldId;
   return row;
 }
 
@@ -67,7 +85,7 @@ export function toggleRow({ label, hint, checked, onChange, disabled, name }) {
 }
 
 export function selectRow({ label, hint, value, options, onChange, disabled }) {
-  const sel = el('select', { class: 'input', 'aria-label': label });
+  const sel = el('select', { class: 'input' });
   if (disabled) sel.disabled = true;
   for (const o of options) {
     const opt = el('option', { value: o.value }, o.label);

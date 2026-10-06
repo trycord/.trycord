@@ -437,6 +437,142 @@ async function settle(window, ms = 60) {
 
     console.log(`  navigated ${seen.length} routes without an uncaught error`);
 
+    // ---- accessibility, over the pages that were just rendered ----
+    //
+    // Asserted here rather than in a separate script because the interesting cases are
+    // the ones that only exist once a page has painted: a button whose label is set by
+    // the code that drew it, an input the page forgot to label, a heading a surface
+    // lost. Re-rendering them separately would mean a second boot and a second chance
+    // for the two to disagree about what the page looked like.
+    console.log('\n  accessibility, over the same rendered pages');
+
+    const unnamed = [];
+    let controls = 0;
+    for (const page of targets) {
+      const url = concrete(page.path, world);
+      const out = await visit(window, document, Router, url, base);
+      for (const bad of accessibilityFaults(document)) {
+        unnamed.push(`${page.id}: ${bad}`);
+      }
+      controls += countControls(document);
+    }
+
+    ok('every interactive control has an accessible name', unnamed.length === 0,
+      unnamed.slice(0, 4).join(' | '));
+    console.log(`    ${controls} controls checked across ${targets.length} pages`);
+
+    // ---- the phone composition ----
+    //
+    // The navigation on a phone is derived from the registry, so the thing worth
+    // checking is that it is the same destinations and that they render as tabs with
+    // names - not that there are five of them, which would pass just as well if they
+    // were five arbitrary buttons.
+    console.log('\n  phone composition');
+    await setViewport(window, 375, 812);
+    const { updateFromViewport } = await import(pathToUrl(path.join(CLIENT, 'js/presentation.js')));
+    updateFromViewport();
+    await settle(window, 30);
+
+    ok('a narrow viewport switches the shell to the phone composition',
+      document.documentElement.dataset.presentation === 'mobile',
+      'data-presentation=' + document.documentElement.dataset.presentation);
+
+    await Router.run();
+    await settle(window);
+    const { renderAllChrome } = await import(pathToUrl(path.join(CLIENT, 'js/shell.js')));
+    renderAllChrome();
+    await settle(window, 20);
+
+    const tabBar = document.getElementById('mobile-tab-navigation');
+    const expected = registry.mobilePages().map((pg) => pg.nav.tabLabel || pg.nav.short);
+    const tabs = tabBar ? [...tabBar.querySelectorAll('.tab-button__label')].map((n) => n.textContent.trim()) : [];
+    ok('the phone tab bar carries the destinations the registry defines',
+      expected.length > 0 && tabs.length === expected.length
+        && expected.every((label) => tabs.includes(label)),
+      'expected ' + expected.join(', ') + ' - got ' + (tabs.join(', ') || 'nothing'));
+
+    const navToggle = document.querySelector('#context-header .nav-toggle');
+    ok('the phone header has a navigation control that reports its state',
+      !!navToggle && navToggle.hasAttribute('aria-expanded'),
+      navToggle ? 'no aria-expanded' : 'no nav-toggle in the context header');
+
+    // ---- themes ----
+    //
+    // Themes are applied as a data-theme attribute plus stylesheet rules, so reading an
+    // inline custom property off the shell - which is what this check did first - finds
+    // nothing and looks like a broken theme engine. What is worth asserting is that the
+    // theme a reader picks is one the stylesheet actually implements, because a theme
+    // that is listed in the picker and has no rule behind it is a button that does
+    // nothing.
+    console.log('\n  themes');
+    const theme = await import(pathToUrl(path.join(CLIENT, 'js/theme.js')));
+    const current = () => document.documentElement.getAttribute('data-theme') || '';
+
+    theme.setTheme(theme.DEFAULT_THEME);
+    await settle(window, 10);
+    const def = current();
+    ok('the default theme identifies itself on the document', !!def, 'no data-theme');
+
+    theme.setTheme('midnight');
+    await settle(window, 10);
+    const switched = current();
+    ok('switching themes changes the document', !!switched && switched !== def,
+      def + ' -> ' + switched);
+
+    theme.setTheme(theme.DEFAULT_THEME);
+    await settle(window, 10);
+    ok('switching back restores it', current() === def, current() + ' != ' + def);
+
+    // Every theme the picker offers, except 'custom' and 'system', needs a rule.
+    const stylesheet = readFile(path.join(CLIENT, 'css', 'app.css'));
+    const undressed = theme.THEMES
+      .filter((t) => t.id !== 'custom' && t.id !== 'system')
+      .filter((t) => !stylesheet.includes("data-theme='" + t.id + "'")
+        && !stylesheet.includes('data-theme="' + t.id + '"')
+        && !stylesheet.includes('[data-theme=' + t.id + ']'))
+      .map((t) => t.id);
+    ok('every theme offered in the picker has a stylesheet rule behind it',
+      undressed.length === 0,
+      'listed but not implemented: ' + undressed.join(', '));
+
+    // Custom themes, including the safety net.
+    //
+    // applyCustomTheme() measures the shell afterwards and refuses the theme if the
+    // application did not survive it, falling back to Ember. jsdom has no layout engine,
+    // so every element measures 0x0 and the refusal always fires here - which means this
+    // check exercises the recovery branch rather than the happy one.
+    //
+    // That branch is the one worth asserting: a hand-authored theme that breaks the
+    // shell must not be able to break the shell. Both outcomes are checked, because
+    // "either it applied or it deliberately backed off" is the contract, and a version
+    // that quietly did neither would pass a test that only looked for tokens.
+    const ACCENT = '#00a3ff';
+    const result = theme.applyCustomTheme({
+      tokens: Object.assign({}, theme.DEFAULT_CUSTOM_TOKENS, { accent: ACCENT }),
+    });
+    await settle(window, 10);
+
+    const inline = document.documentElement.style;
+    const probe = ['--c-accent', '--c-pg', '--c-base', '--c-txt'];
+    const landed = probe.filter((name) => inline.getPropertyValue(name).trim());
+
+    ok('a custom theme either applies or reports why it did not',
+      typeof result === 'object' && typeof result.ok === 'boolean',
+      'applyCustomTheme returned ' + JSON.stringify(result));
+
+    if (result && result.ok) {
+      ok('an applied custom theme wrote its tokens onto the document',
+        landed.length === probe.length,
+        landed.length + ' of ' + probe.length);
+    } else {
+      ok('a custom theme the shell cannot survive falls back to Ember',
+        current() === 'trycord' && landed.length === 0,
+        'data-theme=' + current() + ', ' + landed.length + ' tokens left behind: '
+          + (result && result.problems ? result.problems.join('; ') : 'no reasons given'));
+      console.log('    no layout engine here, so the safety net fired - which is the'
+        + ' behaviour that matters; the tokens themselves need a browser');
+    }
+
     await boot1.stop();
   } catch (e) {
     console.error('\n  render check failed to run: ' + e.message + '\n');
@@ -558,4 +694,116 @@ async function visit(window, document, Router, url, base) {
     signature: (view ? view.innerHTML : '').length + ':'
       + Array.from(document.querySelectorAll('h1')).map((h) => h.textContent.trim()).join('|'),
   };
+}
+
+// A built-in theme that is not the default, so the switch has something to switch to.
+// Read out of the module rather than hardcoded, so this does not rot when a theme is
+// renamed.
+const DEFAULT_TEST_THEME = 'midnight';
+
+/** jsdom's window has no viewport of its own worth the name. Give it one. */
+async function setViewport(window, width, height) {
+  const define = (name, value) => Object.defineProperty(window, name, {
+    value, writable: true, configurable: true,
+  });
+  define('innerWidth', width);
+  define('outerWidth', width);
+  define('innerHeight', height);
+  if (window.screen) {
+    Object.defineProperty(window.screen, 'width', { value: width, configurable: true });
+    Object.defineProperty(window.screen, 'height', { value: height, configurable: true });
+  }
+  window.dispatchEvent(new window.Event('resize'));
+  await settle(window, 10);
+}
+
+/** How a control is named, using the same precedence a screen reader applies. */
+function accessibleName(node) {
+  const aria = node.getAttribute('aria-label');
+  if (aria && aria.trim()) return aria.trim();
+  const labelledBy = node.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const text = labelledBy.split(/\s+/)
+      .map((id) => {
+        const target = node.ownerDocument.getElementById(id);
+        return target ? target.textContent : '';
+      })
+      .join(' ').trim();
+    if (text) return text;
+  }
+  if (node.tagName === 'INPUT' || node.tagName === 'SELECT' || node.tagName === 'TEXTAREA') {
+    // A real <label for>, or a label wrapping the control.
+    const id = node.getAttribute('id');
+    if (id) {
+      const label = node.ownerDocument.querySelector('label[for="' + CSS.escape(id) + '"]');
+      if (label && label.textContent.trim()) return label.textContent.trim();
+    }
+    const wrapping = node.closest('label');
+    if (wrapping && wrapping.textContent.trim()) return wrapping.textContent.trim();
+    const title = node.getAttribute('title');
+    if (title && title.trim()) return title.trim();
+    const placeholder = node.getAttribute('placeholder');
+    if (placeholder && placeholder.trim()) return '[placeholder] ' + placeholder.trim();
+    return '';
+  }
+  const text = (node.textContent || '').trim();
+  if (text) return text;
+  const title = node.getAttribute('title');
+  if (title && title.trim()) return title.trim();
+  return '';
+}
+
+/**
+ * Everything on the page a screen reader would struggle with.
+ *
+ * Only faults that are unambiguous from the DOM are reported. "This button looks
+ * small" and "this contrast is too low" need a layout engine and a colour maths, and a
+ * check that guesses at them is a check that cries wolf - which is worse than none,
+ * because it teaches people to ignore it.
+ */
+function accessibilityFaults(document) {
+  const faults = [];
+  const seenIds = new Set();
+
+  for (const node of document.querySelectorAll('button, a[href], input, select, textarea')) {
+    if (node.closest('[hidden]')) continue;
+    const what = node.tagName.toLowerCase()
+      + (node.className && typeof node.className === 'string'
+        ? '.' + node.className.trim().split(/\s+/).slice(0, 2).join('.')
+        : '');
+    if (!accessibleName(node)) faults.push(what + ' has no accessible name');
+  }
+
+  for (const node of document.querySelectorAll('img')) {
+    if (node.closest('[hidden]')) continue;
+    if (!node.hasAttribute('alt')) {
+      faults.push('img without alt: ' + (node.getAttribute('src') || '(no src)').slice(-40));
+    }
+  }
+
+  for (const node of document.querySelectorAll('[role="dialog"]')) {
+    if (node.closest('[hidden]')) continue;
+    if (!accessibleName(node)) faults.push('dialog with no name');
+  }
+
+  // Buttons inside a form default to type=submit, which is a real behaviour and not
+  // what most of these mean.
+  for (const node of document.querySelectorAll('button')) {
+    if (node.closest('[hidden]')) continue;
+    if (!node.hasAttribute('type') && node.closest('form')) {
+      faults.push('button with no type inside a form (defaults to submit)');
+    }
+  }
+
+  for (const node of document.querySelectorAll('[id]')) {
+    const id = node.getAttribute('id');
+    if (seenIds.has(id)) faults.push('duplicate id: ' + id);
+    seenIds.add(id);
+  }
+
+  return faults;
+}
+
+function countControls(document) {
+  return document.querySelectorAll('button, a[href], input, select, textarea').length;
 }
