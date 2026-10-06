@@ -197,31 +197,37 @@ export const PAGES = [
     layout: 'admin',
     scope: 'admin', group: 'People', order: 1,
     label: 'Users', icon: 'users', tabs: ['users'],
+      blurb: 'Find an account, and act on it',
   }),
   p('admin.communities', '/admin/communities', {
     layout: 'admin',
     scope: 'admin', group: 'People', order: 2,
     label: 'Communities', icon: 'layers', tabs: ['communities'],
+      blurb: 'Every community on this instance',
   }),
   p('admin.reports', '/admin/reports', {
     layout: 'admin',
     scope: 'admin', group: 'Trust and safety', order: 1,
     label: 'Reports', icon: 'warn', tabs: ['reports'],
+      blurb: 'What people have reported, and what you decided',
   }),
   p('admin.appeals', '/admin/appeals', {
     layout: 'admin',
     scope: 'admin', group: 'Trust and safety', order: 2,
     label: 'Appeals', icon: 'flag', tabs: ['appeals'],
+      blurb: 'Requests to undo a moderation decision',
   }),
   p('admin.audit', '/admin/audit', {
     layout: 'admin',
     scope: 'admin', group: 'Trust and safety', order: 3,
     label: 'Audit log', icon: 'document', tabs: ['audit'],
+      blurb: 'Administrative actions, most recent first',
   }),
   p('admin.announcements', '/admin/announcements', {
     layout: 'admin',
     scope: 'admin', group: 'Trust and safety', order: 4,
     label: 'Announcements', icon: 'bell', tabs: ['announcements'],
+      blurb: 'Banners shown to everyone on this instance',
   }),
   p('admin.pages', '/admin/pages', {
     layout: 'admin',
@@ -232,6 +238,7 @@ export const PAGES = [
     layout: 'admin',
     scope: 'admin', group: 'Platform', order: 2,
     label: 'GDPR requests', icon: 'shield', tabs: ['gdpr'],
+      blurb: 'Erasure and access requests from account holders',
   }),
 
   // ---- community settings, declared for navigation. The router resolves the

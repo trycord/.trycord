@@ -8,9 +8,10 @@ import State from '../state.js';
 import { esc, el, btn, clear, toast, openModal, confirmDialog, relTime, fullTime } from '../ui.js';
 import { initialOf, emptyState } from '../components.js';
 import { renderContextHeader } from '../shell.js';
-import { settingsNav, settingsFrame } from '../settings-shell.js';
+import { settingsNav, settingsFrame, findItem } from '../settings-shell.js';
 import { adminContext } from '../context-column.js';
-import { navigate, route } from '../nav.js';;
+import { navigate, route } from '../nav.js';
+import { sectionHead } from '../settings-ui.js';
 
 const REPORT_STATUSES = ['OPEN', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'];
 const APPEAL_STATUSES = ['OPEN', 'UNDER_REVIEW', 'APPROVED', 'DENIED'];
@@ -890,6 +891,17 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
     contentClass: 'admin-page',
   });
   const body = pane;
+
+  // The pane's own heading. The context header says "Admin" on every one of these
+  // sections, and without this the content was a filter dropdown above a list with
+  // nothing naming which of the eight you were looking at.
+  //
+  // Read from the registry entry rather than typed here, so the heading and the nav
+  // item cannot drift apart - which is the whole reason the nav reads from the
+  // registry at all.
+  const item = findItem('admin', section);
+  const heading = item ? sectionHead(item.label, item.blurb || '') : null;
+
   const wrap = el('div', { class: 'page admin' }, frame);
   container.appendChild(wrap);
 
@@ -899,10 +911,24 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
     const fresh = await Api.me().catch(() => null);
     if (fresh) { State.me = fresh; me = fresh; }
   }
-  if (!me || me.isAdmin !== true) { body.appendChild(denied()); return; }
+  // Kept on the denied path too: a moderator who lost admin access mid-session
+  // should still be able to see which console they were in.
+  if (!me || me.isAdmin !== true) {
+    if (heading) body.appendChild(heading);
+    body.appendChild(denied());
+    return;
+  }
 
   const seq = ++adminSeq;
-  const show = (node) => { if (seq === adminSeq) { clear(body); body.appendChild(node); } };
+  // Re-attached on every paint. The pane is emptied each time a section renders
+  // itself into it, so a heading appended once would survive only until the first
+  // thing drawn.
+  const show = (node) => {
+    if (seq !== adminSeq) return;
+    clear(body);
+    if (heading) body.appendChild(heading);
+    body.appendChild(node);
+  };
   // node must not linger in body: give them a fresh container that show()
   const sec = el('div', { class: 'admin-block' });
   const showSec = (node) => { if (seq === adminSeq) { clear(sec); sec.appendChild(node); } };
@@ -921,6 +947,7 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
   } catch (ex) {
     if (seq !== adminSeq) return;
     clear(body);
+    if (heading) body.appendChild(heading);
     if (ex && (ex.code === 'PERMISSION_DENIED' || ex.code === 'AUTH_REQUIRED')) body.appendChild(denied());
     else body.appendChild(loadError(ex, () => { clear(container); renderAdmin(container, { section }); }));
   }
