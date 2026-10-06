@@ -256,6 +256,7 @@ function pageEditor(container, route) {
   document.documentElement.dataset.fullpage = 'page-editor';
 
   const wrap = el('div', { class: 'page-editor' });
+  renderContextHeader({ title: '/' + route, sub: 'Editing this page' });
 
   const head = el('header', { class: 'page-editor__bar' });
   const back = el('button', {
@@ -263,7 +264,7 @@ function pageEditor(container, route) {
     onClick: () => { navigate('/admin/pages'); },
   }, '← All pages');
   head.appendChild(back);
-  head.appendChild(el('h1', { class: 'page-editor__title' }, '/' + route));
+  head.appendChild(el('div', { class: 'page-editor__title' }, '/' + route));
   wrap.appendChild(head);
 
   const main = el('div', { class: 'page-editor__main' });

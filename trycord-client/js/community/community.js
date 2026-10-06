@@ -8,6 +8,7 @@ import { ensureServer } from '../workspace-shared.js';
 import { channelPath, serverPath } from '../links.js';
 import { errorState, onStale} from '../view-states.js';
 import { navigate } from '../nav.js';
+import { countFor } from '../badges.js';
 
 async function renderServerLanding(container, serverId) {
   clear(container);
@@ -140,7 +141,7 @@ async function renderNewServer(container, serverId) {
     }
   });
 
-  card.appendChild(el('h1', {}, 'Create a community'));
+  // The context header already says 'Create a community' and already owns the h1.
   card.appendChild(el('p', { class: 'auth-sub' }, 'A permanent place for your community to gather.'));
   card.appendChild(form);
   wrap.appendChild(card);
@@ -189,8 +190,11 @@ async function renderMenu(container) {
     }));
   };
 
-  const dmUnread = (State.dms || []).reduce((n, d) => n + (d.unreadCount || 0), 0);
-  const requests = (State.friendsIn || []).length;
+  // badges.js, because the rail and the phone tab bar count the same three things
+  // for the same destinations and this was a third copy of the arithmetic.
+  const dmUnread = countFor('dms');
+  const requests = countFor('friends');
+  const alerts = countFor('notifications');
 
   // Who you are, first. Everything else on this page is a place; this is the one
   // row that is a person, and it is the way into your own settings.
@@ -210,7 +214,7 @@ async function renderMenu(container) {
   const mine = section('Your Trycord');
   link(mine, { label: 'Home', sub: 'What needs you', icon: icon('home'), path: '/home' });
   link(mine, { label: 'Messages', sub: 'Direct conversations', icon: icon('mail'), path: '/dms', count: dmUnread });
-  link(mine, { label: 'Alerts', sub: 'Mentions and replies', icon: icon('bell'), path: '/notifications', count: State.notifUnread });
+  link(mine, { label: 'Alerts', sub: 'Mentions and replies', icon: icon('bell'), path: '/notifications', count: alerts });
   link(mine, { label: 'Friends', sub: requests ? 'People waiting on you' : 'People you know', icon: icon('users'), path: '/friends', count: requests });
   link(mine, { label: 'Discover', sub: 'Communities on this instance', icon: icon('search'), path: '/discover' });
 

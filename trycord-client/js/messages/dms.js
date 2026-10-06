@@ -55,7 +55,10 @@ async function renderDmList(container) {
 
 // The router hands /dms here with or without an id.
 export async function renderDms(container, { id } = {}) {
-  renderContextHeader({});
+  // Named rather than blank: an empty header falls back to the product name, so for as
+  // long as a thread takes to arrive the page claims to be called Trycord. The thread
+  // replaces this with the peer's name once it has them.
+  renderContextHeader({ title: 'Direct messages' });
   if (!id) return renderDmList(container);
   return renderDmThread(container, id);
 }

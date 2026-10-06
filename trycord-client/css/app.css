@@ -3883,6 +3883,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 /* Do not disturb: nothing on screen should compete for attention, but counts stay
    legible. The in-app control and the OS media query end up here. */
 .is-dnd .rail-nav__badge,
+.is-dnd .tab-button__count,
 .is-dnd .row__count,
 .is-dnd .nv-count { opacity: 0.55; }
 .is-dnd .notif-row.unread,
@@ -4229,12 +4230,23 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
    .active class - .is-active was a rule for a class nothing ever produced, which
    meant the current tab was never marked. */
 .tab-button.active { color: var(--t-accent); }
-.tab-button.active .tab-button__dot { opacity: 1; }
-.tab-button__dot {
-  width: 4px; height: 4px;
+
+/* The glyph, with somewhere for a count to sit. A tab bar is the only navigation a
+   phone has, so a count that is not here is a count nobody sees - which is what the
+   rail's used to be, on the destinations the tab bar shares with it. */
+.tab-button__glyph { position: relative; display: inline-flex; }
+.tab-button__count {
+  position: absolute;
+  top: -5px; left: 12px;
+  min-width: 15px; height: 15px;
+  padding: 0 4px;
+  display: grid; place-items: center;
   border-radius: var(--t-r-full);
   background: var(--t-accent);
-  opacity: 0;
+  color: var(--t-accent-ink);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 /* --- tablet: the rail narrows, the member panel goes --- */

@@ -84,7 +84,8 @@ async function renderNewChannel(container, serverId) {
     } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
   });
 
-  card.appendChild(el('h1', {}, 'Create a channel'));
+  // The heading is the context header's, which says 'New channel'. Repeating it here
+  // gave the page two top-level headings that also disagreed about what it is called.
   card.appendChild(el('p', { class: 'auth-sub' }, 'Channels are how your community talks.'));
   card.appendChild(form);
   wrap.appendChild(card);
