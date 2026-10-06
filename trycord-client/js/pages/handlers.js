@@ -35,7 +35,7 @@ import { renderServerSettings } from '../community/settings.js';
 import { renderServerMembers } from '../community/members.js';
 import { renderNewChannel, renderServerCategories } from '../community/channels.js';
 import { renderHome } from '../global/home.js';
-import HelloDms from '../messages/dms.js';
+import Dms from '../messages/dms.js';
 import { resolveCommunity, resolveChannelToken, renderRouteError } from '../resolve.js';
 
 // The community tree. The registry knows these addresses; this resolves the slug
@@ -131,14 +131,14 @@ export const HANDLERS = {
   dms: async (ctx, page) => {
     // Leaving is a teardown, not a detail of the page: the socket room and the
     // draft have to go whether we arrived from a conversation or from the list.
-    ctx.onCleanup(() => HelloDms.leaveDm());
-    await HelloDms.renderDms(ctx.region, { id: ctx.params.id || null });
+    ctx.onCleanup(() => Dms.leaveDm());
+    await Dms.renderDms(ctx.region, { id: ctx.params.id || null });
   },
   'dms.conversation': (ctx) => HANDLERS.dms(ctx),
 
   notifications: (ctx) => renderNotifications(ctx.region),
   discover: (ctx) => renderBrowse(ctx.region, { previewId: ctx.params.id || null }),
-  friends: (ctx) => HelloDms.renderFriendsPage(ctx.region),
+  friends: (ctx) => Dms.renderFriendsPage(ctx.region),
   menu: (ctx) => renderMenu(ctx.region),
 
   community,
