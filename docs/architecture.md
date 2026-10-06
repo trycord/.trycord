@@ -131,6 +131,8 @@ connection error.
 | `cd trycord-server && npm run check` | schema against a throwaway SQLite database, index uniqueness, client routes served by the server, every client module parsed with its imports resolved, every client singleton bound |
 | `npm run check:routes` | every client route is served by the server |
 | `npm run check-server-routes` | no route is registered twice in one server module |
+| `npm run check-server-bindings` | no server module uses a name it did not require or define |
+| `npm run check:client-bindings` | the same, for the client |
 | `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
 | `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
 
@@ -148,6 +150,27 @@ read exactly like it.
 
 It checks same-file duplication only. Two routers mounted at the same prefix is ordinary
 — Express composes them — and so is a route declared in one file and re-exported.
+
+`check-server-bindings` and `check:client-bindings` exist because every other check
+verifies that an import *resolves*. None of them notices a name that is simply absent —
+a missing `require`, a missing `toast` — which is a `ReferenceError` on the line that
+uses it and nothing at all until that line runs. Three were live: a stale-refresh
+warning that threw inside its own `.catch()`, accepting a friend request from Settings
+that threw after the request had already succeeded, and changing a password that
+succeeded and then threw while repainting. All three passed the four older checks.
+
+Getting the noise to zero took four attempts — 98 findings, then 40, then 15, then 1 —
+and the reason is `strip-comments.mjs`. Comments have to come out by character
+scanning, and the scanner had a hole: a regex literal was read as code, so the quotes
+inside `const re = /\bhttps?:\/\/[^\s<>"']+/gi` opened a string that swallowed 130
+lines of `services/embeds.js`, including a function definition three lines below the
+one that opened it. It now recognises regex literals, which means deciding whether a
+`/` divides or begins one; the usual rule applies, since a regex cannot begin where an
+operand has already ended.
+
+Both checks report a borrowed name only when exactly one module exports it, so the six
+legitimate re-exports — `leaveDm`, `icon`, `onCleanup` and friends — do not produce
+findings. A check that cries wolf does not get run.
 
 `check:client-singletons` exists because all four of the above passed while every
 settings page was rendering the shell's error card. A refactor had removed
