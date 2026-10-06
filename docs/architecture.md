@@ -4,8 +4,31 @@ What this document is: how the system is put together, and the decisions that
 the code alone does not explain. It is reference, not a plan and not a log.
 
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
-and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 18
-client segments are served.
+and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
+client segments are served; `npm run check:flows` boots a server and passes 37
+assertions against real flows.
+
+## Where things live
+
+The eleven questions worth being able to answer without searching.
+
+| | |
+|---|---|
+| Routing | `trycord-client/js/router.js` - parses `location`, calls `mount`. Longest-prefix matching, no hash. |
+| Page definitions | `trycord-client/js/pages/registry.js` - the one source of truth for every page, route and nav entry. |
+| Navigation | Derived from that registry: `shell.js` for the rail and tab bar, `settings-shell.js` for settings and admin, `community-nav.js` for the community sidebar. Presentation differs; identity does not. |
+| Renderers | `trycord-client/js/pages/handlers.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
+| Lifecycle | `trycord-client/js/pages/lifecycle.js` - mount, teardown, access gate, per-page error isolation. |
+| Authentication state | `trycord-client/js/state.js`. The token is in `api.js`; everything else reads `State.me`. |
+| Client-side permissions | `state.js#can`, mirrored from `services/permissions.js`. **Display only** - the server decides. |
+| Server-side authorization | `middleware/serverAccess.js` - `resolveServer`, `requireMember`, `requirePerm`, `requireOwner`. Routes declare their own level. |
+| Themes | `trycord-client/js/theme.js` over the `--t-*` tokens in `css/app.css`. Built-in themes are `[data-theme]` blocks; custom ones are verified and kept working. |
+| API calls | `trycord-client/js/api.js`. One `request()`, no per-feature clients. |
+| Message state | `messages/dm-thread.js` and `community/conversation.js`, each owning its own feed and subscriptions, torn down on the way out. |
+| Community context | `state.js` - `currentServerId`, plus `workspace-shared.js` for the realtime wiring that keeps it fresh. |
+| Database access | `db/index.js`, which is the only module that speaks SQL dialect. |
+| Instance configuration | `db/config.js` and the `instanceConfig()` in `server.js`. Every deployment fact is an environment variable, documented in `trycord-server/.env.example`. |
+| Self-hosting | `docs/selfhosting.md`. No product code requires Trycord's own infrastructure: the client defaults to it but every value is overridable, and a client served by a backend is repointed at that backend. |
 
 ## Architecture
 
