@@ -159,8 +159,13 @@ async function boot() {
   // 5) Router: binds hash navigation and renders the active view.
   Router.init();
 
-  Realtime.on('notification', () => {
-    refreshNotifications().catch(() => {});
+  Realtime.on('notification', async () => {
+    // In that order. refreshNotifications() writes to state and returns; it does
+    // not repaint. Calling renderAllChrome() straight after it painted the badge
+    // with the count from before the request went out, and nothing repainted once
+    // the new count landed - so the badge stayed on the old number until the next
+    // notification arrived, which is the only thing that could correct it.
+    await refreshNotifications().catch(() => {});
     renderAllChrome();
   });
 }
