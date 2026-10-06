@@ -3,7 +3,7 @@
 import Api from './api.js';
 import { TrycordConfig } from './config.js';
 import State, {
-  setOnline, setPresence, refreshNotifications, isAuthed,
+  setOnline, setPresence, isAuthed,
   refreshFriends, refreshBlocks, clearSession,
 } from './state.js';
 import { renderAllChrome } from './shell.js';
@@ -100,7 +100,11 @@ ws.addEventListener('message', (ev) => {
     if (!msg || !msg.type) return;
     emit(msg.type, msg);
     if (msg.type === 'presence') setPresence(msg.userId, msg.presence);
-    if (msg.type === 'notification') refreshNotifications().catch(() => {});
+    // Notifications are not refreshed here. The unread badge is painted from
+    // State.notifUnread, so the refresh has to finish before anything repaints
+    // or the badge is drawn with the count from before this message arrived.
+    // app.js owns that sequence; calling it from here as well only joined the
+    // in-flight request and returned.
 
     // Account-scoped events. Each one means "your own state changed somewhere
     // else", and the correct response is to read the new state rather than to

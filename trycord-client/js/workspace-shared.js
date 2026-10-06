@@ -4,6 +4,7 @@ import Realtime from './realtime.js';
 
 import { currentServerId, enterServer, isAuthed, leaveServerContext, refreshServerView } from './state.js';
 import { showEmojiPicker, toast } from './ui.js';
+import { onStale } from './states.js';
 import { renderAllChrome, currentRoute } from './shell.js';
 import { navigate } from './nav.js';
 
@@ -55,8 +56,22 @@ function wireCommunityEvents() {
           return;
         }
         await refreshServerView();
+      } catch (ex) {
+        // Throwing here used to stop the handler before it repainted, which left
+        // the community sidebar showing the last thing it knew about: a role
+        // change, a new channel, a member leaving. That sidebar is the one piece
+        // of chrome that is on screen everywhere, and it going quiet looks like
+        // nothing happened.
+        onStale('This community')(ex);
+        return;
+      }
+      try {
         renderAllChrome();
-      } catch { /* realtime refresh must never break the loop */ }
+      } catch {
+        // The data is current and the repaint is what failed, so this is a
+        // different problem from the one above and the stale warning would be
+        // wrong. The next event paints it.
+      }
     });
   }
 }
