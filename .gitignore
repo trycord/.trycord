@@ -50,3 +50,10 @@ tests/browser/shots/
 # See above. Builds and pushes an image on every push to main, so it stays out
 # until that is a decision someone makes on purpose rather than by accident.
 /.github/workflows/publish-docker.yml
+
+# shots.yml runs the screenshot suite, which is scaffolding for UI work rather than
+# something every push should pay for. It lives on a shots/* branch together with the
+# scripts it drives - tests/browser/, ignored above as /tests/ - so on main it would
+# reference a directory that does not exist, which is the same mistake the browser
+# job in check.yml was making.
+/.github/workflows/shots.yml
