@@ -31,8 +31,8 @@ function withPresence(list) {
 
 async function notify(userId, type, actorId, referenceId) {
   try {
-    const note = await notifications.create(userId, type, actorId, referenceId);
-    gateway.sendToUser(userId, { type: 'notification', notification: note });
+    const { notification, held } = await notifications.create(userId, type, actorId, referenceId);
+    if (!held) gateway.sendToUser(userId, { type: 'notification', notification });
   } catch { /* notifications never fail the request */ }
 }
 

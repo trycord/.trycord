@@ -37,8 +37,8 @@ async function notifyReply({ kind, scopeId, rootId, replyId, authorId }) {
       );
       if (muted) return null;
     }
-    const note = await notifications.create(target, 'reply', authorId, replyId);
-    return { userId: target, notification: note };
+    const { notification, held } = await notifications.create(target, 'reply', authorId, replyId);
+    return { userId: target, notification, held };
   } catch {
     return null;
   }

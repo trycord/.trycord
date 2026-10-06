@@ -289,6 +289,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
         authorId: req.user.id, content,
       });
       for (const f of found) {
+        if (f.held) continue;
         try { sendToUser(f.userId, { type: 'notification', notification: f.notification }); } catch { /* ignore */ }
       }
     } catch { /* ignore */ }
@@ -299,7 +300,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
         kind: 'channel', scopeId: ch.id, rootId: threadRootId,
         replyId: msg.id, authorId: req.user.id,
       });
-      if (r) sendToUser(r.userId, { type: 'notification', notification: r.notification });
+      if (r && !r.held) sendToUser(r.userId, { type: 'notification', notification: r.notification });
     } catch { /* a missing notification must not fail the post */ }
     res.json(msg);
   } catch (e) { next(e); }

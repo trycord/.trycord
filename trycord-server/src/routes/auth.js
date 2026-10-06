@@ -15,7 +15,7 @@ const { checkPassword, BCRYPT_COST } = require('../auth/passwords');
 const enforcement = require('../services/enforcement');
 const recovery = require('../auth/recovery');
 const twofactor = require('../services/twofactor');
-const privacy = require('../services/privacy');
+const sessions = require('../services/sessions');
 
 // Every token this file mints is also a row in user_sessions, so the Security
 // page can name the devices and revoke one without revoking all. Recording is
@@ -24,7 +24,7 @@ const privacy = require('../services/privacy');
 function issued(res, user, req, extra) {
   const { token, jti } = signWithJti(user);
   Promise.resolve()
-    .then(() => privacy.recordSession({
+    .then(() => sessions.recordSession({
       jti,
       userId: user.id,
       userAgent: req.get('user-agent'),
@@ -393,7 +393,7 @@ router.post('/sessions/revoke-others', auth, async (req, res, next) => {
     // a fresh one - so keeping its row would leave the list showing a device
     // that no longer holds a usable token. issued() below registers the
     // replacement, so the reader's own device is the row that survives.
-    await privacy.revokeOthers(req.user.id, null);
+    await sessions.revokeOthers(req.user.id, null);
     console.log(`[security] other_sessions_revoked user=${req.user.id}`);
     // Before the sockets go, for the same reason as revoke-all above. This one
     // also names who asked, because the version bump killed the caller's own
@@ -417,7 +417,7 @@ router.post('/sessions/revoke-others', auth, async (req, res, next) => {
 // to the caller's own token.
 router.get('/sessions', auth, async (req, res, next) => {
   try {
-    res.json({ sessions: await privacy.listSessions(req.user.id, req.user.jti || null) });
+    res.json({ sessions: await sessions.listSessions(req.user.id, req.user.jti || null) });
   } catch (e) { next(e); }
 });
 
@@ -434,7 +434,7 @@ router.post('/sessions/revoke', auth, rateLimit({ windowMs: 60000, max: 30 }), a
     if (jti === req.user.jti) {
       return fail(res, 'VALIDATION_ERROR', 'use sign out to end the session you are currently using');
     }
-    const revoked = await privacy.revokeSession(req.user.id, jti);
+    const revoked = await sessions.revokeSession(req.user.id, jti);
     // Every socket, including the one that asked: a revoked session that stays
     // connected is a session the server has already refused but the client has
     // not noticed, which is the worst of both.

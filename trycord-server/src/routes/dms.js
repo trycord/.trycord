@@ -154,8 +154,8 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
         if (String(id) === String(req.user.id)) continue;
         try {
           if (gateway.isOnline && gateway.isOnline(id)) continue;
-          const note = await notifications.create(id, 'dm', req.user.id, req.params.id);
-          gateway.sendToUser(id, { type: 'notification', notification: note });
+          const { notification, held } = await notifications.create(id, 'dm', req.user.id, req.params.id);
+          if (!held) gateway.sendToUser(id, { type: 'notification', notification });
         } catch { /* notification failure must not fail the send */ }
       }
     }
@@ -169,7 +169,7 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
           kind: 'dm', scopeId: req.params.id, rootId: msg.threadRootId,
           replyId: msg.id, authorId: req.user.id,
         });
-        if (r) gateway.sendToUser(r.userId, { type: 'notification', notification: r.notification });
+        if (r && !r.held) gateway.sendToUser(r.userId, { type: 'notification', notification: r.notification });
       } catch { /* ignore */ }
     }
     res.json(msg);

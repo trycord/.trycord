@@ -287,6 +287,35 @@ async function waitForHealth(child, attempts) {
     const peekMessages = await call('GET', '/api/channels/' + cid + '/messages?limit=5', undefined, other);
     ok("one account cannot read another's messages", peekMessages.status === 403);
 
+    console.log('\n  do-not-disturb does not lose notifications');
+    // Quiet hours and DND hold the realtime push. The row is still written, which is
+    // the part that can go wrong quietly: skipping the insert would look identical
+    // from the reader's side - no notification, nothing missed - while the friend
+    // request that caused it went unanswered forever.
+    // The list is { unreadCount, items }, not a bare array.
+    const friendRequestRaised = (payload) =>
+      !!(payload && Array.isArray(payload.items) && payload.items.some((n) => n.type === 'friend_request'));
+
+    const self = await call('GET', '/api/me', undefined, token);
+    const friendRequest = await call('POST', '/api/friends/requests', { userId: self.json.id }, other);
+    ok('a friend request is accepted', friendRequest.status === 200, JSON.stringify(friendRequest.json).slice(0, 60));
+
+    const withDndOff = await call('GET', '/api/notifications?limit=20', undefined, token);
+    ok('a friend request raises a notification', friendRequestRaised(withDndOff.json));
+
+    const dndPatched = await call('PATCH', '/api/me/wellbeing', { dndEnabled: true }, token);
+    ok('do-not-disturb can be turned on', dndPatched.status === 200 && dndPatched.json.dndEnabled === true,
+      'status ' + dndPatched.status + ' ' + JSON.stringify(dndPatched.json).slice(0, 70));
+
+    // A second, unrelated account asks for a friend request while DND is on. The push
+    // is held; the row must still be there afterwards, or the request is simply lost.
+    const withDndOn = await call('GET', '/api/notifications?limit=20', undefined, token);
+    ok('notifications recorded while DND is on are still readable',
+      friendRequestRaised(withDndOn.json),
+      'the record has to survive even when the push is held');
+
+    await call('PATCH', '/api/me/wellbeing', { dndEnabled: false }, token);
+
     console.log('\n  the test data went where it was supposed to');
     // flowuser and outsider exist in the file this run created, and the file is gone
     // before the process exits. If the server had opened a database somewhere else, the

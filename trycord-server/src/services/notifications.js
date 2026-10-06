@@ -4,9 +4,16 @@
 // database is the durable source when offline.
 const db = require('../db');
 const { now, uuid } = require('../util');
+const wellbeing = require('./wellbeing');
 
 const TYPES = ['dm', 'friend_request', 'friend_accepted', 'mention', 'reply'];
 
+// `held` means this account's wellbeing settings say not to interrupt them right now.
+// The row is still written: a held notification is waiting next time they open the app,
+// which is what quiet hours mean. Only the push is skipped.
+//
+// Without this the setting was stored, returned by the API and shown in Settings, and
+// nothing ever read it - a toggle that changes nothing.
 async function create(userId, type, actorId, referenceId) {
   if (TYPES.indexOf(type) === -1) throw { code: 'VALIDATION_ERROR', message: 'unknown notification type' };
   const row = {
@@ -18,7 +25,7 @@ async function create(userId, type, actorId, referenceId) {
     'INSERT INTO notifications (id, user_id, type, actor_id, reference_id, created_at, read_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [row.id, row.user_id, row.type, row.actor_id, row.reference_id, row.created_at, row.read_at]
   );
-  return shape(row, null);
+  return { notification: shape(row, null), held: await wellbeing.holds(userId, type) };
 }
 
 function shape(n, actor) {

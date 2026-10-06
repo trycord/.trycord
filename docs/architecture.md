@@ -28,6 +28,7 @@ The eleven questions worth being able to answer without searching.
 | Message state | `messages/dm-thread.js` and `community/conversation.js`, each owning its own feed and subscriptions, torn down on the way out. |
 | Community context | `state.js` - `currentServerId`, plus `workspace-shared.js` for the realtime wiring that keeps it fresh. |
 | Database access | `db/index.js`, which is the only module that speaks SQL dialect. |
+| Notification preferences, quiet hours, sessions | `services/prefs.js`, `services/wellbeing.js`, `services/sessions.js` - each its own module, not three more things inside `services/privacy.js`. |
 | Instance configuration | `db/config.js` and the `instanceConfig()` in `server.js`. Every deployment fact is an environment variable, documented in `trycord-server/.env.example`. |
 | Self-hosting | `docs/selfhosting.md`. No product code requires Trycord's own infrastructure: the client defaults to it but every value is overridable, and a client served by a backend is repointed at that backend. |
 
