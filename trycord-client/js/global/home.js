@@ -211,8 +211,10 @@ export async function renderHome(container) {
   const firstName = (me.displayName || me.username || '').split(' ')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  // The h1 for this surface is the context header's. This is the greeting under the
+  // page title, not a second name for the page.
   wrap.appendChild(el('div', { class: 'home-greeting' },
-    el('h1', { class: 'home-greeting__title' }, firstName ? greeting + ', ' + firstName : greeting),
+    el('p', { class: 'home-greeting__title' }, firstName ? greeting + ', ' + firstName : greeting),
     el('p', { class: 'home-greeting__sub' },
       firstName ? 'Here is what has been happening in your Trycord.' : 'Here is what has been happening.')));
 
