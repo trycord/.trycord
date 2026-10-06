@@ -130,6 +130,7 @@ connection error.
 |---|---|
 | `cd trycord-server && npm run check` | schema against a throwaway SQLite database, index uniqueness, client routes served by the server, every client module parsed with its imports resolved, every client singleton bound |
 | `npm run check:routes` | every client route is served by the server |
+| `npm run check-server-routes` | no route is registered twice in one server module |
 | `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
 | `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
 
@@ -137,6 +138,16 @@ connection error.
 for a file containing `import` statements even when the body has a duplicate
 declaration. A duplicate `const serverId` reached `main` through it, in `44e1ba8`,
 and the app would not start.
+
+`check-server-routes` exists because `/support` and `/security` were each registered
+twice in `server.js` — once as editable pages, where the page editor's database content
+is substituted into the file, and again further down as plain static files. Express takes
+the first handler that responds, so the second was unreachable. Nothing was visibly
+broken, which is why it survived: the dead line sat in the same list as the live one and
+read exactly like it.
+
+It checks same-file duplication only. Two routers mounted at the same prefix is ordinary
+— Express composes them — and so is a route declared in one file and re-exported.
 
 `check:client-singletons` exists because all four of the above passed while every
 settings page was rendering the shell's error card. A refactor had removed
