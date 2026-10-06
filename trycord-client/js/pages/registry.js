@@ -248,7 +248,7 @@ export const PAGES = [
     ['appearance', 'Appearance', 'image', 'Banner, accent and layout'],
     ['channels', 'Channels', 'hash', 'Create and reorder channels'],
     ['categories', 'Categories', 'layers', 'Group channels together'],
-    ['members', 'Members', 'users', 'Roles, permissions and bans'],
+    ['members', 'Members', 'users', 'Everyone here, and what they can do'],
     ['roles', 'Roles', 'shield', 'What each role may manage'],
     ['invites', 'Invites', 'mail', 'Codes and their uses'],
     ['moderation', 'Moderation', 'warn', 'Reports and automod'],
