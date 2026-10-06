@@ -77,36 +77,69 @@ async function waitForHealth(child, attempts) {
   // asserts is about who may see what, and that needs two identities. They exist only
   // in the throwaway database below, which is deleted on the way out.
   //
-  // The server loads the repository's .env, which sets DB_FILE=./dev.db. dotenv does
-  // not overwrite a variable that is already set, so the DB_FILE passed below wins -
-  // but that is a property of dotenv rather than of this script, so it is checked
-  // afterwards instead of assumed. A check that quietly wrote accounts into a
-  // developer's real database would be worse than no check at all.
+  // The server loads the repository's .env, which carries DB_CLIENT twice - sqlite,
+  // then mysql - so the last one wins and a checkout resolves to a remote database
+  // unless something says otherwise. Setting DB_CLIENT here is what makes this a local
+  // run; setting only DB_FILE is not, which is how accounts once ended up in a live
+  // database.
   const env = { ...process.env };
   delete env.DATABASE_URL;
   delete env.JWT_SECRET;
   delete env.ALLOW_TEST_HOOKS;
 
+  const childEnv = {
+    ...env,
+    DB_CLIENT: 'sqlite',
+    DB_FILE: dbFile,
+    PORT: String(PORT),
+    HOST: '127.0.0.1',
+    UPLOAD_DIR: uploadDir,
+    STORAGE_DRIVER: 'local',
+    MAIL_MODE: 'log',
+    // A throwaway secret for a throwaway database. Every instance must supply its own;
+    // the server refuses to start without one, which is correct.
+    JWT_SECRET: 'flowcheck0123456789abcdef0123456789abcdef',
+    SERVER_HOST_TYPE: 'express',
+    // Suites cannot receive email, so verified-only routes need a way in. The server
+    // mounts these paths only when this is exactly true, and every other caller sees
+    // them as 404.
+    ALLOW_TEST_HOOKS: 'true',
+  };
+
+  // Asked before anything is created, not checked afterwards. This asks the real
+  // configuration code what the server will resolve to under the environment the server
+  // will actually get - not under this process's, which has no DB_CLIENT at all.
+  //
+  // Worth the four lines: the repository's .env carries DB_CLIENT twice, sqlite and
+  // then mysql, so the last one wins and a bare checkout resolves to a remote database.
+  // Setting DB_CLIENT is what makes this run local; setting only DB_FILE is not, and
+  // accounts have ended up in a live database that way before.
+  const { spawnSync } = require('child_process');
+  const probe = spawnSync(process.execPath, [
+    '-e',
+    "require('dotenv').config();" +
+    "process.stdout.write(JSON.stringify(require('./src/db/config').loadDbConfig()));",
+  ], { cwd: ROOT, env: childEnv, encoding: 'utf8' });
+
+  let resolved = null;
+  try { resolved = JSON.parse((probe.stdout || '').trim().split('\n').pop()); } catch { /* handled below */ }
+
+  if (!resolved || resolved.client !== 'sqlite' || path.resolve(resolved.file) !== path.resolve(dbFile)) {
+    const where = !resolved
+      ? 'an unresolvable database configuration'
+      : resolved.client === 'mysql'
+        ? `the MySQL database ${resolved.host}/${resolved.name}`
+        : `the SQLite file ${resolved.file}`;
+    console.error('  refusing to run. This check creates two accounts, and it would create');
+    console.error(`  them in ${where}, which is not its own throwaway file.`);
+    console.error('  It sets DB_CLIENT=sqlite and DB_FILE itself, so something is overriding them.');
+    console.error('  ' + (probe.stderr || '').trim().split('\n').filter(Boolean).slice(0, 2).join(' '));
+    process.exit(1);
+  }
+
   const child = spawn(process.execPath, [path.join(ROOT, 'src', 'server.js')], {
     cwd: ROOT,
-    env: {
-      ...env,
-      DB_CLIENT: 'sqlite',
-      DB_FILE: dbFile,
-      PORT: String(PORT),
-      HOST: '127.0.0.1',
-      UPLOAD_DIR: uploadDir,
-      STORAGE_DRIVER: 'local',
-      MAIL_MODE: 'log',
-      // A throwaway secret for a throwaway database. Every instance must supply its
-      // own; the server refuses to start without one, which is correct.
-      JWT_SECRET: 'flowcheck0123456789abcdef0123456789abcdef',
-      SERVER_HOST_TYPE: 'express',
-      // Suites cannot receive email, so verified-only routes need a way in. The server
-      // mounts these paths only when this is exactly true, and every other caller
-      // sees them as 404.
-      ALLOW_TEST_HOOKS: 'true',
-    },
+    env: childEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -117,6 +150,7 @@ async function waitForHealth(child, attempts) {
   const cleanup = () => {
     try { child.kill('SIGTERM'); } catch { /* already gone */ }
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* best effort */ }
+
   };
 
   let booted;
