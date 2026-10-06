@@ -350,3 +350,52 @@ Real, known gaps. None blocks ordinary use.
 - **`docs/selfhosting.md` is a deployment narrative, not a variable reference.**
   Every variable is documented in `backend/.env.example`.
 - **Attachment progress, cancel and retry, drop and paste, and a lightbox.**
+
+### Where a request actually goes
+
+The client resolves its backend in this order, and the order matters more than it looks:
+
+1. a reader's saved setting (`trycord.backendUrl`)
+2. `backend.json`, served by the backend itself
+3. a server pin (`window.TRYCORD_CONFIG`)
+4. the origin that served the page
+5. a localhost default, for `file://` and desktop runs
+
+Step 2 is the one that surprises people. `frontend/backend.json` names the official
+instance, because the hosted front end needs something to talk to. A self-hoster
+deploying this repository inherits that name - and since `backend.json` outranks the
+serving origin, their client would sign people in against `api.trycord.dev` while
+sitting on their own API. `serve-client.js` rewrites the file as it serves it:
+`backendUrl` becomes whoever is asking, and `fallbackUrls` is dropped unless the
+instance asking is the one those backups belong to. So the rule is one line - a client
+served by a backend talks to that backend - and no domain is written into the client.
+
+The desktop app is the deliberate exception: it loads the bundled `backend.json`
+pin, because a shipped desktop build is always talking to the official instance.
+
+Anyone writing a test that loads the client needs to know this. Reading
+`index.html` off disk, as `check-render.js` does, gets the on-disk file rather than
+the rewritten one, so the client talks to `api.trycord.dev` and every request comes
+back 401. `check-render.js` pins `trycord.backendUrl` and refuses any request to a
+port it does not own.
+
+### What cannot be verified here, and why
+
+Chromium is installed and `--dump-dom` works against `about:blank`, but any `http://`
+navigation hangs until the process is killed. With `--enable-logging=stderr` the last
+thing it does before hanging is wait on `optimizationguide-pa.googleapis.com`; disabling
+that lets it finish starting, and then every real request hangs the same way. The
+network service cannot complete a request in this sandbox, and `--single-process`
+traps instead of working around it.
+
+So the client is verified with jsdom, which has a DOM but no layout engine. That
+covers what it can be trusted for: pages render, routes resolve, controls have names,
+navigation composes, themes switch. It cannot cover measurement - widths, contrast,
+touch target sizes, or anything `getBoundingClientRect` feeds - and it cannot exercise
+a custom theme past `verifyCustomSafety()`, which measures the shell and refuses the
+theme when it cannot confirm the shell survived. In jsdom that refusal always fires,
+which means the check exercises the recovery branch: a theme that breaks the shell has
+to put Ember back rather than leave the application broken.
+
+The honest summary: rendering, structure, semantics, routing and state are covered.
+Pixels are not.

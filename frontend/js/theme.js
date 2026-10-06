@@ -285,7 +285,18 @@ function setInline(name, value) {
 
 export function clearCustomInline() {
   try {
-    for (const k of CUSTOM_INLINE_PROPS) document.documentElement.style.removeProperty(k);
+    const style = document.documentElement.style;
+    for (const k of CUSTOM_INLINE_PROPS) style.removeProperty(k);
+    // applyCustomPalette() writes the derived palette as --c-* custom properties, and
+    // CUSTOM_INLINE_PROPS does not list them - it lists the older --t-* ones. So switching
+    // off a custom theme left the whole derived palette sitting on <html>: invisible
+    // most of the time because a built-in theme does not read --c-*, and wrong the next
+    // time anything did. Removing whatever is actually there rather than a second
+    // hand-kept list is the only version of this that cannot drift again.
+    for (let i = style.length - 1; i >= 0; i--) {
+      const name = style[i];
+      if (name && name.startsWith('--c-')) style.removeProperty(name);
+    }
     delete document.documentElement.dataset.density;
     delete document.documentElement.dataset.motion;
   } catch { /* ignore */ }
