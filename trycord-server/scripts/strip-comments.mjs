@@ -28,7 +28,7 @@
 // recognises regex literals, which means deciding whether a `/` divides or begins one.
 // The rule used is the usual one: a `/` begins a regex where an operand cannot already
 // have ended - after an opening bracket, a comma, an operator, or the start of input.
-export function stripComments(src) {
+export function stripComments(src, keepStrings) {
   let out = '';
   let i = 0;
   const n = src.length;
@@ -78,15 +78,20 @@ export function stripComments(src) {
     }
     if (c === '"' || c === "'" || c === '`') {
       const quote = c;
-      out += ' ';
+      // keepStrings is the difference between the two entry points. A check that wants
+      // to find `from './x.js'` needs the path; a check that wants to find every use of
+      // a name does not want 'btn' inside a class attribute. Same state machine, and
+      // it still has to step over regex literals to get here, because a '/' in one can
+      // hold a quote that would otherwise close the string early.
+      out += keepStrings ? c : ' ';
       i++;
       while (i < n && src[i] !== quote) {
         // A backslash escape, and for a template literal a ${...} hole whose code
         // has to survive - otherwise `${Api.get('/x')}` loses the Api.
-        if (src[i] === '\\') { out += '  '; i += 2; continue; }
+        if (src[i] === '\\') { out += keepStrings ? src[i] + src[i + 1] : '  '; i += 2; continue; }
         if (quote === '`' && src[i] === '$' && src[i + 1] === '{') {
           let depth = 1;
-          out += '  ';
+          out += keepStrings ? '${' : '  ';
           i += 2;
           while (i < n && depth > 0) {
             if (src[i] === '{') depth++;
@@ -96,10 +101,10 @@ export function stripComments(src) {
           }
           continue;
         }
-        out += src[i] === '\n' ? '\n' : ' ';
+        out += keepStrings ? src[i] : (src[i] === '\n' ? '\n' : ' ');
         i++;
       }
-      out += ' ';
+      out += keepStrings ? quote : ' ';
       i++;
       continue;
     }
@@ -110,4 +115,9 @@ export function stripComments(src) {
   return out;
 }
 
-export default { stripComments };
+// Comments out, string bodies kept. For the check that reads import specifiers: a
+// comment that quotes an import is prose, and a string that names a module is the
+// thing being looked for.
+export const stripCommentsOnly = (src) => stripComments(src, true);
+
+export default { stripComments, stripCommentsOnly };
