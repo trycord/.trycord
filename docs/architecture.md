@@ -5,9 +5,12 @@ the code alone does not explain. It is reference, not a plan and not a log.
 
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
-client segments are served; `npm run check:flows` boots a server and passes 38
-assertions against real flows, and `npm run check:client-load`
-evaluates all 65 client modules.
+client segments are served; `npm run check:flows` boots a server and passes 42
+assertions against real flows; `npm run check:render` boots a server and renders all
+40 routable pages in jsdom, passing 51 assertions over 1151 interactive controls;
+`npm run check:realtime` puts two accounts on two sockets and confirms a message
+crosses between them, and `npm run check:client-load`
+evaluates all 66 client modules.
 
 ## Where things live
 
@@ -162,6 +165,10 @@ connection error.
 | `npm run check:client-load` | **evaluates** every client module against a stub DOM |
 | `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
 | `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
+| `npm run check:headings` | one `h1` per surface; a page that adds its own beside the context header's fails |
+| `npm run check:render` | **renders every route in jsdom** against a real backend, and checks accessible names, the phone composition and themes |
+| `npm run check:realtime` | **two clients, two sockets** - one person's message reaches somebody else's open tab and is still there after a reload |
+| `npm run check:shots` | photographs every surface at eight widths in a real browser; skips where the browser cannot load `http` |
 
 `check:client` exists because `node --check` on a `.js` client file reports success
 for a file containing `import` statements even when the body has a duplicate
