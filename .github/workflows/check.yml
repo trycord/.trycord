@@ -88,6 +88,13 @@ jobs:
       - name: Parse client modules as ES modules
         run: node trycord-server/scripts/check-client-modules.js trycord-client/js
 
+      # Imports every client module, which is the only step that evaluates client code.
+      # `export { esc, el } from './dom.js'` re-exports without binding a local name, so
+      # every importer resolved, the file parsed, and the application still died on its
+      # first line. Nothing that reads source can see that; importing the module can.
+      - name: Load client modules against a stub DOM
+        run: node trycord-server/scripts/check-client-load.js
+
 
   desktop:
     name: Desktop checks (no install needed)

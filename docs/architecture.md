@@ -5,8 +5,9 @@ the code alone does not explain. It is reference, not a plan and not a log.
 
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
-client segments are served; `npm run check:flows` boots a server and passes 37
-assertions against real flows.
+client segments are served; `npm run check:flows` boots a server and passes 38
+assertions against real flows, and `npm run check:client-load`
+evaluates all 65 client modules.
 
 ## Where things live
 
@@ -157,6 +158,7 @@ connection error.
 | `npm run check:flows` | **runs the application** - boots a server and drives real flows |
 | `npm run check-server-bindings` | no server module uses a name it did not require or define |
 | `npm run check:client-bindings` | the same, for the client |
+| `npm run check:client-load` | **evaluates** every client module against a stub DOM |
 | `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
 | `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
 
@@ -204,6 +206,16 @@ valid, the imports that remained all resolved, and the module parsed. It is narr
 on purpose: a general "identifier used but not declared" pass produces hundreds of
 false positives from dynamic `import()` destructuring, and a check that cries wolf
 does not get run.
+
+`check:client-load` imports every client module into Node against a stub DOM, which is
+the only step that evaluates client code. A browser would be the honest place for it and
+cannot be used here — Chromium cannot fetch `http://` and ES modules are CORS-blocked
+over `file://` — so the modules are imported instead. It caught a fault that five other
+checks passed: `export { esc, el, clear } from './ui/dom.js'` re-exports without creating
+a local binding, so every importer resolved, the module parsed, every name was
+"exported", and the application died on its first line with "Can't find variable: esc".
+It is not the same as running the client and does not claim to be: it catches a module
+that cannot be evaluated, which is the failure that had nowhere else to be caught.
 
 **`npm run check:flows` is the exception, and it is the only one that runs anything.**
 The rest read source: they parse files, resolve imports and compare lists. Three
