@@ -53,7 +53,7 @@ Don't rewrite public history or force-push branches that other contributors are 
 ### Server
 
 ```bat
-cd trycord-server
+cd backend
 npm install
 copy .env.example .env
 ```
@@ -98,7 +98,7 @@ This creates a local installer without publishing a release.
 Make sure:
 
 - [ ] The change is focused on one purpose.
-- [ ] `cd trycord-server && npm run check && npm run check:routes && npm run check:client` passes.
+- [ ] `cd backend && npm run check && npm run check:routes && npm run check:client` passes.
 - [ ] The affected application starts successfully.
 - [ ] The changed functionality works as expected.
 - [ ] You haven't introduced unnecessary dependencies.

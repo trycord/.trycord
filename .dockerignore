@@ -34,8 +34,8 @@ trycord-desktop/node_modules/
 *.asar
 
 # Per-package dependencies. Reinstalled in the builder stage.
-trycord-server/node_modules/
-trycord-client/node_modules/
+backend/node_modules/
+frontend/node_modules/
 
 # Editor / OS noise
 .vscode

@@ -8,9 +8,9 @@ Vocabulary: a **community** is a group of people with channels, roles and
 permissions. An **instance** is one running Trycord server. A **client** is the
 web app (WAC) or the desktop shell (DAC).
 
-- `trycord-server/` — REST API, WebSocket gateway, accounts, permissions,
+- `backend/` — REST API, WebSocket gateway, accounts, permissions,
   moderation, uploads, database access
-- `trycord-client/` — the web client (also shipped inside the desktop app)
+- `frontend/` — the web client (also shipped inside the desktop app)
 - `trycord-desktop/` — Electron shell around the same client
 - `public/` — the public website and legal pages
 - `docs/` — self-hosting, theming, the desktop app and its launcher, and the
@@ -19,7 +19,7 @@ web app (WAC) or the desktop shell (DAC).
 ## Quick start
 
 ```
-cd trycord-server
+cd backend
 npm install
 cp .env.example .env
 ```
@@ -43,14 +43,14 @@ The server serves the API, the web client and the public site on one port
 
 It finds the web client next to itself in the layout this repository ships with.
 If your layout is different — a single directory, a checkout of only
-`trycord-server/`, or an image that copies the client somewhere else — point it
+`backend/`, or an image that copies the client somewhere else — point it
 at the directory holding `index.html`:
 
 ```
 TRYCORD_CLIENT_DIR=/srv/trycord npm start
 ```
 
-A relative value resolves against `trycord-server/`, not against the directory
+A relative value resolves against `backend/`, not against the directory
 you happened to start `node` in. If it is set to something that does not contain
 `index.html`, or is set at all and no client is found, the API still runs and the
 server lists every path it looked at.
@@ -58,7 +58,7 @@ server lists every path it looked at.
 ## Checks
 
 ```
-cd trycord-server
+cd backend
 npm run check                              # schema smoke test on a throwaway SQLite
 npm run check:routes                       # every client route is served
 npm run check:client                       # parse every client module and resolve its imports
@@ -96,7 +96,7 @@ is a default rather than a requirement.
 
 ## Configuration
 
-`trycord-server/.env.example` documents every variable. The ones with no
+`backend/.env.example` documents every variable. The ones with no
 default, where the server refuses to start without them, are `JWT_SECRET`,
 `SERVER_HOST_TYPE` and the database profile. See `docs/selfhosting.md` for
 deployment, including the nginx topology and the Docker volume layout, and

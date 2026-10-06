@@ -8,7 +8,7 @@ gives you that device's theme. This is deliberate — a shared account across
 devices should not mean two people arguing about colour.
 
 - Where it lives: **Settings → Appearance**
-- Code: `trycord-client/js/theme.js`, styles in `trycord-client/css/app.css`
+- Code: `frontend/js/theme.js`, styles in `frontend/css/app.css`
 
 ## The built-in themes
 
@@ -58,7 +58,7 @@ application, and that is enforced rather than promised.
 ### What is rejected
 
 Validation runs on **Validate**, and again on **Apply and save**. It is a real
-parser, not a warning banner — `trycord-client/js/theme.js` splits rules,
+parser, not a warning banner — `frontend/js/theme.js` splits rules,
 checks each selector and each declaration, and reports what it refused and
 why.
 
