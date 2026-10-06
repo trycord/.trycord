@@ -474,7 +474,7 @@ function createGateway(server) {
                   kind: 'channel', scopeId: ch.id, rootId: threadRootId,
                   replyId: msg.id, authorId: user.id,
                 });
-                if (r) sendToUser(r.userId, { type: 'notification', notification: r.notification });
+                if (r && !r.held) sendToUser(r.userId, { type: 'notification', notification: r.notification });
               } catch { /* a missing notification must not fail the post */ }
             }
           } else if (data.type === 'dm:join') {

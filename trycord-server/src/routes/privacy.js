@@ -14,6 +14,8 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail } = require('../errors');
 const privacy = require('../services/privacy');
+const prefs = require('../services/prefs');
+const wellbeing = require('../services/wellbeing');
 const events = require('../services/events');
 
 const router = express.Router();
@@ -112,9 +114,9 @@ router.get('/notification-prefs', async (req, res, next) => {
   try {
     const serverId = req.query.serverId ? String(req.query.serverId) : null;
     res.json({
-      global: await privacy.getNotificationPrefs(req.user.id, null),
-      server: serverId ? await privacy.getNotificationPrefs(req.user.id, serverId) : null,
-      categories: privacy.NOTIFICATION_CATEGORIES,
+      global: await prefs.getNotificationPrefs(req.user.id, null),
+      server: serverId ? await prefs.getNotificationPrefs(req.user.id, serverId) : null,
+      categories: prefs.NOTIFICATION_CATEGORIES,
     });
   } catch (e) { next(e); }
 });
@@ -125,7 +127,7 @@ router.patch('/notification-prefs', rateLimit({ windowMs: 60_000, max: 60 }), as
   try {
     const body = req.body || {};
     const patch = {};
-    for (const key of privacy.NOTIFICATION_CATEGORIES) {
+    for (const key of prefs.NOTIFICATION_CATEGORIES) {
       if (body[key] === undefined) continue;
       if (typeof body[key] !== 'boolean') {
         return fail(res, 'VALIDATION_ERROR', `\`${key}\` must be a boolean`);
@@ -136,7 +138,7 @@ router.patch('/notification-prefs', rateLimit({ windowMs: 60_000, max: 60 }), as
       return fail(res, 'VALIDATION_ERROR', 'nothing to update');
     }
     const serverId = body.serverId ? String(body.serverId) : null;
-    const effective = await privacy.setNotificationPrefs(req.user.id, patch, serverId);
+    const effective = await prefs.setNotificationPrefs(req.user.id, patch, serverId);
     events.emitTo(req.user.id, 'notification-prefs', { prefs: effective, serverId });
     res.json({ effective, serverId });
   } catch (e) { next(e); }
@@ -147,7 +149,7 @@ router.patch('/notification-prefs', rateLimit({ windowMs: 60_000, max: 60 }), as
 // GET /api/me/wellbeing — DND, quiet hours and the motion preference.
 router.get('/wellbeing', async (req, res, next) => {
   try {
-    res.json(await privacy.getWellbeing(req.user.id));
+    res.json(await wellbeing.getWellbeing(req.user.id));
   } catch (e) { next(e); }
 });
 
@@ -174,7 +176,7 @@ router.patch('/wellbeing', rateLimit({ windowMs: 60_000, max: 60 }), async (req,
     if (!Object.keys(patch).length) {
       return fail(res, 'VALIDATION_ERROR', 'nothing to update');
     }
-    const saved = await privacy.setWellbeing(req.user.id, patch);
+    const saved = await wellbeing.setWellbeing(req.user.id, patch);
     // Wellbeing changes what the client's own chrome does - motion, attention -
     // so a second client has to apply it without being told to refresh.
     events.emitTo(req.user.id, 'wellbeing', { wellbeing: saved });

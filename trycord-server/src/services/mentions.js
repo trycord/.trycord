@@ -35,8 +35,10 @@ async function notifyMentions({ serverId, channelId, messageId, authorId, conten
   for (const m of members) {
     if (mutedSet.has(String(m.id))) continue;
     try {
-      const note = await notifications.create(m.id, 'mention', authorId, messageId);
-      out.push({ userId: m.id, notification: note });
+      const { notification, held } = await notifications.create(m.id, 'mention', authorId, messageId);
+      // Held or not, the notification is queued for the sender to deliver; `held` is
+      // carried so the caller can skip the push rather than lose the record.
+      out.push({ userId: m.id, notification, held });
     } catch { /* one bad mention never fails the post */ }
   }
   return out;
