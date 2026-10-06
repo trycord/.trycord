@@ -20,7 +20,7 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.join(__dirname, '..');
 const CLIENT_PAGES = path.join(ROOT, '..', 'trycord-client', 'js', 'pages', 'registry.js');
-const SERVER = path.join(ROOT, 'src', 'server.js');
+const SERVE_CLIENT = path.join(ROOT, 'src', 'serve-client.js');
 
 // Prefixes the server answers with the shell even though no client route uses
 // them. They are real application URLs - the ones the client reaches by
@@ -44,10 +44,13 @@ async function clientSegments() {
   );
 }
 
+// The list lives with the code that uses it rather than with the entry point. It was
+// in server.js until the static serving moved out; this check caught the move, which is
+// the sort of thing it is here for.
 function serverSegments() {
-  const src = fs.readFileSync(SERVER, 'utf8');
+  const src = fs.readFileSync(SERVE_CLIENT, 'utf8');
   const block = src.match(/const APP_ROUTE_PREFIXES = new Set\(\[([\s\S]*?)\]\)/);
-  if (!block) throw new Error('APP_ROUTE_PREFIXES not found in server.js');
+  if (!block) throw new Error('APP_ROUTE_PREFIXES not found in ' + SERVE_CLIENT);
   return new Set([...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
 }
 
