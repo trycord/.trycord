@@ -1,4 +1,5 @@
 import { storage } from './config.js';
+import { labelFor } from './badges.js';
 
 import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from './ui.js';
 import { avatar, icon, navRow, serverChip, navGroup } from './components.js';
@@ -271,17 +272,17 @@ export function renderCommunities(region) {
   // The rail's destinations come from the registry, which is also what the route
   // table and the phone tab bar read. This list used to be a fourth copy of the
   // same five rows, which is how Discover ended up in the rail and nowhere else.
-  const badgeFor = {
-    notifications: () => State.notifUnread,
-    friends: () => (State.friendsIn || []).length,
-  };
+  // The count lives in badges.js, keyed by page id, because the phone tab bar asks
+  // the same question about the same destinations. Two copies of this map is how
+  // Direct messages ended up with no badge on the rail while the home page knew about
+  // four unread conversations.
   const globalItems = railPages().map((page) => ({
     id: page.id,
     label: page.nav.label,
     short: page.nav.short,
     icon: page.nav.icon,
     path: page.path,
-    badge: badgeFor[page.id],
+    badge: () => labelFor(page.id),
   }));
 
   // The rail's own destinations carry words, for the same reason communities do:
@@ -298,9 +299,9 @@ export function renderCommunities(region) {
     },
     el('span', { class: 'rail-nav__icon' }, icon(iconName)),
     el('span', { class: 'rail-nav__label' }, short || label));
-    const count = badge ? badge() : 0;
-    if (count > 0) {
-      btn.appendChild(el('span', { class: 'rail-nav__badge' }, count > 99 ? '99+' : String(count)));
+    const badgeLabel = badge ? badge() : null;
+    if (badgeLabel) {
+      btn.appendChild(el('span', { class: 'rail-nav__badge' }, badgeLabel));
     }
     return btn;
   };
@@ -1004,8 +1005,14 @@ export function renderMobileTabs(region) {
       'aria-current': active ? 'page' : null,
       onClick: () => { navigate(route(t.path)); },
     });
-    btn.appendChild(el('span', { class: 'micon' }, icon(t.icon)));
+    const count = labelFor(t.id);
+    const glyph = el('span', { class: 'micon tab-button__glyph' }, icon(t.icon));
+    if (count) glyph.appendChild(el('span', { class: 'tab-button__count' }, count));
+    btn.appendChild(glyph);
     btn.appendChild(el('span', { class: 'mlabel tab-button__label' }, t.label));
+    // The count is the only place it appears on a phone, so the label has to say it
+    // out loud too: "four waiting" is not the same information as the word "Messages".
+    if (count) btn.setAttribute('aria-label', t.label + ', ' + count + ' waiting');
     strip.appendChild(btn);
   }
 

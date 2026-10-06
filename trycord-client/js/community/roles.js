@@ -143,7 +143,9 @@ async function renderServerRoles(container, serverId) {
 
   const head = el('div', { class: 'roles-head' });
   const headText = el('div', { class: 'roles-head__text' });
-  headText.appendChild(el('h1', { class: 'page-title' }, 'Roles'));
+  // The heading above this line belongs to renderContextHeader, which emits the one
+  // h1 every surface has. A second one here left the page with two top-level headings
+  // saying the same thing, which is what someone navigating by heading lands on.
   headText.appendChild(el('p', { class: 'muted small' },
     (State.roles || []).length + ' role' + ((State.roles || []).length === 1 ? '' : 's') +
     ' · highest first. Position decides what each member can manage.'));
