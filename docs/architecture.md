@@ -131,6 +131,7 @@ connection error.
 | `cd trycord-server && npm run check` | schema against a throwaway SQLite database, index uniqueness, client routes served by the server, every client module parsed with its imports resolved, every client singleton bound |
 | `npm run check:routes` | every client route is served by the server |
 | `npm run check-server-routes` | no route is registered twice in one server module |
+| `npm run check:flows` | **runs the application** - boots a server and drives real flows |
 | `npm run check-server-bindings` | no server module uses a name it did not require or define |
 | `npm run check:client-bindings` | the same, for the client |
 | `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
@@ -181,8 +182,21 @@ on purpose: a general "identifier used but not declared" pass produces hundreds 
 false positives from dynamic `import()` destructuring, and a check that cries wolf
 does not get run.
 
-**None of these execute anything.** A syntax gate is not a test suite, and three
-separate breakages in one refactor passed all of them.
+**`npm run check:flows` is the exception, and it is the only one that runs anything.**
+The rest read source: they parse files, resolve imports and compare lists. Three
+separate breakages in one refactor passed all of them, which is what a syntax gate is.
+
+`check:flows` boots a real server on a throwaway SQLite file and drives the flows a
+person performs — register, sign in, create a community, post a message, edit it,
+react, pin, delete, and try to read somebody else's community — then asserts what came
+back. It is the only thing here that can catch a route that 404s, a permission that
+lets the wrong person in, or a write that never reaches the database. It takes about
+twenty seconds, most of which is waiting for the server to come up, and it is a separate
+job in CI rather than part of `npm run check`.
+
+What it does **not** cover is the browser. It asserts that `/settings/privacy` comes
+back as the application document, because that is what makes a bookmark survive a
+refresh, but nothing in this repository loads the client in a browser and looks at it.
 
 What catches those is the screenshot suite: it walks the signed-out pages before it
 signs in, reports where the browser ended up and what the console said, treats the

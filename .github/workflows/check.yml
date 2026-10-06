@@ -38,6 +38,37 @@ jobs:
       - name: Schema smoke test (throwaway SQLite)
         run: npm run check
 
+  flows:
+    name: Flow checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: trycord-server/package-lock.json
+
+      - name: Install server dependencies
+        working-directory: trycord-server
+        run: npm ci
+
+      # The only job that runs the application. Everything else reads source: it parses
+      # files, resolves imports and compares lists. This boots a real server on a
+      # throwaway database and drives the flows a person performs - signing in, posting a
+      # message, reacting, pinning, and trying to read somebody else's community - which
+      # is the only way to catch a route that 404s or a permission that lets the wrong
+      # person in.
+      #
+      # It needs the web client on disk to serve, because some of its assertions are
+      # about what a browser gets back.
+      - name: Flow checks
+        working-directory: trycord-server
+        run: npm run check:flows
+
   client:
     name: Client checks
     runs-on: ubuntu-latest

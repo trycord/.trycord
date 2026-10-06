@@ -29,7 +29,8 @@
     "check:client-singletons": "node scripts/check-singletons.js",
     "check-server-routes": "node scripts/check-server-routes.js",
     "check:client-bindings": "node scripts/check-client-bindings.js",
-    "check:server-bindings": "node scripts/check-server-bindings.js"
+    "check:server-bindings": "node scripts/check-server-bindings.js",
+    "check:flows": "node scripts/check-flows.js"
   },
   "license": "MIT",
   "dependencies": {
