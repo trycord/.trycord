@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 
 const auth = require('../../middleware/auth');
+const recovery = require('../../auth/recovery');
 const { fail, serviceError } = require('../../errors');
 const rateLimit = require('../../middleware/ratelimit');
 

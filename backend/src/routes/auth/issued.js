@@ -1,4 +1,4 @@
-const sessionsService = require('../../services/sessions');
+const sessions = require('../../services/sessions');
 const auth = require('../../middleware/auth');
 const { now, uuid, sign, signWithJti, secret } = require('../../util');
 
