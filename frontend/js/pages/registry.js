@@ -60,10 +60,14 @@ export const PAGES = [
     sidebar: 'dms',
     nav: { label: 'Direct messages', short: 'Messages', icon: 'mail', rail: true, mobile: true, tabLabel: 'DMs', tabOrder: 2 },
   }),
-  // /dms/:id is the same page with a conversation open. Declared as a child so the
-  // sidebar and the rail highlight the same entry either way.
+  // /dms/:id is the same place as /dms with a conversation open.
+  //
+  // It carried a parent: 'dms' field so the sidebar and the rail would highlight the
+  // same entry here as they do on /dms. Nothing ever read it - the highlighting is done
+  // by prefix match, since /dms/<id> starts with /dms/ - so the field said nothing and
+  // the comment described a mechanism that did not exist. What does the job is noted
+  // here instead, so nobody adds the field back.
   p('dms.conversation', '/dms/:id', {
-    parent: 'dms',
     sidebar: 'dms',
     nav: null,
   }),
