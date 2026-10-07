@@ -44,15 +44,15 @@ export function renderMobileTabs(region) {
     id: page.id,
     label: page.nav.tabLabel || page.nav.short,
     icon: page.nav.icon,
-    path: page.path,
+    route: page.route,
   }));
   const strip = el('div', { class: 'mobile-tab-navigation__strip' });
   for (const t of tabs) {
-    const active = here === t.path || here.startsWith(t.path + '/');
+    const active = here === t.route || here.startsWith(t.route + '/');
     const btn = el('button', {
       type: 'button', class: 'tab-button' + (active ? ' active' : ''),
       'aria-current': active ? 'page' : null,
-      onClick: () => { navigate(route(t.path)); },
+      onClick: () => { navigate(route(t.route)); },
     });
     const count = labelFor(t.id);
     const glyph = el('span', { class: 'micon tab-button__glyph' }, icon(t.icon));

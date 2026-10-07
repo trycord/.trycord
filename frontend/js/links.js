@@ -1,11 +1,7 @@
 // URL construction, in one place.
 //
-// Links used to be built inline as '#/server/' + id in a dozen files, which is
-// why readable slugs never reached the address bar.
-//
-// Slugs are best-effort: a server's detail may not be loaded yet, a channel
-// list may predate a rename. Every helper falls back to the id, which always
-// resolves - hence resolve.js accepting both forms.
+// Slugs are best-effort - a community's detail may not be loaded yet. Every helper falls
+// back to the id, which always resolves.
 import State from './state.js';
 import { route } from './nav.js';
 

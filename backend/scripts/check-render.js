@@ -467,7 +467,7 @@ async function settle(window, ms = 400) {
       // Accept an id, a route template, or a concrete URL - "/c/render-test" as readily
       // as "/c/:slug". Looking at a surface should not require remembering which form
       // the registry happens to store.
-      let target = PAGES.find((pg) => pg.id === wanted || pg.path === wanted);
+      let target = PAGES.find((pg) => pg.id === wanted || pg.route === wanted);
       if (!target && registry.matchRoute) {
         const hit = registryModule.matchRoute(wanted);
         if (hit && hit.page) target = hit.page;
@@ -478,7 +478,7 @@ async function settle(window, ms = 400) {
         await boot1.stop();
         process.exit(1);
       }
-      const url = concrete(target.path, world);
+      const url = concrete(target.route, world);
       await visit(window, document, Router, url, base);
       const view = document.getElementById('view-root');
       console.log('\n  ==== ' + target.id + '  ' + url + ' ====\n');
@@ -487,9 +487,9 @@ async function settle(window, ms = 400) {
       process.exit(0);
     }
 
-    const routable = PAGES.filter((p) => p.path && p.access !== 'guest');
+    const routable = PAGES.filter((p) => p.route && p.access !== 'guest');
     const targets = wanted
-      ? routable.filter((p) => p.path === wanted || p.id === wanted)
+      ? routable.filter((p) => p.route === wanted || p.id === wanted)
       : routable;
 
     // Hand the rendered surfaces to something that can measure them.
@@ -509,7 +509,7 @@ async function settle(window, ms = 400) {
       mkdirSync(emitDir, { recursive: true });
       const manifest = [];
       for (const page of targets) {
-        const url = concrete(page.path, world);
+        const url = concrete(page.route, world);
         const outcome = await visit(window, document, Router, url, base);
         const root = document.getElementById('view-root');
         const html = (document.documentElement.outerHTML || '').replace(
@@ -517,7 +517,7 @@ async function settle(window, ms = 400) {
         );
         const file = path.join(emitDir, page.id.replace(/[^a-z0-9._-]+/gi, '_') + '.html');
         writeFileSync(file, '<!doctype html>\n' + html);
-        manifest.push({ id: page.id, path: page.path, url, file, error: outcome.error || null });
+        manifest.push({ id: page.id, path: page.route, url, file, error: outcome.error || null });
         console.log('    wrote ' + page.id + (outcome.error ? '  <- ' + outcome.error : ''));
       }
       writeFileSync(path.join(emitDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
@@ -535,7 +535,7 @@ async function settle(window, ms = 400) {
     let previousPageId = null;
 
     for (const page of targets) {
-      const url = concrete(page.path, world);
+      const url = concrete(page.route, world);
       const outcome = await visit(window, document, Router, url, base);
       if (outcome.error) {
         failures.push(`${page.id} (${url}): ${outcome.error}`);
@@ -595,7 +595,7 @@ async function settle(window, ms = 400) {
     const unnamed = [];
     let controls = 0;
     for (const page of targets) {
-      const url = concrete(page.path, world);
+      const url = concrete(page.route, world);
       const out = await visit(window, document, Router, url, base);
       for (const bad of accessibilityFaults(document)) {
         unnamed.push(`${page.id}: ${bad}`);
@@ -659,7 +659,7 @@ async function settle(window, ms = 400) {
     for (const spec of brokenSpecs) {
       breakUrl = spec.url;
       const out = await visit(window, document, Router,
-        concrete(registry.PAGES.find((pg) => pg.id === spec.page).path, world), base);
+        concrete(registry.PAGES.find((pg) => pg.id === spec.page).route, world), base);
       const chrome = document.getElementById('shell');
       ok(spec.id + ': the shell survives a failed request',
         !!chrome && chrome.contains(document.getElementById('view-root')),
@@ -676,14 +676,14 @@ async function settle(window, ms = 400) {
     // breaking it changed anything.
     for (const spec of brokenSpecs) {
       const out = await visit(window, document, Router,
-        concrete(registry.PAGES.find((pg) => pg.id === spec.page).path, world), base);
+        concrete(registry.PAGES.find((pg) => pg.id === spec.page).route, world), base);
       ok(spec.id + ': a working backend is not shown as an error', out.errors === 0,
         'the page is showing an error block with nothing broken');
     }
 
     // And with the backend healthy again the page has to recover, not stay stuck.
     const recovered = await visit(window, document, Router,
-      concrete(registry.PAGES.find((pg) => pg.id === 'notifications').path, world), base);
+      concrete(registry.PAGES.find((pg) => pg.id === 'notifications').route, world), base);
     ok('a page recovers once the endpoint does', recovered.errors === 0,
       'still showing an error after the backend was healthy again');
 
@@ -759,12 +759,12 @@ async function settle(window, ms = 400) {
       slowUrl = spec.url;
       slowMs = 700;
       const route = registry.PAGES.find((pg) => pg.id === spec.page);
-      if (!route || !route.path) {
+      if (!route || !route.route) {
         ok(spec.what + ': has a route to check', false, 'no path on page ' + spec.page);
         continue;
       }
       // Deliberately not awaited: the visit races the response, which is the point.
-      const pending = visit(window, document, Router, concrete(route.path, world), base);
+      const pending = visit(window, document, Router, concrete(route.route, world), base);
       await new Promise((r) => setTimeout(r, 250));
       const mid = document.getElementById('view-root');
       const waiting = mid
@@ -801,7 +801,7 @@ async function settle(window, ms = 400) {
     for (const page of targets) {
       requestLog = [];
       recording = true;
-      await visit(window, document, Router, concrete(page.path, world), base);
+      await visit(window, document, Router, concrete(page.route, world), base);
       recording = false;
 
       const counts = new Map();
@@ -844,7 +844,7 @@ async function settle(window, ms = 400) {
     console.log('\n  controls that do nothing');
     const dead = [];
     for (const page of targets) {
-      const url = concrete(page.path, world);
+      const url = concrete(page.route, world);
       await visit(window, document, Router, url, base);
       for (const fault of deadControls(document, boot1.wired)) {
         dead.push(`${page.id}: ${fault}`);
@@ -971,7 +971,7 @@ function pathToUrl(p) {
 }
 
 async function renderRoute(window, document, page, base) {
-  window.history.replaceState({}, '', page.path);
+  window.history.replaceState({}, '', page.route);
   const main = document.getElementById('view-root') || document.body;
   const errors = [];
   const onError = (e) => errors.push(e.message || String(e.error));

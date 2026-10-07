@@ -1,54 +1,18 @@
 // The page registry: one entry per destination in Trycord.
 //
-// There used to be six lists, each answering part of "where can I go and what is
-// this screen called" - the route table, a layout prefix table, a sidebar context
-// classifier, the rail's destinations, the phone tab bar's, and the settings
-// information architecture. They had drifted: the admin navigation came from
-// SETTINGS_IA.admin while the admin page's title came from a second list holding the
-// same nine sections in a different order, so adding one to the nav left the title
-// silently reading Overview. Layout, sidebar and navigation are derived from the
-// matched page now rather than decided again by whoever is asking.
+//   {id, route, scope, render}
 //
-// A page looks like:
+// id is the stable identity - navigation and tests reference it, and routes change. route
+// is the address and may contain :params. scope is which navigation tree it belongs to.
+// render is attached by handlers.js at load; see bind() below.
 //
-//   {
-//     id,      stable identity. Referenced by navigation and by tests; never a route
-//              string, because routes change and identities should not.
-//     path,    the address. May contain :params. Legacy spellings are rewritten to
-//              the current one before matching rather than kept as parallel entries,
-//              so /account/* reaches the page that answers to it and cannot drift.
-//     access,  'guest'   signed out only; a signed-in reader is sent elsewhere
-//              'session' needs a session
-//              'public'  either
-//     layout,  which shell layout: channel | list | settings | admin | profile | plain
-//     sidebar, which contextual nav the shell paints, or null for a surface that
-//              carries its own navigation inside its content
-//     scope,   for the scoped navigations: 'account' | 'community' | 'admin'
-//     group,   the heading it sits under inside its scope
-//     label,   what the navigation calls it
-//     icon,    glyph name from ui.js ICON_PATHS
-//     order,   position within the scope. Not the array order - a page with no order
-//              still belongs to its scope, it just sorts last.
-//     blurb,   the line under the title when this is the current page
-//     tabs,    every tab id that means this page. The settings tree has always had
-//              more addresses than screens; /settings/sessions and /settings/password
-//              are both Security.
-//     nav,     presentation. `rail` and `mobile` say whether this destination appears
-//              in the desktop rail and the phone tab bar. Presentation may differ
-//              between them; identity does not.
-//     hidden   true keeps a page routable but out of every navigation
-//   }
+// Optional: access (who may be here), layout (which shell shape it needs), sidebar, label,
+// icon, blurb, tabs, nav, hidden.
 //
-// Matching is longest-prefix-wins on segment boundaries, which the old route table
-// already did and is worth keeping: the order of this array is a reading convenience,
-// not a correctness requirement, so moving an entry cannot change what a URL means.
-//
-// Deliberately not here: the renderer. Binding one to a registry entry would make
-// every navigation consumer - the rail, the sidebar, the settings nav, the tab bar -
-// import all nineteen page modules to read a label, and those modules import the
-// shell, which reads this file. The binding lives in handlers.js, keyed by id.
+// Matching is longest-prefix on segment boundaries, so the array order is a reading
+// convenience - moving an entry cannot change what a URL means.
 
-const p = (id, path, rest) => ({ id, path, access: 'session', layout: 'list', sidebar: null, ...rest });
+const p = (id, route, rest) => ({ id, route, access: 'session', layout: 'list', sidebar: null, ...rest });
 
 export const PAGES = [
   // ---- global destinations. These are the ones that appear in the rail, and most
@@ -312,9 +276,9 @@ function groupForCommunitySetting(id) {
 // ---- lookup tables, built once.
 
 const BY_ID = new Map(PAGES.map((page) => [page.id, page]));
-const BY_PATH = new Map();
+const BY_ROUTE = new Map();
 for (const page of PAGES) {
-  if (page.path) BY_PATH.set(page.path, page);
+  if (page.route) BY_ROUTE.set(page.route, page);
 }
 
 // /account/* was the whole settings tree before it was renamed, and both spellings
@@ -328,11 +292,11 @@ export function matchPath(rawPath) {
   let best = null;
   let bestLength = -1;
   for (const page of PAGES) {
-    if (!page.path) continue;
-    if (!matches(page.path, path)) continue;
-    if (page.path.length <= bestLength) continue;
+    if (!page.route) continue;
+    if (!matches(page.route, path)) continue;
+    if (page.route.length <= bestLength) continue;
     best = page;
-    bestLength = page.path.length;
+    bestLength = page.route.length;
   }
   return best || null;
 }
@@ -391,7 +355,7 @@ export function matchRoute(rawPath) {
   const path = normalise(String(rawPath || '/'));
   const page = matchPath(path);
   if (!page) return null;
-  return { page, ...splitPath(page.path, path) };
+  return { page, ...splitPath(page.route, path) };
 }
 
 function splitPath(pattern, path) {
@@ -409,8 +373,8 @@ export function pageById(id) {
   return BY_ID.get(id) || null;
 }
 
-export function pageAt(path) {
-  return BY_PATH.get(path) || null;
+export function pageAt(route) {
+  return BY_ROUTE.get(route) || null;
 }
 
 /**
@@ -430,7 +394,7 @@ export function scopeNav(scope) {
       label: page.label,
       icon: page.icon,
       blurb: page.blurb || '',
-      path: page.path || null,
+      route: page.route || null,
       order: page.order == null ? 999 : page.order,
     };
     const g = groups.get(page.group) || [];
@@ -481,9 +445,42 @@ export function scopeFor(page) {
   return page && page.scope ? page.scope : null;
 }
 
+// The renderer, attached to the page by handlers.js at load. Binding is separate from
+// declaring because the renderers import the shell, and the shell reads this file -
+// importing them from here would close the loop.
+//
+// Community sections are the exception: they have no route and are navigation entries
+// for tabs inside /server/:id/settings, which community.settings draws.
+let bound = false;
+
+export function bind(renderers) {
+  for (const page of PAGES) {
+    if (page.route) page.render = renderers[page.id] || null;
+  }
+  bound = true;
+}
+
+/** Whether bind() has run. Cheap enough for a check to ask. */
+export function isBound() {
+  return bound;
+}
+
+/**
+ * Draw a page.
+ *
+ * Through the page rather than through the map, so the thing that decides where to go
+ * and the thing that draws it are the same object.
+ */
+export function renderPage(page, ctx) {
+  if (!page || typeof page.render !== 'function') {
+    throw new Error('No renderer for page ' + (page && page.id));
+  }
+  return page.render(ctx, page);
+}
+
 export const HOME_PAGE = BY_ID.get('home');
 
 export default {
   PAGES, matchPath, matchRoute, pageById, pageAt, scopeNav, scopeHasTab,
-  railPages, mobilePages, scopeFor, HOME_PAGE,
+  railPages, mobilePages, scopeFor, HOME_PAGE, bind, isBound, renderPage,
 };

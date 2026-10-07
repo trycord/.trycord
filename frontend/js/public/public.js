@@ -3,7 +3,7 @@ import Api from '../api.js';
 import { esc, el, clear, toast } from '../ui.js';
 import State, { applyAuth, isAuthed, clearSession } from '../state.js';
 import { renderContextHeader } from '../shell.js';
-import { TrycordConfig, BACKEND_URL } from '../config.js';
+import { TrycordConfig } from '../config.js';
 import Realtime from '../realtime.js';
 import { navigate, route } from '../nav.js';;
 
@@ -414,7 +414,7 @@ const PagesPublic = {
 // (tokens belong to one backend) and reloads.
 export function renderBackendSelector(mount) {
   clear(mount);
-  const url = BACKEND_URL();
+  const url = TrycordConfig.backendUrl();
   const source = TrycordConfig.backendSource();
 
   mount.appendChild(el('div', { class: 'section-label' }, 'Backend'));

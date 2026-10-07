@@ -141,11 +141,11 @@ export function simpleListContext(region, { title, sub, groups }) {
     for (const item of g.items) {
       // A row with no destination is still information - it is a fact the reader was
       // shown - but it must not become a link that throws when the route is compared.
-      const dest = item.path || '';
+      const dest = item.route || '';
       const active = !!dest && (item.exact ? here === dest : (here === dest || here.startsWith(dest + '/')));
       group.list.appendChild(navRow({
-        label: item.label, href: route(item.path), active,
-        onClick: () => { navigate(item.path); },
+        label: item.label, href: route(item.route), active,
+        onClick: () => { navigate(item.route); },
       }));
     }
     scroll.appendChild(group);

@@ -1,12 +1,7 @@
-// Shared settings composition.
+// Shared settings parts: headings, label-and-control rows, danger blocks.
 //
-// Every surface used to grow its own markup: a heading here, a hand-rolled
-// two-column label-and-control row there, and a danger block that looked like a
-// different component on each page. They lined up visually by luck.
-//
-// These are the parts, so a new settings section is assembled rather than
-// restyled. Everything here is a plain builder returning a node - no state, no
-// framework - so a section can use one part, all of them, or none.
+// Plain builders returning a node - no state, no framework - so a section can use one
+// part, all of them, or none.
 import { el } from './ui.js';
 import { icon } from './components.js';
 

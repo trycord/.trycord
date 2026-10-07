@@ -1,17 +1,5 @@
-// Page id -> what to run.
-//
-// Split from registry.js on purpose. The registry holds identity, routes, layout
-// and navigation labels; it imports nothing but itself. If the renderers lived
-// there, every navigation consumer - the rail, the sidebar, the settings nav, the
-// phone tab bar - would pull in all nineteen page modules to read a string, and
-// those modules import the shell, which reads the registry. That is a cycle, and
-// the kind that works until someone reorders an import.
-//
-// So: registry.js says what a page *is*. This file says what it *does*.
-//
-// No page calls renderAllChrome(). lifecycle.js paints the chrome after the
-// handler returns, because a surface that forgets to is indistinguishable from one
-// that has no members panel.
+// The renderer for every page, keyed by page id. handlers.js calls bind() at load, so a
+// page carries its own render() and the registry does not import the modules that draw.
 
 import Api from '../api.js';
 import { refreshServers } from '../state.js';
@@ -37,6 +25,7 @@ import { renderNewChannel, renderServerCategories } from '../community/channels.
 import { renderHome } from '../global/home.js';
 import Dms from '../messages/dms.js';
 import { resolveCommunity, resolveChannelToken, renderRouteError } from '../resolve.js';
+import { bind } from './registry.js';
 
 // The community tree. The registry knows these addresses; this resolves the slug
 // to an id, republishes the route in the shape the chrome matches on, and picks
@@ -186,3 +175,8 @@ export const HANDLERS = {
 };
 
 export default { HANDLERS };
+
+// Attach the renderers to the pages. Runs once at load, and it is the only dependency
+// between this file and the registry - which does not import this one, so the twenty
+// modules above can import the shell while the shell reads the registry.
+bind(HANDLERS);

@@ -1,17 +1,8 @@
 // How many things are waiting at each destination.
 //
-// Three surfaces ask this and each had its own arithmetic: the desktop rail, the
-// phone tab bar, and the home page's own links. Direct messages fell out of it
-// entirely - the home page knew there were four unread conversations and the rail
-// showed nothing, because the rail's list only ever had two entries on it.
-//
-// One function, keyed by the page id in the registry, so a destination that exists
-// in one navigation and not another cannot end up with a count in one and nothing
-// in the other.
-//
-// Counts read from State rather than fetching. Everything here is already loaded at
-// boot and refreshed on the realtime stream, so a badge that needed a request would
-// either lag the number it is claiming or cost one per repaint.
+// One function keyed by page id, so a destination in one navigation and not another
+// cannot end up with a count in one and nothing in the other. Reads from State rather
+// than fetching - a badge that needed a request would cost one per repaint.
 
 import State from './state.js';
 

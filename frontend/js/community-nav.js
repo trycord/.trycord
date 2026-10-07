@@ -1,14 +1,7 @@
-// Community context navigation.
+// The context column: the community header, its channels, and the account panel.
 //
-// Replaces the community sidebar: the banner header, the "Text channels" label
-// above a flat list, the empty area, and the account panel pinned to the bottom.
-// What it keeps is everything the old one did - switch community, reach every
-// channel, act within the viewer's actual permissions.
-//
-// One switchable header and one scroller, because those are the two things a
-// reader needs before they start reading. The banner is gone: a large mostly
-// empty image that pushed the channels it was labelling below the fold, and the
-// community is already identified by the rail chip and the channel header.
+// No banner. A large mostly-empty image pushed the channels it was labelling below the
+// fold, and the rail chip and the channel header already say which community this is.
 import { el, icon, attachContextMenu, attachMenu, copyText, confirmDialog, toast } from './ui.js';
 import { communityMark } from './components.js';
 import Api from './api.js';

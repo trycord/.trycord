@@ -1,28 +1,9 @@
-// Theming.
-//
-// One file used to hold five jobs, including the one that decides what a user is allowed
-// to put in a custom stylesheet. That decision is a security boundary and it was sitting
-// between the palette maths and the sheet that installs the result, where nothing about
-// its position suggested it:
+// Theming. The engine is under theme/; this is the surface everything imports.
 //
 //   theme/registry.js  the theme list, resolving and applying one, the OS watcher
-//   theme/palette.js   custom token definitions and the palette, applied as inline
-//                      properties on the document element
-//   theme/css.js       validating a custom stylesheet - a pure function from text to
-//                      verdict, holding the forbidden-property list and the protected
-//                      selectors
-//   theme/custom.js    installing a custom stylesheet, checking afterwards that it did
-//                      not hide the composer, and the recovery path
-//
-// The dependency runs one way. css.js knows nothing but CSS. palette.js knows nothing
-// about stylesheets. custom.js needs the palette, because a custom sheet sits on top of
-// the custom tokens, and needs the recovery fallback, because applying a stylesheet is the
-// one theming operation that can lock someone out of their own app. registry.js needs
-// custom.js only to apply a custom theme, which is why setTheme can take one.
-//
-// The export surface below is the 23 names this file had before the split, exactly. A
-// split that quietly narrowed or widened what callers can reach would be a different
-// change from the one that was asked for.
+//   theme/palette.js   custom token definitions, applied as inline properties on <html>
+//   theme/css.js       validating a custom stylesheet. The security boundary.
+//   theme/custom.js    installing it, and the recovery path if it hides the composer
 
 import {
   DEFAULT_THEME,

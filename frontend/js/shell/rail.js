@@ -35,13 +35,13 @@ export function renderCommunities(region) {
     label: page.nav.label,
     short: page.nav.short,
     icon: page.nav.icon,
-    path: page.path,
+    route: page.route,
     badge: () => labelFor(page.id),
   }));
 
   // The rail's own destinations carry words, for the same reason communities do:
   // five glyphs in a column is a puzzle, five labelled rows is a menu.
-  const railButton = ({ label, short, icon: iconName, path, active, badge }) => {
+  const railButton = ({ label, short, icon: iconName, route, active, badge }) => {
     const btn = el('button', {
       class: 'rail-nav' + (active ? ' is-active' : ''),
       type: 'button',
@@ -81,8 +81,8 @@ export function renderCommunities(region) {
   const globalGroup = el('nav', { class: 'rail-group', 'aria-label': 'Your Trycord' });
   for (const item of globalItems) {
     globalGroup.appendChild(railButton({
-      label: item.label, short: item.short, icon: item.icon, path: item.path, badge: item.badge,
-      active: here === item.path || here.startsWith(item.path + '/'),
+      label: item.label, short: item.short, icon: item.icon, route: item.route, badge: item.badge,
+      active: here === item.route || here.startsWith(item.route + '/'),
     }));
   }
   region.appendChild(el('div', { class: 'rail-section' },
