@@ -1,4 +1,4 @@
-import { currentRoute } from './route.js';
+import { compose } from './compose.js';
 import { serverChipMenuFor } from './menus.js';
 import { sidebarToggleButton } from './sidebar.js';
 import { labelFor } from '../badges.js';
@@ -15,7 +15,7 @@ import { matchRoute, railPages, mobilePages } from '../pages/registry.js';
 export function renderCommunities(region) {
   clear(region);
   if (!isAuthed()) return;
-  const here = currentRoute();
+  const here = compose().route;
 
   // `path` is what the router reports, `href` is where the browser goes. They are
   // different strings wherever the app is mounted under a subpath, so the active
