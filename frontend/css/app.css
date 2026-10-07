@@ -100,7 +100,17 @@
   --t-txt:  #f2efe8;
   --t-txt2: #b8b2a6;
   --t-mut:  #8b8478;
-  --t-dim:  #5b564e;   /* disabled, and the floor for anything unreadable */
+  /* The most de-emphasised text that is still meant to be read: timestamps, counts,
+     "edited", hints, empty states, placeholders. It is not a disabled colour, and for a
+     long time it was used as one - at 2.33:1 on this theme's own raised surface, which
+     is where a message timestamp actually sits. Fifty-odd rules use this token, so the
+     fix had to happen here rather than in each of them.
+
+     It now clears 4.5:1 against both --t-base and --t-elev in every theme. That leaves
+     almost no room between it and --t-mut, so the difference between secondary and
+     de-emphasised text is now carried by size and weight, which is where the rules were
+     already putting it. */
+  --t-dim:  #8a8377;
 
   /* Ember. One accent, three intensities. The old theme had accent and
      accent-2 pulling in different directions on the same screen. */
@@ -232,7 +242,7 @@
   --t-txt:   #fff4ea;
   --t-txt2:  #d9c3b0;
   --t-mut:   #a0826d;
-  --t-dim:   #6f5a4b;
+  --t-dim:   #9d816d;
   --t-accent:     #ff8c3a;
   --t-accent-hi:  #ffab6b;
   --t-accent-lo:  #d4611a;
@@ -252,7 +262,7 @@
   --t-txt:   #f2efe8;
   --t-txt2:  #b8b2a6;
   --t-mut:   #8b8478;
-  --t-dim:   #5b564e;
+  --t-dim:   #8a8377;
   --t-accent:     #e8752a;
   --t-accent-hi:  #ff8a3d;
   --t-accent-lo:  #b94f16;
@@ -273,7 +283,7 @@
   --t-txt:   #f2f3f7;
   --t-txt2:  #c8cad3;
   --t-mut:   #8b8f9c;
-  --t-dim:   #63676f;
+  --t-dim:   #898d95;
   --t-accent:     #6ea8ff;
   --t-accent-hi:  #9cc4ff;
   --t-accent-lo:  #4a86e0;
@@ -299,7 +309,7 @@
   --t-txt:   #eef0fa;
   --t-txt2:  #c3c8e0;
   --t-mut:   #858bb0;
-  --t-dim:   #5e6486;
+  --t-dim:   #8287a7;
   --t-accent:     #a78bfa;
   --t-accent-hi:  #c9b6ff;
   --t-accent-lo:  #8567e0;
@@ -365,7 +375,7 @@
   --t-txt:     #23150c;
   --t-txt2:    #4d382a;
   --t-mut:     #7d6353;
-  --t-dim:     #a08a78;
+  --t-dim:     #806b5a;
   --t-accent:  #c2490d;
   --t-accent-hi: #a33c08;
   --t-accent-lo: #e0661f;
@@ -1186,8 +1196,21 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   display: flex;
   align-items: center;
   gap: var(--t-d-1);
+  /* The header is one flex line, and on a narrow phone the line runs out before the
+     actions do. The box gets squeezed to what is left, the button inside it does not,
+     and because nothing here clips, the overflow escapes the header and becomes the
+     document's scroll width - so the whole page can be dragged sideways by a button.
+     Letting this shrink and clipping keeps the mess inside its own box. */
+  min-width: 0;
+  overflow: hidden;
 }
-.context-actions button,
+/* 34px square is the shape of an icon control. It was applied to every button in the
+   slot, including the one labelled button the pinned-messages header puts there: that
+   button was forced into a 34px box, its label was cropped, and the leftover text ran
+   past the header and became the document's scroll width - so one button in one header
+   made every page draggable sideways. Icon controls carry .icon; a labelled control is
+   a .btn variant and keeps its own sizing. */
+.context-actions button.icon,
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -1200,8 +1223,8 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   color: var(--t-mut);
   transition: background var(--t-fast) var(--t-ease), color var(--t-fast) var(--t-ease);
 }
-.context-actions button:hover, .icon-btn:hover { background: var(--t-hover); color: var(--t-txt); }
-.context-actions button[aria-pressed='true'] { color: var(--t-accent); }
+.context-actions button.icon:hover, .icon-btn:hover { background: var(--t-hover); color: var(--t-txt); }
+.context-actions button.icon[aria-pressed='true'] { color: var(--t-accent); }
 
 .ui-icon { width: 18px; height: 18px; flex: 0 0 auto; }
 
@@ -1314,6 +1337,11 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   color: var(--t-txt);
   font-size: var(--t-fs-s);
   font-weight: 700;
+  /* The same reasoning as .member-name-btn: this is a link-shaped control that opens a
+     profile, and at line height it was 20px of target. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   text-align: left;
 }
 .msg-author:hover { color: var(--t-accent); }
@@ -1509,6 +1537,8 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   gap: 5px;
   margin-top: var(--t-d-2);
   padding: 2px 10px 2px 7px;
+  /* 22px before: two pixels of padding either side of a line of small text. */
+  min-height: 24px;
   border: 0;
   border-radius: var(--t-r-full);
   background: color-mix(in srgb, var(--t-accent) 12%, transparent);
@@ -1824,6 +1854,11 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   color: var(--t-txt);
   font-size: var(--t-fs-s);
   font-weight: 700;
+  /* Reads as text, but it is the control that opens that person's profile, so it needs
+     a target. A line of 0.83rem text is 20px tall, which is below the 24px minimum. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   text-align: left;
   cursor: pointer;
   min-width: 0;
@@ -2191,13 +2226,16 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
 .settings-nav__toggle { display: none; }
 
 .settings-nav__search { position: relative; flex: 0 0 auto; }
-.settings-nav__search .input { padding-right: 34px; }
+.settings-nav__search .input { padding-right: 40px; }
+/* 22px was below the 24px minimum for a pointer target, and this is the control people
+   press most often in that panel. Rather than pad a 22px square out to a round number,
+   the button takes the full height of the search field it sits in - the field is 38px -
+   so the target grows where there is already room and the glyph does not change size. */
 .settings-nav__search-clear {
   position: absolute;
-  top: 50%; right: 8px;
-  transform: translateY(-50%);
+  top: 0; bottom: 0; right: 5px;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px;
+  width: 28px;
   border: 0; border-radius: var(--t-r-xs);
   background: transparent; color: var(--t-mut);
 }
@@ -3153,6 +3191,12 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
 html[data-auth-page] .mobile-tab-navigation { display: none; }
 
 @media (max-width: 760px) {
+  /* A phone is not a narrow desktop. The header holds a back control, a title and a
+     row of actions, and on 390px that is three things competing for one line. Giving it
+     two is the deliberate composition: the title keeps the room it needs, and the
+     actions get a row of their own instead of being clipped. */
+  .context-header { flex-wrap: wrap; row-gap: var(--t-d-2); padding-bottom: var(--t-d-2); }
+
   .auth-card:has(> .auth-secondary) { grid-template-columns: minmax(0, 1fr); }
   .auth-secondary { border-left: 0; border-top: 1px solid var(--t-line-hi); }
   .auth-footer { flex-direction: column; align-items: center; text-align: center; }
@@ -3348,7 +3392,16 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 .row--channel.muted { color: var(--t-dim); }
 .row--channel.muted .ch-name { text-decoration: line-through; text-decoration-color: var(--t-line-hi); }
 
-.row--member { grid-template-columns: auto minmax(0, 1fr) auto; }
+/* This row is a button, and a button is sized by its content unless something says
+   otherwise. In the panels that hold a list of members the parent lays its children out
+   as a flex line, so the row ended up 16px wide - just its avatar - with the name's
+   column collapsed to nothing. Filling the container is what every row here expects. */
+.row--member {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
 .member-item__info { grid-column: 2; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .member-item__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .member-item__role { color: var(--t-mut); font-size: var(--t-fs-xxs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3761,6 +3814,10 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   align-items: center;
   gap: var(--t-d-3);
   width: 100%;
+  /* Four children in a row - prefix, name, description, spacer and buttons - and the
+     name and description will not shrink on their own, so on a 390px phone the row's
+     min-content width pushed the page to 454 and made it scroll sideways. */
+  min-width: 0;
   padding: var(--t-d-3);
   border: 1px solid var(--t-line);
   border-radius: var(--t-r-s);
@@ -3768,6 +3825,17 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   color: var(--t-txt2);
   font-size: var(--t-fs-s);
   text-align: left;
+}
+.community-channel-row .ch-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The description is the first thing worth losing when the row runs out of room. */
+.community-channel-row .row-sub {
+  min-width: 0;
+  flex: 0 1 auto;
 }
 .community-channel-row:hover { border-color: var(--t-line-hi); background: var(--t-elev); color: var(--t-txt); }
 .community-channel-row .ch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
@@ -4222,10 +4290,15 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
     white-space: nowrap;
   }
 
+  /* A real button that collapses the navigation, so it gets a real target. It was 18px
+     tall - the collapsed bar's height token - which is below the 24px minimum and a long
+     way below the 44px this codebase uses for .btn and the rail. It also saved nothing:
+     the tab strip beside it already forces the bar to --t-ui-tabbar, so the row was 58px
+     either way and the control was just a strip of 18px in the middle of it. */
   .mobile-tab-navigation__toggle {
     flex: 0 0 auto;
     align-self: center;
-    width: 48px; height: var(--t-ui-tabbar-handle);
+    width: 48px; height: var(--t-hit);
     display: inline-flex; align-items: center; justify-content: center;
     border: 0; background: transparent; color: var(--t-mut);
   }
@@ -4288,6 +4361,12 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 }
 @media (max-width: 999px) and (min-width: 760px) {
   :root { --ui-rail: 76px; --ui-sidebar: 216px; --ui-members: 0px; }
+  /* The track is zero here, so the panel was being laid out in it anyway: one pixel of
+     border down the edge of the workspace, holding a list of members whose rows had
+     collapsed to the width of their own avatars - sixteen pixels of button each. The
+     phone range already hides the panel for exactly this reason, and the members page
+     still carries it, so this hides the sliver rather than a feature. */
+  .shell[data-members='yes'] .member-sidebar { display: none; }
 }
 /* A small tablet still gets the labelled rail. The old rule here hid the
    community names and went back to big square marks at 759px and under, which
