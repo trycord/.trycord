@@ -19,7 +19,12 @@
       'border:1px solid var(--t-line,rgba(255,255,255,.2));background:var(--t-accent,#ff914d);' +
       'color:var(--t-on-accent,#111);border-radius:8px;padding:8px 18px;font:inherit;cursor:pointer;';
     b.textContent = 'Reload';
-    b.addEventListener('click', function () { location.reload(); });
+    // Clears the one-shot stale-graph flag, so pressing this always gets the full
+    // automatic recovery back rather than one refetch short of it.
+    b.addEventListener('click', function () {
+      try { sessionStorage.removeItem('trycord.staleReload'); } catch (e) { /* private mode */ }
+      location.reload();
+    });
     box.appendChild(t);
     box.appendChild(p);
     box.appendChild(b);
@@ -40,6 +45,37 @@
     return null;
   }
 
+  // A module graph that disagrees with itself. Two halves of the application were
+  // written at different times and one of them imports a name the other no longer
+  // exports. It is not a fault in any single file, it is a page holding half of one
+  // build and half of another, and the only thing that resolves it is refetching the
+  // graph.
+  //
+  //   does not provide an export named X   - this file is older than its importer
+  //   Failed to fetch dynamically imported module - this file is newer than the
+  //                                         document that asked for it
+  //
+  // Reload once, automatically. The server sends Cache-Control: no-cache with an ETag, so
+  // a reload revalidates every module and the graph is coherent again.
+  var STALE_RELOADED = 'trycord.staleReload';
+  function looksLikeStaleGraph(text) {
+    return /does not provide an export named/i.test(text)
+      || /(?:failed|error) (?:to )?(?:load|fetch)(?:ing)? (?:dynamically imported )?module/i.test(text)
+      || /module\s+script\s+.*(?:failed|error)/i.test(text)
+      || /importing a module script failed/i.test(text);
+  }
+  function recoverFromStaleGraph(text) {
+    if (!looksLikeStaleGraph(text)) return false;
+    var already = false;
+    try { already = sessionStorage.getItem(STALE_RELOADED) === '1'; } catch (e) { /* private mode */ }
+    if (already) return false; // Already refetched once. Let the caller show the message.
+    try { sessionStorage.setItem(STALE_RELOADED, '1'); } catch (e) { /* private mode */ }
+    // Replace rather than reload so this attempt is not in the history: if it works the
+    // reader should land where they were, with no back button pointing at a dead page.
+    location.replace(location.pathname + location.search + location.hash);
+    return true;
+  }
+
   window.addEventListener('error', function (ev) {
     // file:line:column, not just the filename. A filename alone left three
     // separate crashes ambiguous because several modules load from the same
@@ -53,15 +89,18 @@
       if (typeof ev.lineno === 'number' && ev.lineno) where += ':' + ev.lineno + (ev.colno ? ':' + ev.colno : '');
     }
     var msg = (ev && ev.message) ? String(ev.message).slice(0, 200) : 'Unknown script error';
+    if (recoverFromStaleGraph(msg)) return;
     paintError('A script error occurred' + where + ': ' + msg);
   });
 
   window.addEventListener('unhandledrejection', function (ev) {
     var reason = ev && ev.reason;
     if (reason && reason.name === 'TypeError' && /(?:loading.*chunk|module\s+script|imported)\s+/i.test(String(reason.message))) {
+      if (recoverFromStaleGraph(String(reason.message))) return;
       paintError('The app files changed while this window was open. Reload to pick up the latest build.');
       return;
     }
+    if (recoverFromStaleGraph(reason && reason.message ? String(reason.message) : '')) return;
     // Everything else was silently discarded before, so a boot that failed on a
     // rejected promise looked like a blank page with nothing to go on.
     var origin = faultOrigin(reason);
