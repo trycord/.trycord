@@ -1,5 +1,4 @@
 import { currentRoute } from './route.js';
-import { storage } from '../config.js';
 import { labelFor } from '../badges.js';
 import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from '../ui.js';
 import { avatar, icon, navRow, serverChip, navGroup } from '../components.js';
@@ -9,14 +8,14 @@ import { matchRoute, railPages, mobilePages } from '../pages/registry.js';
 
 // The phone tab bar, and whether it is showing.
 
-const LS_TABBAR_HIDDEN = 'trycord.tabbarHidden';
+import { setShell, shellState } from './compose.js';
 
 export function isTabBarHidden() {
-  try { return localStorage.getItem(LS_TABBAR_HIDDEN) === '1'; } catch { return false; }
+  return !shellState().tabsVisible;
 }
 
 export function setTabBarHidden(hidden) {
-  storage(() => localStorage.setItem(LS_TABBAR_HIDDEN, hidden));
+  setShell({ tabsVisible: !hidden });
   const bar = qs('#mobile-tab-navigation');
   // The attribute lives on the bar, and the narrow layout's grid gives the bar
   // its own auto track, so collapsing it hands the height straight back to the
