@@ -29,7 +29,10 @@ const CSS = path.join(ROOT, 'frontend', 'css', 'app.css');
 
 // Module -> the routes in that module whose heading is legitimately its own.
 const EXEMPT = {
-  'shell.js': {
+  // This was exempt as 'shell.js' when the whole shell was one file. It is exempt now
+  // because it is the component that renders the context header, and therefore the h1 -
+  // not because of where it happens to live.
+  'shell/context-header.js': {
     why: 'renderContextHeader is where the one h1 comes from',
     routes: [],
   },
