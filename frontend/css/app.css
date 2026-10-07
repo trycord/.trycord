@@ -99,7 +99,7 @@
 
   --t-txt:  #f2efe8;
   --t-txt2: #b8b2a6;
-  --t-mut:  #7d776c;
+  --t-mut:  #8b8478;
   --t-dim:  #5b564e;   /* disabled, and the floor for anything unreadable */
 
   /* Ember. One accent, three intensities. The old theme had accent and
@@ -231,7 +231,7 @@
   --t-act:   #39302a;
   --t-txt:   #fff4ea;
   --t-txt2:  #d9c3b0;
-  --t-mut:   #9a7d69;
+  --t-mut:   #a0826d;
   --t-dim:   #6f5a4b;
   --t-accent:     #ff8c3a;
   --t-accent-hi:  #ffab6b;
@@ -251,7 +251,7 @@
   --t-act:   #2d2926;
   --t-txt:   #f2efe8;
   --t-txt2:  #b8b2a6;
-  --t-mut:   #7d776c;
+  --t-mut:   #8b8478;
   --t-dim:   #5b564e;
   --t-accent:     #e8752a;
   --t-accent-hi:  #ff8a3d;
@@ -888,7 +888,9 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   font-weight: 800;
   font-size: 0.72rem;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
+
+  /* colour-exempt: a mark over a user-supplied banner or icon, so white is the only value that reads
+     against an arbitrary photograph. A token here would be a guess. */}
 .rail-mark img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* A community's name is how it is told apart from the next one, so it wraps to a
    second line rather than becoming 'The Foun...'. Destination words are short
@@ -964,7 +966,9 @@ hr { border: 0; border-top: 1px solid var(--t-line); margin: var(--t-d-6) 0; }
   color: #fff;
   font-weight: 800;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-}
+
+  /* colour-exempt: a mark over a user-supplied banner or icon, so white is the only value that reads
+     against an arbitrary photograph. A token here would be a guess. */}
 .community-mark img, .community-mark__img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .community-mark.has-img { background: transparent; text-shadow: none; }
 .community-mark.lg { width: var(--t-avatar-lg); height: var(--t-avatar-lg); border-radius: var(--t-r-l); font-size: 2rem; }
@@ -2024,7 +2028,7 @@ label {
 .switch:has(input:checked):not(:has(.switch__track))::before {
   border-color: transparent;
   background:
-    radial-gradient(circle at 29px 50%, #fff 0 8px, transparent 8px),
+    radial-gradient(circle at 29px 50%, var(--t-accent-ink) 0 8px, transparent 8px),
     var(--t-accent);
 }
 .switch:not(:has(.switch__track)):has(input:focus-visible)::before {
@@ -2061,7 +2065,7 @@ input.switch::before {
   transition: transform var(--t-med) var(--t-ease), background var(--t-fast) var(--t-ease);
 }
 input.switch:checked { background: var(--t-accent); border-color: transparent; }
-input.switch:checked::before { transform: translateX(18px); background: #fff; }
+input.switch:checked::before { transform: translateX(18px); background: var(--t-accent-ink); }
 input.switch:focus-visible { outline: 2px solid var(--t-accent); outline-offset: 2px; }
 input.switch:disabled { opacity: 0.5; cursor: default; }
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -2081,7 +2085,7 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
   transition: transform var(--t-med) var(--t-ease), background var(--t-fast) var(--t-ease);
 }
 .switch__input:checked + .switch__track { background: var(--t-accent); border-color: transparent; }
-.switch__input:checked + .switch__track .switch__thumb { background: #fff; transform: translateX(18px); }
+.switch__input:checked + .switch__track .switch__thumb { background: var(--t-accent-ink); transform: translateX(18px); }
 .switch__input:focus-visible + .switch__track { outline: 2px solid var(--t-accent); outline-offset: 2px; }
 .switch__input:disabled + .switch__track { opacity: 0.5; }
 
@@ -2518,6 +2522,8 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
 .community-banner__img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .community-banner__scrim {
   position: absolute; inset: 0;
+  /* colour-exempt: a scrim over a user-supplied banner, which has to darken whatever
+     photograph is behind it, so it cannot be a surface token. */
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.1) 0%, rgba(8, 5, 4, 0.86) 100%);
 }
 .community-hero__text { position: relative; min-width: 0; flex: 1 1 auto; }
@@ -2774,9 +2780,12 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
 .theme-chip:hover { border-color: var(--t-line-hi); }
 .theme-chip.active { border-color: var(--t-accent); background: var(--t-elev); box-shadow: var(--t-glow); }
 .theme-chip-swatch { flex: 0 0 40px; height: 28px; border-radius: var(--t-r-s); border: 1px solid var(--t-line-hi); background: var(--t-pg); }
-.theme-chip-swatch[data-theme='system'] { background: linear-gradient(120deg, #130b07 30%, #f6f0e7 70%); }
-.theme-chip-swatch[data-theme='ember'] { background: linear-gradient(120deg, #0c0806 30%, #241a16 62%, #ff8c3a); }
-.theme-chip-swatch[data-theme='light'] { background: linear-gradient(120deg, #fffdfa 30%, #f4efe8 62%, #c2490d); }
+/* colour-exempt: swatches previewing another theme. These must be literals -
+   written as var(--t-*) every swatch would render in the currently selected
+   theme's own colours, so all seven would look identical. */
+.theme-chip-swatch[data-theme='system'] { background: linear-gradient(120deg, #130b07 30%, #f6f0e7 70%); } /* colour-exempt: previews another theme, so it must be a literal */
+.theme-chip-swatch[data-theme='ember'] { background: linear-gradient(120deg, #0c0806 30%, #241a16 62%, #ff8c3a); } /* colour-exempt: previews another theme, so it must be a literal */
+.theme-chip-swatch[data-theme='light'] { background: linear-gradient(120deg, #fffdfa 30%, #f4efe8 62%, #c2490d); } /* colour-exempt: previews another theme, so it must be a literal */
 .theme-chip-swatch[data-theme='custom'] { background: linear-gradient(120deg, var(--t-base), var(--t-accent)); }
 .theme-chip-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .theme-chip-label small { color: var(--t-mut); font-size: var(--t-fs-xxs); line-height: 1.4; }
@@ -2820,6 +2829,8 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
   display: grid;
   place-items: center;
   padding: var(--t-d-5);
+/* colour-exempt: a scrim dimming arbitrary content behind it, composed against
+   whatever is dimmed rather than being a surface of its own. */
   background: rgba(6, 4, 3, 0.72);
   backdrop-filter: blur(4px);
   overflow-y: auto;
@@ -2932,6 +2943,7 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
   position: fixed;
   inset: 0;
   z-index: 94;
+/* colour-exempt: a scrim dimming arbitrary content behind it. */
   background: rgba(6, 4, 3, 0.5);
   animation: tc-fade var(--t-fast) var(--t-ease);
 }
@@ -3057,7 +3069,11 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
   z-index: 80;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: #16151a;
+  /* Was #16151a, hardcoded. Paired with the color: var(--t-txt) below, that made the
+     sign-in form 1.02:1 in the light theme - near-black text on near-black - so it was
+     unreadable for anyone not on the default theme, and nothing in the rule looked like
+     a colour choice. */
+  background: var(--t-base);
   color: var(--t-txt);
 }
 .auth-background {
@@ -3075,6 +3091,8 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
      solid: the lettering is bright orange on near-black, and three percent of it
      still reads as a word. Anchoring left keeps the geometry under the card rather
      than half off the edge. */
+/* colour-exempt: the two layers below are a scrim tuned against a fixed
+   photograph, and that comment above explains why each alpha is what it is. */
   background-image:
     linear-gradient(90deg,
       rgba(18, 17, 21, 0.50) 0%,
@@ -3604,7 +3622,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 .embed-card.is-image { max-width: 480px; }
 .embed-card.is-image img { width: 100%; max-height: 340px; object-fit: cover; }
 .embed-card.is-video { border-left-color: transparent; }
-.embed-card.is-video video { width: 100%; max-height: 380px; display: block; background: #000; }
+.embed-card.is-video video { width: 100%; max-height: 380px; display: block; background: #000; } /* colour-exempt: letterboxing around a video, which is black in every theme */
 .embed-card.is-unavailable .embed-card__title { color: var(--t-dim); }
 .embed-card.is-unavailable { border-style: dashed; }
 
@@ -4070,7 +4088,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
     position: fixed;
     inset: 0;
     z-index: 68;
-    background: rgba(6, 4, 3, 0.6);
+    background: rgba(6, 4, 3, 0.6); /* colour-exempt: a scrim dimming arbitrary content behind it */
     animation: tc-fade var(--t-fast) var(--t-ease);
   }
 
