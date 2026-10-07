@@ -38,6 +38,12 @@ jobs:
       - name: Schema smoke test (throwaway SQLite)
         run: npm run check
 
+      # Which origins this instance answers. Security-relevant, and until now covered by
+      # nothing: the flow check sends no Origin header at all, which is the one branch
+      # that has no rules in it.
+      - name: Origin policy
+        run: npm run check:origins
+
   flows:
     name: Flow checks
     runs-on: ubuntu-latest
