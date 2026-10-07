@@ -1,27 +1,7 @@
-// The UI layer.
+// The UI layer: everything imports from here.
 //
-// One module that almost everything imports from, and which held four unrelated things:
-// the primitives, the menu system, the things that talk to the reader, and text
-// formatting. It is now the re-export surface it was already half-way to being, with
-// dom.js and menus.js beside it and the twenty things it still owned split by what they
-// are:
-//
-//   ui/dom.js       the primitives - el, clear, qs, icon
-//   ui/menus.js     the menu system - attachMenu, showContextMenu
-//   ui/feedback.js  toasts and the live region they announce into
-//   ui/overlay.js   buttons, and the modal that covers the page
-//   ui/dialogs.js   dialogs that ask a question and expect an answer
-//   ui/usercard.js  the hover card, and copying text
-//   ui/report.js    reporting content
-//   ui/emoji.js     the emoji picker and its table
-//   ui/text.js      relTime, plural, and the rest - not UI in the sense the rest of this
-//                   directory means it
-//
-// Splitting by what a thing *is* rather than by size is the point. relTime and plural are
-// the two most-called functions in the client, and while they sat beside the modal system
-// both looked like part of it. Nothing here is large; it was just unrelated.
-//
-// Everything still imports from this module, so no import in the client changed.
+// dom.js and menus.js hold the primitives. The rest - toasts, modals, dialogs, the user
+// card, reports, emoji, text formatting - are in a module named for what they are.
 
 import { TrycordConfig } from './config.js';
 

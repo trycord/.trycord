@@ -1,14 +1,7 @@
 // Privacy, blocking, notification preferences and wellbeing.
 //
-// These were enforced on the server and absent here: the Privacy page showed who
-// had asked and who was a friend, which is two lists rather than the settings
-// that decide those outcomes. Every section reads from the API, because a
-// server-enforced preference displayed from a cached copy disagrees with reality
-// exactly when it matters.
-//
-// Controls are settings-ui's toggleRow and selectRow, not hand-rolled inputs. A
-// parallel switch implementation would be a second visual answer to the same
-// question.
+// Every section reads from the API rather than a cached copy, because a server-enforced
+// preference shown from stale state disagrees with reality exactly when it matters.
 
 import Api from './api.js';
 import { loadingState, errorState } from './view-states.js';

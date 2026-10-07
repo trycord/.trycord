@@ -1,16 +1,14 @@
-// What happens around a page.
+// What surrounds a page: access, teardown, when the chrome is painted, what a thrown
+// page looks like.
 //
-// The router decides *which* page. This decides what surrounds it: who is allowed
-// in, what the previous page gets to clean up, when the shell's chrome is painted,
-// and what a page that throws looks like.
-//
-// Those four used to be spread across the route table and the router, which meant
-// every one of the twenty-odd routes had to remember to call renderAllChrome() and
-// a page that forgot left stale navigation next to fresh content. There were
-// twenty-five of those calls. There are none now.
+// The chrome is painted here rather than by each page, so a page cannot forget.
 
 import { matchRoute, HOME_PAGE } from './registry.js';
-import { HANDLERS } from './handlers.js';
+import { renderPage } from './registry.js';
+// Imported for its side effect: handlers.js attaches every renderer to its page when it
+// loads. Drawing through page.render is only correct if that has happened, and this is
+// the module that draws.
+import './handlers.js';
 import { isAuthed, refreshServers } from '../state.js';
 import { setLayout } from '../layout.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from '../shell.js';
@@ -95,10 +93,10 @@ export async function mount(path, query = {}) {
     try { await refreshServers(); } catch { /* offline */ }
   }
 
-  const handler = HANDLERS[page.id];
-  if (!handler) {
-    // A page with no renderer is a mistake in the registry, and saying so beats a
-    // blank pane.
+  // A page with no renderer is a mistake in the registry, and saying so beats a
+  // blank pane. renderPage raises it, and the catch below turns it into the error
+  // surface.
+  if (typeof page.render !== 'function') {
     return fail(region, new Error('No renderer for page ' + page.id));
   }
 
@@ -115,7 +113,7 @@ export async function mount(path, query = {}) {
   };
 
   try {
-    const painted = await handler(ctx, page);
+    const painted = await renderPage(page, ctx);
     // A handler that returns false has navigated or redirected; there is no new
     // chrome to paint over what it left.
     if (painted !== false) renderAllChrome();

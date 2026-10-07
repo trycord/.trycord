@@ -1,25 +1,9 @@
-// What is on screen right now.
+// One answer to "what is on screen right now", computed once before any region draws.
 //
-// One function, one answer, computed before any region draws. It exists because four
-// subsystems each owned a piece of that question and nothing could see whether they
-// agreed:
-//
-//   rail.js, navigation.js, members.js and tabs.js all called currentRoute() to decide
-//   what to show
-//   navigation.js and members.js each read layoutUsesSidebar() and layoutUsesMembers()
-//   three modules each kept their own localStorage key for a visibility flag
-//   and the widths disagreed - the script docked the sidebar at 760px while the
-//   stylesheet only reserved a track for the member panel from 1000px
-//
-// That last one is the bug that made the rewrite worth doing. Between 760 and 999 the
-// sidebar was docked and not collapsed, and the member panel had no track at all: one
-// pixel of border holding a list of members whose rows had collapsed to sixteen pixels of
-// button. It was not a styling slip, it was two sources of truth answering the same
-// question differently.
-//
-// So the thresholds are here, once, and each one names the rule in app.css it has to
-// agree with. If a media query moves, this is the list to move with it - not a comment
-// about it, the list.
+// Four subsystems used to answer that question separately, and two of them disagreed:
+// the script docked the sidebar at 760px while the stylesheet reserved no track for the
+// member panel until 1000px, which is how the panel ended up one pixel wide holding
+// sixteen-pixel buttons.
 
 import { currentRoute } from './route.js';
 import { layoutUsesSidebar, layoutUsesMembers } from '../layout.js';

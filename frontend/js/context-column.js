@@ -1,14 +1,8 @@
-// The contextual column beside a settings pane.
+// The column beside a settings pane.
 //
-// A settings form has a natural width. Read one across a 1600px pane and its
-// label and its control end up at opposite ends of the screen. Capping the pane
-// leaves the rest of the window empty, so the width that isn't worth spending on
-// a form is spent on the other half of the same decision: what is stored, what
-// it means, what else this section governs.
-//
-// Every column is built from state the API returned for the section beside it,
-// and none of it restates the controls - a summary that repeats them tells a
-// reader nothing and takes the space they were meant to have.
+// A form has a natural width. The space either side of it is spent on what is stored,
+// what it means and what else the section governs - never a restatement of the controls
+// beside it.
 
 import Api from './api.js';
 import State from './state.js';

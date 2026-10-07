@@ -1,10 +1,5 @@
-// Building blocks. Everything else in the interface is made of these, so they
-// are the only part with no opinion about what anything is for.
-//
-// Split out of ui.js, which was one file for the primitives, the menus, the
-// overlays and the emoji picker. These are here rather than left behind so that
-// the menu system can reach el() and icon() without ui.js and menus.js having
-// to import each other.
+// Building blocks. Everything else in the interface is made of these, so they are the
+// only part with no opinion about what anything is for.
 export function esc(v) {
   return String(v == null ? '' : v)
     .replace(/&/g, '&amp;')

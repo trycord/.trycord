@@ -1,14 +1,7 @@
-// The settings framework.
+// The settings framework: one implementation for account, community and admin.
 //
-// There were three of these and they disagreed: account settings drew a pill
-// row, community settings a sticky sidebar, admin its own thing. Same idea, three
-// implementations, and none held more than about six destinations before
-// wrapping.
-//
-// This is the one implementation. It owns the information architecture (grouped
-// data, not markup), a nav that works as a sidebar and as a disclosure on a
-// phone, filtering, and the active-state rules including sections that span
-// aliases. Sections are described by data, so adding one is a data change.
+// Sections are data, not markup. The nav works as a sidebar on a wide screen and as a
+// disclosure on a phone, off the same description.
 import { el, clear } from './ui.js';
 import { icon } from './components.js';
 import { route } from './nav.js';
@@ -35,10 +28,10 @@ function iconFor(name) {
   return icon(ICON_ALIASES[name] || name);
 }
 
-// A section with a path is addressed by it; a community section has none and is
+// A section with a route is addressed by it; a community section has none and is
 // addressed relative to whichever community is open, which the caller resolves.
 export function resolveHref(item, resolve) {
-  if (item.path) return route(item.path);
+  if (item.route) return route(item.route);
   return resolve ? resolve(item.tab) : null;
 }
 

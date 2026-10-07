@@ -1,18 +1,8 @@
-// Surface layouts.
+// Which shell shape a surface gets.
 //
-// Every route used to be fitted into the shell's three tracks, which suited a
-// channel and nothing else. Settings was the worst: it drew its own nav inside
-// the content pane while the shell reserved a sidebar beside it, so the same list
-// appeared twice with the useful part in the middle.
-//
-// A surface declares the shape it needs, in the page registry, and the CSS decides
-// the measurements. Which path gets which shape used to be a second prefix table
-// here; it is now a field on the page, so the two cannot disagree.
-//
-// Always three tracks, even where the middle one is zero - the sidebar collapse
-// animates by interpolating track lengths, which a shorter list can't do. So a
-// surface with no sidebar contributes a zero-width track instead of removing
-// one, and nothing is rendered into it.
+// A surface declares what it needs in the page registry and the stylesheet owns every
+// measurement. Always three tracks, even where the middle one is zero: the sidebar
+// collapse animates by interpolating track lengths, which a shorter list can't do.
 import { qs } from './ui.js';
 
 // `sidebar` means the contextual nav region is used; `members` means the member

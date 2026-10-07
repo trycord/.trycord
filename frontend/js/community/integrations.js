@@ -1,15 +1,6 @@
-// Community integrations: outgoing webhooks and bot applications.
-//
-// One section for both, because they answer the same question for an
-// administrator - "what can post into this community from outside it" - and
-// because an application and its slash commands are one object split across two
-// tables. The credential rules are the same for both, so they are stated once at
-// the top of the section instead of twice inside two panels.
-//
-// Nothing here keeps a secret in memory after it is shown. A webhook secret and
-// an application token are stored hashed, so the only way to obtain one is to
-// create or rotate it, and the UI never pretends otherwise by offering to reveal
-// a stored one.
+// Outgoing webhooks and bot applications, as one section: both answer "what can post
+// into this community from outside it" and both store their credential hashed. Nothing
+// here can reveal a stored secret, because there is no way to get one back.
 
 import Api from '../api.js';
 import { clear, confirmDialog, el, openModal, relTime, toast } from '../ui.js';
