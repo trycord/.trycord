@@ -46,6 +46,10 @@ async function freePort() {
 }
 
 let inFlight = 0;
+
+// Set to a substring; any request whose URL contains it is answered with a server
+// error instead of being made. Nothing else in the harness needs to know.
+let breakUrl = null;
 let PORT = Number(process.env.RENDER_PORT || 0);
 // Resolved lazily: PORT is 0 until the free-port probe has run.
 const origin = () => `http://127.0.0.1:${PORT}`;
@@ -264,6 +268,14 @@ function wireFetch(window, token) {
     const absolute = url.startsWith('http') ? url : origin() + (url.startsWith('/') ? url : '/' + url);
     const headers = Object.assign({}, (init && init.headers) || {});
     headers.Authorization = 'Bearer ' + token;
+    if (breakUrl && absolute.includes(breakUrl)) {
+      // In the shape the real server uses, so the client parses it the way it would in
+      // production rather than falling into a branch that only exists in a test.
+      return new Response(
+        JSON.stringify({ error: { code: 'INTERNAL', message: 'the render check broke this on purpose' } }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
     inFlight++;
     let res;
     try {
@@ -571,6 +583,54 @@ async function settle(window, ms = 400) {
     ok('a reaction shows on the message it is on', (marks.reactions || 0) > 0,
       'a reaction was added but no reaction rendered');
 
+    // ---- what a failure looks like ----
+    //
+    // Every state above was read while the backend was working. The brief asks for more
+    // than that: if a request fails, say so, offer a way back, do not take the
+    // application down, and do not quietly show something stale as though it were fresh.
+    //
+    // So one endpoint is broken on purpose and the page is visited again. The shell has
+    // to survive, the page has to say something, and the something has to be an error
+    // rather than an empty list that reads like "you have nothing".
+    console.log('\n  when a request fails');
+    const failuresBefore = failures.length;
+
+    const brokenSpecs = [
+      { id: 'notifications', url: '/api/notifications', page: 'notifications' },
+      { id: 'dms', url: '/api/dms', page: 'dms' },
+    ];
+
+    for (const spec of brokenSpecs) {
+      breakUrl = spec.url;
+      const out = await visit(window, document, Router,
+        concrete(registry.PAGES.find((pg) => pg.id === spec.page).path, world), base);
+      const chrome = document.getElementById('shell');
+      ok(spec.id + ': the shell survives a failed request',
+        !!chrome && chrome.contains(document.getElementById('view-root')),
+        'the shell itself is gone');
+      ok(spec.id + ': the failure is shown rather than shown as empty',
+        out.errors >= 1 || out.failed,
+        'the page rendered ' + out.headings + ' headings and nothing said anything had gone wrong'
+        + ' - an error that looks like an empty list is the failure mode this is looking for');
+    }
+    breakUrl = null;
+
+    // The same pages with nothing broken must NOT be showing an error, or the two
+    // assertions above pass because the page is always broken rather than because
+    // breaking it changed anything.
+    for (const spec of brokenSpecs) {
+      const out = await visit(window, document, Router,
+        concrete(registry.PAGES.find((pg) => pg.id === spec.page).path, world), base);
+      ok(spec.id + ': a working backend is not shown as an error', out.errors === 0,
+        'the page is showing an error block with nothing broken');
+    }
+
+    // And with the backend healthy again the page has to recover, not stay stuck.
+    const recovered = await visit(window, document, Router,
+      concrete(registry.PAGES.find((pg) => pg.id === 'notifications').path, world), base);
+    ok('a page recovers once the endpoint does', recovered.errors === 0,
+      'still showing an error after the backend was healthy again');
+
     // ---- dead controls ----
     //
     // The brief's rule: every visible control either works or does not exist. Nothing in
@@ -847,6 +907,8 @@ async function visit(window, document, Router, url, base) {
     // What the reader can actually read, and whether the composer is there.
     text: (document.getElementById('view-root') || document.body).textContent || '',
     // The message-row details worth asserting on, read off the rendered surface.
+    errors: document.querySelectorAll('#view-root .state-block--error').length,
+    failed: !!document.querySelector('#view-root [data-failed], #view-root .form-error'),
     marks: {
       edited: !!document.querySelector('#view-root .msg-edited'),
       threadCount: (document.querySelector('#view-root .msg-thread-badge__count') || {}).textContent || '',
