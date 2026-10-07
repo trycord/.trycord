@@ -124,7 +124,70 @@ function boundNames(code) {
 
 const findings = [];
 
+// A third question, and the one that let a broken sign-in ship: does the thing this file
+// destructures out of a require actually exist? `const { issued } = require('./issued')`
+// resolves to a real module whether or not that module exports anything, and
+// issued.js defined `issued` without exporting it, so every successful login answered 500
+// with nothing in the log but `issued is not a function`. The client has had this check
+// since check-client-modules.js was written; the server did not.
+function exportsOf(src) {
+  const names = new Set();
+  const add = (list) => {
+    for (const raw of list.split(',')) {
+      const part = raw.trim().replace(/^type\s+/, '');
+      if (!part) continue;
+      const as = /\bas\s+([A-Za-z0-9_$]+)$/.exec(part);
+      names.add(as ? as[1] : part);
+    }
+  };
+  for (const m of src.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm)) {
+    names.add(m[1]);
+  }
+  for (const m of src.matchAll(/^export\s*\{([^}]*)\}/gm)) add(m[1]);
+  for (const m of src.matchAll(/^module\.exports\s*=\s*\{/gm)) {
+    // The block runs to the matching brace; good enough for a list of short names.
+    const start = m.index + m[0].length;
+    let depth = 1;
+    let i = start;
+    while (i < src.length && depth > 0) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') depth--;
+      i++;
+    }
+    add(src.slice(start, i - 1));
+  }
+  if (/^module\.exports\s*=\s*[A-Za-z_$][\w$]*\s*;/m.test(src)) names.add('__default_fn__');
+  if (/^module\.exports\s*=\s*\{/m.test(src)) names.add('__default_obj__');
+  return names;
+}
+
+const exportedBy = new Map();
+for (const [file, { raw }] of sources) exportedBy.set(file, exportsOf(raw));
+
 for (const [file, { raw, code }] of sources) {
+  // Question 0: names destructured out of a require that the target does not export.
+  for (const m of raw.matchAll(
+    /(?:const|let|var)\s*\{([^{}]*)\}\s*=\s*require\(\s*'([^']+)'\s*\)/g)) {
+    const spec = m[2];
+    if (!spec.startsWith('.') && !spec.startsWith('/')) continue;
+    const target = path.resolve(path.dirname(file), spec);
+    const available = exportedBy.get(target);
+    if (!available) continue; // question 1/2 covers a module that is not there at all
+    for (const part of m[1].split(',')) {
+      const raw_name = part.trim().split(':')[0].split('=')[0].trim();
+      if (!/^[A-Za-z_$][\w$]*$/.test(raw_name)) continue;
+      if (available.has(raw_name)) continue;
+      if (raw_name.startsWith('__')) continue;
+      findings.push({
+        file,
+        line: raw.slice(0, m.index).split('\n').length,
+        head: `${raw_name} is imported from '${spec}', which does not export it`,
+        detail: `${path.relative(ROOT, target)} has no such export. Destructuring gets undefined, `
+          + 'so this is a runtime failure on the line that uses it rather than a load error.',
+      });
+    }
+  }
+
   const bound = boundNames(code);
 
   // Question 1: bound to one name, called by another.
@@ -149,9 +212,19 @@ for (const [file, { raw, code }] of sources) {
     }
   }
 
-  // Question 2: called as a service, and nothing in this file binds it.
+  // Question 2: called, and nothing in this file binds it.
+  //
+  // Both shapes, because both shipped. `recovery.verifyEmail(...)` is a service method;
+  // `issued(res, user, req)` is a bare call to a function another module in this
+  // directory exports - and that one is how login came to answer 500 on every successful
+  // sign-in, from a module that did define `issued` and simply never exported it. A
+  // method-call pattern alone cannot see it.
   const seen = new Set();
-  for (const m of code.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*\.\s*[A-Za-z_$][\w$]*\s*\(/g)) {
+  const CALLS = [
+    /(?<![\w$.])([A-Za-z_$][\w$]*)\s*\.\s*[A-Za-z_$][\w$]*\s*\(/g,
+    /(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(/g,
+  ];
+  for (const re of CALLS) for (const m of code.matchAll(re)) {
     const name = m[1];
     if (seen.has(name) || bound.has(name)) continue;
     if (BUILTIN.has(name) || NOT_A_SERVICE.has(name) || !moduleBasenames.has(name)) continue;

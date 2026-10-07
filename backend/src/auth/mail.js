@@ -114,15 +114,18 @@ function clientUrl() {
   return raw.replace(/\/+$/, '');
 }
 
-// Email deep link into the client. The fragment MUST stay a literal `#`
-// so the client's hash router receives the route; only the token is
-// encoded (hex tokens pass through unchanged). A base ending in a file
-// (…/index.html) joins directly; a bare host gets the `/` separator.
+// A deep link into the client, as an ordinary path.
+//
+// These were built as `#/verify-email/<token>` on the stated grounds that the client has
+// a hash router. It has not for some time, so every verification and password-reset email
+// carried a legacy link that only worked because adoptLegacyHash() translates it on
+// arrival - a translation step nothing documents on the sending side. A base ending in a
+// file joins directly; a bare host gets the `/` separator.
 function clientLink(path, token) {
   const base = clientUrl();
-  const frag = '#/' + String(path).replace(/^\/+/, '') + '/' + encodeURIComponent(String(token));
+  const route = String(path).replace(/^\/+/, '') + '/' + encodeURIComponent(String(token));
   const sep = /\.(html?|php|aspx?)$/i.test(base) ? '' : '/';
-  return base + sep + frag;
+  return base + sep + route;
 }
 
 module.exports = { sendMail, clientUrl, clientLink, mode, mailConfig, describe };

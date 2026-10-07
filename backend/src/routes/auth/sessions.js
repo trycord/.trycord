@@ -10,6 +10,7 @@ const { fail, serviceError } = require('../../errors');
 const { now, uuid, sign, signWithJti, secret } = require('../../util');
 const rateLimit = require('../../middleware/ratelimit');
 const events = require('../../services/events');
+const { issued } = require('./issued');
 
 // Listing and revoking sessions.
 // 
