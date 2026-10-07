@@ -8,7 +8,7 @@ import { clear, confirmDialog, copyText, el, toast, attachContextMenu } from '..
 import { renderContextHeader } from '../shell.js';
 import { groupPermissions, humanizePerm } from '../permission-groups.js';
 import { assignableRoleTest, myTopPosition, openRoleAssignModal } from '../role-assignment.js';
-import { ensureServer } from '../workspace-shared.js';
+import { ensureServer, reloadServer } from '../workspace-shared.js';
 import { serverPath } from '../links.js';
 import { navigate } from '../nav.js';
 import { onStale } from '../view-states.js';
@@ -182,7 +182,9 @@ async function renderServerRoles(container, serverId) {
   let selectedId = null;
   let dragId = null;
 
-  const reload = async () => { await ensureServer(serverId); };
+  // Force, for the same reason as everywhere else: this only runs after a role was
+  // created, changed or deleted.
+  const reload = async () => { await reloadServer(serverId); };
   setViewRefresh(() => { reload().catch(onStale('Roles')); });
 
   const paint = () => {

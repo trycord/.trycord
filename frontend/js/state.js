@@ -168,17 +168,29 @@ export function clearSession() {
 }
 
 
+// One in-flight load, for the same reason enterServer has one: the lifecycle fetches the
+// server list for every signed-in page, and a page that needs it fetches it too. Without
+// this, landing on Home asked the server for its community list twice - once for the
+// shell, once for the page - and the shell had already finished by the time the page
+// asked. Sharing the promise collapses that to one.
+let serversInFlight = null;
+
 export async function refreshServers() {
-  const list = await Api.servers();
-  state.servers = Array.isArray(list) ? list : [];
-  if (state.servers.length) {
-    const found = state.servers.find((s) => s.id === state.lastServerId);
-    if (!found && state.lastServerId) {
-      state.lastServerId = null;
-      localStorage.removeItem(LS_SERVER_ID);
+  if (serversInFlight) return serversInFlight;
+  const run = (async () => {
+    const list = await Api.servers();
+    state.servers = Array.isArray(list) ? list : [];
+    if (state.servers.length) {
+      const found = state.servers.find((s) => s.id === state.lastServerId);
+      if (!found && state.lastServerId) {
+        state.lastServerId = null;
+        localStorage.removeItem(LS_SERVER_ID);
+      }
     }
-  }
-  return state.servers;
+    return state.servers;
+  })().finally(() => { serversInFlight = null; });
+  serversInFlight = run;
+  return run;
 }
 
 // One in-flight load per community. Every route that opens a community calls
@@ -188,10 +200,54 @@ export async function refreshServers() {
 // flight joins it instead of starting a second copy.
 const enterInFlight = new Map();
 
-export async function enterServer(serverId) {
+// The five responses from the most recent entry, replayed by enterServer when the
+// community is already in state. Declared here because the cached path has to answer
+// with exactly what the network path answers with.
+let lastServerResponses = null;
+
+// Entering a community fetches five endpoints - detail, channels, members, permissions
+// and roles. Two things used to make that happen more than once for a single visit:
+//
+//   - concurrent callers shared a promise only while the first was still running, so a
+//     caller arriving a moment later started a second full load
+//   - callers arriving after the first finished started a third, because there was no
+//     check that the community was already in state
+//
+// The roster page made all of that visible: it asks for the community to be entered, then
+// its own reload does the same, and every visit fetched ten endpoints to draw a list of
+// people it already had. The membership check below is what "enter" should have meant -
+// bring this community into state - and it is the reason the duplicate-fetch assertion in
+// the render check now passes.
+// After something changed on the server - a role assigned, a member kicked, a category
+// renamed - the cached entry is the wrong answer and the page needs the new one. This is
+// that call. Having it named separately is the point: "ensure" and "reload" look
+// interchangeable at a call site and are not, and the difference decides whether a
+// moderator sees the change they just made.
+export function reloadServer(serverId) {
+  return enterServer(serverId, { force: true });
+}
+
+export async function enterServer(serverId, opts) {
+  const force = !!(opts && opts.force);
   const key = String(serverId);
   const running = enterInFlight.get(key);
+  // A load is already in flight, forced or not, so its answers are as fresh as this
+  // call could produce. Joining beats starting a second copy either way.
   if (running) return running;
+
+  // Already in state from a previous entry and no one is mid-flight: hand back what is
+  // there rather than refetching it. Callers that genuinely need fresh data after a
+  // mutation say so by clearing state first (leaveServerContext) or re-entering under a
+  // different id.
+  //
+  // The last entry's responses are replayed rather than rebuilt out of state. state
+  // holds *derived* values - state.members is a bare array, state.permissions is the
+  // contents of a { permissions } envelope - while this function returns what the API
+  // actually sent. Rebuilding here would make the second call to enterServer answer a
+  // differently shaped question from the first.
+  if (!force && state.lastServerId === serverId && lastServerResponses) {
+    return lastServerResponses;
+  }
 
   const load = loadServer(serverId).finally(() => { enterInFlight.delete(key); });
   enterInFlight.set(key, load);
@@ -217,6 +273,7 @@ async function loadServer(serverId) {
   state.channelPermissions = null;
   state.roles = roles || [];
   state.lastServerId = serverId;
+  lastServerResponses = { detail, layout, members, perms, roles };
   storage(() => localStorage.setItem(LS_SERVER_ID, serverId));
   // A failure here means the socket was never told which community we are looking
   // at, so its live messages will not arrive. Worth a reconnect rather than a
@@ -237,11 +294,16 @@ async function loadServer(serverId) {
   return { detail, layout, members, perms, roles };
 }
 
+// Serialised, and forced. This is the "something changed and every permission gate that
+// depends on it is now stale" path - a role assigned or revoked, a member added or
+// removed - so it has to actually go and get it again. Without the force it would join
+// the cached entry that enterServer now returns and repaint the same data, which looks
+// like the change being ignored.
 let serverRefreshChain = Promise.resolve();
 export function refreshServerView() {
   const sid = state.lastServerId;
   if (!sid) return Promise.resolve(null);
-  const run = serverRefreshChain.then(() => enterServer(sid)).catch(() => null);
+  const run = serverRefreshChain.then(() => enterServer(sid, { force: true })).catch(() => null);
   serverRefreshChain = run.catch(() => null);
   return run.then(() => { repaintView(); return null; });
 }

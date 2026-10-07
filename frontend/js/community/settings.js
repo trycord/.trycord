@@ -9,7 +9,7 @@ import { clear, confirmDialog, el, relTime, toast } from '../ui.js';
 import { communityMark, invalidateAuthedImage, loadAuthedImage } from '../components.js';
 import { onStale } from '../view-states.js';
 import { renderContextHeader } from '../shell.js';
-import { ensureServer } from '../workspace-shared.js';
+import { ensureServer, reloadServer } from '../workspace-shared.js';
 import { serverPath } from '../links.js';
 import { settingsFrame, findItem } from '../settings-shell.js';
 import { scopeHasTab } from '../pages/registry.js';
@@ -99,7 +99,8 @@ async function renderServerSettings(container, serverId, section = 'overview') {
     roles: (State.roles || []).length,
   });
 
-  const reload = async () => { await ensureServer(serverId); };
+  // Force: the settings were just changed, which is also what decides permissions.
+  const reload = async () => { await reloadServer(serverId); };
   setViewRefresh(() => { reload().catch(onStale('This page')); });
 
   const memberCount = (State.members || []).length;

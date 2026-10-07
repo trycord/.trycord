@@ -90,6 +90,25 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     });
   }
 
+  // One sessions fetch per visit to Security. The body and the sidebar both need it, and
+  // the body paints first - so by the time the sidebar asked, the body's request had
+  // already finished and an in-flight guard did nothing. Starting it once here means one
+  // request for the visit and both consumers see the same answer.
+  const sessionsOnce = (tab === 'security' || tab === 'password' || tab === 'sessions')
+    ? Api.sessions().then((res) => res.sessions || [])
+    : null;
+
+  // The same story for Privacy: the section and the sidebar beside it both need the
+  // gates and the block list, and each used to ask the server for them separately.
+  const privacyOnce = tab === 'privacy'
+    ? Promise.all([Api.privacy(), Api.blocks()])
+    : null;
+
+  // And for Notifications, where the section and the sidebar each wanted the prefs. Not
+  // caught here - the section turns a failure into an error state with a retry, which
+  // beats an empty form that looks like "you have no preferences set".
+  const prefsOnce = tab === 'notifications' ? Api.notificationPrefs() : null;
+
   if (tab === 'appearance') {
     renderAppearance(body);
   } else if (tab === 'updates') {
@@ -98,7 +117,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     // Legacy password/sessions routes render the unified Security page.
     renderPasswordSection(body, () => renderAccount(container, { tab }));
     renderTwoFactorSection(body);
-    renderSessionsSection(body);
+    renderSessionsSection(body, sessionsOnce);
   } else if (tab === 'backend') {
     body.appendChild(setNote('Switching instances signs you out here first.'));
     const backendBox = sectionCard();
@@ -109,7 +128,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
     // Order matters: a reader arriving here because someone asked them to should
     // see the control that decides whether that is allowed before the list of
     // people who already have.
-    await renderPrivacySection(body);
+    await renderPrivacySection(body, privacyOnce);
     renderPrivacySocial(body);
     // A block or unblock made on another device has to repaint this list.
     // Refreshing the cache alone left the section showing an empty list and a
@@ -122,7 +141,7 @@ export async function renderAccount(container, { tab = 'profile' } = {}) {
   } else if (tab === 'notifications') {
     // Per-category preferences and wellbeing first, then the muted channels that
     // were the only notification control this page had.
-    await renderNotificationPrefsSection(body);
+    await renderNotificationPrefsSection(body, prefsOnce);
     renderNotificationsSettings(body);
     registerRemote('notifications', body, () => { renderNotificationPrefsSection(body); });
     registerRemote('wellbeing', body, () => { renderNotificationPrefsSection(body); });
@@ -152,14 +171,13 @@ async function fillContext(frame, host, tab) {
   let nodes = [];
   try {
     if (tab === 'privacy') {
-      const [privacy, blocks] = await Promise.all([Api.privacy(), Api.blocks()]);
+      const [privacy, blocks] = await privacyOnce;
       nodes = privacyContext(privacy, blocks);
     } else if (tab === 'security' || tab === 'password' || tab === 'sessions') {
-      const res = await Api.sessions();
-      nodes = securityContext(res.sessions || []);
+      nodes = securityContext(await sessionsOnce);
     } else if (tab === 'notifications') {
       const [prefs, wellbeing] = await Promise.all([
-        Api.notificationPrefs().catch(() => null),
+        prefsOnce.catch(() => null),
         Api.wellbeing().catch(() => null),
       ]);
       nodes = notificationsContext(

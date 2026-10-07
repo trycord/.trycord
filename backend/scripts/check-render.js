@@ -51,6 +51,12 @@ let inFlight = 0;
 // error instead of being made. Nothing else in the harness needs to know.
 let breakUrl = null;
 
+// Requests made since the last reset, for measuring what a page actually costs.
+// "Do not optimize based on guesses" - a guess is the guess that a page fetches what it
+// needs once.
+let recording = false;
+let requestLog = [];
+
 // A URL to answer slowly instead of immediately, for checking what a page shows while
 // it is still waiting. Same reasoning as breakUrl: the states a reader sees between
 // clicking and reading are states, and none of them had ever been observed.
@@ -274,6 +280,12 @@ function wireFetch(window, token) {
     const absolute = url.startsWith('http') ? url : origin() + (url.startsWith('/') ? url : '/' + url);
     const headers = Object.assign({}, (init && init.headers) || {});
     headers.Authorization = 'Bearer ' + token;
+    if (recording) {
+      requestLog.push({ method: (init && init.method) || 'GET', path: absolute, at: Date.now() });
+      if (process.env.RENDER_TRACE_REQ) {
+        console.log('      [' + (init && init.method) + '] ' + absolute.replace(origin(), ''));
+      }
+    }
     if (breakUrl && absolute.includes(breakUrl)) {
       // In the shape the real server uses, so the client parses it the way it would in
       // production rather than falling into a branch that only exists in a test.
@@ -720,12 +732,15 @@ async function settle(window, ms = 400) {
       const pending = visit(window, document, Router, concrete(route.path, world), base);
       await new Promise((r) => setTimeout(r, 250));
       const mid = document.getElementById('view-root');
-      const seen = mid
-        ? !!mid.querySelector('.state-block--loading, .skeleton, [aria-busy="true"], .loading')
-        : false;
-      ok(spec.what + ': says it is waiting', seen,
-        'nothing on screen indicates loading - '
-        + (mid ? mid.innerHTML.slice(0, 140) : '(nothing rendered)'));
+      const waiting = mid
+        && !!mid.querySelector('.state-block--loading, .skeleton, [aria-busy="true"], .loading');
+      const hasContent = mid
+        && mid.children.length > 0
+        && !mid.querySelector('.state-block--loading, .skeleton');
+      ok(spec.what + ': waits visibly, or already has its data',
+        waiting || hasContent,
+        waiting ? '' : 'nothing rendered and nothing says it is loading - '
+          + (mid ? mid.innerHTML.slice(0, 140) : '(nothing at all)'));
       ok(spec.what + ': does not claim to be empty while waiting',
         !(mid && /(no |nothing |all caught up|yet\b)/i.test(mid.textContent)),
         'it says there is nothing before it has asked');
@@ -733,6 +748,56 @@ async function settle(window, ms = 400) {
       slowUrl = null;
       slowMs = 0;
     }
+
+    // ---- what each page costs ----
+    //
+    // A navigation is measured by counting what goes over the wire. Nothing here decides
+    // whether a request is *necessary* - that is a judgement about the page and it belongs
+    // to whoever owns it. What it does answer is two mechanical questions that are easy to
+    // get wrong and impossible to see:
+    //
+    //   - does the same endpoint get asked for more than once in one navigation, which is
+    //     either a cache that is not being consulted or two components that each assume
+    //     they own the data
+    //   - how many requests a page makes at all, so the two that make thirty stand out
+    console.log('\n  what each page costs');
+    const repeats = [];
+    const costs = [];
+    for (const page of targets) {
+      requestLog = [];
+      recording = true;
+      await visit(window, document, Router, concrete(page.path, world), base);
+      recording = false;
+
+      const counts = new Map();
+      for (const r of requestLog) {
+        // Query strings are part of the identity of a request: two different ?before=
+        // cursors are two legitimate calls, not a duplicate.
+        const key = r.method + ' ' + r.path.split('?')[0];
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      for (const [key, n] of counts) {
+        if (n > 1) repeats.push(page.id + ': ' + key + ' x' + n);
+      }
+      costs.push({ id: page.id, n: requestLog.length });
+    }
+    requestLog = [];
+
+    ok('no page asks for the same endpoint twice in one navigation',
+      repeats.length === 0, repeats.slice(0, 8).join(' | '));
+
+    costs.sort((a, b) => b.n - a.n);
+    console.log('    requests per navigation, busiest first:');
+    for (const c of costs.slice(0, 8)) {
+      console.log('      ' + String(c.n).padStart(3) + '  ' + c.id);
+    }
+    const median = costs[Math.floor(costs.length / 2)].n;
+    console.log('    median ' + median + ', across ' + costs.length + ' pages');
+
+    // A hard ceiling rather than a judgement: past this, something is fetching per row.
+    const worst = costs[0];
+    ok('no page makes an unreasonable number of requests to render',
+      worst.n <= 25, worst.id + ' makes ' + worst.n);
 
     // ---- dead controls ----
     //

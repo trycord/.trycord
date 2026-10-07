@@ -94,14 +94,19 @@ function saveAndRefresh(save, repaint) {
  * arriving here because someone asked them to should see the control that
  * decides whether that is allowed before the list of people who already have.
  */
-export async function renderPrivacySection(body) {
+// `preloaded` is the [settings, blocks] pair the caller may already be holding. The
+// Privacy page shows this section and a sidebar built from the same two requests, so
+// without this every visit asked twice for data that had not changed in between.
+export async function renderPrivacySection(body, preloaded) {
   body.appendChild(sectionHead('Privacy', 'Who can reach you, and who you have stopped.'));
   body.appendChild(loadingState('Loading your privacy settings'));
 
   let settings;
   let blocks;
   try {
-    [settings, blocks] = await Promise.all([Api.privacy(), Api.blocks()]);
+    [settings, blocks] = preloaded
+      ? await preloaded
+      : await Promise.all([Api.privacy(), Api.blocks()]);
   } catch (ex) {
     clear(body);
     body.appendChild(sectionHead('Privacy', 'Who can reach you.'));
@@ -239,16 +244,21 @@ function confirmBlock(user, onDone) {
  * per-category preference, which decides whether a category is delivered at all
  * rather than whether one channel is quiet.
  */
-export async function renderNotificationPrefsSection(body) {
+// `preloaded` is the preferences the caller may already be holding, for the same reason
+// as renderPrivacySection above.
+export async function renderNotificationPrefsSection(body, preloaded) {
   body.appendChild(sectionHead('Notifications', 'What Trycord is allowed to interrupt you for.'));
   body.appendChild(loadingState('Loading your notification settings'));
 
   let prefs;
   let categories;
   try {
-    const res = await Api.notificationPrefs();
-    prefs = res.global || {};
-    categories = res.categories || Object.keys(PREF_LABELS);
+    const res = preloaded ? await preloaded : await Api.notificationPrefs();
+    prefs = (res && res.global) || {};
+    // A caller that already had a request can hand over a resolved null for it, so
+    // this is not the "the request succeeded" case it looks like. Reading .categories
+    // off it would turn a soft failure into a hard one.
+    categories = (res && res.categories) || Object.keys(PREF_LABELS);
   } catch (ex) {
     clear(body);
     body.appendChild(sectionHead('Notifications', 'What you are notified about.'));
