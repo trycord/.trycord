@@ -20,6 +20,7 @@
 // that changes state asks for a repaint instead of importing the thing that repaints.
 
 import { qs } from './ui.js';
+import { buildTree, viewRoot } from './shell/tree.js';
 import { renderCommunities } from './shell/rail.js';
 import { renderPlaceNavigation } from './shell/navigation.js';
 import { renderMemberSidebar, membersHidden, toggleMembers } from './shell/members.js';
@@ -63,9 +64,11 @@ export function renderAllChrome() {
 // repaint do not each import the module that knows how to do one.
 setChromePainter(renderAllChrome);
 
-// The shell's public surface, unchanged from when all of this was in this one file. The
-// pages that import from shell.js should not learn that the shell has an interior.
+// The shell's public surface. The pages that import from here should not learn that the
+// shell has an interior.
 export {
+  buildTree,
+  viewRoot,
   setNavRoute,
   currentRoute,
   renderCommunities,

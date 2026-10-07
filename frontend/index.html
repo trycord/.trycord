@@ -1,262 +1,50 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="ember" data-motion="full">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Trycord">
+  <meta name="color-scheme" content="dark">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  >
-
-  <meta
-    name="description"
-    content="Trycord communication client"
-  >
-
-  <!-- Content Security Policy. Covers both browser (server-rendered, which
-       also sends its own header — policies intersect) and the desktop
-       Electron build loading this page from file://. 'self' covers the
-       local client; connect-src permits the configured API/WebSocket
-       backend; blob: is required for attachment previews. -->
-  <meta
-    http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self'; style-src 'self';
-             img-src 'self' data: blob: http: https:;
-             media-src 'self' blob: http: https:;
-             font-src 'self' data:;
-             connect-src 'self' http: https: ws: wss:;
-             worker-src 'self' blob:;
-             object-src 'none'; frame-src 'none';
-             base-uri 'self'; form-action 'self'"
-  >
+  <!-- Both the browser build, which also gets this as a response header, and the desktop
+       build, which loads this document off disk and so only ever sees this one. They
+       intersect rather than replace, so both are written out. blob: is required for
+       attachment previews; connect-src is open because the backend is instance
+       configuration, not something this document can know. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self';
+    style-src 'self';
+    img-src 'self' data: blob: http: https:;
+    media-src 'self' blob: http: https:;
+    font-src 'self' data:;
+    connect-src 'self' http: https: ws: wss:;
+    worker-src 'self' blob:;
+    object-src 'none';
+    frame-src 'none';
+    base-uri 'self';
+    form-action 'self'">
 
   <title>Trycord</title>
 
-  <!-- Brand logo. trycord-logo.ico is multi-resolution and is what a desktop
-       tab actually uses. The PNG master is 1254x1254 (958 KB) and is rendered
-       at 28-72px in the UI and 180px by iOS, so neither consumer benefits from
-       it; loading it as a second icon just fetched the large file as well. -->
-  <!-- Asset URLs are relative, so without a base they resolve against the current
-       route rather than the app root: /settings/security asks the server for
-       /settings/css/app.css, receives a document instead of a stylesheet, and
-       renders with no styling and no application.
-
-       The value written here is the hosted mount. The server rewrites it per
-       request for anything served from a different mount, because it is the only
-       thing that knows where it is mounted - the same file is served from the
-       origin root by a self-hoster and from /app by the hosted deployment. The
-       Cloudflare deployment serves this file statically with no rewrite, so what
-       is written here is what that deployment gets. "/" was correct for a
-       self-hoster at the root and silently broke the hosted one. -->
+  <!-- Required for a hard refresh of a deep route. /settings/security asks for
+       ./css/app.css, which without this resolves to /settings/css/app.css and comes
+       back as a document. What is written here is the hosted mount; the server rewrites
+       it per request, because the server is the only thing that knows where it is
+       mounted - the same file is served from the origin root by a self-hoster. -->
   <base href="/app/">
 
   <link rel="icon" href="./assets/trycord-logo.ico" sizes="any" type="image/x-icon">
   <link rel="apple-touch-icon" href="./assets/trycord-logo.ico">
-
-  <!-- Application stylesheet -->
   <link rel="stylesheet" href="./css/app.css">
 </head>
-
 <body>
   <a class="skip-link" href="#trycord-main">Skip to main content</a>
 
-  <!--
-    ============================================================
-    TRYCORD APPLICATION
-    ============================================================
+  <!-- The application tree is built from js/shell/tree.js. -->
+  <div id="app"></div>
 
-    IMPORTANT:
-
-    This is the APPLICATION shell.
-
-    This is NOT:
-    - the public landing page
-    - a dashboard
-    - a marketing page
-    - a static documentation page
-
-    Do not populate this HTML with mock users, communities,
-    channels, messages, or other application data.
-
-    JavaScript must populate these regions from the real
-    application state/API/WebSocket system.
-  -->
-
-  <div id="app" class="trycord-app">
-
-    <!-- ======================================================
-         APPLICATION SHELL
-
-         One tree, two layouts. The rail is a column on a wide
-         viewport and an overlay drawer on a narrow one; nothing
-         else differs. It used to be two parallel DOM trees with
-         only one mounted at a time, which meant two skip links,
-         two main landmarks, two sets of layout rules and a
-         scroll container that moved on rotation.
-    ====================================================== -->
-
-    <section
-      id="shell"
-      class="shell"
-      aria-label="Trycord"
-    >
-
-      <!-- The rail is the same element in both layouts: a column beside the
-           main area when there is room, a slide-over drawer when there is not.
-           aria-expanded reflects the drawer state only. -->
-      <aside
-        id="app-rail"
-        class="app-rail"
-        aria-label="Navigation"
-      >
-
-        <!-- Identity lives in the rail header; kept as an empty landmark so
-             the region is addressable by the shell. -->
-        <header
-          id="identity-region"
-          class="rail-identity"
-        ></header>
-
-        <!-- Global destinations: Home, DMs and other application-level routes.
-             Collapsed into the rail on desktop. -->
-        <nav
-          id="global-navigation"
-          class="rail-global-nav"
-          aria-label="Global navigation"
-        ></nav>
-
-        <!-- Communities the authenticated user belongs to -->
-        <section
-          id="community-navigation"
-          class="app-rail__items"
-          aria-label="Communities"
-        ></section>
-
-        <!-- Channels and categories for the selected community -->
-        <section
-          id="place-navigation"
-          class="context-sidebar"
-          aria-label="Current place navigation"
-        ></section>
-
-      </aside>
-
-      <!-- Behind the drawer on narrow viewports only. -->
-      <div
-        id="desktop-backdrop"
-        class="nav-backdrop"
-        aria-hidden="true"
-        hidden
-      ></div>
-
-      <main
-        id="trycord-main"
-        class="main-content"
-      >
-
-        <!-- Context belongs inside the main area and changes with the current
-             place, so it is not an application-wide top bar. -->
-        <header
-          id="context-header"
-          class="context-header"
-        ></header>
-
-        <div class="chat-environment">
-          <section
-            id="view-root"
-            class="view-root"
-          ></section>
-
-          <aside
-            id="member-sidebar"
-            class="member-sidebar"
-            aria-label="Community members"
-          ></aside>
-        </div>
-
-      </main>
-
-      <!-- Thumb-reachable primary navigation. Desktop uses the rail. -->
-      <nav
-        id="mobile-tab-navigation"
-        class="mobile-tab-navigation"
-        aria-label="Primary navigation"
-      ></nav>
-
-    </section>
-
-    <!-- ======================================================
-         GLOBAL OVERLAYS
-         ======================================================
-
-         These are intentionally outside the shells so they can
-         be used by both desktop and mobile.
-    -->
-
-    <div
-      id="modal-root"
-      class="modal-root"
-    ></div>
-
-    <div
-      id="popover-root"
-      class="popover-root"
-    ></div>
-
-    <!-- Route changes are announced here rather than by making the whole view a
-         live region, which would re-read the entire page on every render. -->
-    <div
-      id="route-announcer"
-      class="sr-only"
-      role="status"
-      aria-live="polite"
-      aria-atomic="true"
-    ></div>
-
-    <div
-      id="toast-root"
-      class="toast-root"
-      aria-live="polite"
-      aria-atomic="true"
-    ></div>
-
-
-    <!-- ======================================================
-         APPLICATION STATUS
-         ====================================================== -->
-
-    <div
-      id="connection-status"
-      class="connection-status"
-      role="status"
-      aria-live="polite"
-    ></div>
-
-  </div>
-
-
-  <!--
-    ============================================================
-    APPLICATION JAVASCRIPT
-    ============================================================
-
-    Keep application logic in JS modules.
-
-    The HTML above is the structural shell only.
-
-    Do not put:
-    - fake data
-    - example communities
-    - example messages
-    - fake users
-    - fake channels
-    - fake API responses
-
-    into this document.
-  -->
-
-  <!-- Crash surface: if a module fails to load (stale cache mixing during
-       live development), show an actionable message instead of a blank window. -->
+  <!-- A module that fails to load leaves a blank window otherwise. -->
   <script src="./js/crash.js"></script>
   <script type="module" src="./js/app.js"></script>
 </body>
