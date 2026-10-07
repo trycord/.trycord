@@ -9,7 +9,8 @@ client segments are served; `npm run check:flows` boots a server and passes 42
 assertions against real flows; `npm run check:render` boots a server and renders all
 40 routable pages in jsdom, passing 51 assertions over 1151 interactive controls;
 `npm run check:realtime` puts two accounts on two sockets and confirms a message
-crosses between them, and `npm run check:client-load`
+crosses between them; `npm run check:contrast` measures every theme against WCAG AA
+and finds 79 ratios that pass; and `npm run check:client-load`
 evaluates all 66 client modules.
 
 ## Where things live
@@ -168,6 +169,7 @@ connection error.
 | `npm run check:client-load` | **evaluates** every client module against a stub DOM |
 | `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
 | `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
+| `npm run check:contrast` | every theme's contrast ratios against WCAG AA, and no colour written into a component rule |
 | `npm run check:headings` | one `h1` per surface; a page that adds its own beside the context header's fails |
 | `npm run check:render` | **renders every route in jsdom** against a real backend, and checks accessible names, the phone composition and themes |
 | `npm run check:realtime` | **two clients, two sockets** - one person's message reaches somebody else's open tab and is still there after a reload |
