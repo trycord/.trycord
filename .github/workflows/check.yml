@@ -44,6 +44,12 @@ jobs:
       - name: Origin policy
         run: npm run check:origins
 
+      # Every theme's contrast ratios, and no colour written into a component rule.
+      # Contrast is the part of accessibility that can be measured exactly rather than
+      # judged by eye, and this is where it was measured for the first time.
+      - name: Contrast
+        run: npm run check:contrast
+
   flows:
     name: Flow checks
     runs-on: ubuntu-latest
