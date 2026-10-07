@@ -36,9 +36,19 @@ const EXEMPT = {
     why: 'renderContextHeader is where the one h1 comes from',
     routes: [],
   },
-  'public/public.js': {
-    why: 'the sign-in screens and the legal documents, which have no context header',
-    routes: ['/login', '/register', '/forgot', '/reset-password', '/verify-email', '/legal'],
+  'public/auth.js': {
+    // The previous entry for this exemption said these pages have no context header,
+    // which was not true: four of the six call authShell with a contextTitle, so the
+    // header and the page's own h1 both render. They say much the same thing -
+    // "Welcome back" above "Sign in" - which is redundant rather than either being
+    // wrong, and dropping the header would change what the signed-out shell looks like.
+    // Recorded here rather than left as a stale path.
+    why: 'the sign-in screens render both a context header and their own h1, and say the same thing twice',
+    routes: ['/login', '/register', '/forgot', '/reset-password'],
+  },
+  'public/legal.js': {
+    why: 'the legal documents, which name themselves with an h1 and no context header',
+    routes: ['/legal', '/verify-email'],
   },
   'support/support.js': {
     why: '/support is a document: the stylesheet gives it no context header',
