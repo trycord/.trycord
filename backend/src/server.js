@@ -13,6 +13,7 @@ const cors = require('cors');
 const db = require('./db');
 const createGateway = require('./ws');
 const serveClient = require('./serve-client');
+const { corsOptions, originCovers, DESKTOP_ORIGIN } = require('./origins');
 const inviteRoutes = require('./routes/invites');
 const enforcement = require('./services/enforcement');
 const pages = require('./services/pages');
@@ -91,101 +92,6 @@ function instanceConfig() {
 // "trycord://app" - is matched exactly, so a non-web origin still has to be
 // listed deliberately. A bare "*" is never accepted: it would be equivalent to
 // Access-Control-Allow-Origin: *.
-function originCovers(pattern, origin) {
-  if (pattern === origin) return true;
-  if (!pattern.includes('*')) return false;
-  // A bare "*" would be Access-Control-Allow-Origin: *. Never honour it.
-  if (pattern === '*') return false;
-
-  // The only wildcard form supported is a "*." label at the start of the HOST:
-  //   https://*.trycord.dev
-  // Written with string operations rather than a regex on purpose - the
-  // pattern is not a valid URL (that is the whole point of the wildcard), and
-  // an escaped-delimiter regex for it is easy to get subtly wrong.
-  const schemeEnd = pattern.indexOf('://');
-  if (schemeEnd < 0) return false;
-  const scheme = pattern.slice(0, schemeEnd);
-  if (!/^[a-z][a-z0-9+.-]*$/i.test(scheme)) return false;  // literal scheme only
-  const hostPart = pattern.slice(schemeEnd + 3);
-  if (!hostPart.startsWith('*.')) return false;
-  // No second wildcard anywhere else in the host or port.
-  if (hostPart.slice(1).includes('*')) return false;
-
-  let p, o;
-  try {
-    // Replace the "*" label only, keeping the dot that separates it from the
-    // base host: "*.trycord.dev" -> "wildcard-label.trycord.dev".
-    p = new URL(scheme + '://wildcard-label' + hostPart.slice(1));
-    o = new URL(origin);
-  } catch {
-    return false;
-  }
-  // Wildcards only ever cover subdomains of an http(s) site. A custom-scheme
-  // origin such as the desktop app's "trycord://app" is always matched exactly.
-  if (p.protocol !== 'http:' && p.protocol !== 'https:') return false;
-  if (p.protocol !== o.protocol) return false;
-  if (p.port !== o.port) return false;
-  // Hostnames are case-insensitive. Strip the label we just substituted back
-  // off, leaving the base domain the wildcard actually covers.
-  const base = p.hostname.toLowerCase().slice('wildcard-label.'.length);
-  const host = o.hostname.toLowerCase();
-  if (!base || !host.endsWith('.' + base)) return false;
-  // Exactly one label: "a.trycord.dev" matches, "a.b.trycord.dev" does not, and
-  // the bare apex is not covered by a "*." pattern.
-  const label = host.slice(0, host.length - base.length - 1);
-  return label.length > 0 && !label.includes('.');
-}
-
-// The desktop app's own origin. Registered as a privileged scheme in the
-// Electron main process, so it has a real, non-opaque origin — which means the
-// backend must allowlist it by name like any other client.
-const DESKTOP_ORIGIN = 'trycord://app';
-
-// Origins already explained, so a misconfiguration is logged once rather than
-// on every request.
-const refusedOrigins = new Set();
-
-function warnRefusedOrigin(origin, clientOrigins) {
-  if (refusedOrigins.has(origin)) return;
-  refusedOrigins.add(origin);
-  // The desktop app is the case that actually bites: it is a custom scheme, so
-  // it can never be inferred the way localhost or file: can.
-  if (origin.startsWith('trycord:')) {
-    console.warn(
-      '[warn] refused origin ' + origin + ' - this is the desktop app scheme. '
-      + 'Add it to CLIENT_ORIGIN, e.g. CLIENT_ORIGIN='
-      + (clientOrigins.length ? clientOrigins.join(',') + ',' : '')
-      + DESKTOP_ORIGIN
-    );
-    return;
-  }
-  console.warn('[warn] refused origin ' + origin + ' (not matched by CLIENT_ORIGIN)');
-}
-
-function corsOptions(clientOrigins) {
-  return {
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true); // curl, same-origin navigations, health probes
-      if (clientOrigins.length) {
-        if (clientOrigins.some((p) => originCovers(p, origin))) return cb(null, true);
-        warnRefusedOrigin(origin, clientOrigins);
-        return cb(null, false);
-      }
-      try {
-        const u = new URL(origin);
-        const host = u.hostname;
-        if (u.protocol === 'file:' || origin === 'null') return cb(null, true);
-        if (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return cb(null, true);
-        warnRefusedOrigin(origin, clientOrigins);
-        return cb(new Error('CORS: origin not allowed'));
-      } catch {
-        warnRefusedOrigin(origin, clientOrigins);
-        return cb(new Error('CORS: origin not allowed'));
-      }
-    },
-  };
-}
-
 async function boot() {
   if (!process.env.JWT_SECRET) {
     throw new Error(

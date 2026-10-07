@@ -25,6 +25,7 @@ The eleven questions worth being able to answer without searching.
 | Lifecycle | `frontend/js/pages/lifecycle.js` - mount, teardown, access gate, per-page error isolation. |
 | Authentication state | `frontend/js/state.js`. The token is in `api.js`; everything else reads `State.me`. |
 | Client-side permissions | `state.js#can`, mirrored from `services/permissions.js`. **Display only** - the server decides. |
+| Which origins may talk to this instance | `src/origins.js` - the CORS policy, including the desktop app's custom scheme and the `*.` wildcard rules. |
 | Server-side authorization | `middleware/serverAccess.js` - `resolveServer`, `requireMember`, `requirePerm`, `requireOwner`. Routes declare their own level. |
 | Themes | `frontend/js/theme.js` over the `--t-*` tokens in `css/app.css`. Built-in themes are `[data-theme]` blocks; custom ones are verified and kept working. |
 | API calls | `frontend/js/api.js`. One `request()`, no per-feature clients. |
