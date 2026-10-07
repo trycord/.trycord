@@ -61,7 +61,6 @@ const Api = {
   searchUsers: (q) => request('GET', '/api/users/search?q=' + encodeURIComponent(q)),
   presence: (ids) => request('GET', '/api/users/presence?ids=' + encodeURIComponent(ids.join(','))),
   user: (id, serverId) => request('GET', '/api/users/' + encodeURIComponent(id) + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
-  legacyMe: () => request('GET', '/api/me'),
 
   uploadProfileImage: (kind, file) => {
     const fd = new FormData();
@@ -71,7 +70,6 @@ const Api = {
   },
   removeProfileImage: (kind) =>
     request('DELETE', kind === 'banner' ? '/api/users/me/banner' : '/api/users/me/avatar'),
-  fetchProfileImage: (path) => request('GET', path, { raw: true }),
   // Generic authenticated image fetch. Profile avatars/banners and community
   // icons/banners are both "GET this path with the session, get bytes back", so
   fetchAuthedImage: (path) => request('GET', path, { raw: true }),
@@ -110,8 +108,6 @@ const Api = {
   timeoutMember: (id, userId, minutes) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/timeout', { body: { userId, minutes } }),
   setNickname: (serverId, userId, nickname) =>
     request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/members/' + encodeURIComponent(userId) + '/nickname', { body: { nickname } }),
-  serverByCode: (code) => request('GET', '/api/servers/by-code/' + encodeURIComponent(code)),
-  joinServerByCode: (code) => request('POST', '/api/servers/join/' + encodeURIComponent(code)),
 
   channels: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/channels'),
   createChannel: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels', { body }),
@@ -120,7 +116,6 @@ const Api = {
   deleteChannel: (serverId, channelId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId)),
 
-  categories: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/categories'),
   createCategory: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/categories', { body }),
   deleteCategory: (serverId, categoryId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/categories/' + encodeURIComponent(categoryId)),
@@ -128,8 +123,6 @@ const Api = {
     request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/categories/' + encodeURIComponent(categoryId), { body: { name } }),
   reorderCategories: (serverId, orderedIds) =>
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/categories/reorder', { body: { orderedIds } }),
-  reorderChannels: (serverId, orderedIds) =>
-    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels/reorder', { body: { orderedIds } }),
 
   // ---- permission overrides: category -> channel tri-state --------------
   channelOverrides: (serverId, channelId) =>
@@ -193,12 +186,6 @@ const Api = {
   updateAnnouncement: (id, data) => request('PATCH', '/api/announcements/' + encodeURIComponent(id), { body: data }),
   deleteAnnouncement: (id) => request('DELETE', '/api/announcements/' + encodeURIComponent(id)),
 
-  uploadAttachment: async (channelId, file) => {
-    const fd = new FormData();
-    fd.append('file', file);
-    return request('POST', '/api/channels/' + encodeURIComponent(channelId) + '/attachments',
-      { body: fd, form: true });
-  },
   // XHR rather than fetch, which cannot report how much of a body has been
   // sent. Both upload endpoints go through this.
   uploadAttachmentWithProgress: (channelId, file, onProgress) => {
@@ -211,7 +198,6 @@ const Api = {
     fd.append('file', file);
     return xhrUpload('/api/dms/' + encodeURIComponent(conversationId) + '/attachments', fd, onProgress);
   },
-  attachmentUrl: (id) => base() + '/api/attachments/' + encodeURIComponent(id),
   fetchAttachment: (id) => request('GET', '/api/attachments/' + encodeURIComponent(id), { raw: true }),
 
   serverPermissions: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/roles/permissions'),
@@ -233,7 +219,6 @@ const Api = {
   createInvite: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/invites', { body }),
   deleteInvite: (serverId, inviteId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/invites/' + encodeURIComponent(inviteId)),
-  invitePreview: (code) => request('GET', '/api/invites/' + encodeURIComponent(code) + '/preview'),
   joinInvite: (code) => request('POST', '/api/invites/' + encodeURIComponent(code) + '/join'),
 discover: ({ q = '', page = 1, limit = 12 } = {}) => {
     const qs = new URLSearchParams({
@@ -321,8 +306,6 @@ joinDiscover: (id) =>
       { body: { actionType, reason, expiresInHours: hours, reportId, confirm } }),
   adminLiftUser: (userId, reason) =>
     request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/lift', { body: { reason } }),
-  adminSetBot: (userId, isBot) =>
-    request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/bot', { body: { isBot: !!isBot } }),
   adminServers: ({ q = '', limit = 25 } = {}) =>
     request('GET', '/api/admin/servers?q=' + encodeURIComponent(q) + '&limit=' + limit),
   adminServerActions: (serverId) =>
@@ -361,7 +344,6 @@ joinDiscover: (id) =>
     const qs = q.toString();
     return request('GET', '/api/admin/appeals' + (qs ? '?' + qs : ''));
   },
-  adminAppeal: (id) => request('GET', '/api/admin/appeals/' + encodeURIComponent(id)),
   adminDecideAppeal: (id, decision, reason) =>
     request('PATCH', '/api/admin/appeals/' + encodeURIComponent(id), { body: { decision, reason } }),
   adminAudit: ({ actorId, action, targetId, limit = 50 } = {}) => {
