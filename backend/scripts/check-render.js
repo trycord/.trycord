@@ -45,6 +45,7 @@ async function freePort() {
   });
 }
 
+let inFlight = 0;
 let PORT = Number(process.env.RENDER_PORT || 0);
 // Resolved lazily: PORT is 0 until the free-port probe has run.
 const origin = () => `http://127.0.0.1:${PORT}`;
@@ -263,7 +264,13 @@ function wireFetch(window, token) {
     const absolute = url.startsWith('http') ? url : origin() + (url.startsWith('/') ? url : '/' + url);
     const headers = Object.assign({}, (init && init.headers) || {});
     headers.Authorization = 'Bearer ' + token;
-    const res = await realFetch(absolute, Object.assign({}, init, { headers }));
+    inFlight++;
+    let res;
+    try {
+      res = await realFetch(absolute, Object.assign({}, init, { headers }));
+    } finally {
+      inFlight--;
+    }
     if (process.env.RENDER_TRACE) {
       console.log('    [proxy] ' + (init && init.method) + ' ' + absolute + ' -> '
         + res.status + (res.status >= 400 ? ' ' + (await res.clone().text()).slice(0, 90) : ''));
@@ -313,10 +320,32 @@ async function importClient(window) {
   }
 }
 
-/** Wait for the client to settle: no more microtasks, timers drained. */
-async function settle(window, ms = 60) {
-  for (let i = 0; i < ms; i++) {
-    await new Promise((r) => setTimeout(r, 1));
+/**
+ * Wait until the client stops asking for things.
+ *
+ * This used to mean "let the microtask queue drain", which is not the same thing. A page
+ * that had rendered its loading state satisfied every assertion in this file: it had
+ * content, one heading, something interactive. A conversation in particular never reached
+ * its composer, so --dump showed the shell and no conversation and the check called that
+ * a pass.
+ *
+ * Counting requests as they pass through the proxy is the honest signal - a page that has
+ * finished fetching has nothing outstanding, and one that has not has something.
+ */
+async function settle(window, ms = 400) {
+  const started = Date.now();
+  let quiet = 0;
+  while (Date.now() - started < ms) {
+    if (inFlight === 0) {
+      quiet++;
+      // Three quiet stretches rather than one, because a page commonly fetches, renders
+      // what it has, and then fetches again for whatever it only learns it needs once
+      // there is something to show.
+      if (quiet >= 3) return;
+    } else {
+      quiet = 0;
+    }
+    await new Promise((r) => setTimeout(r, 10));
   }
 }
 
@@ -385,6 +414,7 @@ async function settle(window, ms = 60) {
 
     const registry = await import(pathToUrl(path.join(CLIENT, 'js/pages/registry.js')));
     const { PAGES, matchRoute } = registry;
+    const registryModule = registry;
     console.log('  pages in the registry: ' + PAGES.length);
 
     // Real rows, so a route with :id in it resolves to something. A page that renders
@@ -392,7 +422,37 @@ async function settle(window, ms = 60) {
     const world = await makeWorld(origin(), token);
     console.log('  seeded: community, ' + world.channels.length + ' channel(s), a message, a friend request');
 
-    const wanted = value('--route', null);
+    // --dump takes the page as its own argument: `--dump /dms`, `--dump community`.
+    // Asking what a surface actually produces is the only way to judge it; the
+    // assertions can say a page rendered and had a heading, and neither of those is the
+    // same as it being right.
+    const dumpAt = argv.indexOf('--dump');
+    const wanted = dumpAt >= 0 ? (argv[dumpAt + 1] || null) : value('--route', null);
+
+    if (dumpAt >= 0) {
+      // Accept an id, a route template, or a concrete URL - "/c/render-test" as readily
+      // as "/c/:slug". Looking at a surface should not require remembering which form
+      // the registry happens to store.
+      let target = PAGES.find((pg) => pg.id === wanted || pg.path === wanted);
+      if (!target && registry.matchRoute) {
+        const hit = registryModule.matchRoute(wanted);
+        if (hit && hit.page) target = hit.page;
+      }
+      if (!target) {
+        console.error('\n  no page matches: ' + wanted);
+        console.error('  ids: ' + PAGES.map((pg) => pg.id).join(', ') + '\n');
+        await boot1.stop();
+        process.exit(1);
+      }
+      const url = concrete(target.path, world);
+      await visit(window, document, Router, url, base);
+      const view = document.getElementById('view-root');
+      console.log('\n  ==== ' + target.id + '  ' + url + ' ====\n');
+      console.log(readable(view ? view.innerHTML : '(nothing in #view-root)'));
+      await boot1.stop();
+      process.exit(0);
+    }
+
     const routable = PAGES.filter((p) => p.path && p.access !== 'guest');
     const targets = wanted
       ? routable.filter((p) => p.path === wanted || p.id === wanted)
@@ -478,6 +538,38 @@ async function settle(window, ms = 60) {
     ok('every interactive control has an accessible name', unnamed.length === 0,
       unnamed.slice(0, 4).join(' | '));
     console.log(`    ${controls} controls checked across ${targets.length} pages`);
+
+    // A conversation that renders is not the same as a conversation that renders its
+    // messages. Every conversation assertion below passed for a whole session against an
+    // empty channel, because the seed was posting the wrong field and nothing required
+    // the message to be there. This requires it.
+    const chanOut = await visit(window, document, Router,
+      concrete('/server/:id/channel/:channel', world), base);
+    const chanText = (chanOut.text || '');
+    ok('a conversation shows the message that was sent',
+      chanText.includes('planted'),
+      'the channel rendered without it: ' + (chanOut.headings) + ' headings, '
+        + chanOut.buttons + ' controls');
+
+    const composerOut = await visit(window, document, Router,
+      concrete('/server/:id/channel/:channel', world), base);
+    ok('a conversation has a composer', !!composerOut.composer,
+      'no .composer in the rendered view');
+    ok('the composer is reachable from the keyboard and named',
+      composerOut.composer && composerOut.composer.name.length > 0,
+      composerOut.composer ? 'the textarea has no accessible name' : 'no composer');
+
+    // The three things hanging off a message that a bare message cannot prove. Each was
+    // verified by looking at the rendered surface before it was asserted, which is the
+    // only reason these are the right selectors.
+    const marks = composerOut.marks || {};
+    ok('an edited message says so', !!marks.edited,
+      'the seeded message was edited but nothing on screen says so');
+    ok('a reply shows as a count on the message it replies to',
+      /\d/.test(marks.threadCount || ''),
+      'a reply was posted but no thread count rendered');
+    ok('a reaction shows on the message it is on', (marks.reactions || 0) > 0,
+      'a reaction was added but no reaction rendered');
 
     // ---- dead controls ----
     //
@@ -689,10 +781,36 @@ async function makeWorld(origin, token) {
     { name: 'general', type: 'text' });
   const channelId = channel.json.id || channel.json.channelId || 'general';
 
-  // A message, so the conversation has something in it.
-  await call('POST', `/api/channels/${channelId}/messages`, { body: 'Rendered by the render check.' });
+  // Messages with everything hanging off them, because the conversation is the surface
+  // that matters most and "it rendered" says nothing about whether a reply, an edit or a
+  // reaction is actually shown. Seeding only a plain message left all three untested and
+  // the channel looking emptier than it is.
+  const post = async (body) => {
+    const res = await call('POST', `/api/channels/${channelId}/messages`, body);
+    if (res.status >= 400 || !res.json.id) {
+      throw new Error('could not seed a message: ' + res.status + ' '
+        + JSON.stringify(res.json).slice(0, 200));
+    }
+    return res.json;
+  };
 
-  return { serverId, channelId, slug, channels: [channelId] };
+  const seeded = await post({ content: 'A message the render check planted.' });
+    // Saying so, rather than letting the channel stay quietly empty: the field is
+    // `content`, posting `body` fails validation with "content or an attachment is
+    // required", and this check then asserted against an empty channel for a whole
+    // session while looking entirely healthy.
+
+  // A reply to it, an edit on it, and a reaction - the three things the message row is
+  // supposed to show and the three that a single bare message cannot prove.
+  const reply = await post({ content: 'A reply, so threads are not empty.', replyToId: seeded.id });
+  await call('PATCH', `/api/channels/${channelId}/messages/${seeded.id}`,
+    { content: 'A message the render check planted, and then edited.' });
+  await call('POST', `/api/channels/${channelId}/messages/${seeded.id}/reactions`,
+    { emoji: '\u{1F44D}' });
+
+  const messageId = seeded.id;
+
+  return { serverId, channelId, slug, messageId, replyId: reply.id, channels: [channelId] };
 }
 
 /**
@@ -726,6 +844,18 @@ async function visit(window, document, Router, url, base) {
     // The sign-in, recovery and emailed-link screens hide the shell and mount into
     // document.body, so for those an empty #view-root is the correct shape. Looking only
     // at #view-root called every auth page broken.
+    // What the reader can actually read, and whether the composer is there.
+    text: (document.getElementById('view-root') || document.body).textContent || '',
+    // The message-row details worth asserting on, read off the rendered surface.
+    marks: {
+      edited: !!document.querySelector('#view-root .msg-edited'),
+      threadCount: (document.querySelector('#view-root .msg-thread-badge__count') || {}).textContent || '',
+      reactions: document.querySelectorAll('#view-root .msg-reactions > *').length,
+    },
+    composer: (() => {
+      const ta = document.querySelector('#view-root .composer textarea');
+      return ta ? { name: accessibleName(ta), tag: ta.tagName.toLowerCase() } : null;
+    })(),
     viewEmpty: (!view || view.children.length === 0)
       && !document.querySelector('body > .auth-page, body > .pub-page'),
     signature: (view ? view.innerHTML : '').length + ':'
@@ -879,4 +1009,14 @@ function deadControls(document, wired) {
       + (btn.className || 'no class') + ' has no handler');
   }
   return faults;
+}
+
+/** Break markup at tag boundaries so it can be read. */
+function readable(html) {
+  return String(html)
+    .replace(/>\s*</g, '>\n<')
+    .split('\n')
+    .map((l) => '    ' + l.trim().slice(0, 200))
+    .filter((l) => l.trim() !== '<')
+    .join('\n');
 }
