@@ -4,20 +4,20 @@ import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDial
 import { avatar, icon, navRow, serverChip, navGroup } from '../components.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, clearSession, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from '../state.js';
 import { navigate, route } from '../nav.js';
-import { layoutUsesSidebar, layoutUsesMembers } from '../layout.js';
 
 // The member panel: who is here, what they can do, and how to change it.
 
-const LS_HIDE_MEMBERS = 'trycord.hideMembers';
+import { setShell, shellState, compose } from './compose.js';
 
+// The reader's preference lives in the shell's state object now, not in a key of its own
+// here. What is *shown* is compose()'s answer, which is a different question and lives in
+// one place.
 export function membersHidden() {
-  try { return localStorage.getItem(LS_HIDE_MEMBERS) === '1'; } catch { return false; }
+  return !shellState().membersVisible;
 }
 
 export function toggleMembers() {
-  try {
-    localStorage.setItem(LS_HIDE_MEMBERS, membersHidden() ? '0' : '1');
-  } catch { /* ignore */ }
+  setShell({ membersVisible: !shellState().membersVisible });
   renderMemberSidebar(qs('#member-sidebar'));
 }
 
@@ -26,7 +26,7 @@ export function renderMemberSidebar(region) {
   // A member panel only means something inside a community. The route's layout
   // decides that, not the panel's own guess about the path, so a surface that
   // has no member panel cannot leave one reserving width it will not fill.
-  if (!isAuthed() || !layoutUsesMembers() || !currentServerId()
+  if (!isAuthed() || !compose().members.show || !currentServerId()
     || !State.serverDetail || !currentRoute().startsWith('/server/')) {
     region.hidden = true;
     return;

@@ -6,7 +6,7 @@ import { avatar, icon, navRow, serverChip, navGroup } from '../components.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, clearSession, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from '../state.js';
 import { channelPath, serverPath } from '../links.js';
 import { navigate, route } from '../nav.js';
-import { layoutUsesSidebar, layoutUsesMembers } from '../layout.js';
+import { compose } from './compose.js';
 import { matchRoute, railPages, mobilePages } from '../pages/registry.js';
 import { renderCommunityContext } from '../community-nav.js';
 
@@ -115,12 +115,12 @@ export function dmsContext(region) {
     }
   };
 
-  const compose = el('div', { class: 'ctx-actions' });
-  compose.appendChild(el('button', {
+  const actions = el('div', { class: 'ctx-actions' });
+  actions.appendChild(el('button', {
     class: 'btn primary block', type: 'button',
     onClick: () => { navigate('/friends'); },
   }, 'New message'));
-  scroll.appendChild(compose);
+  scroll.appendChild(actions);
   scroll.appendChild(search);
   scroll.appendChild(listBox);
   search.addEventListener('input', () => paint(search.value));
@@ -293,7 +293,7 @@ export function renderPlaceNavigation(region) {
   // So the track collapses rather than being reserved. The rail keeps the global
   // destinations, which every surface still needs; only the community column goes.
   const shell = region.closest('#shell');
-  if (!layoutUsesSidebar()) {
+  if (!compose().channels.show) {
     region.dataset.empty = 'true';
     region.hidden = true;
     if (shell) shell.classList.add('no-community-nav');
