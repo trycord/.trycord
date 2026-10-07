@@ -3,7 +3,7 @@
 // separate modules - see dm-thread.js and friends.js.
 
 
-import { errorState } from '../view-states.js';
+import { errorState, loadingState } from '../view-states.js';
 import State, { refreshDms } from '../state.js';
 import { el, clear, plural } from '../ui.js';
 import { emptyState } from '../components.js';
@@ -30,6 +30,14 @@ async function renderDmList(container) {
   // it. What it cannot do is fall back to the empty state below and claim there
   // are no conversations: on a cold load that cache is empty too, and the
   // reader is told to go and start a conversation they may already have nine of.
+  //
+  // On screen before the request goes out, too. The wrap used to be appended after the
+  // await, so a reader landing here got a blank workspace for as long as the fetch took,
+  // which reads as broken rather than as waiting.
+  const waiting = loadingState('Loading conversations');
+  wrap.appendChild(waiting);
+  container.appendChild(wrap);
+
   let dms = State.dms;
   let loadFailed = false;
   try {
@@ -38,6 +46,7 @@ async function renderDmList(container) {
     loadFailed = !(dms && dms.length);
   }
   dms = dms || [];
+  waiting.remove();
 
   if (!dms.length && loadFailed) {
     wrap.appendChild(errorState('Could not load your conversations.', () => renderDmList(container)));
@@ -50,8 +59,7 @@ async function renderDmList(container) {
     wrap.appendChild(el('div', { class: 'page-hint' },
       plural(dms.length, 'conversation') + ' - pick one from the list beside this.'));
   }
-  container.appendChild(wrap);
-}
+  }
 
 // The router hands /dms here with or without an id.
 export async function renderDms(container, { id } = {}) {

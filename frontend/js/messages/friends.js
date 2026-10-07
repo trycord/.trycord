@@ -4,7 +4,7 @@
 // Split out of the 655-line module for the same reason as dm-thread.js.
 
 import Api from '../api.js';
-import { errorState } from '../view-states.js';
+import { errorState, loadingState } from '../view-states.js';
 import State, { refreshFriends } from '../state.js';
 import { attachContextMenu, copyText, el, clear, toast, relTime } from '../ui.js';
 import { avatar, emptyState } from '../components.js';
@@ -16,7 +16,15 @@ async function renderFriends(container) {
   clear(container);
   renderContextHeader({ title: 'Friends', sub: 'People you know here' });
   const wrap = el('div', { class: 'page' });
+
+  // On screen before the request. refreshFriends() was awaited with the page still in
+  // hand, so a reader arriving here saw nothing at all for as long as it took - a blank
+  // surface reads as broken, not as waiting.
+  const waiting = loadingState('Loading people you know');
+  wrap.appendChild(waiting);
+  container.appendChild(wrap);
   await refreshFriends();
+  waiting.remove();
 
   const addRow = el('div', { class: 'row-line' });
   // A placeholder is not a label: it disappears as soon as the field has text
@@ -80,8 +88,7 @@ async function renderFriends(container) {
   const requestsRegion = el('div', { class: 'stack', dataset: { region: 'requests' } });
   wrap.appendChild(requestsRegion);
   await renderFriendsList(wrap);
-  container.appendChild(wrap);
-}
+  }
 
 async function renderFriendsList(wrap) {
   const friendActions = (kind, person) => {
