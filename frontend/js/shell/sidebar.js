@@ -1,19 +1,20 @@
 import { repaintChrome } from './repaint.js';
-import { storage } from '../config.js';
+import { setShell, shellState, compose } from './compose.js';
 import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from '../ui.js';
 import { isDesktopNavOpen, openDesktopNav, closeDesktopNav } from '../presentation.js';
 
 // Sidebar visibility state - collapsed, docked, and the toggles that change it.
-
-const LS_SIDEBAR_COLLAPSED = 'trycord.sidebarCollapsed';
+//
+// The persisted flag is the shell's, not this module's, and the thresholds are
+// compose()'s. This file used to keep its own DOCK_MIN of 760, which is how it and the
+// stylesheet came to disagree about where a member track begins.
 
 export function isSidebarCollapsed() {
-  try { return localStorage.getItem(LS_SIDEBAR_COLLAPSED) === '1'; } catch { return false; }
+  return shellState().channelsCollapsed;
 }
 
 export function toggleSidebar() {
-  const next = !isSidebarCollapsed();
-  storage(() => localStorage.setItem(LS_SIDEBAR_COLLAPSED, next));
+  setShell({ channelsCollapsed: !isSidebarCollapsed() });
   applySidebarState();
 }
 
@@ -23,10 +24,8 @@ export function applySidebarState() {
   repaintChrome();
 }
 
-const SIDEBAR_DOCK_MIN = 760;
-
 export function contextSidebarDocked() {
-  return window.innerWidth >= SIDEBAR_DOCK_MIN;
+  return compose().channels.collapsible;
 }
 
 export function contextSidebarVisible() {
