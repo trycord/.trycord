@@ -1,9 +1,5 @@
 /* ==========================================================================
    Trycord — Ember
-   --------------------------------------------------------------------------
-   The application surface. This file replaces the previous stylesheet rather
-   than sitting on top of it: every token below is new, and the rules that
-   consume them were written for this design.
 
    Structure
      1  tokens

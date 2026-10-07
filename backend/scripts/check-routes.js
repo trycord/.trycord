@@ -39,7 +39,7 @@ async function clientSegments() {
   if (!pages.length) throw new Error('no pages found in the registry');
   return new Set(
     pages
-      .map((page) => String(page.path || '').split('/').filter(Boolean)[0])
+      .map((page) => String(page.route || '').split('/').filter(Boolean)[0])
       .filter(Boolean)
   );
 }

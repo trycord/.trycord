@@ -1,23 +1,8 @@
 // The shell: the parts of the interface that are not the page.
 //
-// Rail, place column, context header, member panel, phone tab bar. Each is a module under
-// ./shell/ named for the thing it draws; this file is the only place that knows all five
-// exist, which is what makes renderAllChrome possible and what makes it the right place
-// to stop.
-//
-// Why it was one 1075-line file until now: because the regions call each other. Opening a
-// community repaints the place column, collapsing the sidebar repaints everything, and a
-// member action repaints the member list and the rail. Written inline, that reads as
-// "the shell repaints itself", which is true, and as a cycle, which it also was:
-//
-//   renderPlaceNavigation -> dmsContext -> refreshHomeSidebar -> renderPlaceNavigation
-//   toggleSidebar -> applySidebarState -> renderAllChrome -> renderPlaceNavigation
-//
-// Both are now closed by two small modules rather than by a comment saying to be careful.
-// route.js owns the current-route value on its own, because "which route am I on" is
-// state and "paint the place column" is a renderer, and one file being both is why the
-// cycle was invisible. repaint.js owns the painter, registered from here, so a module
-// that changes state asks for a repaint instead of importing the thing that repaints.
+// Each region is a module under ./shell/ named for the thing it draws. This is the only
+// place that knows all of them exist. Two small modules break the cycles the regions
+// would otherwise have: route.js owns the current route, repaint.js owns the painter.
 
 import { qs } from './ui.js';
 import { buildTree, viewRoot } from './shell/tree.js';

@@ -47,7 +47,7 @@ async function boot() {
   applyTheme();
   watchSystemTheme();
 
-  // below (session restore, realtime, routes) resolves BACKEND_URL live.
+  // below (session restore, realtime, routes) resolves the backend live.
   try { await TrycordConfig.loadStaticConfig(); } catch { /* ignore */ }
   try { await TrycordConfig.loadRuntimeConfig(); } catch { /* ignore */ }
 

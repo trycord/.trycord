@@ -1,14 +1,8 @@
-// An expanded thread, in place under the message it hangs from.
+// An expanded thread, under the message it hangs from.
 //
-// Inline rather than a side panel: it reuses the feed, the message rows and the
-// composer that are already here, and it needs no new region in the shell, which
-// matters because a thread has to work the same in a channel and in a direct
-// message. On a phone a side panel has nowhere to go.
-//
-// The root is repeated in the thread even though it is the message being
-// expanded. Without it the replies have no context - the thing they are replying
-// to is the whole point - and on a narrow screen the expanded block is often the
-// only part of the message still visible.
+// Inline rather than a side panel, so a thread works the same in a channel and in a DM
+// and has somewhere to go on a phone. The root is repeated in the thread even though it
+// is the message being expanded - the replies have no context without it.
 
 import Api from './api.js';
 import { el, clear, insertAtCursor, showEmojiPicker, toast } from './ui.js';

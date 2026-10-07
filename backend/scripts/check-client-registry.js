@@ -34,7 +34,7 @@ const REGISTRY = path.join(CLIENT, 'pages', 'registry.js');
 // stop.
 const ALLOWED = {
   id: 'the key renderers are bound by',
-  path: 'the route the matcher uses',
+  route: 'the address the matcher uses',
   scope: 'which navigation tree the page belongs to',
   access: "'session', 'public' or 'guest' - the router's gate",
   layout: "which of the shell's shapes the page needs; layout.js owns the measurements",
@@ -104,7 +104,7 @@ function ok(label, condition, detail) {
     trulyDead.join(', ') || (unused.length ? unused.length + ' unused by pages but read elsewhere' : ''));
 
   // Longest-prefix matching means two pages cannot share a path, or one is unreachable.
-  const paths = PAGES.filter((p) => p.path).map((p) => p.path);
+  const paths = PAGES.filter((p) => p.route).map((p) => p.route);
   const dupePaths = paths.filter((x, i) => paths.indexOf(x) !== i);
   ok('no two pages claim the same route', dupePaths.length === 0, [...new Set(dupePaths)].join(', '));
 
@@ -118,9 +118,9 @@ function ok(label, condition, detail) {
   // A nav entry has to resolve. The rail and the tab bar both go through the matcher, so
   // a path in nav that no page declares is a control that navigates nowhere.
   const known = new Set(paths);
-  const dangling = withNav.filter((p) => p.path && !known.has(p.path));
+  const dangling = withNav.filter((p) => p.route && !known.has(p.route));
   ok('every navigation destination is a page that exists', dangling.length === 0,
-    dangling.map((p) => p.id + ' -> ' + p.path).join(', '));
+    dangling.map((p) => p.id + ' -> ' + p.route).join(', '));
 
   const rail = railPages();
   const tabs = mobilePages();
@@ -140,7 +140,7 @@ function ok(label, condition, detail) {
   // Orphaned would be a page with a session access, no nav, no tabs and no parent, which
   // nothing links to.
   const inNavigation = new Set([...rail, ...tabs].map((p) => p.id));
-  const isSubPage = (p) => p.path.split('/').filter(Boolean)
+  const isSubPage = (p) => p.route.split('/').filter(Boolean)
     .some((segment, i, all) => i > 0 && segment.startsWith(':')
       && all.slice(0, i).join('/') !== '');
   const reachedSomehow = (p) => inNavigation.has(p.id) || p.access === 'guest'

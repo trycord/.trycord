@@ -1,9 +1,7 @@
 // Teardown for the current page.
 //
-// Its own module because both ends need it and they must not import each other: the
-// lifecycle drains it on every navigation, and a page registers into it. A page
-// importing the lifecycle would close a cycle, since the lifecycle is what calls the
-// page.
+// Its own module because both ends need it and they cannot import each other: the
+// lifecycle drains it on every navigation, and a page registers into it.
 
 let pending = [];
 

@@ -1,13 +1,7 @@
-// Routing.
+// Routing. The pathname becomes a page via the registry, mounted by the lifecycle.
 //
-// The pathname is turned into a page by the registry and mounted by the lifecycle.
-// This file keeps only what a table cannot do: read the location, handle the
-// mount prefix and the query string, and react to history.
-//
-// Dispatch used to be a sixty-branch if-chain here. Then it was a route table with
-// a renderer attached to every row, which meant layout, sidebar, access and
-// navigation were decided in four other places that had to be kept in agreement by
-// hand. Now it is a registry of pages, and this file asks it a question.
+// This file keeps only what a table cannot do: read the location, handle the mount
+// prefix and the query string, react to history.
 
 import { mount } from './pages/lifecycle.js';
 import { clearViewRefresh } from './state.js';

@@ -1,10 +1,7 @@
-// The states a pane can be in: loading, empty, failed.
+// What a pane shows when it has nothing better: loading, empty, failed.
 //
-// Not application state - that is state.js, a store of facts. This builds the
-// blocks a surface shows when it has nothing better to show.
-//
-// The failure case is why this exists: a bare catch used to leave the surface
-// blank, and a blank pane is indistinguishable from a slow network.
+// A bare catch used to leave the surface blank, and a blank pane is indistinguishable
+// from a slow network.
 import { clear, el, toast } from './ui.js';
 import { emptyState } from './components.js';
 

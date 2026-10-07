@@ -1,13 +1,8 @@
 // Community analytics.
 //
-// Read-only, and deliberately so: every figure here is a count over what other
-// people wrote. Nothing on this page can change anything, and there is no
-// action that mutates the community, because a statistics view that can delete
-// a message is a moderation tool wearing a different hat.
-//
-// The charts are drawn from the server's zero-filled daily series rather than
-// from the messages the client happens to have, so a chart and its totals can
-// never disagree, and a quiet day is a zero rather than a gap.
+// Read-only. Every figure is a count over what other people wrote, and nothing on the
+// page changes anything. Drawn from the server's daily series rather than from the
+// messages the client happens to hold, so a chart and its totals cannot disagree.
 
 import Api from '../api.js';
 import { clear, el, relTime } from '../ui.js';

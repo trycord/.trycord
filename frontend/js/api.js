@@ -1,27 +1,15 @@
-// The HTTP surface.
+// The HTTP surface: 179 one-line endpoint calls over api/core.js.
 //
-// Two things used to be in this file and neither belonged next to the other.
-//
-// api/core.js is how we talk: the request, the timeout, the failover probe, the token,
-// uploads, and the two fetchers that take a path rather than naming one. None of it knows
-// what an endpoint is, and it has no list of them.
-//
-// What is left is the list - 179 one-line calls, one per endpoint. It stays in one file
-// deliberately. Grouping it by resource would mean six files that each hold a fragment of
-// one lookup table and that no one reads whole, in exchange for splitting 440 lines that
-// are already one line each. A flat table of one-liners is not a monolith; the transport
-// underneath it was the part with two jobs.
-//
-// Everything still imports Api from here, so no import in the client changed.
+// Kept in one file on purpose. Grouping it by resource would mean six files each holding
+// a fragment of one lookup table that nobody reads whole. The transport underneath is
+// where the complexity lives, and it has its own file.
 
 import {
   ApiError,
-  base,
   onFailover,
   resetFailoverAnnouncement,
   token,
   setToken,
-  apiBase,
   request,
   xhrUpload,
   fetchProfileImage,
@@ -454,12 +442,10 @@ joinDiscover: (id) =>
 
 export {
   ApiError,
-  base,
   onFailover,
   resetFailoverAnnouncement,
   token,
   setToken,
-  apiBase,
   request,
   xhrUpload,
   fetchProfileImage,

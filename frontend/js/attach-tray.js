@@ -1,12 +1,8 @@
-// The attachment tray above a composer.
+// The attachment tray above a composer, shared by channels and direct messages.
 //
-// One implementation for channels and direct messages: both surfaces attach
-// files the same way, and a second copy would be a second set of bugs. The
-// caller supplies the upload call and gets back the ids that are safe to send.
-//
-// Files are rows rather than a bare id list, because "did that upload?" and
-// "take that one back" both need to be answerable while the reader is looking
-// at the composer.
+// The caller supplies the upload call and gets back the ids that are safe to send. Rows
+// rather than a bare id list, because "did that upload?" and "take that one back" both
+// have to be answerable while the reader is looking at the composer.
 
 import { clear, el, toast } from './ui.js';
 

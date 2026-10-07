@@ -1,24 +1,7 @@
-// The application tree.
+// Builds the application tree. index.html has one element in it; this fills it in.
 //
-// index.html has one element in it. This builds the rest, so the structure is code that
-// can be read, checked and changed rather than markup that has to be diffed by eye.
-//
-//   Application
-//     navigation   the rail: identity, global destinations, communities, the current place
-//     context      the header above the workspace, which changes with the place
-//     workspace    the main landmark, and the element pages render into
-//     secondary    the member panel, present only where the page asks for one
-//     overlays     modals, menus, toasts, the route announcer, connection state
-//     phone        the tab bar
-//
-// There is one tree. The phone presentation is the same tree under a different
-// arrangement - the rail becomes a drawer over it and the tab bar appears below - not a
-// second application with its own landmarks, its own state and its own copy of the same
-// regions.
-//
-// The ids are the contract. The stylesheet addresses these, and so do the region
-// renderers and every page that mounts something beside them, so they are written here
-// once rather than declared in two places that can disagree.
+// The ids are the contract - the stylesheet and every region renderer address them - so
+// they are written once, here.
 
 import { el } from '../ui/dom.js';
 

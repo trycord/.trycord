@@ -1,14 +1,8 @@
-// Navigation.
+// Navigation. Routes live in the path, not the fragment, so a shared link and a refresh
+// are the same request.
 //
-// Routes live in the path. They used to live in the fragment, which is never
-// sent to the server - so a shared fragment link and a refresh were two
-// different behaviours, and two ways to name one route is two ways for them to
-// disagree.
-//
-// adoptLegacyHash() is the only thing left that understands the old form. It
-// upgrades bookmarks; nothing here produces one.
-
-// Not ours - don't treat these as routes.
+// adoptLegacyHash() is the only thing that still understands the old form. It upgrades
+// bookmarks; nothing here produces one.
 const EXTERNAL = /^(https?:|mailto:|tel:|#$|blob:|data:)/i;
 
 // This module is served at /js/nav.js on a self-hosted instance and

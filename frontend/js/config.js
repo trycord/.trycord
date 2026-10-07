@@ -1,13 +1,8 @@
 // Which backend to talk to, and how that answer is reached.
 //
-// The order is deliberate (query arg, localStorage, backend.json, server pin,
-// serving origin, production default) and lives in one place so a self-hoster's
-// pin cannot be quietly overridden by a hardcode a backend origin.
-
-// Production backend. Public configuration — safe to expose, and the
-// hardcoded last resort for a deployment that ships no backend.json. The hosted
-// origin, and the one a failover falls back to, both live in backend.json
-// rather than here, so changing where the primary is does not mean editing code.
+// The order is deliberate (query arg, localStorage, backend.json, server pin, serving
+// origin, production default) and lives here so a self-hoster's pin cannot be quietly
+// overridden by a hardcoded origin.
 export const DEFAULT_BACKEND_URL = 'https://api.trycord.dev';
 const LOCAL_BACKEND_URL = 'http://localhost:9971';
 
@@ -362,6 +357,3 @@ export const TrycordConfig = {
   },
 };
 
-export function BACKEND_URL() {
-  return TrycordConfig.backendUrl();
-}

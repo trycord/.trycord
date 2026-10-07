@@ -1,9 +1,7 @@
-// Link preview cards.
+// Link preview cards, shared by every surface that shows a message.
 //
-// Shared by every surface that shows a message - channel, DM and thread - so a
-// preview is drawn the same way in all of them. The card is rendered from what
-// the server stored, never from a fetch the browser makes itself: a preview is
-// an outbound request, and letting every reader fire one would turn opening a
+// Rendered from what the server stored, never from a fetch the browser makes itself: a
+// preview is an outbound request, and letting every reader fire one would turn opening a
 // channel into a request amplifier against whatever host is linked.
 
 import { el, openLightbox } from './ui.js';

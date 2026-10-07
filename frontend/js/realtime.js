@@ -35,10 +35,6 @@ let joinedDm = null;
 let typingTimer = null;
 let closedIntentionally = false;
 
-function wsUrl(ticket) {
-  return TrycordConfig.wsUrl(ticket);
-}
-
 async function connect() {
   closedIntentionally = false;
   clearTimeout(reconnectTimer);
@@ -56,7 +52,7 @@ async function connect() {
   }
   if (closedIntentionally || !isAuthed()) return;
 
-  ws = new WebSocket(wsUrl(currentTicket));
+  ws = new WebSocket(TrycordConfig.wsUrl(currentTicket));
 
   ws.addEventListener('open', () => {
     reconnectDelay = 1000;

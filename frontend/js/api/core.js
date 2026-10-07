@@ -86,10 +86,6 @@ export function setToken(t) {
   } catch { /* ignore */ }
 }
 
-export function apiBase() {
-  return base();
-}
-
 export async function request(method, path, { body, auth = true, raw = false, form = false } = {}) {
   const url = base() + path;
   const headers = {};
