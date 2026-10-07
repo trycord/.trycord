@@ -2,6 +2,22 @@ import Api from '../api.js';
 import { el, toast } from '../ui.js';
 import { sectionCard, toggleRow, selectRow, setNote } from '../settings-ui.js';
 
+
+const minutesToLabel = (mins) => {
+  const h = Math.floor(mins / 60) % 24;
+  const m = mins % 60;
+  const ampm = h < 12 ? 'am' : 'pm';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')}${ampm}`;
+};
+
+const labelToMinutes = (label) => {
+  const m = /^(\d{1,2}):(\d{2})(am|pm)$/i.exec(String(label || '').trim());
+  if (!m) return null;
+  let h = Number(m[1]) % 12;
+  if (/pm/i.test(m[3])) h += 12;
+  return h * 60 + Number(m[2]);
+};
 export async function renderWellbeingSection() {
   let wellbeing;
   try {

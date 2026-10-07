@@ -3,7 +3,7 @@ import { esc, el, clear, btn } from '../ui.js';
 import { isAuthed } from '../state.js';
 import { navigate } from '../nav.js';
 import State from '../state.js';
-import { mountAuthPage } from './auth.js';
+import { mountAuthPage, authShell } from './auth.js';
 // The published terms and privacy versions. The register form checks the
 // reader accepted the versions that are live now, so it asks this module
 // rather than fetching its own copy.
@@ -28,7 +28,7 @@ export function legalPage(container, kind) {
   const body = el('div', { class: 'pub-prose' });
   body.appendChild(el('p', {},
     'This instance manages its own legal documents. Signing in or registering records your acceptance of the versions this server exposes (v'
-    + esc(legal.termsVersion) + ' terms, v' + esc(legal.privacyVersion) + ' privacy).'));
+    + esc(versions.termsVersion) + ' terms, v' + esc(versions.privacyVersion) + ' privacy).'));
   const cta = el('div', { class: 'pub-links' });
   cta.appendChild(el('a', { class: 'pub-link', href: docPath, 'data-document': '' },
     el('div', { class: 'pub-link__title' }, 'Read the full ' + (titles[kind] || 'document')),

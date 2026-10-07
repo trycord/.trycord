@@ -5,6 +5,22 @@ import { el, clear, toast, btn } from '../ui.js';
 import { sectionHead, sectionCard, settingRow, toggleRow, setNote } from '../settings-ui.js';
 import { renderWellbeingSection } from './wellbeing.js';
 
+
+const PREF_LABELS = {
+  dm: 'Direct messages',
+  mention: 'Mentions',
+  friend: 'Friend requests and activity',
+  moderation: 'Moderation and enforcement',
+  announcement: 'Instance announcements',
+};
+
+const PREF_HINTS = {
+  dm: 'A new direct message.',
+  mention: 'Someone mentions you in a channel.',
+  friend: 'A friend request, or someone accepting one.',
+  moderation: 'An enforcement action affecting your account.',
+  announcement: 'An instance-wide announcement.',
+};
 // `preloaded` is the preferences the caller may already be holding, for the same reason
 // as renderPrivacySection above.
 export async function renderNotificationPrefsSection(body, preloaded) {
