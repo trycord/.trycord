@@ -25,6 +25,8 @@ The eleven questions worth being able to answer without searching.
 | Page definitions | `frontend/js/pages/registry.js` - the one source of truth for every page, route and nav entry. |
 | Navigation | Derived from that registry: `shell.js` for the rail and tab bar, `settings-shell.js` for settings and admin, `community-nav.js` for the community sidebar. Presentation differs; identity does not. |
 | A page | `{id, route, scope, render}`. `handlers.js` attaches the renderer at load via the registry's `bind()`, so a page answers for itself and the registry never imports the twenty modules that draw. |
+| Signed-out surfaces | `frontend/js/public/` - `auth.js`, `legal.js`, `backend.js`. The sign-in screens, the legal documents and the instance picker, which had nothing in common but a file. |
+| Privacy settings | `frontend/js/privacy/` - one module per tab, and `sync.js` for the realtime refresh. Three tabs that shared a save helper and nothing else. |
 | The admin console | `frontend/js/admin/` - the frame plus one module per section, and `admin/pages/` for the public-page editor. Eight lists that shared nothing but a paint sequence number. |
 | Renderers | `frontend/js/pages/handlers.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
 | Lifecycle | `frontend/js/pages/lifecycle.js` - mount, teardown, access gate, per-page error isolation. |
