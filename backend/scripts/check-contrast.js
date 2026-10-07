@@ -119,6 +119,14 @@ const TEXT_ON = [
   ['--t-mut', '--t-base', 4.5, 'muted text in the workspace'],
   ['--t-mut', '--t-base2', 4.5, 'muted text in a rail or sidebar'],
   ['--t-mut', '--t-elev', 4.5, 'muted text on a raised card'],
+  // --t-dim is not a disabled colour. Fifty-odd rules use it for text that is meant to
+  // be read - timestamps, counts, "edited", hints, empty states - and it sat at 2.33:1
+  // on a raised card, which is where a message timestamp actually lives. The token-level
+  // check could not see this: it never looked at --t-dim at all, because the colour check
+  // and the layout check were separate worlds and the bug was in the space between them.
+  ['--t-dim', '--t-base', 4.5, 'de-emphasised text in the workspace'],
+  ['--t-dim', '--t-base2', 4.5, 'de-emphasised text in a rail or sidebar'],
+  ['--t-dim', '--t-elev', 4.5, 'de-emphasised text on a raised card'],
 ];
 
 const allThemes = themes();
