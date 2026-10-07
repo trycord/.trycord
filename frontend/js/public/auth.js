@@ -4,7 +4,7 @@ import { applyAuth } from '../state.js';
 import { renderContextHeader } from '../shell.js';
 import { navigate, route } from '../nav.js';
 import Realtime from '../realtime.js';
-import { AUTH_LOGO } from './legal.js';
+import { AUTH_LOGO, legalVersions } from './legal.js';
 import { renderBackendSelector } from './backend.js';
 // box. There is deliberately NO QR/device-login panel here, because the server
 // exposes no such endpoint - a decorative code scanner would promise a feature
@@ -13,7 +13,7 @@ export function mountAuthPage(page) {
   document.body.appendChild(page);
 }
 
-function authShell({ title, lede, secondary, contextTitle }) {
+export function authShell({ title, lede, secondary, contextTitle }) {
   if (contextTitle) renderContextHeader({ title: contextTitle });
   document.documentElement.dataset.authPage = '1';
   const page = el('div', { class: 'auth-page' });
@@ -213,7 +213,7 @@ export function registerForm(container) {
       'By continuing you agree to the ',
       el('a', { href: '/terms', 'data-document': '', target: '_blank', rel: 'noopener' }, 'Terms of Service'),
       ' and ', el('a', { href: '/privacy', 'data-document': '', target: '_blank', rel: 'noopener' }, 'Privacy Policy'),
-      '. (v' + esc(legal.termsVersion) + ' / v' + esc(legal.privacyVersion) + ')'),
+      '. (v' + esc(legalVersions().termsVersion) + ' / v' + esc(legalVersions().privacyVersion) + ')'),
     submit);
 
   let busy = false;
@@ -230,8 +230,8 @@ export function registerForm(container) {
         password: password.value,
         displayName: display.value.trim() || undefined,
         email: email.value.trim() || undefined,
-        termsVersion: legal.termsVersion,
-        privacyVersion: legal.privacyVersion,
+        termsVersion: legalVersions().termsVersion,
+        privacyVersion: legalVersions().privacyVersion,
       });
       applyAuth(res);
       toast('Account created.', 'ok');

@@ -568,6 +568,9 @@ async function settle(window, ms = 400) {
         problems.push('the view is byte-identical to the previous route, so it never changed');
       }
       if (outcome.viewEmpty) problems.push('#view-root is empty');
+      if (outcome.faultOrigin) {
+        problems.push('the page threw and rendered a fault: ' + outcome.faultOrigin);
+      }
 
       if (problems.length) {
         failures.push(`${page.id} (${url}): ${problems.join('; ')}`);
@@ -1110,6 +1113,18 @@ async function visit(window, document, Router, url, base) {
     })(),
     viewEmpty: (!view || view.children.length === 0)
       && !document.querySelector('body > .auth-page, body > .pub-page'),
+    // A view carrying a fault origin is a page whose renderer threw. The lifecycle marks
+    // those explicitly (data-fault-origin) and it is deliberately distinct from a page
+    // reporting that something does not exist, which is a normal answer and is rendered
+    // by renderRouteError as an empty state with no error class at all.
+    //
+    // This was worth catching: four settings pages rendered "scopeOptions is not defined"
+    // for a whole session without failing anything. Each one had a heading, was not
+    // empty, and had a button on it, which is all this file used to ask for.
+    faultOrigin: (() => {
+      const n = document.querySelector('#view-root [data-fault-origin]');
+      return n ? n.getAttribute('data-fault-origin') : null;
+    })(),
     signature: (view ? view.innerHTML : '').length + ':'
       + Array.from(document.querySelectorAll('h1')).map((h) => h.textContent.trim()).join('|'),
   };

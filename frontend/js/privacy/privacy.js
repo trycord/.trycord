@@ -4,6 +4,24 @@ import { can } from '../state.js';
 import { el, clear, toast, openModal, btn } from '../ui.js';
 import { sectionHead, sectionCard, settingRow, toggleRow, selectRow, setEmpty, setNote, dangerButton } from '../settings-ui.js';
 
+
+// The server's vocabulary. Presence historically stored 'everyone' where the
+// request gates stored 'anyone'; the server now accepts both and canonicalises
+// to 'anyone' on read, so a stored value can still arrive as either and must
+// render as the same sentence either way.
+const SCOPE_HELP = {
+  anyone: 'Anyone on this instance',
+  everyone: 'Anyone on this instance',
+  friends: 'People you have accepted',
+  nobody: 'Nobody',
+};
+
+// An unrecognised value shows itself rather than rendering as nothing. A blank
+// sentence reads as "nobody" and means the opposite.
+const scopeText = (v) => SCOPE_HELP[v] || ('unrecognised value: ' + v);
+
+const scopeOptions = ['anyone', 'friends', 'nobody'].map((v) => ({ value: v, label: SCOPE_HELP[v] }));
+
 function fact(key, value) {
   const row = el('div', { class: 'kv-row' });
   row.appendChild(el('dt', { class: 'kv-key' }, key));
