@@ -287,6 +287,73 @@ async function waitForHealth(child, attempts) {
     const peekMessages = await call('GET', '/api/channels/' + cid + '/messages?limit=5', undefined, other);
     ok("one account cannot read another's messages", peekMessages.status === 403);
 
+    // Reading across the boundary was already refused. Writing is the sharper case and
+    // was not covered at all: an outsider who cannot read a channel must not be able to
+    // post into it, edit a message in it, or delete one. A permission check on the
+    // read path that is missing from the write path looks identical from here and is
+    // the most consequential way to get this wrong.
+    // A message of its own, because the flow deleted the earlier one by this point and a
+    // survival check against an empty channel proves nothing.
+    const guard = await call('POST', '/api/channels/' + cid + '/messages',
+      { content: 'the owner wrote this' }, token);
+    const guardId = guard.json && guard.json.id;
+    ok('a message to guard exists', guard.status === 200 && !!guardId);
+
+    const outsiderPost = await call('POST', '/api/channels/' + cid + '/messages',
+      { content: 'should never land' }, other);
+    ok("one account cannot post to another's channel",
+      outsiderPost.status === 403, 'status ' + outsiderPost.status);
+
+    const outsiderEdit = await call('PATCH', '/api/channels/' + cid + '/messages/' + guardId,
+      { content: 'hijacked' }, other);
+    ok("one account cannot edit another's message", outsiderEdit.status === 403,
+      'status ' + outsiderEdit.status);
+
+    const outsiderDelete = await call('DELETE', '/api/channels/' + cid + '/messages/' + guardId,
+      undefined, other);
+    ok("one account cannot delete another's message", outsiderDelete.status === 403,
+      'status ' + outsiderDelete.status);
+
+    const stillMine = await call('GET', '/api/channels/' + cid + '/messages?limit=10', undefined, token);
+    const kept = stillMine.json && stillMine.json.find((m) => m.id === guardId);
+    ok('the message survived all three attempts',
+      !!kept && kept.content === 'the owner wrote this',
+      stillMine.json ? JSON.stringify(stillMine.json.map((m) => m.content)) : 'nothing readable');
+    ok("the outsider's message never landed",
+      !stillMine.json || !stillMine.json.some((m) => m.content === 'should never land'));
+
+    // A malformed id must not be a different answer than a wrong one. Anything that
+    // reaches the database with a raw identifier is worth knowing about here.
+    const malformed = await call('GET', '/api/channels/..%2F..%2Fetc/messages', undefined, token);
+    ok('a traversal in a channel id is refused', malformed.status >= 400 && malformed.status < 500,
+      'status ' + malformed.status);
+
+    console.log('\n  sign-in, and what ends a session');
+    // Registration was covered; the return trip was not. A client that can register but
+    // cannot log in is not an application anyone can use.
+    const signedIn = await call('POST', '/api/auth/login',
+      { username: 'flowuser', password: 'correct-horse-battery-staple' });
+    const signedInToken = signedIn.json && signedIn.json.token;
+    ok('an existing account can sign in', signedIn.status === 200 && !!signedInToken,
+      'status ' + signedIn.status);
+
+    const afterSignIn = await call('GET', '/api/me', undefined, signedInToken);
+    ok('the new session identifies its owner',
+      afterSignIn.status === 200 && afterSignIn.json
+      && afterSignIn.json.username === 'flowuser');
+
+    const wrongPassword = await call('POST', '/api/auth/login',
+      { username: 'flowuser', password: 'not-the-password' });
+    ok('a wrong password is refused', wrongPassword.status === 401,
+      'status ' + wrongPassword.status);
+
+    const signedOut = await call('POST', '/api/auth/logout', undefined, signedInToken);
+    ok('a session can be ended', signedOut.status === 200, 'status ' + signedOut.status);
+
+    const afterSignOut = await call('GET', '/api/me', undefined, signedInToken);
+    ok('an ended session no longer authenticates',
+      afterSignOut.status === 401, 'status ' + afterSignOut.status);
+
     console.log('\n  do-not-disturb does not lose notifications');
     // Quiet hours and DND hold the realtime push. The row is still written, which is
     // the part that can go wrong quietly: skipping the insert would look identical
@@ -354,6 +421,14 @@ async function waitForHealth(child, attempts) {
 
   console.log('');
   if (failures) {
+    // The server's own output is the only place a thrown exception is visible, and it
+    // was being discarded unless the server never came up at all. A 500 from one route
+    // with the stack sitting in a variable three hundred lines away is not a diagnosis.
+    const noise = log.join('').split('\n')
+      .filter((l) => l.trim() && !/^\s*(listening|ready|\[trycord\]\s*(boot|ok))/.test(l));
+    if (noise.length) {
+      console.error('\n  server output:\n' + noise.slice(-40).map((l) => '    ' + l).join('\n'));
+    }
     console.error(`flow check FAILED - ${failures} of ${checks} assertions failed`);
     process.exit(1);
   }

@@ -157,6 +157,16 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
           const name = n.trim().split('=')[0].split(':').pop().trim();
           if (/^\w+$/.test(name)) defined.add(name);
         }
+        // A destructured parameter binds every name in its braces, and splitting the
+        // argument list on commas recovers only the pieces either side of them -
+        // `renderAdminPages(container, { route } = {})` yields "{ route } = {}" and
+        // "route" was being reported as an unbound borrow of nav.js's route().
+        for (const braces of m[1].matchAll(/\{([^{}]*)\}/g)) {
+          for (const n of braces[1].split(',')) {
+            const name = n.trim().split('=')[0].split(':').pop().trim();
+            if (/^\w+$/.test(name)) defined.add(name);
+          }
+        }
       }
     }
 
