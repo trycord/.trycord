@@ -10,6 +10,12 @@ import { layoutUsesSidebar, layoutUsesMembers } from '../layout.js';
 import { matchRoute, railPages, mobilePages } from '../pages/registry.js';
 import { renderCommunityContext } from '../community-nav.js';
 
+
+// Throttle for the home sidebar: it refreshes the community list on a timer, and a
+// route change mid-interval should not start a second one.
+
+let homeRefreshAt = 0;
+let homeRefreshOn = false;
 // The place column: whatever list belongs beside the current route.
 
 export function refreshHomeSidebar(region) {

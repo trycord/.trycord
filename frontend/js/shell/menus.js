@@ -1,3 +1,6 @@
+// Row menus. Together on purpose: a menu that works for a pointer and not a
+// keyboard, or here and not there, is the bug this grouping prevents.
+
 import { repaintChrome } from './repaint.js';
 import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from '../ui.js';
 import Api from '../api.js';

@@ -1,7 +1,7 @@
 const express = require('express');
 
 const router = express.Router();
-const sessionsService = require('../../services/sessions');
+const sessions = require('../../services/sessions');
 const { disconnectUser } = require('../../auth/gateway');
 
 const db = require('../../db');
