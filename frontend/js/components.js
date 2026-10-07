@@ -477,3 +477,10 @@ export function paintReactions(bar, list, onReact) {
 }
 
 export default { avatar, navRow, serverChip, emptyState, messageRow, paintReactions, initialOf, hashColor };
+
+// A status as a badge. Slugified so a status can style itself without every caller
+// knowing the class name - OPEN and UNDER_REVIEW are both rendered here.
+export function statusChip(status, text) {
+  const cls = String(status).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return el('span', { class: 'status-chip ' + cls }, text || String(status).replace(/_/g, ' '));
+}
