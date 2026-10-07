@@ -391,6 +391,28 @@ the rewritten one, so the client talks to `api.trycord.dev` and every request co
 back 401. `check-render.js` pins `trycord.backendUrl` and refuses any request to a
 port it does not own.
 
+### What was swept for, and what was found
+
+The brief asks for development debris to be hunted before completion, inspecting each
+hit rather than deleting on sight. The result:
+
+- **No TODO, FIXME, XXX or HACK** anywhere in shipped source. The ten apparent matches
+  were the substring "todo" inside `applyWellbeingToDocument`.
+- **No `console.log` debris in the client.** The five in `frontend/js` are `[trycord]`
+  error and warning diagnostics, each wrapped so a locked-down webview with no console
+  cannot take the page down.
+- **Every `console.log` in the backend is structured operational output** - `[info]`
+  startup lines, `[security]` account events, `[mail]` delivery, `[schema]` backfills.
+  That is a server's job, not debris.
+- **The one dead field found was `parent` on the dms conversation page**, removed, and
+  the mechanism that actually does the job written in its place.
+- **One piece of dead CSS**, `.tab-button__dot`, replaced with the tab-bar count it was
+  standing in for.
+
+A useful near-miss: an earlier sweep matched 61 occurrences of "hack" and 174 of
+"placeholder". Both were a gitignored local build of the desktop client left over from an
+earlier session, not repository content.
+
 ### What cannot be verified here, and why
 
 Chromium is installed and `--dump-dom` works against `about:blank`, but any `http://`
