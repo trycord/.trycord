@@ -185,11 +185,15 @@ export function renderTwoFactorSection(wrap) {
   }
 }
 
-export function renderSessionsSection(wrap) {
+// `preloaded` is a promise of the sessions the caller has already asked for. The Security
+// page needs them twice - once for this list and once for the sidebar beside it - and
+// passing the same promise means one request rather than two.
+export function renderSessionsSection(wrap, preloaded) {
   wrap.appendChild(el('div', { class: 'section-label' }, 'Sessions'));
   const host = el('div');
   wrap.appendChild(host);
-  loadSessions(host);
+  if (preloaded) paintSessions(host, preloaded);
+  else loadSessions(host);
 
   // Bulk revocation stays, because it is a real answer to "I do not know which
   // one is wrong", but it is no longer the only answer.
@@ -231,7 +235,36 @@ export function renderSessionsSection(wrap) {
 
 // Loaded here rather than by the caller: the sessions list is the only
 // thing that has to wait on it, and it is called from exactly one place.
+// One in-flight load. The Security page fetches sessions for its sidebar and this
+// section fetches them for its own list, in the same paint, so every visit to
+// /settings/security asked the server for the same thing twice.
+let sessionsInFlight = null;
+
 async function loadSessions(host) {
+  if (sessionsInFlight) return sessionsInFlight;
+  const run = fetchSessions(host).finally(() => { sessionsInFlight = null; });
+  sessionsInFlight = run;
+  return run;
+}
+
+// Paint a list from a promise of sessions, whichever promise it is.
+async function paintSessions(host, sessionsPromise) {
+  clear(host);
+  host.appendChild(loadingState('Loading your sessions'));
+  let sessions;
+  try {
+    sessions = await sessionsPromise;
+  } catch (ex) {
+    clear(host);
+    host.appendChild(errorState((ex && ex.message) || 'Could not load your sessions.', () => {
+      loadSessions(host);
+    }));
+    return;
+  }
+  renderSessionRows(host, sessions);
+}
+
+async function fetchSessions(host) {
   clear(host);
   host.appendChild(loadingState('Loading your sessions'));
   let sessions;
@@ -245,6 +278,12 @@ async function loadSessions(host) {
     }));
     return;
   }
+  renderSessionRows(host, sessions);
+}
+
+// Paint the session rows. A fresh fetch and a promise the caller already had both
+// arrive here, so the list looks the same whichever way it came.
+function renderSessionRows(host, sessions) {
   clear(host);
   if (!sessions.length) {
     host.appendChild(setEmpty('No sessions.'));
@@ -277,5 +316,6 @@ async function loadSessions(host) {
   }
   host.appendChild(card);
 }
+
 
 export default { renderPasswordSection, renderTwoFactorSection, renderSessionsSection };

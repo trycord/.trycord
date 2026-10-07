@@ -1,5 +1,5 @@
 import State, {
-  refreshServers, refreshActivity, refreshDms, refreshNotifications, refreshFriends,
+  refreshActivity, refreshDms, refreshNotifications, refreshFriends,
 } from '../state.js';
 import { esc, el, clear, plural, relTime } from '../ui.js';
 import { avatar, communityMark, emptyState } from '../components.js';
@@ -191,14 +191,14 @@ export async function renderHome(container) {
   const results = await Promise.allSettled([
     refreshActivity(),
     refreshDms(),
-    refreshServers(),
     refreshNotifications(),
     refreshFriends(),
   ]);
   const activity = results[0].status === 'fulfilled' ? results[0].value : State.activity;
   const dmList = results[1].status === 'fulfilled' ? results[1].value : State.dms;
-  const servers = results[2].status === 'fulfilled' ? results[2].value : State.servers;
-  const notifications = results[3].status === 'fulfilled' ? results[3].value : State.notifications;
+  // Already refreshed by the lifecycle for every signed-in page.
+  const servers = State.servers;
+  const notifications = results[2].status === 'fulfilled' ? results[2].value : State.notifications;
   // refreshFriends() resolves the whole state object, not an {incoming} payload.
   const friendsIn = State.friendsIn || [];
 

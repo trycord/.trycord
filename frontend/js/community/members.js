@@ -8,7 +8,7 @@ import { errorState, loadingState, onStale } from '../view-states.js';
 import { renderContextHeader, memberActions } from '../shell.js';
 import { openRoleAssignModal, rolePill } from '../role-assignment.js';
 import { userNameButton } from '../user-actions.js';
-import { ensureServer } from '../workspace-shared.js';
+import { ensureServer, reloadServer } from '../workspace-shared.js';
 import { navigate } from '../nav.js';
 
 function memberTopRole(m) {
@@ -135,7 +135,6 @@ async function renderServerMembers(container, serverId) {
   try { ({ detail: server } = await ensureServer(serverId)); }
   catch (ex) { opening.remove(); container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
   renderContextHeader({ title: 'Members', sub: server.name });
-  opening.remove();
   const wrap = el('div', { class: 'page community-manager' });
   const counts = el('div', { class: 'stat-inline' });
   wrap.appendChild(counts);
@@ -157,28 +156,50 @@ async function renderServerMembers(container, serverId) {
   wrap.appendChild(toolbar);
 
   const list = el('div', { class: 'community-list' });
+  // paint() clears this list first, so the spinner is replaced by rows rather than
+  // sitting above them.
+  list.appendChild(loadingState('Loading members'));
   wrap.appendChild(list);
   const banSection = el('div', {});
   let bansFailed = false;
+  // Only when the viewer can see bans at all - otherwise nothing would ever clear it.
+  if (can('BAN_MEMBERS')) banSection.appendChild(loadingState('Loading bans'));
   wrap.appendChild(banSection);
 
-  const reload = async () => {
-    await ensureServer(serverId);
-    if (can('BAN_MEMBERS')) {
-      try {
-        await refreshBans();
-        bansFailed = false;
-      } catch {
-        // Keeping the previous value is right - a stale ban list is still a real
-        // one - but on a first load there is no previous value, and paint() then
-        // renders 'No active bans.' That is a moderator being told nobody is
-        // banned when the request is what would have told them so.
-        bansFailed = !(State.bans && State.bans.length);
-      }
+  const loadBans = async () => {
+    if (!can('BAN_MEMBERS')) return;
+    try {
+      await refreshBans();
+      bansFailed = false;
+    } catch {
+      // Keeping the previous value is right - a stale ban list is still a real
+      // one - but on a first load there is no previous value, and paint() then
+      // renders 'No active bans.' That is a moderator being told nobody is
+      // banned when the request is what would have told them so.
+      bansFailed = !(State.bans && State.bans.length);
     }
+  };
+
+  // Three steps, in increasing cost, and the difference between them is the difference
+  // between answering a question and re-asking it:
+  //
+  //   paint    - draw what state already holds. A filter change, a sort, a new keystroke.
+  //   refresh  - the community is already in state and the live-event handlers have
+  //     refetched whatever changed, so only the bans need reading. Five requests to
+  //     learn nothing is what re-entering the community here would cost.
+  //   reload   - someone just kicked a member, lifted a ban or changed a role from this
+  //     page, and until the community is read again the list they are looking at is a
+  //     picture of a state that no longer exists.
+  const refresh = async () => {
+    await loadBans();
     paint();
   };
-  setViewRefresh(() => { reload().catch(onStale('Members')); });
+
+  const reload = async () => {
+    await reloadServer(serverId);
+    await refresh();
+  };
+  setViewRefresh(() => { refresh().catch(onStale('Members')); });
 
   const paint = () => {
     clear(list);
@@ -355,14 +376,20 @@ async function renderServerMembers(container, serverId) {
       banSection.appendChild(blist);
     }
   };
-  const repaint = () => paint();
-  search.addEventListener('input', repaint);
-  roleFilter.addEventListener('change', repaint);
-  presFilter.addEventListener('change', repaint);
-  botsOnly.addEventListener('change', repaint);
-  sortSel.addEventListener('change', repaint);
-  await reload();
+  // The filters are a view concern over data that is already here, so they redraw
+  // rather than refetch.
+  search.addEventListener('input', paint);
+  roleFilter.addEventListener('change', paint);
+  presFilter.addEventListener('change', paint);
+  botsOnly.addEventListener('change', paint);
+  sortSel.addEventListener('change', paint);
+  // The page goes up before the data it fills arrives. Tearing down the "Opening
+  // community" state and only then awaiting the first fetch left the container empty for
+  // the length of the bans request, which reads as a page that failed rather than one
+  // that is working.
   container.appendChild(wrap);
+  opening.remove();
+  await refresh();
 }
 
 // Role management, as a hierarchy rather than a permission checklist.
