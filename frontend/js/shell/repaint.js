@@ -1,9 +1,5 @@
-// Asking for the chrome to be repainted.
-//
-// The painter is registered by shell.js rather than imported, because every module that
-// changes visible state needs this and the painter needs every module. Wiring it here
-// means the dependency runs one way: a module knows that repaints exist, and shell.js
-// knows how to do one.
+// The chrome painter, registered by shell.js. Modules ask for a repaint here
+// rather than importing the thing that repaints.
 
 let painter = null;
 

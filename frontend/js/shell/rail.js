@@ -173,5 +173,3 @@ async function signOut() {
   navigate(route('/login'));
 }
 
-let homeRefreshAt = 0;
-let homeRefreshOn = false;
