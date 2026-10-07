@@ -7,9 +7,8 @@
 import Api from '../api.js';
 import State, { mustVerifyToPost } from '../state.js';
 import { el, clear, toast, confirmDialog } from '../ui.js';
-import { avatar, loadAuthedImage, invalidateAuthedImage } from '../components.js';
+import { avatar, loadAuthedImage, invalidateAuthedImage, statusChip } from '../components.js';
 import { renderAllChrome } from '../shell.js';
-import { statusChip } from '../admin/admin.js';
 
 const DELETION_STATUS_TEXT = {
   DELETION_REQUESTED: 'Requested. An administrator will review it.',
