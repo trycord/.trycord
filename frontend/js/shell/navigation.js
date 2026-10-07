@@ -246,24 +246,12 @@ export function notificationsContext(region) {
   });
 }
 
-// Privacy Policy are full document loads at /terms and /privacy, not hash
-// queue - an admin reaches it deliberately, not while triaging - so it lives
-// current destination is never hidden behind a collapsed control.
-
-const ADMIN_OVERFLOW = [
-  { label: 'Announcements', path: '/admin/announcements' },
-];
-
-const adminSectionActive = (s, route) => (s.exact ? route === s.path : (route === s.path || route.startsWith(s.path + '/')));
-
 // Which sidebar the shell paints, asked of the page registry rather than guessed
 // from the path.
 //
-// This used to be eleven route comparisons in a row, which is a second opinion on
-// what page you are on and had already drifted: three of the types it returned -
-// discover, support and profile - no longer had a case to render them, so they
-// silently fell through to the messages list. The registry already knows, per page,
-// whether it has a contextual sidebar and which one.
+// This used to be eleven route comparisons in a row, and had already drifted: three of
+// the types it returned - discover, support and profile - no longer had a case to render
+// them, so they silently fell through to the messages list.
 export function sidebarContext() {
   const hit = matchRoute(compose().route || '/');
   if (!hit || !hit.page.sidebar) return { type: 'dms' };
