@@ -30,6 +30,8 @@ The eleven questions worth being able to answer without searching.
 | API calls | `frontend/js/api.js`. One `request()`, no per-feature clients. |
 | Message state | `messages/dm-thread.js` and `community/conversation.js`, each owning its own feed and subscriptions, torn down on the way out. |
 | Community context | `state.js` - `currentServerId`, plus `workspace-shared.js` for the realtime wiring that keeps it fresh. |
+| Data model | `db/tables/` - one module per concern: identity, communities, messaging, social, moderation, instance. |
+| Schema migrations | `db/schema.js` - the ALTER and MODIFY lists that bring an existing database up to date, the declared indexes, the backfills. |
 | Database access | `db/index.js`, which is the only module that speaks SQL dialect. |
 | Notification preferences, quiet hours, sessions | `services/prefs.js`, `services/wellbeing.js`, `services/sessions.js` - each its own module, not three more things inside `services/privacy.js`. |
 | Instance configuration | `db/config.js` and the `instanceConfig()` in `server.js`. Every deployment fact is an environment variable, documented in `backend/.env.example`. |
