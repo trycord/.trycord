@@ -5,7 +5,7 @@ the code alone does not explain. It is reference, not a plan and not a log.
 
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
-client segments are served; `npm run check:flows` boots a server and passes 42
+client segments are served; `npm run check:flows` boots a server and passes 54
 assertions against real flows; `npm run check:render` boots a server and renders all
 40 routable pages in jsdom, passing 51 assertions over 1151 interactive controls;
 `npm run check:realtime` puts two accounts on two sockets and confirms a message
@@ -19,9 +19,13 @@ The eleven questions worth being able to answer without searching.
 
 | | |
 |---|---|
+| The application tree | `frontend/js/shell/tree.js` - builds it into the one element in `index.html`. The document itself has nothing in it but metadata and a mount point. |
+| What is on screen | `frontend/js/shell/compose.js` - one function, called once before any region draws, returning mode, width, route, state and whether each region exists. The regions read that and nothing else decides on its own. |
 | Routing | `frontend/js/router.js` - parses `location`, calls `mount`. Longest-prefix matching, no hash. |
 | Page definitions | `frontend/js/pages/registry.js` - the one source of truth for every page, route and nav entry. |
 | Navigation | Derived from that registry: `shell.js` for the rail and tab bar, `settings-shell.js` for settings and admin, `community-nav.js` for the community sidebar. Presentation differs; identity does not. |
+| A page | `{id, route, scope, render}`. `handlers.js` attaches the renderer at load via the registry's `bind()`, so a page answers for itself and the registry never imports the twenty modules that draw. |
+| The admin console | `frontend/js/admin/` - the frame plus one module per section, and `admin/pages/` for the public-page editor. Eight lists that shared nothing but a paint sequence number. |
 | Renderers | `frontend/js/pages/handlers.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
 | Lifecycle | `frontend/js/pages/lifecycle.js` - mount, teardown, access gate, per-page error isolation. |
 | Authentication state | `frontend/js/state.js`. The token is in `api.js`; everything else reads `State.me`. |
@@ -173,7 +177,12 @@ connection error.
 | `npm run check:headings` | one `h1` per surface; a page that adds its own beside the context header's fails |
 | `npm run check:render` | **renders every route in jsdom** against a real backend, and checks accessible names, the phone composition and themes |
 | `npm run check:realtime` | **two clients, two sockets** - one person's message reaches somebody else's open tab and is still there after a reload |
-| `npm run check:shots` | photographs every surface at eight widths in a real browser; skips where the browser cannot load `http` |
+| `npm run check:shots` | photographs every surface at eight widths in a real browser; skips where t
+| `node scripts/check-sibling-bindings.js` | a module in a split directory references a name a sibling exports, without importing it |
+| `node scripts/check-require-aliases.js` | a service is called by a name it was not bound to, is imported where it is not exported, or is called bare and never imported |
+| `node scripts/check-crash-recovery.js` | the crash surface recovers by itself from a half-updated module graph, and does not reload for an ordinary fault |
+| `node scripts/check-signin.js` | a correct password returns a token. A regression test for the sign-in bug below, which no other check could see |
+| `npm run db:backup` | dumps the live database read-only and verifies the dump against what the server reported |he browser cannot load `http` |
 
 `check:client` exists because `node --check` on a `.js` client file reports success
 for a file containing `import` statements even when the body has a duplicate
@@ -189,6 +198,22 @@ read exactly like it.
 
 It checks same-file duplication only. Two routers mounted at the same prefix is ordinary
 — Express composes them — and so is a route declared in one file and re-exported.
+
+`check-require-aliases.js` exists because of one bug that the rest of the suite walked past
+twice. `routes/auth/issued.js` defined a function called `issued` and did not export it,
+so `login.js` destructured `undefined` out of a module that resolved perfectly, and every
+successful sign-in answered 500 with nothing in the log but `issued is not a function`.
+`sessions.js` called `issued` with no import at all. Neither the binding checks nor 54
+flow assertions saw either, because both ask about names that appear bare or as
+`service.member`, and this is a named import of something that does not exist.
+
+The check answers three questions: is a require bound to a name the file then calls by a
+different one; is a name called that nothing in the file binds, whether it is `obj.member`
+or a bare call; and does a destructured import actually exist in the target. It got two of
+those wrong before it was right, both recorded in the file - it excluded "built-ins" with
+a pattern that matched any lowercase word, so it skipped exactly the modules it was
+written for, and it stripped comments with its own regexes, which is the third time this
+repository has been bitten by that.
 
 `check-server-bindings` and `check:client-bindings` exist because every other check
 verifies that an import *resolves*. None of them notices a name that is simply absent —
