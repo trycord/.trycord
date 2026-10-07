@@ -12,7 +12,6 @@ const rateLimit = require('../../middleware/ratelimit');
 // Verify a recovery email address.
 router.post('/verify-email', rateLimit({ windowMs: 60000, max: 10 }), async (req, res, next) => {
   try {
-    const recovery = require('../auth/recovery');
     res.json(await recovery.verifyEmail((req.body || {}).token));
   } catch (e) { serviceError(res, e); }
 });
@@ -21,7 +20,6 @@ router.post('/verify-email', rateLimit({ windowMs: 60000, max: 10 }), async (req
 // so the address can't be probed anonymously).
 router.post('/verify-email/resend', auth, rateLimit({ windowMs: 60000, max: 5 }), async (req, res, next) => {
   try {
-    const recovery = require('../auth/recovery');
     res.json(await recovery.requestVerification(req.user.id, (req.body || {}).email));
   } catch (e) { serviceError(res, e); }
 });
@@ -29,7 +27,6 @@ router.post('/verify-email/resend', auth, rateLimit({ windowMs: 60000, max: 5 })
 // Change recovery email: password-confirmed here, applied on verification.
 router.post('/change-email', auth, rateLimit({ windowMs: 60000, max: 10 }), async (req, res, next) => {
   try {
-    const recovery = require('../auth/recovery');
     res.json(await recovery.requestEmailChange(req.user.id, (req.body || {}).currentPassword, (req.body || {}).newEmail));
   } catch (e) { serviceError(res, e); }
 });
