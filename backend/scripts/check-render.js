@@ -24,6 +24,7 @@
 //   node scripts/check-render.js --seed             create the throwaway account
 
 const fs = require('fs');
+const { mkdirSync, writeFileSync } = fs;
 const path = require('path');
 const http = require('http');
 
@@ -490,6 +491,40 @@ async function settle(window, ms = 400) {
     const targets = wanted
       ? routable.filter((p) => p.path === wanted || p.id === wanted)
       : routable;
+
+    // Hand the rendered surfaces to something that can measure them.
+    //
+    // jsdom has no layout engine, so everything this file can say about a page stops at
+    // the DOM: it cannot tell you that a sidebar is 40px wider than the viewport, that a
+    // button is 12px tall, or what colour text actually ends up on once the cascade has
+    // had its way with it. A real browser can answer all three, and the browser in this
+    // environment cannot fetch over http - so rather than have it fetch, this mode writes
+    // out the finished DOM and the layout check feeds that to Chromium with the real
+    // stylesheet. One render, measured twice, instead of a second implementation of the
+    // app.
+    const emitDir = process.argv.includes('--emit-dom')
+      ? process.argv[process.argv.indexOf('--emit-dom') + 1]
+      : null;
+    if (emitDir) {
+      mkdirSync(emitDir, { recursive: true });
+      const manifest = [];
+      for (const page of targets) {
+        const url = concrete(page.path, world);
+        const outcome = await visit(window, document, Router, url, base);
+        const root = document.getElementById('view-root');
+        const html = (document.documentElement.outerHTML || '').replace(
+          /<script[\s\S]*?<\/script>/g, ''
+        );
+        const file = path.join(emitDir, page.id.replace(/[^a-z0-9._-]+/gi, '_') + '.html');
+        writeFileSync(file, '<!doctype html>\n' + html);
+        manifest.push({ id: page.id, path: page.path, url, file, error: outcome.error || null });
+        console.log('    wrote ' + page.id + (outcome.error ? '  <- ' + outcome.error : ''));
+      }
+      writeFileSync(path.join(emitDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
+      console.log('\n  wrote ' + manifest.length + ' surfaces to ' + emitDir);
+      await boot1.stop();
+      process.exit(0);
+    }
 
     if (!wanted) {
       ok('there are routable pages to render', targets.length > 10, targets.length + ' found');
