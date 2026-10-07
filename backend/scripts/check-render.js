@@ -152,7 +152,24 @@ async function boot({ seed = false } = {}) {
     runScripts: 'outside-only',
     pretendToBeVisual: true,
   });
+
   const { window } = dom;
+
+  // Record which elements were given an event listener, so a control that does nothing
+  // can be caught. The DOM does not expose registered listeners and jsdom has no
+  // equivalent of the inspector's getEventListeners, and addEventListener is the only
+  // place a handler can appear - including the onClick shorthand that every el() call
+  // with a handler goes through. Patching the prototype catches all of them at once.
+  const wired = new WeakMap();
+  const original = window.EventTarget.prototype.addEventListener;
+  window.EventTarget.prototype.addEventListener = function (type, fn, opts) {
+    if (fn) {
+      let seen = wired.get(this);
+      if (!seen) { seen = new Set(); wired.set(this, seen); }
+      seen.add(String(type).toLowerCase());
+    }
+    return original.call(this, type, fn, opts);
+  };
 
   // jsdom implements neither of these and the shell uses both.
   if (!window.matchMedia) {
@@ -167,6 +184,7 @@ async function boot({ seed = false } = {}) {
   return {
     window,
     document: window.document,
+    wired,
     log: () => log,
     stop: () => new Promise((r) => { child.once('exit', r); child.kill('SIGTERM'); }),
     dbDir,
@@ -460,6 +478,25 @@ async function settle(window, ms = 60) {
     ok('every interactive control has an accessible name', unnamed.length === 0,
       unnamed.slice(0, 4).join(' | '));
     console.log(`    ${controls} controls checked across ${targets.length} pages`);
+
+    // ---- dead controls ----
+    //
+    // The brief's rule: every visible control either works or does not exist. Nothing in
+    // the DOM can tell you whether a button has a handler - jsdom exposes no listener
+    // registry - so the window was instrumented at boot and every addEventListener
+    // recorded. A button with no listener on it, and none on any ancestor that could be
+    // delegating, and no form to submit, is a control that does nothing.
+    console.log('\n  controls that do nothing');
+    const dead = [];
+    for (const page of targets) {
+      const url = concrete(page.path, world);
+      await visit(window, document, Router, url, base);
+      for (const fault of deadControls(document, boot1.wired)) {
+        dead.push(`${page.id}: ${fault}`);
+      }
+    }
+    ok('no visible control is inert', dead.length === 0, dead.slice(0, 5).join(' | '));
+    console.log(`    ${dead.length} inert control(s) across ${targets.length} pages`);
 
     // ---- the phone composition ----
     //
@@ -806,4 +843,40 @@ function accessibilityFaults(document) {
 
 function countControls(document) {
   return document.querySelectorAll('button, a[href], input, select, textarea').length;
+}
+
+/**
+ * Buttons that would do nothing if pressed.
+ *
+ * A button counts as wired when it has a listener of its own, or when an ancestor does
+ * and the container is delegating by selector - which this codebase does in several
+ * places, so a missing listener on the button is not by itself a fault. Inside a form a
+ * button is not dead either: submitting is what it does.
+ *
+ * A disabled button is excluded deliberately. "Save" while the request is in flight is
+ * inert on purpose, and reporting it would be a check that cries wolf.
+ */
+function deadControls(document, wired) {
+  const faults = [];
+  const hasListener = (node, types) => {
+    for (let n = node; n && n.nodeType === 1; n = n.parentElement) {
+      const seen = wired.get(n);
+      if (!seen) continue;
+      for (const t of types) if (seen.has(t)) return true;
+    }
+    return false;
+  };
+
+  for (const btn of document.querySelectorAll('button')) {
+    if (btn.closest('[hidden]') || btn.disabled) continue;
+    const inForm = btn.closest('form');
+    const type = (btn.getAttribute('type') || (inForm ? 'submit' : '')).toLowerCase();
+    if (inForm && (type === 'submit' || type === 'reset' || type === 'image')) continue;
+    if (hasListener(btn, ['click', 'pointerdown', 'mousedown', 'keydown', 'keyup'])) continue;
+    const name = (btn.textContent || '').trim().slice(0, 30)
+      || btn.getAttribute('aria-label') || btn.className || '(unlabelled)';
+    faults.push('<' + String(name).replace(/\s+/g, ' ') + '> in '
+      + (btn.className || 'no class') + ' has no handler');
+  }
+  return faults;
 }
