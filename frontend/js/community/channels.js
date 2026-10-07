@@ -6,7 +6,7 @@ import { clear, confirmDialog, el, openModal, toast } from '../ui.js';
 import { emptyState } from '../components.js';
 import { renderContextHeader } from '../shell.js';
 import { openOverrideEditor } from '../permission-overrides.js';
-import { ensureServer } from '../workspace-shared.js';
+import { ensureServer, reloadServer } from '../workspace-shared.js';
 import { channelPath } from '../links.js';
 import { navigate } from '../nav.js';
 import { onStale } from '../view-states.js';
@@ -128,7 +128,9 @@ async function renderServerCategories(container, serverId) {
   const add = el('button', { class: 'btn primary', type: 'button' }, 'Add category');
   createRow.append(input, add); wrap.appendChild(createRow);
   const list = el('div', { class: 'community-list' }); wrap.appendChild(list);
-  const reload = async () => { await ensureServer(serverId); paint(); };
+  // Force: every caller of this has just changed the channel layout, so serving the
+  // cached entry would repaint the layout that was just replaced.
+  const reload = async () => { await reloadServer(serverId); paint(); };
   setViewRefresh(() => { reload().catch(onStale('Channels')); });
   const paint = () => {
     clear(list);

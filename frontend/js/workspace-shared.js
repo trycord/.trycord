@@ -2,7 +2,9 @@ import Api from './api.js';
 import State from './state.js';
 import Realtime from './realtime.js';
 
-import { currentServerId, enterServer, isAuthed, leaveServerContext, refreshServerView } from './state.js';
+import {
+  currentServerId, enterServer, reloadServer, isAuthed, leaveServerContext, refreshServerView,
+} from './state.js';
 import { showEmojiPicker, toast } from './ui.js';
 import { onStale } from './view-states.js';
 import { renderAllChrome, currentRoute } from './shell.js';
@@ -77,10 +79,12 @@ function wireCommunityEvents() {
 }
 wireCommunityEvents();
 
+// The catch-then-rethrow this used to wrap is gone: it rethrew exactly what it was
+// given. What matters is that these two are different functions and callers pick
+// deliberately - ensureServer for "put this community in state", reloadServer for
+// "I changed it, so fetch it again".
 function ensureServer(serverId) {
-  return enterServer(serverId).catch((ex) => {
-    throw ex;
-  });
+  return enterServer(serverId);
 }
 
-export { pickReaction, wireCommunityEvents, ensureServer };
+export { pickReaction, wireCommunityEvents, ensureServer, reloadServer };
