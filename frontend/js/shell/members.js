@@ -1,4 +1,3 @@
-import { currentRoute } from './route.js';
 import { memberMenu } from './menus.js';
 import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from '../ui.js';
 import { avatar, icon, navRow, serverChip, navGroup } from '../components.js';
@@ -27,7 +26,7 @@ export function renderMemberSidebar(region) {
   // decides that, not the panel's own guess about the path, so a surface that
   // has no member panel cannot leave one reserving width it will not fill.
   if (!isAuthed() || !compose().members.show || !currentServerId()
-    || !State.serverDetail || !currentRoute().startsWith('/server/')) {
+    || !State.serverDetail || !compose().route.startsWith('/server/')) {
     region.hidden = true;
     return;
   }

@@ -1,4 +1,4 @@
-import { currentRoute } from './route.js';
+import { compose } from './compose.js';
 import { labelFor } from '../badges.js';
 import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from '../ui.js';
 import { avatar, icon, navRow, serverChip, navGroup } from '../components.js';
@@ -30,7 +30,7 @@ export function setTabBarHidden(hidden) {
 export function renderMobileTabs(region) {
   clear(region);
   if (!isAuthed()) return;
-  const here = currentRoute();
+  const here = compose().route;
   const hidden = isTabBarHidden();
   region.dataset.collapsed = hidden ? 'true' : 'false';
 
