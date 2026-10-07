@@ -1,4 +1,3 @@
-import { currentRoute } from './route.js';
 import { dmRowActions } from './menus.js';
 import { repaintChrome } from './repaint.js';
 import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from '../ui.js';
@@ -46,12 +45,12 @@ export function pageHeader(title, sub) {
 
 
 export function communityContext(region, sid) {
-  renderCommunityContext(region, sid, currentRoute());
+  renderCommunityContext(region, sid, compose().route);
 }
 
 
 export function dmsContext(region) {
-  const here = currentRoute();
+  const here = compose().route;
   // 'Conversations', not 'Direct messages': the page header directly to the right
   // already says Direct messages, and a second title a different width away with a
   // different subtitle under it reads as two things disagreeing about what this is.
@@ -132,7 +131,7 @@ export function dmsContext(region) {
 
 
 export function simpleListContext(region, { title, sub, groups }) {
-  const here = currentRoute();
+  const here = compose().route;
   region.appendChild(pageHeader(title, sub));
   const scroll = el('div', { class: 'ctx-scroll' });
   region.appendChild(scroll);
@@ -266,7 +265,7 @@ const adminSectionActive = (s, route) => (s.exact ? route === s.path : (route ==
 // silently fell through to the messages list. The registry already knows, per page,
 // whether it has a contextual sidebar and which one.
 export function sidebarContext() {
-  const hit = matchRoute(currentRoute() || '/');
+  const hit = matchRoute(compose().route || '/');
   if (!hit || !hit.page.sidebar) return { type: 'dms' };
   return {
     type: hit.page.sidebar,
