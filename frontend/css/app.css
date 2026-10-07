@@ -4267,6 +4267,20 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   line-height: 1;
 }
 
+  /* Fields a reader types into, held at 16px on a phone.
+     iOS Safari zooms the viewport when a focused field computes to under 16px, and it
+     does not zoom back out when the keyboard closes. The composer is the one that
+     matters: docked to the bottom with the keyboard taking the rest of the screen, a
+     composer at --t-fs-m (about 15px) zoomed itself off the top of the viewport and left
+     no way back short of reloading. max() only ever grows the size, so a field already
+     larger than 16px is untouched. */
+  input, textarea, select { font-size: max(16px, 1em); }
+
+  /* The composer's own minimum was 40px, a few pixels under the touch target this file
+     sets everywhere else - and it is the control a reader uses most, and the one most
+     likely to be aimed at with a thumb rather than a cursor. */
+  .composer textarea { min-height: var(--t-hit); }
+
 /* --- tablet: the rail narrows, the member panel goes --- */
 
 @media (max-width: 1299px) and (min-width: 1000px) {
