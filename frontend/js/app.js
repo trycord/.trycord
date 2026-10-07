@@ -7,7 +7,7 @@ import { loadWellbeing } from './privacy-ui.js';
 import Realtime from './realtime.js';
 import Router from './router.js';
 import { route } from './nav.js';
-import { renderAllChrome, loadAnnouncements } from './shell.js';
+import { renderAllChrome, loadAnnouncements, buildTree } from './shell.js';
 import { qs } from './ui.js';
 import { onFailover, resetFailoverAnnouncement } from './api.js';
 import TrycordPresentation from './presentation.js';
@@ -40,6 +40,10 @@ try {
 }
 
 async function boot() {
+  // Before anything that reaches for a region. The document ships one element; the
+  // application tree is built here and every renderer below addresses it by id.
+  buildTree();
+
   applyTheme();
   watchSystemTheme();
 
@@ -156,7 +160,7 @@ async function boot() {
   // only during boot.
   onFailover(() => { setOnline(true); paintStatus(true); });
 
-  // 5) Router: binds hash navigation and renders the active view.
+  // 5) Router: resolves the path and renders the active page.
   Router.init();
 
   Realtime.on('notification', async () => {
