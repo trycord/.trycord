@@ -110,6 +110,14 @@ jobs:
         working-directory: backend
         run: npm run check:realtime
 
+      # The page contract and the navigation built from it: no field a page defines that
+      # nothing reads, no nav entry pointing at a route no page claims, no page orphaned
+      # from every way in. This is the check that stops the page registry growing a field
+      # per conceivable concern, which is how one registry became four.
+      - name: Page contract and navigation
+        working-directory: backend
+        run: npm run check:registry
+
   shots:
     name: Screenshots (real browser)
     runs-on: ubuntu-latest
