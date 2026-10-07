@@ -4,7 +4,7 @@ import State from '../state.js';
 import { can, enterServer, peerPresence, refreshBans, setViewRefresh } from '../state.js';
 import { clear, confirmDialog, el, openModal, relTime, toast, attachContextMenu } from '../ui.js';
 import { avatar, emptyState } from '../components.js';
-import { errorState, onStale} from '../view-states.js';
+import { errorState, loadingState, onStale } from '../view-states.js';
 import { renderContextHeader, memberActions } from '../shell.js';
 import { openRoleAssignModal, rolePill } from '../role-assignment.js';
 import { userNameButton } from '../user-actions.js';
@@ -126,10 +126,16 @@ function openTimeoutModal(serverId, m, onDone) {
 
 async function renderServerMembers(container, serverId) {
   clear(container);
+  // Before the community is even loaded. Everything below sits behind an await, so
+  // without this the page is a blank surface until the server detail and the member list
+  // both arrive - which reads as broken rather than as waiting.
+  const opening = loadingState('Opening community');
+  container.appendChild(opening);
   let server;
   try { ({ detail: server } = await ensureServer(serverId)); }
-  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
+  catch (ex) { opening.remove(); container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
   renderContextHeader({ title: 'Members', sub: server.name });
+  opening.remove();
   const wrap = el('div', { class: 'page community-manager' });
   const counts = el('div', { class: 'stat-inline' });
   wrap.appendChild(counts);

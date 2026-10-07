@@ -2,6 +2,7 @@ import Api from '../api.js';
 import State, { refreshNotifications } from '../state.js';
 import { attachContextMenu, copyText, el, clear, toast, relTime } from '../ui.js';
 import { emptyState, avatar } from '../components.js';
+import { loadingState } from '../view-states.js';
 import { renderContextHeader, renderAllChrome } from '../shell.js';
 import { channelPath } from '../links.js';
 import { navigate, route } from '../nav.js';
@@ -166,16 +167,43 @@ export async function renderNotifications(container) {
   let items = State.raw.notifications || [];
   let cursor = null;
   let hasMore = false;
+
+  // Something has to be on screen before the request goes out. Without this the page
+  // arrives already finished and empty: a reader landing here saw the whole layout with
+  // nothing in it for as long as the request took, which is indistinguishable from "you
+  // have no notifications" and quite the opposite.
+  const waiting = loadingState('Loading notifications');
+  list.appendChild(waiting);
+
+  // Cached rows are real, so they are shown - but they may not be the newest, so they
+  // sit under the indicator rather than instead of it. They live in their own container
+  // so they can be taken out cleanly once the real answer lands.
+  const cached = el('div', { class: 'notif-cached' });
+  for (const n of items) cached.appendChild(renderRow(n));
+  list.appendChild(cached);
+
   try {
     const res = await Api.notifications({ limit: PAGE });
     items = res.items || [];
     cursor = res.nextCursor || null;
     hasMore = !!res.hasMore;
   } catch (ex) {
+    waiting.remove();
+    if (items.length) {
+      // The cached rows are the whole page now, so say what happened above them instead
+      // of replacing them with an error the reader did not need.
+      list.appendChild(el('div', { class: 'form-error' },
+        (ex.message || 'Cannot load the newest notifications') + ' - showing the last loaded.'));
+      loadMoreBtn.hidden = true;
+      return;
+    }
+    list.removeChild(cached);
     list.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load notifications'));
     loadMoreBtn.hidden = true;
     return;
   }
+  waiting.remove();
+  cached.remove();
   if (!items.length) {
     list.appendChild(emptyState('bell', 'All caught up', 'Mentions, messages and friend activity land here.'));
     loadMoreBtn.hidden = true;

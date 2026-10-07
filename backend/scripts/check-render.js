@@ -50,6 +50,12 @@ let inFlight = 0;
 // Set to a substring; any request whose URL contains it is answered with a server
 // error instead of being made. Nothing else in the harness needs to know.
 let breakUrl = null;
+
+// A URL to answer slowly instead of immediately, for checking what a page shows while
+// it is still waiting. Same reasoning as breakUrl: the states a reader sees between
+// clicking and reading are states, and none of them had ever been observed.
+let slowUrl = null;
+let slowMs = 0;
 let PORT = Number(process.env.RENDER_PORT || 0);
 // Resolved lazily: PORT is 0 until the free-port probe has run.
 const origin = () => `http://127.0.0.1:${PORT}`;
@@ -275,6 +281,9 @@ function wireFetch(window, token) {
         JSON.stringify({ error: { code: 'INTERNAL', message: 'the render check broke this on purpose' } }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+    if (slowUrl && absolute.includes(slowUrl)) {
+      await new Promise((r) => setTimeout(r, slowMs));
     }
     inFlight++;
     let res;
@@ -675,6 +684,55 @@ async function settle(window, ms = 400) {
     await setViewport(window, 1440, 900);
     updateFromViewport();
     await settle(window, 100);
+
+    // ---- what a page shows while it is waiting ----
+    //
+    // "Do not make the page appear complete before its data exists" is a rule about the
+    // gap between arriving and knowing anything, and the gap had never been observed -
+    // every page asserted so far was read after it had finished loading.
+    //
+    // An endpoint is answered slowly, the page is visited, and what is on screen during
+    // the wait is looked at. The failure mode this is looking for is a page that shows
+    // its finished layout with nothing in it, which reads as "you have no notifications"
+    // when it means "we have not asked yet".
+    console.log('\n  while a page is still loading');
+
+    // A list of (page, endpoint-that-feeds-it). Notifications found the problem, so the
+    // question is worth asking of the other list-shaped surfaces rather than fixing one
+    // page and stopping.
+    const LOADING_CASES = [
+      { page: 'notifications', url: '/api/notifications', what: 'notifications' },
+      { page: 'dms', url: '/api/dms', what: 'direct messages' },
+      { page: 'friends', url: '/api/friends', what: 'friends' },
+      { page: 'community.members', url: '/api/servers/', what: 'community members' },
+    ];
+
+
+    for (const spec of LOADING_CASES) {
+      slowUrl = spec.url;
+      slowMs = 700;
+      const route = registry.PAGES.find((pg) => pg.id === spec.page);
+      if (!route || !route.path) {
+        ok(spec.what + ': has a route to check', false, 'no path on page ' + spec.page);
+        continue;
+      }
+      // Deliberately not awaited: the visit races the response, which is the point.
+      const pending = visit(window, document, Router, concrete(route.path, world), base);
+      await new Promise((r) => setTimeout(r, 250));
+      const mid = document.getElementById('view-root');
+      const seen = mid
+        ? !!mid.querySelector('.state-block--loading, .skeleton, [aria-busy="true"], .loading')
+        : false;
+      ok(spec.what + ': says it is waiting', seen,
+        'nothing on screen indicates loading - '
+        + (mid ? mid.innerHTML.slice(0, 140) : '(nothing rendered)'));
+      ok(spec.what + ': does not claim to be empty while waiting',
+        !(mid && /(no |nothing |all caught up|yet\b)/i.test(mid.textContent)),
+        'it says there is nothing before it has asked');
+      await pending;
+      slowUrl = null;
+      slowMs = 0;
+    }
 
     // ---- dead controls ----
     //
