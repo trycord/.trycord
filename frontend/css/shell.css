@@ -1,0 +1,634 @@
+/* ==========================================================================
+   The application shell.
+
+   Four regions, and a page uses the ones it needs:
+
+     rail      what instance you are in and where you can go
+     context   what you are looking at inside that
+     workspace the thing itself
+     members   who is here, or detail about what you are looking at
+
+   A message list gets all four. Settings gets none of the first. Home gets the
+   rail, a context and a workspace. Nothing is stretched to fill: the workspace
+   has a reading measure and the rest of a wide screen goes to something useful.
+   ========================================================================== */
+
+.trycord-app {
+  min-height: 100dvh;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail-width) var(--sidebar-width) minmax(0, 1fr);
+  grid-template-rows: 100dvh;
+  background: var(--color-background);
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   Rail
+   -------------------------------------------------------------------------- */
+
+.app-rail {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) 0 var(--space-6);
+  background: var(--color-surface-sunken);
+  border-right: 1px solid var(--color-border-subtle);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.app-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.rail-identity {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+  width: 40px;
+  flex: 0 0 auto;
+}
+
+.rail-mark {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-md);
+  letter-spacing: -0.03em;
+  box-shadow: var(--glow-accent);
+}
+
+.rail-global-nav,
+.app-rail__items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0 var(--space-4);
+}
+
+.app-rail__items {
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4) 0;
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.rail-link {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out),
+              border-radius var(--duration-fast) var(--ease-out);
+}
+
+.rail-link:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.rail-link.is-active,
+.rail-link[aria-current="page"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+/* The one place an accent bar is used as a position indicator: on the rail, a
+   reader is scanning vertically and the bar is readable at a glance where a
+   fill colour is not. */
+.rail-link.is-active::before,
+.rail-link[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 50%;
+  width: 3px;
+  height: 22px;
+  transform: translateY(-50%);
+  background: var(--color-accent);
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+.rail-link__icon {
+  width: 21px;
+  height: 21px;
+}
+
+.rail-link__badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.rail-community {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-md);
+  overflow: hidden;
+  transition: border-radius var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+}
+
+.rail-community:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.rail-community.is-active,
+.rail-community[aria-current="page"] {
+  border-radius: var(--radius-md);
+  box-shadow: var(--glow-accent);
+}
+
+.rail-community img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rail-community--add {
+  background: transparent;
+  border: 1px dashed var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.rail-community--add:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   Context navigation
+   -------------------------------------------------------------------------- */
+
+.context-sidebar {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.context-sidebar__head {
+  flex: 0 0 auto;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.context-sidebar__name {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.context-sidebar__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.context-sidebar__foot {
+  flex: 0 0 auto;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.context-sidebar__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.context-sidebar__user:hover {
+  background: var(--color-surface-hover);
+}
+
+/* Channel groups. Nested type is real hierarchy, so it is indented and quieter
+   rather than given a different colour that would read as a category. */
+.nav-group {
+  margin-bottom: var(--space-6);
+}
+
+.nav-group__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.nav-group__label:hover {
+  color: var(--color-text-secondary);
+}
+
+.nav-group__chevron {
+  width: 11px;
+  height: 11px;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.nav-group.is-collapsed .nav-group__chevron {
+  transform: rotate(-90deg);
+}
+
+.nav-group.is-collapsed .nav-group__items {
+  display: none;
+}
+
+.nav-group__items {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: var(--space-2);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+
+.nav-item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.nav-item.is-active,
+.nav-item[aria-current="page"] {
+  background: var(--color-surface-active);
+  color: var(--color-text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.nav-item__icon {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  opacity: 0.85;
+}
+
+.nav-item__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-item__badge {
+  flex: 0 0 auto;
+  min-width: 18px;
+  height: 17px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.nav-item--unread {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-semibold);
+}
+
+.nav-item--muted {
+  opacity: 0.55;
+}
+
+/* --------------------------------------------------------------------------
+   Workspace
+   -------------------------------------------------------------------------- */
+
+.main-content {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-background);
+}
+
+.context-header {
+  flex: 0 0 auto;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: 0 var(--space-7);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border-subtle);
+  z-index: var(--z-sticky);
+}
+
+.context-header__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.context-header__name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.context-header__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.context-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+}
+
+.chat-environment {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.chat-environment--with-members {
+  grid-template-columns: minmax(0, 1fr) var(--members-width);
+}
+
+.view-root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* A page that is not a message list scrolls itself; a message list does not,
+   because its composer has to stay put. */
+.view-root--scroll {
+  overflow-y: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Member and context panel
+   -------------------------------------------------------------------------- */
+
+.member-sidebar {
+  grid-column: 2;
+  display: none;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.chat-environment--with-members .member-sidebar {
+  display: flex;
+}
+
+.member-sidebar__head {
+  flex: 0 0 auto;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.member-sidebar__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.member-group + .member-group {
+  margin-top: var(--space-7);
+}
+
+.member-group__label {
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.member-row:hover {
+  background: var(--color-surface-hover);
+}
+
+.member-row__name {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+}
+
+.member-row:hover .member-row__name {
+  color: var(--color-text-primary);
+}
+
+.member-row__tag {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.member-row--offline {
+  opacity: 0.45;
+}
+
+/* --------------------------------------------------------------------------
+   Mobile navigation
+   -------------------------------------------------------------------------- */
+
+.mobile-tab-navigation {
+  display: none;
+}
+
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-drawer);
+  background: var(--overlay-scrim-soft);
+  animation: fade-in var(--duration-fast) var(--ease-out);
+}
+
+/* --------------------------------------------------------------------------
+   Wide screens
+
+   The workspace stops growing at a measure a line of text can be read across;
+   past that, the extra width goes to the member panel and to a wider context
+   navigation rather than to longer lines.
+   -------------------------------------------------------------------------- */
+
+@media (min-width: 1600px) {
+  .shell {
+    grid-template-columns: var(--rail-width) 268px minmax(0, 1fr);
+  }
+
+  .chat-environment--with-members {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .shell {
+    grid-template-columns: var(--rail-width) 288px minmax(0, 1fr);
+  }
+
+  .chat-environment--with-members {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+
+  :root {
+    --gutter: 28px;
+  }
+}
+
+@media (min-width: 2560px) {
+  .shell {
+    grid-template-columns: var(--rail-width) 320px minmax(0, 1fr);
+  }
+
+  .chat-environment--with-members {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
+  :root {
+    --gutter: 36px;
+    --page-max: 1360px;
+    --reading-max: 74ch;
+  }
+}
+/* --------------------------------------------------------------------------
+   Routes that are documents rather than places.
+
+   Sign-in, registration, password reset, email verification, the legal
+   documents and /support are read, not navigated. They have no rail, no
+   context navigation and no header, and a sign-in form inside the
+   application chrome is a form inside somebody else's navigation.
+
+   This is one place, and it is data-driven off the document's own route
+   attribute rather than written per page, so a route added here cannot
+   forget to hide the chrome. check-client-headings reads these same selectors
+   to know which surfaces own their own h1 - if the two disagree, it fails.
+   -------------------------------------------------------------------------- */
+
+html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
+        [data-route^='/reset-password'], [data-route^='/verify-email'],
+        [data-route^='/legal'], [data-route='/support']) {
+  --is-public-page: 1;
+}
+
+html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
+        [data-route^='/reset-password'], [data-route^='/verify-email'],
+        [data-route^='/legal'], [data-route='/support'])
+  :is(.app-rail, .context-sidebar, .context-header, .member-sidebar,
+      .mobile-tab-navigation, .ctx-scrim) {
+  display: none !important;
+}
+
+html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
+        [data-route^='/reset-password'], [data-route^='/verify-email'],
+        [data-route^='/legal'], [data-route='/support']) .shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
+        [data-route^='/reset-password'], [data-route^='/verify-email'],
+        [data-route^='/legal'], [data-route='/support']) .main-content {
+  grid-column: 1;
+  width: 100%;
+  padding-bottom: 0;
+}

@@ -1,0 +1,595 @@
+/* ==========================================================================
+   The remainder: role management, community media, the mobile switcher, and
+   the smaller pieces that did not warrant their own section.
+
+   Kept separate so the two large layers above stay readable.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Roles
+
+   Role ordering is the substance of this surface - a role's rank is what makes
+   it able to grant another role - so the row is built around the rank and the
+   handle rather than around the name.
+   -------------------------------------------------------------------------- */
+
+.role-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.role-row:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.role-row--owner {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.role-row--owner:hover {
+  background: var(--color-accent-muted);
+}
+
+.role-row__handle {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  cursor: grab;
+}
+
+.role-row__rank {
+  flex: 0 0 auto;
+  min-width: 20px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.role-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-row__meta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.role-row__lock {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.role-pills,
+.role-pill-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 2px var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-active);
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+.role-protected {
+  padding: 2px var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-info-muted);
+  color: var(--color-info);
+  font-size: var(--text-xs);
+}
+
+.role-hierarchy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.role-holder,
+.role-members {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.role-holder {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+}
+
+.role-holder:hover {
+  background: var(--color-surface-hover);
+}
+
+.role-holder__name {
+  min-width: 0;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+}
+
+.role-unassign {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.role-unassign:hover {
+  color: var(--color-danger);
+}
+
+.owner {
+  color: var(--color-accent);
+  font-weight: var(--weight-semibold);
+}
+
+.rail-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding-top: var(--space-5);
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.rail-section--communities {
+  align-items: center;
+}
+
+.rail-section__label {
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Rail labels. The rail is 68px, so a label is one or two characters - this is
+   not body text and never was, but 9px was below every type token in the
+   system, which is what made it unreadable rather than merely small. */
+.rail-nav__label,
+.nv-label {
+  font-size: var(--text-xs);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: inherit;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-mark-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.rail-mark-btn__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The context switcher is a button, so it carries the affordance. */
+.ctx-switcher__trigger {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ctx-card,
+.ctx-card__body {
+  margin: 0 var(--space-5);
+}
+
+.ctx-card__body {
+  padding: var(--space-5);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.context-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+}
+
+.is-dropping {
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Community media
+   -------------------------------------------------------------------------- */
+
+.community-media {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.community-media__banner {
+  position: relative;
+  aspect-ratio: 3 / 1;
+  max-height: 200px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+}
+
+.community-media__preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.community-media__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.community-media__actions .btn--danger {
+  margin-left: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Mobile tab switcher
+
+   Below the tablet breakpoint the tab bar is a strip; the toggle reveals the
+   places a rail would have carried. Same destinations as the rail, a different
+   presentation - which is the whole point of a mobile composition.
+   -------------------------------------------------------------------------- */
+
+.mobile-tab-navigation__strip {
+  display: contents;
+}
+
+.mobile-tab-navigation__toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--space-6);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.mobile-tab-navigation__toggle-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   Settings panels and panes
+
+   The settings area has a navigation pane and a content pane. Both are named
+   here so the layout can be read without cross-referencing another file.
+   -------------------------------------------------------------------------- */
+
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.settings-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-7);
+}
+
+.settings-panel--danger {
+  border-color: var(--color-danger-muted);
+  background: var(--color-danger-muted);
+}
+
+.settings-panel__title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-3);
+}
+
+.settings-panel--danger .settings-panel__title {
+  color: var(--color-danger);
+}
+
+.settings-panel__blurb {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  max-width: 62ch;
+}
+
+.settings-pane {
+  min-width: 0;
+}
+
+.settings-subhead {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-secondary);
+  padding: var(--space-5) var(--space-6);
+  background: var(--color-surface-sunken);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.settings-note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  padding: var(--space-5) var(--space-6);
+}
+
+.settings-tab {
+  width: 100%;
+  text-align: left;
+}
+
+.settings-nav__groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.settings-nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.settings-nav__label {
+  padding: 0 var(--space-5) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.settings-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+
+.settings-nav__item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.settings-nav__item.is-active,
+.settings-nav__item[aria-current="page"] {
+  background: var(--color-surface-active);
+  color: var(--color-text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.settings-nav__search {
+  margin: 0 0 var(--space-5);
+  position: relative;
+}
+
+.settings-nav__search-clear {
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: var(--target-min);
+  height: var(--target-min);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.settings-nav__signout {
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  color: var(--color-danger);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-nav__signout:hover {
+  background: var(--color-danger-muted);
+}
+
+.settings-nav__toggle {
+  display: none;
+  align-items: center;
+  gap: var(--space-5);
+  width: 100%;
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-primary);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.settings-nav__toggle-caret {
+  margin-left: auto;
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-muted);
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.settings-nav__toggle-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-nav.is-open .settings-nav__toggle-caret {
+  transform: rotate(180deg);
+}
+
+/* --------------------------------------------------------------------------
+   Auth, the remainder
+   -------------------------------------------------------------------------- */
+
+.auth-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.auth-title {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-3);
+}
+
+.auth-sub {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-7);
+}
+
+.auth-secondary__title {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.btn__icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.row__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.dm-load-older,
+.notif-load-more {
+  display: block;
+  width: calc(100% - var(--space-9));
+  max-width: 520px;
+  margin: var(--space-5) auto var(--space-7);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  cursor: pointer;
+}
+
+.dm-load-older:hover,
+.notif-load-more:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.block {
+  display: block;
+}
+
+.set-note-- {
+  background: transparent;
+  border-style: dashed;
+}
+
+.page-editor__preview {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.show {
+  display: initial;
+}
+
+@media (max-width: 820px) {
+  /* The settings navigation collapses to a disclosure on a phone, because a
+     two-column layout on a 390px screen is two unreadable columns. */
+  .settings-nav__toggle {
+    display: flex;
+  }
+
+  .settings-nav__groups,
+  .settings-nav__search,
+  .settings-nav__footer {
+    display: none;
+  }
+
+  .settings-nav.is-open .settings-nav__groups,
+  .settings-nav.is-open .settings-nav__search,
+  .settings-nav.is-open .settings-nav__footer {
+    display: flex;
+  }
+
+  .settings-nav {
+    gap: 0;
+  }
+
+  .role-row__meta {
+    display: none;
+  }
+}
