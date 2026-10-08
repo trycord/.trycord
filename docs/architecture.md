@@ -5,7 +5,7 @@ the code alone does not explain. It is reference, not a plan and not a log.
 
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
-client segments are served; `npm run check:flows` boots a server and passes 54
+client segments are served; `npm run check:flows` boots a server and passes 62
 assertions against real flows; `npm run check:render` boots a server and renders all
 40 routable pages in jsdom, passing 51 assertions over 1151 interactive controls;
 `npm run check:realtime` puts two accounts on two sockets and confirms a message

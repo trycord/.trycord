@@ -328,6 +328,55 @@ async function waitForHealth(child, attempts) {
     ok('a traversal in a channel id is refused', malformed.status >= 400 && malformed.status < 500,
       'status ' + malformed.status);
 
+    // The security boundary the brief names, and the ones nothing was asking about.
+    //
+    // Roles. Every role write carries `role.server_id !== req.server.id`, which is the
+    // only thing standing between a community manager and another community's roles.
+    const foreignRole = await call('POST', '/api/servers/' + sid + '/roles',
+      { name: 'probe-role' }, token);
+    const rid = foreignRole.json && foreignRole.json.id;
+    ok('a role can be created', foreignRole.status === 200 && !!rid,
+      'status ' + foreignRole.status);
+
+    // A second community, so there is somewhere for "not yours" to mean something.
+    const elsewhere = await call('POST', '/api/servers', { name: 'Probe Elsewhere' }, other);
+    const oid = elsewhere.json && elsewhere.json.serverId;
+    ok('a second account can create its own community',
+      elsewhere.status === 200 && !!oid, 'status ' + elsewhere.status);
+
+    // Addressed through their own community with our role id. The route reads the role
+    // and compares server_id, so this is where a cross-community write would land.
+    const crossRole = await call('POST', '/api/servers/' + oid + '/roles/' + rid + '/assign',
+      { userId: 'nobody' }, other);
+    ok("a role from another community cannot be assigned through this one",
+      crossRole.status === 404 || crossRole.status === 403, 'status ' + crossRole.status);
+
+    const badRole = await call('POST', '/api/servers/' + sid + '/roles/' + rid + '/assign',
+      { userId: '' }, token);
+    ok('assigning a role to nobody is refused', badRole.status >= 400,
+      'status ' + badRole.status);
+
+    const badRoleId = await call('POST', '/api/servers/' + sid + '/roles/00000000-0000-0000-0000-000000000000/assign',
+      { userId: '00000000-0000-0000-0000-000000000000' }, token);
+    ok('a role that does not exist is refused', badRoleId.status === 404,
+      'status ' + badRoleId.status);
+
+    // Attachments. uploads.authorized() is the whole gate on a private file, and a
+    // message attachment is the case that must not be readable by everyone signed in.
+    const stolenAttachment = await call('GET', '/api/attachments/00000000-0000-0000-0000-000000000000',
+      undefined, other);
+    ok("an attachment that does not exist is not readable", stolenAttachment.status === 404,
+      'status ' + stolenAttachment.status);
+
+    const traversalAttachment = await call('GET', '/api/attachments/..%2F..%2F..%2Fetc%2Fpasswd',
+      undefined, token);
+    ok('a traversal in an attachment id does not escape the store',
+      traversalAttachment.status === 404, 'status ' + traversalAttachment.status);
+
+    const anonymousAttachment = await call('GET', '/api/attachments/00000000-0000-0000-0000-000000000000');
+    ok('an attachment is refused to an anonymous caller', anonymousAttachment.status === 401,
+      'status ' + anonymousAttachment.status);
+
     console.log('\n  sign-in, and what ends a session');
     // Registration was covered; the return trip was not. A client that can register but
     // cannot log in is not an application anyone can use.
