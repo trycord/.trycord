@@ -15,7 +15,8 @@ export function legalVersions() {
 
 Api.legal().then((l) => { if (l) versions = l; }).catch(() => {});
 
-export const AUTH_BG = '/assets/trycord-login-bg.png';
+// verification happens with or without a session and never reveals whether a
+
 export const AUTH_LOGO = '/assets/trycord-logo.png';
 
 export function legalPage(container, kind) {
@@ -39,6 +40,7 @@ export function legalPage(container, kind) {
 }
 
 // verification happens with or without a session and never reveals whether a
+
 export function verifyEmailPage(container, token) {
   clear(container);
   const { page, main } = authShell({

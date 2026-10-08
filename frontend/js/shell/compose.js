@@ -74,13 +74,6 @@ export function setShell(patch) {
   return shellState();
 }
 
-// Reset between renders in the render harness, which loads the module once and then
-// navigates through many shells.
-export function resetShellState() {
-  state = readState();
-  return shellState();
-}
-
 // The answer. Every region reads this and nothing else decides on its own.
 export function compose() {
   const width = window.innerWidth;
