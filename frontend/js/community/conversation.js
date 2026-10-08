@@ -15,6 +15,7 @@ import { serverPath, channelPath, absoluteChannelUrl } from '../links.js';
 import { navigate } from '../nav.js';
 import { presentationMode } from '../presentation.js';
 import { stampMsgNode, regroupAround, groupFeed } from './message-grouping.js';
+import { renderComposer } from './composer.js';
 
 /**
  * A value that identifies one send attempt.
@@ -483,115 +484,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
   }
 
 
-  const composer = el('div', { class: 'composer' });
-  const fileBtn = el('button', { class: 'file-btn', type: 'button', title: 'Attach file', 'aria-label': 'Attach file' }, icon('paperclip'));
-  const fileInput = el('input', { type: 'file', hidden: true, multiple: true });
-  const ta = el('textarea', { placeholder: 'Message #' + chanName, rows: 1, 'aria-label': 'Message' });
-  const sendBtn = el('button', { class: 'btn primary', type: 'button' }, 'Send');
-  const emojiBtn = el('button', { class: 'emoji-btn', type: 'button', title: 'Emoji', 'aria-label': 'Insert emoji' }, icon('smile'));
-  emojiBtn.addEventListener('click', () => showEmojiPicker(emojiBtn, (e) => insertAtCursor(ta, e)));
-  const attachments = createAttachTray({
-    upload: (file, onProgress) => Api.uploadAttachmentWithProgress(channelId, file, onProgress),
-    onChange: () => { sendBtn.disabled = !attachments.hasReady() && !ta.value.trim(); },
-  });
-  // Suppress previews for the next message. The flag travels with the send and
-  // the server decides what to do with it, so this cannot drift into a control
-  // that only changes how the composer looks.
-  const previewOff = el('button', {
-    class: 'preview-toggle', type: 'button',
-    title: 'Do not generate link previews for this message',
-    'aria-label': 'Do not generate link previews for this message',
-    'aria-pressed': 'false',
-  }, icon('globe'));
-  previewOff.addEventListener('click', () => {
-    const on = previewOff.getAttribute('aria-pressed') !== 'true';
-    previewOff.setAttribute('aria-pressed', on ? 'true' : 'false');
-    previewOff.classList.toggle('is-on', on);
-    previewOff.title = on ? 'Link previews are off for the next message'
-      : 'Do not generate link previews for this message';
-  });
-
-  composer.appendChild(fileBtn);
-  composer.appendChild(fileInput);
-  composer.appendChild(ta);
-  composer.appendChild(el('div', { class: 'composer-actions' }, previewOff, emojiBtn, sendBtn));
-  // The tray is a sibling of the composer rather than a flex child of it: as a
-  // child it competed with the textarea for the line and collapsed to nothing on
-  // a phone.
-  conv.appendChild(el('div', { class: 'composer-dock' }, attachments.node, composer));
-  {
-    const me = State.me;
-    const locked = !canInChannel('SEND_MESSAGES') ? 'You do not have permission to send messages here.'
-      : mustVerifyToPost() ? 'Verify your email to send messages.' : null;
-    if (locked) {
-      ta.disabled = true;
-      ta.placeholder = locked;
-      sendBtn.disabled = true;
-      fileBtn.disabled = true;
-      emojiBtn.disabled = true;
-      previewOff.disabled = true;
-      composer.classList.add('locked');
-    }
-  }
-
-  attachments.attach({ container: conv, composer, textarea: ta, button: fileBtn, input: fileInput });
-
-  function resize() {
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
-  }
-  ta.addEventListener('input', () => { resize(); sendBtn.disabled = !attachments.hasReady() && !ta.value.trim(); });
-
-  // A double submit must not produce two real messages. Mirrors the DM sendLock.
-  let sending = false;
-  let pendingNonce = null;
-  async function send() {
-    if (sending) return;
-    const content = ta.value.trim();
-    // Only files that finished uploading can go on the message. Sending while
-    // one is still in flight would attach nothing for it and silently drop it.
-    const readyIds = attachments.readyIds();
-    if (!content && !readyIds.length) {
-      if (attachments.isUploading()) { toast('Still uploading', 'warn'); return; }
-      return;
-    }
-    sending = true;
-    sendBtn.setAttribute('aria-busy', 'true');
-    // One nonce per attempt, reused across a retry of the same attempt. If the
-    // POST times out we cannot tell whether the server wrote the message, so the
-    // nonce is what stops a retry from posting it twice.
-    const clientNonce = pendingNonce || newNonce();
-    pendingNonce = clientNonce;
-    const attachmentIds = readyIds.length ? readyIds : undefined;
-    try {
-      const suppressEmbeds = previewOff.getAttribute('aria-pressed') === 'true';
-      const saved = await Api.sendMessage(channelId, {
-        content, attachmentIds, clientNonce, suppressEmbeds: suppressEmbeds || undefined,
-      });
-      pendingNonce = null;
-      // The choice is about one message, so it does not stick to the next one.
-      if (suppressEmbeds) {
-        previewOff.setAttribute('aria-pressed', 'false');
-        previewOff.classList.remove('is-on');
-      }
-      ta.value = '';
-      attachments.clear();
-      resize();
-      if (saved && saved.id) {
-        upsertMessage(saved, { scroll: true });
-      } else {
-        await reload();
-      }
-    } catch (ex) {
-      toast(ex.message || 'Cannot send', 'error');
-    } finally {
-      sending = false;
-      sendBtn.removeAttribute('aria-busy');
-    }
-  }
-  sendBtn.addEventListener('click', send);
-  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
-
+  renderComposer({ conv, channelId, chanName, upsertMessage, reload });
   container.appendChild(conv);
   setActiveChannel(channelId);
   await reload();
