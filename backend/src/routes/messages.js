@@ -61,6 +61,40 @@ async function attachEngagement(rows, meId) {
   }
 }
 
+// The two questions every write in this file asks, answered once.
+//
+// Five write routes each opened with the same lines - see the channel, check a permission,
+// check the timeout - and because the refusal was written out longhand every time they had
+// drifted into five wordings for one rule. A guard that is copied is a guard that stops
+// being one, so the caller now says which permission it is asking about and what to call
+// the refusal.
+//
+// They are two functions rather than one because a route has to work between them:
+// editing fetches the message and checks the author first, and deleting exempts a moderator
+// from the timeout. Merging them would have changed which refusal each caller sees.
+
+/** The channel the request names, or null once the refusal has been sent. */
+async function theChannel(req, res) {
+  const ch = await visibleChannel(req.params.channelId, req.user.id);
+  if (!ch) fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+  return ch;
+}
+
+/** Whether this person may write in this channel right now. Sends the refusal if not. */
+async function mayAct(req, res, ch, permission, refused) {
+  if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, permission))) {
+    fail(res, 'PERMISSION_DENIED', refused);
+    return false;
+  }
+  // A timeout means the member cannot act in this community at all, so it applies to
+  // everything a write can be.
+  if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
+    fail(res, 'TIMED_OUT', 'you are timed out in this community');
+    return false;
+  }
+  return true;
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
@@ -161,14 +195,9 @@ async function resolveSeq(table, scope, scopeId, id) {
 
 router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
-    const ch = await visibleChannel(req.params.channelId, req.user.id);
-    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
-    if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
-      return fail(res, 'PERMISSION_DENIED', 'you cannot post in this server');
-    }
-    if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
-      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
-    }
+    const ch = await theChannel(req, res);
+    if (!ch || !(await mayAct(req, res, ch, 'SEND_MESSAGES',
+      'you cannot post in this community'))) return;
     const content = readContent((req.body || {}).content);
 
     // Opt-out from link previews for this one message. Read here rather than
@@ -308,8 +337,8 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
 
 router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
   try {
-    const ch = await visibleChannel(req.params.channelId, req.user.id);
-    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    const ch = await theChannel(req, res);
+    if (!ch) return;
     const msg = await db.get('SELECT * FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
     if (!msg) return fail(res, 'NOT_FOUND', 'message not found');
     const isAuthor = msg.author_id === req.user.id;
@@ -320,7 +349,7 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
     // they cannot post. A moderator with MANAGE_MESSAGES is exempt, so a
     // moderation action is still possible while someone is timed out.
     if (isAuthor && (await memberships.isTimedOut(ch.server_id, req.user.id))) {
-      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
+      return fail(res, 'TIMED_OUT', 'you are timed out in this community');
     }
     const fileRows = await db.all('SELECT id FROM attachments WHERE message_id = ?', [msg.id]);
     // Replies outlive the message they hang from: they are other people's
@@ -340,18 +369,14 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
 // rewrite someone else's words. Broadcasts message_updated.
 router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
-    const ch = await visibleChannel(req.params.channelId, req.user.id);
-    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    const ch = await theChannel(req, res);
+    if (!ch) return;
     const msg = await db.get('SELECT * FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
     if (!msg) return fail(res, 'NOT_FOUND', 'message not found');
     if (msg.author_id !== req.user.id) return fail(res, 'PERMISSION_DENIED', 'only the author can edit');
     // Editing is a write, so it is gated the same way posting is.
-    if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
-      return fail(res, 'PERMISSION_DENIED', 'you cannot edit here');
-    }
-    if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
-      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
-    }
+    if (!(await mayAct(req, res, ch, 'SEND_MESSAGES',
+      'you cannot edit a message here'))) return;
     const content = readContent((req.body || {}).content);
     if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
     const editedAt = now();
@@ -374,14 +399,9 @@ router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, m
 // POST /api/channels/:channelId/messages/:messageId/reactions { emoji }
 router.post('/:messageId/reactions', auth.requireVerified, rateLimit({ windowMs: 60000, max: 120 }), async (req, res, next) => {
   try {
-    const ch = await visibleChannel(req.params.channelId, req.user.id);
-    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
-    if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
-      return fail(res, 'PERMISSION_DENIED', 'you cannot react here');
-    }
-    if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
-      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
-    }
+    const ch = await theChannel(req, res);
+    if (!ch || !(await mayAct(req, res, ch, 'SEND_MESSAGES',
+      'you cannot react in this channel'))) return;
     const msg = await db.get('SELECT id FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
     if (!msg) return fail(res, 'NOT_FOUND', 'message not found in this channel');
     let emoji;
@@ -400,19 +420,12 @@ router.post('/:messageId/reactions', auth.requireVerified, rateLimit({ windowMs:
 // DELETE .../reactions/:emoji — removes only the caller's own reaction.
 router.delete('/:messageId/reactions/:emoji', auth.requireVerified, async (req, res, next) => {
   try {
-    const ch = await visibleChannel(req.params.channelId, req.user.id);
-    if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    const ch = await theChannel(req, res);
+    if (!ch) return;
     const msg = await db.get('SELECT id FROM messages WHERE id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
     if (!msg) return fail(res, 'NOT_FOUND', 'message not found in this channel');
-    // Removing your own reaction is a write, so it carries the same gate as
-    // adding one. Without this a member denied SEND_MESSAGES, or timed out,
-    // could still act on a channel they are supposed to be locked out of.
-    if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
-      return fail(res, 'PERMISSION_DENIED', 'you cannot react here');
-    }
-    if (await memberships.isTimedOut(ch.server_id, req.user.id)) {
-      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
-    }
+    if (!(await mayAct(req, res, ch, 'SEND_MESSAGES',
+      'you cannot change your reactions here'))) return;
     let emoji;
     try {
       emoji = await reactions.remove(req.user.id, msg.id, req.params.emoji);
