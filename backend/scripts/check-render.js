@@ -518,11 +518,33 @@ async function settle(window, ms = 400) {
         const file = path.join(emitDir, page.id.replace(/[^a-z0-9._-]+/gi, '_') + '.html');
         writeFileSync(file, '<!doctype html>\n' + html);
         manifest.push({ id: page.id, path: page.route, url, file, error: outcome.error || null });
-        console.log('    wrote ' + page.id + (outcome.error ? '  <- ' + outcome.error : ''));
+        // A page that threw is written out like any other, and the layout check then
+        // measures the fault screen's geometry and calls it a pass. That is how a channel
+        // view answering `renderContextHeader is not defined` measured clean at 240
+        // assertions while the page a reader saw was a black screen with a Retry button.
+        const fault = /data-fault-origin="([^"]*)"/.exec(html);
+        const bad = outcome.error || (fault && fault[1]);
+        if (bad) {
+          failures.push(`${page.id} (${url}): the page threw and rendered a fault: ${bad}`);
+          console.log('    FAIL ' + page.id + '  <- ' + bad);
+        } else {
+          console.log('    wrote ' + page.id);
+        }
       }
       writeFileSync(path.join(emitDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
       console.log('\n  wrote ' + manifest.length + ' surfaces to ' + emitDir);
+      // Only the fault check runs in this mode. It is a dump for the layout check, and the
+      // layout check measures geometry - so this says which half of the work it did rather
+      // than reporting a pass for a file it never inspected.
+      console.log('  (dump mode: faults only. Run without --emit-dom for the full'
+        + ' ' + manifest.length + ' surfaces.)');
       await boot1.stop();
+      if (failures.length) {
+        console.error(`\n  render check FAILED - ${failures.length} of ${manifest.length}`
+          + ' surface(s) rendered a fault\n');
+        for (const f of failures) console.error('  ' + f);
+        process.exit(1);
+      }
       process.exit(0);
     }
 
