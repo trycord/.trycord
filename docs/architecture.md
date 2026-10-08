@@ -8,8 +8,9 @@ and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
 client segments are served; `npm run check:flows` boots a server and passes 62
 assertions against real flows; `npm run check:render` boots a server and renders all
 40 routable pages in jsdom, passing 51 assertions over 1151 interactive controls;
-`npm run check:realtime` puts two accounts on two sockets and confirms a message
-crosses between them; `npm run check:contrast` measures every theme against WCAG AA
+`npm run check:realtime` puts three accounts on three sockets and confirms a
+message crosses between the two that share a community and does not reach the third, who
+never joined the room; `npm run check:contrast` measures every theme against WCAG AA
 and finds 79 ratios that pass; and `npm run check:client-load`
 evaluates all 66 client modules.
 
