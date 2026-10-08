@@ -76,6 +76,42 @@
     return true;
   }
 
+  // What the server actually said about a file the browser would not load. The browser
+  // discards this, which leaves "did not send" covering a file that does not exist (a bug
+  // in the repository) and an origin that is not answering (nothing to do with the
+  // repository) - and those send a reader to completely different places.
+  var STATUS = {
+    404: 'the server does not have this file',
+    403: 'the server refused this file',
+    410: 'the server has retired this file',
+    429: 'the server is rate limiting this file',
+    500: 'the server failed handling this file',
+    502: 'the origin did not answer',
+    503: 'the origin is unavailable',
+    504: 'the origin timed out',
+    521: 'the origin refused the connection',
+    522: 'the origin did not reply in time',
+    524: 'the origin took too long to reply'
+  };
+  function probe(src, tag, short) {
+    function say(detail) {
+      paintError('Could not load ' + tag + ' ' + short + ' - ' + detail
+        + '. Reload to retry.');
+    }
+    if (!src || typeof fetch !== 'function') {
+      say('the server did not send it');
+      return;
+    }
+    // `no-store` because the answer we want is what the origin is doing right now, and a
+    // cached copy would be the previous good one - which is exactly what is on screen.
+    fetch(src, { method: 'GET', cache: 'no-store' }).then(function (res) {
+      say(STATUS[res.status] ? res.status + ' - ' + STATUS[res.status] : 'HTTP ' + res.status);
+    }, function (err) {
+      say('the server could not be reached'
+        + (err && err.message ? ' (' + String(err.message).slice(0, 60) + ')' : ''));
+    });
+  }
+
   window.addEventListener('error', function (ev) {
     // A file the server did not answer. This arrives as an `error` event on the element
     // that failed to load, it does not bubble, and it carries no message - so without the
@@ -88,8 +124,11 @@
       var tag = String(ev.target.tagName).toLowerCase();
       var short = src ? src.split('/').pop().split('?')[0] : '(unknown file)';
       if (recoverFromStaleGraph('failed to load module script ' + src)) return;
-      paintError('A file the server did not send: ' + tag + ' ' + short
-        + '. Reload to retry.');
+      // A resource error carries no status, so "did not send" was ambiguous between a file
+      // that does not exist and an origin that is not answering - which are different
+      // problems in different places, and the difference was invisible. Ask for the file
+      // once and report what came back.
+      probe(src, tag, short);
       return;
     }
     // file:line:column, not just the filename. A filename alone left three
