@@ -52,7 +52,7 @@ export function emptyState(iconName, title, sub) {
       ? el('div', { class: 'es-icon' }, icon(iconName))
       : iconName);
   }
-  if (title) box.appendChild(el('div', { style: { color: 'var(--t-txt2)', fontWeight: '600' } }, title));
+  if (title) box.appendChild(el('div', { style: { color: 'var(--color-text-secondary)', fontWeight: '600' } }, title));
   if (sub) box.appendChild(el('div', { style: { maxWidth: '420px' } }, sub));
   return box;
 }

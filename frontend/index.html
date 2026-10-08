@@ -1,37 +1,15 @@
 <!doctype html>
-<html lang="en" data-theme="ember" data-motion="full">
+<html lang="en" data-theme="trycord">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Trycord">
-  <meta name="color-scheme" content="dark">
-
-  <!-- Both the browser build, which also gets this as a response header, and the desktop
-       build, which loads this document off disk and so only ever sees this one. They
-       intersect rather than replace, so both are written out. blob: is required for
-       attachment previews; connect-src is open because the backend is instance
-       configuration, not something this document can know. -->
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self';
-    style-src 'self';
-    img-src 'self' data: blob: http: https:;
-    media-src 'self' blob: http: https:;
-    font-src 'self' data:;
-    connect-src 'self' http: https: ws: wss:;
-    worker-src 'self' blob:;
-    object-src 'none';
-    frame-src 'none';
-    base-uri 'self';
-    form-action 'self'">
-
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Trycord - communities that own their communication, identity and data.">
   <title>Trycord</title>
 
-  <!-- Required for a hard refresh of a deep route. /settings/security asks for
-       ./css/app.css, which without this resolves to /settings/css/app.css and comes
-       back as a document. What is written here is the hosted mount; the server rewrites
-       it per request, because the server is the only thing that knows where it is
-       mounted - the same file is served from the origin root by a self-hoster. -->
+  <!-- The hosted mount, for a front end deployed under a path. The server rewrites this
+       per request because it is the only thing that knows where it is mounted; the same
+       file is served from the origin root by a self-hoster. -->
   <base href="/app/">
 
   <link rel="icon" href="./assets/trycord-logo.ico" sizes="any" type="image/x-icon">
@@ -39,12 +17,13 @@
   <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
-  <a class="skip-link" href="#trycord-main">Skip to main content</a>
-
-  <!-- The application tree is built from js/shell/tree.js. -->
+  <!-- One mount point. Anything the application builds beyond this exists in JavaScript,
+       not in this document, so there is no second tree to disagree with the first. -->
   <div id="app"></div>
 
-  <!-- A module that fails to load leaves a blank window otherwise. -->
+  <!-- Loaded before the application, and before it as a plain script with no imports: it
+       has to be able to report a module graph that failed to load, so it cannot depend on
+       that graph. -->
   <script src="./js/crash.js"></script>
   <script type="module" src="./js/app.js"></script>
 </body>

@@ -50,7 +50,7 @@ export function verifyEmailPage(container, token) {
   });
   const msg = el('div', { class: 'muted small', 'aria-live': 'polite' });
   const err = el('div', { class: 'form-error', hidden: true });
-  const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)' } });
+  const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--space-5)' } });
   main.appendChild(err);
   main.appendChild(msg);
   main.appendChild(actions);

@@ -143,7 +143,7 @@ export function loginForm(container) {
       err.appendChild(el('span', {}, ex.message || 'Sign in failed'));
       const actionId = ex && ex.details && ex.details.actionId;
       if (ex && ex.code === 'ACCOUNT_ENFORCED' && actionId) {
-        err.appendChild(el('div', { style: { marginTop: 'var(--t-d-2)' } },
+        err.appendChild(el('div', { style: { marginTop: 'var(--space-2)' } },
           el('a', { class: 'btn sm', href: route('/support/appeals/new?action=') + encodeURIComponent(actionId) }, 'Appeal this decision')));
       }
     } finally {

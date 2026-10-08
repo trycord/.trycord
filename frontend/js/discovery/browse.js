@@ -51,7 +51,7 @@ export async function renderBrowse(container, { previewId } = {}) {
   searchRow.appendChild(input);
   searchRow.appendChild(goBtn);
   wrap.appendChild(searchRow);
-  const resultMeta = el('div', { class: 'muted small', style: { margin: 'var(--t-d-2) 0' } });
+  const resultMeta = el('div', { class: 'muted small', style: { margin: 'var(--space-2) 0' } });
   wrap.appendChild(resultMeta);
 
   const previewPane = el('div', { hidden: true, class: 'stack' });

@@ -189,8 +189,8 @@ export function renderProfileEditor(wrap) {
   const emailBox = el('div', { class: 'field' });
   emailBox.appendChild(el('label', {}, 'Email'));
   const emailLine = el('div', { class: 'muted small' });
-  const emailNote = el('div', { class: 'muted small', style: { marginTop: 'var(--t-d-2)' } });
-  const emailActions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-2)' } });
+  const emailNote = el('div', { class: 'muted small', style: { marginTop: 'var(--space-2)' } });
+  const emailActions = el('div', { class: 'row-line', style: { marginTop: 'var(--space-2)' } });
 
   const paintEmail = (cur) => {
     cur = cur || State.me || {};
@@ -220,11 +220,11 @@ export function renderProfileEditor(wrap) {
     emailActions.appendChild(resend);
   }
 
-  const changePanel = el('div', { style: { marginTop: 'var(--t-d-3)' }, hidden: true });
+  const changePanel = el('div', { style: { marginTop: 'var(--space-4)' }, hidden: true });
   const newEmail = el('input', { class: 'input', type: 'email', placeholder: 'new@example.com', required: true });
   const curPass = el('input', { class: 'input', type: 'password', autocomplete: 'current-password', placeholder: 'Current password', required: true });
   const sendBtn = el('button', { class: 'btn primary sm', type: 'submit' }, (me && me.email ? 'Change' : 'Add') + ' email');
-  const changeForm = el('form', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--t-d-3)' } },
+  const changeForm = el('form', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' } },
     el('div', { class: 'field' }, el('label', {}, 'New recovery email'), newEmail),
     el('div', { class: 'field' }, el('label', {}, 'Current password'), curPass,
       el('span', { class: 'hint' }, 'Required to prove this is your account.')),
