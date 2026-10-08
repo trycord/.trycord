@@ -194,6 +194,13 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      # The graph the server actually serves, over HTTP. Every other client check reads
+      # files on disk; this one asks the server, because a specifier can resolve on disk
+      # and still 404, which is a black screen rather than a failing test.
+      - name: Client module graph over HTTP
+        working-directory: backend
+        run: npm run check:graph
+
       - name: Photograph every surface at eight widths
         working-directory: backend
         run: npm run check:shots
