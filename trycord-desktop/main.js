@@ -153,11 +153,20 @@ function resolveClientFile(requestUrl) {
   const root = path.resolve(clientDir());
   const target = path.resolve(path.join(root, rel));
   if (target !== root && !target.startsWith(root + path.sep)) return null;
-  // Routes are paths, not a hash, so trycord://app/settings is a real
-  // navigation and there is no settings file. Serve the shell instead, or a
-  // reload on any deep route is a blank window.
-  if (!isFile(target)) return path.join(root, 'index.html');
-  return target;
+  if (isFile(target)) return target;
+  // A request for something that looks like a file but is not one gets a 404, not the
+  // shell. The shell is only correct for a *route*: trycord://app/settings is a
+  // navigation and there is no settings file, so a reload there has to land on the
+  // application rather than a blank window.
+  //
+  // Returning index.html for a missing asset is what made the application boot into a
+  // black screen. index.html carries `<base href="/app/">`, the mount a hosted server
+  // rewrites and nothing here rewrites, so ./js/app.js resolved to trycord://app/app/
+  // js/app.js - which is not a file - which came back as index.html with status 200. The
+  // browser was handed HTML where it asked for a module, and the module graph never
+  // started. The crash screen could see the 200 and could not tell it was not JavaScript.
+  if (/\.[a-z0-9]+$/i.test(rel)) return null;
+  return path.join(root, 'index.html');
 }
 
 function isFile(target) {
@@ -168,13 +177,32 @@ function isFile(target) {
   }
 }
 
+// index.html names the mount it expects, and here there is no server to correct it. The
+// hosted deployment rewrites <base href> per request because it is the only thing that
+// knows where it is mounted; the desktop window knows its own answer and has to write it.
+//
+// Served unchanged, the base is "/app/", so every relative asset request from
+// trycord://app/index.html goes to trycord://app/app/... - a directory that does not exist.
+// This is the same rewrite the server does, for the same reason.
+async function serveShell(file) {
+  const res = await net.fetch(pathToFileURL(file).toString());
+  if (!file.endsWith('index.html')) return res;
+  const html = await res.text();
+  const mounted = html.replace(/<base href="[^"]*">/i, '<base href="/">');
+  if (mounted === html) return res;
+  return new Response(mounted, {
+    status: 200,
+    headers: res.headers,
+  });
+}
+
 function registerAppProtocol() {
   protocol.handle(APP_SCHEME, async (request) => {
     const file = resolveClientFile(request.url);
     if (!file) return new Response('Not found', { status: 404 });
     // net.fetch understands file:// and sets the correct Content-Type from the
     // extension, which the client relies on for its ES modules and CSS.
-    return net.fetch(pathToFileURL(file).toString());
+    return serveShell(file);
   });
 }
 

@@ -26,16 +26,21 @@ function mount() {
   // crash.js asks the server what it actually said about a file the browser would not load,
   // because the browser throws that away. Stubbed here so each status can be checked; left
   // to jsdom it would be a different answer on a different day and the check would drift.
-  const net = { status: 404, reject: false, calls: 0 };
+  const net = { status: 404, type: 'text/javascript; charset=utf-8', reject: false, calls: 0 };
   Object.defineProperty(w, 'fetch', {
     configurable: true,
     value: (url, opts) => {
       net.calls++;
       net.url = url;
       net.cache = opts && opts.cache;
-      return net.reject
-        ? Promise.reject(new Error('Failed to fetch'))
-        : Promise.resolve({ status: net.status });
+      if (net.reject) return Promise.reject(new Error('Failed to fetch'));
+      const type = net.type;
+      return Promise.resolve({
+        status: net.status,
+        headers: {
+          get: (k) => (String(k).toLowerCase() === 'content-type' ? type : null),
+        },
+      });
     },
   });
   Object.defineProperty(w, 'sessionStorage', {
@@ -77,10 +82,11 @@ const statuses = (async () => {
       'no #trycord-crash was painted, so the page went dark with nothing on it');
   }
 
-  const say = async (status, reject) => {
+  const say = async (status, reject, type) => {
     const { w, store, net } = mount();
     net.status = status;
     net.reject = !!reject;
+    if (type !== undefined) net.type = type;
     const script = w.document.createElement('script');
     script.src = '/js/app.js';
     w.document.body.appendChild(script);
@@ -95,6 +101,8 @@ const statuses = (async () => {
   check('a 404 says the server does not have the file',
     /404/.test(missing.text) && /does not have/.test(missing.text), missing.text.slice(0, 100));
 
+  const jsOk = await say(200, false, 'text/javascript; charset=utf-8');
+
   const down = await say(521);
   check('a 521 says the origin refused the connection',
     /521/.test(down.text) && /refused the connection/.test(down.text), down.text.slice(0, 100));
@@ -102,6 +110,17 @@ const statuses = (async () => {
   const unreachable = await say(0, true);
   check('an unreachable server says so in its own words',
     /could not be reached/.test(unreachable.text), unreachable.text.slice(0, 100));
+
+  // A 200 whose body is not a script. This is the desktop window's old answer to every
+  // unresolved request - the application shell - and it is why the failure looked like a
+  // healthy server: the status said 200, so the screen said "HTTP 200", which says nothing
+  // about why the browser refused to run it.
+  const shell = await say(200, false, 'text/html; charset=utf-8');
+  check('a 200 that is not a script says so',
+    /200/.test(shell.text) && /text\/html/.test(shell.text) && /rather than a script/.test(shell.text),
+    shell.text.slice(0, 110));
+  check('and a 200 that is a script is reported as such',
+    /200/.test(jsOk.text) && !/rather than a script/.test(jsOk.text), jsOk.text.slice(0, 110));
 
   check('the status is asked for fresh, not from cache',
     down.net.cache === 'no-store', 'cache was ' + down.net.cache);
