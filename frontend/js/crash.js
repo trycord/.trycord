@@ -77,6 +77,21 @@
   }
 
   window.addEventListener('error', function (ev) {
+    // A file the server did not answer. This arrives as an `error` event on the element
+    // that failed to load, it does not bubble, and it carries no message - so without the
+    // capture flag below it is never seen here at all and the result is a black screen
+    // with nothing on it and nothing in the console to act on. That is not hypothetical:
+    // `ui/usercard.js` imported `./components.js` when the module is one level up, and the
+    // whole application went dark without a word from this file.
+    if (ev && ev.target && ev.target !== window && ev.target.tagName) {
+      var src = ev.target.src || ev.target.href || '';
+      var tag = String(ev.target.tagName).toLowerCase();
+      var short = src ? src.split('/').pop().split('?')[0] : '(unknown file)';
+      if (recoverFromStaleGraph('failed to load module script ' + src)) return;
+      paintError('A file the server did not send: ' + tag + ' ' + short
+        + '. Reload to retry.');
+      return;
+    }
     // file:line:column, not just the filename. A filename alone left three
     // separate crashes ambiguous because several modules load from the same
     // place, and the only alternative was devtools - which a desktop user may
@@ -91,7 +106,9 @@
     var msg = (ev && ev.message) ? String(ev.message).slice(0, 200) : 'Unknown script error';
     if (recoverFromStaleGraph(msg)) return;
     paintError('A script error occurred' + where + ': ' + msg);
-  });
+    // Capture, because a module that fails to load fires an error event that does not
+    // bubble, and this listener is the only thing standing between that and a blank page.
+  }, true);
 
   window.addEventListener('unhandledrejection', function (ev) {
     var reason = ev && ev.reason;
