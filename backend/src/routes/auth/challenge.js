@@ -31,3 +31,8 @@ function readChallenge(token) {
     return null;
   }
 }
+
+// login.js reports the window back to the client so it can say how long the code stays
+// valid, which means the constant crosses the module boundary rather than being read
+// twice. It was defined here, used there, and imported by neither.
+module.exports = { CHALLENGE_TTL_SECONDS, signChallenge, readChallenge };

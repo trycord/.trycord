@@ -5,7 +5,7 @@ the code alone does not explain. It is reference, not a plan and not a log.
 
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
-client segments are served; `npm run check:flows` boots a server and passes 62
+client segments are served; `npm run check:flows` boots a server and passes 70
 assertions against real flows; `npm run check:render` boots a server and renders all
 40 routable pages in jsdom, passing 51 assertions over 1151 interactive controls;
 `npm run check:realtime` puts three accounts on three sockets and confirms a
@@ -186,6 +186,7 @@ connection error.
 | `node scripts/check-require-aliases.js` | a service is called by a name it was not bound to, is imported where it is not exported, or is called bare and never imported |
 | `node scripts/check-crash-recovery.js` | the crash surface recovers by itself from a half-updated module graph, and does not reload for an ordinary fault |
 | `node scripts/check-signin.js` | a correct password returns a token. A regression test for the sign-in bug below, which no other check could see |
+| `npm run check:checks-can-fail` | runs eight checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
 | `npm run check-client-styles` | every class name the client emits has a rule in app.css. Finds a forgotten rule; names the two that are handles with no rule on purpose. |
 | `npm run check:dialects` | both database dialects. Boots SQLite and runs the upsert end to end, then has the live MySQL instance **parse** the statement the other branch produces. Not in `check`, because it needs the live database. |
 | `npm run db:backup` | dumps the live database read-only and verifies the dump against what the server reported |he browser cannot load `http` |
@@ -221,6 +222,24 @@ a pattern that matched any lowercase word, so it skipped exactly the modules it 
 written for, and it stripped comments with its own regexes, which is the third time this
 repository has been bitten by that.
 
+The third question was answering almost nothing, and it is the one that would have caught
+all three of the `routes/auth/` defects above. Four things had to be true for it to see a
+single one:
+
+- the specifier resolves the way Node resolves it. The check compared
+  `path.resolve(dir, './roles')` against a list of walked `.js` files, so every
+  extensionless require missed. 381 of the 464 relative requires in this tree were
+  invisible to it.
+- the export block is walked to its matching brace, counting `[`, `(` and quotes, and
+  skipping comments. `gateway.js`, `legal.js` and `origins.js` all annotate their export
+  lists, and a naive counter stopped at the first comment.
+- `key: value` is cut at the colon. Without that, every entry in `legal.js` read as
+  `"TERMS_VERSION: '1.0'"` and matched nothing that imported it.
+- `module.exports.name = name` counts, which is how `middleware/auth.js` hangs four
+  helpers off a bare `module.exports = auth`.
+
+Each of those was found by the checks-can-fail harness, not by reading the check.
+
 `check-server-bindings` and `check:client-bindings` exist because every other check
 verifies that an import *resolves*. None of them notices a name that is simply absent —
 a missing `require`, a missing `toast` — which is a `ReferenceError` on the line that
@@ -228,6 +247,21 @@ uses it and nothing at all until that line runs. Three were live: a stale-refres
 warning that threw inside its own `.catch()`, accepting a friend request from Settings
 that threw after the request had already succeeded, and changing a password that
 succeeded and then threw while repainting. All three passed the four older checks.
+
+The same shape appeared three more times, all in `routes/auth/`, and all found the same
+way — by asking whether a check could fail at all. `requirePassword` was defined in
+`password.js`, exported by nobody, and called unimported from `twofactor.js`, so every
+second-factor route answered 500: an account could not set up, enable, disable or recover
+2FA. `invalidateSessions` was defined in `sessions.js` and exported by nobody, so a
+password change wrote the new hash and then threw. `challenge.js` defined `signChallenge`
+and `readChallenge` and exported neither, so a correct password on an account with 2FA
+answered 500 one line into the branch. Three files, three exports, and nothing in seventy
+flow assertions touched a second factor.
+
+`npm run check:checks-can-fail` exists because of that run. It copies the tree, breaks one
+thing per check, and requires the check to notice: eight checks, three runs each, clean
+and broken and reverted, so a run that dies mid-way leaves nothing behind. It is what
+turned up the `require-aliases` defects below, which had been hiding the whole time.
 
 Getting the noise to zero took four attempts — 98 findings, then 40, then 15, then 1 —
 and the reason is `strip-comments.mjs`. Comments have to come out by character

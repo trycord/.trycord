@@ -10,7 +10,7 @@ const rateLimit = require('../../middleware/ratelimit');
 const enforcement = require('../../services/enforcement');
 const twofactor = require('../../services/twofactor');
 const { issued } = require('./issued');
-const { signChallenge, readChallenge } = require('./challenge');
+const { signChallenge, readChallenge, CHALLENGE_TTL_SECONDS } = require('./challenge');
 
 // POST /login and POST /2fa/verify.
 // 

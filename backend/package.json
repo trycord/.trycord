@@ -27,6 +27,7 @@
     "check": "node scripts/check.js && node scripts/check-routes.js && node scripts/check-server-routes.js && node scripts/check-server-bindings.js && node scripts/check-client-modules.js && node scripts/check-client-bindings.js && node scripts/check-client-load.js && node scripts/check-sibling-bindings.js && node scripts/check-singletons.js && node scripts/check-client-headings.js && node scripts/check-client-registry.js && node scripts/check-origins.js && node scripts/check-contrast.js && node scripts/check-client-styles.js && node scripts/check-require-aliases.js && node scripts/check-crash-recovery.js && node scripts/check-signin.js && node scripts/check-split-loses.js",
     "check-client-styles": "node scripts/check-client-styles.js",
     "check-server-routes": "node scripts/check-server-routes.js",
+    "check:checks-can-fail": "node scripts/check-checks-can-fail.js",
     "check:client": "node scripts/check-client-modules.js",
     "check:client-bindings": "node scripts/check-client-bindings.js",
     "check:client-load": "node scripts/check-client-load.js",

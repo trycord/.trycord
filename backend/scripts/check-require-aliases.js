@@ -132,37 +132,73 @@ const findings = [];
 // since check-client-modules.js was written; the server did not.
 function exportsOf(src) {
   const names = new Set();
+  // `key: value` is the common shape, and only the key is a name. Without cutting at the
+  // first colon every entry in legal.js read as "TERMS_VERSION: '1.0'", which matched
+  // nothing that imports it - so five correct imports looked like missing exports.
+  // Comments come out first: these blocks are annotated, and the names after a comment
+  // were arriving as one entry beginning with a slash. `stripComments` is what the rest
+  // of this check already uses for the same reason.
   const add = (list) => {
     for (const raw of list.split(',')) {
       const part = raw.trim().replace(/^type\s+/, '');
       if (!part) continue;
       const as = /\bas\s+([A-Za-z0-9_$]+)$/.exec(part);
-      names.add(as ? as[1] : part);
+      names.add(as ? as[1] : part.split(':')[0].trim());
     }
   };
   for (const m of src.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm)) {
     names.add(m[1]);
   }
   for (const m of src.matchAll(/^export\s*\{([^}]*)\}/gm)) add(m[1]);
+  // The block runs to the matching brace, counting every kind. A brace counter that
+  // only knows about `{` stops at the first one it meets, and these blocks all carry
+  // comments - gateway.js explains why disconnectUser keeps its name, origins.js
+  // explains the desktop scheme - so a naive walk cut every one of them short and
+  // reported the names after the comment as missing. Strings and template literals
+  // count too, which is why the slice below walks rather than matching to the next `}`.
   for (const m of src.matchAll(/^module\.exports\s*=\s*\{/gm)) {
-    // The block runs to the matching brace; good enough for a list of short names.
     const start = m.index + m[0].length;
     let depth = 1;
     let i = start;
+    let quote = null;
     while (i < src.length && depth > 0) {
-      if (src[i] === '{') depth++;
-      else if (src[i] === '}') depth--;
+      const c = src[i];
+      if (quote) {
+        if (c === '\\') i++;
+        else if (c === quote) quote = null;
+      } else if (c === '"' || c === "'" || c === '`') {
+        quote = c;
+      } else if (c === '{' || c === '[' || c === '(') {
+        depth++;
+      } else if (c === '}' || c === ']' || c === ')') {
+        depth--;
+        if (depth === 0) break;
+      } else if (c === '/' && src[i + 1] === '/') {
+        while (i < src.length && src[i] !== '\n') i++;
+      } else if (c === '/' && src[i + 1] === '*') {
+        i += 2;
+        while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++;
+        i++;
+      }
       i++;
     }
-    add(src.slice(start, i - 1));
+    add(src.slice(start, i));
   }
+  // The shorthand assignments that follow a bare `module.exports = fn`, which is how a
+  // middleware with one primary export still hangs named helpers off the same object.
+  // auth.js is the shape: `module.exports = auth` and then four `module.exports.x = x`
+  // lines, so without this every one of those names read as missing.
+  for (const m of src.matchAll(/^module\.exports\.([A-Za-z_$][\w$]*)\s*=/gm)) names.add(m[1]);
   if (/^module\.exports\s*=\s*[A-Za-z_$][\w$]*\s*;/m.test(src)) names.add('__default_fn__');
   if (/^module\.exports\s*=\s*\{/m.test(src)) names.add('__default_obj__');
   return names;
 }
 
+const walkedFiles = new Set(files);
 const exportedBy = new Map();
-for (const [file, { raw }] of sources) exportedBy.set(file, exportsOf(raw));
+// `code` is the comment-stripped form, and `raw` is not: these export blocks are
+// annotated, and an unstripped one arrives with a name glued to the comment above it.
+for (const [file, { code }] of sources) exportedBy.set(file, exportsOf(code));
 
 for (const [file, { raw, code }] of sources) {
   // Question 0: names destructured out of a require that the target does not export.
@@ -170,7 +206,12 @@ for (const [file, { raw, code }] of sources) {
     /(?:const|let|var)\s*\{([^{}]*)\}\s*=\s*require\(\s*'([^']+)'\s*\)/g)) {
     const spec = m[2];
     if (!spec.startsWith('.') && !spec.startsWith('/')) continue;
-    const target = path.resolve(path.dirname(file), spec);
+    // Node resolves an extensionless specifier by trying .js, .json and the directory
+    // index. walkedFiles only holds the .js files, so a target had to be matched
+    // extensionless or the lookup missed - which is why 381 of the 464 relative
+    // requires in this tree were invisible to this question.
+    const base = path.resolve(path.dirname(file), spec);
+    const target = walkedFiles.has(base) ? base : base + '.js';
     const available = exportedBy.get(target);
     if (!available) continue; // question 1/2 covers a module that is not there at all
     for (const part of m[1].split(',')) {
