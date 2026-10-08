@@ -211,7 +211,16 @@ async function boot() {
   // policy then refuses presents as an empty application rather than as a
   // switch, which is the same symptom as having no failover at all.
   [apiOrigin, apiBackup, inst.publicUrl, inst.globalUrl].forEach((o) => o && addCspOrigin(o));
-  ['http://localhost:9971', 'http://127.0.0.1:9971', 'https://trycord.dev'].forEach(addCspOrigin);
+  // The two loopback origins, because an operator developing against this instance reaches
+  // it from there. Nothing else is here by default.
+  //
+  // https://trycord.dev used to be in this list, which meant every self-hosted instance
+  // shipped a Content-Security-Policy naming the official network - a client served from
+  // somebody's own server was permitted to send its traffic to it. Self-hosting is a
+  // property of the architecture, so an origin that has nothing to do with the operator's
+  // instance does not belong in the operator's policy. If they do want it, they set
+  // CSP_CONNECT_ORIGINS, which is what that setting is for.
+  ['http://localhost:9971', 'http://127.0.0.1:9971'].forEach(addCspOrigin);
   String(process.env.CSP_CONNECT_ORIGINS || '')
     .split(',').map((s) => s.trim()).filter(Boolean).forEach(addCspOrigin);
   // The scheme and host a request arrived on, or null when it did not arrive
@@ -226,18 +235,6 @@ async function boot() {
     return proto + '://' + host;
   }
 
-  // The served client's own static pin (backend.json) is part of the
-  // centralized backend configuration: allow it once the client directory
-  // is located below. Self-hosters need no edit at all - see the /backend.json
-  // handler below, which repoints that file at whichever instance is serving it.
-  function allowClientStaticBackend(clientDir) {
-    if (!clientDir) return;
-    try {
-      const raw = fs.readFileSync(path.join(clientDir, 'backend.json'), 'utf8');
-      const pinned = cspOriginOf(JSON.parse(raw).backendUrl);
-      if (pinned) addCspOrigin(pinned);
-    } catch { /* missing/unparseable file means "no static pin" */ }
-  }
   const buildCsp = (allowInlineScripts, extraOrigins) => {
     const connect = [...new Set([...cspConnect, ...(extraOrigins || [])])];
     return [
@@ -398,7 +395,6 @@ async function boot() {
     appMount: APP_MOUNT,
     originOf,
     cspOriginOf,
-    allowClientStaticBackend,
   });
 
 
