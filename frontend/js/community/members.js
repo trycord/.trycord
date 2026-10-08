@@ -8,6 +8,9 @@ import { errorState, loadingState, onStale } from '../view-states.js';
 import { renderContextHeader, memberActions } from '../shell.js';
 import { openRoleAssignModal, rolePill } from '../role-assignment.js';
 import { userNameButton } from '../user-actions.js';
+import {
+  openNicknameModal, openBanModal, openTimeoutModal,
+} from './member-moderation.js';
 import { ensureServer, reloadServer } from '../workspace-shared.js';
 import { navigate } from '../nav.js';
 
@@ -29,100 +32,8 @@ function timedOutUntil(m) {
 }
 
 
-function openNicknameModal(serverId, member, wrap) {
-  const name = member.nickname || member.display_name || member.username;
-  const input = el('input', { class: 'input', type: 'text', maxlength: 32, placeholder: 'Nickname (2-32 chars)', value: name });
-  const err = el('div', { class: 'form-error', hidden: true });
-  const save = el('button', { class: 'btn primary', type: 'button' }, 'Save');
-  const clearBtn = el('button', { class: 'btn ghost', type: 'button' }, 'Clear');
-  const modal = openModal({
-    title: 'Nickname',
-    body: el('div', {}, err,
-      el('p', { class: 'muted small' }, 'Set how @' + (member.username || '') + ' appears in this community. Empty clears it.'),
-      input),
-    footer: [clearBtn, save],
-  });
-  const saveIt = async () => {
-    err.hidden = true;
-    try {
-      const res = await Api.setNickname(serverId, member.user_id || member.id, input.value.trim());
-      toast(res && res.nickname ? 'Nickname saved.' : 'Nickname cleared.', 'ok');
-      modal.close();
-      await enterServer(serverId).catch(() => {});
-      if (wrap) renderMemberList(wrap, serverId);
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
-  };
-  save.addEventListener('click', saveIt);
-  clearBtn.addEventListener('click', async () => {
-    err.hidden = true;
-    try {
-      await Api.setNickname(serverId, member.user_id || member.id, '');
-      toast('Nickname cleared.', 'ok');
-      modal.close();
-      await enterServer(serverId).catch(() => {});
-      if (wrap) renderMemberList(wrap, serverId);
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Failed'; }
-  });
-}
 
-function openBanModal(serverId, m, onDone) {
-  const id = m.user_id || m.id;
-  const reason = el('input', { class: 'input', type: 'text', maxlength: 500, placeholder: 'Reason (optional)' });
-  const dur = el('select', { class: 'input' });
-  [['', 'Permanent'], ['60', '1 hour'], ['1440', '1 day'], ['10080', '7 days']].forEach(([v, label]) => {
-    const o = el('option', { value: v }, label);
-    dur.appendChild(o);
-  });
-  const err = el('div', { class: 'form-error', hidden: true });
-  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
-  const go = el('button', { class: 'btn danger', type: 'button' }, 'Ban member');
-  const modal = openModal({
-    title: 'Ban @' + (m.username || ''),
-    body: el('div', {}, err,
-      el('div', { class: 'field' }, el('label', {}, 'Reason'), reason),
-      el('div', { class: 'field' }, el('label', {}, 'Duration'), dur),
-      el('p', { class: 'muted small' }, 'Banned users are removed immediately and cannot rejoin until unbanned or the ban expires.')),
-    footer: [cancel, go],
-  });
-  cancel.addEventListener('click', () => modal.close());
-  go.addEventListener('click', async () => {
-    err.hidden = true;
-    try {
-      await Api.banMember(serverId, id, { reason: reason.value.trim() || undefined, minutes: dur.value ? Number(dur.value) : undefined });
-      modal.close();
-      toast('Member banned.', 'ok');
-      await onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not ban member.'; }
-  });
-}
 
-function openTimeoutModal(serverId, m, onDone) {
-  const id = m.user_id || m.id;
-  const dur = el('select', { class: 'input' });
-  [['10', '10 minutes'], ['60', '1 hour'], ['1440', '1 day'], ['10080', '7 days'], ['', 'Clear timeout']].forEach(([v, label]) => {
-    dur.appendChild(el('option', { value: v }, label));
-  });
-  const err = el('div', { class: 'form-error', hidden: true });
-  const cancel = el('button', { class: 'btn ghost', type: 'button' }, 'Cancel');
-  const go = el('button', { class: 'btn primary', type: 'button' }, 'Apply');
-  const modal = openModal({
-    title: 'Timeout @' + (m.username || ''),
-    body: el('div', {}, err,
-      el('div', { class: 'field' }, el('label', {}, 'Duration'), dur),
-      el('p', { class: 'muted small' }, 'Timed-out members stay in the community but cannot post until it lapses.')),
-    footer: [cancel, go],
-  });
-  cancel.addEventListener('click', () => modal.close());
-  go.addEventListener('click', async () => {
-    err.hidden = true;
-    try {
-      await Api.timeoutMember(serverId, id, dur.value === '' ? null : Number(dur.value));
-      modal.close();
-      toast(dur.value === '' ? 'Timeout cleared.' : 'Member timed out.', 'ok');
-      await onDone();
-    } catch (ex) { err.hidden = false; err.textContent = ex.message || 'Could not set timeout.'; }
-  });
-}
 
 async function renderServerMembers(container, serverId) {
   clear(container);
@@ -314,7 +225,7 @@ async function renderServerMembers(container, serverId) {
       const actions = el('div', { class: 'card--list__actions' });
       actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => { navigate('/users/' + id); } }, 'Profile'));
       if (mine || can('KICK_MEMBERS')) {
-        actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => openNicknameModal(serverId, m, wrap) }, 'Nickname'));
+        actions.appendChild(el('button', { class: 'btn sm', type: 'button', onClick: () => openNicknameModal(serverId, m, () => renderMemberList(wrap, serverId)) }, 'Nickname'));
       }
       if (can('MANAGE_ROLES') && !m.is_owner) {
         const manage = el('button', {
@@ -424,7 +335,7 @@ function renderMemberList(wrap, serverId) {
     const mine = State.me && String(rid) === String(State.me.id);
     if (mine || canNickname) {
       const nick = el('button', { class: 'btn sm', type: 'button', title: 'Set nickname' }, 'nick');
-      nick.addEventListener('click', () => openNicknameModal(serverId, m, wrap));
+      nick.addEventListener('click', () => openNicknameModal(serverId, m, () => renderMemberList(wrap, serverId)));
       row.appendChild(nick);
     }
     listBox.appendChild(row);
