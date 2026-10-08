@@ -135,16 +135,30 @@ if (findings.length) {
   process.exit(1);
 }
 // Comparing nothing is not passing. This check reads the committed version of each file
-// from before its split, so a shallow clone, a tarball export, or a copy without .git all
-// make every `git show` throw, every split `continue`, and the check report success while
-// having verified no split at all. Found by check-checks-can-fail.js, which runs this
-// against a copy of the tree precisely because a copy has no history.
+// from before its split, so a shallow clone makes every `git show` throw, every split
+// `continue`, and the check report success while having verified no split at all. Found by
+// check-checks-can-fail.js, which runs this against a copy of the tree precisely because a
+// copy has no history.
+//
+// Two situations, two answers. No repository at all - a source tarball, a Docker build
+// context, `git archive` - means the check cannot run, and saying so and exiting clean is
+// right, because there is no defect there to find. A repository that is present but cannot
+// produce the revisions means CI checked out too little, and that is a failure.
+const inARepository = fs.existsSync(path.join(ROOT, '.git'))
+  || fs.existsSync(path.join(ROOT, '..', '.git'));
+
 if (!compared) {
+  if (!inARepository) {
+    console.log(`split loss check SKIPPED - there is no repository here, so there is no`
+      + ` history to compare against (${SPLITS.length} splits). Each one is compared as it`
+      + `\n  was before the split, so this needs a clone rather than an export.`);
+    process.exit(0);
+  }
   console.error('\n  split loss check FAILED - 0 of ' + SPLITS.length
     + ' splits could be compared.\n');
-  console.error('  It reads each file as it was before its split, so it needs the commits.'
-    + ' A shallow\n  clone or an export without .git makes every comparison throw and the'
-    + ' check pass on nothing.\n');
+  console.error('  It reads each file as it was before its split, so it needs the commits. A'
+    + ' shallow\n  clone has the repository but not the history, so every comparison throws'
+    + ' and the\n  check passes on nothing. CI needs fetch-depth: 0.\n');
   process.exit(1);
 }
 console.log(`split loss check passed (${compared} splits, every module-scope declaration is accounted for)`);
