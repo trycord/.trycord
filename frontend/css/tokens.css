@@ -1,0 +1,421 @@
+/* ==========================================================================
+   Trycord design tokens.
+
+   One palette, one scale, one set of names. Everything below this file refers to
+   these tokens and never to a raw colour, which is what lets a custom theme
+   replace the whole surface without touching a component.
+
+   The direction: warm near-black rather than blue-black, surfaces that read as
+   charcoal with brown in them, off-white text that is not pure white, borders
+   that are quiet, and one saturated colour - Ember - used sparingly enough that
+   it still means something.
+   ========================================================================== */
+
+/* The default palette is addressed two ways on purpose. Bare :root is what a
+   reader gets before the theme engine has run, and data-theme='trycord' is
+   what it sets when they pick Trycord itself - naming it makes the theme
+   visible to the checks, which is how a theme with no rule behind it is
+   caught instead of silently rendering as whatever came before. */
+:root,
+:root[data-theme='trycord'] {
+  color-scheme: dark;
+
+  /* -- surfaces --------------------------------------------------------- */
+  --color-background: #0c0a09;
+  --color-surface: #141110;
+  --color-surface-elevated: #1c1817;
+  --color-surface-hover: #241f1d;
+  --color-surface-active: #2b2523;
+  --color-surface-sunken: #080706;
+
+  /* -- lines ------------------------------------------------------------ */
+  --color-border: #2a2422;
+  --color-border-strong: #3d3532;
+  --color-border-subtle: #1f1a19;
+
+  /* -- type ------------------------------------------------------------- */
+  --color-text-primary: #f2ece7;
+  --color-text-secondary: #b6aca5;
+  /* Solved against every surface it can land on, not only --color-surface: the interior
+     surfaces are lighter, and muted on surface-active was 4.01:1. #978c82 clears 4.5 on
+     the whole set, worst case 4.59. */
+  --color-text-muted: #978c82;
+  --color-text-inverse: #140f0c;
+
+  /* -- Ember, the accent ------------------------------------------------- */
+  --color-accent: #ff7a29;
+  --color-accent-hover: #ff8f47;
+  --color-accent-active: #e8641a;
+  --color-accent-muted: #4a2411;
+  --color-accent-subtle: #2a160b;
+  --color-on-accent: #180d05;
+
+  /* -- meaning ----------------------------------------------------------- */
+  --color-success: #6fbf73;
+  --color-warning: #e3b341;
+  --color-danger: #e0574f;
+  --color-info: #6aa9d8;
+  --color-success-muted: #1c2c1d;
+  --color-warning-muted: #2e2714;
+  --color-danger-muted: #2e1a19;
+  --color-info-muted: #16242e;
+
+  /* -- typography ------------------------------------------------------- */
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", ui-monospace, monospace;
+
+  --text-xs: 0.6875rem;
+  --text-sm: 0.78125rem;
+  --text-base: 0.875rem;
+  --text-md: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.7;
+
+  --tracking-wide: 0.06em;
+  --tracking-tight: -0.01em;
+
+  /* -- space ------------------------------------------------------------ */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 20px;
+  --space-8: 24px;
+  --space-9: 32px;
+  --space-10: 40px;
+  --space-11: 56px;
+
+  /* -- shape ------------------------------------------------------------ */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-pill: 999px;
+  --radius-circle: 50%;
+
+  /* -- depth ------------------------------------------------------------ */
+  /* Warm, not neutral: a shadow over an orange-black surface reads grey unless
+     the shadow carries some of the background's hue. */
+  --shadow-sm: 0 1px 2px rgba(6, 4, 3, 0.5);
+  --shadow-md: 0 4px 12px rgba(6, 4, 3, 0.55);
+  --shadow-lg: 0 12px 32px rgba(6, 4, 3, 0.62);
+  --shadow-pop: 0 16px 48px rgba(4, 3, 2, 0.7);
+  --glow-accent: 0 0 0 1px rgba(255, 122, 41, 0.34), 0 0 18px rgba(255, 122, 41, 0.16);
+
+  /* -- motion ----------------------------------------------------------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 90ms;
+  --duration-normal: 160ms;
+  --duration-slow: 260ms;
+
+  /* -- layout ----------------------------------------------------------- */
+  --rail-width: 68px;
+  --sidebar-width: 244px;
+  --sidebar-collapsed: 60px;
+  --members-width: 232px;
+  --header-height: 48px;
+  --composer-min: 44px;
+  --tabbar-height: 56px;
+  --page-max: 1180px;
+  --reading-max: 68ch;
+  --gutter: 20px;
+
+  /* Target size. WCAG 2.2 SC 2.5.8 sets 24px as the minimum, and that is the line the
+     layout check fails below. The comfortable figure is reported, not enforced: a
+     38px form input is a perfectly good control and failing it would be encoding a
+     stricter rule than the standard the check claims to enforce. */
+  --target-min: 24px;
+  --target-comfortable: 44px;
+
+  --z-sticky: 20;
+  --z-drawer: 40;
+  --z-popover: 60;
+  --z-modal: 80;
+  --z-toast: 90;
+  --z-crash: 100;
+
+  /* Overlays. A scrim over the application's own background, so a theme that
+     changes the background changes the scrim with it - hardcoded rgba black
+     sits wrong on a light theme and check-contrast rejects it for that reason. */
+  /* The letter drawn on a derived community or avatar colour. Those colours are all dark
+     warm tones, so the ink has to be light - and the app solves against the whole palette
+     rather than one entry, because the tone is chosen by a hash. */
+  --color-mark-ink: #c8c1bc;
+
+  --overlay-scrim: rgba(12, 10, 9, 0.72);
+  --overlay-scrim-soft: rgba(12, 10, 9, 0.6);
+  --overlay-scrim-strong: rgba(12, 10, 9, 0.9);
+}
+
+/* A light theme, because the token names are the contract and a theme that has
+   to override components has already failed. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-background: #faf7f4;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-hover: #f2ede8;
+  --color-surface-active: #e9e2dc;
+  --color-surface-sunken: #f4efea;
+
+  --color-border: #e0d8d1;
+  --color-border-strong: #c9bdb4;
+  --color-border-subtle: #efe9e4;
+
+  --color-text-primary: #1c1613;
+  --color-text-secondary: #55493f;
+  --color-text-muted: #6f6155;
+  --color-text-inverse: #fdfbf9;
+
+  --color-accent: #964e18;
+  --color-accent-hover: #7e4013;
+  --color-accent-active: #68340e;
+  --color-accent-muted: #f3ddcb;
+  --color-accent-subtle: #fbeee2;
+  --color-on-accent: #fffaf6;
+
+  --color-success: #2f7a34;
+  --color-warning: #9a6b09;
+  --color-danger: #b8332b;
+  --color-info: #2b6c9c;
+  --color-success-muted: #e4f2e5;
+  --color-warning-muted: #f7ecd8;
+  --color-danger-muted: #fae6e4;
+  --color-info-muted: #e4eef6;
+
+  --shadow-sm: 0 1px 2px rgba(60, 40, 25, 0.09);
+  --shadow-md: 0 4px 12px rgba(60, 40, 25, 0.11);
+  --shadow-lg: 0 12px 32px rgba(60, 40, 25, 0.14);
+  --shadow-pop: 0 16px 48px rgba(60, 40, 25, 0.18);
+  --glow-accent: 0 0 0 1px rgba(217, 84, 10, 0.3), 0 0 16px rgba(217, 84, 10, 0.12);
+
+  --overlay-scrim: rgba(250, 247, 244, 0.78);
+  --overlay-scrim-soft: rgba(250, 247, 244, 0.62);
+  --overlay-scrim-strong: rgba(250, 247, 244, 0.92);
+}
+
+/* Density is a reader setting, not a theme: it changes how much fits, never
+   what anything looks like. */
+:root[data-density="compact"] {
+  --space-5: 8px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-9: 22px;
+  --space-10: 28px;
+  --header-height: 42px;
+  --rail-width: 60px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+/* --------------------------------------------------------------------------
+   The other themes in the picker.
+
+   Each one overrides the same semantic names and nothing else, which is the
+   point: a theme is a palette, not a second stylesheet. The engine does not
+   know these exist beyond the id - it sets data-theme and every component
+   follows.
+
+   check-render asserts that every theme the picker offers has a rule here, so
+   a theme added to the picker without one fails the build rather than
+   rendering as the default.
+   -------------------------------------------------------------------------- */
+
+/* Orthocord: cool steel on neutral charcoal. Deliberately colder than
+   Trycord, and the accent is not orange at all - this is what Trycord looks
+   like to somebody who does not want Ember. */
+:root[data-theme='orthocord'] {
+  --color-background: #0b0d10;
+  --color-surface: #12151a;
+  --color-surface-elevated: #191d23;
+  --color-surface-hover: #20252d;
+  --color-surface-active: #272d36;
+  --color-surface-sunken: #070809;
+
+  --color-border: #242a33;
+  --color-border-strong: #364050;
+  --color-border-subtle: #1a1f26;
+
+  --color-text-primary: #eef2f7;
+  --color-text-secondary: #a9b4c2;
+  --color-text-muted: #9c9385;
+
+  --color-accent: #62a8e8;
+  --color-accent-hover: #7fbbef;
+  --color-accent-active: #4a8fcc;
+  --color-accent-muted: #16304a;
+  --color-accent-subtle: #0e1f30;
+  --color-on-accent: #05121d;
+
+  --color-success: #5fbf8f;
+  --color-warning: #e0b055;
+  --color-danger: #e2695f;
+  --color-info: #62a8e8;
+  --color-success-muted: #12291f;
+  --color-warning-muted: #2c2415;
+  --color-danger-muted: #2c1917;
+  --color-info-muted: #14212e;
+
+  --shadow-sm: 0 1px 2px rgba(3, 5, 8, 0.5);
+  --shadow-md: 0 4px 12px rgba(3, 5, 8, 0.55);
+  --shadow-lg: 0 12px 32px rgba(3, 5, 8, 0.62);
+  --shadow-pop: 0 16px 48px rgba(3, 5, 8, 0.7);
+  --glow-accent: 0 0 0 1px rgba(98, 168, 232, 0.32), 0 0 18px rgba(98, 168, 232, 0.14);
+  --overlay-scrim: rgba(11, 13, 16, 0.72);
+  --overlay-scrim-soft: rgba(11, 13, 16, 0.6);
+  --overlay-scrim-strong: rgba(11, 13, 16, 0.9);
+}
+
+/* Midnight: deep indigo, dimmer and lower contrast than Trycord on purpose.
+   A theme for reading at night, not a different brand. */
+:root[data-theme='midnight'] {
+  --color-background: #08080f;
+  --color-surface: #0f1019;
+  --color-surface-elevated: #161825;
+  --color-surface-hover: #1d2030;
+  --color-surface-active: #252839;
+  --color-surface-sunken: #050509;
+
+  --color-border: #212436;
+  --color-border-strong: #333854;
+  --color-border-subtle: #181a26;
+
+  --color-text-primary: #e6e7f2;
+  --color-text-secondary: #a4a6bd;
+  --color-text-muted: #968d9b;
+
+  --color-accent: #9b8cf0;
+  --color-accent-hover: #b0a3f4;
+  --color-accent-active: #8071e0;
+  --color-accent-muted: #2b2456;
+  --color-accent-subtle: #1b1736;
+  --color-on-accent: #0b0818;
+
+  --color-success: #63c194;
+  --color-warning: #dfb85c;
+  --color-danger: #e86b6b;
+  --color-info: #7fa8e8;
+  --color-success-muted: #122a20;
+  --color-warning-muted: #2c2617;
+  --color-danger-muted: #2d181c;
+  --color-info-muted: #16212e;
+
+  --shadow-sm: 0 1px 2px rgba(2, 2, 8, 0.5);
+  --shadow-md: 0 4px 12px rgba(2, 2, 8, 0.55);
+  --shadow-lg: 0 12px 32px rgba(2, 2, 8, 0.62);
+  --shadow-pop: 0 16px 48px rgba(2, 2, 8, 0.7);
+  --glow-accent: 0 0 0 1px rgba(155, 140, 240, 0.3), 0 0 18px rgba(155, 140, 240, 0.14);
+  --overlay-scrim: rgba(8, 8, 15, 0.74);
+  --overlay-scrim-soft: rgba(8, 8, 15, 0.62);
+  --overlay-scrim-strong: rgba(8, 8, 15, 0.92);
+}
+
+/* Ember: the same warm family as Trycord, pushed. More saturated accent, more
+   warmth in the surfaces, for people who want the accent louder. */
+:root[data-theme='ember'] {
+  --color-background: #100a06;
+  --color-surface: #1a110b;
+  --color-surface-elevated: #241710;
+  --color-surface-hover: #2e1e14;
+  --color-surface-active: #38251a;
+  --color-surface-sunken: #0b0604;
+
+  --color-border: #352217;
+  --color-border-strong: #4b3020;
+  --color-border-subtle: #26180f;
+
+  --color-text-primary: #fdf3ea;
+  --color-text-secondary: #c7ac98;
+  --color-text-muted: #a68c74;
+
+  --color-accent: #ff8c1a;
+  --color-accent-hover: #ffa347;
+  --color-accent-active: #e0720c;
+  --color-accent-muted: #59290a;
+  --color-accent-subtle: #331707;
+  --color-on-accent: #1a0c02;
+
+  --color-success: #7bc45f;
+  --color-warning: #f0bb3c;
+  --color-danger: #ef6a3c;
+  --color-info: #e0a878;
+  --color-success-muted: #1f2c16;
+  --color-warning-muted: #33280f;
+  --color-danger-muted: #33190f;
+  --color-info-muted: #2c1e14;
+
+  --shadow-sm: 0 1px 2px rgba(8, 3, 0, 0.5);
+  --shadow-md: 0 4px 12px rgba(8, 3, 0, 0.55);
+  --shadow-lg: 0 12px 32px rgba(8, 3, 0, 0.62);
+  --shadow-pop: 0 16px 48px rgba(8, 3, 0, 0.7);
+  --glow-accent: 0 0 0 1px rgba(255, 140, 26, 0.38), 0 0 20px rgba(255, 140, 26, 0.2);
+  --overlay-scrim: rgba(16, 10, 6, 0.72);
+  --overlay-scrim-soft: rgba(16, 10, 6, 0.6);
+  --overlay-scrim-strong: rgba(16, 10, 6, 0.9);
+}
+
+/* High contrast: near-black on white text, borders everywhere, nothing
+   ambiguous. Every pair here is checked by check-contrast like any other
+   theme - a theme nobody verified is a theme nobody has looked at. */
+:root[data-theme='high-contrast'] {
+  --color-background: #000000;
+  --color-surface: #000000;
+  --color-surface-elevated: #0d0d0d;
+  --color-surface-hover: #1c1c1c;
+  --color-surface-active: #2b2b2b;
+  --color-surface-sunken: #000000;
+
+  --color-border: #5c5c5c;
+  --color-border-strong: #8f8f8f;
+  --color-border-subtle: #383838;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #e4e4e4;
+  --color-text-muted: #c2c2c2;
+
+  --color-accent: #ffb020;
+  --color-accent-hover: #ffc24d;
+  --color-accent-active: #e09400;
+  --color-accent-muted: #4a3200;
+  --color-accent-subtle: #241900;
+  --color-on-accent: #000000;
+
+  --color-success: #6ee79a;
+  --color-warning: #ffd166;
+  --color-danger: #ff8f85;
+  --color-info: #8fd0ff;
+  --color-success-muted: #0a2416;
+  --color-warning-muted: #2a2200;
+  --color-danger-muted: #2a0f0c;
+  --color-info-muted: #0a1e2c;
+
+  --shadow-sm: 0 0 0 1px #5c5c5c;
+  --shadow-md: 0 0 0 1px #5c5c5c;
+  --shadow-lg: 0 0 0 2px #8f8f8f;
+  --shadow-pop: 0 0 0 2px #8f8f8f;
+  --glow-accent: 0 0 0 2px #ffb020;
+  --overlay-scrim: rgba(0, 0, 0, 0.86);
+  --overlay-scrim-soft: rgba(0, 0, 0, 0.7);
+  --overlay-scrim-strong: rgba(0, 0, 0, 0.94);
+}

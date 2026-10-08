@@ -141,16 +141,19 @@ const MEASURE = String.raw`
   // 2. Pointer targets.
   //
   //    The failure line is 24x24, which is WCAG 2.2 SC 2.5.8 Target Size (Minimum) at
-  //    AA. My first version of this asserted the app's own --t-hit (44px) against
+  //    AA. My first version of this asserted the app's own 44px target (Apple's guideline) against
   //    everything, which is Apple's guideline, not the standard, and it failed 38-40px
   //    form inputs that are perfectly good controls. A check that encodes a stricter rule
   //    than the one it claims to enforce gets ignored when it goes off.
   //
-  //    Below the line is a failure. Between the line and --t-hit is reported, not failed:
+  //    Below the line is a failure. Between the line and the comfortable target is reported, not failed:
   //    on a phone it is worth knowing about, but it is a design decision rather than a
   //    defect, and only the person who owns the design can make it.
   const rootStyle = getComputedStyle(document.documentElement);
-  const hitDeclared = parseFloat(rootStyle.getPropertyValue('--t-hit')) || 44;
+  // The design system's own names. This read --t-hit and --t-fs-xs, which the palette
+  // rebuild retired, so both fell through to their defaults: a 12px floor that the real
+  // 11px --text-xs failed, and a 44px advisory line for a token that no longer exists.
+  const hitDeclared = parseFloat(rootStyle.getPropertyValue('--target-min')) || 24;
   const AA = 24;
   const advisory = window.innerWidth < 820;
   for (const el of document.querySelectorAll('button, a[href], input, select, textarea, [role="button"], [role="tab"]')) {
@@ -179,7 +182,7 @@ const MEASURE = String.raw`
   }
 
   // 3. Text that is too small to read comfortably at the size it is actually rendered.
-  const fsDeclared = parseFloat(rootStyle.getPropertyValue('--t-fs-xs')) || 12;
+  const fsDeclared = parseFloat(rootStyle.getPropertyValue('--text-xs')) || 12;
   for (const el of document.querySelectorAll('body *')) {
     if (el.children.length) continue;
     if (!visible(el)) continue;

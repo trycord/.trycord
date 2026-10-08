@@ -28,7 +28,7 @@ const source = fs.readFileSync(CSS, 'utf8');
  * Every theme's tokens.
  *
  * Reading only :root checked one of the eight themes a reader can pick. Each one has its
- * own --t-mut, and one of them had the same value that fails, which a check of :root
+ * own muted colour, and one of them had the same value that fails, which a check of :root
  * alone would never have seen.
  */
 function themes() {
@@ -36,12 +36,18 @@ function themes() {
   // :root first, so it is the default theme's starting point; later blocks override it.
   let current = null;
   source.split('\n').forEach((line, i) => {
-    const sel = line.match(/^:root(?:\[data-theme='([a-z-]+)'\])?\s*\{/);
+    // Both quote styles. It only accepted data-theme='light', so a theme written
+    // data-theme="light" was never read - and a theme the check cannot see is a theme
+    // nobody has verified the contrast of.
+    const sel = line.match(/^:root(?:\[data-theme=["']([a-z-]+)["']\])?\s*\{/);
     if (sel) {
       current = sel[1] || 'trycord';
       if (!blocks.has(current)) blocks.set(current, {});
     } else if (current) {
-      const m = line.match(/^\s*(--t-[a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})/);
+      // The semantic names, not the retired --t-* ones. A check that reads names the design
+      // system no longer uses reports nothing at all, which is what happened when the
+      // palette was rebuilt: it failed on nineteen tokens that had not existed for a while.
+      const m = line.match(/^\s*(--color-[a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})/);
       if (m) blocks.get(current)[m[1]] = normalise(m[2]);
       if (line.trim() === '}') current = null;
     }
@@ -109,24 +115,24 @@ console.log('\n  contrast in the default theme');
 
 // The pairs the design intends, and the surface each is actually drawn on.
 const TEXT_ON = [
-  ['--t-txt', '--t-pg', 4.5, 'primary text on the page'],
-  ['--t-txt', '--t-base', 4.5, 'primary text in the workspace'],
-  ['--t-txt', '--t-base2', 4.5, 'primary text in a rail or sidebar'],
-  ['--t-txt', '--t-elev', 4.5, 'primary text on a raised card'],
-  ['--t-txt2', '--t-base', 4.5, 'secondary text in the workspace'],
-  ['--t-txt2', '--t-base2', 4.5, 'secondary text in a rail or sidebar'],
-  ['--t-txt2', '--t-elev', 4.5, 'secondary text on a raised card'],
-  ['--t-mut', '--t-base', 4.5, 'muted text in the workspace'],
-  ['--t-mut', '--t-base2', 4.5, 'muted text in a rail or sidebar'],
-  ['--t-mut', '--t-elev', 4.5, 'muted text on a raised card'],
-  // --t-dim is not a disabled colour. Fifty-odd rules use it for text that is meant to
+  ['--color-text-primary', '--color-background', 4.5, 'primary text on the page'],
+  ['--color-text-primary', '--color-surface', 4.5, 'primary text in the workspace'],
+  ['--color-text-primary', '--color-surface-sunken', 4.5, 'primary text in a rail or sidebar'],
+  ['--color-text-primary', '--color-surface-elevated', 4.5, 'primary text on a raised card'],
+  ['--color-text-secondary', '--color-surface', 4.5, 'secondary text in the workspace'],
+  ['--color-text-secondary', '--color-surface-sunken', 4.5, 'secondary text in a rail or sidebar'],
+  ['--color-text-secondary', '--color-surface-elevated', 4.5, 'secondary text on a raised card'],
+  ['--color-text-muted', '--color-surface', 4.5, 'muted text in the workspace'],
+  ['--color-text-muted', '--color-surface-sunken', 4.5, 'muted text in a rail or sidebar'],
+  ['--color-text-muted', '--color-surface-elevated', 4.5, 'muted text on a raised card'],
+  // Muted is not a disabled colour. Dozens of rules use it for text that is meant to
   // be read - timestamps, counts, "edited", hints, empty states - and it sat at 2.33:1
   // on a raised card, which is where a message timestamp actually lives. The token-level
-  // check could not see this: it never looked at --t-dim at all, because the colour check
+  // check could not see this: it never looked at muted at all, because the colour check
   // and the layout check were separate worlds and the bug was in the space between them.
-  ['--t-dim', '--t-base', 4.5, 'de-emphasised text in the workspace'],
-  ['--t-dim', '--t-base2', 4.5, 'de-emphasised text in a rail or sidebar'],
-  ['--t-dim', '--t-elev', 4.5, 'de-emphasised text on a raised card'],
+  ['--color-accent', '--color-surface', 4.5, 'accent text in the workspace'],
+  ['--color-accent', '--color-surface-sunken', 4.5, 'accent text in a rail or sidebar'],
+  ['--color-accent', '--color-surface-elevated', 4.5, 'accent text on a raised card'],
 ];
 
 const allThemes = themes();
@@ -145,38 +151,41 @@ for (const [name, table] of allThemes) {
   }
 }
 
-// --t-dim is the floor for anything unread, and it says so. It is allowed to be less
+// Muted is the floor for anything unread, and it says so. It is allowed to be less
 // than body-text minimum because it is only ever used for genuinely disabled things -
 // but it still has to be legible enough to recognise.
-const dim = token('--t-dim');
-if (dim) ok('disabled text is at least recognisable', ratio(dim, token('--t-base')), 2.0);
-else failures.push('--t-dim not found');
+const dim = token('--color-text-muted');
+if (dim) ok('muted text is at least recognisable', ratio(dim, token('--color-surface')), 2.0);
+else failures.push('--color-text-muted not found');
 
 // Accent ink on accent is the whole button, and a primary button that fails contrast is
 // the most visible failure a theme can have.
-const accent = token('--t-accent');
-const ink = token('--t-accent-ink');
+const accent = token('--color-accent');
+const ink = token('--color-on-accent');
 if (accent && ink) {
   ok('text on a primary button', ratio(ink, accent), 4.5);
-  ok('the accent itself against the workspace', ratio(accent, token('--t-base')), 3.0);
-  ok('the accent itself against the page', ratio(accent, token('--t-pg')), 3.0);
+  ok('the accent itself against the workspace', ratio(accent, token('--color-surface')), 3.0);
+  ok('the accent itself against the page', ratio(accent, token('--color-background')), 3.0);
 } else {
   failures.push('accent tokens not found');
 }
 
 // Status colours carry meaning on their own - a red dot has to read as red - so they are
 // held to the non-text 3:1 rather than to body text.
-for (const [name, what] of [['--t-ok', 'the success colour'], ['--t-warn', 'the warning colour'], ['--t-err', 'the error colour']]) {
+for (const [name, what] of [['--color-success', 'the success colour'],
+  ['--color-warning', 'the warning colour'], ['--color-danger', 'the danger colour']]) {
   const c = token(name);
-  if (c) ok(what + ' is distinguishable from the workspace', ratio(c, token('--t-base')), 3.0);
+  if (c) ok(what + ' is distinguishable from the workspace', ratio(c, token('--color-surface')), 3.0);
   else failures.push(name + ' not found');
 }
 
 // A border that separates two things has to be visible enough to do it.
-const line = token('--t-line');
-const lineHi = token('--t-line-hi');
+const line = token('--color-border');
+const lineHi = token('--color-border-strong');
 if (line && lineHi) {
-  ok('the strongest border against a surface', ratio(lineHi, token('--t-base')), 1.5);
+  ok('the strongest border against a surface', ratio(lineHi, token('--color-surface')), 1.5);
+} else {
+  failures.push('border tokens not found');
 }
 
 console.log('\n  colours hardcoded outside the token block');
