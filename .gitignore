@@ -67,3 +67,8 @@ tests/browser/shots/
 # Screenshots from backend/scripts/browser/shots.mjs. Generated on every run and
 # uploaded as a CI artifact; nothing to commit.
 backend/shots/
+
+# Database dumps. They hold every user row including password hashes and email
+# addresses, so they belong on the machine that made them and nowhere else. Git is not
+# somewhere a copy of that goes.
+/data/
