@@ -16,14 +16,6 @@ export const BLOCK_TYPES = [
   { type: 'rule', label: 'Divider', make: () => ({ type: 'rule' }) },
 ];
 
-export function summaryOf(block) {
-  if (!block) return '(empty)';
-  if (block.type === 'list') return `${block.items.length} item(s)`;
-  if (block.type === 'rule') return 'divider';
-  if (block.type === 'link') return `${block.text} → ${block.href}`;
-  return block.text || '(empty)';
-}
-
 export function statusChipFor(page) {
   if (page.status === 'PUBLISHED') return ['Published', 'resolved'];
   if (page.status === 'DRAFT') return ['Draft', 'open'];

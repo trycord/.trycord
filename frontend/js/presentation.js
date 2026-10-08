@@ -238,7 +238,6 @@ export function wireDrawerGestures() {
 export const isDesktopNavOpen = isNavOpen;
 export const openDesktopNav = openNav;
 export const closeDesktopNav = closeNav;
-export const toggleDesktopNav = toggleNav;
 
 const TrycordPresentation = {
   mode: presentationMode,
@@ -252,6 +251,7 @@ const TrycordPresentation = {
   wire: wireNav,
   onChange: onPresentationChange,
 };
+
 
 export { TrycordPresentation };
 export default TrycordPresentation;
