@@ -2850,8 +2850,10 @@ input.switch:disabled { opacity: 0.5; cursor: default; }
    14  overlays
    --------------------------------------------------------------------------
    Three fixed layers, mounted by ui.js into #modal-root, #popover-root and
-   #toast-root. The roots are inert containers in index.html, so they carry no
-   positioning of their own and the children position themselves.
+   #toast-root. Two of them are inert containers with no positioning of their own -
+   the modal card and the popover panel place themselves - so they carry a class and no
+   rule, and ui.js finds the layer by that class. #toast-root is not one of them: it is
+   positioned below, because a toast needs somewhere to stack from.
    ========================================================================== */
 
 /* A modal is a centred card, and a sheet from the bottom on a phone. Same

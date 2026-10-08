@@ -9,7 +9,11 @@ node_modules/
 *.db-journal
 *.db-wal
 *.db-shm
-uploads/
+# Where uploaded files land. Anchored, because an unanchored `uploads/` also matched
+# backend/src/services/uploads/ - the source of the uploads service - and four of its five
+# modules were silently missing from every clone, so a fresh checkout could not start the
+# server at all. A directory name is not a safe ignore pattern when code shares it.
+/backend/uploads/
 
 # build output
 release/
@@ -30,10 +34,10 @@ trycord-desktop/build/icon.ico
 .DS_Store
 Thumbs.db
 
-# Screenshots are output, not source.
+# Screenshots are output, not source. This one line covers all of it; an earlier `/tests/`
+# below it was hiding six source files, and the reason given - that the directory was
+# output - was already handled here.
 tests/browser/shots/
-
-/tests/
 
 # .github/ is not ignored. It held four workflows - check, publish-docker,
 # release-desktop and the screenshot pipeline - and none of them were tracked, so
@@ -45,17 +49,19 @@ tests/browser/shots/
 # It builds and pushes an image on *every* push to main, so tracking it would start
 # publishing images for every commit from now on rather than resuming something that
 # had been switched off deliberately. That is a decision about their infrastructure,
-# not a cleanup.
-
-# See above. Builds and pushes an image on every push to main, so it stays out
-# until that is a decision someone makes on purpose rather than by accident.
+# not a cleanup - and it is the one ignore in this file that is a decision rather than
+# an accident. The file is on disk and complete; tracking it is `git add -f` and a
+# push, and narrowing it to tag-triggered is a two-line edit to its `on:` block.
 /.github/workflows/publish-docker.yml
 
 # shots.yml runs the screenshot suite, which is scaffolding for UI work rather than
-# something every push should pay for. It lives on a shots/* branch together with the
-# scripts it drives - tests/browser/, ignored above as /tests/ - so on main it would
-# reference a directory that does not exist, which is the same mistake the browser
-# job in check.yml was making.
+# something every push should pay for. An earlier version of this comment said it lived
+# on a shots/* branch together with the scripts it drives; there is no such branch, and
+# the scripts it referenced were untracked, so the reasoning described a setup that did
+# not exist. The real reason to leave it out is in backend/scripts/browser/README.md:
+# a repository that ships a browser-driving workflow to every self-hoster asks each of
+# them to keep a Chromium around for a test they did not ask for. The suite itself is
+# tracked and runs on demand.
 /.github/workflows/shots.yml
 
 # Screenshots from backend/scripts/browser/shots.mjs. Generated on every run and
