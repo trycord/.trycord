@@ -45,8 +45,12 @@ const CASES = [
     // renderPrivacySocial is exported by exactly one module (account/privacy.js) and
     // notifications.js does not import it, which is the shape the check is for: a name
     // used in a module that neither defines it nor imports it.
-    break: (f) => append(f, '\nexport function __probe() { return renderPrivacySocial; }\n'),
-    word: 'renderPrivacySocial' },
+    // Two shapes of the same fault, because the check answers two questions. The first
+    // borrows a name one module owns; the second calls a name nobody exports at all,
+    // which is the case the second rule exists for.
+    break: (f) => append(f, '\nexport function __probe() { return renderPrivacySocial; }\n'
+      + 'export function __probe2() { return nothingDefinesThis(); }\n'),
+    word: 'nothingDefinesThis' },
 
   { script: 'check-sibling-bindings', file: 'frontend/js/shell/sidebar.js',
     guards: 'a sibling module used through a bare name',
