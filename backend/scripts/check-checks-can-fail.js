@@ -127,6 +127,40 @@ const CASES = [
     break: (f) => append(f, '\nthrow new Error("__probe: this module does not load");\n'),
     word: 'load' },
 
+  { script: 'check-client-modules', file: 'frontend/js/global/notifications.js',
+    guards: 'a client import that does not resolve',
+    break: (f) => append(f, "\nimport { nothingHere } from './no-such-module.js';\n"),
+    word: 'no-such-module' },
+
+  { script: 'check', file: 'backend/src/db/schema.js',
+    guards: 'an index the schema declares but never creates',
+    // check.js applies the schema to a throwaway database and then looks for the critical
+    // index names, so the two have to disagree for it to see anything.
+    break: (f) => replaceIn(f, /'CREATE INDEX idx_messages_channel ON/, "'CREATE INDEX idx__probe ON"),
+    word: 'idx_messages_channel' },
+
+  { script: 'check-signin', file: 'backend/src/routes/auth/issued.js',
+    guards: 'a sign-in that does not return a token',
+    // The shape is Object.assign, not a literal, so the token has to be dropped from the
+    // object it is merged into. This is the file whose missing export made every login
+    // 500, so it is worth having under test permanently.
+    break: (f) => replaceIn(f, /return res\.json\(Object\.assign\(\{\n    token,/,
+      'return res.json(Object.assign({\n    token: undefined,'),
+    word: 'token' },
+
+  // Reads the committed pre-split file, so it needs the repository and not a copy.
+  { script: 'check-split-loses', file: 'frontend/js/theme/registry.js',
+    needsHistory: true,
+    guards: 'a module-scope declaration that no split file carries',
+    // Only a name that was *there* and is now gone counts: the check compares the
+    // committed pre-split theme.js against the directory it became, so adding one proves
+    // nothing and neither does touching a split the pre-split file never had. It also
+    // Deleting the whole line, not just the export keyword: the name is still declared
+    // either way, and the remaining two uses of it below are references, not
+    // declarations, so only removing it counts as a loss.
+    break: (f) => replaceIn(f, /^export const DEFAULT_THEME = .*\n/m, ''),
+    word: 'DEFAULT_THEME' },
+
   { script: 'check-crash-recovery', file: 'frontend/js/crash.js',
     guards: 'a stale module graph with nothing that recovers from it',
     // Dropping the arm is the real defect: without it the one-shot guard can never fire,
@@ -173,20 +207,25 @@ if (!cases.length) {
 console.log(`\n  ${cases.length} check(s), against a copy at ${work}\n`);
 
 for (const c of cases) {
-  const target = path.join(work, c.file);
+  // A check that reads git history cannot run against a copy - there is no .git there,
+  // which is how check-split-loses came to pass on nothing at all. Those run in the
+  // working copy with the file put back afterwards, which is the one thing this harness
+  // does that could leave something behind if it were killed mid-run.
+  const dir = c.needsHistory ? REPO : work;
+  const target = path.join(dir, c.file);
   if (!fs.existsSync(target)) {
     ok(c.script + ': the file it breaks exists', false, c.file);
     continue;
   }
   const saved = fs.readFileSync(target, 'utf8');
 
-  const clean = run(work, c.script);
+  const clean = run(dir, c.script);
   ok(`${c.script}: passes on the tree as committed`, clean.code === 0,
     'exit ' + clean.code + '  ' + tail(clean.out));
 
   try {
     c.break(target);
-    const broken = run(work, c.script);
+    const broken = run(dir, c.script);
     ok(`${c.script}: fails when there is ${c.guards}`, broken.code !== 0,
       'still exit 0, so it is not looking at ' + c.file);
     ok(`${c.script}: and names it, mentioning ${c.word}`,
@@ -196,7 +235,7 @@ for (const c of cases) {
     fs.writeFileSync(target, saved, 'utf8');
   }
 
-  const after = run(work, c.script);
+  const after = run(dir, c.script);
   ok(`${c.script}: green again once the breakage is reverted`, after.code === 0,
     'exit ' + after.code + '  ' + tail(after.out));
 }
