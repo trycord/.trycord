@@ -79,6 +79,20 @@ module.exports = {
         + Object.entries(setColumns).map(([c, e]) => `\`${c}\` = ${e}`).join(', ');
     return active().run(sql, values);
   },
+  /**
+   * How one dialect spells "the value I just inserted, in a column I am not naming".
+   *
+   * MySQL writes `VALUES(column)` in an ON DUPLICATE KEY UPDATE branch and SQLite writes
+   * `excluded.column` in an ON CONFLICT one. Three services were each carrying their own
+   * copy of this one-liner, and when the sessions service was split out of privacy it was
+   * left behind - so recordSession threw on every login, inside a `.catch()` that logs and
+   * carries on, and sessions silently stopped being recorded at all.
+   *
+   * It belongs here because this is the module that knows the dialect in the first place.
+   */
+  newRef: (column) => (conn && conn.dialect === 'mysql'
+    ? `VALUES(${column})`
+    : `excluded.${column}`),
   get: (...args) => active().get(...args),
   all: (...args) => active().all(...args),
   run: (...args) => active().run(...args),

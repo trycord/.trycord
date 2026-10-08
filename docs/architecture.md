@@ -5,7 +5,7 @@ the code alone does not explain. It is reference, not a plan and not a log.
 
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
-client segments are served; `npm run check:flows` boots a server and passes 70
+client segments are served; `npm run check:flows` boots a server and passes 72
 assertions against real flows; `npm run check:render` boots a server and renders all
 40 routable pages in jsdom, passing 81 assertions;
 `npm run check:realtime` puts three accounts on three sockets and confirms a
@@ -290,6 +290,28 @@ That second question found eight live faults, none of which any other check coul
 The last two could have been fixed by importing the helper, but the parent module already
 imports the child in both cases, so importing back would close a cycle. Each moved to the
 file that is its only caller.
+
+The same second question now exists on the server, and it found a live bug that had been
+shipping silently for a week. `services/sessions.js` was split out of
+`services/privacy.js` and left calling `newRef`, a one-liner that had stayed behind in the
+module it came from — three copies of it existed across `prefs.js`, `privacy.js` and the
+original. `recordSession` threw on every login, inside a `.catch()` in `issued.js` that logs
+and carries on, so signing in worked perfectly and **no session was ever recorded**: the
+Security page listed nothing to sign out of, and "sign out everywhere" had no rows to
+revoke. The live database's newest session was a week old.
+
+`newRef` now lives on `db` beside `upsert`, because that is the module that knows the
+dialect it is spelling for — `VALUES(column)` on MySQL and `excluded.column` on SQLite —
+and three services were each carrying their own copy. All three call `db.newRef`.
+
+The check also learned to collect two things it had been missing, both found by its own
+first run: the parameters of a method (`async transaction(fn) {` has no `function` in
+front of it) and the names a destructured `for...of` head binds
+(`for (const [name, read] of Object.entries(sections))`).
+
+And check-flows now asserts that signing in records a session. Nothing before this did,
+which is why a week of missing rows passed seventy assertions. Reintroducing the bug fails
+two of them with `sessions=[]`.
 
 `check-server-bindings` and `check:client-bindings` exist because every other check
 verifies that an import *resolves*. None of them notices a name that is simply absent —

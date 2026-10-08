@@ -33,8 +33,6 @@ const DEFAULTS = {
 // SQLite writes `excluded.column`; MySQL and MariaDB write `VALUES(column)`.
 // db.upsert() builds the surrounding statement, but this part is a per-value
 // expression and so is spelled here, once, at the call site.
-const newRef = (column) =>
-  db.dialect === 'mysql' ? `VALUES(${column})` : `excluded.${column}`;
 
 const boolInt = (v) => (v ? 1 : 0);
 const intBool = (v) => !!v;
@@ -84,11 +82,11 @@ async function setPrivacy(userId, patch) {
     [userId, next.friendRequests, next.dms, next.presence, boolInt(next.discoverable), ts],
     ['user_id'],
     {
-      friend_requests: newRef('friend_requests'),
-      dms: newRef('dms'),
-      presence: newRef('presence'),
-      discoverable: newRef('discoverable'),
-      updated_at: newRef('updated_at'),
+      friend_requests: db.newRef('friend_requests'),
+      dms: db.newRef('dms'),
+      presence: db.newRef('presence'),
+      discoverable: db.newRef('discoverable'),
+      updated_at: db.newRef('updated_at'),
     }
   );
   return next;
@@ -126,7 +124,7 @@ async function block(userId, blockedId, reason) {
     ['user_id', 'blocked_id', 'reason', 'created_at'],
     [userId, blockedId, reason || null, ts],
     ['user_id', 'blocked_id'],
-    { reason: newRef('reason') }
+    { reason: db.newRef('reason') }
   );
 
   const pending = await db.get(

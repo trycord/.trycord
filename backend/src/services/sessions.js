@@ -17,7 +17,7 @@ async function recordSession({ jti, userId, userAgent, ip, label }) {
     ['jti', 'user_id', 'label', 'user_agent', 'ip', 'created_at', 'last_seen_at'],
     [jti, userId, label || null, (userAgent || '').slice(0, 512) || null, ip || null, ts, ts],
     ['jti'],
-    { last_seen_at: newRef('last_seen_at') }
+    { last_seen_at: db.newRef('last_seen_at') }
   );
 }
 
