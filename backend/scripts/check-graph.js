@@ -34,6 +34,33 @@ const missing = [];
 const from = [];
 const askedBy = new Map();
 let fetched = 0;
+let failures = 0;
+
+const ok = (label, cond, detail) => {
+  console.log(`  ${cond ? 'ok  ' : 'FAIL'} ${label}${detail && !cond ? '  <- ' + detail : ''}`);
+  if (!cond) failures++;
+};
+
+/**
+ * How many modules the client ships, read from the directory rather than from the network.
+ * Zero when there is no client beside this server, which is the case for a self-hoster who
+ * has not cloned the front end - there is nothing to compare against and the walk stands
+ * on its own.
+ */
+function countClientModules() {
+  const jsDir = path.join(ROOT, '..', 'frontend', 'js');
+  let total = 0;
+  (function walk(dir) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith('.js')) total++;
+    }
+  })(jsDir);
+  return total;
+}
 
 async function get(p) {
   if (cache.has(p)) return cache.get(p);
@@ -59,8 +86,18 @@ function specs(src) {
     .replace(/^[ \t]*\/\/.*$/gm, ' ')
     .replace(/^([ \t]*)(\/\/)[^\n]*$/gm, '$1 ');
   const out = new Set();
-  // import ... from 'x'   |  import('x')   |  export ... from 'x'
-  for (const m of body.matchAll(/(?:^|[^\w$])(?:import|export)\s*(?:[\s\S]*?\s*from\s*)?\(?\s*['"](\.[^'"]+)['"]/gm)) {
+  // import ... from 'x'   |  import('x')   |  export ... from 'x'   |  import 'x'
+  //
+  // The `from` clause has to span lines, because a name list can be one name per line -
+  // api.js imports eleven that way - but it must never cross a statement boundary. Written
+  // as one lazy `[\s\S]*?\s*from\s*` it reaches past the end of a bare `import 'x';` and
+  // latches onto the `from` of the *next* import, so the capture reports that module and the
+  // bare one is never recorded. `pages/lifecycle.js` has `import './handlers.js';` for its
+  // side effect, and handlers.js is the parent of every page renderer - so the walk reported
+  // "every import the server is asked for is one it serves" having visited 58 of 116
+  // modules and not one page. Excluding the semicolon and quotes from the clause is what
+  // lets a multi-line name list through while still stopping at the end of the statement.
+  for (const m of body.matchAll(/(?:^|[^\w$])(?:import|export)\s*(?:[^;'"]*?\sfrom\s*)?\(?\s*['"](\.[^'"]+)['"]/gm)) {
     out.add(m[1]);
   }
   return out;
@@ -109,12 +146,17 @@ async function boot(port) {
     await boot(port);
   }
   const entry = '/js/app.js';
-  const seen = new Set([entry]);
-  const queue = [entry];
+  // Both roots: the module entry, and crash.js, which the document loads with a <script>
+  // tag rather than an import. No walk of the module graph can reach crash.js, and it is the
+  // one module whose health decides whether a failure is a black screen or a sentence
+  // explaining itself - so it is asked about directly rather than assumed present.
+  const roots = [entry, '/js/crash.js'];
+  const seen = new Set(roots);
+  const queue = [...roots];
   let rounds = 0;
 
   while (queue.length) {
-    if (++rounds > 400) { console.log('  refusing to follow more than 400 modules'); break; }
+    if (++rounds > 600) { console.log('  refusing to follow more than 600 modules'); break; }
     const p = queue.shift();
     const src = await get(p);
     if (src === null) continue;
@@ -125,8 +167,11 @@ async function boot(port) {
     }
   }
 
-  console.log('  entry            : ' + entry);
-  console.log('  modules walked   : ' + seen.size);
+  const onDisk = countClientModules();
+  console.log('  modules on disk  : ' + onDisk);
+  // Every module the client ships, now that crash.js is walked as a root too.
+  ok('the walk reaches every module the client ships', onDisk === 0 || seen.size >= onDisk,
+    'walked ' + seen.size + ' of ' + onDisk + '; the rest were never asked about');
   console.log('  bodies fetched   : ' + fetched);
   console.log('  not served       : ' + missing.length);
   for (const m of from.slice(0, 20)) console.log('    from ' + m);
@@ -138,12 +183,14 @@ async function boot(port) {
   };
   process.on('exit', stop);
   stop();
-  if (missing.length) {
-    console.error('\n  graph check FAILED - ' + missing.length + ' import(s) the server does'
-      + ' not answer\n');
-    process.exit(1);
+  if (missing.length || failures) {
+    console.error('\n  graph check FAILED - ' + (missing.length
+      ? missing.length + ' import(s) the server does not answer' : '')
+      + (missing.length && failures ? ', ' : '')
+      + (failures ? failures + ' assertion(s)' : '') + '\n');
+    process.exitCode = 1;
+    return;
   }
-  console.log('\n  graph check passed - every import the server is asked for is one it serves'
-    + '\n');
-  process.exit(0);
+  console.log('\n  graph check passed - every import the server is asked for is one it serves,'
+    + ' and every module the client ships was asked about\n');
 })();
