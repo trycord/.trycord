@@ -37,6 +37,7 @@
     "check:contrast": "node scripts/check-contrast.js",
     "check:dialects": "node scripts/check-dialects.js",
     "check:flows": "node scripts/check-flows.js",
+    "check:graph": "node scripts/check-graph.js",
     "check:headings": "node scripts/check-client-headings.js",
     "check:origins": "node scripts/check-origins.js",
     "check:realtime": "node scripts/check-realtime.js",
