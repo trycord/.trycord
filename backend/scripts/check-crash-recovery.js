@@ -45,6 +45,40 @@ function mount() {
 const results = [];
 const check = (name, ok, detail) => results.push({ name, ok, detail: detail || '' });
 
+// A file the server does not answer. The browser fires a non-bubbling `error` on the
+// element that failed, with no message, so a listener without the capture flag never
+// sees it and the application goes dark without a word. `ui/usercard.js` imported
+// './components.js' when the module is one level up and that is exactly what happened.
+{
+  const { w, store } = mount();
+  const crashed = () => !!w.document.getElementById('trycord-crash');
+  const script = w.document.createElement('script');
+  script.src = '/js/does-not-exist.js';
+  // Attached, or the event has no path to window and nothing sees it - which is the other
+  // half of why this failure was invisible.
+  w.document.body.appendChild(script);
+  // A resource error carries no message and does not bubble; dispatch it on the element
+  // the way the browser does, and let the listener find it or not.
+  const fire = () => {
+    const ev = new w.Event('error');
+    ev.target = script;
+    script.dispatchEvent(ev);
+  };
+  // The first one is spent on the stale-graph reload, because a file that was cached and
+  // is gone now looks exactly like a file that was never there. The second is the one a
+  // reader sees, and it has to be a message rather than a black screen.
+  fire();
+  check('a missing file is treated as a stale graph once', !crashed() && store['trycord.staleReload'] === '1',
+    'reload flag is ' + store['trycord.staleReload']);
+  fire();
+  check('a file the server did not send says so', crashed(),
+    'no #trycord-crash was painted, so the page went dark with nothing on it');
+  if (crashed()) {
+    const t = w.document.getElementById('trycord-crash').textContent || '';
+    check('and names the file', /did not send/.test(t) && /does-not-exist/.test(t), t.slice(0, 90));
+  }
+}
+
 // 1. The exact failure the tab hit: recover silently, do not apologise.
 {
   const { w, store } = mount();
