@@ -10,7 +10,7 @@ export function renderBackendSelector(mount) {
   const source = TrycordConfig.backendSource();
 
   mount.appendChild(el('div', { class: 'section-label' }, 'Backend'));
-  const current = el('div', { class: 'row-line', style: { marginBottom: 'var(--t-d-2)' } },
+  const current = el('div', { class: 'row-line', style: { marginBottom: 'var(--space-2)' } },
     el('span', { class: 'muted small', style: { overflowWrap: 'anywhere' } }, url),
     el('span', { class: 'badge' }, source));
   mount.appendChild(current);
@@ -18,7 +18,7 @@ export function renderBackendSelector(mount) {
   const input = el('input', { class: 'input', type: 'url', inputmode: 'url', value: url, placeholder: 'https://api.example.com' });
   const status = el('div', { class: 'muted small', 'aria-live': 'polite', style: { minHeight: '1.2em' } },
     'Default: the official backend. Point here at your own instance to self-host.');
-  const row = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-2)' } });
+  const row = el('div', { class: 'row-line', style: { marginTop: 'var(--space-2)' } });
   const saveBtn = el('button', { class: 'btn sm', type: 'button' }, 'Save');
   const testBtn = el('button', { class: 'btn ghost sm', type: 'button' }, 'Test connection');
   const resetBtn = el('button', { class: 'btn ghost sm', type: 'button' }, 'Reset to default');

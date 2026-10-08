@@ -59,7 +59,7 @@ export async function renderProfile(container, { id } = {}) {
       el('div', { class: 'prof-presence' }, profile.presence === 'online' ? '● online' : 'offline'),
       profile.statusText ? el('div', { class: 'prof-status' }, profile.statusText) : null,
       profile.bio ? el('div', { class: 'prof-bio' }, profile.bio) : el('div', { class: 'muted small' }, 'No bio yet.'),
-      el('div', { class: 'muted small', style: { marginTop: 'var(--t-d-2)' } }, 'Member since ' + fullTime(profile.createdAt))));
+      el('div', { class: 'muted small', style: { marginTop: 'var(--space-2)' } }, 'Member since ' + fullTime(profile.createdAt))));
   if (profile.membership) {
     const mbox = el('div', { class: 'prof-community' });
     mbox.appendChild(el('div', { class: 'section-label' }, 'In this community'));
@@ -138,7 +138,7 @@ export async function renderProfile(container, { id } = {}) {
       return b;
     }
 
-    const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)' } });
+    const actions = el('div', { class: 'row-line', style: { marginTop: 'var(--space-5)' } });
     const blockBtn = el('button', { class: 'btn ghost', type: 'button' }, blocked ? 'Unblock' : 'Block');
     blockBtn.addEventListener('click', async () => {
       blockBtn.disabled = true;

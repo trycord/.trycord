@@ -49,7 +49,7 @@ export async function renderNotifications(container) {
   clear(container);
   renderContextHeader({ title: 'Notifications', sub: 'Replies, mentions, messages and requests' });
   const wrap = el('div', { class: 'page' });
-  const toolbar = el('div', { class: 'row-line', style: { marginBottom: 'var(--t-d-3)' } });
+  const toolbar = el('div', { class: 'row-line', style: { marginBottom: 'var(--space-4)' } });
   const markAll = el('button', { class: 'btn sm', type: 'button' }, 'Mark all read');
   markAll.addEventListener('click', async () => {
     try {

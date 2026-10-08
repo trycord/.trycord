@@ -62,7 +62,7 @@ export function openModal({ title, eyebrow, closable, body, footer, closeText = 
     box.setAttribute('aria-label', 'Dialog');
   }
   if (body) box.appendChild(el('div', {}, body));
-  if (footer) box.appendChild(el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-4)', justifyContent: 'flex-end' } }, footer));
+  if (footer) box.appendChild(el('div', { class: 'row-line', style: { marginTop: 'var(--space-5)', justifyContent: 'flex-end' } }, footer));
 
   const prevFocus = document.activeElement;
 

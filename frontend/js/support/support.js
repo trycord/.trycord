@@ -68,7 +68,7 @@ export async function renderSupport(container) {
   link(rules, 'Privacy Policy', 'What this instance stores, and why.', '/privacy', 'document');
 
   if (instanceName) {
-    wrap.appendChild(el('p', { class: 'muted small', style: { marginTop: 'var(--t-d-5)' } },
+    wrap.appendChild(el('p', { class: 'muted small', style: { marginTop: 'var(--space-6)' } },
       'You are on ' + instanceName + '. Appeals are reviewed by this instance\u2019s team.'));
   }
   container.appendChild(wrap);
@@ -167,7 +167,7 @@ export async function renderMyAppeals(container) {
       when + (a.id ? ' · reference ' + String(a.id).slice(0, 8) : '')));
 
     if (a.decision) {
-      info.appendChild(el('div', { class: 'small', style: { marginTop: 'var(--t-d-1)' } },
+      info.appendChild(el('div', { class: 'small', style: { marginTop: 'var(--space-1)' } },
         String(a.decision)));
     }
     row.appendChild(info);
