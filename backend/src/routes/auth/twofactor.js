@@ -7,6 +7,8 @@ const { fail, serviceError } = require('../../errors');
 const { now, uuid, sign, signWithJti, secret } = require('../../util');
 const events = require('../../services/events');
 const twofactor = require('../../services/twofactor');
+const { requirePassword } = require('./password');
+const { invalidateSessions } = require('./sessions');
 
 // The second factor itself - status, setup, enable, disable, recovery codes.
 

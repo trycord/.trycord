@@ -17,6 +17,7 @@
 // whether a bookmark works.
 
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -36,6 +37,35 @@ function ok(label, condition, detail) {
     failures++;
     console.log('  FAIL ' + label + (detail ? '  <- ' + detail : ''));
   }
+}
+
+// The server's TOTP, restated rather than imported: src/services/twofactor.js hands back
+// a base32 secret and expects a six-digit code for the current 30-second step. RFC 6238
+// with HMAC-SHA1, which is what every authenticator app produces, so this is not a private
+// algorithm being mirrored - it is the public one. Written out here because the check
+// talks to a server over HTTP and cannot reach into its module.
+const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function base32Decode(s) {
+  let bits = 0, value = 0;
+  const out = [];
+  for (const ch of String(s).toUpperCase()) {
+    const idx = B32.indexOf(ch);
+    if (idx === -1) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) { bits -= 8; out.push((value >> bits) & 0xff); }
+  }
+  return Buffer.from(out);
+}
+function totpCode(secretB32) {
+  const step = Math.floor(Date.now() / 1000 / 30);
+  const buf = Buffer.alloc(8);
+  buf.writeBigUInt64BE(BigInt(step));
+  const hmac = crypto.createHmac('sha1', base32Decode(secretB32)).update(buf).digest();
+  const off = hmac[hmac.length - 1] & 0x0f;
+  const bin = ((hmac[off] & 0x7f) << 24) | (hmac[off + 1] << 16)
+    | (hmac[off + 2] << 8) | hmac[off + 3];
+  return String(bin % 10 ** 6).padStart(6, '0');
 }
 
 async function call(method, path_, body, token) {
@@ -402,6 +432,70 @@ async function waitForHealth(child, attempts) {
     const afterSignOut = await call('GET', '/api/me', undefined, signedInToken);
     ok('an ended session no longer authenticates',
       afterSignOut.status === 401, 'status ' + afterSignOut.status);
+
+    console.log('\n  a second factor stops the sign-in at the right place');
+    // This is the path that was broken. routes/auth/challenge.js defined signChallenge
+    // and readChallenge and exported neither, so destructuring them out of the require
+    // yielded undefined and the first call - signChallenge(user.id), one line into the
+    // totp_enabled_at branch - threw. Every account with a second factor answered 500 and
+    // could never sign in, and nothing above this line noticed because nothing else in
+    // the suite switched the factor on.
+    //
+    // The code is computed here rather than read from a clock the server shares, because
+    // a hardcoded six digits would be rejected by the very replay check this is testing.
+    // An account of its own, because switching the factor on invalidates every session
+    // the account already has and the rest of this file is still using them.
+    const PASSWORD = 'correct-horse-battery-staple';
+    let made = await call('POST', '/api/auth/register', {
+      username: 'mfauser', email: 'mfauser@example.com',
+      password: PASSWORD, displayName: 'Mfa User',
+      termsVersion: '1.0', privacyVersion: '1.0',
+    });
+    if (made.status !== 200) {
+      made = await call('POST', '/api/auth/login', { username: 'mfauser', password: PASSWORD });
+    }
+    const totp = made.json && made.json.token;
+    ok('an account for the second-factor path exists', !!totp, 'status ' + made.status);
+
+    const setup = await call('POST', '/api/auth/2fa/setup',
+      { password: PASSWORD }, totp);
+    const secret = setup.json && setup.json.secret;
+    ok('a second factor can be set up', setup.status === 200 && !!secret,
+      'status ' + setup.status);
+
+    if (secret) {
+      const enabled = await call('POST', '/api/auth/2fa/enable',
+        { password: PASSWORD, code: totpCode(secret) }, totp);
+      ok('and enabled with a code from its own secret', enabled.status === 200,
+        'status ' + enabled.status + ' ' + (enabled.text || '').slice(0, 60));
+
+      // Enabling the factor invalidates sessions, so the token above is dead and this has
+      // to start from a password again.
+      const stopped = await call('POST', '/api/auth/login',
+        { username: 'mfauser', password: PASSWORD });
+      ok('a correct password with a second factor on stops instead of signing in',
+        stopped.status === 200 && stopped.json && stopped.json.mfaRequired === true
+          && !stopped.json.token,
+        'status ' + stopped.status + ' mfaRequired=' + JSON.stringify(stopped.json && stopped.json.mfaRequired));
+      ok('and hands back a challenge token, not a session',
+        !!(stopped.json && stopped.json.challengeToken),
+        JSON.stringify(stopped.json || {}).slice(0, 70));
+
+      const bad = await call('POST', '/api/auth/2fa/verify',
+        { challengeToken: (stopped.json && stopped.json.challengeToken) || 'x', code: '000000' });
+      ok('a wrong code does not sign in', bad.status >= 400 && !(bad.json && bad.json.token),
+        'status ' + bad.status);
+
+      const good = await call('POST', '/api/auth/2fa/verify',
+        { challengeToken: (stopped.json && stopped.json.challengeToken) || 'x', code: totpCode(secret) });
+      ok('the right code signs in', good.status === 200 && !!(good.json && good.json.token),
+        'status ' + good.status);
+
+      const replay = await call('POST', '/api/auth/2fa/verify',
+        { challengeToken: (stopped.json && stopped.json.challengeToken) || 'x', code: totpCode(secret) });
+      ok('and the same code cannot be used twice', !(replay.json && replay.json.token),
+        'status ' + replay.status);
+    }
 
     console.log('\n  do-not-disturb does not lose notifications');
     // Quiet hours and DND hold the realtime push. The row is still written, which is
