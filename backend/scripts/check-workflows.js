@@ -209,8 +209,69 @@ for (const { f, name, steps } of jobs) {
     'no npm ci or npm install step, so the first require() decides');
 }
 
+// A check nothing runs is not coverage. Every check in scripts/ has to be reachable from
+// `npm run check`, named directly by a workflow, or on the list below with a reason -
+// which is the same question check-checks-can-fail.js asks about the checks themselves,
+// one level up: are they right, and do they run at all?
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'backend', 'package.json'), 'utf8'));
+const scriptsDir = path.join(ROOT, 'backend', 'scripts');
+
+const BY_HAND = {
+  'check-checks-can-fail': 'copies the tree and runs each check three times; minutes of work'
+    + ' for a guarantee the other checks already give cheaply',
+  'check-dialects': 'needs the live database, which CI does not have and should not be given',
+};
+
+const wfText = fs.readdirSync(DIR)
+  .filter((f) => /\.ya?ml$/.test(f))
+  .map((f) => fs.readFileSync(path.join(DIR, f), 'utf8'))
+  .map((t) => t.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n'))
+  .join('\n');
+
+const npmText = Object.values(pkg.scripts).join(' ');
+const checkFiles = fs.readdirSync(scriptsDir)
+  .filter((f) => f.startsWith('check') && f.endsWith('.js'));
+
+const unreachable = checkFiles.map((f) => f.slice(0, -3)).filter((name) => {
+  if (BY_HAND[name]) return false;
+  if (npmText.includes('scripts/' + name + '.js')) return false;
+  if (wfText.includes('scripts/' + name + '.js')) return false;
+  return true;
+});
+
+ok('every check is run somewhere, or says why it is not', unreachable.length === 0,
+  unreachable.join(', ') + ' - no npm script and no workflow mentions it');
+
+// The other direction, because the one above cannot see a check that has been deleted:
+// it only asks about files that are still there. Here every npm script and every workflow
+// step that names a script under scripts/ has to name one that exists.
+// Capture groups are read by index, not by m.group(1). The Node build this is developed
+// against returns a plain array from RegExp.prototype.exec rather than a match object, so
+// .group is not on it. Nothing else in the repository calls .group for the same reason, and
+// m[1] is what the other checks already do.
+const dangling = [];
+for (const [name, cmd] of Object.entries(pkg.scripts)) {
+  for (const m of String(cmd).matchAll(/scripts\/([\w.-]+)/g)) {
+    if (!fs.existsSync(path.join(scriptsDir, m[1]))) {
+      dangling.push(`npm run ${name} -> scripts/${m[1]}`);
+    }
+  }
+}
+for (const m of wfText.matchAll(/scripts\/([\w.-]+\.js)/g)) {
+  if (!fs.existsSync(path.join(scriptsDir, m[1]))) {
+    dangling.push('a workflow -> scripts/' + m[1]);
+  }
+}
+ok('nothing runs a script that is not there', dangling.length === 0,
+  dangling.slice(0, 4).join('; '));
+
+for (const name of Object.keys(BY_HAND)) {
+  ok(`${name} still exists`, checkFiles.includes(name + '.js'),
+    'it is listed as deliberately unrun but the file is gone');
+}
+
 console.log(failures
   ? `\n  workflows FAILED - ${failures} assertion(s)\n`
-  : `\n  workflows passed - ${files.length} file(s), ${jobs.length} job(s), every job installs`
-    + ` before it runs npm\n`);
+  : `\n  workflows passed - ${files.length} file(s), ${jobs.length} job(s): every job installs`
+    + ` before it runs npm, no key is repeated, and every check is run\n`);
 process.exit(failures ? 1 : 0);
