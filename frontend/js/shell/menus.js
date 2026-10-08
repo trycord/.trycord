@@ -7,6 +7,7 @@ import Api from '../api.js';
 import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, clearSession, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from '../state.js';
 import { channelPath, serverPath } from '../links.js';
 import { navigate, route } from '../nav.js';
+import { messageMember } from '../user-actions.js';
 
 // Right-click and overflow menus for rows in the chrome.
 // 

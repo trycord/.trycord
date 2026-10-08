@@ -14,6 +14,24 @@ import { currentActiveChannel, ensureServer, pickReaction, setActiveChannel } fr
 import { serverPath, channelPath, absoluteChannelUrl } from '../links.js';
 import { navigate } from '../nav.js';
 import { presentationMode } from '../presentation.js';
+import { stampMsgNode, regroupAround, groupFeed } from './message-grouping.js';
+
+/**
+ * A value that identifies one send attempt.
+ *
+ * If the POST times out we cannot tell whether the server wrote the message, so the retry
+ * carries the same nonce and the server drops it as a duplicate rather than posting twice.
+ * That only works if the nonce is the same across the retry, which is why it is generated
+ * per attempt and held, not per call.
+ */
+function newNonce() {
+  try {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+      return globalThis.crypto.randomUUID();
+    }
+  } catch { /* fall through */ }
+  return 'n-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
 
 async function renderChannel(container, serverId, channelId, opts = {}) {
   clear(container);
@@ -426,57 +444,6 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     if (!panel.children.length) return;
     node.appendChild(panel);
     anchor.setAttribute('aria-expanded', 'true');
-  }
-
-  function newNonce() {
-    try {
-      if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
-        return globalThis.crypto.randomUUID();
-      }
-    } catch { /* fall through */ }
-    return 'n-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-  }
-
-  function stampMsgNode(node, m) {
-    try {
-      if (m && m.author_id) node.dataset.author = String(m.author_id);
-      if (m && m.created_at) node.dataset.ts = String(m.created_at);
-      if (m && typeof m.seq === 'number') node.dataset.seq = String(m.seq);
-    } catch { /* grouping metadata is decorative */ }
-  }
-
-  const GROUP_WINDOW_MS = 5 * 60 * 1000;
-
-  function groupState(node, prev) {
-    if (!node || !prev) return false;
-    const a = node.dataset.author || '';
-    if (!a) return false;
-    const pa = prev.dataset.author || '';
-    if (a !== pa) return false;
-    const ts = Date.parse(node.dataset.ts || '') || 0;
-    const pts = Date.parse(prev.dataset.ts || '') || 0;
-    return ts >= pts && (ts - pts) < GROUP_WINDOW_MS;
-  }
-
-  function applyGrouping(node) {
-    if (!node) return;
-    const prev = node.previousElementSibling;
-    node.classList.toggle('grouped', groupState(node, prev));
-  }
-
-  function regroupAround(node) {
-    applyGrouping(node);
-    if (node && node.previousElementSibling) applyGrouping(node.previousElementSibling);
-    const next = node && node.nextElementSibling;
-    if (next) applyGrouping(next);
-  }
-
-  function groupFeed(feedEl) {
-    let prev = null;
-    for (const node of feedEl.querySelectorAll(':scope > .msg')) {
-      node.classList.toggle('grouped', groupState(node, prev));
-      prev = node;
-    }
   }
 
   function editMsg(m) {

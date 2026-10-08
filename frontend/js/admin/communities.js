@@ -62,7 +62,9 @@ export async function renderCommunities(body, show, seq) {
   await render(search.value.trim());
 }
 
-function serverEnforceModal(server, onDone) {
+// Exported for the same reason as the two in users.js: the reports console offers
+// these on a community row and called them without importing them.
+export function serverEnforceModal(server, onDone) {
   const err = el('div', { class: 'form-error', hidden: true });
   const typeSel = el('select', { class: 'input' },
     el('option', { value: 'SERVER_SUSPENSION' }, 'Suspension'),
@@ -100,7 +102,7 @@ function serverEnforceModal(server, onDone) {
   return modal;
 }
 
-function serverLiftModal(server, onDone) {
+export function serverLiftModal(server, onDone) {
   const err = el('div', { class: 'form-error', hidden: true });
   const reason = el('textarea', { class: 'input', rows: 2, required: true, placeholder: 'Reason for lifting enforcement' });
   const modal = openModal({
@@ -126,7 +128,7 @@ function serverLiftModal(server, onDone) {
   return modal;
 }
 
-function serverRemoveModal(server, onDone) {
+export function serverRemoveModal(server, onDone) {
   const err = el('div', { class: 'form-error', hidden: true });
   const reason = el('textarea', { class: 'input', rows: 3, required: true, placeholder: 'Removal reason — audited and final' });
   const confirm = el('input', { type: 'checkbox' });

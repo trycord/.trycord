@@ -5,6 +5,12 @@ import { emptyState } from '../components.js';
 import { adminError, currentSeq, reportListFailure } from './shared.js';
 
 import { statusChip } from '../components.js';
+// The reports console offers the same moderation actions the users and communities
+// consoles do. These five buttons called them with no import at all, so every one of
+// them threw a ReferenceError when pressed, and nothing noticed at load because a
+// missing name is only a failure on the line that uses it.
+import { userEnforceModal, liftUserModal } from './users.js';
+import { serverEnforceModal, serverRemoveModal, serverLiftModal } from './communities.js';
 
 const REPORT_STATUSES = ['OPEN', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'];
 
