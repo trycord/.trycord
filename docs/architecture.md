@@ -12,7 +12,7 @@ assertions against real flows; `npm run check:render` boots a server and renders
 message crosses between the two that share a community and does not reach the third, who
 never joined the room; `npm run check:contrast` measures every theme against WCAG AA
 and finds 100 ratios that pass; and `npm run check:client-load`
-evaluates all 114 client modules.
+evaluates all 115 client modules.
 
 ## Where things live
 
