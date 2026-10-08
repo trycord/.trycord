@@ -139,7 +139,15 @@
     // with nothing on it and nothing in the console to act on. That is not hypothetical:
     // `ui/usercard.js` imported `./components.js` when the module is one level up, and the
     // whole application went dark without a word from this file.
-    if (ev && ev.target && ev.target !== window && ev.target.tagName) {
+    //
+    // The element on its own is not enough. In capture phase this listener sees every error
+    // in the document, and an uncaught exception inside a module reaches it with the element
+    // that failed to *parse* as the target and a message attached. Taking the element alone
+    // as "a file the server did not send" fetches a file that is present, gets 200, and
+    // reports a healthy origin while the real error goes unreported. A resource failure
+    // carries no message and no position; that is what distinguishes them.
+    if (ev && ev.target && ev.target !== window && ev.target.tagName
+        && !ev.message && !ev.lineno && !ev.filename) {
       var src = ev.target.src || ev.target.href || '';
       var tag = String(ev.target.tagName).toLowerCase();
       var short = src ? src.split('/').pop().split('?')[0] : '(unknown file)';
@@ -149,6 +157,14 @@
       // problems in different places, and the difference was invisible. Ask for the file
       // once and report what came back.
       probe(src, tag, short);
+      return;
+    }
+    // A module that failed to parse or threw while evaluating: the target is the element and
+    // the message is the real thing. Reported as a script error, which is what it is.
+    if (ev && ev.target && ev.target !== window && ev.target.tagName && ev.message) {
+      var bad = ev.target.src || ev.target.href || '';
+      paintError('A script failed to run' + (bad ? ' (' + String(bad).split('/').pop() + ')' : '')
+        + ': ' + String(ev.message).slice(0, 200) + '. Reload to retry.');
       return;
     }
     // file:line:column, not just the filename. A filename alone left three
