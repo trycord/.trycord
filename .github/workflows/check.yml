@@ -11,6 +11,16 @@ on:
   pull_request:
     branches: [main]
 
+# One run at a time, and a new push cancels the one it supersedes.
+#
+# The screenshots job photographs 27 surfaces at eight widths - 216 renders - and takes
+# most of half an hour. Without this, three commits in quick succession leave three runs
+# each doing all of it, none of them answering a question anyone is still asking, and the
+# last one queued behind the two in front.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   server:
     name: Server checks
