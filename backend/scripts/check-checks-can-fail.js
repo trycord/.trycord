@@ -131,7 +131,7 @@ const CASES = [
     guards: 'a workflow job that runs npm without installing first',
     // Exactly the failure that made this check necessary: a job with npm run and no
     // install, which is a red tick every push and reads as a broken product.
-    break: (f) => removeStep(f, 'Install server dependencies', 'Photograph'),
+    break: (f) => removeStep(f, 'Install server dependencies'),
     word: 'installs' },
 
   { script: 'check-client-modules', file: 'frontend/js/global/notifications.js',
@@ -253,14 +253,17 @@ console.log(failures
 process.exit(failures ? 1 : 0);
 
 function append(f, text) { fs.appendFileSync(f, text, 'utf8'); }
-/** Delete one step, identified by the name of the step that follows it. */
-function removeStep(f, name, before) {
+/**
+ * Delete one step: everything from the `- name:` line that starts it up to the next
+ * `- name:` line. Named by a prefix of the step name, because matching the whole line
+ * means renaming a step breaks the harness in a way that looks like the check failing.
+ */
+function removeStep(f, name) {
   const s = fs.readFileSync(f, 'utf8');
-  const start = s.indexOf('      - name: ' + name + '\n');
+  const start = s.indexOf('      - name: ' + name);
   if (start === -1) throw new Error('no step named ' + name + ' in ' + f);
-  const end = s.indexOf('      - name: ' + before + '\n', start);
-  if (end === -1) throw new Error('no step named ' + before + ' after ' + name);
-  fs.writeFileSync(f, s.slice(0, start) + s.slice(end), 'utf8');
+  const end = s.indexOf('\n      - name: ', start + 1);
+  fs.writeFileSync(f, s.slice(0, start) + (end === -1 ? '' : s.slice(end + 1)), 'utf8');
 }
 function replaceAll(f, re, fn) {
   const s = fs.readFileSync(f, 'utf8');

@@ -186,7 +186,8 @@ connection error.
 | `node scripts/check-require-aliases.js` | a service is called by a name it was not bound to, is imported where it is not exported, or is called bare and never imported |
 | `node scripts/check-crash-recovery.js` | the crash surface recovers by itself from a half-updated module graph, and does not reload for an ordinary fault |
 | `node scripts/check-signin.js` | a correct password returns a token. A regression test for the sign-in bug below, which no other check could see |
-| `npm run check:checks-can-fail` | runs eighteen checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
+| `npm run check-workflows` | every CI file: no mapping repeats a key, every line is block-style YAML it can read, and every job that runs npm installs dependencies first. There is no YAML dependency, so it reads the block subset directly. |
+| `npm run check:checks-can-fail` | runs nineteen checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
 | `npm run check-client-styles` | every class name the client emits has a rule in app.css. Finds a forgotten rule; names the two that are handles with no rule on purpose. |
 | `npm run check:dialects` | both database dialects. Boots SQLite and runs the upsert end to end, then has the live MySQL instance **parse** the statement the other branch produces. Not in `check`, because it needs the live database. |
 | `npm run db:backup` | dumps the live database read-only and verifies the dump against what the server reported |he browser cannot load `http` |
@@ -282,6 +283,8 @@ dialects - are proven by hand instead, and recorded where they are: removing the
 authorisation gate in `ws/frames.js` fails the realtime leak assertion, removing the
 export from `challenge.js` fails three flow assertions with a 500, and the live MySQL
 instance is asked to parse the SQLite form of the upsert and refuses it.
+
+A check written to catch a vacuous pass passed vacuously twice while being written, which is the note worth making. `check-workflows.js` reported success on a workflow file it could not read, because it iterated a map of keys to line numbers instead of keys to nodes, so every job appeared to have zero steps and every assertion passed on zero steps. The failure it exists to prevent, inside the check written to prevent it.
 
 A case is a probe, and a probe that does not compile looks exactly like a check with a
 hole. Eight of the eighteen were wrong on the first attempt and the harness reported the
