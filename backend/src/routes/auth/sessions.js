@@ -149,3 +149,8 @@ router.post('/sessions/revoke', auth, rateLimit({ windowMs: 60000, max: 30 }), a
 // Forgot password: ALWAYS generic, so nobody can probe for accounts.
 
 module.exports = router;
+// Changing the password or the second factor has to end every session the account has,
+// and both of those live in other files. This one was defined here, called there, and
+// exported by nobody - so a password change reached `await invalidateSessions(...)` and
+// threw, answering 500 after the new password had already been written.
+module.exports.invalidateSessions = invalidateSessions;

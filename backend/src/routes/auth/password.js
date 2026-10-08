@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const { disconnectUser } = require('../../auth/gateway');
+const { invalidateSessions } = require('./sessions');
 
 const db = require('../../db');
 const auth = require('../../middleware/auth');
@@ -115,3 +116,8 @@ router.post('/change-password', auth, rateLimit({ windowMs: 60000, max: 20 }), a
 // The client drops its token and returns to login.
 
 module.exports = router;
+// Changing a second factor is as sensitive as changing the password, so the same
+// proof-of-password gate is used. It lived here and was not exported, and twofactor.js
+// called it without importing it - so every route in that file answered 500 and 2FA could
+// not be set up, enabled, disabled or recovered.
+module.exports.requirePassword = requirePassword;
