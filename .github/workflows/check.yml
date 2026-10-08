@@ -25,16 +25,9 @@ jobs:
           # Full history, not the default shallow clone. Three of these jobs run
           # `npm run check`, which includes check-split-loses, and that check reads each
           # file as it was before it was split by revision - so on a shallow checkout all
-          # eight `git show` calls throw and it verifies nothing. It used to report that
-          # as a pass. It fails on zero comparisons now, which is right, and which would
-          # otherwise turn three jobs red on their first run.
-          fetch-depth: 0
-        with:
-          # Full history, not the default shallow clone. check-split-loses reads each file
-          # as it was before it was split, by revision, so on a shallow checkout all eight
-          # `git show` calls throw and it compares nothing at all. It used to report that
-          # as a pass. It now fails on zero comparisons, which is correct - and which would
-          # otherwise turn this job red on the very first run.
+          # eight `git show` calls throw and it verifies nothing at all. It used to report
+          # that as a pass. It fails on zero comparisons now, which is right, and which
+          # would otherwise turn three jobs red on their first run.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -75,9 +68,9 @@ jobs:
           # Full history, not the default shallow clone. Three of these jobs run
           # `npm run check`, which includes check-split-loses, and that check reads each
           # file as it was before it was split by revision - so on a shallow checkout all
-          # eight `git show` calls throw and it verifies nothing. It used to report that
-          # as a pass. It fails on zero comparisons now, which is right, and which would
-          # otherwise turn three jobs red on their first run.
+          # eight `git show` calls throw and it verifies nothing at all. It used to report
+          # that as a pass. It fails on zero comparisons now, which is right, and which
+          # would otherwise turn three jobs red on their first run.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -114,9 +107,9 @@ jobs:
           # Full history, not the default shallow clone. Three of these jobs run
           # `npm run check`, which includes check-split-loses, and that check reads each
           # file as it was before it was split by revision - so on a shallow checkout all
-          # eight `git show` calls throw and it verifies nothing. It used to report that
-          # as a pass. It fails on zero comparisons now, which is right, and which would
-          # otherwise turn three jobs red on their first run.
+          # eight `git show` calls throw and it verifies nothing at all. It used to report
+          # that as a pass. It fails on zero comparisons now, which is right, and which
+          # would otherwise turn three jobs red on their first run.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -171,9 +164,9 @@ jobs:
           # Full history, not the default shallow clone. Three of these jobs run
           # `npm run check`, which includes check-split-loses, and that check reads each
           # file as it was before it was split by revision - so on a shallow checkout all
-          # eight `git show` calls throw and it verifies nothing. It used to report that
-          # as a pass. It fails on zero comparisons now, which is right, and which would
-          # otherwise turn three jobs red on their first run.
+          # eight `git show` calls throw and it verifies nothing at all. It used to report
+          # that as a pass. It fails on zero comparisons now, which is right, and which
+          # would otherwise turn three jobs red on their first run.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -181,9 +174,16 @@ jobs:
         with:
           node-version: 22
 
-      # No npm install on purpose. Nothing in scripts/browser/ imports a package - it
-      # speaks CDP over the browser's own WebSocket - so the only thing needed is
-      # whatever Chromium the runner image already has.
+      # The comment that used to be here said no install was needed, because nothing in
+      # scripts/browser/ imports a package - it speaks CDP over the browser's own
+      # WebSocket. That is true of the driver and false of what runs it: shoot.js spawns
+      # src/server.js and photographs a real application, so it needs the server's
+      # dependencies. Without this step every push failed with `Cannot find module
+      # 'dotenv'`, which reads as a broken product and is not one.
+      - name: Install server dependencies
+        working-directory: backend
+        run: npm ci
+
       - name: Photograph every surface at eight widths
         working-directory: backend
         run: npm run check:shots
@@ -209,9 +209,9 @@ jobs:
           # Full history, not the default shallow clone. Three of these jobs run
           # `npm run check`, which includes check-split-loses, and that check reads each
           # file as it was before it was split by revision - so on a shallow checkout all
-          # eight `git show` calls throw and it verifies nothing. It used to report that
-          # as a pass. It fails on zero comparisons now, which is right, and which would
-          # otherwise turn three jobs red on their first run.
+          # eight `git show` calls throw and it verifies nothing at all. It used to report
+          # that as a pass. It fails on zero comparisons now, which is right, and which
+          # would otherwise turn three jobs red on their first run.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -244,9 +244,9 @@ jobs:
           # Full history, not the default shallow clone. Three of these jobs run
           # `npm run check`, which includes check-split-loses, and that check reads each
           # file as it was before it was split by revision - so on a shallow checkout all
-          # eight `git show` calls throw and it verifies nothing. It used to report that
-          # as a pass. It fails on zero comparisons now, which is right, and which would
-          # otherwise turn three jobs red on their first run.
+          # eight `git show` calls throw and it verifies nothing at all. It used to report
+          # that as a pass. It fails on zero comparisons now, which is right, and which
+          # would otherwise turn three jobs red on their first run.
           fetch-depth: 0
 
       - name: Set up Node.js
