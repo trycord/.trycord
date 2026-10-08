@@ -21,11 +21,17 @@ export const DEFAULT_CUSTOM_TOKENS = {
   ambient: 'balanced',
 };
 
-// can be removed when leaving the custom theme (they would otherwise leak
+// Removed when leaving the custom theme (they would otherwise leak).
+//
+// Every name here is one the stylesheet defines. The previous list was the --t-* tokens
+// from the palette this file replaced, so a custom theme wrote them all and nothing read
+// them back: every option in the theme studio - radius, contrast, ambient glow - had no
+// effect at all, and the studio showed a theme it had not applied.
 const CUSTOM_INLINE_PROPS = [
-  '--t-r-s', '--t-r-m', '--t-r-l',
-  '--t-txt', '--t-txt2', '--t-mut', '--t-line', '--t-line-hi',
-  '--t-env-glow-a', '--t-env-glow-b',
+  '--radius-sm', '--radius-md', '--radius-lg',
+  '--color-text-primary', '--color-text-secondary', '--color-text-muted',
+  '--color-border', '--color-border-strong',
+  '--glow-accent',
 ];
 
 export function loadPalette() {
@@ -207,7 +213,7 @@ export function clearCustomInline() {
     const style = document.documentElement.style;
     for (const k of CUSTOM_INLINE_PROPS) style.removeProperty(k);
     // applyCustomPalette() writes the derived palette as --c-* custom properties, and
-    // CUSTOM_INLINE_PROPS does not list them - it lists the older --t-* ones. So switching
+    // CUSTOM_INLINE_PROPS does not list them. So switching
     // off a custom theme left the whole derived palette sitting on <html>: invisible
     // most of the time because a built-in theme does not read --c-*, and wrong the next
     // time anything did. Removing whatever is actually there rather than a second
@@ -229,16 +235,25 @@ export function applyGuidedTokens(p) {
     if (p.motion === 'reduced') root.dataset.motion = 'reduced';
     else delete root.dataset.motion;
   } catch { /* ignore */ }
-  if (p.radius === 'sharp') { setInline('--t-r-s', '2px'); setInline('--t-r-m', '4px'); setInline('--t-r-l', '8px'); }
-  else if (p.radius === 'round') { setInline('--t-r-s', '12px'); setInline('--t-r-m', '18px'); setInline('--t-r-l', '28px'); }
+  if (p.radius === 'sharp') {
+    setInline('--radius-sm', '2px'); setInline('--radius-md', '4px'); setInline('--radius-lg', '6px');
+  } else if (p.radius === 'round') {
+    setInline('--radius-sm', '12px'); setInline('--radius-md', '18px'); setInline('--radius-lg', '26px');
+  }
   const dark = p.tone !== 'light';
   if (p.contrast === 'high') {
     if (dark) {
-      setInline('--t-txt', '#ffffff'); setInline('--t-txt2', '#ece5dd'); setInline('--t-mut', '#cfc2b4');
-      setInline('--t-line', 'rgba(255,255,255,.22)'); setInline('--t-line-hi', 'rgba(255,255,255,.36)');
+      setInline('--color-text-primary', '#ffffff');
+      setInline('--color-text-secondary', '#ece5dd');
+      setInline('--color-text-muted', '#cfc2b4');
+      setInline('--color-border', 'rgba(255,255,255,.22)');
+      setInline('--color-border-strong', 'rgba(255,255,255,.36)');
     } else {
-      setInline('--t-txt', '#14100c'); setInline('--t-txt2', '#33291f'); setInline('--t-mut', '#5c4f42');
-      setInline('--t-line', 'rgba(20,12,6,.24)'); setInline('--t-line-hi', 'rgba(20,12,6,.38)');
+      setInline('--color-text-primary', '#14100c');
+      setInline('--color-text-secondary', '#33291f');
+      setInline('--color-text-muted', '#5c4f42');
+      setInline('--color-border', 'rgba(20,12,6,.24)');
+      setInline('--color-border-strong', 'rgba(20,12,6,.38)');
     }
   }
   try {
@@ -248,8 +263,7 @@ export function applyGuidedTokens(p) {
       return `hsla(${h} ${s}% ${l2}% / ${Math.min(0.6, base * f).toFixed(3)})`;
     };
     if (p.ambient && p.ambient !== 'balanced') {
-      setInline('--t-env-glow-a', glow(dark ? 58 : 52, dark ? 0.26 : 0.2));
-      setInline('--t-env-glow-b', glow(dark ? 40 : 42, dark ? 0.18 : 0.14));
+      setInline('--glow-accent', glow(dark ? 58 : 52, dark ? 0.26 : 0.2));
     }
   } catch { /* ignore */ }
 }

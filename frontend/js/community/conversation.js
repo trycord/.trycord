@@ -387,7 +387,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     const cancel = el('button', { class: 'btn ghost sm', type: 'button' }, 'Cancel');
     const box = el('div', { class: 'modal' },
       el('h3', {}, 'Edit message'), ta,
-      el('div', { class: 'row-line', style: { marginTop: 'var(--t-d-3)' } }, cancel, save));
+      el('div', { class: 'row-line', style: { marginTop: 'var(--space-4)' } }, cancel, save));
     const backdrop = el('div', { class: 'backdrop' }, box);
     container.appendChild(backdrop);
     cancel.addEventListener('click', () => backdrop.remove());

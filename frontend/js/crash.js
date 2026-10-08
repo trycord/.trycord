@@ -5,7 +5,7 @@
     e.id = 'trycord-crash';
     e.style.cssText =
       'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;' +
-      'background:var(--t-base,rgba(10,10,12,.96));color:var(--t-txt,#fff);font-family:inherit;';
+      'background:var(--color-surface,rgba(10,10,12,.96));color:var(--color-text-primary,#fff);font-family:inherit;';
     var box = document.createElement('div');
     box.style.cssText = 'text-align:center;padding:24px;max-width:460px;';
     var t = document.createElement('div');
@@ -16,8 +16,8 @@
     p.textContent = msg || 'A page script failed to load.';
     var b = document.createElement('button');
     b.style.cssText =
-      'border:1px solid var(--t-line,rgba(255,255,255,.2));background:var(--t-accent,#ff914d);' +
-      'color:var(--t-on-accent,#111);border-radius:8px;padding:8px 18px;font:inherit;cursor:pointer;';
+      'border:1px solid var(--color-border,rgba(255,255,255,.2));background:var(--color-accent,#ff914d);' +
+      'color:var(--color-on-accent,#111);border-radius:8px;padding:8px 18px;font:inherit;cursor:pointer;';
     b.textContent = 'Reload';
     // Clears the one-shot stale-graph flag, so pressing this always gets the full
     // automatic recovery back rather than one refetch short of it.

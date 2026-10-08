@@ -46,7 +46,7 @@ export function initialOf(name) {
 }
 
 // The colour the initial is written in. Exported so the CSS can use it too, rather
-// than being written in both places and drifting the way --t-txt did.
+// than being written in both places and drifting the way --color-text-primary did.
 export const markInk = () => MARK_INK;
 
 export function avatarUrlOf(user) {
