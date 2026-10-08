@@ -7,12 +7,12 @@ Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
 client segments are served; `npm run check:flows` boots a server and passes 70
 assertions against real flows; `npm run check:render` boots a server and renders all
-40 routable pages in jsdom, passing 51 assertions over 1151 interactive controls;
+40 routable pages in jsdom, passing 81 assertions;
 `npm run check:realtime` puts three accounts on three sockets and confirms a
 message crosses between the two that share a community and does not reach the third, who
 never joined the room; `npm run check:contrast` measures every theme against WCAG AA
-and finds 79 ratios that pass; and `npm run check:client-load`
-evaluates all 66 client modules.
+and finds 100 ratios that pass; and `npm run check:client-load`
+evaluates all 113 client modules.
 
 ## Where things live
 
@@ -186,6 +186,7 @@ connection error.
 | `node scripts/check-require-aliases.js` | a service is called by a name it was not bound to, is imported where it is not exported, or is called bare and never imported |
 | `node scripts/check-crash-recovery.js` | the crash surface recovers by itself from a half-updated module graph, and does not reload for an ordinary fault |
 | `node scripts/check-signin.js` | a correct password returns a token. A regression test for the sign-in bug below, which no other check could see |
+| `npm run check-doc-counts` | every number in the summary of this document is still the number the suite prints. A figure in prose is the one claim no check looks at. |
 | `npm run check-workflows` | every CI file: no mapping repeats a key, every line is block-style YAML it can read, every job that runs npm installs dependencies first, every check is run somewhere or says why not, and nothing runs a script that is not there. There is no YAML dependency, so it reads the block subset directly. |
 | `npm run check:checks-can-fail` | runs nineteen checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
 | `npm run check-client-styles` | every class name the client emits has a rule in app.css. Finds a forgotten rule; names the two that are handles with no rule on purpose. |
