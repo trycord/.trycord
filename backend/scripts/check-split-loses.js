@@ -113,7 +113,10 @@ for (const { rev, was, became } of SPLITS) {
   // `legal` became `versions` behind legalVersions(); EXTERNAL_SECTIONS had no reader.
   const REMOVED = { legal: 'renamed to versions, behind legalVersions()',
     EXTERNAL_SECTIONS: 'had no reader anywhere in the client',
-    statusChip: 'moved to components.js - a status badge is not an admin concept' };
+    statusChip: 'moved to components.js - a status badge is not an admin concept',
+    summaryOf: 'the bbcode bar labels its own buttons; summaryOf had no reader',
+    AUTH_BG: 'the stylesheet applies this background itself, at app.css:3135',
+  };
   for (const n of before) {
     if (!seen.has(n) && REMOVED[n]) continue;
     const homes = seen.get(n) || [];

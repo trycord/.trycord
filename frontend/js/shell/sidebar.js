@@ -28,14 +28,6 @@ export function contextSidebarDocked() {
   return compose().channels.collapsible;
 }
 
-export function contextSidebarVisible() {
-  const shell = qs('#shell');
-  if (!shell) return false;
-  if (shell.classList.contains('sidebar-collapsed')) return isDesktopNavOpen();
-  if (isDesktopNavOpen()) return true;
-  return contextSidebarDocked();
-}
-
 export function toggleContextSidebar() {
   const shell = qs('#shell');
   if (!shell) return;

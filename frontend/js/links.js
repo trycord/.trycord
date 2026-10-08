@@ -62,10 +62,6 @@ export function channelPath(serverId, channelId, query) {
   return query ? p + query : p;
 }
 
-export function userPath(user) {
-  return route('/users/' + encodeURIComponent(userToken(user)));
-}
-
 // Permalink. These get picked into other apps, so a UUID is a poor thing to hand
 // someone.
 //
