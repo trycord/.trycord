@@ -186,6 +186,7 @@ connection error.
 | `node scripts/check-require-aliases.js` | a service is called by a name it was not bound to, is imported where it is not exported, or is called bare and never imported |
 | `node scripts/check-crash-recovery.js` | the crash surface recovers by itself from a half-updated module graph, and does not reload for an ordinary fault |
 | `node scripts/check-signin.js` | a correct password returns a token. A regression test for the sign-in bug below, which no other check could see |
+| `npm run check:dialects` | both database dialects. Boots SQLite and runs the upsert end to end, then has the live MySQL instance **parse** the statement the other branch produces. Not in `check`, because it needs the live database. |
 | `npm run db:backup` | dumps the live database read-only and verifies the dump against what the server reported |he browser cannot load `http` |
 
 `check:client` exists because `node --check` on a `.js` client file reports success
