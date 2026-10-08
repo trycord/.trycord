@@ -19,12 +19,26 @@
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
+const net = require('net');
 const os = require('os');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const PORT = Number(process.env.FLOW_TEST_PORT || 9989);
-const BASE = 'http://127.0.0.1:' + PORT;
+// Allocated, not chosen, for the reason check-signin.js learned the hard way: a fixed port
+// left held by a leaked server is silently tested instead of this run's own.
+let PORT = 0;
+let BASE = '';
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const s = net.createServer();
+    s.on('error', reject);
+    s.listen(0, '127.0.0.1', () => {
+      const p = s.address().port;
+      s.close(() => resolve(p));
+    });
+  });
+}
 
 let failures = 0;
 let checks = 0;
@@ -98,6 +112,8 @@ async function waitForHealth(child, attempts) {
 }
 
 (async () => {
+  PORT = await freePort();
+  BASE = 'http://127.0.0.1:' + PORT;
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-flow-'));
   const dbFile = path.join(tmp, 'flow.db');
   const uploadDir = path.join(tmp, 'uploads');
@@ -178,7 +194,16 @@ async function waitForHealth(child, attempts) {
   child.stderr.on('data', (d) => log.push(String(d)));
 
   const cleanup = () => {
-    try { child.kill('SIGTERM'); } catch { /* already gone */ }
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill('SIGTERM');
+      // Wait for it. Exiting the moment the signal was sent left the server alive holding
+      // its port, and the next run tested that server instead of its own.
+      const t = setTimeout(() => {
+        try { child.kill('SIGKILL'); } catch { /* already gone */ }
+      }, 4000);
+      t.unref();
+      child.once('exit', () => clearTimeout(t));
+    }
     try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* best effort */ }
 
   };

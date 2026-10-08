@@ -80,6 +80,11 @@
   // discards this, which leaves "did not send" covering a file that does not exist (a bug
   // in the repository) and an origin that is not answering (nothing to do with the
   // repository) - and those send a reader to completely different places.
+  //
+  // A 200 is not an answer by itself. The desktop window used to answer every unresolved
+  // request with the application shell, so a request for a module came back 200 with HTML in
+  // the body and the status said nothing was wrong. Status and content type are read
+  // together, because either alone can be true of a response that is useless here.
   var STATUS = {
     404: 'the server does not have this file',
     403: 'the server refused this file',
@@ -105,7 +110,22 @@
     // `no-store` because the answer we want is what the origin is doing right now, and a
     // cached copy would be the previous good one - which is exactly what is on screen.
     fetch(src, { method: 'GET', cache: 'no-store' }).then(function (res) {
-      say(STATUS[res.status] ? res.status + ' - ' + STATUS[res.status] : 'HTTP ' + res.status);
+      var type = String(res.headers && res.headers.get
+        ? res.headers.get('content-type') || '' : '');
+      var code = STATUS[res.status] ? res.status + ' - ' + STATUS[res.status] : 'HTTP ' + res.status;
+      // A script or a stylesheet must arrive as one. Anything else at this URL is a server
+      // answering with the wrong document - the single-page shell, an error page, a redirect
+      // to a login form - and the browser's refusal is correct.
+      var expectsScript = tag === 'script';
+      if (expectsScript && type && !/(javascript|ecmascript)/i.test(type)) {
+        say(code + ', and it is ' + type.split(';')[0] + ' rather than a script');
+        return;
+      }
+      if (expectsScript && type) {
+        say(code);
+        return;
+      }
+      say(code + (type ? ' (' + type.split(';')[0] + ')' : ''));
     }, function (err) {
       say('the server could not be reached'
         + (err && err.message ? ' (' + String(err.message).slice(0, 60) + ')' : ''));

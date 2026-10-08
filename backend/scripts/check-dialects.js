@@ -23,13 +23,28 @@
 
 const { spawn } = require('child_process');
 const fs = require('fs');
+const net = require('net');
 const os = require('os');
 const path = require('path');
 const mysql = require('mysql2/promise');
 
 const ROOT = path.join(__dirname, '..');
-const PORT = Number(process.env.DIALECT_TEST_PORT || 9987);
-const BASE = 'http://127.0.0.1:' + PORT;
+// Allocated, not chosen. A fixed port means a run whose server leaked is still holding it,
+// so the next run cannot bind, never notices, and quietly tests the leftover server and its
+// older database. check-signin.js did exactly that for days.
+let PORT = 0;
+let BASE = '';
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const s = net.createServer();
+    s.on('error', reject);
+    s.listen(0, '127.0.0.1', () => {
+      const p = s.address().port;
+      s.close(() => resolve(p));
+    });
+  });
+}
 
 // The statement prefs.js builds, one per dialect. Copied from the call site rather than
 // derived from it, so that changing the call site without changing this shows up as a
@@ -86,14 +101,28 @@ async function bootSqlite() {
   const log = [];
   child.stdout.on('data', (d) => log.push(String(d)));
   child.stderr.on('data', (d) => log.push(String(d)));
+  let up = false;
   for (let i = 0; i < 80; i++) {
-    try { if ((await fetch(BASE + '/api/health')).ok) break; } catch { /* not yet */ }
+    try { if ((await fetch(BASE + '/api/health')).ok) { up = true; break; } } catch { /* not yet */ }
     await new Promise((r) => setTimeout(r, 250));
+  }
+  if (!up) throw new Error('the server this check started never answered on ' + PORT
+    + '.\n' + log.join('').split('\n').slice(-8).join('\n'));
+  if (child.exitCode !== null) {
+    throw new Error('the server this check started exited, and something else is answering on '
+      + PORT + '. Refusing to test it.');
   }
   return {
     log,
-    stop() {
-      try { child.kill('SIGTERM'); } catch { /* gone */ }
+    // Wait for it, so a check cannot leak a server holding a port for the next run.
+    async stop() {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGTERM');
+        await new Promise((resolve) => {
+          const t = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* gone */ } resolve(); }, 4000);
+          child.once('exit', () => { clearTimeout(t); resolve(); });
+        });
+      }
       try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* best effort */ }
     },
   };
@@ -227,6 +256,8 @@ async function checkMysql() {
 }
 
 async function main() {
+  PORT = await freePort();
+  BASE = 'http://127.0.0.1:' + PORT;
   require('dotenv').config({ path: path.join(ROOT, '.env'), quiet: true });
   console.log('\n  sqlite');
   await checkSqlite();
