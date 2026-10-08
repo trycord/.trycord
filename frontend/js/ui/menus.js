@@ -5,7 +5,7 @@
 // picker. It takes el(), icon() and qs() from ui/dom.js, so ui.js and this module do
 // not import each other.
 
-import { el, icon, qs } from './dom.js';
+import { el, icon, qs, focusQuietly } from './dom.js';
 
 // One menu system for every entity in the app. Callers do not build DOM; they
 // list, so a long-press and a right-click can never drift apart.

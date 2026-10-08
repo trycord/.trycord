@@ -1,4 +1,4 @@
-import { el } from './dom.js';
+import { el, focusQuietly } from './dom.js';
 import { TrycordConfig } from '../config.js';
 
 // Text and time formatting.

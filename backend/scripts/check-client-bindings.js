@@ -98,8 +98,17 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
     'WebSocket', 'CSSStyleSheet', 'MediaQueryList', 'ShadowRoot', 'ReadableStream',
   ]);
 
+  // Every exported name, with the modules that export it - not only the ones with a single
+  // home.
+  //
+  // Restricting this to exactly one owner was how the check kept quiet, and it hid every
+  // re-export from it: renderContextHeader is defined in shell/context-header.js and
+  // re-exported by shell.js, so it had two homes, so it was never on the list, so a module
+  // that called it without importing it from either passed. Which module owns a name does
+  // not change the question this loop asks - does this file bind it - so the ambiguity is
+  // carried into the message rather than used to skip the check.
   const unique = new Map();
-  for (const [name, homes] of owner) if (homes.size === 1) unique.set(name, [...homes][0]);
+  for (const [name, homes] of owner) unique.set(name, [...homes]);
 
   const findings = [];
 
@@ -205,13 +214,19 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
       }
     }
 
-    for (const [name, home] of unique) {
-      if (home === file || defined.has(name)) continue;
+    for (const [name, homes] of unique) {
+      if (homes.includes(file) || defined.has(name)) continue;
+      // A definition, not a use. realtime.js owns `leaveDm()` and was reported for it until
+      // this loop got the same body-follows-the-arguments test the zero-owner loop has.
+      if (isDefinition(code, code.indexOf(name + '('))) continue;
       const hit = new RegExp(`(?<![\\w.$])${name}\\b`).exec(code);
       if (!hit) continue;
       // `route: ctx.rest[0]` is an object key, not a reference to the router's route().
       if (/^\s*:/.test(code.slice(hit.index + name.length))) continue;
-      findings.push({ file, name, home, line: bodyStart + code.slice(0, hit.index).split('\n').length });
+      findings.push({
+        file, name, homes,
+        line: bodyStart + code.slice(0, hit.index).split('\n').length,
+      });
     }
 
     // A name that nobody exports, and that this module calls.
@@ -276,8 +291,8 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
   if (findings.length) {
     console.error(`client binding check FAILED - ${findings.length} name(s) used but neither imported nor defined:`);
     for (const f of findings) {
-      console.error(`  ${rel(f.file)}:${f.line}  ${f.name}  (${f.home
-        ? 'exported by ' + path.basename(f.home)
+      console.error(`  ${rel(f.file)}:${f.line}  ${f.name}  (${f.homes
+        ? 'exported by ' + f.homes.map((h) => path.basename(h)).join(', ')
         : 'nothing exports this, and it is not bound here'})`);
     }
     process.exit(1);
