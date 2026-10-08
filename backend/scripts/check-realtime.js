@@ -184,6 +184,13 @@ async function main() {
     const tokenB = await account('rtbob', 'rtbob@example.com');
     ok('two accounts exist', !!tokenA && !!tokenB);
 
+    // A third account that is never invited to anything. The brief's rule is that a client
+    // must never receive events for a resource it cannot access, and the gate for that is
+    // `visibleChannel` on the join frame - so the interesting case is a socket that opens
+    // successfully, asks to join, and is refused.
+    const tokenC = await account('rtcarol', 'rtcarol@example.com');
+    ok('a third, uninvited account exists', !!tokenC);
+
     // A community both of them can see.
     const server = await request(base, 'POST', '/api/servers',
       { name: 'Realtime Test', description: 'seeded' }, tokenA);
@@ -272,6 +279,36 @@ async function main() {
       ok('an edit reaches the other client\'s socket', false, 'no message id to edit');
       ok('a delete reaches the other client\'s socket', false, 'no message id to delete');
     }
+
+    // --- a non-member gets nothing -------------------------------------------
+    // Carol's socket opens - the ticket is hers and valid - and then she asks for the
+    // room. Both halves matter: a refused ticket is the easy case, and it is already
+    // asserted below. This is the one where authorisation has to do the work.
+    const carol = await connect(wsBase + '/?ticket=' + encodeURIComponent(await ticket(tokenC)), 'carol');
+    clients.push(carol);
+    ok('an uninvited account can open a socket', true);
+
+    carol.received.length = 0;
+    carol.socket.send(JSON.stringify({ type: 'join-server', serverId }));
+    carol.socket.send(JSON.stringify({ type: 'join', channelId }));
+    await new Promise((r) => setTimeout(r, 700));
+    ok('an uninvited account is not told it joined the room',
+      !carol.received.some((m) => m && (m.type === 'joined' || m.type === 'room')));
+
+    // Now the one that matters: something is said in the room, and Carol is not told.
+    carol.received.length = 0;
+    alice.received.length = 0;
+    const secret = await request(base, 'POST', `/api/channels/${channelId}/messages`,
+      { content: 'not for carol' }, tokenA);
+    await new Promise((r) => setTimeout(r, 1200));
+    const leaked = carol.received.some((m) => m
+      && (m.type === 'message' || m.type === 'message_created')
+      && JSON.stringify(m).includes('not for carol'));
+    ok('a message in a room the account never joined does not reach it', !leaked,
+      'carol received ' + carol.received.length + ' frame(s)');
+    ok('and the member still received it',
+      alice.received.some((m) => m && JSON.stringify(m).includes('not for carol')),
+      secret.status + ' ' + secret.text.slice(0, 60));
 
     // --- a socket with a bad ticket is refused ------------------------------
     let refused = false;
