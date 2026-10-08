@@ -26,6 +26,13 @@ const AVATAR_COLORS = [
 // A stable colour for an account with no avatar, so the same person is always the
 // same tone. Every entry is a dark, low-saturation warm tone, so a screen full of
 // them reads as one product rather than as a bag of sweets.
+// The letter is drawn in this, and it has to be light: every entry in the palette above
+// is a dark warm tone, and the letter on it was --color-on-accent - a near-black brown,
+// 1.75:1 at worst. A community mark with an illegible initial is worse than no initial,
+// because it looks like a rendering fault. Solved against the whole palette, not against
+// one entry: #c8c1bc clears 4.5:1 on all ten, worst case 4.90.
+const MARK_INK = '#c8c1bc';
+
 export function hashColor(str) {
   let h = 0;
   const s = String(str || '');
@@ -37,6 +44,10 @@ export function initialOf(name) {
   const s = String(name || '?').trim();
   return (s[0] || '?').toUpperCase();
 }
+
+// The colour the initial is written in. Exported so the CSS can use it too, rather
+// than being written in both places and drifting the way --t-txt did.
+export const markInk = () => MARK_INK;
 
 export function avatarUrlOf(user) {
   if (!user) return null;

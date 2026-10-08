@@ -250,10 +250,16 @@ ok('every check is run somewhere, or says why it is not', unreachable.length ===
 // .group is not on it. Nothing else in the repository calls .group for the same reason, and
 // m[1] is what the other checks already do.
 const dangling = [];
+// The path in the script is resolved from the working directory npm would use, which is
+// the backend. `npm run css` points at ../frontend/scripts/build-css.js because the CSS
+// belongs to the front end; resolving every match against backend/scripts reported it as a
+// script that does not exist.
+const backendDir = path.resolve(__dirname, '..');
 for (const [name, cmd] of Object.entries(pkg.scripts)) {
-  for (const m of String(cmd).matchAll(/scripts\/([\w.-]+)/g)) {
-    if (!fs.existsSync(path.join(scriptsDir, m[1]))) {
-      dangling.push(`npm run ${name} -> scripts/${m[1]}`);
+  for (const m of String(cmd).matchAll(/((?:\.\.\/)?[\w./-]*scripts)\/([\w.-]+)/g)) {
+    const resolved = path.resolve(backendDir, m[1], m[2]);
+    if (!fs.existsSync(resolved)) {
+      dangling.push(`npm run ${name} -> ${m[1]}/${m[2]}`);
     }
   }
 }
