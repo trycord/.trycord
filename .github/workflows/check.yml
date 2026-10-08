@@ -21,6 +21,21 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow clone. Three of these jobs run
+          # `npm run check`, which includes check-split-loses, and that check reads each
+          # file as it was before it was split by revision - so on a shallow checkout all
+          # eight `git show` calls throw and it verifies nothing. It used to report that
+          # as a pass. It fails on zero comparisons now, which is right, and which would
+          # otherwise turn three jobs red on their first run.
+          fetch-depth: 0
+        with:
+          # Full history, not the default shallow clone. check-split-loses reads each file
+          # as it was before it was split, by revision, so on a shallow checkout all eight
+          # `git show` calls throw and it compares nothing at all. It used to report that
+          # as a pass. It now fails on zero comparisons, which is correct - and which would
+          # otherwise turn this job red on the very first run.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -56,6 +71,14 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow clone. Three of these jobs run
+          # `npm run check`, which includes check-split-loses, and that check reads each
+          # file as it was before it was split by revision - so on a shallow checkout all
+          # eight `git show` calls throw and it verifies nothing. It used to report that
+          # as a pass. It fails on zero comparisons now, which is right, and which would
+          # otherwise turn three jobs red on their first run.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -87,6 +110,14 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow clone. Three of these jobs run
+          # `npm run check`, which includes check-split-loses, and that check reads each
+          # file as it was before it was split by revision - so on a shallow checkout all
+          # eight `git show` calls throw and it verifies nothing. It used to report that
+          # as a pass. It fails on zero comparisons now, which is right, and which would
+          # otherwise turn three jobs red on their first run.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -136,6 +167,14 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow clone. Three of these jobs run
+          # `npm run check`, which includes check-split-loses, and that check reads each
+          # file as it was before it was split by revision - so on a shallow checkout all
+          # eight `git show` calls throw and it verifies nothing. It used to report that
+          # as a pass. It fails on zero comparisons now, which is right, and which would
+          # otherwise turn three jobs red on their first run.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -166,6 +205,14 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow clone. Three of these jobs run
+          # `npm run check`, which includes check-split-loses, and that check reads each
+          # file as it was before it was split by revision - so on a shallow checkout all
+          # eight `git show` calls throw and it verifies nothing. It used to report that
+          # as a pass. It fails on zero comparisons now, which is right, and which would
+          # otherwise turn three jobs red on their first run.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -193,6 +240,14 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          # Full history, not the default shallow clone. Three of these jobs run
+          # `npm run check`, which includes check-split-loses, and that check reads each
+          # file as it was before it was split by revision - so on a shallow checkout all
+          # eight `git show` calls throw and it verifies nothing. It used to report that
+          # as a pass. It fails on zero comparisons now, which is right, and which would
+          # otherwise turn three jobs red on their first run.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
