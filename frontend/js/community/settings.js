@@ -42,20 +42,6 @@ function resolveCommunityHref(serverId, id) {
   return serverPath(serverId, 'settings', id === 'overview' ? '' : id);
 }
 
-function linkedSection({ serverId, title, blurb, href, cta, counts }) {
-  const box = el('div', { class: 'settings-panel' });
-  box.appendChild(el('h2', { class: 'settings-panel__title' }, title));
-  box.appendChild(el('p', { class: 'muted small settings-panel__blurb' }, blurb));
-  if (counts && counts.length) {
-    const row = el('div', { class: 'role-detail__summary' });
-    for (const c of counts) row.appendChild(el('span', {}, c));
-    box.appendChild(row);
-  }
-  const go = el('a', { class: 'btn primary', href: serverPath(serverId, href) }, cta);
-  box.appendChild(el('div', { class: 'card-actions' }, go));
-  return box;
-}
-
 // Kept across range changes so the picker does not spring back to 30 days when
 // the section is re-rendered for any other reason.
 let analyticsDays = 30;

@@ -12,7 +12,7 @@ assertions against real flows; `npm run check:render` boots a server and renders
 message crosses between the two that share a community and does not reach the third, who
 never joined the room; `npm run check:contrast` measures every theme against WCAG AA
 and finds 100 ratios that pass; and `npm run check:client-load`
-evaluates all 113 client modules.
+evaluates all 114 client modules.
 
 ## Where things live
 
@@ -255,6 +255,41 @@ this machine because this machine is that path. Everywhere else — CI, a fresh 
 copy the harness makes — neither resolved, and a check that cannot read its subject is a
 check that reports nothing while looking green. Every path in the check scripts now comes
 from `__dirname`.
+
+`check-client-bindings` asks a second question, added after the first one turned out to be
+half the answer. It only ever looked at names *exactly one module exports*, which is what
+keeps it quiet - and which makes it blind to the other half of the same fault: a function
+defined in a file and removed by an edit leaves its call site behind, no module exports that
+name any more, and there is nothing to compare it against.
+
+That is not hypothetical. Moving the grouping block out of `renderChannel` took `newNonce`
+with it and left `pendingNonce || newNonce()` in the send path - a ReferenceError on every
+message anyone sends, with the whole suite green. So the check now also reports a name that
+*nobody* exports and that the file calls. Narrow on purpose: only a call counts, the
+language and the browser are listed rather than guessed at, and a definition is told from a
+call by whether a body follows the argument list - `wsUrl(ticket) {` is a method in an
+object literal and looks identical to a call until you read what comes after the `)`.
+
+That second question found eight live faults, none of which any other check could see:
+
+  admin/reports.js              five moderation buttons - enforce, lift and remove, on
+                               users and on communities - called functions defined in
+                               users.js and communities.js and imported by nobody
+  account/privacy.js            accepting, declining or removing a friend request called
+                               `renderPrivacy`, which does not exist; the renderer in that
+                               file is `renderPrivacySocial`
+  shell/menus.js                the Message item on a member's context menu called
+                               `messageMember`, which did not exist. It was written once
+                               properly in user-actions.js, so that is now exported and
+                               both menus call it
+  settings-sections.js          `linkedSection` lives in settings.js and only this file
+                               calls it
+  integrations-lists.js         `commandEditor` lives in integrations.js and only this file
+                               calls it
+
+The last two could have been fixed by importing the helper, but the parent module already
+imports the child in both cases, so importing back would close a cycle. Each moved to the
+file that is its only caller.
 
 `check-server-bindings` and `check:client-bindings` exist because every other check
 verifies that an import *resolves*. None of them notices a name that is simply absent —

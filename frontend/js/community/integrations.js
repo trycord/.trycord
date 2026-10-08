@@ -19,8 +19,6 @@ const EVENT_LABELS = {
   'command.created': 'Slash command used',
 };
 
-
-
 function webhookPanel(ctx) {
   const box = el('div', { class: 'settings-panel' });
   box.appendChild(sectionHead('Outgoing webhooks', 'This community POSTs an event to a URL you choose. Each request is signed, and the signature travels in x-trycord-signature so the receiver can verify it.'));
@@ -95,96 +93,6 @@ function appsPanel(ctx) {
   return box;
 }
 
-function commandEditor(ctx, appId) {
-  const wrap = el('div', { class: 'command-editor' });
-  const list = el('div', { class: 'command-list' });
-  const form = el('form', { class: 'secret-form' });
-  const cmdName = el('input', { class: 'input', type: 'text', placeholder: 'ping', maxlength: '32', 'aria-label': 'Command name' });
-  const cmdResp = el('input', { class: 'input', type: 'text', placeholder: 'Reply sent when someone types /ping', maxlength: '2000', 'aria-label': 'Command reply' });
-  const cmdDesc = el('input', { class: 'input', type: 'text', placeholder: 'Description (optional)', maxlength: '255', 'aria-label': 'Command description' });
-  // Declared options, one per line, as name:type. The declaration is what the
-  // server binds arguments against, so a typo here becomes a refusal at send
-  // time rather than a silently ignored argument.
-  const cmdOpts = el('input', {
-    class: 'input', type: 'text', maxlength: '400',
-    placeholder: 'Options: loud:boolean times:number mood:choice(happy,sad)',
-    'aria-label': 'Command options',
-  });
-  const save = el('button', { class: 'btn', type: 'submit' }, 'Save command');
-  form.append(cmdName, cmdDesc, cmdResp, cmdOpts, save);
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const n = cmdName.value.trim().replace(/^\/+/, '');
-    const response = cmdResp.value;
-    if (!n || !response) { toast('A command needs a name and a reply.', 'error'); return; }
-    try {
-      let options;
-      const spec = cmdOpts.value.trim();
-      if (spec) {
-        options = spec.split(/[,\n]/).map((part) => part.trim()).filter(Boolean).map((part) => {
-          const m = /^([a-z0-9][a-z0-9_-]*)(?::([a-z]+))?(?:\(([^)]*)\))?$/i.exec(part);
-          if (!m) throw new Error('cannot read the option "' + part + '" - use name:type');
-          const o = { name: m[1], type: (m[2] || 'string').toLowerCase() };
-          if (m[3]) o.choices = m[3].split(',').map((c) => c.trim()).filter(Boolean);
-          return o;
-        });
-      }
-      await Api.setAppCommand(ctx.serverId, appId, {
-        name: n, response, description: cmdDesc.value.trim() || undefined, options,
-      });
-      cmdName.value = ''; cmdDesc.value = ''; cmdResp.value = ''; cmdOpts.value = '';
-      await load();
-      toast('Command saved.', 'ok');
-    } catch (ex) { toast(ex.message || 'Could not save the command.', 'error'); }
-  });
-
-  async function load() {
-    list.textContent = '';
-    let commands;
-    try { commands = (await Api.appCommands(ctx.serverId, appId)).commands || []; }
-    catch (ex) {
-      list.appendChild(el('p', { class: 'form-error' }, ex.message || 'Could not load commands.'));
-      return;
-    }
-    if (!commands.length) {
-      list.appendChild(el('p', { class: 'muted small' }, 'No commands yet. Anyone in this community can trigger one by typing /name.'));
-      return;
-    }
-    for (const c of commands) {
-      const row = el('div', { class: 'command-row' });
-      const main = el('div', { class: 'command-row__main' });
-      main.appendChild(el('code', { class: 'command-row__name' }, '/' + c.name));
-      if (c.description) main.appendChild(el('span', { class: 'muted small' }, c.description));
-      if ((c.options || []).length) {
-        const names = c.options.map((o) => (o.required ? '' : '[') + o.name + (o.required ? '' : ']')
-          + (o.type === 'choice' ? '(' + (o.choices || []).join('|') + ')' : '')).join(' ');
-        main.appendChild(el('code', { class: 'command-row__usage' }, '/' + c.name + ' ' + names));
-      }
-      main.appendChild(el('p', { class: 'command-row__response' }, c.response));
-      row.appendChild(main);
-      row.appendChild(dangerButton('Delete', () => {
-        confirmDialog({
-          title: 'Delete command',
-          message: 'Delete /' + c.name + '? Anyone who types it stops getting a reply.',
-          confirmText: 'Delete', danger: true,
-          onConfirm: async () => {
-            try {
-              await Api.deleteAppCommand(ctx.serverId, appId, c.id);
-              await load();
-              toast('Command deleted.', 'ok');
-            } catch (ex) { toast(ex.message || 'Could not delete the command.', 'error'); }
-          },
-        });
-      }));
-      list.appendChild(row);
-    }
-  }
-
-  wrap.append(list, form);
-  load();
-  return wrap;
-}
-
 export async function renderIntegrations(container, serverId) {
   clear(container);
 
@@ -211,9 +119,6 @@ export async function renderIntegrations(container, serverId) {
       );
     },
   };
-
-
-
 
   const head = sectionHead(
     'Integrations',

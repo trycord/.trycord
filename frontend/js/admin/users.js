@@ -72,7 +72,10 @@ export async function renderUsers(body, show, seq) {
   await render(search.value.trim());
 }
 
-function userEnforceModal(user, onDone) {
+// Exported because the reports console offers the same two actions on the same row.
+// It called them without importing them, so both buttons threw a ReferenceError on
+// click; they are module-private, which is why nothing noticed at load.
+export function userEnforceModal(user, onDone) {
   const err = el('div', { class: 'form-error', hidden: true });
   const typeSel = el('select', { class: 'input' },
     el('option', { value: 'WARNING' }, 'Warning'),
@@ -118,7 +121,7 @@ function userEnforceModal(user, onDone) {
   return modal;
 }
 
-function liftUserModal(user, onDone) {
+export function liftUserModal(user, onDone) {
   const err = el('div', { class: 'form-error', hidden: true });
   const reason = el('textarea', { class: 'input', rows: 2, required: true, placeholder: 'Reason for lifting enforcement' });
   const modal = openModal({

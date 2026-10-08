@@ -39,12 +39,12 @@ export function renderPrivacySocial(body) {
       const who = (r.from && (r.from.displayName || r.from.username)) || 'Someone';
       const accept = dangerButton('Accept', async () => {
         accept.disabled = true;
-        try { await Api.acceptFriendRequest(r.id); toast('Request accepted.', 'ok'); await refreshFriends(); renderPrivacy(clearAndRebuild(body)); }
+        try { await Api.acceptFriendRequest(r.id); toast('Request accepted.', 'ok'); await refreshFriends(); renderPrivacySocial(clearAndRebuild(body)); }
         catch (e) { accept.disabled = false; toast(e.message || 'Could not accept that.', 'error'); }
       }, { variant: 'primary' });
       const decline = dangerButton('Decline', async () => {
         decline.disabled = true;
-        try { await Api.declineFriendRequest(r.id); toast('Request declined.', 'warn'); await refreshFriends(); renderPrivacy(clearAndRebuild(body)); }
+        try { await Api.declineFriendRequest(r.id); toast('Request declined.', 'warn'); await refreshFriends(); renderPrivacySocial(clearAndRebuild(body)); }
         catch (e) { decline.disabled = false; toast(e.message || 'Could not decline that.', 'error'); }
       }, { variant: 'ghost' });
       card.appendChild(settingRow({
@@ -70,7 +70,7 @@ export function renderPrivacySocial(body) {
             message: 'They stay on this instance and can send you another request.',
             danger: true, confirmText: 'Remove',
             onConfirm: async () => {
-              try { await Api.removeFriend(f.id); toast('Friend removed.', 'warn'); await refreshFriends(); renderPrivacy(clearAndRebuild(body)); }
+              try { await Api.removeFriend(f.id); toast('Friend removed.', 'warn'); await refreshFriends(); renderPrivacySocial(clearAndRebuild(body)); }
               catch (e) { toast(e.message || 'Could not remove that friend.', 'error'); }
             },
           });
