@@ -12,7 +12,7 @@ assertions against real flows; `npm run check:render` boots a server and renders
 message crosses between the two that share a community and does not reach the third, who
 never joined the room; `npm run check:contrast` measures every theme against WCAG AA
 and finds 100 ratios that pass; and `npm run check:client-load`
-evaluates all 115 client modules.
+evaluates all 116 client modules.
 
 ## Where things live
 
@@ -255,6 +255,21 @@ this machine because this machine is that path. Everywhere else — CI, a fresh 
 copy the harness makes — neither resolved, and a check that cannot read its subject is a
 check that reports nothing while looking green. Every path in the check scripts now comes
 from `__dirname`.
+
+It also stopped restricting itself to names exactly one module exports. That restriction was
+how it kept quiet, and it hid every re-export: `renderContextHeader` is defined in
+`shell/context-header.js` and re-exported by `shell.js`, so it had two homes, so it was
+never on the list, so a module calling it without importing it from either passed. Which
+module owns a name does not change the question — does this file bind it — so the ambiguity
+goes into the message instead of skipping the check. Widening it found two more faults the
+same afternoon: `ui/menus.js` and `ui/text.js` both called `focusQuietly` with nothing
+imported it.
+
+`check-render --emit-dom` had the same disease one level up. It writes each surface out for
+the layout check and exits 0, having asserted **nothing** — so a channel view answering
+`renderContextHeader is not defined` measured clean at 240 layout assertions, because what
+Chromium measured was the fault screen's geometry. It now fails on a page that threw, and
+prints that it is checking faults only.
 
 `check-client-bindings` asks a second question, added after the first one turned out to be
 half the answer. It only ever looked at names *exactly one module exports*, which is what
