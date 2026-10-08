@@ -50,7 +50,7 @@ ok('the client module count in the summary', doc.includes(`all ${clientModules} 
 // to the numbers those runs last printed, which are recorded here so a stale figure in the
 // summary is a failing check rather than a sentence nobody re-reads.
 const REPORTED = {
-  'check:flows': 70,
+  'check:flows': 72,
   'check:render': 81,
   'check:realtime': 17,
   'check:contrast': 100,

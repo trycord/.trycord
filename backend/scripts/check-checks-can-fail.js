@@ -94,6 +94,15 @@ const CASES = [
     break: (f) => append(f, "\nPAGES.push({ id: '__probe', scope: 'me', render: () => {} });\n"),
     word: 'route' },
 
+  { script: 'check-server-bindings', file: 'backend/src/services/sessions.js',
+    guards: 'a name a server module calls and nothing defines',
+    // The exact live bug this rule found: services/sessions.js was split out of
+    // services/privacy.js and left calling newRef, which had stayed behind. It threw on
+    // every login inside a .catch() that logs and carries on, so sessions silently stopped
+    // being recorded and nothing else noticed.
+    break: (f) => replaceIn(f, /db\.newRef\('last_seen_at'\)/, "newRef('last_seen_at')"),
+    word: 'newRef' },
+
   { script: 'check-server-bindings', file: 'backend/src/services/slugs.js',
     guards: 'a name used bare that only one module in the tree exports',
     // The check tracks exported names, not module basenames, and skips anything preceded

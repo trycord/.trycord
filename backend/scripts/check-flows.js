@@ -426,6 +426,21 @@ async function waitForHealth(child, attempts) {
     ok('a wrong password is refused', wrongPassword.status === 401,
       'status ' + wrongPassword.status);
 
+    // A session is a row, not just a token, and the row is what the Security page lists
+    // and what "sign out everywhere" revokes. recordSession is called from a .catch() that
+    // logs and carries on, so when it broke - which it did, for a week, because a split
+    // left it calling a function that had stayed behind in the module it came from -
+    // signing in still worked perfectly and nothing above this line could tell.
+    const sessions = await call('GET', '/api/auth/sessions', undefined, signedInToken);
+    ok('signing in records a session', sessions.status === 200
+      && Array.isArray(sessions.json && sessions.json.sessions)
+      && sessions.json.sessions.length > 0,
+      'status ' + sessions.status + ' sessions='
+      + JSON.stringify((sessions.json && sessions.json.sessions) || []).slice(0, 60));
+    ok('and the current one is marked as current',
+      !!(sessions.json && sessions.json.sessions
+        && sessions.json.sessions.some((x) => x.current === true)));
+
     const signedOut = await call('POST', '/api/auth/logout', undefined, signedInToken);
     ok('a session can be ended', signedOut.status === 200, 'status ' + signedOut.status);
 
