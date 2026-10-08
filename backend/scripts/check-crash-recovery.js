@@ -6,8 +6,12 @@
 //
 // runScripts must be 'dangerously' - with 'outside-only' the document's own scripts do
 // not execute at all, which is how the first two attempts at this harness tested nothing.
-const { JSDOM } = require('/home/ultim/trycord/.trycord/backend/node_modules/jsdom');
+const { JSDOM } = require('jsdom');
+// Both of these were absolute paths into one machine's working copy: the jsdom import
+// and the crash.js it mounts. On CI neither resolved, so the check was asserting that a
+// file it could not read was fine.
 const fs = require('fs');
+const path = require('path');
 
 const STALE = "Uncaught SyntaxError: The requested module '../config.js' does not"
   + " provide an export named 'BACKEND_URL'";
@@ -28,8 +32,12 @@ function mount() {
     },
   });
   const el = w.document.createElement('script');
+  // Resolved from this file rather than written out, like every other check in this
+  // directory. It was an absolute path into one developer's working copy, which means it
+  // read a stale crash.js - or found nothing at all - on every other machine, including
+  // CI, where it would have been asserting nothing about anything.
   el.textContent = fs.readFileSync(
-    '/home/ultim/trycord/.trycord/frontend/js/crash.js', 'utf8');
+    path.join(__dirname, '..', '..', 'frontend', 'js', 'crash.js'), 'utf8');
   w.document.body.appendChild(el);
   return { w, store };
 }

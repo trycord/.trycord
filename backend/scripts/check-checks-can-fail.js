@@ -89,6 +89,53 @@ const CASES = [
     // constant nothing reads would not be seen by anything.
     break: (f) => append(f, "\nPAGES.push({ id: '__probe', scope: 'me', render: () => {} });\n"),
     word: 'route' },
+
+  { script: 'check-server-bindings', file: 'backend/src/services/slugs.js',
+    guards: 'a name used bare that only one module in the tree exports',
+    // The check tracks exported names, not module basenames, and skips anything preceded
+    // by a dot - so `memberships.isTimedOut` is invisible to it and `clientLink` used
+    // bare is exactly what it is looking for. clientLink is exported by auth/mail.js
+    // alone, and slugs.js neither defines nor imports it.
+    break: (f) => append(f, '\nfunction __probe() { return clientLink; }\n'),
+    word: 'clientLink' },
+
+  { script: 'check-singletons', file: 'frontend/js/global/notifications.js',
+    guards: 'a capitalised name used as an object with nothing importing it',
+    // The check looks for `Name.member` where Name is capitalised and unbound in that
+    // file. It is not about `new` - a module cannot reach a service at all if it never
+    // imported one, and that is a boot failure, not a second copy.
+    break: (f) => append(f, '\nexport function __probe() { return UnimportedThing.state; }\n'),
+    word: 'UnimportedThing' },
+
+  { script: 'check-server-routes', file: 'backend/src/routes/mutes.js',
+    guards: 'a route registered twice',
+    // The pattern matches router.get('/x') with a single-quoted literal, so a duplicate
+    // has to be spelled exactly as the live one is or the check never sees it.
+    break: (f) => append(f, "\nrouter.get('/', requireVerified, async (req, res) => res.json([]));\n"),
+    word: 'duplicate' },
+
+  { script: 'check-routes', file: 'frontend/js/pages/registry.js',
+    guards: 'a client route the server would not treat as an application route',
+    break: (f) => append(f,
+      "\nPAGES.push({ id: '__probe', route: '/app/__probe', scope: 'me', render: () => {} });\n"),
+    word: 'route' },
+
+  { script: 'check-client-load', file: 'frontend/js/global/notifications.js',
+    guards: 'a module that does not load',
+    // Throwing at module scope is the failure it exists for: every source check reads
+    // this file and finds it fine, and the application dies on it.
+    break: (f) => append(f, '\nthrow new Error("__probe: this module does not load");\n'),
+    word: 'load' },
+
+  { script: 'check-crash-recovery', file: 'frontend/js/crash.js',
+    guards: 'a stale module graph with nothing that recovers from it',
+    // Dropping the arm is the real defect: without it the one-shot guard can never fire,
+    // so a stale graph reloads forever and the reader never sees the crash screen. The
+    // check names this exact behaviour in its first assertion.
+    // The whole recoverFromStaleGraph body, which is what the six assertions are about.
+    break: (f) => replaceIn(f, /function recoverFromStaleGraph\(text\) \{[\s\S]*?\n  \}\n/,
+      'function recoverFromStaleGraph(text) {\n    return false;\n  }\n'),
+    word: 'one-shot' },
 ];
 
 function run(dir, script) {
