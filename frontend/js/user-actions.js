@@ -90,6 +90,24 @@ export function openUserCard({ user, x, y, serverId, self = false, onCard = null
   return card;
 }
 
+/**
+ * Open, or reuse, the direct-message conversation with one person and go to it.
+ *
+ * Two menus offer this and it was written twice: once here, and once in the shell context
+ * menu as a call to a `messageMember` that had never existed - so that menu item threw a
+ * ReferenceError. Opening is not the same as creating, which is why this goes through
+ * Api.openDm rather than navigating to a conversation id nobody has.
+ */
+export async function messageMember(id) {
+  try {
+    const conv = await Api.openDm(id);
+    const cid = conv && (conv.id || conv.conversationId);
+    if (cid) navigate('/dms/' + cid);
+  } catch (ex) {
+    toast(ex.message || 'Could not open a conversation.', 'error');
+  }
+}
+
 export function buildUserActions({ user, id, name, sid, isSelf, blocked = false }) {
   const out = [];
   const authed = isAuthed();
@@ -105,17 +123,7 @@ export function buildUserActions({ user, id, name, sid, isSelf, blocked = false 
   // the reader has blocked: the server refuses with NOT_ACCEPTING_DMS, so the
   // menu item would only ever exist to fail.
   if (!isSelf && !blocked) {
-    out.push({
-      label: 'Send message',
-      primary: true,
-      onSelect: async () => {
-        try {
-          const conv = await Api.openDm(id);
-          const cid = conv && (conv.id || conv.conversationId);
-          if (cid) navigate('/dms/' + cid);
-        } catch (ex) { toast(ex.message || 'Could not open a conversation.', 'error'); }
-      },
-    });
+    out.push({ label: 'Send message', primary: true, onSelect: () => messageMember(id) });
   }
 
   if (sid && !isSelf && can('MANAGE_ROLES')) {

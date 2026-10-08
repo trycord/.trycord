@@ -70,6 +70,34 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
   // Only names exactly one module exports. Six names are exported by more than one
   // module - leaveDm, icon, onCleanup and friends are re-exports - and a name with
   // two possible homes cannot be resolved to one answer.
+  // Words that are followed by an opening parenthesis and are not calls.
+  const KEYWORDS = new Set([
+    'if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'await', 'delete',
+    'void', 'in', 'of', 'do', 'else', 'yield', 'throw', 'case', 'with', 'import',
+    'export', 'super', 'this', 'constructor', 'async', 'function', 'class', 'get', 'set',
+  ]);
+
+  // Language and browser. Anything called by name that is not here, not bound in the
+  // file, and not exported anywhere in the tree is a name that does not exist.
+  const CALLED_OK = new Set([
+    'require', 'import', 'fetch', 'parseInt', 'parseFloat', 'isNaN', 'isFinite',
+    'encodeURIComponent', 'decodeURIComponent', 'encodeURI', 'decodeURI',
+    'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask',
+    'requestAnimationFrame', 'cancelAnimationFrame', 'structuredClone', 'atob', 'boto',
+    'console', 'alert', 'confirm', 'prompt', 'TextDecoder', 'TextEncoder', 'URL',
+    'URLSearchParams', 'AbortController', 'FormData', 'Blob', 'File', 'Event',
+    'EventTarget', 'CustomEvent', 'MessageChannel', 'Headers', 'Request', 'Response',
+    'Symbol', 'Promise', 'Map', 'Set', 'WeakMap', 'WeakSet', 'Proxy', 'Reflect',
+    'Object', 'Array', 'String', 'Number', 'Boolean', 'Math', 'JSON', 'Date', 'RegExp',
+    'Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError', 'Function',
+    'Intl', 'ArrayBuffer', 'Uint8Array', 'DataView', 'crypto', 'performance', 'globalThis',
+    'matchMedia', 'getComputedStyle', 'FileReader', 'IntersectionObserver',
+    'MutationObserver', 'ResizeObserver', 'localStorage', 'sessionStorage', 'history',
+    'location', 'navigator', 'screen', 'Notification', 'IntersectionObserverEntry',
+    'XMLHttpRequest', 'PopStateEvent', 'CustomEvent', 'Image', 'Audio', 'Option',
+    'WebSocket', 'CSSStyleSheet', 'MediaQueryList', 'ShadowRoot', 'ReadableStream',
+  ]);
+
   const unique = new Map();
   for (const [name, homes] of owner) if (homes.size === 1) unique.set(name, [...homes][0]);
 
@@ -185,6 +213,62 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
       if (/^\s*:/.test(code.slice(hit.index + name.length))) continue;
       findings.push({ file, name, home, line: bodyStart + code.slice(0, hit.index).split('\n').length });
     }
+
+    // A name that nobody exports, and that this module calls.
+    //
+    // The loop above only looks at names exactly one module exports, which is what keeps it
+    // quiet - and which makes it blind to the other half of the same fault. A function
+    // defined here and removed by an edit leaves its call site behind; no module exports
+    // that name any more, so there is nothing to compare it against and the check passes.
+    // It happened: moving the grouping block out of renderChannel took newNonce with it and
+    // left `pendingNonce || newNonce()` in the send path, which is a ReferenceError on every
+    // message anyone sends, and the whole suite was green.
+    //
+    // Narrow on purpose. Only a *call* counts, so prose and property reads do not, and the
+    // language and the browser are listed rather than guessed at.
+    for (const m of code.matchAll(/(?<![\w.$'`])([A-Za-z_$][\w$]*)\s*\(/g)) {
+      const name = m[1];
+      if (defined.has(name) || owner.has(name) || CALLED_OK.has(name)) continue;
+      // The match *is* the keyword where there is one - `if (` captures "if" - so this
+      // tests the captured name, not the text before it.
+      if (KEYWORDS.has(name)) continue;
+      const before = code.slice(Math.max(0, m.index - 16), m.index);
+      if (/\b(function|class)\s*$/.test(before)) continue;
+      // A definition, not a use. `function send(` has the keyword before it, but an object
+      // literal's method has nothing in front of the name: `TrycordConfig` holds `wsUrl(
+      // ticket) {` and every one of those looked like a call to a name that did not exist.
+      // The thing that tells them apart is what follows the argument list: a definition has
+      // a body, a call has not.
+      if (isDefinition(code, m.index)) continue;
+      findings.push({
+        file, name, home: null,
+        line: bodyStart + code.slice(0, m.index).split('\n').length,
+      });
+    }
+  }
+
+  /**
+   * Whether the `(` at `at` opens an argument list that is followed by a body.
+   *
+   * Walks the parentheses rather than pattern-matching the line, so a default value or a
+   * nested call does not end the scan early. This is the difference between a method in an
+   * object literal and a call to something undefined, and the two look identical until you
+   * read what comes after the closing bracket.
+   */
+  function isDefinition(code, at) {
+    let i = code.indexOf('(', at);
+    if (i === -1) return false;
+    let depth = 0;
+    for (; i < code.length; i++) {
+      const c = code[i];
+      if (c === '(') depth++;
+      else if (c === ')') {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    const after = code.slice(i + 1).match(/^\s*(.)/);
+    return !!after && after[1] === '{';
   }
 
   const rel = (f) => path.relative(path.join(__dirname, '..', '..'), f);
@@ -192,7 +276,9 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
   if (findings.length) {
     console.error(`client binding check FAILED - ${findings.length} name(s) used but neither imported nor defined:`);
     for (const f of findings) {
-      console.error(`  ${rel(f.file)}:${f.line}  ${f.name}  (exported by ${path.basename(f.home)})`);
+      console.error(`  ${rel(f.file)}:${f.line}  ${f.name}  (${f.home
+        ? 'exported by ' + path.basename(f.home)
+        : 'nothing exports this, and it is not bound here'})`);
     }
     process.exit(1);
   }
