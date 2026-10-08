@@ -186,7 +186,7 @@ connection error.
 | `node scripts/check-require-aliases.js` | a service is called by a name it was not bound to, is imported where it is not exported, or is called bare and never imported |
 | `node scripts/check-crash-recovery.js` | the crash surface recovers by itself from a half-updated module graph, and does not reload for an ordinary fault |
 | `node scripts/check-signin.js` | a correct password returns a token. A regression test for the sign-in bug below, which no other check could see |
-| `npm run check:checks-can-fail` | runs fourteen checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
+| `npm run check:checks-can-fail` | runs eighteen checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
 | `npm run check-client-styles` | every class name the client emits has a rule in app.css. Finds a forgotten rule; names the two that are handles with no rule on purpose. |
 | `npm run check:dialects` | both database dialects. Boots SQLite and runs the upsert end to end, then has the live MySQL instance **parse** the statement the other branch produces. Not in `check`, because it needs the live database. |
 | `npm run db:backup` | dumps the live database read-only and verifies the dump against what the server reported |he browser cannot load `http` |
@@ -240,6 +240,12 @@ single one:
 
 Each of those was found by the checks-can-fail harness, not by reading the check.
 
+It caught a second one after that: `check-split-loses` passed on nothing. It reads each
+file as it was before its split with `git show`, and every `git show` in a shallow clone,
+a tarball export or a copy without `.git` throws, which the check treated as "nothing to
+compare" and counted as a pass. It now fails on zero comparisons, and the harness runs it
+against the repository rather than the copy, because a copy has no history to read.
+
 That harness also caught a check that was not running at all.
 `check-crash-recovery.js` reached into `/home/ultim/trycord/.trycord` twice: once to
 `require` jsdom by absolute path and once to read the `crash.js` it mounts. It passed on
@@ -267,9 +273,22 @@ answered 500 one line into the branch. Three files, three exports, and nothing i
 flow assertions touched a second factor.
 
 `npm run check:checks-can-fail` exists because of that run. It copies the tree, breaks one
-thing per check, and requires the check to notice: eight checks, three runs each, clean
-and broken and reverted, so a run that dies mid-way leaves nothing behind. It is what
+thing per check, and requires the check to notice: three runs each - clean, broken, and
+broken-then-reverted - so a run that dies mid-way leaves nothing behind. It is what
 turned up the `require-aliases` defects below, which had been hiding the whole time.
+
+Every static check is in it now. The four that are not - flows, realtime, render and
+dialects - are proven by hand instead, and recorded where they are: removing the
+authorisation gate in `ws/frames.js` fails the realtime leak assertion, removing the
+export from `challenge.js` fails three flow assertions with a 500, and the live MySQL
+instance is asked to parse the SQLite form of the upsert and refuses it.
+
+A case is a probe, and a probe that does not compile looks exactly like a check with a
+hole. Eight of the eighteen were wrong on the first attempt and the harness reported the
+check as broken every time: a double-quoted `require` the pattern does not match, a class
+the emitter does not scan, an invented name where a borrowed one was needed, one theme
+altered out of seven, `new Api()` where the check wanted an unbound capitalised name, and
+a declaration deleted from a split whose pre-split file never had it.
 
 Getting the noise to zero took four attempts — 98 findings, then 40, then 15, then 1 —
 and the reason is `strip-comments.mjs`. Comments have to come out by character
