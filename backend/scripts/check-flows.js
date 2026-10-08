@@ -193,20 +193,25 @@ async function waitForHealth(child, attempts) {
   child.stdout.on('data', (d) => log.push(String(d)));
   child.stderr.on('data', (d) => log.push(String(d)));
 
-  const cleanup = () => {
-    if (child.exitCode === null && child.signalCode === null) {
-      child.kill('SIGTERM');
-      // Wait for it. Exiting the moment the signal was sent left the server alive holding
-      // its port, and the next run tested that server instead of its own.
-      const t = setTimeout(() => {
-        try { child.kill('SIGKILL'); } catch { /* already gone */ }
-      }, 4000);
-      t.unref();
-      child.once('exit', () => clearTimeout(t));
-    }
-    try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* best effort */ }
-
-  };
+    // Stop the server and wait until it is actually stopped.
+    //
+    // kill() sends a signal; it does not wait for the process to act on it. The original
+    // cleanup called it and returned, so the caller exited while the server was still
+    // running, holding its port. Every run leaked one, and once a leaked server held the
+    // port the next run could not bind - which is how this check came to test somebody
+    // else's server without saying so. Awaited here, and every caller awaits it.
+    const cleanup = async () => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill('SIGTERM');
+        await new Promise((resolve) => {
+          const t = setTimeout(() => {
+            try { child.kill('SIGKILL'); } catch { /* already gone */ }
+          }, 4000);
+          child.once('exit', () => { clearTimeout(t); resolve(); });
+        });
+      }
+      try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* best effort */ }
+    };
 
   let booted;
   try {
@@ -217,7 +222,7 @@ async function waitForHealth(child, attempts) {
 
   if (!booted) {
     console.error('  the server never became healthy. Its output:\n' + log.join('').split('\n').slice(-25).map((l) => '    ' + l).join('\n'));
-    cleanup();
+    await cleanup();
     process.exit(1);
   }
 
@@ -599,7 +604,7 @@ async function waitForHealth(child, attempts) {
     ok('an unknown API path answers in the error envelope',
       apiMiss.status === 404 && code(apiMiss) === 'NOT_FOUND' && apiMiss.json !== null);
   } finally {
-    cleanup();
+    await cleanup();
   }
 
   console.log('');
