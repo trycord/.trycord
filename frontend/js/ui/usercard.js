@@ -14,7 +14,7 @@ export function showUserCard(clientX, clientY, { avatarEl, title, sub, statusLin
   // Banner is optional and loads through the authenticated media route, so
   const banner = el('div', { class: 'user-card__banner' });
   if (bannerUrl) {
-    import('./components.js').then(({ loadAuthedImage }) => loadAuthedImage(bannerUrl)).then((url) => {
+    import('../components.js').then(({ loadAuthedImage }) => loadAuthedImage(bannerUrl)).then((url) => {
       if (!url || !pop.isConnected) return;
       banner.style.backgroundImage = 'url("' + url + '")';
       banner.classList.add('has-img');
