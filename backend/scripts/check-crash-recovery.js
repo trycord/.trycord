@@ -126,6 +126,30 @@ const statuses = (async () => {
     down.net.cache === 'no-store', 'cache was ' + down.net.cache);
   check('and the file that failed is the one asked about',
     /app\.js$/.test(down.net.url || ''), down.net.url);
+
+  // A module that threw while evaluating. The target is still the script element and there
+  // is still a message, which is what separates it from a file the server did not send.
+  // Reporting that by fetching the file gives a 200 and says the origin is healthy while
+  // the error that actually broke the application goes unreported - and the reader is told
+  // to reload something that will load and fail again.
+  {
+    const { w } = mount();
+    const script = w.document.createElement('script');
+    script.src = '/js/app.js';
+    w.document.body.appendChild(script);
+    const ev = new w.Event('error');
+    ev.message = 'Cannot read properties of null (reading "appendChild")';
+    ev.filename = 'http://x/js/shell.js';
+    ev.lineno = 42;
+    ev.target = script;
+    script.dispatchEvent(ev);
+    const text = w.document.getElementById('trycord-crash').textContent || '';
+    check('a module that threw says it threw',
+      /threw|failed to run/i.test(text) && /appendChild/.test(text),
+      text.slice(0, 110));
+    check('and names the file that threw',
+      /app\.js/.test(text), text.slice(0, 110));
+  }
 })();
 
 const results = [];
