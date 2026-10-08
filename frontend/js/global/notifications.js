@@ -178,7 +178,7 @@ export async function renderNotifications(container) {
   // Cached rows are real, so they are shown - but they may not be the newest, so they
   // sit under the indicator rather than instead of it. They live in their own container
   // so they can be taken out cleanly once the real answer lands.
-  const cached = el('div', { class: 'notif-cached' });
+  const cached = el('div');
   for (const n of items) cached.appendChild(renderRow(n));
   list.appendChild(cached);
 
