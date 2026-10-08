@@ -7,8 +7,6 @@
 const db = require('../db');
 const { now } = require('../util');
 
-const newRef = (column) =>
-  db.dialect === 'mysql' ? `VALUES(${column})` : `excluded.${column}`;
 
 const boolInt = (v) => (v ? 1 : 0);
 const intBool = (v) => !!v;
@@ -69,7 +67,7 @@ async function setNotificationPrefs(userId, patch, serverId = null) {
     ['user_id', 'server_id', 'categories', 'updated_at'],
     [userId, serverId || null, JSON.stringify(next), ts],
     ['user_id', 'server_id'],
-    { categories: newRef('categories'), updated_at: newRef('updated_at') }
+    { categories: db.newRef('categories'), updated_at: db.newRef('updated_at') }
   );
   return next;
 }
