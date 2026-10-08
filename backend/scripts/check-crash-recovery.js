@@ -23,6 +23,21 @@ function mount() {
   });
   const w = dom.window;
   const store = {};
+  // crash.js asks the server what it actually said about a file the browser would not load,
+  // because the browser throws that away. Stubbed here so each status can be checked; left
+  // to jsdom it would be a different answer on a different day and the check would drift.
+  const net = { status: 404, reject: false, calls: 0 };
+  Object.defineProperty(w, 'fetch', {
+    configurable: true,
+    value: (url, opts) => {
+      net.calls++;
+      net.url = url;
+      net.cache = opts && opts.cache;
+      return net.reject
+        ? Promise.reject(new Error('Failed to fetch'))
+        : Promise.resolve({ status: net.status });
+    },
+  });
   Object.defineProperty(w, 'sessionStorage', {
     configurable: true,
     value: {
@@ -39,8 +54,60 @@ function mount() {
   el.textContent = fs.readFileSync(
     path.join(__dirname, '..', '..', 'frontend', 'js', 'crash.js'), 'utf8');
   w.document.body.appendChild(el);
-  return { w, store };
+  return { w, store, net };
 }
+
+// The same failure, told apart by what the server actually answered. 404 is a bug in the
+// repository and 521 is an origin that is not running; before this, both said "the server
+// did not send it", which sends a reader to the wrong place entirely - one to edit a file,
+// one to go and restart a machine.
+const statuses = (async () => {
+  // The failure a reader actually sees, after the status probe has answered.
+  {
+    const { w, store } = mount();
+    const script = w.document.createElement('script');
+    script.src = '/js/does-not-exist.js';
+    w.document.body.appendChild(script);
+    const fire = () => script.dispatchEvent(new w.Event('error'));
+    fire();
+    fire();
+    await new Promise((r) => setTimeout(r, 0));
+    check('a file the server did not send says so',
+      !!w.document.getElementById('trycord-crash'),
+      'no #trycord-crash was painted, so the page went dark with nothing on it');
+  }
+
+  const say = async (status, reject) => {
+    const { w, store, net } = mount();
+    net.status = status;
+    net.reject = !!reject;
+    const script = w.document.createElement('script');
+    script.src = '/js/app.js';
+    w.document.body.appendChild(script);
+    const fire = () => script.dispatchEvent(new w.Event('error'));
+    fire();
+    fire();
+    await new Promise((r) => setTimeout(r, 0));
+    return { text: w.document.getElementById('trycord-crash').textContent || '', net };
+  };
+
+  const missing = await say(404);
+  check('a 404 says the server does not have the file',
+    /404/.test(missing.text) && /does not have/.test(missing.text), missing.text.slice(0, 100));
+
+  const down = await say(521);
+  check('a 521 says the origin refused the connection',
+    /521/.test(down.text) && /refused the connection/.test(down.text), down.text.slice(0, 100));
+
+  const unreachable = await say(0, true);
+  check('an unreachable server says so in its own words',
+    /could not be reached/.test(unreachable.text), unreachable.text.slice(0, 100));
+
+  check('the status is asked for fresh, not from cache',
+    down.net.cache === 'no-store', 'cache was ' + down.net.cache);
+  check('and the file that failed is the one asked about',
+    /app\.js$/.test(down.net.url || ''), down.net.url);
+})();
 
 const results = [];
 const check = (name, ok, detail) => results.push({ name, ok, detail: detail || '' });
@@ -70,13 +137,9 @@ const check = (name, ok, detail) => results.push({ name, ok, detail: detail || '
   fire();
   check('a missing file is treated as a stale graph once', !crashed() && store['trycord.staleReload'] === '1',
     'reload flag is ' + store['trycord.staleReload']);
-  fire();
-  check('a file the server did not send says so', crashed(),
-    'no #trycord-crash was painted, so the page went dark with nothing on it');
-  if (crashed()) {
-    const t = w.document.getElementById('trycord-crash').textContent || '';
-    check('and names the file', /did not send/.test(t) && /does-not-exist/.test(t), t.slice(0, 90));
-  }
+  // The second failure no longer paints synchronously: it asks the server what it said
+  // before saying anything, so that a missing file and an unreachable origin are not the
+  // same sentence. The painted-message assertions moved into the async block below.
 }
 
 // 1. The exact failure the tab hit: recover silently, do not apologise.
@@ -122,6 +185,7 @@ const check = (name, ok, detail) => results.push({ name, ok, detail: detail || '
   check('the Reload button clears the one-shot flag', !('trycord.staleReload' in store));
 }
 
+statuses.then(() => {
 let bad = 0;
 for (const r of results) {
   if (!r.ok) bad++;
@@ -130,4 +194,6 @@ for (const r of results) {
 console.log(bad
   ? `\n  crash recovery FAILED - ${bad} of ${results.length} assertions\n`
   : `\n  crash recovery passed - ${results.length} assertions\n`);
-process.exit(bad ? 1 : 0);
+// exitCode, not exit(): process.exit() drops buffered stdout when it is a pipe.
+process.exitCode = bad ? 1 : 0;
+});
