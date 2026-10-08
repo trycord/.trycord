@@ -127,6 +127,13 @@ const CASES = [
     break: (f) => append(f, '\nthrow new Error("__probe: this module does not load");\n'),
     word: 'load' },
 
+  { script: 'check-workflows', file: '.github/workflows/check.yml',
+    guards: 'a workflow job that runs npm without installing first',
+    // Exactly the failure that made this check necessary: a job with npm run and no
+    // install, which is a red tick every push and reads as a broken product.
+    break: (f) => removeStep(f, 'Install server dependencies', 'Photograph'),
+    word: 'installs' },
+
   { script: 'check-client-modules', file: 'frontend/js/global/notifications.js',
     guards: 'a client import that does not resolve',
     break: (f) => append(f, "\nimport { nothingHere } from './no-such-module.js';\n"),
@@ -195,7 +202,7 @@ process.on('exit', () => { try { fs.rmSync(work, { recursive: true, force: true 
 // node_modules is thousands of files and no check here should be reading it, so it is
 // excluded from the copy and a link put back in its place.
 spawnSync('sh', ['-c',
-  'tar -cf - --exclude=backend/node_modules -C "$1" backend frontend | tar -xf - -C "$2"',
+  'tar -cf - --exclude=backend/node_modules -C "$1" backend frontend .github | tar -xf - -C "$2"',
   'sh', REPO, work], { stdio: 'inherit' });
 fs.symlinkSync(path.join(REPO, 'backend', 'node_modules'), path.join(work, 'backend', 'node_modules'));
 
@@ -246,6 +253,15 @@ console.log(failures
 process.exit(failures ? 1 : 0);
 
 function append(f, text) { fs.appendFileSync(f, text, 'utf8'); }
+/** Delete one step, identified by the name of the step that follows it. */
+function removeStep(f, name, before) {
+  const s = fs.readFileSync(f, 'utf8');
+  const start = s.indexOf('      - name: ' + name + '\n');
+  if (start === -1) throw new Error('no step named ' + name + ' in ' + f);
+  const end = s.indexOf('      - name: ' + before + '\n', start);
+  if (end === -1) throw new Error('no step named ' + before + ' after ' + name);
+  fs.writeFileSync(f, s.slice(0, start) + s.slice(end), 'utf8');
+}
 function replaceAll(f, re, fn) {
   const s = fs.readFileSync(f, 'utf8');
   const n = (s.match(re) || []).length;
