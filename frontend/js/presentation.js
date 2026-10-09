@@ -26,35 +26,40 @@ export function updateFromViewport() {
 }
 
 
-// The rail is permanent on desktop and an overlay on mobile, but it is the same
-// element, so "is navigation showing" is one question with one answer.
+// The rail is permanent on desktop and hidden on a phone, but "is navigation showing"
+// is still one question with one answer - and the answer belongs to the context
+// navigation, which is the drawer at both breakpoints where one exists.
+//
+// It used to be asked of #app-rail, which no stylesheet ever turns into a drawer: below
+// 820px the rail is display:none and the toggle opened a hidden element, so on a phone
+// and on a tablet the only way into the sidebar was a button that did nothing.
 export function isNavOpen() {
-  const rail = document.getElementById('app-rail');
-  return !!rail && rail.dataset.open === 'true';
+  const place = document.getElementById('place-navigation');
+  return !!place && place.classList.contains('is-open');
 }
 
 export function openNav() {
-  const rail = document.getElementById('app-rail');
-  if (!rail || rail.dataset.open === 'true') return;
-  // Captured before the first control is focused, or the drawer would hand
-  // focus straight back to itself on close.
+  const place = document.getElementById('place-navigation');
+  if (!place || place.classList.contains('is-open')) return;
+  // Captured before the first control is focused, or the drawer would hand focus
+  // straight back to itself on close.
   returnFocus = document.activeElement;
-  rail.dataset.open = 'true';
+  place.classList.add('is-open');
   const backdrop = document.getElementById('desktop-backdrop');
   if (backdrop) backdrop.hidden = false;
-  const toggle = rail.ownerDocument.querySelector('.nav-toggle');
+  const toggle = document.querySelector('.nav-toggle');
   if (toggle) toggle.setAttribute('aria-expanded', 'true');
-  const first = rail.querySelector('a[href], button:not([disabled]), input');
+  const first = place.querySelector('a[href], button:not([disabled]), input');
   if (first && first.focus) first.focus();
 }
 
 export function closeNav() {
-  const rail = document.getElementById('app-rail');
-  if (!rail || rail.dataset.open !== 'true') return;
-  rail.dataset.open = 'false';
+  const place = document.getElementById('place-navigation');
+  if (!place || !place.classList.contains('is-open')) return;
+  place.classList.remove('is-open');
   const backdrop = document.getElementById('desktop-backdrop');
   if (backdrop) backdrop.hidden = true;
-  const toggle = rail.ownerDocument.querySelector('.nav-toggle');
+  const toggle = document.querySelector('.nav-toggle');
   if (toggle) toggle.setAttribute('aria-expanded', 'false');
   if (returnFocus && typeof returnFocus.focus === 'function') {
     try { returnFocus.focus(); } catch { /* ignore */ }
@@ -73,9 +78,8 @@ export function onPresentationChange(fn) {
 
 
 // The drawer is modal, so it has to behave like one: Escape closes it, and Tab
-// cycles inside it rather than walking out into the view it is covering. On a
-// wide viewport the same rail is an ordinary column rather than an overlay, so
-// there is nothing to trap and both branches stand down.
+// cycles inside it rather than walking out into the view it is covering. Where the
+// context navigation is a column there is nothing to trap and both branches stand down.
 function drawerKeys(e) {
   if (presentationMode() !== 'mobile' || !isNavOpen()) return;
 
@@ -86,14 +90,14 @@ function drawerKeys(e) {
   }
   if (e.key !== 'Tab') return;
 
-  const rail = document.getElementById('app-rail');
-  const f = [...rail.querySelectorAll('a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])')]
+  const place = document.getElementById('place-navigation');
+  const f = [...place.querySelectorAll('a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])')]
     .filter((n) => n.offsetParent !== null || n === document.activeElement);
   if (!f.length) return;
   const first = f[0];
   const last = f[f.length - 1];
   const at = document.activeElement;
-  if (e.shiftKey && (at === first || !rail.contains(at))) {
+  if (e.shiftKey && (at === first || !place.contains(at))) {
     e.preventDefault();
     last.focus();
   } else if (!e.shiftKey && at === last) {
@@ -153,7 +157,7 @@ export function wireDrawerGestures() {
   let wasOpen = false;
   let offset = 0;           // live travel, negative = closed
 
-  const railEl = () => document.getElementById('app-rail');
+  const drawerEl = () => document.getElementById('place-navigation');
 
   function begin(e) {
     if (presentationMode() !== 'mobile') return;
@@ -173,22 +177,22 @@ export function wireDrawerGestures() {
     x0 = x; y0 = e.touches[0].clientY;
     axis = null;
     offset = 0;
-    const rail = railEl();
-    if (!rail) return;
-    width = rail.getBoundingClientRect().width || 1;
+    const drawer = drawerEl();
+    if (!drawer) return;
+    width = drawer.getBoundingClientRect().width || 1;
     // Detach from the open/closed transform so the finger can drive it directly.
-    rail.style.transition = 'none';
-    if (wasOpen) rail.style.transform = 'translateX(0)';
+    drawer.style.transition = 'none';
+    if (wasOpen) drawer.style.transform = 'translateX(0)';
   }
 
   // Hand the drawer back to the stylesheet. Called on every exit path: a gesture
   // that turns out to be a vertical scroll must not leave `transition: none`
   // inline, or the drawer never animates again.
   function release() {
-    const rail = railEl();
-    if (!rail) return;
-    rail.style.transition = '';
-    rail.style.transform = '';
+    const drawer = drawerEl();
+    if (!drawer) return;
+    drawer.style.transition = '';
+    drawer.style.transform = '';
   }
 
   function move(e) {
@@ -209,16 +213,14 @@ export function wireDrawerGestures() {
 
     // Opening travels positive, closing negative; past either end it stops.
     offset = Math.max(-width, Math.min(width, dx));
-    const rail = railEl();
-    if (rail) rail.style.transform = `translateX(${offset}px)`;
+    const drawer = drawerEl();
+    if (drawer) drawer.style.transform = `translateX(${offset}px)`;
   }
 
   function end() {
     if (id === null) return;
     id = null;
-    const rail = railEl();
     release();
-    if (!rail) return;
     if (wasOpen ? offset < -COMMIT_DIST : offset > COMMIT_DIST) {
       if (wasOpen) closeNav(); else openNav();
     } else if (wasOpen !== isNavOpen()) {
@@ -232,12 +234,6 @@ export function wireDrawerGestures() {
   document.addEventListener('touchend', end, { passive: true });
   document.addEventListener('touchcancel', end, { passive: true });
 }
-
-// Retained names from the two-shell era. They are called by the router and the
-// shell, and the behaviour they named is now the drawer's.
-export const isDesktopNavOpen = isNavOpen;
-export const openDesktopNav = openNav;
-export const closeDesktopNav = closeNav;
 
 const TrycordPresentation = {
   mode: presentationMode,

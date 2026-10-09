@@ -431,8 +431,55 @@ async function settle(window, ms = 400) {
     // Boot the application the way the browser does, by loading the entry module. The
     // app is what calls hydrate(), and without it isAuthed() is false and every route
     // redirects to /login - which is a green test that proves nothing.
-    const { default: App } = await import(pathToUrl(path.join(CLIENT, 'js/app.js')));
-    await App.boot();
+    //
+    // Recording is on for the boot specifically: what boot() asks the server for is the
+    // one set of requests this harness had no way to see, and the session -> gateway ->
+    // cache path is exactly the part that fails silently. A page fetches what it needs
+    // itself, so a boot that never connects the gateway still renders every route.
+    // A process-level handler for the duration of the import. app.js lets a hard failure
+    // propagate so the browser's crash screen is what a reader gets; without this the
+    // same rejection takes the whole Node process down instead of being asserted on.
+    //
+    // Recording is armed before the import and disarmed only after the boot it starts
+    // has finished. The import resolves as soon as the module body has run - which is
+    // immediately after boot() is *called*, not after it has finished - so disarming in a
+    // finally around the import sees none of the session, gateway or cache requests.
+    const unhandled = [];
+    const onUnhandled = (reason) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled);
+    requestLog = [];
+    recording = true;
+    let App = null;
+    let importError = null;
+    try {
+      App = await import(pathToUrl(path.join(CLIENT, 'js/app.js')));
+    } catch (e) {
+      importError = e;
+    } finally {
+      process.removeListener('unhandledRejection', onUnhandled);
+    }
+    // Handled explicitly rather than with a bare .catch(), because a handled rejection
+    // never reaches unhandledRejection - and a boot that failed is exactly what this is
+    // here to see. `ready` rejects, the reason is kept, and the assertion below reads it.
+    let bootError = importError;
+    if (App && App.ready) {
+      await App.ready.then(() => {}, (e) => { if (!bootError) bootError = e; });
+    }
+    if (!bootError && unhandled.length) bootError = unhandled[0];
+    recording = false;
+
+    const bootLog = requestLog.slice();
+    requestLog = [];
+
+    // A boot that throws is the failure that looks like nothing at all: the crash screen
+    // says "Background task failed ... setOnline is not defined" and there is no page.
+    //
+    // That is a runtime ReferenceError - the module *linked* (a missing export would have
+    // said "does not provide an export named X") and then used a name it never imported.
+    // check-client-bindings catches that by reading the source; this catches it by
+    // running it, which is the only version that can see a name used only on a branch.
+    ok('boot() runs without throwing', !bootError,
+      bootError ? (bootError.name + ': ' + bootError.message) : 'boot threw nothing');
     const { default: Router } = await import(pathToUrl(path.join(CLIENT, 'js/router.js')));
     console.log('  booted; signed in as ' + (document.documentElement.dataset.session || 'out'));
     if (process.env.RENDER_TRACE) {
@@ -608,6 +655,127 @@ async function settle(window, ms = 400) {
 
     console.log(`  navigated ${seen.length} routes without an uncaught error`);
 
+    // ---- the application rail is actually painted ----
+    //
+    // renderRail() existed and nothing called it, so #global-navigation and
+    // #identity-region were empty elements on every page and the only live thing in the
+    // rail was the community list. Every check in this file passed the whole time,
+    // because all of them read #view-root and the rail is not in #view-root.
+    //
+    // So: read the rail. It is the one part of the shell that decides where "here" is
+    // globally, and it is the one part nothing was looking at.
+    console.log('\n  the application rail');
+
+    const { renderAllChrome: paintChrome } = await import(pathToUrl(path.join(CLIENT, 'js/shell.js')));
+    const { updateFromViewport } = await import(pathToUrl(path.join(CLIENT, 'js/presentation.js')));
+    const { railPages, mobilePages } = registry;
+    await setViewport(window, 1440, 900);
+    updateFromViewport();
+    await visit(window, document, Router, concrete('/home', world), base);
+    paintChrome();
+    await settle(window, 200);
+
+    const railDestinations = railPages();
+    const railLinks = [...document.querySelectorAll('#global-navigation a[href]')];
+    ok('the rail offers every destination the registry marks for it',
+      railLinks.length === railDestinations.length,
+      railLinks.length + ' of ' + railDestinations.length + ': '
+      + railDestinations.map((p) => p.id).join(', '));
+
+    // Same list, read off the hrefs rather than counted, so a rail that renders five
+    // links to three places still fails.
+    const railHrefs = new Set(railLinks.map((a) => a.getAttribute('href')));
+    ok('the rail\'s destinations are the registry\'s, not a second list',
+      railDestinations.every((p) => railHrefs.has(concreteHref(p.route, world))),
+      'registry wants ' + railDestinations.map((p) => p.route).join(', ')
+      + ' but the rail has ' + [...railHrefs].join(', '));
+
+    const railNames = railLinks.map((a) => a.getAttribute('aria-label')).filter(Boolean);
+    ok('every rail destination has an accessible name',
+      railNames.length === railLinks.length,
+      (railLinks.length - railNames.length) + ' unnamed of ' + railLinks.length);
+
+    // The boot's session -> gateway -> cache path, which had no assertion of its own.
+    //
+    // A step() helper that swallowed its return value left `restored` undefined, so the
+    // gateway was never connected and the caches were never warmed - and every route
+    // still rendered, because each page fetches what it needs itself. Nothing in this
+    // file could see it, and on a live instance the symptom is a rail with no unread
+    // badge and no presence.
+    const sessionMod = await import(pathToUrl(path.join(CLIENT, 'js/state.js')));
+    ok('boot restores the session it was handed',
+      !!sessionMod.default.me,
+      'State.me is null after boot, so nothing downstream knows who this is');
+
+    const ticketHits = bootLog.filter((r) => String(r.path || '').includes('ws/ticket'));
+    ok('a signed-in boot connects the realtime gateway',
+      ticketHits.length > 0,
+      'no /api/auth/ws/ticket request was made, so Realtime.connect() never ran');
+
+    const warmHits = bootLog.filter((r) => /\/api\/(dms|friends)/.test(String(r.path || '')));
+    ok('boot warms the caches the shell paints from', warmHits.length > 0,
+      'no DM or friend request was made during boot, so the rail badges start empty');
+
+    ok('the rail carries the Trycord identity',
+      !!document.querySelector('#identity-region a[href], #identity-region button'),
+      '#identity-region is empty');
+
+    const account = document.querySelector('#rail-foot a[href], #rail-foot button');
+    ok('the rail has an account control at its foot', !!account,
+      '#rail-foot is empty - no way to reach your own profile or sign out from the rail');
+    ok('the account control opens a menu rather than going nowhere',
+      !!account && account.tagName === 'BUTTON' && account.getAttribute('aria-haspopup') === 'menu',
+      account ? account.tagName.toLowerCase() + ' has no menu' : 'no account control');
+
+    // The rail's own active state, which is the one thing it does that a list of links
+    // does not: /dms/<id> has to keep Direct messages lit.
+    await visit(window, document, Router, concrete('/dms/:id', world), base);
+    paintChrome();
+    await settle(window, 200);
+    const dmsActive = document.querySelector('#global-navigation a.is-active');
+    ok('the rail marks the destination you are inside, not just the one you are on',
+      !!dmsActive && dmsActive.getAttribute('href') === concreteHref('/dms', world),
+      dmsActive ? 'active href is ' + dmsActive.getAttribute('href') : 'nothing is active on /dms/<id>');
+
+    // A rail entry is a link, so left-click, middle-click and the keyboard all work
+    // without any of them being wired by hand.
+    const isAnchor = [...document.querySelectorAll('#global-navigation a')]
+      .every((a) => a.tagName === 'A');
+    ok('the rail\'s destinations are real links, not scripted buttons', isAnchor,
+      'a rail destination is not an anchor');
+
+    // ---- the shell is laid out as three columns ----
+    //
+    // The layout defect this is here for: #place-navigation was built inside #app-rail,
+    // where it was a flex item of a 68px column. The conversation list, the channel list
+    // and the member list were all 68px wide, and #trycord-main was auto-placed into the
+    // 244px context column instead of the 1fr one - so a third of every screen was blank
+    // and the rest was unusable. Nothing in the stylesheet was wrong; the tree was.
+    //
+    // jsdom has no layout engine, so this asserts the structure the grid depends on
+    // rather than the widths it produces. The widths are checked by the browser check.
+    const shellEl = document.getElementById('shell');
+    const railEl = document.getElementById('app-rail');
+    const placeEl = document.getElementById('place-navigation');
+    const mainEl = document.getElementById('trycord-main');
+
+    ok('the rail, the context navigation and the workspace are the shell\'s own children',
+      !!shellEl && !!railEl && !!placeEl && !!mainEl
+      && railEl.parentElement === shellEl
+      && placeEl.parentElement === shellEl
+      && mainEl.parentElement === shellEl,
+      'a region is nested inside another, so it inherits the wrong width');
+
+    ok('the context navigation is not inside the rail',
+      !!placeEl && !railEl.contains(placeEl),
+      '#place-navigation is inside #app-rail - the sidebar is being laid out in 68px');
+
+    const overlay = document.getElementById('desktop-backdrop');
+    const tabbar = document.getElementById('mobile-tab-navigation');
+    ok('the drawer backdrop and the tab bar are not grid items',
+      !!overlay && !!tabbar && shellEl.contains(overlay) && shellEl.contains(tabbar),
+      'an overlay that takes a grid cell shifts the workspace out of its column');
+
     // ---- accessibility, over the pages that were just rendered ----
     //
     // Asserted here rather than in a separate script because the interesting cases are
@@ -712,9 +880,6 @@ async function settle(window, ms = 400) {
     ok('a page recovers once the endpoint does', recovered.errors === 0,
       'still showing an error after the backend was healthy again');
 
-    const { updateFromViewport } = await import(pathToUrl(path.join(CLIENT, 'js/presentation.js')));
-    const { renderAllChrome } = await import(pathToUrl(path.join(CLIENT, 'js/shell.js')));
-
     // ---- the phone, at the widths people actually use ----
     //
     // The desktop sweep above is the wrong shape to judge a phone by, and a phone is
@@ -727,7 +892,7 @@ async function settle(window, ms = 400) {
       await setViewport(window, w, h);
       updateFromViewport();
       await visit(window, document, Router, concrete('/home', world), base);
-      renderAllChrome();
+      paintChrome();
       await settle(window, 200);
       const tabBar = document.getElementById('mobile-tab-navigation');
       const tabs = tabBar ? tabBar.querySelectorAll('.tab-button').length : 0;
@@ -749,6 +914,13 @@ async function settle(window, ms = 400) {
         ok(name + ': the navigation drawer is available from the header',
           !!document.querySelector('#context-header .nav-toggle'),
           'no .nav-toggle in the context header');
+        // On a phone the context navigation is a drawer rather than a column, and the
+        // rail is hidden entirely. Both are the same regions as desktop - only the
+        // presentation differs - so the same ids have to still be in the tree.
+        ok(name + ': the sidebar and the rail are the same regions as desktop',
+          !!document.getElementById('place-navigation')
+          && !!document.getElementById('app-rail'),
+          'a phone-only navigation tree was built instead of reusing the shell');
       }
     }
 
@@ -1032,6 +1204,14 @@ function concrete(template, world) {
     .replace(':doc', 'terms')
     .replace(':code', 'nope')
     .replace(':token', 'nope');
+}
+
+// The href a rail destination is drawn with. nav.js's route() adds the mount, and this
+// harness serves the client from the origin root, so the href is the route itself -
+// but going through one named helper on both sides is what keeps the comparison from
+// being accidentally right.
+function concreteHref(template, world) {
+  return concrete(template, world);
 }
 
 /** Create the rows the dynamic routes need. */

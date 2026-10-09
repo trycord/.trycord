@@ -407,12 +407,6 @@
   padding: var(--space-7);
 }
 
-.divider {
-  height: 1px;
-  background: var(--color-border-subtle);
-  border: 0;
-  margin: var(--space-6) 0;
-}
 
 /* --------------------------------------------------------------------------
    Badges and pills
@@ -570,18 +564,7 @@
 .avatar__presence--dnd { background: var(--color-danger); }
 .avatar__presence--offline { background: var(--color-text-muted); }
 
-.avatar-stack {
-  display: flex;
-  align-items: center;
-}
 
-.avatar-stack > * + * {
-  margin-left: -8px;
-}
-
-.avatar-stack .avatar {
-  border: 2px solid var(--color-surface);
-}
 
 /* --------------------------------------------------------------------------
    Lists
@@ -700,17 +683,6 @@
   display: none;
 }
 
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  display: grid;
-  place-items: center;
-  padding: var(--gutter);
-  background: var(--overlay-scrim);
-  backdrop-filter: blur(3px);
-  animation: fade-in var(--duration-fast) var(--ease-out);
-}
 
 .modal {
   width: 100%;
@@ -846,10 +818,6 @@
   font-weight: var(--weight-medium);
 }
 
-.connection-status.is-visible {
-  display: flex;
-}
-
 /* --------------------------------------------------------------------------
    Progress and states
    -------------------------------------------------------------------------- */
@@ -925,8 +893,4 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
-}
-
-.pulse {
-  animation: pulse 1.4s ease-in-out infinite;
 }

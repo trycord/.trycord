@@ -2,6 +2,24 @@
 //
 // The ids are the contract - the stylesheet and every region renderer address them - so
 // they are written once, here.
+//
+// The shell is a three-column grid, and the columns are the whole layout:
+//
+//   rail      who you are and where you can go       --rail-width
+//   context   what is inside the current place       --sidebar-width
+//   workspace the thing itself                        minmax(0, 1fr)
+//
+// The regions are direct children of #shell for that reason. A region nested inside
+// another one is a region that inherits the wrong width: #place-navigation used to sit
+// inside #app-rail, where it was laid out as a flex item of a 68px column - so the
+// conversation list, the channel list and the member list were all 68px wide, and the
+// workspace was auto-placed into the 244px context column instead of the 1fr one. A
+// third of every screen was blank and the rest was unusable, and nothing in the
+// stylesheet was wrong.
+//
+// The backdrop and the tab bar are not grid items: the backdrop is position:fixed and
+// the tab bar is display:none on desktop, so neither takes a cell. They are kept as
+// children of the shell because that is the scope they belong to.
 
 import { el } from '../ui/dom.js';
 
@@ -32,17 +50,27 @@ export function buildTree() {
     'aria-label': 'Community members',
   });
 
+  // Column 1. Identity first, because it is the one thing that is the same on every
+  // page; then the global destinations; then the communities you are in; then the
+  // account control, at the foot.
   const rail = el('aside', { id: 'app-rail', class: 'app-rail', 'aria-label': 'Navigation' }, [
-    // Identity has to come first and has to stay a landmark: it holds the account menu,
-    // which is reachable from every page.
     el('header', { id: 'identity-region', class: 'rail-identity' }),
     el('nav', { id: 'global-navigation', class: 'rail-global-nav', 'aria-label': 'Global navigation' }),
     el('section', { id: 'community-navigation', class: 'app-rail__items', 'aria-label': 'Communities' }),
-    // The current place's own navigation: this community's channels, or the DM list.
-    // One region for both because both answer the same question - what is in here.
-    el('section', { id: 'place-navigation', class: 'context-sidebar', 'aria-label': 'Current place navigation' }),
+    el('footer', { id: 'rail-foot', class: 'rail-foot', 'aria-label': 'Account' }),
   ]);
 
+  // Column 2. The current place's own navigation: this community's channels, or the DM
+  // list. Its own grid child, not a member of the rail - the rail answers "where can I
+  // go" and this answers "what is in here", and they are different widths because they
+  // hold different amounts of information.
+  const place = el('section', {
+    id: 'place-navigation',
+    class: 'context-sidebar',
+    'aria-label': 'Current place navigation',
+  });
+
+  // Column 3.
   const main = el('main', { id: 'trycord-main', class: 'main-content' }, [
     el('header', { id: 'context-header', class: 'context-header' }),
     el('div', { class: 'chat-environment' }, [view, members]),
@@ -50,11 +78,16 @@ export function buildTree() {
 
   const shell = el('section', { id: 'shell', class: 'shell', 'aria-label': 'Trycord' }, [
     rail,
-    // Only ever shown on a narrow viewport, where the rail is a drawer and needs
-    // something to click to close it. Hidden here so it cannot be tabbed to on a
-    // desktop where it covers nothing.
-    el('div', { id: 'desktop-backdrop', class: 'nav-backdrop', 'aria-hidden': 'true', hidden: true }),
+    place,
     main,
+    // Only ever shown on a narrow viewport, where the rail and the context navigation
+    // are drawers and need something to click to close them. Hidden here so it cannot
+    // be tabbed to on a desktop where it covers nothing. position:fixed, so it is not
+    // a grid item.
+    el('div', { id: 'desktop-backdrop', class: 'nav-backdrop', 'aria-hidden': 'true', hidden: true }),
+    // display:none on desktop and position:fixed on a phone, so never a grid item
+    // either. It is a child of the shell rather than of the body because it belongs to
+    // the shell's scope and the shell is what hides it.
     el('nav', { id: 'mobile-tab-navigation', class: 'mobile-tab-navigation', 'aria-label': 'Primary navigation' }),
   ]);
 

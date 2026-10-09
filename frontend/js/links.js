@@ -30,11 +30,6 @@ export function channelToken(serverId, channelId) {
   return (row && row.slug) || String(channelId);
 }
 
-export function userToken(user) {
-  if (!user) return '';
-  return user.username || String(user.id || '');
-}
-
 // '/c/:slug' and '/c/:slug/channel/:slug'. Old '/server/:id/...' routes are
 // still understood by the router, so nothing here knows who reads a link.
 //

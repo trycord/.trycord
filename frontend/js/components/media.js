@@ -45,10 +45,6 @@ export function initialOf(name) {
   return (s[0] || '?').toUpperCase();
 }
 
-// The colour the initial is written in. Exported so the CSS can use it too, rather
-// than being written in both places and drifting the way --color-text-primary did.
-export const markInk = () => MARK_INK;
-
 export function avatarUrlOf(user) {
   if (!user) return null;
   return user.avatarUrl || user.avatar_url || null;

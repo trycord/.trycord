@@ -4,29 +4,12 @@
 // is its own page; keeping them in one file meant opening the whole settings
 // surface to change the appearance picker.
 
-import Api from '../api.js';
-import Realtime from '../realtime.js';
-import { clearSession } from '../state.js';
-import { el, confirmDialog } from '../ui.js';
-import { clearAnnouncements } from '../shell.js';
-import { navigate } from '../nav.js';
+import { el } from '../ui.js';
+import { confirmSignOut } from '../shell/sign-out.js';
 
 export function signOutButton() {
   const b = el('button', { class: 'settings-nav__signout', type: 'button' }, 'Sign out');
-  b.addEventListener('click', () => {
-    confirmDialog({
-      title: 'Sign out?',
-      message: 'You will need to sign in again on this device.',
-      danger: true, confirmText: 'Sign out',
-      onConfirm: async () => {
-        try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
-        try { Realtime.disconnect(); } catch { /* ignore */ }
-        clearAnnouncements();
-        clearSession();
-        navigate('/login');
-      },
-    });
-  });
+  b.addEventListener('click', confirmSignOut);
   return b;
 }
 

@@ -10,52 +10,11 @@ import { navigate, route } from '../nav.js';
 import { messageMember } from '../user-actions.js';
 
 // Right-click and overflow menus for rows in the chrome.
-// 
+//
 // All of it in one place on purpose: a menu that exists for a pointer and not for a
 // keyboard, or on one surface and not another, is the failure this file exists to
-// prevent. The actions are permission-shaped, so an action the viewer cannot
-// perform is not offered rather than offered and refused.
-
-// wiring, so a menu can never exist on one input method and be missing on
-// another. Menus are permission-shaped here: an action the viewer cannot perform
-
-export function serverChipMenuFor(s) {
-  return () => {
-    const sid = String(s.id);
-    const isCurrent = sid === String(currentServerId());
-    const mayManage = (isCurrent && can('MANAGE_SERVER')) || (s.is_owner && !isCurrent);
-    return [
-      { label: 'Open community', desc: s.name || '', onSelect: () => { navigate(serverPath(sid)); } },
-      {
-        label: 'Community settings', desc: mayManage ? undefined : 'Requires Manage Community',
-        disabled: !mayManage,
-        onSelect: () => { navigate(serverPath(sid, 'settings')); },
-      },
-      { label: 'Copy community link', onSelect: () => copyText(sid, 'Community ID copied.') },
-      { label: 'Copy community ID', onSelect: () => copyText(sid, 'Community ID copied.') },
-      { sep: true },
-      {
-        label: 'Leave community', danger: true,
-        onSelect: () => {
-          if (s.is_owner) { toast('You own this community. Transfer or delete it first.', 'warn'); return; }
-          confirmDialog({
-            title: 'Leave ' + (s.name || 'community') + '?',
-            message: 'You can rejoin later with a new invite.',
-            danger: true, confirmText: 'Leave',
-            onConfirm: async () => {
-              try {
-                await Api.leaveServer(sid);
-                await refreshServers();
-                if (isCurrent) leaveServerContext();
-                navigate('/home');
-              } catch (ex) { toast(ex.message || 'Failed', 'error'); }
-            },
-          });
-        },
-      },
-    ];
-  };
-}
+// prevent. The actions are permission-shaped, so an action the viewer cannot perform
+// is not offered rather than offered and refused.
 
 export function roleAssignable(roleId) {
   if (!can('MANAGE_ROLES')) return false;
