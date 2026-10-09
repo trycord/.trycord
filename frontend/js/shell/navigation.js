@@ -168,7 +168,50 @@ export function simpleListContext(region, { title, sub, groups }) {
   // once as a duplicate of the place beside it. The rail is the navigation; this
   // panel is for what the rail has no room for: finding somewhere else to be, and
   // what is waiting for you.
-  function homeContext(region) {
+
+
+
+export function friendsContext(region) {
+  const requests = (State.friendsIn || []).length;
+  simpleListContext(region, {
+    title: 'Friends',
+    sub: requests ? requests + ' request' + (requests === 1 ? '' : 's') + ' pending' : 'People you know',
+    groups: [{ label: 'People', items: [
+      { label: 'All friends', path: '/friends', exact: true },
+      { label: 'Add friend', path: '/friends', exact: true },
+    ] }],
+  });
+}
+
+export function notificationsContext(region) {
+  simpleListContext(region, {
+    title: 'Notifications',
+    sub: State.notifUnread ? State.notifUnread + ' unread' : 'All caught up',
+    groups: [{ label: 'Activity', items: [
+      { label: 'All notifications', path: '/notifications', exact: true },
+    ] }],
+  });
+}
+
+// Which sidebar the shell paints, asked of the page registry rather than guessed
+// from the path.
+//
+// This used to be eleven route comparisons in a row, and had already drifted: three of
+// the types it returned - discover, support and profile - no longer had a case to render
+// them, so they silently fell through to the messages list.
+export function sidebarContext() {
+  const hit = matchRoute(compose().route || '/');
+  if (!hit || !hit.page.sidebar) return { type: 'dms' };
+  return {
+    type: hit.page.sidebar,
+    // A community's channels and a person's profile are both addressed by an id,
+    // and both are the only thing the sidebar needs to know about them.
+    serverId: hit.params.id || null,
+    userId: hit.params.id || null,
+  };
+}
+
+export function homeContext(region) {
     const servers = State.servers || [];
     const attention = [
       ...(State.notifications || [])
@@ -223,47 +266,6 @@ export function simpleListContext(region, { title, sub, groups }) {
     refreshHomeSidebar(region);
   }
 
-
-export function friendsContext(region) {
-  const requests = (State.friendsIn || []).length;
-  simpleListContext(region, {
-    title: 'Friends',
-    sub: requests ? requests + ' request' + (requests === 1 ? '' : 's') + ' pending' : 'People you know',
-    groups: [{ label: 'People', items: [
-      { label: 'All friends', path: '/friends', exact: true },
-      { label: 'Add friend', path: '/friends', exact: true },
-    ] }],
-  });
-}
-
-export function notificationsContext(region) {
-  simpleListContext(region, {
-    title: 'Notifications',
-    sub: State.notifUnread ? State.notifUnread + ' unread' : 'All caught up',
-    groups: [{ label: 'Activity', items: [
-      { label: 'All notifications', path: '/notifications', exact: true },
-    ] }],
-  });
-}
-
-// Which sidebar the shell paints, asked of the page registry rather than guessed
-// from the path.
-//
-// This used to be eleven route comparisons in a row, and had already drifted: three of
-// the types it returned - discover, support and profile - no longer had a case to render
-// them, so they silently fell through to the messages list.
-export function sidebarContext() {
-  const hit = matchRoute(compose().route || '/');
-  if (!hit || !hit.page.sidebar) return { type: 'dms' };
-  return {
-    type: hit.page.sidebar,
-    // A community's channels and a person's profile are both addressed by an id,
-    // and both are the only thing the sidebar needs to know about them.
-    serverId: hit.params.id || null,
-    userId: hit.params.id || null,
-  };
-}
-
 export function renderPlaceNavigation(region) {
   clear(region);
   if (!isAuthed()) return;
@@ -290,20 +292,12 @@ export function renderPlaceNavigation(region) {
   region.hidden = false;
   if (shell) shell.classList.remove('no-community-nav');
   const ctx = sidebarContext();
-// Five of the ten arms below could not run, and the reason is worth writing down.
-//
-// A surface whose layout has no sidebar - settings, admin, discover, support,
-// profile, and every plain page - returns from renderPlaceNavigation before this
-// switch is reached, so its arm here was unreachable. The surfaces that do need a
-// navigation column build it themselves in context-column.js, where the page and
-// its column live together. Discover had a discoverContext written for it and it
-// had never painted anything, which is why the column beside Discover sat empty
-// through several rounds of looking at it.
-//
-// So the arms are now exactly the surfaces that have a sidebar. Adding one is a
-// layout change and an arm here, in that order; a surface whose layout says
-// sidebar:false must not grow an arm, because that will look right in review and
-// never run.
+  // Exactly the surfaces whose layout says they have a sidebar. A surface with
+  // sidebar:false returns above and never reaches this switch, which is why Discover, Support
+  // and the legal documents once each carried an arm here that had never painted anything.
+  //
+  // Adding a surface is therefore a layout change first and an arm here second. An arm for a
+  // layout that has no sidebar looks right in review and never runs.
   switch (ctx.type) {
     case 'community': return communityContext(region, ctx.serverId);
     case 'dms': return dmsContext(region);
