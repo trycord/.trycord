@@ -20,12 +20,19 @@ export const WIDTH = {
   // Matches the max-width: 599px / min-width: 600px pair, and presentation.js's own
   // mobile switch. Below this the rail is an overlay drawer, not a column.
   phone: 600,
-  // Matches the 759/760 pair. At or above it the channel sidebar is a column and does
-  // not need a toggle to be seen.
-  dock: 760,
-  // Matches the 999/1000 pair - NOT the dock threshold. The member panel is wider than
-  // the channel sidebar and only earns a track once there is room for both. This is the
-  // number the old code got wrong by borrowing the dock threshold.
+  // Below this the rail is hidden entirely and the phone's tab bar is the global
+  // navigation. Matches the 820/821 pair in responsive.css.
+  rail: 820,
+  // Below this the context navigation stops being a column and becomes an off-canvas
+  // drawer, leaving the shell as rail + workspace. Matches the 1100/1101 pair.
+  //
+  // This is the number the old code got wrong in both directions at once: compose()
+  // used 760 for "is the sidebar collapsible", and the stylesheet used 820 for the rail
+  // and 1100 for the context column. Between 821 and 1100 the context sidebar and the
+  // workspace both claimed grid-column 2 and overlapped.
+  drawer: 1100,
+  // The member panel is wider than the context sidebar and only earns a track once
+  // there is room for both.
   members: 1000,
 };
 
@@ -78,7 +85,7 @@ export function setShell(patch) {
 export function compose() {
   const width = window.innerWidth;
   const route = currentRoute();
-  const mode = width < WIDTH.phone ? 'phone' : (width < WIDTH.dock ? 'tablet' : 'desktop');
+  const mode = width < WIDTH.phone ? 'phone' : (width <= WIDTH.drawer ? 'tablet' : 'desktop');
   const s = shellState();
 
   // A surface that has no channel list does not get one, whatever the width. The layout
@@ -103,9 +110,11 @@ export function compose() {
       // `show` is whether the surface has one at all. `collapsed` is the reader's
       // preference, and it only means something where a column exists.
       show: channelsWanted,
-      collapsed: channelsWanted && mode !== 'phone' ? s.channelsCollapsed : false,
-      // A toggle is offered only where collapsing actually changes what is visible.
-      collapsible: channelsWanted && width >= WIDTH.dock,
+      // `drawer` is the other half: below WIDTH.drawer the context navigation is an
+      // off-canvas sheet rather than a column, and collapsing it means opening it.
+      drawer: channelsWanted && width <= WIDTH.drawer,
+      collapsible: channelsWanted && width > WIDTH.drawer,
+      collapsed: channelsWanted && width > WIDTH.drawer ? s.channelsCollapsed : false,
     },
 
     members: {

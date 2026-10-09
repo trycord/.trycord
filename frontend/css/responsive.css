@@ -14,22 +14,41 @@
    Wide desktop: the member panel can afford to be a column again.
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   Small desktop and tablet: the context navigation becomes a drawer.
+
+   Below 1100px three columns stop being three readable columns, so the shell
+   becomes rail + workspace and the context navigation moves off-canvas. This is
+   the range that was broken: the old rules gave .context-sidebar and
+   .main-content the same grid-column, and they overlapped.
+   -------------------------------------------------------------------------- */
+
 @media (max-width: 1100px) {
-  /* Below this the three columns stop being three readable columns. */
   .shell {
     grid-template-columns: var(--rail-width) minmax(0, 1fr);
   }
 
   .context-sidebar {
-    grid-column: 2;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(288px, 84vw);
+    z-index: var(--z-drawer);
+    transform: translateX(-100%);
+    transition: transform var(--duration-normal) var(--ease-out);
+    box-shadow: var(--shadow-pop);
+  }
+
+  .context-sidebar.is-open {
+    transform: none;
   }
 
   .main-content {
     grid-column: 2;
   }
 
-  /* One source of truth for one column: the rail is column 1 and everything
-     else is column 2, so the workspace never has to be told to move. */
+  /* The member panel becomes a sheet on the right rather than a third column. */
   .member-sidebar {
     display: none;
   }
@@ -38,7 +57,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* The member panel becomes a sheet on the right. */
   .chat-environment--with-members .member-sidebar {
     position: fixed;
     top: 0;
@@ -71,24 +89,10 @@
     grid-template-rows: calc(100dvh - var(--tabbar-height) - env(safe-area-inset-bottom, 0px));
   }
 
+  /* The rail is gone on a phone. Its destinations live in the tab bar, which is the
+     same list from the same registry - one navigation model, two presentations. */
   .app-rail {
     display: none;
-  }
-
-  .context-sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: min(288px, 84vw);
-    z-index: var(--z-drawer);
-    transform: translateX(-100%);
-    transition: transform var(--duration-normal) var(--ease-out);
-    box-shadow: var(--shadow-pop);
-  }
-
-  .context-sidebar.is-open {
-    transform: none;
   }
 
   .main-content {
@@ -212,9 +216,6 @@
     width: 100%;
   }
 
-  .community-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 
   .home__head,
   .community-body,
@@ -315,11 +316,6 @@
     left: calc(var(--space-3) + 17px - 9px);
   }
 
-  .modal-backdrop {
-    /* A sheet from the bottom, not a centred box on a phone. */
-    padding: 0;
-    align-items: flex-end;
-  }
 
   .modal {
     max-width: none;
@@ -362,16 +358,7 @@
     justify-content: center;
   }
 
-  .setting-row {
-    /* Stacked, because a label and a control on one line of a phone is two
-       lines of text and a control that is too small to hit. */
-    flex-direction: column;
-    gap: var(--space-5);
-  }
 
-  .setting-row__control {
-    width: 100%;
-  }
 
   .setting-row__control .input,
   .setting-row__control .select {
@@ -437,9 +424,6 @@
     height: 40px;
   }
 
-  .message-list {
-    padding-top: var(--space-4);
-  }
 
   .composer {
     padding-bottom: var(--space-3);

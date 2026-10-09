@@ -6,7 +6,7 @@
 
 import { qs } from './ui.js';
 import { buildTree, viewRoot } from './shell/tree.js';
-import { renderCommunities } from './shell/rail.js';
+import { renderRail } from './shell/rail.js';
 import { renderPlaceNavigation } from './shell/navigation.js';
 import { renderMemberSidebar, membersHidden, toggleMembers } from './shell/members.js';
 import { renderContextHeader } from './shell/context-header.js';
@@ -37,7 +37,9 @@ function paintRegion(fn) {
 }
 
 export function renderAllChrome() {
-  paintRegion(() => renderCommunities(qs('#community-navigation')));
+  // The rail first: it is the only region that reads the route for its own active
+  // state, and every region below it is painted from state the rail does not touch.
+  paintRegion(() => renderRail({ route: currentRoute() }));
   paintRegion(() => renderPlaceNavigation(qs('#place-navigation')));
   paintRegion(() => renderMobileTabs(qs('#mobile-tab-navigation')));
   paintRegion(() => renderMemberSidebar(qs('#member-sidebar')));
@@ -56,7 +58,7 @@ export {
   viewRoot,
   setNavRoute,
   currentRoute,
-  renderCommunities,
+  renderRail,
   renderPlaceNavigation,
   renderContextHeader,
   renderMemberSidebar,
@@ -80,7 +82,7 @@ export default {
   renderAllChrome,
   renderVerifyBanner,
   renderContextHeader,
-  renderCommunities,
+  renderRail,
   renderPlaceNavigation,
   renderMemberSidebar,
   renderMobileTabs,

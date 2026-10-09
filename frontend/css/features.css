@@ -386,13 +386,6 @@
    answer is a position in a list, so 68px is enough and more would be waste.
    -------------------------------------------------------------------------- */
 
-.rail-brand {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  padding-bottom: var(--space-4);
-}
 
 .rail-nav {
   display: flex;
@@ -562,11 +555,6 @@
 .msg-author:hover {
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.msg-author.is-owner,
-.msg-author.is-admin {
-  color: var(--color-accent);
 }
 
 .msg-time {
@@ -1295,7 +1283,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.row-stack,
 .row__stack {
   display: flex;
   flex-direction: column;
@@ -1685,17 +1672,20 @@
   opacity: 0.5;
 }
 
-.reduced-motion,
+/* The reader's own reduced-motion preference, from the wellbeing settings. This is
+   separate from the `prefers-reduced-motion` media query in base.css, which handles
+   the operating system's: this one is a setting inside Trycord, and a person who
+   asks for less motion here does not have to change their OS to get it. */
 .reduce-motion {
   scroll-behavior: auto;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .reduced-motion *,
-  .reduce-motion * {
-    animation: none !important;
-    transition: none !important;
-  }
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 .spacer {
@@ -1783,9 +1773,6 @@
   font-size: var(--text-sm);
 }
 
-.threat {
-  color: var(--color-danger);
-}
 
 .conversation {
   display: flex;

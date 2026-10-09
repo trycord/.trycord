@@ -13,7 +13,7 @@ import { isAuthed, refreshServers } from '../state.js';
 import { setLayout } from '../layout.js';
 import { setNavRoute, renderAllChrome, renderContextHeader } from '../shell.js';
 import { navigate } from '../nav.js';
-import { closeDesktopNav } from '../presentation.js';
+import { closeNav } from '../presentation.js';
 import { el, clear, qs } from '../ui.js';
 import { onCleanup, runTeardowns } from './teardown.js';
 import { clearViewRefreshNow } from '../resolve.js';
@@ -73,7 +73,7 @@ export async function mount(path, query = {}) {
   // Raw first; the community handler republishes it in the id-shaped form the
   // chrome matches on.
   setNavRoute(() => path);
-  closeDesktopNav();
+  closeNav();
 
   const authed = isAuthed();
 

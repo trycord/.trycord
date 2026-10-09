@@ -257,10 +257,6 @@
 .admin-stats,
 .admin-toolbar,
 .admin-history,
-.admin-appeal {
-  display: flex;
-  flex-direction: column;
-}
 
 .admin-block + .admin-block {
   margin-top: var(--space-8);

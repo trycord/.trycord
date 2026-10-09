@@ -3,15 +3,15 @@
 const PROTECTED_IDS = new Set([
   'app',
   'mobile-tab-navigation',
-  'app-rail', 'identity-region', 'global-navigation',
+  'app-rail', 'identity-region', 'global-navigation', 'rail-foot',
   'community-navigation', 'place-navigation', 'trycord-main', 'context-header',
   'context-title', 'view-root', 'member-sidebar', 'modal-root', 'popover-root',
   'toast-root', 'connection-status',
 ]);
 
 const PROTECTED_CLASSES = new Set([
-  'app-rail', 'app-rail__items', 'rail-identity', 'rail-global-nav',
-    'rail-community', 'rail-nav', 'rail-mark',
+  'app-rail', 'app-rail__items', 'rail-identity', 'rail-global-nav', 'rail-foot',
+    'rail-community', 'rail-nav', 'rail-mark', 'rail-mark-btn',
   'context-sidebar', 'main-content',
   'context-header', 'chat-environment', 'view-root',
   'member-sidebar', 'shell',

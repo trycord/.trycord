@@ -1,7 +1,6 @@
 import { toggleContextSidebar } from './sidebar.js';
-import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from '../ui.js';
-import { avatar, icon, navRow, serverChip, navGroup } from '../components.js';
-import { isDesktopNavOpen, openDesktopNav, closeDesktopNav } from '../presentation.js';
+import { isNavOpen } from '../presentation.js';
+import { el, clear, qs, icon, announce } from '../ui.js';
 
 // The context header above a surface: its title, and what you can do there.
 
@@ -21,7 +20,7 @@ export function renderContextHeader({ title, sub, icon: iconGlyph, actions } = {
   const navToggle = el('button', {
     class: 'nav-toggle', type: 'button',
     title: 'Navigation', 'aria-label': 'Toggle navigation',
-    'aria-expanded': isDesktopNavOpen() ? 'true' : 'false',
+    'aria-expanded': isNavOpen() ? 'true' : 'false',
   }, icon('menu'));
   navToggle.addEventListener('click', () => toggleContextSidebar());
   header.appendChild(navToggle);
