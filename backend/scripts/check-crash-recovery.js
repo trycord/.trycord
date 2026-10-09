@@ -127,6 +127,44 @@ const statuses = (async () => {
   check('and the file that failed is the one asked about',
     /app\.js$/.test(down.net.url || ''), down.net.url);
 
+  // The walk follows the import graph when the entry itself is fine. Reported against a
+  // stand-in graph, because the real one is served by a live instance and a check that
+  // reaches for it would be asserting nothing when that instance is down.
+  {
+    const { w, net } = mount();
+    // app.js is fine; what it imports is not. Two answers, one missing and one served as
+    // HTML - the second is the one that passes a naive status check and still breaks.
+    const graph = {
+      '/js/app.js': "import './a.js';\nimport('./b.js');\n",
+      '/js/a.js': "export const a = 1;\n",
+      '/js/b.js': null,
+    };
+    // mount() defines fetch as a non-writable value, so assigning over it is silently
+    // ignored and the default 404 stub is what the walk sees - which passes as "the entry
+    // is fine" and never follows the graph at all.
+    Object.defineProperty(w, 'fetch', {
+      configurable: true,
+      value: (url, opts) => {
+      net.calls++;
+      if (/app\.js$/.test(url)) return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'text/javascript' }, text: () => Promise.resolve(graph['/js/app.js']) });
+      if (/a\.js$/.test(url)) return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'text/javascript' }, text: () => Promise.resolve(graph['/js/a.js']) });
+      return Promise.resolve({ ok: true, status: 200, headers: { get: () => 'text/html' }, text: () => Promise.resolve('<html>') });
+      },
+    });
+    const script = w.document.createElement('script');
+    script.src = '/js/app.js';
+    w.document.body.appendChild(script);
+    // Twice: the first is spent on the stale-graph reload, the second is the one a reader
+    // sees - which is the sequence every other case in this file uses.
+    script.dispatchEvent(new w.Event('error'));
+    script.dispatchEvent(new w.Event('error'));
+    await new Promise((r) => setTimeout(r, 60));
+    const text = w.document.getElementById('trycord-crash').textContent || '';
+    check('a dependency served as HTML is named, not the entry',
+      /b\.js/.test(text) && /text\/html/.test(text), text.slice(0, 110));
+    check('and it is not reported as a healthy entry', !/Every module/.test(text), text.slice(0, 110));
+  }
+
   // A module that threw while evaluating. The target is still the script element and there
   // is still a message, which is what separates it from a file the server did not send.
   // Reporting that by fetching the file gives a 200 and says the origin is healthy while

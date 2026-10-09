@@ -98,6 +98,10 @@
     522: 'the origin did not reply in time',
     524: 'the origin took too long to reply'
   };
+  // A resource error on a module entry, or on a dependency of it. The browser fires the
+  // error on the entry script element when anything in the graph fails to load, which is why
+  // "app.js 200" was appearing next to a page that would not start: the entry is fine and
+  // something it imports is not.
   function probe(src, tag, short) {
     function say(detail) {
       paintError('Could not load ' + tag + ' ' + short + ' - ' + detail
@@ -113,23 +117,71 @@
       var type = String(res.headers && res.headers.get
         ? res.headers.get('content-type') || '' : '');
       var code = STATUS[res.status] ? res.status + ' - ' + STATUS[res.status] : 'HTTP ' + res.status;
-      // A script or a stylesheet must arrive as one. Anything else at this URL is a server
-      // answering with the wrong document - the single-page shell, an error page, a redirect
-      // to a login form - and the browser's refusal is correct.
       var expectsScript = tag === 'script';
       if (expectsScript && type && !/(javascript|ecmascript)/i.test(type)) {
         say(code + ', and it is ' + type.split(';')[0] + ' rather than a script');
         return;
       }
-      if (expectsScript && type) {
-        say(code);
-        return;
-      }
+      // The entry itself is being served correctly. Follow the graph it imports: one of
+      // those is what the browser actually refused, and naming the entry instead left the
+      // message pointing at a healthy file on a healthy origin.
+      if (expectsScript && res.ok) { walk(src); return; }
       say(code + (type ? ' (' + type.split(';')[0] + ')' : ''));
     }, function (err) {
       say('the server could not be reached'
         + (err && err.message ? ' (' + String(err.message).slice(0, 60) + ')' : ''));
     });
+  }
+
+  // Follow the import graph from a module that serves fine and report the first one that
+  // does not. Same rules the browser applies: a module has to be served, as JavaScript.
+  // Without this the message named app.js while the real fault was anywhere in the graph.
+  function walk(entryUrl) {
+    var seen = {};
+    var queue = [entryUrl];
+    var worst = null;
+    var step = function () {
+      if (!queue.length || seen[entryUrl + ':done']) { report(); return; }
+      var url = queue.shift();
+      if (seen[url]) { step(); return; }
+      seen[url] = 1;
+      fetch(url, { cache: 'no-store' }).then(function (res) {
+        var file = url.split('/').pop().split('?')[0];
+        var type = String(res.headers && res.headers.get
+          ? res.headers.get('content-type') || '' : '');
+        if (!res.ok) {
+          worst = worst || file + ' - ' + (STATUS[res.status]
+            ? res.status + ' ' + STATUS[res.status] : 'HTTP ' + res.status);
+          return;
+        }
+        // A module the server answers with HTML is refused by the browser and served fine to
+        // this probe - the single most misleading answer possible.
+        if (type && !/(javascript|ecmascript)/i.test(type)) {
+          worst = worst || file + ' - served as ' + type.split(';')[0] + ' instead of a script';
+          return;
+        }
+        return res.text().then(function (text) {
+          var specs = text.match(/from\s*['"](\.[^'"]+)['"]|import\s*\(\s*['"](\.[^'"]+)['"]/g) || [];
+          for (var i = 0; i < specs.length; i++) {
+            var m = /['"](\.[^'"]+)['"]/.exec(specs[i]);
+            if (!m) continue;
+            var abs = new URL(m[1], url).href;
+            if (!seen[abs]) queue.push(abs);
+          }
+        });
+      }, function () {
+        worst = worst || url.split('/').pop() + ' - could not be reached';
+      }).then(step, function () { step(); });
+    };
+    function report() {
+      if (worst) {
+        paintError('The application\'s own module ' + worst + '. Reload to retry.');
+        return;
+      }
+      paintError('Every module in the application\'s import graph is served. The page did not '
+        + 'run for another reason - reload to retry.');
+    }
+    step();
   }
 
   window.addEventListener('error', function (ev) {
