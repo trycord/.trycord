@@ -11,8 +11,8 @@
 // nothing is refused for what it is. See uploads.isInlineMime for how that is
 // kept from becoming script running on this origin.
 const express = require('express');
-const multer = require('multer');
 const auth = require('../middleware/auth');
+const { singleFile } = require('../middleware/upload');
 const rateLimit = require('../middleware/ratelimit');
 const { fail } = require('../errors');
 const { visibleChannel } = require('../util');
@@ -27,23 +27,6 @@ const router = express.Router();
 // would run — and bill two DB lookups — on every API request that merely
 // passes through on its way to another router. The two attachment
 // endpoints keep the exact same auth behavior via route-level middleware.
-const memory = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: uploads.MAX_SIZE, files: 1 },
-});
-
-function singleFile(req, res, next) {
-  memory.single('file')(req, res, (err) => {
-    if (err) {
-      if (err && err.code === 'LIMIT_FILE_SIZE') {
-        return fail(res, 'VALIDATION_ERROR', 'file is too large (max 8 MB)');
-      }
-      return next(err);
-    }
-    next();
-  });
-}
-
 router.post(
   '/channels/:channelId/attachments',
   auth,
