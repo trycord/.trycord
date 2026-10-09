@@ -161,7 +161,13 @@
           return;
         }
         return res.text().then(function (text) {
-          var specs = text.match(/from\s*['"](\.[^'"]+)['"]|import\s*\(\s*['"](\.[^'"]+)['"]/g) || [];
+          // Comments come out first. ui.js carries a line explaining that it re-exports so
+          // `import { el } from '../ui.js'` keeps working - and reading that comment as an
+          // import made this walk report a module that is not asked for by anything. Every
+          // check that walks this graph strips comments; this one did not.
+          var body = text.replace(/\/\*[\s\S]*?\*\//g, ' ')
+            .replace(/^[ \t]*\/\/.*$/gm, ' ');
+          var specs = body.match(/from\s*['"](\.[^'"]+)['"]|import\s*\(\s*['"](\.[^'"]+)['"]/g) || [];
           for (var i = 0; i < specs.length; i++) {
             var m = /['"](\.[^'"]+)['"]/.exec(specs[i]);
             if (!m) continue;
