@@ -1,145 +1,168 @@
-import { compose } from './compose.js';
-import { serverChipMenuFor } from './menus.js';
-import { sidebarToggleButton } from './sidebar.js';
-import { labelFor } from '../badges.js';
-import { el, clear, qs, toast, relTime, confirmDialog, openModal, openReportDialog, attachMenu, attachContextMenu, showUserCard, copyText, announce } from '../ui.js';
-import { avatar, icon, navRow, serverChip, navGroup } from '../components.js';
-import Api from '../api.js';
-import State, { isAuthed, currentServerId, can, peerPresence, refreshServers, leaveServerContext, clearSession, refreshDms, refreshFriends, refreshNotifications, mustVerifyToPost, refreshServerView } from '../state.js';
-import { channelPath, serverPath } from '../links.js';
+// The application rail: the smallest persistent navigation layer, and the one that answers
+// "where am I in Trycord globally".
+//
+// It is deliberately not a second sidebar. What is inside the current community - its
+// channels, its members - belongs to contextual navigation, and mixing the two is what made
+// a community look like just another destination in a list of global ones. The rail holds
+// the mark, the global destinations, and the places you are in. Nothing else.
+
+import { el, icon } from '../ui.js';
 import { navigate, route } from '../nav.js';
-import { matchRoute, railPages, mobilePages } from '../pages/registry.js';
+import State from '../state.js';
+import {
+  hashColor, initialOf, communityIconUrl, loadAuthedImage,
+} from '../components/media.js';
 
-// The community rail - the destinations, the communities, and the account button.
+// Which global destinations exist, and where they go. Order is reading order, not route
+// matching: the finder matches on prefix boundaries so moving an entry cannot change what a
+// URL means.
+const DESTINATIONS = [
+  { id: 'home', label: 'Home', short: 'Home', icon: 'home', path: '/home' },
+  { id: 'dms', label: 'Direct messages', short: 'DMs', icon: 'mail', path: '/dms' },
+  { id: 'notifications', label: 'Notifications', short: 'Alerts', icon: 'bell', path: '/notifications' },
+  { id: 'discover', label: 'Discover', short: 'Find', icon: 'compass', path: '/discover' },
+];
 
-export function renderCommunities(region) {
-  clear(region);
-  if (!isAuthed()) return;
-  const here = compose().route;
-
-  // `path` is what the router reports, `href` is where the browser goes. They are
-  // different strings wherever the app is mounted under a subpath, so the active
-  // test has to use the first and the navigation the second.
-  // `short` is what the 84px rail prints under the glyph; `label` is the full
-  // name, still used for the title, the aria-label and the tooltip. At 84px
-  // 'Direct messages' truncates to 'Direct me...', which is worse than useless.
-  // The rail's destinations come from the registry, which is also what the route
-  // table and the phone tab bar read. This list used to be a fourth copy of the
-  // same five rows, which is how Discover ended up in the rail and nowhere else.
-  // The count lives in badges.js, keyed by page id, because the phone tab bar asks
-  // the same question about the same destinations. Two copies of this map is how
-  // Direct messages ended up with no badge on the rail while the home page knew about
-  // four unread conversations.
-  const globalItems = railPages().map((page) => ({
-    id: page.id,
-    label: page.nav.label,
-    short: page.nav.short,
-    icon: page.nav.icon,
-    route: page.route,
-    badge: () => labelFor(page.id),
-  }));
-
-  // The rail's own destinations carry words, for the same reason communities do:
-  // five glyphs in a column is a puzzle, five labelled rows is a menu.
-  const railButton = ({ label, short, icon: iconName, route, active, badge }) => {
-    const btn = el('button', {
-      class: 'rail-nav' + (active ? ' is-active' : ''),
-      type: 'button',
-      title: label,
-      'aria-label': label,
-      'aria-current': active ? 'page' : null,
-      dataset: { label },
-      onClick: () => { navigate(route(path)); },
-    },
-    el('span', { class: 'rail-nav__icon' }, icon(iconName)),
-    el('span', { class: 'rail-nav__label' }, short || label));
-    const badgeLabel = badge ? badge() : null;
-    if (badgeLabel) {
-      btn.appendChild(el('span', { class: 'rail-nav__badge' }, badgeLabel));
-    }
-    return btn;
-  };
-
-  // The mark is the anchor for the whole rail: it says which product this is, and
-  // it is the way back to the start from anywhere. The application had none at all -
-  // the sign-in page had one and the shell did not.
-  const mark = el('button', {
-    class: 'rail-mark-btn',
-    type: 'button',
-    title: 'Trycord',
-    'aria-label': 'Trycord home',
-    onClick: () => { navigate(route('/home')); },
-  }, el('img', { class: 'rail-mark-btn__img', src: '/assets/trycord-logo.png', alt: '' }));
-  region.appendChild(el('div', { class: 'rail-brand' }, mark));
-
-  // Two navigations, not one list. Where you are in Trycord, and which places you
-  // are in, are different questions, and the rail answered both with one
-  // undifferentiated column separated by a rule - so a community looked like just
-  // another global destination. They are separate regions now, each with its own
-  // heading. The distinction survives 84px because it is carried by the grouping
-  // rather than by a word that would not fit.
-  const globalGroup = el('nav', { class: 'rail-group', 'aria-label': 'Your Trycord' });
-  for (const item of globalItems) {
-    globalGroup.appendChild(railButton({
-      label: item.label, short: item.short, icon: item.icon, route: item.route, badge: item.badge,
-      active: here === item.route || here.startsWith(item.route + '/'),
-    }));
+/**
+ * One rail button. Icon plus a label, both of which are read by assistive technology: the
+ * icon is decorative and the label carries the meaning, so an icon-only rail is not an
+ * unnamed one.
+ */
+function railLink({ label, short, icon: iconName, path, active, badge, onClick }) {
+  const btn = el('a', {
+    class: 'rail-link' + (active ? ' is-active' : ''),
+    href: route(path),
+    'aria-label': label,
+    'aria-current': active ? 'page' : null,
+    title: label,
+    dataset: { label },
+  });
+  btn.appendChild(el('span', {
+    class: 'rail-link__icon',
+    'aria-hidden': 'true',
+  }, icon(iconName)));
+  if (badge) {
+    btn.appendChild(el('span', { class: 'rail-link__badge', 'aria-hidden': 'true' }, badge));
   }
-  region.appendChild(el('div', { class: 'rail-section' },
-    el('div', { class: 'rail-section__label' }, 'Yours'),
-    globalGroup));
-
-  // Creation action. Discover is deliberately absent: it is a global destination
-  // and already has a row above.
-  const create = el('button', {
-    class: 'rail-nav rail-nav--create',
-    type: 'button',
-    title: 'Create a community',
-    'aria-label': 'Create a community',
-    dataset: { label: 'Create a community' },
-    onClick: () => { navigate('/servers/new'); },
-  },
-  el('span', { class: 'rail-nav__icon' }, icon('plus')),
-  el('span', { class: 'rail-nav__label' }, 'New'));
-
-  const servers = State.servers || [];
-  const communityGroup = el('nav', { class: 'rail-group', 'aria-label': 'Your communities' });
-  if (servers.length) {
-    for (const s of servers) {
-      const chip = serverChip(s, {
-        active: String(s.id) === String(currentServerId()),
-        onClick: () => { navigate(serverPath(s.id)); },
-      });
-      chip.dataset.label = s.name || 'Community';
-      attachContextMenu(chip, serverChipMenuFor(s), {
-        target: (node) => ({ type: 'community', id: String(s.id) }),
-      });
-      communityGroup.appendChild(chip);
-    }
-  }
-  // Shown whether or not there are any yet: on a new account this is where the
-  // empty list admits it, and where the action that fills it lives.
-  communityGroup.appendChild(create);
-  region.appendChild(el('div', { class: 'rail-section rail-section--communities' },
-    el('div', { class: 'rail-section__label' },
-      servers.length ? servers.length + (servers.length === 1 ? ' place' : ' places') : 'Places'),
-    communityGroup));
-
-  // The account control lives at the foot of the global rail rather than inside
-  // any one surface's sidebar. It used to be a panel pinned to the bottom of the
-  // community sidebar, which meant it disappeared on every surface without a
-  // sidebar - and there is no surface that has a sidebar and no account, so the
-  // rail is where a global control belongs.
-  const foot = el('div', { class: 'rail-foot' });
-  foot.appendChild(railAccountButton());
-  foot.appendChild(sidebarToggleButton());
-  region.appendChild(foot);
+  return btn;
 }
 
+/**
+ * The places the reader is in, as a list of community marks.
+ *
+ * An image is preferred where there is one, and the mark keeps a coloured background with
+ * the community's initial behind it so it degrades to something recognisable rather than to
+ * an empty box while the image loads - or forever, if it never does.
+ */
+function communityChip(name, { active, server, onClick }) {
+  const chip = el('a', {
+    class: 'rail-community' + (active ? ' is-active' : ''),
+    href: route('/servers/' + (server && server.id ? server.id : '')),
+    'aria-current': active ? 'page' : null,
+    title: name + (server && server.is_owner ? ' — you own this community' : ''),
+    dataset: { serverId: server && server.id, label: name },
+  });
+
+  // The derived colour is a hash of the name, so the same community is the same tone every
+  // time, and the ink is the light one the palette guarantees against every entry in it.
+  const mark = el('span', {
+    class: 'community-mark',
+    style: { background: hashColor(name), color: 'var(--color-mark-ink)' },
+    'aria-hidden': 'true',
+  }, initialOf(name));
+
+  const src = communityIconUrl(server);
+  if (src) {
+    loadAuthedImage(src).then((url) => {
+      if (!url || !mark.isConnected) return;
+      mark.classList.add('has-img');
+      mark.textContent = '';
+      mark.appendChild(el('img', { class: 'community-mark__img', src: url, alt: '', loading: 'lazy' }));
+    }).catch(() => { /* the initial stays behind; that is what it is for */ });
+  }
+  chip.appendChild(mark);
+  chip.appendChild(el('span', { class: 'rail-community__name' }, name));
+  if (onClick) chip.addEventListener('click', onClick);
+  return chip;
+}
+
+/**
+ * Draw the rail: the mark, the global destinations, and the communities.
+ *
+ * `plan` carries everything this needs - the reader's own home, the destinations to show,
+ * the places they are in, and which of them is current. Building the rail is this function;
+ * deciding what is in it is not, and that is what keeps it from becoming a place where
+ * permission logic quietly accumulates.
+ */
+export function renderRail(region, plan) {
+  const { me, destinations, communities, activePath, badges } = plan || {};
+
+  // The mark is the way back to the start from anywhere, and it is the only thing in the
+  // rail that says which product this is.
+  const brand = el('a', {
+    class: 'rail-mark-btn',
+    href: route('/home'),
+    title: 'Trycord',
+    'aria-label': 'Trycord home',
+  });
+  const markImg = el('img', { class: 'rail-mark-btn__img', src: '/assets/trycord-logo.png', alt: '' });
+  markImg.addEventListener('error', () => {
+    // The mark is the one thing that has to be there even when the asset is not.
+    brand.textContent = '';
+    brand.appendChild(el('span', { class: 'rail-mark', 'aria-hidden': 'true' }, 'T'));
+  });
+  brand.appendChild(markImg);
+
+  const global = el('nav', {
+    class: 'rail-nav',
+    id: 'global-navigation',
+    'aria-label': 'Global navigation',
+  });
+
+  for (const d of (destinations || DESTINATIONS)) {
+    const dest = DESTINATIONS.find((x) => x.id === d.id) || d;
+    global.appendChild(railLink({
+      label: dest.label,
+      short: dest.short,
+      icon: dest.icon,
+      path: dest.path,
+      active: activePath === dest.path || (dest.path === '/home' && activePath === '/'),
+      badge: badges && badges[dest.id],
+    }));
+  }
+
+  const places = el('section', {
+    class: 'rail-group',
+    id: 'community-navigation',
+    'aria-label': 'Communities',
+  }, [
+    el('p', { class: 'rail-section__label' }, 'Places'),
+    ...(communities || []).map((c) => communityChip(c.name, {
+      active: activePath === '/servers/' + c.id,
+      server: c,
+    })),
+    el('a', {
+      class: 'rail-community rail-community--add',
+      href: route('/discover'),
+      title: 'Find a community',
+      'aria-label': 'Find a community',
+    }, el('span', { class: 'rail-community__name', 'aria-hidden': 'true' }, '+')),
+  ]);
+
+  region.replaceChildren(brand, global, places);
+  return region;
+}
+
+export default { renderRail };
+
+/**
+ * The account button, at the foot of the rail. Kept as its own export because it is the one
+ * control reachable from every page, and the shell composes it separately from the rail body.
+ */
 export function railAccountButton() {
   const me = State.me;
   if (!me) {
-    const guest = el('button', {
+    return el('button', {
       class: 'rail-foot-btn',
       type: 'button',
       title: 'Sign in',
@@ -147,29 +170,32 @@ export function railAccountButton() {
       dataset: { label: 'Sign in' },
       onClick: () => { navigate(route('/login')); },
     }, el('span', { class: 'nv-icon' }, icon('users')));
-    return guest;
   }
-  const btn = el('button', {
+  return el('button', {
     class: 'rail-foot-btn rail-account',
     type: 'button',
     title: (me.displayName || me.username) + ' — account',
     'aria-label': 'Your account and settings',
+    'aria-haspopup': 'menu',
     dataset: { label: 'Account' },
-  }, avatar(me, { size: 'sm', withPresence: true }));
-  attachMenu(btn, () => [
-    { label: me.displayName || me.username, desc: '@' + me.username, disabled: true },
-    { sep: true },
-    { label: 'Settings', icon: 'gear', onSelect: () => navigate(route('/settings')) },
-    { label: 'Switch community', icon: 'users', onSelect: () => navigate(route('/menu')) },
-    { sep: true },
-    { label: 'Sign out', icon: 'logout', danger: true, onSelect: () => signOut() },
+  }, el('span', { class: 'nv-icon' }, icon('users')));
+}
+
+/**
+ * The rail's communities, for the caller that owns the region.
+ *
+ * The region this is given is already `#community-navigation` - tree.js creates it - so this
+ * fills it rather than nesting a second element with the same id inside it, which is what
+ * made every surface carry two `community-navigation` ids and failed the accessible-name
+ * check on all forty of them.
+ */
+export function renderCommunities(region, servers, activePath) {
+  const list = el('div', { class: 'rail-group', 'aria-label': 'Communities' }, [
+    ...(servers || []).map((c) => communityChip(c.name, {
+      active: activePath === '/servers/' + c.id,
+      server: c,
+    })),
   ]);
-  return btn;
+  region.replaceChildren(list);
+  return region;
 }
-
-async function signOut() {
-  try { await Api.logout(); } catch { /* server may be down; still sign out locally */ }
-  clearSession();
-  navigate(route('/login'));
-}
-
