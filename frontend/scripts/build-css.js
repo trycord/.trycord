@@ -18,6 +18,10 @@ const fs = require('fs');
 const path = require('path');
 
 const CSS = path.join(__dirname, '..', 'css');
+// The canonical design-token library. Its file is the first layer of the build rather
+// than a copy, so a value changed there reaches the application without anything being
+// duplicated into frontend/css.
+const ASSET_TOKENS = path.join(__dirname, '..', 'assets', 'trycord-assets', 'tokens', 'trycord.css');
 
 // Order is the dependency order, not alphabetical: tokens before anything that
 // reads them, primitives before the surfaces built from them, responsive last
@@ -42,13 +46,32 @@ function build() {
     '/*',
     ' * The one stylesheet. Generated - edit the layers in frontend/css and run npm run css.',
     ' *',
+    ' * The first layer is the canonical token library in assets/trycord-assets/tokens.',
+    ' * Its values are not duplicated here: this layer is that file, unchanged, and the',
+    ' * semantic names in tokens.css are mapped from it.',
+    ' *',
     ' * Order is the dependency order, not alphabetical:',
+    ' *   design-tokens (assets/trycord-assets/tokens/trycord.css)',
     ' *   ' + LAYERS.join('\n *   '),
     ' */',
     '',
   ].join('\n');
 
   const parts = [header];
+
+  // The asset library's own file, first, so everything below it can read --tc-*.
+  let tokenBody;
+  try {
+    tokenBody = fs.readFileSync(ASSET_TOKENS, 'utf8').trim();
+  } catch {
+    console.error('  missing design tokens: ' + ASSET_TOKENS);
+    process.exitCode = 1;
+    return null;
+  }
+  parts.push('/* ---- design-tokens (assets/trycord-assets/tokens/trycord.css) ' + '-'.repeat(8) + ' */');
+  parts.push(tokenBody);
+  parts.push('');
+
   for (const name of LAYERS) {
     const file = path.join(CSS, name);
     let body;

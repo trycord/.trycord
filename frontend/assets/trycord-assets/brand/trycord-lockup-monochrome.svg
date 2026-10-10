@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 140" role="img" width="1120" height="280">
+  <title>Trycord brand asset</title>
+  <g color="#202127">
+<rect width="560" height="140" rx="18" fill="none"/>
+<g transform="translate(24 20) scale(1.0)" color="currentColor">
+  <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+  <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #FFFFFF)"/>
+  <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #FFFFFF)"/>
+  <circle cx="72" cy="58" r="7" fill="var(--cutout, #FFFFFF)"/>
+</g>
+<text x="148" y="82" font-family="Manrope, Arial, sans-serif" font-size="44" font-weight="800" letter-spacing="1.5" fill="currentColor">TRYCORD</text>
+</g>
+</svg>
