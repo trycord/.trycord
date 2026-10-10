@@ -72,3 +72,4 @@ backend/shots/
 # addresses, so they belong on the machine that made them and nowhere else. Git is not
 # somewhere a copy of that goes.
 /data/
+/server/node_modules
