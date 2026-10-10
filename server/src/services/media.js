@@ -30,23 +30,7 @@ const UNKNOWN_MIME = 'application/octet-stream';
 
 const IMAGE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
-// The local driver. A second driver would implement the same three methods.
-const local = {
-  async put(key, buffer) {
-    const file = path.join(config.uploadDir, key);
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, buffer);
-  },
-  async get(key) {
-    return fs.readFileSync(path.join(config.uploadDir, key));
-  },
-  async remove(key) {
-    const file = path.join(config.uploadDir, key);
-    try { fs.unlinkSync(file); } catch { /* already gone */ }
-  },
-};
-
-const driver = local;
+const driver = require('./storage').selectDriver();
 
 function sniffBinary(buf) {
   if (buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';

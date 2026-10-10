@@ -33,6 +33,8 @@ const LAYERS = [
   'shell.css',
   'messages.css',
   'pages.css',
+  'cfg.css',
+  'voice.css',
   'features.css',
   'surfaces.css',
   'roles.css',

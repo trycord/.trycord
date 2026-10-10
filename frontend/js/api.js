@@ -168,6 +168,13 @@ const Api = {
   unmuteChannel: (channelId) => request('DELETE', '/api/mutes/' + encodeURIComponent(channelId)),
 
   // server-side (this client flag is never the authority).
+
+  // Instance configuration, system-admin only.
+  instanceSettings: () => request('GET', '/api/admin/settings'),
+  instanceSettingsCategory: (id) => request('GET', '/api/admin/settings/' + encodeURIComponent(id)),
+  updateInstanceSettings: (body) => request('PUT', '/api/admin/settings', { body }),
+  resetInstanceSetting: (key) => request('DELETE', '/api/admin/settings/' + encodeURIComponent(key)),
+  exportInstanceSettings: () => request('GET', '/api/admin/settings/export/template'),
   announcements: () => request('GET', '/api/announcements'),
   allAnnouncements: () => request('GET', '/api/announcements/all'),
   createAnnouncement: (data) => request('POST', '/api/announcements', { body: data }),

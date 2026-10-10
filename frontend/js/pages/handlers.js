@@ -23,6 +23,7 @@ import { renderServerSettings } from '../community/settings.js';
 import { renderServerMembers } from '../community/members.js';
 import { renderNewChannel, renderServerCategories } from '../community/channels.js';
 import { renderHome } from '../global/home.js';
+import { renderInstanceSettings } from '../admin/settings.js';
 import Dms from '../messages/dms.js';
 import { resolveCommunity, resolveChannelToken, renderRouteError } from '../resolve.js';
 import { bind } from './registry.js';
@@ -157,6 +158,7 @@ export const HANDLERS = {
   'admin.announcements': (ctx) => renderAdmin(ctx.region, { section: 'announcements' }),
   'admin.pages': (ctx) => renderAdminPages(ctx.region, { route: ctx.rest[0] || null }),
   'admin.gdpr': (ctx) => renderAdmin(ctx.region, { section: 'gdpr' }),
+  'admin.settings': (ctx) => renderInstanceSettings(ctx.region),
 
   profile: (ctx) => renderProfile(ctx.region, { id: ctx.params.id }),
   'community.new': (ctx) => renderNewServer(ctx.region),

@@ -77,6 +77,7 @@ function buildApp() {
   api.use('/auth', require('./routes/auth'));
   api.use('/users', require('./routes/users'));
   api.use('/servers', require('./routes/servers'));
+  api.use('/servers/:serverId/webhooks', require('./routes/integrations'));
   // Channels live under the community they belong to, which is what the client calls.
   api.use('/servers/:serverId/channels', require('./routes/channels'));
   api.use('/dms', require('./routes/dms'));
@@ -88,6 +89,7 @@ function buildApp() {
   api.use('/appeals', require('./routes/appeals'));
   api.use('/announcements', require('./routes/announcements'));
   api.use('/admin', require('./routes/admin'));
+  api.use('/admin/settings', require('./routes/settings'));
   api.use('/voice', require('./routes/voice'));
   api.use('/mutes', require('./routes/mutes'));
   api.use('/discover', require('./routes/discover'));

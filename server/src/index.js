@@ -22,11 +22,14 @@ const APP_PREFIXES = new Set([
 ]);
 
 async function start() {
-  // Validate the feature configuration before anything binds. A flag that is on with no
-  // infrastructure is refused here rather than discovered at the first join.
+  await db.connect();
+
+  // The feature configuration is validated before anything binds. A flag that is on with
+  // no infrastructure is refused here rather than discovered at the first join.
   require('./features').load();
 
-  await db.connect();
+  // Instance settings, read before anything serves a request that might read one.
+  await require('./services/settings').load();
   console.log(`[info] database connected (${config.db.client})`);
 
   const app = buildApp();
@@ -65,8 +68,6 @@ function mountStatic(app) {
     return null;
   }
 
-  app.use(express.static(clientDir, { index: false, fallthrough: true }));
-
   // The index is rewritten per request because it carries the mount in its <base href>,
   // and this process is the only thing that knows where it is mounted.
   const indexPath = path.join(clientDir, 'index.html');
@@ -75,26 +76,63 @@ function mountStatic(app) {
       if (err) {
         return res.status(404).type('text').send('the web client is missing its index document');
       }
+      // no-store: a stale index.html paired with fresh assets is what renders a blank page.
       res.setHeader('Cache-Control', 'no-store');
       res.type('html').send(html.replace(/<base href="[^"]*">/i, `<base href="${config.appMount || ''}/">`));
     });
   };
 
-  const root = config.appMount || '/';
-  app.get([root, root + 'index.html'], sendIndex);
+  const staticOptions = {
+    index: false,
+    setHeaders(res) {
+      // Assets revalidate on every load, so a deploy is picked up without giving up
+      // caching entirely.
+      res.setHeader('Cache-Control', 'no-cache');
+    },
+  };
 
-  app.use((req, res, next) => {
-    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  // The tree at the origin root, which is what an instance with no mount serves.
+  app.use(express.static(clientDir, staticOptions));
+
+  // The same tree again under the configured mount, so a deployment that serves the
+  // client from this server can address it at /app/... with no proxy rewriting the
+  // prefix. redirect:false because the default turns a request for a directory into a
+  // 301, and a redirect on a deep link is another hop that can lose the mount.
+  if (config.appMount) {
+    app.use(config.appMount, express.static(clientDir, Object.assign({ redirect: false }, staticOptions)));
+  }
+
+  // The SPA fallback, for a deep link the server has never heard of. It claims only the
+  // application's own route prefixes, so an unrelated path still belongs to whatever else
+  // is published from this origin - an instance that also runs a website keeps its own
+  // clean URLs.
+  const spaIndex = (req, res) => {
     const first = req.path.split('/').filter(Boolean)[0] || '';
-    if (!APP_PREFIXES.has(first)) return next();
+    if (!APP_PREFIXES.has(first)) return false;
     // A path that looks like a file and is not one is a 404, not the shell: asking for
     // /app/js/app.js and receiving HTML is how the client gets a black screen with
     // nothing in the console to act on.
-    if (/\.[a-z0-9]{1,8}$/i.test(req.path)) return next();
+    if (/\.[a-z0-9]{1,8}$/i.test(req.path)) return false;
     sendIndex(req, res);
+    return true;
+  };
+
+  // Under the mount first, so /app/home is answered by the fallback rather than by the
+  // static handler's 404.
+  if (config.appMount) {
+    app.use(config.appMount, (req, res, next) => {
+      if (spaIndex(req, res)) return;
+      next();
+    });
+  }
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    if (spaIndex(req, res)) return;
+    next();
   });
 
-  console.log(`[info] serving web client from ${clientDir}`);
+  console.log(`[info] serving web client from ${clientDir}`
+    + (config.appMount ? ` (also mounted at ${config.appMount})` : ''));
   return clientDir;
 }
 

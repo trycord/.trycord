@@ -1,5 +1,8 @@
 // Building blocks. Everything else in the interface is made of these, so they are the
 // only part with no opinion about what anything is for.
+
+import { LIBRARY_ICONS } from '../icon-paths.js';
+
 export function esc(v) {
   return String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -25,8 +28,6 @@ function associateLabels(node) {
     label.setAttribute('for', control.id);
   }
 }
-
-import { LIBRARY_ICONS } from '../icon-paths.js';
 
 // One icon set, drawn rather than typed.
 //

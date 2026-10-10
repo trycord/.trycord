@@ -51,7 +51,7 @@ ok('the client module count in the summary', doc.includes(`all ${clientModules} 
 // summary is a failing check rather than a sentence nobody re-reads.
 const REPORTED = {
   'check:flows': 72,
-  'check:render': 92,
+  'check:render': 99,
   'check:realtime': 17,
   'check:contrast': 100,
   'check:origins': 35,

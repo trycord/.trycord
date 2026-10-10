@@ -1,16 +1,13 @@
 // The schema. Applies the table definitions and the migrations that bring an existing
 // database up to date.
 //
-// The DDL is imported from the legacy package rather than copied, because it is the data
-// contract the live rows depend on. Two copies of a schema drift, and the one that drifts
-// loses data.
+// The table DDL is the data contract the live rows depend on. It lived in the legacy
+// package while this one was being built; now that this package is the server, the tables
+// live beside it. They are unchanged: an existing database must come out of a boot
+// exactly as it went in.
 
 const path = require('path');
-const LEGACY = path.join(__dirname, '..', '..', '..', 'backend', 'src', 'db');
 
-// ALTERs that bring an older database up to date. Introspection-driven: each one asks
-// the database whether it is needed, so a fresh database and an old one converge on the
-// same shape without either doing work it does not need to.
 const ALTERS = [
   ['servers', 'is_public', 'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0'],
   ['servers', 'is_discoverable', 'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1'],
@@ -25,6 +22,65 @@ const ALTERS = [
   ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
 ];
 
+const INDEXES = [
+  'CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, seq)',
+  'CREATE INDEX IF NOT EXISTS idx_dm_messages_conversation ON dm_messages(conversation_id, seq)',
+  'CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at)',
+  'CREATE INDEX IF NOT EXISTS idx_server_members_server ON server_members(server_id, user_id)',
+  'CREATE INDEX IF NOT EXISTS idx_reactions_message ON reactions(message_id)',
+];
+
+const INDEXES_SETTINGS = [];
+
+const SETTINGS_SCHEMA = [
+  // `key` is a reserved word in MySQL, so the column name is quoted. SQLite accepts the
+  // backtick form too.
+  'CREATE TABLE IF NOT EXISTS instance_settings ('
+  + ' `key` VARCHAR(128) PRIMARY KEY,'
+  + ' value TEXT NOT NULL,'
+  + ' updated_at VARCHAR(64) NOT NULL,'
+  + ' updated_by VARCHAR(64)'
+  + ')',
+];
+
+const VOICE_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS voice_rooms (
+     id         VARCHAR(64) PRIMARY KEY,
+     channel_id VARCHAR(64) NOT NULL,
+     server_id  VARCHAR(64) NOT NULL,
+     created_at VARCHAR(64) NOT NULL,
+     UNIQUE (channel_id)
+   )`,
+  `CREATE TABLE IF NOT EXISTS voice_participants (
+     id         VARCHAR(64) PRIMARY KEY,
+     room_id    VARCHAR(64) NOT NULL,
+     channel_id VARCHAR(64) NOT NULL,
+     user_id    VARCHAR(64) NOT NULL,
+     session_id VARCHAR(128),
+     joined_at  VARCHAR(64) NOT NULL,
+     left_at    VARCHAR(64),
+     muted      INTEGER NOT NULL DEFAULT 0,
+     deafened   INTEGER NOT NULL DEFAULT 0,
+     UNIQUE (channel_id, user_id)
+   )`,
+  `CREATE TABLE IF NOT EXISTS voice_speak_requests (
+     id         VARCHAR(64) PRIMARY KEY,
+     channel_id VARCHAR(64) NOT NULL,
+     user_id    VARCHAR(64) NOT NULL,
+     created_at VARCHAR(64) NOT NULL
+   )`,
+];
+
+const INDEXES_VOICE = [
+  'CREATE INDEX IF NOT EXISTS idx_voice_participants_room ON voice_participants(room_id)',
+  'CREATE INDEX IF NOT EXISTS idx_voice_participants_live ON voice_participants(channel_id, left_at)',
+  'CREATE INDEX IF NOT EXISTS idx_voice_rooms_server ON voice_rooms(server_id)',
+];
+
+function engineSuffixFor(conn) {
+  return conn.dialect === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+}
+
 function describeTable(conn, table) {
   return conn.dialect === 'mysql' ? `SHOW COLUMNS FROM \`${table}\`` : `PRAGMA table_info(${table})`;
 }
@@ -33,30 +89,35 @@ function columnNameOf(conn, col) {
   return conn.dialect === 'mysql' ? col.Field : col.name;
 }
 
-function engineSuffixFor(conn) {
-  return conn.dialect === 'mysql'
-    ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
-    : '';
-}
-
 async function apply(conn) {
-  const statements = require(path.join(LEGACY, 'tables'))(engineSuffixFor(conn));
+  const statements = require('./tables')(engineSuffixFor(conn));
 
   // MySQL validates a foreign key against a table that already exists, and the table
   // definitions are ordered by concern rather than by dependency: message_embeds
   // references dm_conversations and dm_messages, both declared after it. SQLite does not
-  // check at creation time, so this only ever failed on MySQL - and the legacy backend
-  // has the same latent bug. Deferring the checks is what mysqldump does, and it is the
-  // only way a list ordered for reading can be created in that order. The checks still
-  // run on every insert afterwards, because this is session state, not a server setting.
+  // check at creation time, so this only ever failed on MySQL.
+  //
+  // Deferring the checks is what mysqldump does, and it is the only way a list ordered for
+  // reading can be created in that order. The checks still run on every insert afterwards,
+  // because this is session state, not a server setting.
   const deferFk = conn.dialect === 'mysql';
   if (deferFk) await conn.run('SET FOREIGN_KEY_CHECKS = 0');
 
   try {
     for (const ddl of statements) {
       if (!ddl || !ddl.trim()) continue;
-      // CREATE TABLE IF NOT EXISTS is a no-op on an existing database, so an instance
-      // that already has its tables is left exactly as it is.
+      // CREATE TABLE IF NOT EXISTS is a no-op on an existing database, so an instance that
+      // already has its tables is left exactly as it is.
+      try {
+        await conn.run(ddl);
+      } catch (e) {
+        const msg = String((e && e.message) || e);
+        if (/already exists|duplicate/i.test(msg)) continue;
+        throw e;
+      }
+    }
+    for (const ddl of SETTINGS_SCHEMA) {
+      if (!ddl || !ddl.trim()) continue;
       try {
         await conn.run(ddl);
       } catch (e) {
@@ -87,28 +148,10 @@ async function apply(conn) {
     }
   }
 
-  // Declared indexes, kept apart from the tables because a table module owns its shape
-  // while an index is a performance decision that outlives it.
-  try {
-    const legacy = require(path.join(LEGACY, 'schema.js'));
-    if (typeof legacy.declaredIndexes === 'function') {
-      for (const sql of legacy.declaredIndexes(conn.dialect)) {
-        try { await conn.run(sql); } catch { /* an index that already exists is fine */ }
-      }
-    }
-  } catch { /* the legacy schema module is not required to be present */ }
-
-  // Voice is new to this backend rather than migrated into it. Created empty, so an
-  // existing instance gains the tables with no data movement at all.
-  const voice = require(path.join(__dirname, '..', 'services', 'voice-schema.js'));
-  for (const ddl of [...voice.TABLE_DDL, ...voice.INDEX_DDL]) {
-    try {
-      await conn.run(ddl);
-    } catch (e) {
-      const msg = String((e && e.message) || e);
-      if (/already exists|duplicate/i.test(msg)) continue;
-      throw e;
-    }
+  // An index is a performance decision that outlives the table it belongs to, so it is
+  // kept separate from the DDL rather than declared inside it.
+  for (const ddl of [...INDEXES, ...INDEXES_VOICE, ...INDEXES_SETTINGS]) {
+    try { await conn.run(ddl); } catch { /* an index that already exists is fine */ }
   }
 }
 
