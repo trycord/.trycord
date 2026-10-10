@@ -173,4 +173,5 @@ async function decideAppeal(appealId, reviewerId, { decision }) {
 module.exports = {
   REASONS, file, sameOpen, list, assign, resolve,
   fileAppeal, listAppeals, decideAppeal, shape,
+  markBot: null,
 };

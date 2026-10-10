@@ -22,16 +22,24 @@ async function notify(userId, { type, actorId, referenceId }) {
   return { id };
 }
 
-async function list(userId, { limit = 50, offset = 0 } = {}) {
+async function list(userId, { limit = 50, before } = {}) {
+  // The cursor is a timestamp, so paging backwards is "older than the last thing I was
+  // shown" rather than an offset that moves as new notifications arrive.
+  const page = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+  const anchor = before ? String(before) : null;
+
   const rows = await db.all(
     `SELECT n.*, a.username AS actor_name, a.display_name AS actor_display, a.avatar_url
        FROM notifications n LEFT JOIN users a ON a.id = n.actor_id
-      WHERE n.user_id = ?
-      ORDER BY n.created_at DESC LIMIT ? OFFSET ?`,
-    [userId, Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200), Math.max(parseInt(offset, 10) || 0, 0)]
+      WHERE n.user_id = ? ${anchor ? 'AND n.created_at < ?' : ''}
+      ORDER BY n.created_at DESC LIMIT ?`,
+    anchor ? [userId, anchor, page + 1] : [userId, page + 1]
   );
 
-  return rows.map((r) => ({
+  // One more than asked for is the cheapest way to know whether there is another page,
+  // and it costs no extra query.
+  const hasMore = rows.length > page;
+  const items = (hasMore ? rows.slice(0, page) : rows).map((r) => ({
     id: r.id,
     type: r.type,
     actor: r.actor_id ? {
@@ -44,6 +52,13 @@ async function list(userId, { limit = 50, offset = 0 } = {}) {
     createdAt: r.created_at,
     read: !!r.read_at,
   }));
+
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && items.length ? items[items.length - 1].createdAt : null,
+    unreadCount: await unreadCount(userId),
+  };
 }
 
 async function unreadCount(userId) {
