@@ -1,4 +1,4 @@
-// SQLite adapter. better-sqlite3 is synchronous, so the promise-based surface the
+// The SQLite adapter. better-sqlite3 is synchronous, so the promise-based surface the
 // rest of the server uses is a thin async wrapper.
 
 const path = require('path');
@@ -33,7 +33,7 @@ async function connect(cfg) {
 
     async transaction(fn) {
       // better-sqlite3 transactions are synchronous, so the callback's promises are
-      // awaited inside the SAVEPOINT via a plain begin/commit pair.
+      // awaited inside a plain begin/commit pair.
       raw.prepare('BEGIN').run();
       const tx = {
         dialect,

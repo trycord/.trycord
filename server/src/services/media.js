@@ -292,7 +292,7 @@ async function removeCommunity(serverId, kind, viewerId) {
 async function purgePending() {
   const cutoff = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const rows = await db.all(
-    'SELECT id, channel_id, conversation_id FROM attachments WHERE message_id IS NULL AND created_at < ?',
+    'SELECT id, channel_id, dm_conversation_id AS conversation_id FROM attachments WHERE message_id IS NULL AND created_at < ?',
     [cutoff]
   );
   for (const r of rows) {

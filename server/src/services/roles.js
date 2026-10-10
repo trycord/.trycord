@@ -10,12 +10,24 @@ async function list(serverId, viewerId) {
   if (!(await servers.membership(viewerId, serverId))) {
     throw { code: 'NOT_A_MEMBER', message: 'you are not a member of this community' };
   }
-  return db.all(
-    `SELECT r.id, r.name, r.color, r.position, r.is_hoisted,
+  const rows = await db.all(
+    `SELECT r.id, r.name, r.color, r.position, r.permissions,
        (SELECT COUNT(*) FROM member_roles mr WHERE mr.role_id = r.id) AS member_count
      FROM roles r WHERE r.server_id = ? ORDER BY r.position DESC`,
     [serverId]
   );
+  return rows.map((r) => {
+    let permissions = [];
+    try { permissions = JSON.parse(r.permissions || '[]'); } catch { permissions = []; }
+    return {
+      id: r.id,
+      name: r.name,
+      color: r.color || null,
+      position: Number(r.position || 0),
+      permissions: Array.isArray(permissions) ? permissions : [],
+      memberCount: Number(r.member_count || 0),
+    };
+  });
 }
 
 async function create(serverId, viewerId, { name, color }) {
@@ -40,7 +52,7 @@ async function update(serverId, roleId, viewerId, patch) {
   const role = await db.get('SELECT * FROM roles WHERE id = ? AND server_id = ?', [roleId, serverId]);
   if (!role) throw { code: 'NOT_FOUND', message: 'role not found' };
 
-  const allowed = ['name', 'color', 'position', 'is_hoisted'];
+  const allowed = ['name', 'color', 'position'];
   const sets = [];
   const params = [];
   for (const key of allowed) {
