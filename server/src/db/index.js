@@ -47,6 +47,31 @@ const db = {
    * Run fn inside a transaction. The object handed to fn has the same get/all/run
    * surface, so a service can be written once against either.
    */
+  /**
+   * An insert that is a no-op when the row already exists.
+   *
+   * The two engines spell this differently and there is no shared syntax: SQLite says
+   * INSERT OR IGNORE, MySQL says INSERT IGNORE. Getting it wrong is not a syntax error
+   * a test on one engine catches - it is a 500 that only appears on the other.
+   */
+  ignore(sql) {
+    return this.dialect === 'mysql' ? sql.replace(/^INSERT OR IGNORE/i, 'INSERT IGNORE') : sql;
+  },
+
+  /**
+   * An upsert keyed on the named columns.
+   *
+   * SQLite says ON CONFLICT(cols) DO UPDATE SET; MySQL says ON DUPLICATE KEY UPDATE.
+   */
+  upsert(sql, { conflict, updates }) {
+    const sets = updates.map(([col, expr]) => `${col} = ${expr}`).join(', ');
+    if (this.dialect === 'mysql') {
+      return sql.replace(/ON CONFLICT\\s*\\([^)]*\\)\\s+DO UPDATE SET[\\s\\S]*$/i,
+        `ON DUPLICATE KEY UPDATE ${sets}`);
+    }
+    return `${sql} ON CONFLICT(${conflict}) DO UPDATE SET ${sets}`;
+  },
+
   async transaction(fn) {
     const c = active();
     return c.transaction(fn);

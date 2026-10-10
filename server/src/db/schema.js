@@ -42,17 +42,31 @@ function engineSuffixFor(conn) {
 async function apply(conn) {
   const statements = require(path.join(LEGACY, 'tables'))(engineSuffixFor(conn));
 
-  for (const ddl of statements) {
-    if (!ddl || !ddl.trim()) continue;
-    // CREATE TABLE IF NOT EXISTS is a no-op on an existing database, so an instance that
-    // already has its tables is left exactly as it is.
-    try {
-      await conn.run(ddl);
-    } catch (e) {
-      const msg = String((e && e.message) || e);
-      if (/already exists|duplicate/i.test(msg)) continue;
-      throw e;
+  // MySQL validates a foreign key against a table that already exists, and the table
+  // definitions are ordered by concern rather than by dependency: message_embeds
+  // references dm_conversations and dm_messages, both declared after it. SQLite does not
+  // check at creation time, so this only ever failed on MySQL - and the legacy backend
+  // has the same latent bug. Deferring the checks is what mysqldump does, and it is the
+  // only way a list ordered for reading can be created in that order. The checks still
+  // run on every insert afterwards, because this is session state, not a server setting.
+  const deferFk = conn.dialect === 'mysql';
+  if (deferFk) await conn.run('SET FOREIGN_KEY_CHECKS = 0');
+
+  try {
+    for (const ddl of statements) {
+      if (!ddl || !ddl.trim()) continue;
+      // CREATE TABLE IF NOT EXISTS is a no-op on an existing database, so an instance
+      // that already has its tables is left exactly as it is.
+      try {
+        await conn.run(ddl);
+      } catch (e) {
+        const msg = String((e && e.message) || e);
+        if (/already exists|duplicate/i.test(msg)) continue;
+        throw e;
+      }
     }
+  } finally {
+    if (deferFk) await conn.run('SET FOREIGN_KEY_CHECKS = 1');
   }
 
   for (const [table, column, ddl] of ALTERS) {
