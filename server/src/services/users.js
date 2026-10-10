@@ -11,10 +11,23 @@ async function me(userId) {
     [userId]
   );
   if (!row) return null;
-  return shape(row);
+  return shape(row, await extraFor(userId));
 }
 
-function shape(row) {
+// The facts only an account's own view of itself carries. isAdmin is what the console
+// checks before it will open, and it is server-computed rather than a client-side flag.
+// verificationRequired tells the reader whether this instance can enforce verification at
+// all, so a self-hoster with no mail relay is never asked to confirm an address they have
+// no way of confirming.
+async function extraFor(userId) {
+  const admin = await db.get('SELECT 1 FROM admins WHERE user_id = ?', [userId]);
+  return {
+    isAdmin: !!admin,
+    verificationRequired: require('../config').verificationEnforceable(),
+  };
+}
+
+function shape(row, extra) {
   return {
     id: row.id,
     username: row.username,
@@ -24,9 +37,12 @@ function shape(row) {
     avatarUrl: row.avatar_url || null,
     bannerUrl: row.banner_url || null,
     bio: row.bio || '',
-    status: row.status_text || '',
+    // statusText is the name the context panel reads, so a profile card shows the status
+    // a person set for themselves.
+    statusText: row.status_text || '',
     isBot: !!row.is_bot,
     createdAt: row.created_at,
+    ...(extra || {}),
   };
 }
 

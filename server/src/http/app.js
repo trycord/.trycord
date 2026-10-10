@@ -87,6 +87,8 @@ function buildApp() {
   api.use('/reports', require('./routes/reports'));
   api.use('/appeals', require('./routes/appeals'));
   api.use('/announcements', require('./routes/announcements'));
+  api.use('/admin', require('./routes/admin'));
+  api.use('/voice', require('./routes/voice'));
   api.use('/mutes', require('./routes/mutes'));
   api.use('/discover', require('./routes/discover'));
 

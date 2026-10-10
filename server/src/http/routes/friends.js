@@ -1,4 +1,8 @@
 // Friends, blocking, and the privacy settings that govern who may reach you.
+//
+// The contract is two list endpoints, because a reader asks two questions: who are my
+// friends, and what is waiting for me. /api/friends answers the first as a plain list;
+// /api/friends/requests answers the second as { incoming, outgoing }.
 
 const express = require('express');
 const { fail, wrap } = require('../errors');
@@ -13,7 +17,12 @@ router.get('/', wrap(async (req, res) => {
   res.json(await friends.list(req.user.id));
 }));
 
-router.post('/', requireVerified, limit({ windowMs: 60000, max: 20 }), wrap(async (req, res) => {
+router.get('/requests', wrap(async (req, res) => {
+  const both = await friends.both(req.user.id);
+  res.json({ incoming: both.incoming, outgoing: both.outgoing });
+}));
+
+router.post('/requests', requireVerified, limit({ windowMs: 60000, max: 20 }), wrap(async (req, res) => {
   const { userId } = req.body || {};
   if (!userId) return fail(res, 'VALIDATION_ERROR', 'a user id is required');
   res.status(201).json(await friends.sendRequest(req.user.id, userId));
@@ -35,6 +44,7 @@ router.delete('/:userId', requireVerified, wrap(async (req, res) => {
   res.json(await friends.remove(req.user.id, req.params.userId));
 }));
 
+// Privacy, blocking, and the preferences that decide who can reach this person at all.
 router.get('/privacy', wrap(async (req, res) => {
   res.json(await friends.privacy(req.user.id));
 }));

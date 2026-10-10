@@ -145,6 +145,13 @@ async function register({ username, email, password, displayName, termsVersion, 
   const existing = await db.get('SELECT id FROM users WHERE lower(username) = lower(?)', [username]);
   if (existing) throw { code: 'ALREADY_EXISTS', message: 'that username is taken' };
 
+  // The email column carries a unique index, and an address already in use is a refusal
+  // the reader can act on rather than a database error they cannot.
+  if (email) {
+    const taken = await db.get('SELECT id FROM users WHERE lower(email) = lower(?)', [email]);
+    if (taken) throw { code: 'ALREADY_EXISTS', message: 'that email is already registered' };
+  }
+
   const id = uuid();
   const at = now();
   await db.run(

@@ -22,6 +22,10 @@ const APP_PREFIXES = new Set([
 ]);
 
 async function start() {
+  // Validate the feature configuration before anything binds. A flag that is on with no
+  // infrastructure is refused here rather than discovered at the first join.
+  require('./features').load();
+
   await db.connect();
   console.log(`[info] database connected (${config.db.client})`);
 

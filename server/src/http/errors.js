@@ -24,6 +24,11 @@ const STATUS = {
   CONFLICT: 409,
   ALREADY_EXISTS: 409,
   RATE_LIMITED: 429,
+  // A feature this instance does not have enabled. 403 rather than 404, because the
+  // request was well-formed and the resource may well exist - the capability does not.
+  FEATURE_DISABLED: 403,
+  ROOM_FULL: 409,
+  BANNED: 403,
   INTERNAL: 500,
 };
 

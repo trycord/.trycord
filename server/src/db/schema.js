@@ -97,6 +97,19 @@ async function apply(conn) {
       }
     }
   } catch { /* the legacy schema module is not required to be present */ }
+
+  // Voice is new to this backend rather than migrated into it. Created empty, so an
+  // existing instance gains the tables with no data movement at all.
+  const voice = require(path.join(__dirname, '..', 'services', 'voice-schema.js'));
+  for (const ddl of [...voice.TABLE_DDL, ...voice.INDEX_DDL]) {
+    try {
+      await conn.run(ddl);
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      if (/already exists|duplicate/i.test(msg)) continue;
+      throw e;
+    }
+  }
 }
 
 module.exports = { apply };

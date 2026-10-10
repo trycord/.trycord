@@ -6,15 +6,26 @@
 const db = require('../db');
 const { now, uuid } = require('../util');
 
+// The friends themselves, as a plain list. A separate endpoint answers what is waiting,
+// because a reader asks those as two questions and loads them at two moments.
 async function list(userId) {
-  const friends = await db.all(
-    `SELECT u.id, u.username, u.display_name, u.avatar_url, f.created_at AS since
+  const rows = await db.all(
+    `SELECT u.id, u.username, u.display_name, u.created_at, f.created_at AS friends_since
        FROM friendships f JOIN users u ON u.id = f.friend_id
-      WHERE f.user_id = ?
-      ORDER BY u.display_name`,
+      WHERE f.user_id = ? ORDER BY u.username`,
     [userId]
   );
+  return rows.map((r) => ({
+    id: r.id,
+    username: r.username,
+    displayName: r.display_name,
+    createdAt: r.created_at,
+    friendsSince: r.friends_since,
+  }));
+}
 
+// Both halves of a pending request: who asked, and who was asked.
+async function both(userId) {
   const incoming = await db.all(
     `SELECT r.id, r.created_at, u.id AS user_id, u.username, u.display_name, u.avatar_url
        FROM friend_requests r JOIN users u ON u.id = r.from_user_id
@@ -22,7 +33,6 @@ async function list(userId) {
       ORDER BY r.created_at DESC`,
     [userId]
   );
-
   const outgoing = await db.all(
     `SELECT r.id, r.created_at, u.id AS user_id, u.username, u.display_name, u.avatar_url
        FROM friend_requests r JOIN users u ON u.id = r.to_user_id
@@ -36,16 +46,11 @@ async function list(userId) {
     username: r.username,
     displayName: r.display_name,
     avatarUrl: r.avatar_url || null,
-    since: r.created_at,
   });
 
   return {
-    friends: friends.map((r) => ({
-      id: r.id, username: r.username, displayName: r.display_name,
-      avatarUrl: r.avatar_url || null, since: r.since,
-    })),
-    incoming: incoming.map((r) => ({ id: r.id, ...shapeUser(r) })),
-    outgoing: outgoing.map((r) => ({ id: r.id, ...shapeUser(r) })),
+    incoming: incoming.map((r) => ({ id: r.id, from: shapeUser(r), createdAt: r.created_at })),
+    outgoing: outgoing.map((r) => ({ id: r.id, to: shapeUser(r), createdAt: r.created_at })),
   };
 }
 
@@ -215,6 +220,6 @@ async function isBlockedEitherWay(a, b) {
 }
 
 module.exports = {
-  list, sendRequest, accept, decline, withdraw, remove,
+  list, both, sendRequest, accept, decline, withdraw, remove,
   privacy, setPrivacy, block, unblock, blocks, isBlockedEitherWay,
 };
