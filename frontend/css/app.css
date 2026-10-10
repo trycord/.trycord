@@ -1,7 +1,12 @@
 /*
  * The one stylesheet. Generated - edit the layers in frontend/css and run npm run css.
  *
+ * The first layer is the canonical token library in assets/trycord-assets/tokens.
+ * Its values are not duplicated here: this layer is that file, unchanged, and the
+ * semantic names in tokens.css are mapped from it.
+ *
  * Order is the dependency order, not alphabetical:
+ *   design-tokens (assets/trycord-assets/tokens/trycord.css)
  *   tokens.css
  *   base.css
  *   components.css
@@ -13,6 +18,43 @@
  *   roles.css
  *   responsive.css
  */
+
+/* ---- design-tokens (assets/trycord-assets/tokens/trycord.css) -------- */
+/* Trycord design tokens v1.0 */
+:root {
+  --tc-brand: #FF4D24;
+  --tc-brand-hover: #E9431D;
+  --tc-brand-strong: #C93618;
+  --tc-success: #35B875;
+  --tc-warning: #F2B84B;
+  --tc-danger: #EF5350;
+  --tc-info: #5798F5;
+  --tc-font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --tc-font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --tc-space-1: 4px; --tc-space-2: 8px; --tc-space-3: 12px;
+  --tc-space-4: 16px; --tc-space-5: 20px; --tc-space-6: 24px;
+  --tc-space-8: 32px; --tc-space-10: 40px; --tc-space-12: 48px;
+  --tc-radius-sm: 4px; --tc-radius-md: 8px; --tc-radius-lg: 12px;
+  --tc-radius-xl: 16px; --tc-radius-pill: 999px;
+  --tc-motion-fast: 140ms; --tc-motion-normal: 180ms;
+  --tc-ease: cubic-bezier(.2, 0, 0, 1);
+}
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  --tc-bg: #18191D; --tc-bg-deep: #121317;
+  --tc-surface: #22242A; --tc-surface-hover: #2A2C33;
+  --tc-border: #30323A; --tc-text: #F4F5F7;
+  --tc-text-muted: #A4A7B0; --tc-text-on-brand: #FFFFFF;
+  --tc-brand-focus: #FF7A5A;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --tc-bg: #F5F6F8; --tc-bg-deep: #FFFFFF;
+  --tc-surface: #FFFFFF; --tc-surface-hover: #ECEEF2;
+  --tc-border: #E7E9EE; --tc-text: #202127;
+  --tc-text-muted: #666A75; --tc-text-on-brand: #FFFFFF;
+  --tc-brand-focus: #C93618;
+}
 
 /* ---- tokens ---------------------------------------------------- */
 /* ==========================================================================
@@ -38,21 +80,21 @@
   color-scheme: dark;
 
   /* -- surfaces --------------------------------------------------------- */
-  --color-background: #0c0a09;
-  --color-surface: #141110;
-  --color-surface-elevated: #1c1817;
-  --color-surface-hover: #241f1d;
-  --color-surface-active: #2b2523;
-  --color-surface-sunken: #080706;
+  --color-background: var(--tc-bg);
+  --color-surface: var(--tc-surface);
+  --color-surface-elevated: var(--tc-surface);
+  --color-surface-hover: var(--tc-surface-hover);
+  --color-surface-active: var(--tc-surface-hover);
+  --color-surface-sunken: var(--tc-bg-deep);
 
   /* -- lines ------------------------------------------------------------ */
-  --color-border: #2a2422;
-  --color-border-strong: #3d3532;
-  --color-border-subtle: #1f1a19;
+  --color-border: var(--tc-border);
+  --color-border-strong: var(--tc-border);
+  --color-border-subtle: var(--tc-border);
 
   /* -- type ------------------------------------------------------------- */
-  --color-text-primary: #f2ece7;
-  --color-text-secondary: #b6aca5;
+  --color-text-primary: var(--tc-text);
+  --color-text-secondary: var(--tc-text-muted);
   /* Solved against every surface it can land on, not only --color-surface: the interior
      surfaces are lighter, and muted on surface-active was 4.01:1. #978c82 clears 4.5 on
      the whole set, worst case 4.59. */
@@ -60,12 +102,12 @@
   --color-text-inverse: #140f0c;
 
   /* -- Ember, the accent ------------------------------------------------- */
-  --color-accent: #ff7a29;
-  --color-accent-hover: #ff8f47;
-  --color-accent-active: #e8641a;
-  --color-accent-muted: #4a2411;
-  --color-accent-subtle: #2a160b;
-  --color-on-accent: #180d05;
+  --color-accent: var(--tc-brand);
+  --color-accent-hover: var(--tc-brand-hover);
+  --color-accent-active: var(--tc-brand-strong);
+  --color-accent-muted: var(--tc-brand-strong);
+  --color-accent-subtle: var(--tc-brand-strong);
+  --color-on-accent: var(--tc-text-on-brand);
 
   /* -- meaning ----------------------------------------------------------- */
   --color-success: #6fbf73;
@@ -78,8 +120,8 @@
   --color-info-muted: #16242e;
 
   /* -- typography ------------------------------------------------------- */
-  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", ui-monospace, monospace;
+  --font-sans: var(--tc-font-sans);
+  --font-mono: var(--tc-font-mono);
 
   --text-xs: 0.6875rem;
   --text-sm: 0.78125rem;
@@ -103,23 +145,23 @@
   --tracking-tight: -0.01em;
 
   /* -- space ------------------------------------------------------------ */
-  --space-1: 2px;
-  --space-2: 4px;
-  --space-3: 6px;
-  --space-4: 8px;
-  --space-5: 12px;
-  --space-6: 16px;
-  --space-7: 20px;
-  --space-8: 24px;
-  --space-9: 32px;
-  --space-10: 40px;
-  --space-11: 56px;
+  --space-1: var(--tc-space-1);
+  --space-2: var(--tc-space-2);
+  --space-3: var(--tc-space-3);
+  --space-4: var(--tc-space-4);
+  --space-5: var(--tc-space-5);
+  --space-6: var(--tc-space-6);
+  --space-7: var(--tc-space-8);
+  --space-8: var(--tc-space-10);
+  --space-9: var(--tc-space-12);
+  --space-10: var(--tc-space-12);
+  --space-11: var(--tc-space-12);
 
   /* -- shape ------------------------------------------------------------ */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  --radius-sm: var(--tc-radius-sm);
+  --radius-md: var(--tc-radius-md);
+  --radius-lg: var(--tc-radius-lg);
+  --radius-xl: var(--tc-radius-xl);
   --radius-pill: 999px;
   --radius-circle: 50%;
 
@@ -133,11 +175,11 @@
   --glow-accent: 0 0 0 1px rgba(255, 122, 41, 0.34), 0 0 18px rgba(255, 122, 41, 0.16);
 
   /* -- motion ----------------------------------------------------------- */
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --duration-fast: 90ms;
-  --duration-normal: 160ms;
-  --duration-slow: 260ms;
+  --ease-out: var(--tc-ease);
+  --ease-in-out: var(--tc-ease);
+  --duration-fast: var(--tc-motion-fast);
+  --duration-normal: var(--tc-motion-normal);
+  --duration-slow: var(--tc-motion-normal);
 
   /* -- layout ----------------------------------------------------------- */
   --rail-width: 68px;
@@ -173,9 +215,9 @@
      rather than one entry, because the tone is chosen by a hash. */
   --color-mark-ink: #c8c1bc;
 
-  --overlay-scrim: rgba(12, 10, 9, 0.72);
-  --overlay-scrim-soft: rgba(12, 10, 9, 0.6);
-  --overlay-scrim-strong: rgba(12, 10, 9, 0.9);
+  --overlay-scrim: rgba(18, 19, 23, 0.72);
+  --overlay-scrim-soft: rgba(18, 19, 23, 0.6);
+  --overlay-scrim-strong: rgba(18, 19, 23, 0.9);
 }
 
 /* A light theme, because the token names are the contract and a theme that has
@@ -183,28 +225,28 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --color-background: #faf7f4;
-  --color-surface: #ffffff;
-  --color-surface-elevated: #ffffff;
-  --color-surface-hover: #f2ede8;
-  --color-surface-active: #e9e2dc;
-  --color-surface-sunken: #f4efea;
+  --color-background: var(--tc-bg);
+  --color-surface: var(--tc-surface);
+  --color-surface-elevated: var(--tc-surface);
+  --color-surface-hover: var(--tc-surface-hover);
+  --color-surface-active: var(--tc-surface-hover);
+  --color-surface-sunken: var(--tc-bg-deep);
 
-  --color-border: #e0d8d1;
-  --color-border-strong: #c9bdb4;
-  --color-border-subtle: #efe9e4;
+  --color-border: var(--tc-border);
+  --color-border-strong: var(--tc-border);
+  --color-border-subtle: var(--tc-border);
 
-  --color-text-primary: #1c1613;
-  --color-text-secondary: #55493f;
-  --color-text-muted: #6f6155;
-  --color-text-inverse: #fdfbf9;
+  --color-text-primary: var(--tc-text);
+  --color-text-secondary: var(--tc-text-muted);
+  --color-text-muted: var(--tc-text-muted);
+  --color-text-inverse: var(--tc-text-on-brand);
 
-  --color-accent: #964e18;
-  --color-accent-hover: #7e4013;
-  --color-accent-active: #68340e;
-  --color-accent-muted: #f3ddcb;
-  --color-accent-subtle: #fbeee2;
-  --color-on-accent: #fffaf6;
+  --color-accent: var(--tc-brand);
+  --color-accent-hover: var(--tc-brand-hover);
+  --color-accent-active: var(--tc-brand-strong);
+  --color-accent-muted: var(--tc-brand-strong);
+  --color-accent-subtle: var(--tc-brand-strong);
+  --color-on-accent: var(--tc-text-on-brand);
 
   --color-success: #2f7a34;
   --color-warning: #9a6b09;
@@ -221,9 +263,9 @@
   --shadow-pop: 0 16px 48px rgba(60, 40, 25, 0.18);
   --glow-accent: 0 0 0 1px rgba(217, 84, 10, 0.3), 0 0 16px rgba(217, 84, 10, 0.12);
 
-  --overlay-scrim: rgba(250, 247, 244, 0.78);
-  --overlay-scrim-soft: rgba(250, 247, 244, 0.62);
-  --overlay-scrim-strong: rgba(250, 247, 244, 0.92);
+  --overlay-scrim: rgba(245, 246, 248, 0.78);
+  --overlay-scrim-soft: rgba(245, 246, 248, 0.62);
+  --overlay-scrim-strong: rgba(245, 246, 248, 0.92);
 }
 
 /* Density is a reader setting, not a theme: it changes how much fits, never

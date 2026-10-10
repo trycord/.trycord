@@ -267,6 +267,25 @@ joinDiscover: (id) =>
     request('PATCH', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId), { body: { content } }),
   dmRead: (id) => request('POST', '/api/dms/' + encodeURIComponent(id) + '/read'),
 
+  // Voice and video, all of it gated behind the capability response. A disabled instance
+  // answers FEATURE_DISABED rather than pretending a session was created.
+  voiceCapabilities: () => request('GET', '/api/voice/capabilities'),
+  voiceJoin: (channelId) => request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/join'),
+  voiceLeave: (channelId) => request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/leave'),
+  voiceParticipants: (channelId) => request('GET', '/api/voice/channels/' + encodeURIComponent(channelId) + '/participants'),
+  voiceState: (channelId, { muted, deafened }) =>
+    request('PUT', '/api/voice/channels/' + encodeURIComponent(channelId) + '/state', { body: { muted, deafened } }),
+  voiceModerate: (channelId, userId, body) =>
+    request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/moderate/' + encodeURIComponent(userId), { body }),
+  voiceCredentials: (sessionId) => request('POST', '/api/voice/credentials', { body: { sessionId } }),
+  voiceNegotiate: (channelId, body) =>
+    request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/negotiate', { body }),
+  voiceAnswer: (channelId, sessionDescription) =>
+    request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/answer', { body: { sessionDescription } }),
+  voiceScreen: (channelId) => request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/screen'),
+  voiceSpeakRequests: (channelId) => request('GET', '/api/voice/channels/' + encodeURIComponent(channelId) + '/speak-requests'),
+  requestSpeak: (channelId) => request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/request-speak'),
+
   friends: () => request('GET', '/api/friends'),
   friendRequests: () => request('GET', '/api/friends/requests'),
   sendFriendRequest: (userId) => request('POST', '/api/friends/requests', { body: { userId } }),

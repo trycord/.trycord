@@ -26,6 +26,8 @@ function associateLabels(node) {
   }
 }
 
+import { LIBRARY_ICONS } from '../icon-paths.js';
+
 // One icon set, drawn rather than typed.
 //
 // The UI used to reach for Unicode pictographs - a smiling face for Friends, a
@@ -81,7 +83,6 @@ export const ICON_PATHS = {
 };
 
 export function icon(name, opts = {}) {
-  const d = ICON_PATHS[name];
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('fill', 'none');
@@ -99,7 +100,18 @@ export function icon(name, opts = {}) {
   // setAttribute.
   if (opts.class) svg.setAttribute('class', 'ui-icon ' + opts.class);
   else svg.setAttribute('class', 'ui-icon');
-  for (const seg of (d || ICON_PATHS.inbox).split(' M').map((p, i) => (i ? 'M' + p : p))) {
+  const lib = LIBRARY_ICONS[name];
+  if (lib) {
+    // The canonical library draws with a 2px stroke on the same 24 grid, so its own
+    // geometry is used as-is: the stroke weight it ships with is the brand's, and
+    // overriding it per call site would put the app back in the business of deciding.
+    svg.innerHTML = lib;
+    return svg;
+  }
+
+  // The icons the library does not carry. Drawn from this file's own table.
+  const d = ICON_PATHS[name] || ICON_PATHS.inbox;
+  for (const seg of d.split(' M').map((p, i) => (i ? 'M' + p : p))) {
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', seg);
     svg.appendChild(path);

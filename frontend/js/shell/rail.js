@@ -113,7 +113,12 @@ function trycordMark() {
     title: 'Trycord home',
     'aria-label': 'Trycord home',
   });
-  const img = el('img', { class: 'rail-mark-btn__img', src: './assets/trycord-logo.png', alt: '', loading: 'lazy' });
+  const img = el('img', {
+    class: 'rail-mark-btn__img',
+    src: './assets/trycord-assets/brand/trycord-symbol.svg',
+    alt: '',
+    loading: 'lazy',
+  });
   img.addEventListener('error', () => {
     // The mark is the one thing that has to be there even when the asset is not.
     brand.replaceChildren(el('span', { class: 'rail-mark', 'aria-hidden': 'true' }, 'T'));

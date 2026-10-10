@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" width="512" height="512">
+  <title>Trycord brand asset</title>
+  <g color="#FF4D24">
+  <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+  <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+  <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+  <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+</g>
+</svg>
