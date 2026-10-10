@@ -3,12 +3,23 @@
 
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const config = require('./config');
 const db = require('./db');
 const { buildApp } = require('./http/app');
 const createGateway = require('./ws');
 const auth = require('./services/auth');
+
+// Every first path segment that belongs to the application. The fallback is mounted only
+// for these, so an unrelated path still belongs to whatever else is published from this
+// origin - an instance that also runs a website keeps its own clean URLs.
+const APP_PREFIXES = new Set([
+  'home', 'dms', 'settings', 'account', 'server', 'servers', 'c', 'admin',
+  'friends', 'notifications', 'discover', 'profile', 'users', 'invite',
+  'login', 'register', 'forgot', 'reset-password', 'verify-email',
+  'menu', 'legal', 'channel', 'message', 'support',
+]);
 
 async function start() {
   await db.connect();
@@ -21,10 +32,10 @@ async function start() {
   const gateway = createGateway(server, config);
   app.set('gateway', gateway);
 
-  mountStatic(app, server);
+  mountStatic(app);
 
-  // Housekeeping runs once at boot and then hourly, unref'd so it never keeps the
-  // process alive on its own.
+  // Housekeeping runs once at boot and then hourly, unref'd so it never keeps the process
+  // alive on its own.
   const tick = async () => {
     try { await auth.purgeExpired(); } catch { /* shutting down */ }
   };
@@ -43,39 +54,30 @@ async function start() {
   return { app, server, gateway };
 }
 
-// The static client, and the fallback that answers a deep link. The fallback is mounted
-// last and only for the application's own route prefixes, so an unrelated path still
-// belongs to whatever else is published from this origin.
-const APP_PREFIXES = new Set([
-  'home', 'dms', 'settings', 'account', 'server', 'servers', 'c', 'admin',
-  'friends', 'notifications', 'discover', 'profile', 'users', 'invite',
-  'login', 'register', 'forgot', 'reset-password', 'verify-email',
-  'menu', 'legal', 'channel', 'message', 'support',
-]);
-
-function mountStatic(app, server) {
+function mountStatic(app) {
   const clientDir = findClientDir();
   if (!clientDir) {
     console.warn('[warn] no web client found — serving the API only');
     return null;
   }
 
-  const sendIndex = (mount, res) => (req, res2, next) => {
-    express.static(clientDir, { index: false })(req, res2, () => {
-      res2.sendFile(path.join(clientDir, 'index.html'));
-    });
-  };
-  void sendIndex;
-
-  // The index is rewritten per request because it is the file that carries the mount in
-  // its <base href>, and this process is the only thing that knows where it is mounted.
-  const serveIndex = (req, res, next) => {
-    express.static(clientDir, { index: false })(req, res, () => {
-      express.static(path.join(clientDir), { index: 'index.html' })(req, res, next);
-    });
-  };
-
   app.use(express.static(clientDir, { index: false, fallthrough: true }));
+
+  // The index is rewritten per request because it carries the mount in its <base href>,
+  // and this process is the only thing that knows where it is mounted.
+  const indexPath = path.join(clientDir, 'index.html');
+  const sendIndex = (req, res) => {
+    fs.readFile(indexPath, 'utf8', (err, html) => {
+      if (err) {
+        return res.status(404).type('text').send('the web client is missing its index document');
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      res.type('html').send(html.replace(/<base href="[^"]*">/i, `<base href="${config.appMount || ''}/">`));
+    });
+  };
+
+  const root = config.appMount || '/';
+  app.get([root, root + 'index.html'], sendIndex);
 
   app.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
@@ -85,26 +87,27 @@ function mountStatic(app, server) {
     // /app/js/app.js and receiving HTML is how the client gets a black screen with
     // nothing in the console to act on.
     if (/\.[a-z0-9]{1,8}$/i.test(req.path)) return next();
-    res.sendFile(path.join(clientDir, 'index.html'));
+    sendIndex(req, res);
   });
 
-  void server;
   console.log(`[info] serving web client from ${clientDir}`);
   return clientDir;
 }
 
 function findClientDir() {
-  const here = path.join(__dirname, '..');
+  // __dirname is src/, so the package root is one level up and the repository root is two.
+  const pkg = path.join(__dirname, '..');
+  const repo = path.join(__dirname, '..', '..');
   const candidates = [
     process.env.TRYCORD_CLIENT_DIR,
-    path.join(here, '..', '..', 'frontend'),
-    path.join(here, '..', 'client'),
-    path.join(here, '..', '..', 'trycord-desktop', 'client'),
+    path.join(repo, 'frontend'),
+    path.join(pkg, 'client'),
+    path.join(repo, 'trycord-desktop', 'client'),
   ].filter(Boolean);
   for (const dir of candidates) {
     try {
-      if (require('fs').existsSync(path.join(dir, 'index.html'))) return dir;
-    } catch { /* unreadable candidate is simply not a candidate */ }
+      if (fs.existsSync(path.join(dir, 'index.html'))) return dir;
+    } catch { /* an unreadable candidate is simply not a candidate */ }
   }
   return null;
 }

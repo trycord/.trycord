@@ -12,10 +12,10 @@ const { singleFile } = require('../../middleware/upload');
 const media = require('../../services/media');
 const db = require('../../db');
 
-// Uploads are addressed by the conversation they belong to, so this router is mounted at
-// the api root and owns the whole path. The download router below owns the other prefix.
+// Uploads are mounted at the api root, so authentication is applied per route rather than
+// with router.use: a router-level guard would claim every /api/* path and turn an unknown
+// route into a 401 instead of the 404 it should be.
 const uploads = express.Router();
-uploads.use(authenticate);
 
 // Reading an attachment needs the same membership as reading the message it was attached
 // to, so a file is never more public than the conversation it belongs to.
@@ -60,7 +60,7 @@ async function receiveFile(req, res, scope, store) {
 }
 
 uploads.post('/channels/:channelId/attachments',
-  requireVerified, limit({ windowMs: 60000, max: 30 }), singleFile,
+  authenticate, requireVerified, limit({ windowMs: 60000, max: 30 }), singleFile,
   wrap(async (req, res) => receiveFile(req, res, { id: req.params.channelId, key: 'channelId' }, media.store))
 );
 
@@ -72,7 +72,7 @@ async function dmMember(conversationId, userId) {
 }
 
 uploads.post('/dms/:conversationId/attachments',
-  requireVerified, limit({ windowMs: 60000, max: 30 }), singleFile,
+  authenticate, requireVerified, limit({ windowMs: 60000, max: 30 }), singleFile,
   wrap(async (req, res) => {
     if (!(await dmMember(req.params.conversationId, req.user.id))) {
       return fail(res, 'NOT_A_MEMBER', 'conversation not found or not a member');

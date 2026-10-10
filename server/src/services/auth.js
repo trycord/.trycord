@@ -28,6 +28,12 @@ function sign(user, { jti } = {}) {
   return { token, jti: id, expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString() };
 }
 
+// The claims off a bearer token, without checking them against the database. Used only
+// to copy a live session's identity onto a socket ticket.
+function decode(token) {
+  return verify(token);
+}
+
 function verify(token) {
   try {
     return jwt.verify(String(token), config.jwtSecret);
@@ -207,7 +213,7 @@ async function purgeExpired() {
 
 module.exports = {
   hashPassword, verifyPassword,
-  sign, verify,
+  sign, verify, decode,
   issueTicket, consumeTicket,
   signChallenge, readChallenge,
   tokenStale, enforced,

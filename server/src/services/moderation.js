@@ -117,7 +117,7 @@ async function audit(serverId, { limit = 50, offset = 0 } = {}) {
   );
   return rows.map((r) => ({
     id: r.id,
-    action: r.action_type,
+    action: r.action,
     actor: r.actor_display || r.actor_name || 'system',
     targetType: r.target_type,
     targetId: r.target_id,

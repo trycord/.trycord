@@ -4,6 +4,8 @@ const db = require('../db');
 const { now, uuid } = require('../util');
 const servers = require('./servers');
 const channels = require('./channels');
+const bus = require('./bus');
+const publish = (room, payload) => bus.emit(room, payload);
 
 const MAX_CONTENT = 4000;
 
@@ -178,6 +180,10 @@ async function post(channelId, viewer, { content, threadRootId, clientNonce }) {
 
   const row = await db.get('SELECT * FROM messages WHERE id = ?', [id]);
   const [message] = await decorate([row]);
+  // Published to both rooms, so a reader with the channel open sees it without a refresh
+  // and one with the community open sees the unread move.
+  publish('channel:' + ch.id, { type: 'message', message });
+  publish('server:' + ch.server_id, { type: 'message', message });
   return { message, deduped: false };
 }
 

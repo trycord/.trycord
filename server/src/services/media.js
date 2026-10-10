@@ -175,6 +175,11 @@ async function read(row) {
   return driver.get(scope);
 }
 
+// Identity media is keyed by the user and the kind, not by a conversation.
+async function readProfile(row) {
+  return driver.get(`user/${row.user_id}/${row.kind}/${row.id}`);
+}
+
 async function forMessages(messageIds) {
   const safe = sanitizeIds(messageIds);
   if (!safe.length) return {};
@@ -304,6 +309,7 @@ module.exports = {
   store, storeForConversation, byId, forMessages, attachToMessage,
   storeProfile, storeCommunity, profileMedia, serverMedia,
   removeProfile, removeCommunity, purgePending,
+  read, readProfile,
   detectMime, isInlineMime, sendHeaders, sanitizeIds,
   MAX_ATTACHMENTS_PER_MESSAGE, INLINE_MIMES, IMAGE_MIMES,
 };
