@@ -143,9 +143,11 @@ async function enable(userId, code) {
     return mintRecoveryCodes(userId, t);
   });
 
-  // The session that enabled the factor is revoked, so a stolen session cannot turn 2FA
-  // on and then keep using itself.
-  await revokeOtherSessions(userId);
+  // Every existing session is dead, so a stolen session cannot turn the factor on and
+  // then keep using itself. Bumping the version is what makes a token stale, because
+  // tokenStale compares the claim's sv against the column.
+  await db.run('UPDATE users SET session_version = COALESCE(session_version, 0) + 1 WHERE id = ?', [userId]);
+  await db.run('UPDATE user_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL', [now(), userId]);
   return out;
 }
 

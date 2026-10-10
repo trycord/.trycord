@@ -228,9 +228,11 @@ router.post('/2fa/recovery-codes', limit({ windowMs: 60000, max: 5 }), wrap(asyn
 }));
 
 // The WebSocket handshake ticket. The bearer token never appears in a URL, because URLs
-// end up in access logs, proxy logs and Referer headers.
+// end up in access logs, proxy logs and Referer headers - so the claims are copied off
+// the live token, which keeps the jti and therefore the ability to revoke.
 router.post('/ws/ticket', wrap(async (req, res) => {
-  res.json({ ticket: auth.issueTicket({ id: req.user.id, username: req.user.username }) });
+  const claims = auth.decode((req.headers.authorization || '').replace(/^Bearer /, ''));
+  res.json({ ticket: auth.issueTicket(claims || { id: req.user.id, username: req.user.username }) });
 }));
 
 module.exports = router;

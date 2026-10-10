@@ -5,6 +5,7 @@
 
 const auth = require('../services/auth');
 const permissions = require('../services/permissions');
+const db = require('../db');
 const { fail } = require('../http/errors');
 
 async function authenticate(req, res, next) {
@@ -16,7 +17,15 @@ async function authenticate(req, res, next) {
 
   req.user = out.user;
   req.verified = out.verified;
+  // Platform admin is a row on admins, not a permission inside a community. Resolved here
+  // because every route that asks the question needs the same answer.
+  req.admin = await isPlatformAdmin(out.user.id);
   next();
+}
+
+async function isPlatformAdmin(userId) {
+  const row = await db.get('SELECT 1 FROM admins WHERE user_id = ?', [userId]);
+  return !!row;
 }
 
 // Verification is only enforceable when the instance can actually deliver mail. With

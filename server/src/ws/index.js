@@ -21,6 +21,7 @@ const db = require('../db');
 const auth = require('../services/auth');
 const { can, serverPermissions } = require('../middleware/auth');
 const { now } = require('../util');
+const bus = require('../services/bus');
 
 const FRAME_WINDOW_MS = 10000;
 const FRAME_MAX = 120;
@@ -301,6 +302,10 @@ function createGateway(server, config) {
       dispatch(ws, user, data).catch(() => { /* a malformed payload is ignored */ });
     });
   }
+
+  // The services publish through the bus; this is the one place it learns a socket
+  // exists. Detaching is not needed because there is one gateway per process.
+  bus.attach(broadcast);
 
   server.on('upgrade', (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
