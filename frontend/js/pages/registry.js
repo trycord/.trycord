@@ -214,6 +214,12 @@ export const PAGES = [
     label: 'GDPR requests', icon: 'shield', tabs: ['gdpr'],
       blurb: 'Erasure and access requests from account holders',
   }),
+  p('admin.settings', '/admin/settings', {
+    layout: 'admin',
+    scope: 'admin', group: 'Platform', order: 3,
+    label: 'Instance configuration', icon: 'settings', tabs: ['settings'],
+    blurb: 'Everything this instance lets an administrator change',
+  }),
 
   // ---- community settings, declared for navigation. The router resolves the
   // address; these give the settings nav its labels, order and blurbs.

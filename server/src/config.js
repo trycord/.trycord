@@ -97,6 +97,19 @@ const config = {
   uploadDir: path.resolve(ROOT, optional('UPLOAD_DIR', './uploads')),
   maxUploadBytes: integer('MAX_UPLOAD_BYTES', 8 * 1024 * 1024, { min: 1024 }),
 
+  // S3-compatible object storage. Only read when STORAGE_DRIVER=s3; a local-disk
+  // instance never needs any of it.
+  s3: {
+    endpoint: optional('S3_ENDPOINT', ''),
+    region: optional('S3_REGION', 'us-east-1'),
+    bucket: optional('S3_BUCKET', ''),
+    accessKeyId: optional('S3_ACCESS_KEY_ID', ''),
+    secretAccessKey: optional('S3_SECRET_ACCESS_KEY', ''),
+    // Path style is what MinIO and most self-hosted endpoints expect; virtual-host style
+    // is what AWS uses.
+    forcePathStyle: boolean('S3_FORCE_PATH_STYLE', true),
+  },
+
   // --- mail ----------------------------------------------------------------
   // 'log' writes to stdout and sends nothing, which is the safe default: with it,
   // email verification is not enforceable and the app must not ask anyone to verify.

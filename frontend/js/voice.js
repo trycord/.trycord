@@ -13,7 +13,7 @@
 
 import Api from './api.js';
 import { esc, el, clear, icon, toast, relTime, confirmDialog } from './ui.js';
-import { avatar, presenceLabel } from './components.js';
+import { avatar } from './components.js';
 import { navigate } from './nav.js';
 
 // One panel per channel, so switching channels leaves the old one behind.
