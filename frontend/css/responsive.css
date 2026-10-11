@@ -57,7 +57,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .chat-environment--with-members .member-sidebar {
+  /* The member panel becomes a sheet on the right. display:flex is what makes it a
+     panel at all, so it is scoped away from the hidden state rather than left to be
+     overridden - `hidden` cannot win against a display rule, which is how a closed panel
+     stayed on screen as an empty black box. */
+  .chat-environment--with-members .member-sidebar:not([hidden]) {
     position: fixed;
     top: 0;
     right: 0;
@@ -70,7 +74,7 @@
     transition: transform var(--duration-normal) var(--ease-out);
   }
 
-  .chat-environment--with-members .member-sidebar.is-open {
+  .chat-environment--with-members .member-sidebar.is-open:not([hidden]) {
     transform: none;
   }
 }
@@ -108,7 +112,10 @@
     padding-right: max(var(--space-5), env(safe-area-inset-right, 0px));
   }
 
-  .nav-backdrop {
+  /* The drawer's scrim. display:block on its own would beat the element's `hidden`
+     attribute, which is what left a black box over the whole phone that nothing could
+     dismiss - the rail was not even open. */
+  .nav-backdrop:not([hidden]) {
     display: block;
   }
 
