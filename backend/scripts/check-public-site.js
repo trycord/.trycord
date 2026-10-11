@@ -14,6 +14,7 @@ const path = require('path');
 const fs = require('fs');
 
 const ROOT = path.join(__dirname, '..');
+const REPO = path.join(ROOT, '..');
 const PUBLIC = path.join(ROOT, '..', 'public');
 
 // The clean URLs serve-client.js mounts, and what each is for.
@@ -138,16 +139,63 @@ async function main() {
         'status ' + r.status);
     }
 
-    if (process.argv.includes('--tokens')) {
+    // The design-system assertions run every time, not behind a flag. The public site
+    // carried its own palette for as long as it existed and nothing noticed, because the
+    // check that would have noticed was opt-in.
+    {
       console.log('\n  the public site is on the canonical design system');
       const css = fs.readFileSync(path.join(PUBLIC, 'css', 'site.css'), 'utf8');
-      // The tokens the application's stylesheet defines, which the public site has to
-      // consume rather than redeclare under its own names.
+
+      // 1. It consumes the semantic names the asset library is mapped onto. Naming them
+      //    is not enough on its own, but not naming them means the palette was
+      //    redeclared locally, which is the thing being checked for.
       const canonical = ['--color-background', '--color-surface', '--color-accent',
         '--color-text-primary', '--space-', '--radius-', '--text-'];
       const missing = canonical.filter((t) => !css.includes(t));
       ok('site.css consumes the canonical tokens',
         missing.length === 0, 'missing: ' + missing.join(', '));
+
+      // 2. It declares no palette of its own. This is the assertion that actually catches
+      //    a second design language: a file can name every token and still hardcode a
+      //    colour, and the two files then drift the first time either is edited.
+      const hexes = css.match(/#[0-9a-fA-F]{3,8}\b/g) || [];
+      ok('site.css declares no raw colour',
+        hexes.length === 0, hexes.slice(0, 8).join(', '));
+
+      // 3. The generated token layer exists and is the one the build wrote, so the site
+      //    cannot be reading a stale copy that has drifted from the library.
+      const tokens = path.join(REPO, 'frontend', 'css', 'design-tokens.css');
+      ok('the generated token layer exists',
+        fs.existsSync(tokens), tokens);
+      if (fs.existsSync(tokens)) {
+        const body = fs.readFileSync(tokens, 'utf8');
+        const asset = fs.readFileSync(
+          path.join(REPO, 'frontend', 'assets', 'trycord-assets', 'tokens', 'trycord.css'), 'utf8');
+        ok('it is the asset library, not a copy',
+          body.includes(asset.trim().slice(0, 200)), 'first 200 chars of the library not found');
+      }
+
+      // 4. Every page links it, and links it before the file that consumes it.
+      const html = fs.readdirSync(PUBLIC).filter((f) => f.endsWith('.html'));
+      const unlinked = [];
+      const wrongOrder = [];
+      for (const f of html) {
+        const s = fs.readFileSync(path.join(PUBLIC, f), 'utf8');
+        const at = s.indexOf('/css/design-tokens.css');
+        const site = s.indexOf('/css/site.css');
+        if (at === -1) unlinked.push(f);
+        else if (site !== -1 && at > site) wrongOrder.push(f);
+      }
+      ok('every public page links the token layer',
+        unlinked.length === 0, unlinked.join(', '));
+      ok('every public page links it before site.css',
+        wrongOrder.length === 0, wrongOrder.join(', '));
+
+      // 5. And it is actually served, not just present on disk.
+      const served = await get(port, '/css/design-tokens.css');
+      ok('GET /css/design-tokens.css serves the tokens',
+        served.status === 200 && served.body.includes('--tc-brand'),
+        'status ' + served.status);
     }
   } finally {
     server.close();

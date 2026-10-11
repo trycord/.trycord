@@ -42,6 +42,15 @@ const LAYERS = [
 ];
 
 const OUT = path.join(CSS, 'app.css');
+// The token layer on its own, for everything that is not the application.
+//
+// The public website is the same product with the same brand, and it used to carry its
+// own palette in public/css/site.css - a second set of warm-oranges that agreed with the
+// application by coincidence rather than by construction. This file is the asset
+// library's tokens plus the semantic mapping, generated from exactly the same two sources
+// the application is built from, so a value changed in the library reaches both. One
+// source, two consumers, no copy.
+const TOKENS_OUT = path.join(CSS, 'design-tokens.css');
 
 function build() {
   const header = [
@@ -70,6 +79,8 @@ function build() {
     process.exitCode = 1;
     return null;
   }
+  const tokenSource = fs.readFileSync(path.join(CSS, 'tokens.css'), 'utf8').trim();
+
   parts.push('/* ---- design-tokens (assets/trycord-assets/tokens/trycord.css) ' + '-'.repeat(8) + ' */');
   parts.push(tokenBody);
   parts.push('');
@@ -92,6 +103,31 @@ function build() {
   }
 
   const css = parts.join('\n');
+  const tokensOnly = [
+    '/*',
+    ' * The design tokens, on their own. Generated - run npm run css.',
+    ' *',
+    ' * The public website links this before its own stylesheet. It is the same asset',
+    ' * library the application is built from, so the marketing pages and the product',
+    ' * share one palette by construction rather than by coincidence.',
+    ' */',
+    '',
+    tokenBody,
+    '',
+    '/* ---- semantic names (frontend/css/tokens.css) ' + '-'.repeat(22) + ' */',
+    '',
+    tokenSource,
+    '',
+  ].join('\n');
+
+  // Both outputs, every run. The "up to date" branch below used to return before this,
+  // which left the token file absent on a machine whose app.css was already current.
+  const tokensExisted = fs.existsSync(TOKENS_OUT) ? fs.readFileSync(TOKENS_OUT, 'utf8') : null;
+  if (tokensExisted !== tokensOnly) {
+    fs.writeFileSync(TOKENS_OUT, tokensOnly);
+    console.log('  tokens written: ' + TOKENS_OUT + ' (' + (tokensOnly.length / 1024).toFixed(1) + ' KB)');
+  }
+
   const existing = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : null;
   if (existing === css) {
     console.log('  css up to date (' + LAYERS.length + ' layers)');

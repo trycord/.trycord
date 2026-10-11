@@ -181,14 +181,15 @@ async function probePublic(port) {
   lines.push('');
   lines.push('Recorded rather than hidden, so nobody reads a dash as a pass:');
   lines.push('');
-  lines.push('- **Public site is not on the canonical design system.** `public/css/site.css`');
-  lines.push('  declares none of the `--color-*`, `--space-`, `--radius-` or `--text-*` tokens,');
-  lines.push('  so the marketing pages are a second visual language. Measured by');
-  lines.push('  `check-public-site.js --tokens`, which fails until it is fixed.');
   lines.push('- **States, Responsive and a11y are not yet measured per page.** The harness');
   lines.push('  asserts them across the whole run (1365 controls carry accessible names, and');
   lines.push('  `check-mobile-layout.js` covers the phone composition), but not per route.');
   lines.push('  Filling those columns is phase one of the rebuild.');
+  lines.push('- **The public site is on the canonical tokens but not yet redesigned.** It');
+  lines.push('  consumes the asset library\'s palette, type, spacing and radii — verified by');
+  lines.push('  `check-public-site.js`, which fails on any raw colour in `site.css` — but its');
+  lines.push('  layout is still the one it had before. Sharing a design system is not the');
+  lines.push('  same as a redesigned composition, and the mobile frontend brief covers both.');
   lines.push('');
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
