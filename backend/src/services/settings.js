@@ -62,13 +62,6 @@ const SCHEMA = [
     description: 'New accounts must confirm an address before they can post. Only enforced when SMTP is configured.',
     live: true,
   },
-  {
-    key: 'registration.approval', env: 'REGISTRATION_APPROVAL', type: 'boolean', default: false,
-    category: 'registration', label: 'Approve new accounts',
-    description: 'New accounts wait for a system administrator to approve them before they can use the instance.',
-    live: true,
-  },
-
   // ---- security ----------------------------------------------------------
   {
     key: 'security.sessionTtlDays', env: 'SESSION_TTL_DAYS', type: 'integer', default: 7,
@@ -142,6 +135,101 @@ const SCHEMA = [
     description: 'Comma-separated. At least one STUN server or a TURN URL is required when voice is on.',
     live: true,
   },
+
+  // ---- mail ---------------------------------------------------------------
+  // Read at call time by auth/mail.js, so these are live.
+  {
+    key: 'mail.smtpHost', env: 'SMTP_HOST', type: 'string', default: '',
+    category: 'mail', label: 'SMTP host',
+    description: 'The relay that delivers verification and recovery mail. Empty means mail is captured to the server log instead.',
+    live: true,
+  },
+  {
+    key: 'mail.smtpPort', env: 'SMTP_PORT', type: 'integer', default: 587,
+    category: 'mail', label: 'SMTP port',
+    description: '465 implies TLS, 587 implies STARTTLS.',
+    min: 1, max: 65535, live: true,
+  },
+  {
+    key: 'mail.smtpUser', env: 'SMTP_USER', type: 'string', default: '',
+    category: 'mail', label: 'SMTP username',
+    description: 'Left empty for a relay that needs no authentication.',
+    live: true,
+  },
+  {
+    key: 'mail.from', env: 'MAIL_FROM', type: 'string', default: '',
+    category: 'mail', label: 'From address',
+    description: 'What recipients see. Defaults to a noreply address at the instance name.',
+    live: true,
+  },
+  {
+    key: 'mail.smtpSecure', env: 'SMTP_SECURE', type: 'boolean', default: false,
+    category: 'mail', label: 'Implicit TLS',
+    description: 'On for port 465. Off for STARTTLS on 587.',
+    live: true,
+  },
+
+  // ---- storage ------------------------------------------------------------
+  // The driver is read once when the storage module loads, so changing it needs a
+  // restart. The quota is read per upload and is live.
+  {
+    key: 'storage.driver', env: 'STORAGE_DRIVER', type: 'string', default: 'local',
+    category: 'storage', label: 'Storage driver',
+    description: 'local writes under the upload directory. s3 needs a bucket, a region and credentials.',
+    live: false,
+  },
+  {
+    key: 'storage.quotaMb', env: 'STORAGE_QUOTA_MB', type: 'integer', default: 512,
+    category: 'storage', label: 'Upload quota per member (MB)',
+    description: 'Enforced before a file is stored, so a refusal costs nothing.',
+    min: 1, max: 1048576, live: true,
+  },
+
+  // ---- limits -------------------------------------------------------------
+  {
+    key: 'limits.rateMax', env: 'RATE_LIMIT_MAX', type: 'integer', default: 0,
+    category: 'limits', label: 'Rate-limit ceiling override',
+    description: 'Raises every per-endpoint ceiling to this one number. 0 means leave each endpoint at its own default.',
+    min: 0, max: 1000000, live: true,
+  },
+
+  // ---- features -----------------------------------------------------------
+  // The surface for the flags features.js already enforces. A toggle here moves
+  // the same flag, so there is one switch per capability rather than two.
+  {
+    key: 'features.uploads', env: 'FILE_UPLOADS_ENABLED', type: 'boolean', default: true,
+    category: 'features', label: 'File uploads',
+    description: 'Off refuses every upload, whatever a member\'s permissions allow.',
+    live: true,
+  },
+  {
+    key: 'features.bots', env: 'BOTS_ENABLED', type: 'boolean', default: true,
+    category: 'features', label: 'Bot applications',
+    description: 'Off refuses new applications and stops existing ones posting.',
+    live: true,
+  },
+  {
+    key: 'features.webhooks', env: 'WEBHOOKS_ENABLED', type: 'boolean', default: true,
+    category: 'features', label: 'Outgoing webhooks',
+    description: 'Off stops delivery. Existing webhooks keep their configuration.',
+    live: true,
+  },
+  {
+    key: 'features.push', env: 'PUSH_NOTIFICATIONS_ENABLED', type: 'boolean', default: false,
+    description: 'Push needs a delivery service configured. Off by default.',
+    category: 'features', label: 'Push notifications',
+    live: true,
+  },
+
+  // ---- quick setup --------------------------------------------------------
+  // Off by default. With it on, the boot sequence logs a line saying the guided
+  // setup is available, so an operator on a fresh install is not left to find it.
+  {
+    key: 'instance.quickSetup', env: 'TRYCORD_QUICK_SETUP', type: 'boolean', default: false,
+    category: 'general', label: 'Quick setup',
+    description: 'Offer a guided first-run setup that sets the instance name, public URL, registration and mail in one pass.',
+    live: true,
+  },
 ];
 
 // Secret-bearing settings. Named explicitly rather than inferred, because a type of
@@ -180,6 +268,12 @@ const CATEGORIES = [
 const store = {
   values: {},
   sources: {},
+  // What the database actually holds, as a string, before any precedence is
+  // applied. The concurrency guard compares this rather than the effective
+  // value: when a value comes from the environment the two differ by design, and
+  // comparing the effective value against the stored one reports a conflict on
+  // every legitimate save.
+  raw: {},
   loaded: false,
 };
 
@@ -202,7 +296,12 @@ function parse(raw, type, def) {
     try {
       const u = new URL(text);
       if (!/^https?:$/.test(u.protocol)) return { ok: false, error: 'must be an http(s) URL' };
-      return { ok: true, value: u.origin };
+      // The path is kept, without its trailing slash, because an instance can be
+      // served from a subdirectory. Dropping it is what this used to do, which
+      // disagreed with features.js and quietly broke every emailed link on such
+      // an instance.
+      const path = u.pathname === '/' ? '' : u.pathname.replace(/\/+$/, '');
+      return { ok: true, value: u.origin + path };
     } catch { return { ok: false, error: 'must be a valid URL' }; }
   }
   if (type === 'list') {
@@ -238,6 +337,7 @@ async function load(force = false) {
   if (store.loaded && !force) return store;
   store.values = {};
   store.sources = {};
+  store.raw = {};
   store.loaded = false;
   const rows = await db.all('SELECT `key`, value FROM instance_settings');
   const saved = new Map(rows.map((r) => [r.key, r.value]));
@@ -257,6 +357,7 @@ async function load(force = false) {
       continue;
     }
     const fromDb = saved.get(entry.key);
+    store.raw[entry.key] = fromDb;
     if (fromDb !== undefined) {
       const check = validate(entry, fromDb);
       if (check.ok) {
@@ -284,6 +385,15 @@ function get(key) {
 
 function source(key) {
   return store.sources[key] || 'default';
+}
+
+// Whether the store has been read yet.
+//
+// features.js consults this before asking for a value, so a flag still resolves
+// during startup validation when the database connection is not up yet, rather than
+// throwing about a store that is merely not ready.
+function isLoaded() {
+  return store.loaded;
 }
 
 // The upsert, spelled per dialect.
@@ -341,7 +451,7 @@ async function save(entries, adminId) {
     }
 
     before[key] = store.values[key];
-    writes.push({ key, value: check.value, seen: store.values[key] });
+    writes.push({ key, value: check.value, seen: store.raw[key] });
   }
 
   if (problems.length) return { ok: false, problems };
@@ -370,10 +480,11 @@ async function save(entries, adminId) {
     for (const w of writes) {
       const row = await t.get('SELECT value FROM instance_settings WHERE `key` = ?', [w.key]);
       const stored = row ? row.value : undefined;
-      // Nothing stored means the effective value is the default, so that is what the
-      // write was made against.
-      const current = stored === undefined ? serialise(BY_KEY.get(w.key).default) : stored;
-      if (current !== serialise(w.seen)) {
+      // A key with no row is at its default, and that is what the write was made
+      // against. serialise(undefined) is the string "undefined", so the absent case
+      // has to be compared as absent rather than as a value.
+      const expected = w.seen === undefined ? undefined : serialise(w.seen);
+      if (stored !== expected) {
         conflicts.push(w.key);
         continue;
       }
@@ -393,6 +504,12 @@ async function save(entries, adminId) {
   });
 
   await load(true);
+
+  // The flags are rebuilt from the store that just changed. Without this a saved
+  // setting is stored and nothing else: every gate keeps answering from the build it
+  // made at boot.
+  try { require('../features').reload(); } catch { /* a voice config that cannot work is refused by reload, which is correct */ }
+
   return { ok: true, changed: Object.keys(before) };
 }
 
@@ -436,5 +553,5 @@ function catalogue() {
 
 module.exports = {
   SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY,
-  load, get, source, save, catalogue, validate, serialise,
+  load, get, source, save, catalogue, validate, serialise, isLoaded,
 };

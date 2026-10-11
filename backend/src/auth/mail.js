@@ -20,14 +20,21 @@ function fromAddress() {
 
 // Authoritative config load + validation. Throws plain-English errors that
 // never include secret values. Unknown modes fall back to log (safe).
+// SMTP settings, read per call so a change in the configuration centre takes
+// effect on the next mail rather than the next restart.
+//
+// The settings store owns the precedence (default, then database, then
+// environment), so it is asked first. The environment is still read when the
+// store has nothing for a key, which is what a fresh install looks like.
 function mailConfig() {
   const m = mode();
   if (m !== 'smtp') return { mode: 'log', from: fromAddress() };
-  const host = (process.env.SMTP_HOST || '').trim();
+  const s = require('../services/settings');
+  const host = String(s.isLoaded() ? s.get('mail.smtpHost') : (process.env.SMTP_HOST || '')).trim();
   if (!host) {
     throw new Error('MAIL_MODE=smtp but SMTP_HOST is not configured');
   }
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const port = Number(s.isLoaded() ? s.get('mail.smtpPort') : (process.env.SMTP_PORT || 587));
   if (!Number.isFinite(port) || port <= 0 || port > 65535) {
     throw new Error('SMTP_PORT is not a valid port number');
   }
@@ -37,8 +44,10 @@ function mailConfig() {
     smtp: {
       host,
       port,
-      secure: String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || port === 465,
-      user: (process.env.SMTP_USER || '').trim() || null,
+      secure: s.isLoaded()
+        ? !!s.get('mail.smtpSecure')
+        : String(process.env.SMTP_SECURE || '').toLowerCase() === 'true' || port === 465,
+      user: String(s.isLoaded() ? s.get('mail.smtpUser') : (process.env.SMTP_USER || '')).trim() || null,
       hasPassword: !!(process.env.SMTP_PASSWORD || ''),
     },
   };

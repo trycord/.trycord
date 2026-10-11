@@ -8,12 +8,21 @@ const { fail } = require('../errors');
 
 const buckets = new Map();
 
-// RATE_LIMIT_MAX raises every per-endpoint ceiling to one value. Unset in
-// normal operation, so each endpoint keeps its own tuned limit. It exists for
-// the E2E suites, which share a single process-wide bucket per client address
-// and cannot otherwise run as a suite, and for private-network deployments
-// where several people share one egress address.
+// RATE_LIMIT_MAX raises every per-endpoint ceiling to one value, and the
+// configuration centre's limits.rateMax writes through to the same setting.
+//
+// Unset in normal operation, so each endpoint keeps its own tuned limit. It
+// exists for the E2E suites, which share a single process-wide bucket per client
+// address and cannot otherwise run as a suite, and for private-network
+// deployments where several people share one egress address.
+//
+// The settings store is asked first because it owns the precedence, so a value
+// saved in the dashboard wins over the default but still loses to an explicit
+// RATE_LIMIT_MAX in the environment.
 function maxFor(max) {
+  const features = require('../features');
+  const fromSettings = features.current.rateLimitMax;
+  if (fromSettings > 0) return fromSettings;
   const override = parseInt(process.env.RATE_LIMIT_MAX || '', 10);
   return Number.isFinite(override) && override > 0 ? override : max;
 }

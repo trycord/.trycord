@@ -17,12 +17,25 @@ const { isUniqueViolation } = require('./unique-violation');
 
 router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
+    const features = require('../../features');
+    if (!features.current.registration) {
+      return fail(res, 'REGISTRATION_DISABLED',
+        'this instance is not accepting new accounts', 403);
+    }
+
     const { username, password, displayName, email: rawEmail, termsVersion, privacyVersion } = req.body || {};
     const email = rawEmail ? recovery.normalizeEmail(rawEmail) : null;
     if (rawEmail && !email) return fail(res, 'VALIDATION_ERROR', 'email address is invalid');
     if (!username || !password) return fail(res, 'VALIDATION_ERROR', 'username and password required');
     const pwErr = checkPassword(password);
     if (pwErr) return fail(res, 'VALIDATION_ERROR', pwErr);
+    // An address is required when the instance enforces verification, because
+    // there is otherwise no way to verify anything and the account would be
+    // stuck unable to post.
+    if (features.current.emailVerificationRequired && !email) {
+      return fail(res, 'VALIDATION_ERROR',
+        'this instance requires a verified email address, so an address is required');
+    }
     // Terms acceptance is recorded with the exact versions shown at signup.
     // Existing (pre-policy) accounts have NULL columns and are unaffected.
     if (termsVersion !== TERMS_VERSION || privacyVersion !== PRIVACY_VERSION) {

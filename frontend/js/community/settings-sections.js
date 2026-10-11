@@ -61,10 +61,10 @@ async function overview(ctx) {
       el('span', { class: 'hint' }, 'Shown on the community landing page and in browse.')),
     el('h2', { class: 'settings-panel__title' }, 'Visibility'),
     el('div', { class: 'field' },
-      el('label', { class: 'switch' }, isPublic, ' Public — anyone with a join code or invite can join'),
+      el('label', { class: 'switch' }, isPublic, ' Public: anyone with a join code or invite can join'),
       el('span', { class: 'hint' }, 'A private community can only be entered by invitation.')),
     el('div', { class: 'field' },
-      el('label', { class: 'switch' }, isDisc, ' Discoverable — listed in the browse feed'),
+      el('label', { class: 'switch' }, isDisc, ' Discoverable: listed in the browse feed'),
       el('span', { class: 'hint' }, 'Independent of Public: a private community can still be discoverable by name.')),
     el('div', { class: 'card-actions' }, saveBtn));
 
@@ -101,7 +101,7 @@ async function overview(ctx) {
     el('span', {}, server.join_code ? 'Join code ' + server.join_code : 'No join code'));
   facts.appendChild(summary);
   facts.appendChild(el('p', { class: 'muted small' },
-    'Created ' + relTime(server.created_at) + '. Every area has its own page — this is the index.'));
+    'Created ' + relTime(server.created_at) + '. Every area has its own page. This is the index.'));
   panel.appendChild(facts);
   return;
 }

@@ -35,6 +35,9 @@ router.post(
   singleFile,
   async (req, res, next) => {
     try {
+      if (!require('../features').current.uploads) {
+        return fail(res, 'FEATURE_DISABLED', 'file uploads are off on this instance', 403);
+      }
       const ch = await visibleChannel(req.params.channelId, req.user.id);
       if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
       if (!(await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
@@ -72,6 +75,9 @@ router.post(
   singleFile,
   async (req, res, next) => {
     try {
+      if (!require('../features').current.uploads) {
+        return fail(res, 'FEATURE_DISABLED', 'file uploads are off on this instance', 403);
+      }
       const found = await dms.visibleConversation(req.params.id, req.user.id);
       if (!found) return fail(res, 'NOT_FOUND', 'conversation not found');
       if (!req.file || !req.file.buffer) {

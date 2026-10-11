@@ -5,8 +5,8 @@
 // that the module neither requires nor defines.
 //
 // Nothing in the server checks this. A missing require is a ReferenceError on the line
-// that uses it, which for a rarely-taken branch — an admin route, an S3 driver, a
-// recovery email — is a production-only failure. The client's version of this check
+// that uses it, which for a rarely-taken branch (an admin route, an S3 driver, a
+// a recovery email) is a production-only failure. The client's version of this check
 // found three live ones on the first run.
 //
 // The same narrow rule keeps the noise down: only a name exactly one module exports is

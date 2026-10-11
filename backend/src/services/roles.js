@@ -34,7 +34,7 @@ function parseRow(r) {
   return { ...r, color: r.color || null, permissions, is_default: !!r.is_default };
 }
 
-// Role colors are persisted display hints only — validated hex, never free
+// Role colors are persisted display hints only: validated hex, never free
 // text, so clients can style role pills/names without guessing from names.
 function cleanColor(color) {
   if (color == null || color === '') return null;

@@ -107,7 +107,7 @@ export async function renderIntegrations(container, serverId) {
     showWebhookSecret(hook, label) {
       showSecret(
         'Webhook secret',
-        'Shown once for ' + (label || hook.name) + '. It is stored hashed, so it cannot be shown again — rotate it if it is lost.',
+        'Shown once for ' + (label || hook.name) + '. It is stored hashed, so it cannot be shown again. Rotate it if it is lost.',
         hook.secret || ''
       );
     },
@@ -129,7 +129,7 @@ export async function renderIntegrations(container, serverId) {
 
   const head = sectionHead(
     'Integrations',
-    'What can reach this community from outside it. Secrets are shown once at creation and stored hashed — nothing here can reveal one later.'
+    'What can reach this community from outside it. Secrets are shown once at creation and stored hashed, so nothing here can reveal one later.'
   );
   const panel = el('div', { class: 'settings-stack' });
   // append(), not appendChild(): the latter takes one node and ignores the

@@ -65,6 +65,58 @@ function url(name) {
 // The declared flags. Order here is documentation order, not precedence.
 const PROVIDERS = ['cloudflare'];
 
+// Settings the configuration centre owns. Each of these has a row in
+// services/settings.js, and that module already implements the precedence this
+// package needs: default < database < environment, with the environment winning
+// and being reported as the source.
+//
+// features.js used to read these straight from process.env, which meant the
+// dashboard could save a value and nothing would read it - the toggle moved, the
+// application did not. Reading through the store is what makes a saved setting
+// real, and it means there is exactly one implementation of the precedence rule
+// rather than two that can disagree.
+const FROM_SETTINGS = {
+  REGISTRATION_ENABLED: 'registration.enabled',
+  EMAIL_VERIFICATION_REQUIRED: 'registration.emailVerification',
+  COMMUNITY_DISCOVERY_ENABLED: 'content.discovery',
+  MAX_UPLOAD_BYTES: 'content.maxUploadBytes',
+  WS_MAX_PAYLOAD: 'messaging.maxPayload',
+  WS_HEARTBEAT_MS: 'messaging.heartbeatMs',
+  VOICE_VIDEO_ENABLED: 'voice.enabled',
+  VOICE_VIDEO_MAX_PARTICIPANTS: 'voice.maxParticipants',
+  VOICE_VIDEO_SCREEN_SHARING: 'voice.screenSharing',
+  VOICE_VIDEO_STUN_URLS: 'voice.stunUrls',
+  FILE_UPLOADS_ENABLED: 'features.uploads',
+  BOTS_ENABLED: 'features.bots',
+  WEBHOOKS_ENABLED: 'features.webhooks',
+  PUSH_NOTIFICATIONS_ENABLED: 'features.push',
+  STORAGE_QUOTA_MB: 'storage.quotaMb',
+  RATE_LIMIT_MAX: 'limits.rateMax',
+};
+
+// The value for a flag, from wherever it actually comes from.
+//
+// The settings store is consulted first because it owns the precedence. It is only
+// reachable once it has loaded, which the boot sequence guarantees; if it has not, the
+// environment is read directly so a flag still resolves during startup validation
+// rather than throwing about a store that is merely not ready yet.
+function valueOf(envName, fallback) {
+  const key = FROM_SETTINGS[envName];
+  if (key) {
+    try {
+      const settings = require('./services/settings');
+      if (settings.isLoaded()) return settings.get(key);
+    } catch { /* not loaded yet: fall through to the environment */ }
+  }
+  const raw = String(process.env[envName] === undefined ? '' : process.env[envName]).trim();
+  if (raw === '') return fallback;
+  const n = Number(raw);
+  if (Number.isFinite(n) && String(n) === raw) return n;
+  if (/^(true|on|yes|1)$/i.test(raw)) return true;
+  if (/^(false|off|no|0)$/i.test(raw)) return false;
+  return raw;
+}
+
 function providerName() {
   const raw = text('VOICE_VIDEO_PROVIDER', PROVIDERS[0]).toLowerCase();
   if (PROVIDERS.indexOf(raw) === -1) {
@@ -76,10 +128,10 @@ function providerName() {
 }
 
 function build() {
-  const registration = flag('REGISTRATION_ENABLED', true);
-  const emailVerification = flag('EMAIL_VERIFICATION_REQUIRED', false);
+  const registration = valueOf('REGISTRATION_ENABLED', true);
+  const emailVerification = valueOf('EMAIL_VERIFICATION_REQUIRED', false);
   const uploads = flag('FILE_UPLOADS_ENABLED', true);
-  const discovery = flag('COMMUNITY_DISCOVERY_ENABLED', true);
+  const discovery = valueOf('COMMUNITY_DISCOVERY_ENABLED', true);
   const bots = flag('BOTS_ENABLED', true);
   const webhooks = flag('WEBHOOKS_ENABLED', true);
   const push = flag('PUSH_NOTIFICATIONS_ENABLED', false);
@@ -87,40 +139,53 @@ function build() {
   // Voice and video carries the master switch plus the two sub-capabilities beneath it.
   // A sub-capability can be off while the master is on, but never on while the master is
   // off: the master is the one that decides whether the infrastructure exists at all.
-  const voice = flag('VOICE_VIDEO_ENABLED', false);
-  const screenSharing = flag('VOICE_VIDEO_SCREEN_SHARING', true);
+  const voice = valueOf('VOICE_VIDEO_ENABLED', false);
+  const screenSharing = valueOf('VOICE_VIDEO_SCREEN_SHARING', true);
   const stageChannels = flag('VOICE_VIDEO_STAGE_CHANNELS', true);
+  const stun = valueOf('VOICE_VIDEO_STUN_URLS', []);
+  const maxParticipants = valueOf('VOICE_VIDEO_MAX_PARTICIPANTS', 25);
+  const maxPayload = valueOf('WS_MAX_PAYLOAD', 204800);
+  const heartbeatMs = valueOf('WS_HEARTBEAT_MS', 30000);
+  const maxUploadBytes = valueOf('MAX_UPLOAD_BYTES', 8388608);
 
   return {
-    registration: registration.value,
-    emailVerificationRequired: emailVerification.value,
-    uploads: uploads.value,
-    communityDiscovery: discovery.value,
-    bots: bots.value,
-    webhooks: webhooks.value,
-    pushNotifications: push.value,
+    registration: !!registration,
+    emailVerificationRequired: !!emailVerification,
+    uploads: uploads.value && !!valueOf('FILE_UPLOADS_ENABLED', true),
+    communityDiscovery: !!discovery,
+    bots: bots.value && !!valueOf('BOTS_ENABLED', true),
+    webhooks: webhooks.value && !!valueOf('WEBHOOKS_ENABLED', true),
+    pushNotifications: push.value && !!valueOf('PUSH_NOTIFICATIONS_ENABLED', false),
+    maxUploadBytes: Number(maxUploadBytes),
+    quotaBytes: Number(valueOf('STORAGE_QUOTA_MB', 512)) * 1024 * 1024,
+    rateLimitMax: Number(valueOf('RATE_LIMIT_MAX', 0)) || 0,
 
     voiceVideo: {
-      enabled: voice.value,
+      enabled: !!voice,
       // The sub-flags are read only so a bad spelling is still a startup error; the
       // effective values are computed below, gated on the master.
-      screenSharingRequested: screenSharing.value,
+      screenSharingRequested: !!screenSharing,
       stageChannelsRequested: stageChannels.value,
-      screenSharing: voice.value && screenSharing.value,
-      stageChannels: voice.value && stageChannels.value,
+      screenSharing: !!voice && !!screenSharing,
+      stageChannels: !!voice && stageChannels.value,
 
       // Only one provider is implemented. An operator who sets anything else gets a
       // startup error naming what is supported, rather than a runtime failure at the
       // first join.
       provider: providerName(),
-      maxParticipants: integer('VOICE_VIDEO_MAX_PARTICIPANTS', 25, { min: 1, max: 200 }),
+      maxParticipants: Math.min(Math.max(Number(maxParticipants) || 25, 1), 200),
 
-      stun: list('VOICE_VIDEO_STUN_URLS', []),
+      stun: Array.isArray(stun) ? stun : [],
       turn: {
         url: text('VOICE_VIDEO_TURN_URL', ''),
         username: text('VOICE_VIDEO_TURN_USERNAME', ''),
         credential: text('VOICE_VIDEO_TURN_CREDENTIAL', ''),
       },
+    },
+
+    realtime: {
+      maxPayload: Math.min(Math.max(Number(maxPayload) || 204800, 1024), 4194304),
+      heartbeatMs: Math.min(Math.max(Number(heartbeatMs) || 30000, 1000), 300000),
     },
   };
 }
@@ -214,6 +279,16 @@ function healthOf(features) {
 
 let features = null;
 
+// Drops the cached build so the next read consults the settings store again.
+//
+// Without this, saving a flag in the configuration centre updates the database and
+// nothing else: features.current keeps answering from the build it made at boot,
+// which is exactly the "the toggle moved and the application did not" failure.
+function reload() {
+  features = null;
+  return load();
+}
+
 function load() {
   if (features) return features;
   features = build();
@@ -230,6 +305,7 @@ function load() {
 
 module.exports = {
   load,
+  reload,
   get current() { return load(); },
   capabilities,
   healthOf,

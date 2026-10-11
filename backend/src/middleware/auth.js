@@ -49,12 +49,12 @@ function auth(req, res, next) {
   // Identical semantics: revoked jti, missing user, or stale markers reject.
   db.get(
     `SELECT u.password_changed_at, u.sessions_invalidated_at, u.enforcement_state,
-       u.enforcement_expires_at, u.email_verified_at, u.session_version,
+       u.enforcement_expires_at, u.email_verified_at, u.session_version, u.totp_enabled_at,
        (SELECT 1 FROM revoked_tokens r WHERE r.jti = ?) AS revoked
      FROM users u WHERE u.id = ?`,
     [user.jti || '', user.id]
   )
-    .then((row) => {
+    .then(async (row) => {
       if (!row) return fail(res, 'NOT_FOUND', 'user not found');
       if (user.jti && row.revoked) return fail(res, 'SESSION_REVOKED', 'session revoked');
       if (tokenStale(user, row)) return fail(res, 'SESSION_REVOKED', 'session revoked');
@@ -64,8 +64,25 @@ function auth(req, res, next) {
       if (user.sv !== undefined && Number(user.sv) !== Number(row.session_version || 0)) {
         return fail(res, 'SESSION_REVOKED', 'session revoked');
       }
+      const require2fa = require('../services/settings').isLoaded()
+        && require('../services/settings').get('security.require2fa');
       const ef = enforced(user, row);
       if (ef) return fail(res, 'ACCOUNT_ENFORCED', 'account is subject to a moderation action', 403, ef);
+      // An instance that requires a second factor refuses anyone who has not
+      // enrolled. Platform admins are exempt, because locking out the people who
+      // operate the instance, including whoever just turned the requirement on,
+      // is not a security improvement.
+      //
+      // Read per request, so a change in the configuration centre applies to the
+      // next request rather than the next restart.
+      if (require2fa && !row.totp_enabled_at) {
+        const isAdmin = await require('../services/enforcement').isPlatformAdmin(user.id);
+        if (!isAdmin) {
+          return fail(res, 'MFA_REQUIRED',
+            'this instance requires two-factor authentication. Enrol a second factor to continue.',
+            403);
+        }
+      }
       req.user = user;
       // Authoritative verification state for this session. Write routes
       // that require a verified email use requireVerified below; reads
