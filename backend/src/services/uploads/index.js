@@ -29,7 +29,6 @@ module.exports = {
   isInlineMime: detect.isInlineMime,
   sanitizeIds: detect.sanitizeIds,
 
-  QUOTA_BYTES: quota.QUOTA_BYTES,
   quota: quota.usage,
 
   store: attachments.store,

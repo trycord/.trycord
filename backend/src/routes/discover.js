@@ -14,6 +14,11 @@ const router = express.Router();
 
 router.get('/servers', rateLimit({ windowMs: 60000, max: 120 }), async (req, res, next) => {
   try {
+    // Discovery off is a refusal, not an empty list. A client that gets an empty
+    // feed shows "nothing here" rather than "this is switched off".
+    if (!require('../features').current.communityDiscovery) {
+      return fail(res, 'FEATURE_DISABLED', 'community discovery is off on this instance', 403);
+    }
     res.json(await discovery.search({ q: req.query.q, page: req.query.page, limit: req.query.limit }));
   } catch (e) { next(e); }
 });

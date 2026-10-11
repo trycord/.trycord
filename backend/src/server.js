@@ -94,10 +94,38 @@ function instanceConfig() {
 // "trycord://app" - is matched exactly, so a non-web origin still has to be
 // listed deliberately. A bare "*" is never accepted: it would be equivalent to
 // Access-Control-Allow-Origin: *.
+// Tells an operator the guided setup exists, if they asked to be told.
+//
+// Off by default: a fresh install that logs a wall of notices at you is not
+// helpful, and an operator who has already configured everything does not need
+// to be offered a wizard. With it on, one line at boot pointing at where to run
+// it is the whole feature.
+function announceQuickSetup() {
+  const settings = require('./services/settings');
+  if (!settings.get('instance.quickSetup')) return;
+  const essentials = require('./services/quick-setup').essentials();
+  const todo = essentials.filter((e) => !e.done);
+  if (!todo.length) {
+    console.log('[quick setup] nothing to do. Every essential setting is already set.');
+    return;
+  }
+  console.log('[quick setup] ' + todo.length + ' setting(s) still need a value:');
+  todo.forEach((e) => console.log('             ' + e.label + ' (' + e.key + ')'));
+  console.log('             run it at ' + quickSetupUrl());
+}
+
+// Where the setup lives. The app is mounted under a prefix on some deployments,
+// so the link has to be the mounted one rather than a hardcoded path.
+function quickSetupUrl() {
+  const mount = (process.env.TRYCORD_APP_MOUNT || '').replace(/\/+$/, '');
+  const base = (process.env.TRYCORD_PUBLIC_URL || '').replace(/\/+$/, '');
+  return base + mount + '/admin/settings';
+}
+
 async function boot() {
   if (!process.env.JWT_SECRET) {
     throw new Error(
-      'JWT_SECRET is required. Each instance must have its own secret — ' +
+      'JWT_SECRET is required. Each instance must have its own secret: ' +
       'generate one and set it in .env (see .env.example). The official secret is never shared.'
     );
   }
@@ -110,15 +138,15 @@ async function boot() {
       try {
         const pub = new URL(inst.publicUrl);
         if (pub.port) {
-          console.warn('[warn] nginx mode: TRYCORD_PUBLIC_URL includes a port — the public origin should be the bare site URL (e.g. https://trycord.dev), not an upstream port.');
+          console.warn('[warn] nginx mode: TRYCORD_PUBLIC_URL includes a port. The public origin should be the bare site URL (e.g. https://trycord.dev), not an upstream port.');
         }
         if (inst.clientOrigins.length && !inst.clientOrigins.includes(pub.origin)) {
-          console.warn('[warn] nginx mode: CLIENT_ORIGIN does not include the public origin (' + pub.origin + ') — CORS may be misconfigured.');
+          console.warn('[warn] nginx mode: CLIENT_ORIGIN does not include the public origin (' + pub.origin + '), so CORS may be misconfigured.');
         }
       } catch { /* publicUrl invalid; other paths handle it */ }
     }
     if (process.env.HOST && !isLoopbackHost(process.env.HOST)) {
-      console.warn('[warn] nginx mode: HOST=' + process.env.HOST + ' is not a loopback interface. The public listener is nginx — keep Express on 127.0.0.1 unless the deployment explicitly requires another interface.');
+      console.warn('[warn] nginx mode: HOST=' + process.env.HOST + ' is not a loopback interface. The public listener is nginx, so keep Express on 127.0.0.1 unless the deployment explicitly requires another interface.');
     }
     if (String(process.env.TRUST_PROXY || '').trim() !== '1') {
       console.warn('[warn] nginx mode: TRUST_PROXY=1 is not set. Client IPs and HTTPS detection will be wrong behind the proxy. Set it only when a proxy on the same host (nginx) is actually in front of Express.');
@@ -127,7 +155,7 @@ async function boot() {
     try {
       const u = new URL(inst.publicUrl);
       if (u.port && String(parseInt(u.port, 10)) !== String(PORT)) {
-        console.warn('[warn] express mode: PUBLIC URL port ' + u.port + ' differs from listener port ' + PORT + ' — public links may not reach this listener as configured.');
+        console.warn('[warn] express mode: PUBLIC URL port ' + u.port + ' differs from listener port ' + PORT + ', so public links may not reach this listener as configured.');
       }
     } catch { /* publicUrl invalid; other paths handle it */ }
   }
@@ -140,7 +168,7 @@ async function boot() {
   // instead of being caught here. Say it at boot, once, for every deployment.
   if (inst.clientOrigins.length && !inst.clientOrigins.some((p) => originCovers(p, DESKTOP_ORIGIN))) {
     console.warn(
-      '[warn] CLIENT_ORIGIN does not include ' + DESKTOP_ORIGIN + ' — the Trycord desktop app '
+      '[warn] CLIENT_ORIGIN does not include ' + DESKTOP_ORIGIN + '. The Trycord desktop app '
       + '(both the installer and the portable build) will NOT be able to reach this backend. '
       + 'Add it, e.g. CLIENT_ORIGIN=' + inst.clientOrigins.join(',') + ',' + DESKTOP_ORIGIN
     );
@@ -149,8 +177,13 @@ async function boot() {
   await db.connect();
   console.log(`[info] database connected (${db.dialect})`);
 
-  features.load();
+  // The configuration centre is read before the feature flags are validated, because a
+  // flag's value comes from the store when the store has one: the precedence is
+  // default < database < environment, and reading the environment first would let a
+  // saved dashboard value be ignored.
   await settings.load();
+  features.load();
+  announceQuickSetup();
 
   const app = express();
   const server = http.createServer(app);
@@ -258,7 +291,7 @@ async function boot() {
   app.use((req, res, next) => {
     // The client's top-precedence backend travels in ?api= (desktop exe,
     // bookmarks, backend-selector reloads). Reflect that configured origin
-    // — and only that origin — into connect-src so the served page may
+    // and only that origin into connect-src so the served page may
     // reach exactly the backend it was told to use. Anything else still
     // requires the allowlist above (TRYCORD_API_URL, backend.json,
     // CSP_CONNECT_ORIGINS, localhost, trycord.dev).
@@ -303,13 +336,24 @@ async function boot() {
   });
 
   // Safe public instance metadata. Never secrets, paths, or credentials.
+  //
+  // The name, description and support link come from the configuration centre so a
+  // change in the dashboard is what the public site and the sign-in screen read.
   app.get('/api/instance', (req, res) => {
     const mail = require('./auth/mail');
+    const s = require('./services/settings');
+    const features = require('./features');
     res.json({
       instanceId: inst.instanceId,
-      name: inst.name,
+      name: s.isLoaded() ? s.get('instance.name') : inst.name,
+      description: s.isLoaded() ? s.get('instance.description') : '',
+      supportUrl: s.isLoaded() ? s.get('instance.supportUrl') : '',
       globalSync: inst.globalUrl !== '',
-      features: { publicDiscovery: true, uploads: true, email: mail.mode() === 'smtp' && !!process.env.SMTP_HOST },
+      features: {
+        publicDiscovery: features.current.communityDiscovery,
+        uploads: features.current.uploads,
+        email: mail.mode() === 'smtp',
+      },
     });
   });
 
@@ -381,7 +425,7 @@ async function boot() {
   // Strictly opt-in: unmounted in every other boot, where the paths 404.
   if (process.env.ALLOW_TEST_HOOKS === 'true') {
     app.use('/api/test', require('./routes/test'));
-    console.warn('[warn] ALLOW_TEST_HOOKS is enabled — test endpoints are mounted (never do this in production)');
+    console.warn('[warn] ALLOW_TEST_HOOKS is enabled: test endpoints are mounted (never do this in production)');
   }
 
   // Back-compat alias for older clients.
@@ -435,19 +479,19 @@ async function boot() {
   });
 
   // Trust & Safety: bootstrap platform admins from ADMIN_USERNAMES before
-  // the server accepts traffic. Idempotent — re-runs promote any new names
+  // the server accepts traffic. Idempotent, so re-runs promote any new names
   // and leave existing admins untouched.
   const bootstrapAdmins = (async () => {
     const names = String(process.env.ADMIN_USERNAMES || '')
       .split(',').map((s) => s.trim()).filter(Boolean);
     if (!names.length) {
-      console.log('[info] ADMIN_USERNAMES not set — no platform admins bootstrapped');
+      console.log('[info] ADMIN_USERNAMES not set, so no platform admins bootstrapped');
       return;
     }
     for (const username of names) {
       // Case-insensitive: usernames preserve case, operators do not.
       const u = await db.get('SELECT * FROM users WHERE lower(username) = lower(?)', [username]);
-      if (!u) { console.warn(`[warn] ADMIN_USERNAMES: no user "${username}" yet — it will be promoted automatically at registration/login`); continue; }
+      if (!u) { console.warn(`[warn] ADMIN_USERNAMES: no user "${username}" yet. It will be promoted automatically at registration/login`); continue; }
       await enforcement.ensureAdminUser(u.id);
       console.log(`[info] platform admin: ${username}`);
     }
@@ -516,7 +560,7 @@ async function boot() {
     const status = (err && (err.statusCode || err.status)) || 500;
     // Client-side problems surface as proper 4xx (body-parser rejects with
     // 413/400 for oversized or malformed JSON). Everything else stays a
-    // generic 500 — never stack traces, queries, or internals.
+    // generic 500, never stack traces, queries, or internals.
     if (status >= 400 && status < 500) {
       const code = err && err.type === 'entity.too.large' ? 'PAYLOAD_TOO_LARGE'
         : err && err.type === 'entity.parse.failed' ? 'BAD_JSON'
@@ -531,7 +575,7 @@ async function boot() {
     res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
   });
 
-  // Drop expired token revocations (uses JS time — portable across databases).
+  // Drop expired token revocations (uses JS time, portable across databases).
   const uploads = require('./services/uploads');
   const purge = async () => {
     try {

@@ -18,7 +18,16 @@ const { signChallenge, readChallenge, CHALLENGE_TTL_SECONDS } = require('./chall
 // with a second factor outstanding produces a challenge, and only a challenge plus a
 // valid code produces a session.
 
-router.post('/login', rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
+// The ceiling comes from the configuration centre, per request, so a change in
+// the dashboard applies to the next attempt. A rate limit captured at mount time
+// would make the setting decorative.
+function loginLimit() {
+  const settings = require('../../services/settings');
+  const configured = settings.isLoaded() ? Number(settings.get('security.loginRateLimit')) : 0;
+  return rateLimit({ windowMs: 60000, max: Number.isFinite(configured) && configured > 0 ? configured : 30 });
+}
+
+router.post('/login', (req, res, next) => loginLimit()(req, res, next), async (req, res, next) => {
   try {
     const { username, password } = req.body || {};
     if (!username || !password) return fail(res, 'VALIDATION_ERROR', 'username and password required');

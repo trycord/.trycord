@@ -25,7 +25,7 @@ const tableDefinitions = require('./tables');
 // The old approach detected "duplicate column" by parsing driver error
 // messages, which was fragile across SQLite/MySQL version pairings. These
 // migrations ask the database what actually exists and only run each ALTER
-// once the column is missing — idempotent by construction, and genuine
+// once the column is missing, so it is idempotent by construction, and genuine
 // schema problems still throw instead of being swallowed.
 // Instance configuration, and the voice rooms and participants a call creates.
 //

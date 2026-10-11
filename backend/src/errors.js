@@ -29,6 +29,9 @@ const Codes = {
   SERVER_SUSPENDED: 403,
   SERVER_NOT_FOUND: 404,
   INVITE_INVALID: 404,
+  // A refused registration is a policy decision, not a validation failure: the
+  // details were fine, the instance is closed. 403 so a client can say so.
+  REGISTRATION_DISABLED: 403,
   NOT_FOUND: 404,
   // A privacy setting refused an interaction. 403, and distinct from
   // PERMISSION_DENIED because the answer is a personal preference rather than

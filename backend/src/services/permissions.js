@@ -1,5 +1,5 @@
 // Permission registry + evaluation. Owners bypass all checks.
-// Add new permission names here — evaluation logic stays unchanged.
+// Add new permission names here. Evaluation logic stays unchanged.
 const db = require('../db');
 
 const PERMISSIONS = {

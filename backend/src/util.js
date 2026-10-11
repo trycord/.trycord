@@ -17,16 +17,24 @@ const uuid = () => crypto.randomUUID();
 // The signature authenticates the request; jti is what lets one session be
 // revoked without touching the others. session_version can't do that - it's
 // all-or-nothing by design.
-function signWithJti(user) {
-  const jti = uuid();
-  const token = jwt.sign(
+//
+// The lifetime comes from the configuration centre, read per sign-in so a change
+// applies to the next session rather than needing a restart. Sessions already
+// issued keep the lifetime they were minted with, which is what a JWT is.
+//
 // iat has one-second resolution, so a token minted in the same second as a
 // password change is indistinguishable from one minted after it and the change
 // silently does nothing. The session version is what makes "invalidate every
 // session" exact.
+function signWithJti(user) {
+  const jti = uuid();
+  const settings = require('./services/settings');
+  const days = settings.isLoaded() ? Number(settings.get('security.sessionTtlDays')) : 7;
+  const expiresIn = (Number.isFinite(days) && days > 0 ? days : 7) + 'd';
+  const token = jwt.sign(
     { id: user.id, username: user.username, jti, sv: Number(user.session_version || 0) },
     secret(),
-    { expiresIn: '7d' }
+    { expiresIn }
   );
   return { token, jti };
 }

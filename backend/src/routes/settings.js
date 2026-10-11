@@ -1,7 +1,7 @@
-// System administration → instance configuration.
+// System administration: instance configuration.
 //
 // Every route is behind the platform-admin gate, which is the admins table and nothing
-// else: a community administrator owning a community does not reach any of this.
+// else. A community administrator owning a community does not reach any of this.
 //
 // The catalogue is what the dashboard renders. It carries no secret value, ever - a
 // secret setting is reported as set or unset and replaced only by an explicit write.
@@ -11,6 +11,7 @@ const { fail, wrap } = require('../errors');
 const rateLimit = require('../middleware/ratelimit');
 const adminGuard = require('../middleware/adminGuard');
 const settings = require('../services/settings');
+const quickSetup = require('../services/quick-setup');
 const db = require('../db');
 const { now, uuid } = require('../util');
 
@@ -24,6 +25,34 @@ router.get('/', wrap(async (req, res) => {
     categories: settings.catalogue(),
     deploymentOnly: settings.DEPLOYMENT_ONLY,
   });
+}));
+
+// ---- quick setup ------------------------------------------------------------
+// Off unless instance.quickSetup is on. The boot sequence says so when it is.
+
+router.get('/quick-setup', wrap(async (req, res) => {
+  res.json({
+    enabled: settings.get('instance.quickSetup'),
+    essentials: quickSetup.essentials(),
+  });
+}));
+
+router.put('/quick-setup', rateLimit({ windowMs: 60000, max: 20 }), wrap(async (req, res) => {
+  if (!settings.get('instance.quickSetup')) {
+    return fail(res, 'PERMISSION_DENIED',
+      'quick setup is off. Turn it on in General first.', 403);
+  }
+  const result = await quickSetup.apply(req.body || {}, req.user.id);
+  if (!result.ok) return fail(res, 'VALIDATION_ERROR', result.problems.join('; '), 400);
+  res.json(result);
+}));
+
+// A real test mail through the real sender. Reports what happened rather than
+// whether the call returned.
+router.post('/quick-setup/test-mail', rateLimit({ windowMs: 60000, max: 5 }), wrap(async (req, res) => {
+  const out = await quickSetup.testMail((req.body || {}).to);
+  if (!out.ok) return fail(res, 'VALIDATION_ERROR', out.error, 400);
+  res.json(out);
 }));
 
 // One category, for a dashboard that loads them as they are opened.
