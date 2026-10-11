@@ -1,0 +1,3 @@
+.tc-skeleton { background:var(--tc-surface-hover,#2a2c33); border-radius:var(--tc-radius-sm,4px); animation:tc-pulse 1.4s ease-in-out infinite; }
+@keyframes tc-pulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .tc-skeleton { animation:none; } }
