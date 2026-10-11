@@ -42,10 +42,6 @@ function resolveCommunityHref(serverId, id) {
   return serverPath(serverId, 'settings', id === 'overview' ? '' : id);
 }
 
-// Kept across range changes so the picker does not spring back to 30 days when
-// the section is re-rendered for any other reason.
-let analyticsDays = 30;
-
 async function renderServerSettings(container, serverId, section = 'overview') {
   clear(container);
   let server;

@@ -3,7 +3,7 @@
 // here can reveal a stored secret, because there is no way to get one back.
 
 import Api from '../api.js';
-import { showSecret } from './integrations-lists.js';
+import { renderAppList, renderWebhookList, showSecret } from './integrations-lists.js';
 import { clear, confirmDialog, el, openModal, relTime, toast } from '../ui.js';
 import { sectionHead, sectionCard, settingRow, dangerZone, dangerRow, dangerButton, setEmpty } from '../settings-ui.js';
 
@@ -119,6 +119,13 @@ export async function renderIntegrations(container, serverId) {
       );
     },
   };
+
+  // The two lists. Both panels call ctx.renderWebhooks / ctx.renderApps and neither was
+  // defined, so opening the Integrations section threw a TypeError before anything was
+  // painted. The community and the ctx they need are passed explicitly rather than read
+  // as module state, because they belong to the community being rendered.
+  ctx.renderWebhooks = (node) => renderWebhookList(node, serverId, ctx);
+  ctx.renderApps = (node) => renderAppList(node, serverId, ctx);
 
   const head = sectionHead(
     'Integrations',
