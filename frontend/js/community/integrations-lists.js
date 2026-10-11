@@ -143,7 +143,10 @@ export function showSecret(title, intro, value) {
   done.addEventListener('click', modal.close);
 }
 
-export async function renderWebhookList(node) {
+// serverId and ctx arrive as arguments because they are not module state: they belong
+// to whichever community is being rendered. Reading them as bare names made both
+// renderers throw ReferenceError on the first webhook or application listed.
+export async function renderWebhookList(node, serverId, ctx) {
   node.textContent = '';
   const host = el('div', { class: 'stack' });
   node.appendChild(host);
@@ -246,7 +249,7 @@ export async function renderWebhookList(node) {
   }
 }
 
-export async function renderAppList(node) {
+export async function renderAppList(node, serverId, ctx) {
   node.textContent = '';
   const host = el('div', { class: 'stack' });
   node.appendChild(host);

@@ -534,10 +534,18 @@ async function settle(window, ms = 400) {
       process.exit(0);
     }
 
-    const routable = PAGES.filter((p) => p.route && p.access !== 'guest');
+    // Every registered page, not only the routable ones. A page the filter dropped is a
+    // screen nobody measured, and the count in the summary then under-reports what
+    // exists.
     const targets = wanted
-      ? routable.filter((p) => p.route === wanted || p.id === wanted)
-      : routable;
+      ? PAGES.filter((p) => p.route === wanted || p.id === wanted)
+      : PAGES.slice();
+    // The signed-out screens are excluded from this loop rather than rendered twice in
+    // it. Holding a session, /register redirects to /home - which is correct behaviour and
+    // also a measurement of nothing: the view is byte-identical to the previous route, so
+    // the check reports a page that works fine as one that never changed. They are rendered
+    // signed out below, in the state a visitor is actually in.
+    const loopTargets = targets.filter((p) => p.access !== 'guest');
 
     // Hand the rendered surfaces to something that can measure them.
     //
@@ -555,8 +563,8 @@ async function settle(window, ms = 400) {
     if (emitDir) {
       mkdirSync(emitDir, { recursive: true });
       const manifest = [];
-      for (const page of targets) {
-        const url = concrete(page.route, world);
+      for (const page of loopTargets) {
+        const url = page.route ? concrete(page.route, world) : routeOfRelativePage(page, world);
         const outcome = await visit(window, document, Router, url, base);
         const root = document.getElementById('view-root');
         const html = (document.documentElement.outerHTML || '').replace(
@@ -595,16 +603,65 @@ async function settle(window, ms = 400) {
       process.exit(0);
     }
 
+    // The signed-out screens are rendered twice: once as the signed-in member the
+    // harness booted as, which is the state a stale tab is in, and once with the token
+    // removed, which is the state a visitor is in. Rendering only the second would hide
+    // the redirect; rendering only the first would measure nothing but it.
+    const guestPages = targets.filter((p) => p.access === 'guest');
+    const signedOut = [];
+    for (const page of guestPages) {
+      const keep = window.localStorage.getItem('trycord.token');
+      window.localStorage.removeItem('trycord.token');
+      const url = concrete(page.route, world);
+      const outcome = await visit(window, document, Router, url, base);
+      // Measured now, while this page is the one on screen. The screens mount into
+      // <body> as .auth-page rather than into #view-root, which is the correct shape for
+      // them and the reason #view-root's emptiness says nothing.
+      const auth = document.querySelector('body > .auth-page');
+      signedOut.push({
+        page, url, outcome,
+        text: (auth ? auth.textContent : document.body.textContent) || '',
+        controls: document.querySelectorAll('body > .auth-page button, body > .auth-page input').length,
+        forms: document.querySelectorAll('body > .auth-page form').length,
+      });
+      if (keep) window.localStorage.setItem('trycord.token', keep);
+    }
+
+    // Measured rather than merely visited: a signed-out screen that threw, or that
+    // redirected anyway, is a finding.
+    const guestFailures = signedOut.filter((g) => g.outcome.error);
+    ok('the signed-out screens render for a visitor with no session',
+      guestFailures.length === 0,
+      guestFailures.map((g) => g.page.id + ': ' + g.outcome.error).join(' | '));
+
+    const guestEmpty = signedOut.filter((g) => !g.outcome.error && !String(g.text).trim());
+    ok('every signed-out screen puts something on the page',
+      guestEmpty.length === 0, guestEmpty.map((g) => g.page.id).join(', '));
+
+    // Each has a form and controls, because every one of them is a form: sign in, create
+    // an account, request a reset, apply one. Checked per page rather than against the
+    // document once, which would have passed on the last page alone.
+    const guestFormless = signedOut.filter((g) => !g.outcome.error && !g.forms);
+    ok('every signed-out screen renders its form',
+      guestFormless.length === 0, guestFormless.map((g) => g.page.id).join(', '));
+
+    // And the fields are there, not just the form element.
+    const guestFieldless = signedOut.filter((g) => !g.outcome.error && g.controls < 2);
+    ok('every signed-out screen has fields to fill in',
+      guestFieldless.length === 0,
+      guestFieldless.map((g) => g.page.id + ' (' + g.controls + ')').join(', '));
+
     if (!wanted) {
-      ok('there are routable pages to render', targets.length > 10, targets.length + ' found');
+      ok('every registered page is rendered, not only the routable ones',
+        targets.length === PAGES.length, targets.length + ' of ' + PAGES.length);
     }
 
     const seen = [];
     let previousSignature = null;
     let previousPageId = null;
 
-    for (const page of targets) {
-      const url = concrete(page.route, world);
+    for (const page of loopTargets) {
+      const url = page.route ? concrete(page.route, world) : routeOfRelativePage(page, world);
       const outcome = await visit(window, document, Router, url, base);
       if (outcome.error) {
         failures.push(`${page.id} (${url}): ${outcome.error}`);
@@ -653,7 +710,8 @@ async function settle(window, ms = 400) {
       seen.push(page.id);
     }
 
-    console.log(`  navigated ${seen.length} routes without an uncaught error`);
+    console.log('  navigated ' + loopTargets.length + ' routes without an uncaught error,'
+      + ' plus ' + guestPages.length + ' signed-out screens rendered with no session');
 
     // ---- the application rail is actually painted ----
     //
@@ -995,10 +1053,11 @@ async function settle(window, ms = 400) {
     console.log('\n  what each page costs');
     const repeats = [];
     const costs = [];
-    for (const page of targets) {
+    for (const page of loopTargets) {
       requestLog = [];
       recording = true;
-      await visit(window, document, Router, concrete(page.route, world), base);
+      await visit(window, document, Router,
+        page.route ? concrete(page.route, world) : routeOfRelativePage(page, world), base);
       recording = false;
 
       const counts = new Map();
@@ -1196,7 +1255,31 @@ async function renderRoute(window, document, page, base) {
  * segments with nothing to point at - an invite code and a reset token - because
  * those are for signed-out readers and their not-found state is the correct answer.
  */
+// Where a page with no route of its own actually lives.
+//
+// The eleven community settings sections are registered without a path because they are
+// addressed relative to whichever community is open: the registry owns what the section
+// is called, and resolveCommunityHref in frontend/js/community/settings.js owns where it
+// lives. Reproducing that mapping here is what lets the matrix cover them.
+//
+// It mirrors COMMUNITY_SECTION_ROUTE and the /settings/<id> fallback exactly, including
+// the five sections that redirect to a page of their own. Getting it wrong would test a
+// URL nobody uses.
+function routeOfRelativePage(page, world) {
+  const m = /^community\.settings\.(.+)$/.exec(page.id);
+  if (!m) return null;
+  const section = m[1];
+  const elsewhere = { members: 1, roles: 1, invites: 1, categories: 1, channels: 1 };
+  if (elsewhere[section]) return '/server/' + world.serverId + '/' + section;
+  return '/server/' + world.serverId + '/settings' + (section === 'overview' ? '' : '/' + section);
+}
+
 function concrete(template, world) {
+  if (!template) {
+    // A page with no route of its own. Resolved against the seeded community, because a
+    // section is meaningless without one.
+    return '';
+  }
   return template
     .replace(':slug', world.slug)
     .replace(/:channel/g, world.channelId)

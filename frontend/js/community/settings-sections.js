@@ -7,6 +7,15 @@ import { clear, confirmDialog, el, relTime, toast } from '../ui.js';
 import { renderAnalytics } from './analytics.js';
 import { renderIntegrations } from './integrations.js';
 
+// Kept across range changes so the picker does not spring back to 30 days when the
+// section is re-rendered for any other reason.
+//
+// It lives here and not in settings.js because this is the only module that reads or
+// writes it. It was declared in settings.js while the analytics section that uses it was
+// split into this module, and a module-scope `let` in one file is not visible in another:
+// every visit to the Analytics section threw ReferenceError: analyticsDays is not defined.
+let analyticsDays = 30;
+
 // Moved here from settings.js: this is the only thing that calls it, and
 // settings.js already imports this module, so importing it back would close a cycle.
 function linkedSection({ serverId, title, blurb, href, cta, counts }) {
