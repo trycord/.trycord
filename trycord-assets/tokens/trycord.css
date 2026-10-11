@@ -1,0 +1,35 @@
+/* Trycord design tokens v1.0 */
+:root {
+  --tc-brand: #FF4D24;
+  --tc-brand-hover: #E9431D;
+  --tc-brand-strong: #C93618;
+  --tc-success: #35B875;
+  --tc-warning: #F2B84B;
+  --tc-danger: #EF5350;
+  --tc-info: #5798F5;
+  --tc-font-sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --tc-font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --tc-space-1: 4px; --tc-space-2: 8px; --tc-space-3: 12px;
+  --tc-space-4: 16px; --tc-space-5: 20px; --tc-space-6: 24px;
+  --tc-space-8: 32px; --tc-space-10: 40px; --tc-space-12: 48px;
+  --tc-radius-sm: 4px; --tc-radius-md: 8px; --tc-radius-lg: 12px;
+  --tc-radius-xl: 16px; --tc-radius-pill: 999px;
+  --tc-motion-fast: 140ms; --tc-motion-normal: 180ms;
+  --tc-ease: cubic-bezier(.2, 0, 0, 1);
+}
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  --tc-bg: #18191D; --tc-bg-deep: #121317;
+  --tc-surface: #22242A; --tc-surface-hover: #2A2C33;
+  --tc-border: #30323A; --tc-text: #F4F5F7;
+  --tc-text-muted: #A4A7B0; --tc-text-on-brand: #FFFFFF;
+  --tc-brand-focus: #FF7A5A;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --tc-bg: #F5F6F8; --tc-bg-deep: #FFFFFF;
+  --tc-surface: #FFFFFF; --tc-surface-hover: #ECEEF2;
+  --tc-border: #E7E9EE; --tc-text: #202127;
+  --tc-text-muted: #666A75; --tc-text-on-brand: #FFFFFF;
+  --tc-brand-focus: #C93618;
+}

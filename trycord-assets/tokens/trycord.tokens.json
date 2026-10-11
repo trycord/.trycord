@@ -1,0 +1,50 @@
+{
+  "name": "Trycord Design Tokens",
+  "version": "1.0.0",
+  "color": {
+    "brand": {
+      "500": "#FF4D24",
+      "600": "#E9431D",
+      "700": "#C93618"
+    },
+    "dark": {
+      "950": "#121317",
+      "900": "#18191D",
+      "800": "#22242A",
+      "700": "#30323A"
+    },
+    "light": {
+      "50": "#FFFFFF",
+      "100": "#F5F6F8",
+      "200": "#E7E9EE"
+    },
+    "semantic": {
+      "success": "#35B875",
+      "warning": "#F2B84B",
+      "danger": "#EF5350",
+      "info": "#5798F5"
+    }
+  },
+  "font": {
+    "sans": "Manrope",
+    "mono": "JetBrains Mono"
+  },
+  "radius": {
+    "sm": "4px",
+    "md": "8px",
+    "lg": "12px",
+    "xl": "16px",
+    "pill": "999px"
+  },
+  "spacing": {
+    "1": "4px",
+    "2": "8px",
+    "3": "12px",
+    "4": "16px",
+    "5": "20px",
+    "6": "24px",
+    "8": "32px",
+    "10": "40px",
+    "12": "48px"
+  }
+}

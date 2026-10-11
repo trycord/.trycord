@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+<title>Trycord favicon</title>
+<rect width="64" height="64" rx="13" fill="#FF4D24"/>
+<g transform="translate(8 8) scale(.48)" color="#18191D">
+
+  <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+  <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #FF4D24)"/>
+  <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #FF4D24)"/>
+  <circle cx="72" cy="58" r="7" fill="var(--cutout, #FF4D24)"/>
+
+</g></svg>
