@@ -175,6 +175,46 @@ router.post('/servers/:id/remove', async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
+// --- registration approval ---
+//
+// Only reachable when the instance requires approval, and only platform admins
+// get here. The queue is the accounts that exist but cannot be used yet.
+
+router.get('/approvals', async (req, res, next) => {
+  try {
+    if (!require('../features').current.registrationApproval) {
+      return res.json({ enabled: false, pending: [] });
+    }
+    const rows = await db.all(
+      'SELECT id, username, display_name, email, created_at FROM users '
+      + "WHERE approved_at IS NULL AND enforcement_state IS NULL AND is_bot = 0 "
+      + 'ORDER BY created_at LIMIT 200'
+    );
+    res.json({
+      enabled: true,
+      pending: rows.map((u) => ({
+        id: u.id, username: u.username, displayName: u.display_name,
+        email: u.email, createdAt: u.created_at,
+      })),
+    });
+  } catch (e) { serviceError(res, e); }
+});
+
+router.post('/users/:id/approve', async (req, res, next) => {
+  try {
+    const target = await db.get('SELECT id, approved_at FROM users WHERE id = ?', [req.params.id]);
+    if (!target) return fail(res, 'NOT_FOUND', 'user not found');
+    if (target.approved_at) return fail(res, 'CONFLICT', 'that account is already approved');
+    const at = new Date().toISOString();
+    await db.run('UPDATE users SET approved_at = ? WHERE id = ?', [at, req.params.id]);
+    // The member may already be signed in on the waiting screen, and a new token
+    // is the only thing that tells the client to stop waiting.
+    await require('../services/enforcement').audit(
+      req.user.id, 'ACCOUNT_APPROVED', 'user', req.params.id, 'approved by an administrator');
+    res.json({ ok: true, approvedAt: at });
+  } catch (e) { serviceError(res, e); }
+});
+
 // --- reports ---
 
 router.get('/reports', async (req, res, next) => {

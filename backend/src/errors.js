@@ -45,6 +45,9 @@ const Codes = {
   // which is what an unmapped code used to become and which left a member looking at
   // "something went wrong" for a setting that is working exactly as configured.
   FEATURE_DISABLED: 403,
+  // Registration approval is pending. Distinct from ACCOUNT_ENFORCED because the fix is
+  // different: an administrator approves it, nobody lifts anything.
+  ACCOUNT_PENDING: 403,
   // A full voice channel. 409 rather than 403: the member is allowed in, the room is not.
   ROOM_FULL: 409,
 };

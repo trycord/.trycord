@@ -93,6 +93,10 @@ const LEGACY_ALTERS = [
   // the constraint here; uniqueness is enforced by a UNIQUE index below.
   ['users', 'email', 'ALTER TABLE users ADD COLUMN email VARCHAR(255)'],
   ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
+  // Registration approval. NULL for every account that existed before the
+  // column, which is the point: turning approval on must not lock out the
+  // members an instance already has. See routes/auth/register.js.
+  ['users', 'approved_at', 'ALTER TABLE users ADD COLUMN approved_at VARCHAR(64)'],
   // Embeds, webhooks and applications. Added after the tables existed, so an
   // instance upgraded from before them needs these; a fresh one gets the columns
   // from the CREATE above and these are no-ops.
@@ -228,6 +232,9 @@ const MYSQL_ADD = [
   // databases created from the base DDL.
   ['channels', 'category_id', 'ALTER TABLE channels ADD COLUMN category_id VARCHAR(64)'],
   ['users', 'email_verified_at', 'ALTER TABLE users ADD COLUMN email_verified_at VARCHAR(64)'],
+  // Registration approval. Both lists carry it, because a column only one of them
+  // adds is a column MySQL never gets.
+  ['users', 'approved_at', 'ALTER TABLE users ADD COLUMN approved_at VARCHAR(64)'],
   // Canonical ordering + idempotency. Types must match the base DDL exactly,
   // or the unique indexes built afterwards would index a different type than
   // the INSERTs write.

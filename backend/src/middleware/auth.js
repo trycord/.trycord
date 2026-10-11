@@ -50,6 +50,7 @@ function auth(req, res, next) {
   db.get(
     `SELECT u.password_changed_at, u.sessions_invalidated_at, u.enforcement_state,
        u.enforcement_expires_at, u.email_verified_at, u.session_version, u.totp_enabled_at,
+       u.approved_at,
        (SELECT 1 FROM revoked_tokens r WHERE r.jti = ?) AS revoked
      FROM users u WHERE u.id = ?`,
     [user.jti || '', user.id]
@@ -68,6 +69,16 @@ function auth(req, res, next) {
         && require('../services/settings').get('security.require2fa');
       const ef = enforced(user, row);
       if (ef) return fail(res, 'ACCOUNT_ENFORCED', 'account is subject to a moderation action', 403, ef);
+
+      // A pending account is refused everywhere. NULL means the account predates
+      // approval or the instance does not require it, so switching the setting on
+      // never locks out the members an instance already has.
+      const approval = require('../services/settings');
+      if (approval.isLoaded() && approval.get('registration.approval')
+          && row.approved_at === null) {
+        return fail(res, 'ACCOUNT_PENDING',
+          'this account is waiting for a system administrator to approve it', 403);
+      }
       // An instance that requires a second factor refuses anyone who has not
       // enrolled. Platform admins are exempt, because locking out the people who
       // operate the instance, including whoever just turned the requirement on,

@@ -23,7 +23,6 @@ const { now, uuid } = require('../util');
 // `env` is the deployment variable that outranks the database. `live` means the running
 // process picks the change up without a restart; `restart` means it does not.
 const SCHEMA = [
-  // ---- identity ----------------------------------------------------------
   {
     key: 'instance.name', env: 'TRYCORD_NAME', type: 'string', default: 'Trycord',
     category: 'general', label: 'Instance name',
@@ -49,11 +48,16 @@ const SCHEMA = [
     live: true,
   },
 
-  // ---- registration ------------------------------------------------------
   {
     key: 'registration.enabled', env: 'REGISTRATION_ENABLED', type: 'boolean', default: true,
     category: 'registration', label: 'Open registration',
     description: 'Whether anyone may create an account. Turn this off for an invite-only instance.',
+    live: true, consequential: true,
+  },
+  {
+    key: 'registration.approval', env: 'REGISTRATION_APPROVAL', type: 'boolean', default: false,
+    category: 'registration', label: 'Approve new accounts',
+    description: 'New accounts can sign in but cannot do anything until an administrator approves them. Accounts that already exist are unaffected.',
     live: true, consequential: true,
   },
   {
@@ -62,7 +66,6 @@ const SCHEMA = [
     description: 'New accounts must confirm an address before they can post. Only enforced when SMTP is configured.',
     live: true,
   },
-  // ---- security ----------------------------------------------------------
   {
     key: 'security.sessionTtlDays', env: 'SESSION_TTL_DAYS', type: 'integer', default: 7,
     category: 'security', label: 'Session lifetime (days)',
@@ -82,7 +85,6 @@ const SCHEMA = [
     live: true, consequential: true,
   },
 
-  // ---- content -----------------------------------------------------------
   {
     key: 'content.maxUploadBytes', env: 'MAX_UPLOAD_BYTES', type: 'integer', default: 8388608,
     category: 'content', label: 'Maximum upload size (bytes)',
@@ -96,7 +98,6 @@ const SCHEMA = [
     live: true,
   },
 
-  // ---- messaging ---------------------------------------------------------
   {
     key: 'messaging.maxPayload', env: 'WS_MAX_PAYLOAD', type: 'integer', default: 204800,
     category: 'messaging', label: 'Maximum realtime message size (bytes)',
@@ -110,7 +111,6 @@ const SCHEMA = [
     min: 1000, max: 300000, live: false,
   },
 
-  // ---- voice -------------------------------------------------------------
   {
     key: 'voice.enabled', env: 'VOICE_VIDEO_ENABLED', type: 'boolean', default: false,
     category: 'voice', label: 'Enable voice and video',
@@ -136,7 +136,6 @@ const SCHEMA = [
     live: true,
   },
 
-  // ---- mail ---------------------------------------------------------------
   // Read at call time by auth/mail.js, so these are live.
   {
     key: 'mail.smtpHost', env: 'SMTP_HOST', type: 'string', default: '',
@@ -169,7 +168,6 @@ const SCHEMA = [
     live: true,
   },
 
-  // ---- storage ------------------------------------------------------------
   // The driver is read once when the storage module loads, so changing it needs a
   // restart. The quota is read per upload and is live.
   {
@@ -185,7 +183,6 @@ const SCHEMA = [
     min: 1, max: 1048576, live: true,
   },
 
-  // ---- limits -------------------------------------------------------------
   {
     key: 'limits.rateMax', env: 'RATE_LIMIT_MAX', type: 'integer', default: 0,
     category: 'limits', label: 'Rate-limit ceiling override',
@@ -193,7 +190,6 @@ const SCHEMA = [
     min: 0, max: 1000000, live: true,
   },
 
-  // ---- features -----------------------------------------------------------
   // The surface for the flags features.js already enforces. A toggle here moves
   // the same flag, so there is one switch per capability rather than two.
   {
@@ -221,7 +217,6 @@ const SCHEMA = [
     live: true,
   },
 
-  // ---- quick setup --------------------------------------------------------
   // Off by default. With it on, the boot sequence logs a line saying the guided
   // setup is available, so an operator on a fresh install is not left to find it.
   {
