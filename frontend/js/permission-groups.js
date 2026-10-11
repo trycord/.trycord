@@ -24,6 +24,12 @@ const GROUPS = [
     perms: ['KICK_MEMBERS', 'BAN_MEMBERS'],
   },
   {
+    key: 'voice',
+    title: 'Voice and video',
+    blurb: 'Who may join a voice channel, and what they may do in it.',
+    perms: ['CONNECT', 'VIDEO', 'STREAM', 'MOVE_MEMBERS', 'MUTE_MEMBERS'],
+  },
+  {
     key: 'roles',
     title: 'Roles',
     blurb: 'Who may hand out authority.',

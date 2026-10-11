@@ -23,6 +23,11 @@ const PERM_LABEL = {
   BAN_MEMBERS: 'Ban members',
   MANAGE_MESSAGES: 'Manage any message here',
   SEND_MESSAGES: 'Send messages',
+  CONNECT: 'Join voice channels',
+  VIDEO: 'Send a camera',
+  STREAM: 'Share a screen',
+  MOVE_MEMBERS: 'Move or disconnect in voice',
+  MUTE_MEMBERS: 'Mute or deafen in voice',
 };
 
 function effectRow(perm, current, onPick, disabled) {

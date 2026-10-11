@@ -27,6 +27,48 @@ const tableDefinitions = require('./tables');
 // migrations ask the database what actually exists and only run each ALTER
 // once the column is missing — idempotent by construction, and genuine
 // schema problems still throw instead of being swallowed.
+// Instance configuration, and the voice rooms and participants a call creates.
+//
+// These are not engine-suffixed because neither carries a foreign key or a TEXT default:
+// the two places the two dialects disagree, and the reason ./tables takes an engine
+// argument at all.
+const INSTANCE_SETTINGS_DDL = [
+  'CREATE TABLE IF NOT EXISTS instance_settings ('
+  + ' `key` VARCHAR(128) PRIMARY KEY,'
+  + ' value TEXT NOT NULL,'
+  + ' updated_at VARCHAR(64) NOT NULL,'
+  + ' updated_by VARCHAR(64)'
+  + ')',
+];
+
+const VOICE_DDL = [
+  `CREATE TABLE IF NOT EXISTS voice_rooms (
+     id         VARCHAR(64) PRIMARY KEY,
+     channel_id VARCHAR(64) NOT NULL,
+     server_id  VARCHAR(64) NOT NULL,
+     created_at VARCHAR(64) NOT NULL,
+     UNIQUE (channel_id)
+   )`,
+  `CREATE TABLE IF NOT EXISTS voice_participants (
+     id         VARCHAR(64) PRIMARY KEY,
+     room_id    VARCHAR(64) NOT NULL,
+     channel_id VARCHAR(64) NOT NULL,
+     user_id    VARCHAR(64) NOT NULL,
+     session_id VARCHAR(128),
+     joined_at  VARCHAR(64) NOT NULL,
+     left_at    VARCHAR(64),
+     muted      INTEGER NOT NULL DEFAULT 0,
+     deafened   INTEGER NOT NULL DEFAULT 0,
+     UNIQUE (channel_id, user_id)
+   )`,
+  `CREATE TABLE IF NOT EXISTS voice_speak_requests (
+     id         VARCHAR(64) PRIMARY KEY,
+     channel_id VARCHAR(64) NOT NULL,
+     user_id    VARCHAR(64) NOT NULL,
+     created_at VARCHAR(64) NOT NULL
+   )`,
+];
+
 const LEGACY_ALTERS = [
   ['servers', 'is_public', 'ALTER TABLE servers ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0'],
   ['servers', 'is_discoverable', 'ALTER TABLE servers ADD COLUMN is_discoverable INTEGER NOT NULL DEFAULT 1'],
@@ -218,6 +260,9 @@ const INDEXES = [
   'CREATE INDEX idx_webhooks_server ON webhooks(server_id, active)',
   'CREATE INDEX idx_webhook_deliveries_hook ON webhook_deliveries(webhook_id, created_at)',
   'CREATE INDEX idx_bot_apps_server ON bot_applications(server_id)',
+  'CREATE INDEX idx_voice_participants_room ON voice_participants(room_id)',
+  'CREATE INDEX idx_voice_participants_live ON voice_participants(channel_id, left_at)',
+  'CREATE INDEX idx_voice_rooms_server ON voice_rooms(server_id)',
   'CREATE INDEX idx_bot_commands_app ON bot_commands(application_id)',
   'CREATE INDEX idx_dm_messages_thread ON dm_messages(thread_root_id, seq)',
   'CREATE INDEX idx_attachments_message ON attachments(message_id)',
@@ -436,6 +481,18 @@ async function applySchema(conn) {
 
   // Create the base tables.
   for (const ddl of tableDefinitions(engine)) {
+    await conn.exec(ddl);
+  }
+
+  // The tables this deployment adds on top of the shared data model: the instance
+  // configuration a system administrator saves, and the voice rooms and participants
+  // that exist while a call is running. Declared here rather than in ./tables because
+  // they are specific to this package's features, and their DDL is the one the live rows
+  // depend on - it is copied from the package that introduced them, unchanged.
+  //
+  // `key` is a reserved word in MySQL, so the column name is quoted. SQLite accepts the
+  // backtick form too, so one statement serves both engines.
+  for (const ddl of INSTANCE_SETTINGS_DDL.concat(VOICE_DDL)) {
     await conn.exec(ddl);
   }
 

@@ -11,6 +11,16 @@ const PERMISSIONS = {
   BAN_MEMBERS: 'Ban/unban members and manage timeouts.',
   MANAGE_MESSAGES: 'Delete any message in the server.',
   SEND_MESSAGES: 'Post messages in channels.',
+  // Voice and video. CONNECT and VIDEO belong to @everyone because a community that turns
+  // voice on should not have to re-grant "may join" to every member it already has; the
+  // instance-level master switch is what decides whether any of this is reachable at all.
+  // STREAM, MOVE_MEMBERS and MUTE_MEMBERS are deliberately not granted by default - they
+  // cost bandwidth or act on other people, and both are decisions a community should make.
+  CONNECT: 'Join voice and stage channels.',
+  VIDEO: 'Send a camera in voice channels.',
+  STREAM: 'Share a screen in voice channels.',
+  MOVE_MEMBERS: 'Move or disconnect members in voice channels.',
+  MUTE_MEMBERS: 'Mute or deafen members in voice channels.',
 };
 
 function isKnown(perm) {
