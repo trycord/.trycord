@@ -110,7 +110,7 @@ async function sendMail({ to, subject, text, html, kind }) {
 
 // Base URL of the Trycord CLIENT APP, used for links inside emails
 // (verification, password reset). The client uses hash routing, so links
-// are built as `${clientUrl}/#/path/<token>` with the `#` kept literal —
+// are built as `${clientUrl}/#/path/<token>`, with the `#` kept literal,
 // never encode the whole URL (that turns `#` into `%23` and breaks the
 // fragment). Only the token itself is component-encoded.
 //

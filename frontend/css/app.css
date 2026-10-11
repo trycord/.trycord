@@ -3397,6 +3397,24 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   .switch, .switch__dot { transition: none; }
 }
 
+/* The quick setup: the essentials, one field each, then one button.
+   Stacked rather than in a grid because the labels are sentences and the
+   fields are full width on a phone. */
+.cfg-quick {
+  display: grid;
+  gap: var(--space-5);
+  margin: var(--space-5) 0;
+}
+
+.cfg-quick .cfg-row { border-top: 0; padding: 0; }
+
+.cfg-quick__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
 /* ---- voice ----------------------------------------------------- */
 /* Voice and video.
    The panel is the whole surface: capability first, then controls, then the

@@ -1,4 +1,4 @@
-// Public discovery. No auth, no membership — only public + discoverable servers,
+// Public discovery. No auth, no membership, only public + discoverable servers,
 // safe fields only. Private servers are indistinguishable from missing ones.
 // Reads are rate-limited: discovery is public (no identity key), so the IP
 // bucket is the only backstop against crawl abuse.
@@ -36,7 +36,7 @@ router.post('/servers/:id/join', auth, rateLimit({ windowMs: 60000, max: 30 }), 
   try {
     const srv = await db.get('SELECT id, is_public FROM servers WHERE id = ?', [req.params.id]);
     if (!srv) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
-    if (!srv.is_public) return fail(res, 'SERVER_PRIVATE', 'this server is private — ask for an invite');
+    if (!srv.is_public) return fail(res, 'SERVER_PRIVATE', 'this server is private. Ask for an invite');
     res.json(await memberships.join(srv.id, req.user));
   } catch (e) { serviceError(res, e); }
 });

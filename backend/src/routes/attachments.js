@@ -24,7 +24,7 @@ const dms = require('../services/dms');
 const router = express.Router();
 // Auth is applied per-route, not via router.use(auth): this router is
 // mounted at /api (a prefix of every API path), so router-level auth
-// would run — and bill two DB lookups — on every API request that merely
+// would run, and bill two DB lookups, on every API request that merely
 // passes through on its way to another router. The two attachment
 // endpoints keep the exact same auth behavior via route-level middleware.
 router.post(
@@ -122,7 +122,7 @@ router.get('/attachments/:id', auth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Profile media (avatars / banners) are public identity by design — any
+// Profile media (avatars / banners) are public identity by design, so any
 // authenticated user may load them. Class isolation is now a property of the
 // object key, which is rebuilt from the owning row: a message attachment id
 // cannot resolve to a profile object.

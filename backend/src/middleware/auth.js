@@ -3,7 +3,7 @@
 // markers are also rejected, so password changes and "sign out everywhere"
 // actually end old sessions instead of leaving them valid.
 // Trust & Safety: accounts under an active ban/suspension are rejected here
-// too — the enforcement columns ride along in the same single query as the
+// too. The enforcement columns ride along in the same single query as the
 // revocation flag, so the hot path stays one round trip.
 const jwt = require('jsonwebtoken');
 const db = require('../db');
@@ -96,7 +96,7 @@ function auth(req, res, next) {
 // Email-verification guard for normal user functionality (messages,
 // reactions, community management, social writes). Reads, auth flows,
 // account maintenance, safety flows (reports/appeals) and platform admin
-// routes intentionally do NOT use this — see each router for its list.
+// routes intentionally do NOT use this. See each router for its list.
 //
 // Verification is only enforceable when the instance can actually deliver a
 // verification email. With MAIL_MODE unset/log there is no way for anyone to

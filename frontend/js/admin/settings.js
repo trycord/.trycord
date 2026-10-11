@@ -17,6 +17,9 @@ const byKey = new Map();
 let categories = [];
 let deploymentOnly = [];
 let dirty = new Map();
+// The guided setup, read alongside the catalogue. Off unless the operator turned
+// it on in General.
+let quickSetup = { enabled: false, essentials: [] };
 
 function settingControl(cat, s) {
   const value = dirty.has(s.key) ? dirty.get(s.key) : s.value;
@@ -87,6 +90,97 @@ function settingControl(cat, s) {
 
 let activeCategory = null;
 
+// The guided setup. One pass over the four things an instance cannot run
+// without, in the order an operator thinks about them.
+//
+// It writes through the same endpoint and the same validation as an ordinary
+// save, so this is a convenience over the settings service and not a second way
+// to change configuration that could skip a rule.
+function quickSetupPanel() {
+  const card = el('div', { class: 'card cfg-card' });
+  card.appendChild(el('div', { class: 'cfg-card__head' },
+    el('h2', { class: 'cfg-card__title' }, 'Quick setup')));
+
+  const todo = (quickSetup.essentials || []).filter((e) => !e.done);
+  if (!todo.length) {
+    card.appendChild(el('p', { class: 'cfg-row__desc' },
+      'Every essential setting is already set. Nothing to do here.'));
+    return card;
+  }
+
+  card.appendChild(el('p', { class: 'cfg-row__desc' },
+    todo.length + ' setting' + (todo.length === 1 ? '' : 's')
+      + ' still need a value. Fill these in and save once.'));
+
+  const box = el('div', { class: 'cfg-quick' });
+  const fields = {};
+  for (const e of todo) {
+    const input = el('input', {
+      class: 'input', id: 'qs-' + e.key.replace(/\./g, '-'), type: 'text',
+      placeholder: e.label, 'aria-label': e.label,
+    });
+    fields[e.key] = input;
+    box.appendChild(el('div', { class: 'cfg-row' },
+      el('label', { class: 'cfg-row__title', for: input.id }, e.label),
+      input));
+  }
+
+  const status = el('p', { class: 'cfg-row__desc', role: 'status' });
+  const save = el('button', {
+    class: 'btn primary', type: 'button',
+    onClick: async () => {
+      const body = {};
+      for (const [key, input] of Object.entries(fields)) {
+        if (input.value.trim()) body[key] = input.value.trim();
+      }
+      if (!Object.keys(body).length) {
+        status.textContent = 'Nothing to save.';
+        return;
+      }
+      save.setAttribute('aria-busy', 'true');
+      try {
+        await Api.runQuickSetup(body);
+        status.textContent = 'Saved.';
+        await load();
+        repaint();
+      } catch (ex) {
+        status.textContent = ex.message || 'Could not save.';
+      } finally {
+        save.removeAttribute('aria-busy');
+      }
+    },
+  }, 'Save these');
+  card.appendChild(box);
+  card.appendChild(el('div', { class: 'cfg-quick__actions' }, save, status));
+
+  // A test mail, only useful once an SMTP host is set.
+  const host = byKey.get('mail.smtpHost');
+  if (host && host.value) {
+    const addr = el('input', {
+      class: 'input', type: 'email', placeholder: 'you@example.com',
+      'aria-label': 'Address to send a test message to',
+    });
+    const result = el('span', { class: 'cfg-row__desc', role: 'status' });
+    const test = el('button', {
+      class: 'btn', type: 'button',
+      onClick: async () => {
+        result.textContent = 'Sending...';
+        try {
+          await Api.testQuickSetupMail(addr.value.trim());
+          result.textContent = 'Sent. Check the inbox.';
+        } catch (ex) {
+          result.textContent = ex.message || 'Could not send.';
+        }
+      },
+    }, 'Send a test message');
+    card.appendChild(el('div', { class: 'cfg-row' },
+      el('label', { class: 'cfg-row__title' }, 'Test mail delivery'),
+      addr, test, result));
+  }
+
+  return card;
+}
+
 function repaint() {
   const region = document.getElementById('view-root');
   if (!region) return;
@@ -127,6 +221,13 @@ function repaint() {
 
   for (const s of cat.settings) card.appendChild(settingControl(cat, s));
   region.appendChild(card);
+
+  // The guided setup, only offered when the operator asked for it. It lives at the
+  // top of General rather than in a place of its own, because it is the first thing
+  // a fresh install has to do.
+  if (cat.id === 'general' && quickSetup.enabled) {
+    region.appendChild(quickSetupPanel());
+  }
 
   // Settings the application cannot change, named with the reason rather than hidden.
   if (deploymentOnly.length) {
@@ -201,6 +302,13 @@ async function load() {
   dirty.clear();
   byKey.clear();
   for (const c of categories) for (const s of c.settings) byKey.set(s.key, s);
+  // The setup state is a separate read because it is a flow rather than a setting.
+  // A failure here is not fatal: the console still works, it just has no wizard.
+  try {
+    quickSetup = await Api.quickSetupState();
+  } catch {
+    quickSetup = { enabled: false, essentials: [] };
+  }
 }
 
 export async function renderInstanceSettings(container) {
