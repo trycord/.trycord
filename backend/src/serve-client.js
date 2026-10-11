@@ -84,7 +84,7 @@ function mountClient(app, opts) {
     // api.trycord.dev while sitting on their own API. Repointing the file here makes
     // the rule one line: a client served by a backend talks to that backend. It holds
     // for the official deployment too, with no domain written into the client.
-    app.get('/backend.json', (req, res, next) => {
+    const sendBackendJson = (req, res, next) => {
       fs.readFile(path.join(candidate, 'backend.json'), 'utf8', (err, raw) => {
         if (err) return next();
         let json;
@@ -104,7 +104,8 @@ function mountClient(app, opts) {
           .type('json')
           .send(JSON.stringify(json, null, 2) + '\n');
       });
-    });
+    };
+    app.get('/backend.json', sendBackendJson);
 
     // Entry points are never cached (a stale index.html paired with fresh or stale
     // JS/CSS is what renders a blank page). Versioned assets use conditional
@@ -130,6 +131,9 @@ function mountClient(app, opts) {
     // hop that can lose the mount.
     if (appMount) {
       app.get(appMount + '/', (req, res) => sendIndex(appMount, res, () => {}));
+      // Before the mount's static handler: Express is first-match-wins, so the order is
+      // what decides whether the repointed file or the shipped one is served.
+      app.get(appMount + '/backend.json', sendBackendJson);
       app.use(appMount, express.static(candidate, staticOptions({ redirect: false })));
     }
 
@@ -259,14 +263,11 @@ function mountSpaFallback(app, opts) {
   if (clientDir) {
     app.use((req, res, next) => {
       if (req.method !== 'GET' && req.method !== 'HEAD') return next();
-      if (req.path.startsWith('/api/') || req.path.startsWith('/uploads') || req.path.startsWith('/ws')) return next();
-      // Anything with a file extension is an asset that genuinely is missing;
-      // answering it with HTML would turn a broken script tag into a syntax error
-      // far from the cause.
-      if (/\.[a-z0-9]+$/i.test(req.path)) return next();
-      // An instance can also serve a marketing site from the same origin. Those clean
-      // URLs belong to it, so the app only claims its own prefixes and anything else
-      // falls through to the public site's own 404.
+      // The mount is stripped first, and everything below is judged on the path
+      // relative to it. A guard on the raw path is what let /app/api/nope through:
+      // under the mount the request reads /app/api/nope, which does not start with
+      // /api/, so it fell past this handler and was answered by the public site's
+      // HTML 404 page instead of the API's JSON envelope.
       //
       // The mount is stripped first. Under /app the first segment is "app", which is
       // not an application route, so a mounted deployment 404ed every deep link it was
@@ -277,6 +278,14 @@ function mountSpaFallback(app, opts) {
       // list, so every deep link 404ed on an origin-root deployment while the same
       // build worked under /app.
       const rest = mount ? req.path.slice(mount.length) || '/' : req.path;
+      if (rest.startsWith('/api/') || rest.startsWith('/uploads') || rest.startsWith('/ws')) return next();
+      // Anything with a file extension is an asset that genuinely is missing;
+      // answering it with HTML would turn a broken script tag into a syntax error
+      // far from the cause.
+      if (/\.[a-z0-9]+$/i.test(rest)) return next();
+      // An instance can also serve a marketing site from the same origin. Those clean
+      // URLs belong to it, so the app only claims its own prefixes and anything else
+      // falls through to the public site's own 404.
       const seg = rest.split('/').filter(Boolean)[0] || '';
       if (!APP_ROUTE_PREFIXES.has(seg)) return next();
       // The base is stamped per request because the mount point is a deployment fact,
@@ -302,7 +311,12 @@ function mountSpaFallback(app, opts) {
   // present). API paths keep their JSON error envelope.
   if (publicDir) {
     app.use((req, res, next) => {
-      if (req.method !== 'GET' || req.path.startsWith('/api/') || req.path.startsWith('/uploads') || req.path.startsWith('/ws')) {
+      if (req.method !== 'GET') return next();
+      // Mount-relative, for the same reason the handler above is: /app/api/nope is an
+      // API request, and a guard on the raw path answered it with this HTML page.
+      const mount = mountOf(req.path);
+      const rest = mount ? req.path.slice(mount.length) || '/' : req.path;
+      if (rest.startsWith('/api/') || rest.startsWith('/uploads') || rest.startsWith('/ws')) {
         return next();
       }
       res.status(404).set('Cache-Control', 'no-cache').sendFile('404.html', { root: publicDir }, (err) => {

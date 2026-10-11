@@ -16,7 +16,14 @@ const { isKnown } = require('./permissions');
 // incoherent - a member with Admin could then outrank the owner in every way
 // that matters while still being told they are not the owner.
 const BASELINE_ROLE = {
-  name: '@everyone', position: 1, permissions: ['SEND_MESSAGES'], is_default: 1,
+  name: '@everyone', position: 1,
+  // CONNECT and VIDEO are baseline because a community that turns voice on should not
+  // have to re-grant "may join" and "may use a camera" to members it already has. The
+  // instance-level master switch is what decides whether voice is reachable at all, so
+  // granting them here costs nothing on an instance where it is off. STREAM,
+  // MOVE_MEMBERS and MUTE_MEMBERS are not baseline: they cost bandwidth or act on other
+  // people, and both belong to a community's own decision.
+  permissions: ['SEND_MESSAGES', 'CONNECT', 'VIDEO'], is_default: 1,
 };
 const DEFAULT_ROLES = [BASELINE_ROLE];
 

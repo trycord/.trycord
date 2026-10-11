@@ -17,6 +17,8 @@ const { corsOptions, originCovers, DESKTOP_ORIGIN } = require('./origins');
 const inviteRoutes = require('./routes/invites');
 const enforcement = require('./services/enforcement');
 const pages = require('./services/pages');
+const features = require('./features');
+const settings = require('./services/settings');
 
 const PORT = parseInt(process.env.PORT || '9971', 10);
 
@@ -146,6 +148,9 @@ async function boot() {
 
   await db.connect();
   console.log(`[info] database connected (${db.dialect})`);
+
+  features.load();
+  await settings.load();
 
   const app = express();
   const server = http.createServer(app);
@@ -371,6 +376,7 @@ async function boot() {
   app.use('/api/account', require('./routes/accountDeletion'));
   app.use('/api/admin', require('./routes/admin'));
   app.use('/api/admin/pages', require('./routes/adminPages'));
+  app.use('/api/admin/settings', require('./routes/settings'));
   // Test hooks for automated suites (email verification without an inbox).
   // Strictly opt-in: unmounted in every other boot, where the paths 404.
   if (process.env.ALLOW_TEST_HOOKS === 'true') {
@@ -416,6 +422,7 @@ async function boot() {
   app.use('/api/me', require('./routes/privacy'));
   app.use('/api/me', require('./routes/export'));
   app.use('/api/mutes', require('./routes/mutes'));
+  app.use('/api/voice', require('./routes/voice'));
   // Instance-wide announcement banners (per-deployment, not global).
   app.use('/api/announcements', require('./routes/announcements'));
   require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });

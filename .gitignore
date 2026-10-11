@@ -73,3 +73,15 @@ backend/shots/
 # somewhere a copy of that goes.
 /data/
 /server/node_modules
+
+# .env and every backup of it. A .env holds the JWT signing secret, the database
+# password and the SMTP password, and a timestamped copy of one is the same file with a
+# different name: `git add -A` swept backend/.env.bak.20261010201314 into the repository
+# and put real production credentials into history. The .env.example template is the
+# tracked file; the real one and its copies never are.
+.env
+.env.*
+!.env.example
+!.env.docker.example
+*.env.bak*
+.env.bak.*

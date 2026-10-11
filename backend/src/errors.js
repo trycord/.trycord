@@ -37,6 +37,13 @@ const Codes = {
   BLOCKED: 403,
   NOT_ACCEPTING_DMS: 403,
   NOT_ACCEPTING_REQUESTS: 403,
+  // Voice and video. A feature that is switched off at the instance level is a refusal the
+  // client can act on - it can hide the join control - rather than an internal error,
+  // which is what an unmapped code used to become and which left a member looking at
+  // "something went wrong" for a setting that is working exactly as configured.
+  FEATURE_DISABLED: 403,
+  // A full voice channel. 409 rather than 403: the member is allowed in, the room is not.
+  ROOM_FULL: 409,
 };
 
 function fail(res, code, message, status, extra) {
@@ -55,4 +62,21 @@ function serviceError(res, e) {
   return res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
 }
 
-module.exports = { Codes, fail, serviceError };
+// An async route handler that cannot forget its try/catch.
+//
+// Every route in this package that awaits something has to translate a service throw
+// into a status, and the ones that forget it answer a rejected promise with an
+// unhandled rejection and a hung request instead of the error the client can read.
+// Wrapping the handler centralises it, so a route body reads as the work and not as
+// the error plumbing around it.
+function wrap(handler) {
+  return async (req, res, next) => {
+    try {
+      await handler(req, res, next);
+    } catch (e) {
+      serviceError(res, e);
+    }
+  };
+}
+
+module.exports = { Codes, fail, serviceError, wrap };

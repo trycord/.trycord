@@ -150,6 +150,11 @@ const GLOBALS = new Set([
       }
     }
     for (const m of code.matchAll(/^\s*(?:async\s+)?function\s+(\w+)/gm)) defined.add(m[1])
+    // A class declaration binds its name exactly as a function does. Without this the
+    // name reads as "used but never defined" on every line that constructs or tests it,
+    // which is how SfuError in services/voice.js was reported four times for a class
+    // that was declared twenty lines above.
+    for (const m of code.matchAll(/^\s*class\s+(\w+)/gm)) defined.add(m[1])
 
     // Parameters of a method. `async transaction(fn) {` is a definition like any other, and
     // without this its parameter reads as a name nothing defines - which is how `fn` in
