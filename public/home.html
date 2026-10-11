@@ -16,7 +16,14 @@
   <header class="site-header">
     <div class="wrap nav-wrap">
       <a class="brand" href="/">
-        <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="26" height="26">
+          <g color="#FF4D24">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+          </g>
+        </svg>
         <span class="brand-name">Trycord</span>
       </a>
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
@@ -26,25 +33,47 @@
         <a href="/docs">Docs</a>
         <a href="/download">Download</a>
         <a href="/about">About</a>
-        <a href="/support">Support</a><a href="/security">Security</a><a href="/status">Status</a>
+        <a href="/support">Support</a>
+        <a href="/security">Security</a>
+        <a href="/status">Status</a>
         <a class="btn-open" href="/app/">Open the app</a>
       </nav>
     </div>
   </header>
 
   <main id="main">
+    <!--
+      The hero is two columns on a wide screen and one on a narrow one. The brand
+      mark is the same symbol the header carries, at display size - it is the
+      library's artwork, not a second asset.
+    -->
     <section class="hero">
       <div class="wrap">
-        <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="64" height="64">
-        <h1>Talk together, on your own terms.</h1>
-        <p class="lede">
-          Trycord is private community messaging you can run yourself.
-          Communities, channels, friends, and profiles — the same app in your
-          browser and in a desktop app for Windows.
-        </p>
-        <div class="cta">
-          <a class="btn btn-primary" href="/app/">Open the app</a>
-          <a class="btn btn-ghost" href="/download">Get the desktop app</a>
+        <div class="hero-copy">
+          <p class="hero-eyebrow">Self-hostable</p>
+          <h1>Talk together, <em>on your own terms.</em></h1>
+          <p class="lede">
+            Trycord is private community messaging you can run yourself.
+            Communities, channels, friends, and profiles — the same app in your
+            browser and in a desktop app for Windows.
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary" href="/app/">
+              <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/><path d="M8 9h8M8 13h5"/></g></svg>
+              Open the app
+            </a>
+            <a class="btn btn-ghost" href="/download">Get the desktop app</a>
+          </div>
+        </div>
+        <div class="hero-aside" aria-hidden="true">
+          <svg class="hero-mark" viewBox="0 0 100 100" role="img" focusable="false">
+            <g color="#FF4D24">
+              <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+              <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+              <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+              <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+            </g>
+          </svg>
         </div>
       </div>
     </section>
@@ -57,22 +86,30 @@
         </div>
         <div class="grid">
           <article class="card">
-            <span class="kicker">Messaging</span>
+            <div class="card-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/><path d="M8 9h8M8 13h5"/></g></svg>
+            </div>
             <h3>Communities &amp; channels</h3>
             <p>Organize conversations into communities with text channels, direct messages, friends, and presence.</p>
           </article>
           <article class="card">
-            <span class="kicker">People</span>
+            <div class="card-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></g></svg>
+            </div>
             <h3>Profiles that are yours</h3>
             <p>Display name, status, avatar, and banner — plus per-community nicknames so everyone knows who you are.</p>
           </article>
           <article class="card">
-            <span class="kicker">Safety</span>
+            <div class="card-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="m9 12 2 2 4-4"/></g></svg>
+            </div>
             <h3>Moderation built in</h3>
             <p>Permissions, reports and appeals, and platform-admin tooling for the people who run an instance.</p>
           </article>
           <article class="card">
-            <span class="kicker">Ownership</span>
+            <div class="card-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6"/></g></svg>
+            </div>
             <h3>Self-hosting first</h3>
             <p>Run the server yourself on SQLite or MySQL with strict defaults: JWT sessions, rate limits, and a locked-down header policy.</p>
           </article>
@@ -88,10 +125,16 @@
         </div>
         <div class="grid">
           <article class="card lead">
+            <div class="card-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/></g></svg>
+            </div>
             <h3>In your browser</h3>
             <p>Sign in at your instance's address — nothing to install. Registration asks you to accept the Terms of Service and Privacy Policy before your account exists.</p>
           </article>
           <article class="card lead">
+            <div class="card-icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></g></svg>
+            </div>
             <h3>On Windows desktop</h3>
             <p>An Electron app with an installer or a portable build, pointing at the instance you choose, with automatic updates from releases.</p>
           </article>
@@ -105,6 +148,29 @@
           <h2>Run it your way</h2>
           <p>Configure the server from environment variables — instance name, public URL, mail for recovery, and the database. Then invite who you want.</p>
         </div>
+        <div class="steps">
+          <div class="step">
+            <h3>Install the server</h3>
+            <p>Docker Compose, or Node with SQLite for a small instance and MySQL when you outgrow it. A fresh install works with the defaults and no configuration at all.</p>
+          </div>
+          <div class="step">
+            <h3>Point it at a domain</h3>
+            <p>Set the public URL so links in emails and invites are correct, and put a reverse proxy in front of it if you want TLS.</p>
+          </div>
+          <div class="step">
+            <h3>Invite who you want</h3>
+            <p>Keep registration open, close it and invite by code, or run an instance nobody outside it can see. The choice is yours, and it is enforced by the server.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <h2>Start where you like</h2>
+          <p>The documentation covers both the self-hosting path and the day-to-day of running a community.</p>
+        </div>
         <p>
           <a class="btn" href="/docs">Read the documentation</a>
           <a class="btn btn-ghost" href="/features">See all features</a>
@@ -117,7 +183,14 @@
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <a class="brand" href="/">
-          <img class="brand-mark" src="/assets/trycord-logo.png" alt="" width="30" height="30">
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="26" height="26">
+            <g color="#FF4D24">
+              <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+              <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+              <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+              <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+            </g>
+          </svg>
           <span class="brand-name">Trycord</span>
         </a>
         <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>

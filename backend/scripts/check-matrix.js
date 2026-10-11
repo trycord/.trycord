@@ -185,11 +185,11 @@ async function probePublic(port) {
   lines.push('  asserts them across the whole run (1365 controls carry accessible names, and');
   lines.push('  `check-mobile-layout.js` covers the phone composition), but not per route.');
   lines.push('  Filling those columns is phase one of the rebuild.');
-  lines.push('- **The public site is on the canonical tokens but not yet redesigned.** It');
-  lines.push('  consumes the asset library\'s palette, type, spacing and radii — verified by');
-  lines.push('  `check-public-site.js`, which fails on any raw colour in `site.css` — but its');
-  lines.push('  layout is still the one it had before. Sharing a design system is not the');
-  lines.push('  same as a redesigned composition, and the mobile frontend brief covers both.');
+  lines.push('- **The public site is redesigned for desktop; its phone composition is not.');
+  lines.push('  It is on the canonical tokens and its desktop layout is the new one - verified');
+  lines.push('  by `check-public-site.js` - but it has no purpose-built mobile interface,');
+  lines.push('  which is what the mobile brief asks for. A responsive desktop layout is not');
+  lines.push('  a mobile design, and that work is queued behind the rest of the frontend.');
   lines.push('');
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

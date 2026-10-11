@@ -197,6 +197,61 @@ async function main() {
         served.status === 200 && served.body.includes('--tc-brand'),
         'status ' + served.status);
     }
+
+    // ---- the composition, which is the part that was actually redesigned ----
+    //
+    // A page that serves fine and still carries the old composition passes every
+    // assertion above, so the layout is asserted separately. Sharing a design
+    // system is not the same as being redesigned.
+    console.log('\n  the composition is the redesigned one');
+
+    const home = await get(port, '/welcome');
+    ok('the hero is a two-column composition, not one centred block',
+      /hero-copy/.test(home.body) && /hero-aside/.test(home.body),
+      'no .hero-copy / .hero-aside');
+
+    // The brand mark is the library's SVG, crisp at any size and carrying the
+    // page's own accent, rather than a raster frozen at one colour.
+    ok('the brand mark is the library SVG, not the raster',
+      /<svg class="mark"/.test(home.body) && !/<img class="brand-mark"/.test(home.body));
+
+    // Feature cards carry an icon from the library, which is what gives them a
+    // focal point instead of opening straight onto a kicker.
+    const iconCards = (home.body.match(/<div class="card-icon"/g) || []).length;
+    ok('the feature cards carry library icons',
+      iconCards >= 4, iconCards + ' cards with an icon');
+
+    // "Run it your way" is a numbered sequence rather than another card grid.
+    ok('the steps section is a numbered sequence',
+      /<div class="steps">/.test(home.body) && /<div class="step">/.test(home.body));
+
+    // A prose page is a document with a spine and a generated contents list.
+    const terms = await get(port, '/terms');
+    ok('a prose page uses the two-column layout with a contents list',
+      /prose-layout/.test(terms.body) && /<aside class="toc"/.test(terms.body),
+      'no .prose-layout or .toc');
+    // The wrapper sits outside the editable markers, so publishing cannot
+    // destroy the contents list.
+    const beginAt = terms.body.indexOf('page:begin');
+    const layoutAt = terms.body.indexOf('prose-layout');
+    ok('the layout wrapper is outside the editable region',
+      layoutAt !== -1 && beginAt !== -1 && layoutAt < beginAt,
+      'wrapper at ' + layoutAt + ', page:begin at ' + beginAt);
+
+    // The stylesheet is the new one: the glows are derived, the cards lift, and
+    // the header marks itself when there is content behind it.
+    const css = fs.readFileSync(path.join(PUBLIC, 'css', 'site.css'), 'utf8');
+    ok('the header marks itself once the page has moved',
+      /data-scrolled/.test(css));
+    ok('the hero collapses to one column on a narrow screen',
+      /@media \(max-width: 860px\)[\s\S]*?hero \.wrap \{ grid-template-columns: 1fr/.test(css));
+    ok('the contents list is sticky on a wide screen and gone on a narrow one',
+      /\.toc \{[\s\S]*?position: sticky/.test(css)
+      && /@media \(max-width: 1000px\)[\s\S]*?\.toc \{ display: none/.test(css));
+
+    // The reduced-motion preference removes the motion rather than shortening it.
+    ok('reduced motion removes the hover lift',
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.card:hover/.test(css));
   } finally {
     server.close();
   }
