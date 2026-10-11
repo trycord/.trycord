@@ -53,7 +53,7 @@ function rateLimit({ windowMs = 60000, max = 60 } = {}) {
     if (entry.count > limit) {
       const retryAfter = Math.ceil((entry.start + windowMs - nowMs) / 1000);
       res.set('Retry-After', String(Math.max(retryAfter, 1)));
-      return fail(res, 'RATE_LIMITED', 'slow down — try again shortly');
+      return fail(res, 'RATE_LIMITED', 'slow down. Try again shortly');
     }
     next();
   };

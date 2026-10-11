@@ -59,7 +59,7 @@ router.post('/login', (req, res, next) => loginLimit()(req, res, next), async (r
     await twofactor.recordSuccess(user.id);
 
     // Trust & Safety: a correct login from a banned/suspended account must
-    // not mint new sessions — the account holder gets the enforcement
+    // not mint new sessions. The account holder gets the enforcement
     // details plus the action id so they can open an appeal with it.
     const ef = enforcement.describeEffective(user);
     if (ef) {

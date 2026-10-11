@@ -62,7 +62,7 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
     }
     if (email) recovery.requestVerification(id, email).catch(() => {});
     // Listed platform admins are promoted at creation too, not just at
-    // boot — accounts made after the server started must not miss it.
+    // boot, so accounts made after the server started must not miss it.
     await enforcement.ensureListedAdmin(id, name);
     const token = sign({ id, username: name });
     res.json({ token, user: { id, username: name, displayName: displayName || name, email: email || null, emailVerified: false, createdAt: now() } });
