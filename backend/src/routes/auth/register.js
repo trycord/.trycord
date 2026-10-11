@@ -51,10 +51,16 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
     }
     const id = uuid();
     const hash = await bcrypt.hash(String(password), BCRYPT_COST);
+    // Approval on means the account exists but cannot be used until an admin says
+    // so. Accounts created while it is off are approved at creation, and accounts
+    // that existed before the column are NULL, which the auth gate reads as
+    // "not pending" so switching the setting on never locks out existing members.
+    const awaitingApproval = require('../../features').current.registrationApproval;
     try {
       await db.run(
-        'INSERT INTO users (id, username, display_name, password_hash, created_at, terms_version, privacy_version, terms_accepted_at, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, name, String(displayName || name).slice(0, 32), hash, now(), TERMS_VERSION, PRIVACY_VERSION, now(), email]
+        'INSERT INTO users (id, username, display_name, password_hash, created_at, terms_version, privacy_version, terms_accepted_at, email, approved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, name, String(displayName || name).slice(0, 32), hash, now(), TERMS_VERSION,
+          PRIVACY_VERSION, now(), email, awaitingApproval ? null : now()]
       );
     } catch (e) {
       if (isUniqueViolation(e)) return fail(res, 'CONFLICT', 'username taken');
@@ -64,8 +70,14 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
     // Listed platform admins are promoted at creation too, not just at
     // boot, so accounts made after the server started must not miss it.
     await enforcement.ensureListedAdmin(id, name);
+    // A pending account gets a token so it can see the waiting screen, which is
+    // the only thing that token can reach. Everything else refuses it.
     const token = sign({ id, username: name });
-    res.json({ token, user: { id, username: name, displayName: displayName || name, email: email || null, emailVerified: false, createdAt: now() } });
+    res.json({
+      token,
+      pendingApproval: !!awaitingApproval,
+      user: { id, username: name, displayName: displayName || name, email: email || null, emailVerified: false, createdAt: now() },
+    });
   } catch (e) { next(e); }
 });
 

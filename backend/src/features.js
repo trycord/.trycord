@@ -77,6 +77,7 @@ const PROVIDERS = ['cloudflare'];
 // rather than two that can disagree.
 const FROM_SETTINGS = {
   REGISTRATION_ENABLED: 'registration.enabled',
+  REGISTRATION_APPROVAL: 'registration.approval',
   EMAIL_VERIFICATION_REQUIRED: 'registration.emailVerification',
   COMMUNITY_DISCOVERY_ENABLED: 'content.discovery',
   MAX_UPLOAD_BYTES: 'content.maxUploadBytes',
@@ -129,6 +130,7 @@ function providerName() {
 
 function build() {
   const registration = valueOf('REGISTRATION_ENABLED', true);
+  const registrationApproval = valueOf('REGISTRATION_APPROVAL', false);
   const emailVerification = valueOf('EMAIL_VERIFICATION_REQUIRED', false);
   const uploads = flag('FILE_UPLOADS_ENABLED', true);
   const discovery = valueOf('COMMUNITY_DISCOVERY_ENABLED', true);
@@ -150,6 +152,7 @@ function build() {
 
   return {
     registration: !!registration,
+    registrationApproval: !!registrationApproval,
     emailVerificationRequired: !!emailVerification,
     uploads: uploads.value && !!valueOf('FILE_UPLOADS_ENABLED', true),
     communityDiscovery: !!discovery,

@@ -21,6 +21,7 @@ module.exports = (engine) => [
       sessions_invalidated_at VARCHAR(64),
       email VARCHAR(255) UNIQUE,
       email_verified_at VARCHAR(64),
+      approved_at VARCHAR(64),
       enforcement_state VARCHAR(16),
       enforcement_expires_at VARCHAR(64),
       enforcement_reason TEXT,
