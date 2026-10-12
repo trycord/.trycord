@@ -7,6 +7,7 @@ import State, {
   refreshFriends, refreshBlocks, clearSession,
 } from './state.js';
 import { renderAllChrome } from './shell.js';
+import { EVENTS, SESSION_EVENTS } from './realtime-events.js';
 import { applyWellbeingToDocument } from './privacy-ui.js';
 import { navigate } from './nav.js';
 
@@ -95,7 +96,7 @@ ws.addEventListener('message', (ev) => {
     try { msg = JSON.parse(ev.data); } catch { return; }
     if (!msg || !msg.type) return;
     emit(msg.type, msg);
-    if (msg.type === 'presence') setPresence(msg.userId, msg.presence);
+    if (msg.type === EVENTS.PRESENCE) setPresence(msg.userId, msg.presence);
     // Notifications are not refreshed here. The unread badge is painted from
     // State.notifUnread, so the refresh has to finish before anything repaints
     // or the badge is drawn with the count from before this message arrived.
@@ -107,33 +108,33 @@ ws.addEventListener('message', (ev) => {
     // patch the old one: the payload is a summary, and a client that trusts a
     // summary instead of the source is how two devices end up disagreeing about
     // what the server said.
-    if (msg.type === 'profile' && msg.profile) {
+    if (msg.type === SESSION_EVENTS.PROFILE && msg.profile) {
       State.me = Object.assign({}, State.me, msg.profile);
       renderAllChrome();
     }
-    if (msg.type === 'privacy') {
+    if (msg.type === SESSION_EVENTS.PRIVACY) {
       // Repainted on the Privacy page itself if it is open; the state store is
       // not kept because each section reads from the API rather than from here.
       renderAllChrome();
       document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'privacy' }));
     }
-    if (msg.type === 'wellbeing') {
+    if (msg.type === SESSION_EVENTS.WELLBEING) {
       applyWellbeingToDocument(msg.wellbeing);
       document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'wellbeing' }));
     }
-    if (msg.type === 'notification-prefs') {
+    if (msg.type === SESSION_EVENTS.NOTIFICATION_PREFS) {
       document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'notifications' }));
     }
-    if (msg.type === 'blocks') {
+    if (msg.type === SESSION_EVENTS.BLOCKS) {
       refreshBlocks().catch(() => {});
       document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'blocks' }));
     }
-    if (msg.type === 'friend') {
+    if (msg.type === SESSION_EVENTS.FRIEND) {
       refreshFriends().catch(() => {});
       document.dispatchEvent(new CustomEvent('trycord:state', { detail: 'friends' }));
     }
-    if (msg.type === 'twofactor') renderAllChrome();
-    if (msg.type === 'session-revoked') {
+    if (msg.type === SESSION_EVENTS.TWOFACTOR) renderAllChrome();
+    if (msg.type === SESSION_EVENTS.SESSION_REVOKED) {
       // Our own action is not a revocation of us. "Sign out other sessions"
       // returns a fresh token for this device and leaves it signed in, and the
       // event reaches this socket too - treating it as an attack would sign the

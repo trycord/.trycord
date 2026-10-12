@@ -23,6 +23,7 @@ const replies = require('../services/replies');
 const embeds = require('../services/embeds');
 const webhooks = require('../services/webhooks');
 const { nextSeq } = require('../routes/messages');
+const { EVENTS } = require('./events.js');
 
 // Matches the REST send path. Declared here rather than imported so the socket gateway
 // keeps no dependency on a route module beyond the sequence allocator it genuinely needs.
@@ -126,7 +127,7 @@ module.exports = function createFrames({ rooms, registry }) {
       ? await uploads.attachToMessage(ids, msg.id, user.id, { channelId: ch.id })
       : [];
 
-    rooms.broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
+    rooms.broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE, ...msg });
 
     // Same after-the-fact work as the REST post, so a message submitted over the socket
     // behaves identically.
@@ -134,7 +135,7 @@ module.exports = function createFrames({ rooms, registry }) {
       embeds.queue({ kind: 'channel', messageId: msg.id }, rawContent).then((cards) => {
         if (!cards.length) return;
         rooms.broadcast(ch.server_id, ch.id, {
-          type: 'message_embeds', channel_id: ch.id, server_id: ch.server_id,
+          type: EVENTS.MESSAGE_EMBEDS, channel_id: ch.id, server_id: ch.server_id,
           messageId: msg.id, embeds: cards,
         });
       }).catch(() => {});
@@ -154,7 +155,7 @@ module.exports = function createFrames({ rooms, registry }) {
           replyId: msg.id, authorId: user.id,
         });
         if (r && !r.held) {
-          registry.sendToUser(r.userId, { type: 'notification', notification: r.notification });
+          registry.sendToUser(r.userId, { type: EVENTS.NOTIFICATION, notification: r.notification });
         }
       } catch { /* a missing notification must not fail the post */ }
     }
@@ -208,7 +209,7 @@ module.exports = function createFrames({ rooms, registry }) {
         const members = await dms.memberIds(cid);
         if (members.indexOf(String(user.id)) === -1) return;
         rooms.broadcastDm(members.filter((id) => String(id) !== String(user.id)), {
-          type: 'dm:typing', conversationId: cid, userId: user.id, username: user.username,
+          type: EVENTS.DM_TYPING, conversationId: cid, userId: user.id, username: user.username,
         });
         return;
       }

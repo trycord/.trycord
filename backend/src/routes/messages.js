@@ -30,6 +30,7 @@ const embeds = require('../services/embeds');
 const webhooks = require('../services/webhooks');
 const bots = require('../services/bots');
 const mentions = require('../services/mentions');
+const { EVENTS } = require('../ws/events.js');
 
 let broadcast = () => {};
 let sendToUser = () => {};
@@ -281,7 +282,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       ? await uploads.attachToMessage(ids, msg.id, req.user.id, { channelId: ch.id })
       : [];
     await attachEngagement([msg], req.user.id);
-    broadcast(ch.server_id, ch.id, { type: 'message', ...msg });
+    broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE, ...msg });
 
     // Everything below is extra information about a message that has already
     // been accepted. None of it is allowed to fail the post: a slow link, a dead
@@ -293,7 +294,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     if (content && !suppressEmbeds && /https?:\/\//i.test(content)) {
       embeds.queue({ kind: 'channel', messageId: msg.id }, content).then((cards) => {
         if (!cards.length) return;
-        broadcast(ch.server_id, ch.id, { type: 'message_embeds', channel_id: ch.id, server_id: ch.server_id, messageId: msg.id, embeds: cards });
+        broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_EMBEDS, channel_id: ch.id, server_id: ch.server_id, messageId: msg.id, embeds: cards });
       }).catch(() => {});
     }
     // A slash command answered by an application in this community.
@@ -319,7 +320,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       });
       for (const f of found) {
         if (f.held) continue;
-        try { sendToUser(f.userId, { type: 'notification', notification: f.notification }); } catch { /* ignore */ }
+        try { sendToUser(f.userId, { type: EVENTS.NOTIFICATION, notification: f.notification }); } catch { /* ignore */ }
       }
     } catch { /* ignore */ }
     // A reply tells the author of the message it hangs from. Null unless this
@@ -329,7 +330,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
         kind: 'channel', scopeId: ch.id, rootId: threadRootId,
         replyId: msg.id, authorId: req.user.id,
       });
-      if (r && !r.held) sendToUser(r.userId, { type: 'notification', notification: r.notification });
+      if (r && !r.held) sendToUser(r.userId, { type: EVENTS.NOTIFICATION, notification: r.notification });
     } catch { /* a missing notification must not fail the post */ }
     res.json(msg);
   } catch (e) { next(e); }
@@ -360,7 +361,7 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
     await db.run('UPDATE messages SET thread_root_id = NULL WHERE thread_root_id = ?', [msg.id]);
     await db.run('DELETE FROM messages WHERE id = ?', [msg.id]);
     uploads.removeFiles(fileRows.map((r) => r.id));
-    broadcast(ch.server_id, ch.id, { type: 'message_deleted', id: msg.id, channel_id: ch.id });
+    broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_DELETED, id: msg.id, channel_id: ch.id });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
@@ -390,7 +391,7 @@ router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, m
       author_display: (author && author.display_name) || req.user.username,
     };
     await attachEngagement([out], req.user.id);
-    broadcast(ch.server_id, ch.id, { type: 'message_updated', ...out });
+    broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_UPDATED, ...out });
     res.json(out);
   } catch (e) { next(e); }
 });
@@ -412,7 +413,7 @@ router.post('/:messageId/reactions', auth.requireVerified, rateLimit({ windowMs:
       throw e;
     }
     const summaries = await reactions.summary([msg.id], req.user.id);
-    broadcast(ch.server_id, ch.id, { type: 'message_reaction', id: msg.id, channel_id: ch.id, reactions: summaries[msg.id] || [] });
+    broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_REACTION, id: msg.id, channel_id: ch.id, reactions: summaries[msg.id] || [] });
     res.json({ ok: true, emoji, reactions: summaries[msg.id] || [] });
   } catch (e) { next(e); }
 });
@@ -434,7 +435,7 @@ router.delete('/:messageId/reactions/:emoji', auth.requireVerified, async (req, 
       throw e;
     }
     const summaries = await reactions.summary([msg.id], req.user.id);
-    broadcast(ch.server_id, ch.id, { type: 'message_reaction', id: msg.id, channel_id: ch.id, reactions: summaries[msg.id] || [] });
+    broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_REACTION, id: msg.id, channel_id: ch.id, reactions: summaries[msg.id] || [] });
     res.json({ ok: true, emoji, reactions: summaries[msg.id] || [] });
   } catch (e) { next(e); }
 });

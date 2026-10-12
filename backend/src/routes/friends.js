@@ -9,6 +9,7 @@ const friends = require('../services/friends');
 const events = require('../services/events');
 const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
+const { EVENTS } = require('../ws/events.js');
 
 let gateway = { sendToUser: () => {}, getPresence: null };
 function setGateway(gw) {
@@ -32,7 +33,7 @@ function withPresence(list) {
 async function notify(userId, type, actorId, referenceId) {
   try {
     const { notification, held } = await notifications.create(userId, type, actorId, referenceId);
-    if (!held) gateway.sendToUser(userId, { type: 'notification', notification });
+    if (!held) gateway.sendToUser(userId, { type: EVENTS.NOTIFICATION, notification });
   } catch { /* notifications never fail the request */ }
 }
 

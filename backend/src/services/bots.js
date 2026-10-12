@@ -14,6 +14,7 @@ const db = require('../db');
 const { now, uuid } = require('../util');
 const events = require('./events');
 const { publicMediaUrl } = require('./embeds');
+const { EVENTS } = require('../ws/events.js');
 
 const TOKEN_PREFIX = 'trcd_bot_';
 const COMMAND_RE = /^\/([a-z0-9][a-z0-9_-]{0,31})$/i;
@@ -326,7 +327,7 @@ async function postAsApp(app, channelRow, content, { kind } = {}) {
     [id, channelRow.id, app.owner_user_id, text, ts, seq]
   );
   events.emitChannel(channelRow.server_id, channelRow.id, {
-    type: 'message',
+    type: EVENTS.MESSAGE,
     id, channel_id: channelRow.id, server_id: channelRow.server_id,
     author_id: app.owner_user_id,
     content: text, created_at: ts, edited_at: null, seq,

@@ -11,6 +11,7 @@ const replies = require('../services/replies');
 const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
 const embeds = require('../services/embeds');
+const { EVENTS } = require('../ws/events.js');
 
 // A message body is capped rather than truncated. Slicing to the limit loses
 // whatever the writer typed past it with no indication at all, so a long paste
@@ -125,7 +126,7 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
       (req.body || {}).attachmentIds, (req.body || {}).replyToId
     );
     const members = await dms.memberIds(req.params.id);
-    gateway.broadcastDm(members, { type: 'dm:message', ...msg, conversationId: req.params.id });
+    gateway.broadcastDm(members, { type: EVENTS.DM_MESSAGE, ...msg, conversationId: req.params.id });
 
     // Opt-out from link previews for this one message, read server-side for the
     // same reason as the channel path: a flag the server ignores is a control
@@ -141,7 +142,7 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
       embeds.queue({ kind: 'dm', messageId: msg.id, conversationId: req.params.id }, text).then((cards) => {
         if (!cards.length) return;
         gateway.broadcastDm(members, {
-          type: 'dm:message_embeds', conversationId: req.params.id,
+          type: EVENTS.DM_MESSAGE_EMBEDS, conversationId: req.params.id,
           messageId: msg.id, embeds: cards,
         });
       }).catch(() => {});
@@ -155,7 +156,7 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
         try {
           if (gateway.isOnline && gateway.isOnline(id)) continue;
           const { notification, held } = await notifications.create(id, 'dm', req.user.id, req.params.id);
-          if (!held) gateway.sendToUser(id, { type: 'notification', notification });
+          if (!held) gateway.sendToUser(id, { type: EVENTS.NOTIFICATION, notification });
         } catch { /* notification failure must not fail the send */ }
       }
     }
@@ -169,7 +170,7 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
           kind: 'dm', scopeId: req.params.id, rootId: msg.threadRootId,
           replyId: msg.id, authorId: req.user.id,
         });
-        if (r && !r.held) gateway.sendToUser(r.userId, { type: 'notification', notification: r.notification });
+        if (r && !r.held) gateway.sendToUser(r.userId, { type: EVENTS.NOTIFICATION, notification: r.notification });
       } catch { /* ignore */ }
     }
     res.json(msg);
@@ -181,7 +182,7 @@ router.delete('/:id/messages/:messageId', auth.requireVerified, async (req, res,
   try {
     const out = await dms.remove(req.user.id, req.params.id, req.params.messageId);
     const members = await dms.memberIds(req.params.id);
-    gateway.broadcastDm(members, { type: 'dm:message_deleted', id: out.id, conversationId: out.conversationId });
+    gateway.broadcastDm(members, { type: EVENTS.DM_MESSAGE_DELETED, id: out.id, conversationId: out.conversationId });
     res.json({ ok: true });
   } catch (e) { serviceError(res, e); }
 });
@@ -191,7 +192,7 @@ router.patch('/:id/messages/:messageId', auth.requireVerified, rateLimit({ windo
   try {
     const out = await dms.edit(req.user.id, req.params.id, req.params.messageId, readContent((req.body || {}).content), req.user.username);
     const members = await dms.memberIds(req.params.id);
-    gateway.broadcastDm(members, { type: 'dm:message_updated', ...out, conversationId: out.conversationId });
+    gateway.broadcastDm(members, { type: EVENTS.DM_MESSAGE_UPDATED, ...out, conversationId: out.conversationId });
     res.json(out);
   } catch (e) { serviceError(res, e); }
 });
@@ -203,7 +204,7 @@ router.post('/:id/read', async (req, res, next) => {
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(
       members.filter((id) => String(id) !== String(req.user.id)),
-      { type: 'dm:read', conversationId: out.conversationId, userId: req.user.id, lastReadAt: out.lastReadAt }
+      { type: EVENTS.DM_READ, conversationId: out.conversationId, userId: req.user.id, lastReadAt: out.lastReadAt }
     );
     res.json(out);
   } catch (e) { serviceError(res, e); }
