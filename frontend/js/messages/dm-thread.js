@@ -110,7 +110,7 @@ async function renderDmThread(container, dmId) {
     let msgs = [];
     try { msgs = await Api.dmMessages(dmId, { limit: 50 }); } catch (ex) {
       clear(feed);
-      feed.appendChild(el('div', { class: 'form-error' }, (ex && ex.message) || 'Cannot load messages'));
+      feed.appendChild(el('div', { class: 'form-error' }, (ex && ex.message) || "Couldn't load the messages"));
       const retry = el('button', { class: 'btn sm', type: 'button' }, 'Try again');
       retry.addEventListener('click', () => reload().catch(() => {}));
       feed.appendChild(retry);
@@ -171,7 +171,7 @@ async function renderDmThread(container, dmId) {
       onDelete: mine ? () => removeDm(dmId, m.id) : null,
       onEdit: mine ? () => editDm(dmId, m) : null,
       onOpenThread: () => openDmThread(m),
-      onDownload: (e, att) => { e.preventDefault(); downloadAttachment(att).catch((ex) => toast(ex.message || 'Cannot download', 'error')); },
+      onDownload: (e, att) => { e.preventDefault(); downloadAttachment(att).catch((ex) => toast(ex.message || 'The file could not be downloaded', 'error')); },
     });
     // A direct message had no context menu at all. The community conversation
     // attaches one to every row; the DM view only ever attached its menus to
@@ -273,7 +273,7 @@ async function renderDmThread(container, dmId) {
   async function removeDm(cid, mid) {
     try {
       await Api.deleteDm(cid, mid);
-    } catch (ex) { toast(ex.message || 'Cannot delete', 'error'); }
+    } catch (ex) { toast(ex.message || 'The message could not be deleted', 'error'); }
   }
 
   async function editDm(cid, m) {
@@ -290,7 +290,7 @@ async function renderDmThread(container, dmId) {
       try {
         await Api.updateDm(cid, m.id, textarea.value.trim());
         modal.close();
-      } catch (ex) { toast(ex.message || 'Cannot edit', 'error'); }
+      } catch (ex) { toast(ex.message || 'The edit could not be applied', 'error'); }
     });
   }
 

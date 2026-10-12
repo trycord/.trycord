@@ -142,7 +142,7 @@ export function renderComposer({ conv, channelId, chanName, upsertMessage, reloa
         await reload();
       }
     } catch (ex) {
-      toast(ex.message || 'Cannot send', 'error');
+      toast(ex.message || 'The message could not be sent', 'error');
     } finally {
       sending = false;
       sendBtn.removeAttribute('aria-busy');

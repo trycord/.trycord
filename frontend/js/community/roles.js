@@ -60,7 +60,7 @@ async function renderServerRoles(container, serverId) {
   clear(container);
   let server;
   try { ({ detail: server } = await ensureServer(serverId)); }
-  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
+  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || "Couldn't open this community")); return; }
   renderContextHeader({ title: 'Roles', sub: server.name });
 
   const permsInfo = await Api.serverPermissions(serverId).catch(() => ({ all: [], descriptions: {} }));
@@ -202,7 +202,7 @@ async function renderServerRoles(container, serverId) {
       el('span', { class: 'role-row__handle' }),
       el('span', { class: 'role-row__rank' }, '\u2014'),
       ownerNameCell,
-      el('span', { class: 'role-row__meta' }, 'Cannot be reordered')));
+      el('span', { class: 'role-row__meta' }, 'This role cannot be moved')));
 
     const all = ordered();
     all.forEach((role, idx) => {
