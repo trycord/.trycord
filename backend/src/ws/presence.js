@@ -11,6 +11,7 @@
 // hence the catch in affectedUsers and the callers that ignore the promise.
 
 const db = require('../db');
+const { EVENTS } = require('./events.js');
 
 module.exports = function createPresence({ registry }) {
   async function affectedUsers(userId) {
@@ -43,7 +44,7 @@ module.exports = function createPresence({ registry }) {
     const targets = await affectedUsers(userId);
     for (const id of targets) {
       if (registry.isOnline(id)) {
-        registry.sendToUser(id, { type: 'presence', userId: String(userId), presence });
+        registry.sendToUser(id, { type: EVENTS.PRESENCE, userId: String(userId), presence });
       }
     }
   }

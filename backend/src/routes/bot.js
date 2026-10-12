@@ -17,6 +17,7 @@ const bots = require('../services/bots');
 const events = require('../services/events');
 const embeds = require('../services/embeds');
 const webhooks = require('../services/webhooks');
+const { EVENTS } = require('../ws/events.js');
 
 const router = express.Router();
 
@@ -76,7 +77,7 @@ router.post('/channels/:channelId/messages', requireApp, rateLimit({ windowMs: 6
       if (ids.length) posted.attachments = await uploads.attachToMessage(ids, posted.id, req.botApp.owner_user_id, { channelId: ch.id });
       embeds.queue({ kind: 'channel', messageId: posted.id }, content).then((cards) => {
         if (!cards.length) return;
-        events.emitChannel(ch.server_id, ch.id, { type: 'message_embeds', channel_id: ch.id, server_id: ch.server_id, messageId: posted.id, embeds: cards });
+        events.emitChannel(ch.server_id, ch.id, { type: EVENTS.MESSAGE_EMBEDS, channel_id: ch.id, server_id: ch.server_id, messageId: posted.id, embeds: cards });
       }).catch(() => {});
       webhooks.emit(ch.server_id, 'message.created', {
         serverId: ch.server_id, channelId: ch.id,
@@ -104,7 +105,7 @@ router.delete('/messages/:messageId', requireApp, rateLimit({ windowMs: 60000, m
       const fileRows = await db.all('SELECT id FROM attachments WHERE message_id = ?', [row.id]);
       await db.run('DELETE FROM messages WHERE id = ?', [row.id]);
       uploads.removeFiles(fileRows.map((r) => r.id));
-      events.emit(ch.server_id, ch.id, { type: 'message_deleted', id: row.id, channel_id: ch.id });
+      events.emit(ch.server_id, ch.id, { type: EVENTS.MESSAGE_DELETED, id: row.id, channel_id: ch.id });
       res.json({ ok: true });
     } catch (e) { next(e); }
   });

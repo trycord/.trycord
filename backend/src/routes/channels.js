@@ -91,6 +91,7 @@ const rateLimit = require('../middleware/ratelimit');
 const uploads = require('../services/uploads');
 const reactions = require('../services/reactions');
 const { now } = require('../util');
+const { EVENTS } = require('../ws/events.js');
 
 async function pinChannel(req) {
   // The community is already resolved, so a slug here is unambiguous.
@@ -137,7 +138,7 @@ router.post('/:channelId/pins', auth.requireVerified, requirePerm('MANAGE_MESSAG
       const s = String((e && e.message) || e);
       if (!/UNIQUE|unique|duplicate|PRIMARY/i.test(s)) throw e;
     }
-    broadcastChannel(ch.server_id, ch.id, { type: 'message_pinned', id: messageId, channel_id: ch.id, pinned_by: req.user.id, pinned_at: at });
+    broadcastChannel(ch.server_id, ch.id, { type: EVENTS.MESSAGE_PINNED, id: messageId, channel_id: ch.id, pinned_by: req.user.id, pinned_at: at });
     res.json({ ok: true, id: messageId });
   } catch (e) { next(e); }
 });
@@ -147,7 +148,7 @@ router.delete('/:channelId/pins/:messageId', auth.requireVerified, requirePerm('
     const ch = await pinChannel(req);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     await db.run('DELETE FROM pinned_messages WHERE message_id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
-    broadcastChannel(ch.server_id, ch.id, { type: 'message_unpinned', id: req.params.messageId, channel_id: ch.id });
+    broadcastChannel(ch.server_id, ch.id, { type: EVENTS.MESSAGE_UNPINNED, id: req.params.messageId, channel_id: ch.id });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });
