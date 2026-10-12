@@ -42,10 +42,11 @@ const ok = (label, cond, detail) => {
 };
 
 /**
- * How many modules the client ships, read from the directory rather than from the network.
- * Zero when there is no client beside this server, which is the case for a self-hoster who
- * has not cloned the front end - there is nothing to compare against and the walk stands
- * on its own.
+ * How many ES modules the client ships, read from the directory rather than from the network.
+ * Zero when there is no client beside this server.
+ *
+ * crash.js is a plain script loaded via <script> in index.html, not an ES module.
+ * It is not in the import graph, so it is excluded from the count.
  */
 function countClientModules() {
   const jsDir = path.join(ROOT, '..', 'frontend', 'js');
@@ -56,7 +57,7 @@ function countClientModules() {
     for (const e of entries) {
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith('.js')) total++;
+      else if (e.name.endsWith('.js') && e.name !== 'crash.js') total++;
     }
   })(jsDir);
   return total;

@@ -219,8 +219,7 @@ function mountPublicSite(app, opts) {
     };
   };
 
-  app.get('/terms', editablePage('terms.html', 'terms'));
-  app.get('/privacy', editablePage('privacy.html', 'privacy'));
+  app.get('/terms', editablePage('terms.html', 'terms'));  app.get('/privacy', editablePage('privacy.html', 'privacy'));
   app.get('/instances-terms', editablePage('instances-terms.html', 'instances-terms'));
   app.get('/trust-and-safety', editablePage('trust-and-safety.html', 'trust-and-safety'));
   app.get('/support', editablePage('support.html', 'support'));
@@ -233,16 +232,30 @@ function mountPublicSite(app, opts) {
   app.get('/docs', publicPage('documentation.html'));
   app.get('/download', publicPage('download.html'));
   app.get('/status', publicPage('status.html'));
+  // The origin root is the public site's front door. Registered before the client
+  // is mounted, because Express matches the first route that answers and the
+  // client claims "/" for its own shell.
+  if (fs.existsSync(path.join(publicDir, 'home.html'))) {
+    app.get('/', publicPage('home.html'));
+  }
+
   app.get('/welcome', publicPage('home.html'));
   app.get('/404', publicPage('404.html'));
 
   // Browsers auto-request /favicon.ico on every page: serve the brand icon instead of
   // logging a 404 into every console. The icon is read from the client tree, which is
   // the single copy; public/ no longer carries one.
+  // The brand icon lives in the client tree, which is the single copy. The public
+  // website has no assets of its own, so when it is mounted first this falls back
+  // to the repository's frontend directory.
   app.get('/favicon.ico', (req, res) => {
     const root = clientDir || publicDir;
     res.set('Cache-Control', 'public, max-age=86400').sendFile('assets/trycord-logo.ico', { root }, () => {
-      if (!res.headersSent) res.status(404).end();
+      if (res.headersSent) return;
+      const fallback = path.join(__dirname, '..', '..', 'frontend');
+      res.sendFile('assets/trycord-logo.ico', { root: fallback }, () => {
+        if (!res.headersSent) res.status(404).end();
+      });
     });
   });
 

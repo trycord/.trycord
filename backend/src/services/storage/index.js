@@ -51,20 +51,32 @@ function localRoot() {
 }
 
 function s3Config() {
-  const required = ['S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'];
-  const missing = required.filter((k) => !process.env[k]);
+  const settings = require('../settings');
+  // The settings store owns precedence (default < database < environment), so reading
+  // through it means an operator can configure S3 from the dashboard, and the .env
+  // values still work because they outrank the stored ones.
+  const bucket = settings.isLoaded() ? settings.get('storage.s3Bucket') : process.env.S3_BUCKET;
+  const accessKeyId = settings.isLoaded() ? settings.get('storage.s3AccessKeyId') : process.env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = settings.isLoaded()
+    ? settings.secretValue('storage.s3SecretKey')
+    : process.env.S3_SECRET_ACCESS_KEY;
+
+  const missing = [];
+  if (!bucket) missing.push('S3_BUCKET / storage.s3Bucket');
+  if (!accessKeyId) missing.push('S3_ACCESS_KEY_ID / storage.s3AccessKeyId');
+  if (!secretAccessKey) missing.push('S3_SECRET_ACCESS_KEY / storage.s3SecretKey');
   if (missing.length) {
     throw new Error('STORAGE_DRIVER=s3 requires: ' + missing.join(', '));
   }
+
   return {
-    bucket: process.env.S3_BUCKET,
-    endpoint: (process.env.S3_ENDPOINT || 'https://s3.amazonaws.com').replace(/\/+$/, ''),
-    region: process.env.S3_REGION || 'us-east-1',
-    accessKeyId: process.env.S3_ACCESS_KEY_ID,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-    // Path-style addressing is the default because R2 and MinIO require it;
-    // virtual-host style is needed only when a bucket name is not DNS-safe.
-    forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
+    bucket,
+    endpoint: (settings.isLoaded() ? settings.get('storage.s3Endpoint') : process.env.S3_ENDPOINT
+      || 'https://s3.amazonaws.com').replace(/\/+$/, ''),
+    region: settings.isLoaded() ? settings.get('storage.s3Region') : process.env.S3_REGION || 'us-east-1',
+    accessKeyId,
+    secretAccessKey,
+    forcePathStyle: (settings.isLoaded() ? settings.get('storage.s3ForcePathStyle') : process.env.S3_FORCE_PATH_STYLE !== 'false'),
   };
 }
 

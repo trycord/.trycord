@@ -421,6 +421,7 @@ async function boot() {
   app.use('/api/admin', require('./routes/admin'));
   app.use('/api/admin/pages', require('./routes/adminPages'));
   app.use('/api/admin/settings', require('./routes/settings'));
+  app.use('/api/admin/mail', require('./routes/mail'));
   // Test hooks for automated suites (email verification without an inbox).
   // Strictly opt-in: unmounted in every other boot, where the paths 404.
   if (process.env.ALLOW_TEST_HOOKS === 'true') {
@@ -440,18 +441,24 @@ async function boot() {
     } catch (e) { next(e); }
   });
 
+  // The public website owns the origin root, so it is mounted first: Express is
+  // first-match-wins, and the client's own "/" would otherwise answer and the
+  // landing page would be unreachable. "Open the app" goes to /app/, which is where
+  // the client is served from.
+  //
+  // clientDir is not known yet here and the public site does not need it: it falls
+  // back to its own directory for the favicon.
+  const publicDir = serveClient.mountPublicSite(app, {
+    serverDir: __dirname,
+    clientDir: null,
+    pages,
+  });
+
   const clientDir = serveClient.mountClient(app, {
     serverDir: __dirname,
     appMount: APP_MOUNT,
     originOf,
     cspOriginOf,
-  });
-
-
-  const publicDir = serveClient.mountPublicSite(app, {
-    serverDir: __dirname,
-    clientDir,
-    pages,
   });
 
 
