@@ -8,6 +8,7 @@
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -15,9 +16,20 @@
   <header class="site-header">
     <div class="wrap nav-wrap">
       <a class="brand" href="/">
-        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="30" height="30">  <g color="#FF4D24"> <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/> <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/> <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/> <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/> </g> </svg>
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <g color="#FF4D24">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+          </g>
+        </svg>
         <span class="brand-name">Trycord</span>
       </a>
+      <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+        <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+        <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+      </button>
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
       <nav class="site-nav" id="site-nav" aria-label="Primary">
         <a href="/">Home</a>
@@ -25,78 +37,111 @@
         <a href="/docs">Docs</a>
         <a href="/download">Download</a>
         <a href="/about">About</a>
-        <a href="/support">Support</a><a href="/security">Security</a><a href="/status">Status</a>
+        <a href="/support">Support</a>
+        <a href="/security">Security</a>
+        <a href="/status">Status</a>
         <a class="btn-open" href="/app/">Open the app</a>
       </nav>
     </div>
   </header>
 
-  <main id="main" class="page tight">
-    <div class="prose">
-      <h1>About Trycord</h1>
-      <p class="lede">
+
+  <main id="main" class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <p class="kicker">The project</p>
+        <h1>About Trycord</h1>
+        <p class="lede">
         Trycord is a messaging platform with an original client and server,
         built around one idea: communities should run themselves.
       </p>
-
-      <h2>What it is</h2>
-      <p>
-        Trycord is not a hosted service that holds anyone's conversations for
-        them. It is software you run. The server is a self-contained Node.js
-        application you configure from environment variables and point at the
-        database of your choice. It serves the web client itself, and it powers
-        a desktop app that wraps the same client with automatic updates.
-      </p>
-      <p>
-        Because the people who run an instance own it, the defaults lean toward
-        privacy and control: nothing is created implicitly, sensible limits are
-        on by default, and pages are served with a restrictive security policy.
-      </p>
-
-      <h2>The pieces</h2>
-      <ul>
-        <li><strong>backend</strong> — the Node.js server: HTTP API, WebSocket gateway, auth, and static file serving.</li>
-        <li><strong>frontend</strong> — the web application: communities, channels, direct messages, profiles, and settings.</li>
-        <li><strong>trycord-desktop</strong> — an Electron wrapper around the client for Windows, with installers and portable builds published from the repository.</li>
-        <li><strong>public</strong> — this static website: plain, editable HTML documents shared by every instance's server.</li>
-      </ul>
-
-      <h2>Principles</h2>
-      <ul>
-        <li><strong>Direct and dependable</strong> — a focused feature set that works, rather than a sprawling one that demands attention.</li>
-        <li><strong>Complete by default</strong> — the client and server ship together and are tested against each other.</li>
-        <li><strong>Honest by design</strong> — if a capability (like sending recovery email) is not configured, the app says so instead of pretending.</li>
-        <li><strong>Yours to run</strong> — no managed service, no account-vendor lock-in, no implicit data stores.</li>
-      </ul>
-
-      <h2>Source and license</h2>
-      <p>
-        The project is developed in the open and published to
-        <a href="https://github.com/trycord/.trycord" rel="external">github.com/trycord/.trycord</a>.
-        The desktop package is MIT-licensed; see the repository for details.
-      </p>
+      </div>
+      <div class="prose-layout">
+        <div class="prose">
+          <h2>What it is</h2>
+                <p>
+                  Trycord is not a hosted service that holds anyone's conversations for
+                  them. It is software you run. The server is a self-contained Node.js
+                  application you configure from environment variables and point at the
+                  database of your choice. It serves the web client itself, and it powers
+                  a desktop app that wraps the same client with automatic updates.
+                </p>
+                <p>
+                  Because the people who run an instance own it, the defaults lean toward
+                  privacy and control: nothing is created implicitly, sensible limits are
+                  on by default, and pages are served with a restrictive security policy.
+                </p>
+          
+                <h2>The pieces</h2>
+                <ul>
+                  <li><strong>backend</strong> — the Node.js server: HTTP API, WebSocket gateway, auth, and static file serving.</li>
+                  <li><strong>frontend</strong> — the web application: communities, channels, direct messages, profiles, and settings.</li>
+                  <li><strong>trycord-desktop</strong> — an Electron wrapper around the client for Windows, with installers and portable builds published from the repository.</li>
+                  <li><strong>public</strong> — this static website: plain, editable HTML documents shared by every instance's server.</li>
+                </ul>
+          
+                <h2>Principles</h2>
+                <ul>
+                  <li><strong>Direct and dependable</strong> — a focused feature set that works, rather than a sprawling one that demands attention.</li>
+                  <li><strong>Complete by default</strong> — the client and server ship together and are tested against each other.</li>
+                  <li><strong>Honest by design</strong> — if a capability (like sending recovery email) is not configured, the app says so instead of pretending.</li>
+                  <li><strong>Yours to run</strong> — no managed service, no account-vendor lock-in, no implicit data stores.</li>
+                </ul>
+          
+                <h2>Source and license</h2>
+                <p>
+                  The project is developed in the open and published to
+                  <a href="https://github.com/trycord/.trycord" rel="external">github.com/trycord/.trycord</a>.
+                  The desktop package is MIT-licensed; see the repository for details.
+                </p>
+        </div>
+        <aside class="toc" aria-label="Table of contents">
+          <h2 class="toc-title">On this page</h2>
+        </aside>
+      </div>
     </div>
   </main>
 
   <footer class="site-footer">
+    <div class="wrap footer-band">
+      <h2>Run your own community</h2>
+      <p>Trycord is software you run yourself. Open the app to join a community, or read the documentation and start your own instance.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="/app/">Open the app</a>
+        <a class="btn btn-ghost" href="/docs">Read the documentation</a>
+      </div>
+    </div>
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <a class="brand" href="/">
-          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="30" height="30">  <g color="#FF4D24"> <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/> <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/> <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/> <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/> </g> </svg>
-          <span class="brand-name">Trycord</span>
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <g color="#FF4D24">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+          </g>
+        </svg>
+        <span class="brand-name">Trycord</span>
         </a>
-        <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>
+        <p>Private, self-hostable community messaging. Web and desktop.</p>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
-        <a href="/download">Download</a>
         <a href="/docs">Documentation</a>
+        <a href="/download">Download</a>
+        <a href="/status">Status</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Project</h2>
         <a href="/about">About</a>
         <a href="/support">Support</a>
+        <a href="/security">Security</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Communities</h2>
+        <a href="/app/discover">Browse communities</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Legal</h2>
@@ -111,6 +156,7 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
+
 
   <script src="/js/site.js"></script>
 </body>

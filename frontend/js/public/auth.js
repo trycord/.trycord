@@ -43,6 +43,69 @@ function authFooter(...nodes) {
   return el('div', { class: 'auth-footer' }, ...nodes);
 }
 
+// The only redirect a sign-in or sign-up may honour: an application path that
+// stays on this instance. The rules are a deny-list rather than a whitelist so
+// valid destinations never need registering, while anything that would carry
+// the reader off the instance is refused. navigate() matches routes internally
+// and never hands the string to the address bar, so the worst a bad value can
+// do is hit the app's own "no such page".
+function safeNext() {
+  let next = null;
+  try { next = new URLSearchParams(window.location.search).get('next'); } catch (e) { return null; }
+  if (!next || typeof next !== 'string') return null;
+  if (!next.startsWith('/')) return null;
+  // A protocol-relative URL, whether written with slashes or the backslash that
+  // some browsers quietly read as one. Both leave the instance.
+  if (/^\/[\\/]/.test(next)) return null;
+  // The API, uploads and the socket are not pages. Sending a freshly signed-in
+  // member 'somewhere' that parses as a page is how a redirect becomes a leak.
+  if (next.startsWith('/api/') || next.startsWith('/uploads') || next.startsWith('/ws')) return null;
+  return next;
+}
+
+// One labelled password input with a visibility switch, used on every signed-out
+// surface so the control, the wording, and the autofill hints cannot drift
+// between sign in, registration and reset.
+function passwordField({ id, label, placeholder, autocomplete, hint }) {
+  const input = el('input', {
+    class: 'input', id, type: 'password',
+    autocomplete, placeholder, required: true, minlength: 8,
+  });
+  const toggle = el('button', {
+    class: 'pw-toggle', type: 'button', 'aria-pressed': 'false',
+    'aria-controls': id, 'aria-label': 'Show password',
+  }, 'Show');
+  toggle.addEventListener('click', () => {
+    const nowShown = input.type === 'text';
+    input.type = nowShown ? 'password' : 'text';
+    toggle.textContent = nowShown ? 'Show' : 'Hide';
+    toggle.setAttribute('aria-pressed', nowShown ? 'false' : 'true');
+    toggle.setAttribute('aria-label', (nowShown ? 'Show' : 'Hide') + ' password');
+    input.focus();
+  });
+  const wrap = el('div', { class: 'pw' }, input, toggle);
+  return {
+    input, toggle,
+    field: el('div', { class: 'field' },
+      el('label', { for: id }, label), wrap,
+      hint ? el('span', { class: 'hint' }, hint) : null),
+  };
+}
+
+// A live line under a password field stating the server's one real rule and
+// marking when the current value meets it. No invented complexity: the server
+// requires length only, and asserting that a password needs an uppercase letter
+// when the server would accept one without would be a screenful of lies.
+function passwordCheck() {
+  const line = el('span', { class: 'hint pw-check', 'aria-live': 'polite' }, 'At least 8 characters.');
+  function update(value) {
+    const ok = String(value || '').length >= 8;
+    line.classList.toggle('is-met', ok);
+    line.textContent = ok ? 'Meets the 8-character minimum.' : 'At least 8 characters.';
+  }
+  return { line, update };
+}
+
 function secondFactorStep(challengeToken, err) {
   // Replaces the password form in place rather than navigating: the challenge
   // lives in this closure, so there is nothing to pass to another route and no
@@ -104,14 +167,17 @@ export function loginForm(container) {
     contextTitle: 'Welcome back',
   });
 
-  const err = el('div', { class: 'form-error', hidden: true });
+  const err = el('div', { class: 'form-error', role: 'alert', hidden: true });
   const username = el('input', { class: 'input', id: 'login-username', type: 'text', autocomplete: 'username', placeholder: 'Username', required: true });
-  const password = el('input', { class: 'input', id: 'login-password', type: 'password', autocomplete: 'current-password', placeholder: 'Password', required: true });
+  const pw = passwordField({
+    id: 'login-password', label: 'Password',
+    placeholder: 'Password', autocomplete: 'current-password',
+  });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Sign in');
 
   const form = el('form', { class: 'auth-form' }, err,
     el('div', { class: 'field' }, el('label', { for: 'login-username' }, 'Username'), username),
-    el('div', { class: 'field' }, el('label', { for: 'login-password' }, 'Password'), password),
+    pw.field,
     submit);
 
   let busy = false;
@@ -123,7 +189,7 @@ export function loginForm(container) {
     submit.setAttribute('aria-busy', 'true');
     submit.textContent = 'Signing in…';
     try {
-      const res = await Api.login({ username: username.value.trim(), password: password.value });
+      const res = await Api.login({ username: username.value.trim(), password: pw.input.value });
       // A correct password is not a session. When the account has a second
       // factor the response carries a challenge instead of a token, and calling
       // applyAuth on it would store undefined and leave the member looking at a
@@ -135,7 +201,7 @@ export function loginForm(container) {
       }
       applyAuth(res);
       toast('Signed in.', 'ok');
-      navigate('/home');
+      navigate(safeNext() || '/home');
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -179,10 +245,16 @@ export function registerForm(container) {
     contextTitle: 'Create an account',
   });
 
-  const err = el('div', { class: 'form-error', hidden: true });
+  const err = el('div', { class: 'form-error', role: 'alert', hidden: true });
   const username = el('input', { class: 'input', id: 'reg-username', type: 'text', autocomplete: 'username', placeholder: 'username', minlength: 2, maxlength: 32, required: true });
   const display = el('input', { class: 'input', id: 'reg-display', type: 'text', autocomplete: 'nickname', placeholder: 'Display name (optional)', maxlength: 32 });
-  const password = el('input', { class: 'input', id: 'reg-password', type: 'password', autocomplete: 'new-password', placeholder: 'Password (8+ characters)', minlength: 8, required: true });
+  const pw = passwordField({
+    id: 'reg-password', label: 'Password',
+    placeholder: 'Password (8+ characters)', autocomplete: 'new-password',
+  });
+  const pwLine = passwordCheck();
+  pw.input.addEventListener('input', (e) => pwLine.update(e.target.value));
+  pw.field.appendChild(pwLine.line);
   const email = el('input', { class: 'input', id: 'reg-email', type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
   const emailHint = el('span', { class: 'hint' }, 'Optional. Verification and recovery require email delivery on this instance.');
   const emailField = el('div', { class: 'field' }, el('label', { for: 'reg-email' }, 'Email', el('span', { class: 'badge' }, 'optional')), email, emailHint);
@@ -207,7 +279,7 @@ export function registerForm(container) {
       username,
       el('span', { class: 'hint' }, 'Letters, numbers, dots and underscores. 2–32 characters.')),
     el('div', { class: 'field' }, el('label', { for: 'reg-display' }, 'Display name'), display),
-    el('div', { class: 'field' }, el('label', { for: 'reg-password' }, 'Password'), password),
+    pw.field,
     emailField,
     el('p', { class: 'small muted' },
       'By continuing you agree to the ',
@@ -227,7 +299,7 @@ export function registerForm(container) {
     try {
       const res = await Api.register({
         username: username.value.trim(),
-        password: password.value,
+        password: pw.input.value,
         displayName: display.value.trim() || undefined,
         email: email.value.trim() || undefined,
         termsVersion: legalVersions().termsVersion,
@@ -235,7 +307,7 @@ export function registerForm(container) {
       });
       applyAuth(res);
       toast('Account created.', 'ok');
-      navigate('/home');
+      navigate(safeNext() || '/home');
       Realtime.connect();
     } catch (ex) {
       err.hidden = false;
@@ -263,8 +335,8 @@ export function forgotForm(container) {
     contextTitle: 'Reset password',
   });
 
-  const ok = el('div', { class: 'form-success', hidden: true });
-  const err = el('div', { class: 'form-error', hidden: true });
+  const ok = el('div', { class: 'form-success', role: 'status', hidden: true });
+  const err = el('div', { class: 'form-error', role: 'alert', hidden: true });
   const email = el('input', { class: 'input', id: 'forgot-email', type: 'email', autocomplete: 'email', placeholder: 'you@example.com', required: true });
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Send reset link');
 
@@ -272,10 +344,14 @@ export function forgotForm(container) {
     el('div', { class: 'field' }, el('label', { for: 'forgot-email' }, 'Email'), email),
     submit);
 
+  let busy = false;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (busy) return;
     err.hidden = true;
     ok.hidden = true;
+    busy = true;
+    submit.setAttribute('aria-busy', 'true');
     try {
       const res = await Api.forgotPassword({ email: email.value.trim() });
       ok.hidden = false;
@@ -283,6 +359,9 @@ export function forgotForm(container) {
     } catch (ex) {
       err.hidden = false;
       err.textContent = ex.message || 'Request failed';
+    } finally {
+      busy = false;
+      submit.removeAttribute('aria-busy');
     }
   });
 
@@ -300,23 +379,44 @@ export function resetPasswordPage(container, token) {
     lede: 'Set a new password for your Trycord account.',
     contextTitle: 'Reset password',
   });
-  const err = el('div', { class: 'form-error', hidden: true });
-  const ok = el('div', { class: 'form-success', hidden: true });
-  const password = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true, placeholder: 'New password' });
-  const confirm = el('input', { class: 'input', type: 'password', autocomplete: 'new-password', minlength: 8, required: true, placeholder: 'Repeat new password' });
+  const err = el('div', { class: 'form-error', role: 'alert', hidden: true });
+  const ok = el('div', { class: 'form-success', role: 'status', hidden: true });
+  const pw = passwordField({
+    id: 'reset-password', label: 'New password',
+    placeholder: 'New password', autocomplete: 'new-password',
+  });
+  const pwLine = passwordCheck();
+  pw.input.addEventListener('input', (e) => pwLine.update(e.target.value));
+  pw.field.appendChild(pwLine.line);
+  const confirm = passwordField({
+    id: 'reset-confirm', label: 'Confirm password',
+    placeholder: 'Repeat new password', autocomplete: 'new-password',
+  });
+  const matchLine = el('span', { class: 'hint pw-check', 'aria-live': 'polite' },
+    'Repeat the password above.');
+  confirm.input.addEventListener('input', (e) => {
+    const same = e.target.value === pw.input.value;
+    matchLine.classList.toggle('is-met', same);
+    matchLine.textContent = same ? 'Passwords match.' : 'Passwords do not match yet.';
+  });
+  confirm.field.appendChild(matchLine);
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Reset password');
   const form = el('form', { class: 'auth-form' }, ok, err,
-    el('div', { class: 'field' }, el('label', {}, 'New password'), password),
-    el('div', { class: 'field' }, el('label', {}, 'Confirm password'), confirm),
+    pw.field,
+    confirm.field,
     submit);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     err.hidden = true; ok.hidden = true;
     if (!token) { err.hidden = false; err.textContent = 'This reset link is missing its token.'; return; }
-    if (password.value !== confirm.value) { err.hidden = false; err.textContent = 'Passwords do not match.'; return; }
+    if (pw.input.value !== confirm.input.value) {
+      err.hidden = false; err.textContent = 'Passwords do not match.';
+      confirm.input.focus();
+      return;
+    }
     submit.setAttribute('aria-busy', 'true');
     try {
-      const res = await Api.resetPassword({ token, newPassword: password.value, confirmPassword: confirm.value });
+      const res = await Api.resetPassword({ token, newPassword: pw.input.value, confirmPassword: confirm.input.value });
       ok.hidden = false;
       ok.textContent = 'Password changed. Sign in with your new one.';
       form.reset();

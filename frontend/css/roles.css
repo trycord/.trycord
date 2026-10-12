@@ -487,7 +487,9 @@
 }
 
 /* --------------------------------------------------------------------------
-   Auth, the remainder
+   Auth prompts reached from inside the app (join a community, first channel).
+   The signed-out pages are styled in surfaces.css under "Signed-out", so every
+   rule for those pages lives in one place.
    -------------------------------------------------------------------------- */
 
 .auth-wrap {
@@ -496,21 +498,10 @@
   gap: var(--space-6);
 }
 
-.auth-title {
-  font-size: var(--text-xl);
-  margin-bottom: var(--space-3);
-}
-
 .auth-sub {
   font-size: var(--text-base);
   color: var(--color-text-secondary);
   margin-bottom: var(--space-7);
-}
-
-.auth-secondary__title {
-  font-weight: var(--weight-semibold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-3);
 }
 
 .btn__icon {

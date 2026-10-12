@@ -47,6 +47,58 @@
     });
   }
 
+  /* ---- the theme switch ----------------------------------------------------
+     The public site keeps its own preference under its own key, separate from
+     the signed-in application's. The app offers a dozen themes including custom
+     palettes; this site is built for two, its default dark look and Light.
+     Reading the app's key would drag Midnight or a custom palette onto the
+     marketing pages, and writing it from here would change how the app looks,
+     so a choice on this site must never touch the app or the other way round.
+
+     One file sets data-theme before paint; this only changes it afterwards. */
+  var THEME_KEY = 'trycord.publicTheme';
+  var themeButton = document.querySelector('[data-theme-toggle]');
+
+  function resolvedIsLight() {
+    // theme.js already resolved 'system' against the OS before paint, so the
+    // attribute is the answer. Reading matchMedia again here would misread the
+    // default dark theme on a light-OS machine as light, and the switch would
+    // then stay dark when it was clicked.
+    return document.documentElement.getAttribute('data-theme') === 'light';
+  }
+
+  function applyTheme(name) {
+    document.documentElement.setAttribute('data-theme', name);
+    if (themeButton) {
+      themeButton.setAttribute('aria-pressed', name === 'light' ? 'true' : 'false');
+    }
+  }
+
+  if (themeButton) {
+    themeButton.hidden = false;
+    themeButton.addEventListener('click', function () {
+      // The two states this site is built for: its default dark and Light.
+      var name = resolvedIsLight() ? 'trycord' : 'light';
+      // A write that fails (private mode, storage disabled) still changes the
+      // document for this page; only the memory across pages is lost, which is
+      // the same deal as any other blocked-storage browser.
+      try { localStorage.setItem(THEME_KEY, name); } catch (e) { /* storage blocked */ }
+      applyTheme(name);
+    });
+  }
+
+  // When the visitor follows the OS, watch for the OS changing under them.
+  try {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var savedName = null;
+    try { savedName = localStorage.getItem(THEME_KEY); } catch (e) { /* storage blocked */ }
+    if (savedName === 'system') {
+      var onSystemChange = function (e) { applyTheme(e.matches ? 'trycord' : 'light'); };
+      if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+      else if (mq.addListener) mq.addListener(onSystemChange);
+    }
+  } catch (e) { /* matchMedia unsupported */ }
+
   /* ---- the current section in the nav ------------------------------------
      A page knows which link is itself, rather than the server being asked to
      stamp it on every document. */

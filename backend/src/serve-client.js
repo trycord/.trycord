@@ -27,6 +27,25 @@ const APP_ROUTE_PREFIXES = new Set([
   'menu', 'legal', 'channel', 'message', 'support',
 ]);
 
+// The clean URLs the public site mounts, one per file. A single list drives the
+// routes and the sitemap so the two cannot disagree, and the check in
+// scripts/check-public-site.js asserts them against each other. editable marks
+// the pages served through the page editor; everything else is served verbatim
+// from disk.
+const CLEAN_PAGES = [
+  { route: '/terms', file: 'terms.html', editable: true },
+  { route: '/privacy', file: 'privacy.html', editable: true },
+  { route: '/instances-terms', file: 'instances-terms.html', editable: true },
+  { route: '/trust-and-safety', file: 'trust-and-safety.html', editable: true },
+  { route: '/support', file: 'support.html', editable: true },
+  { route: '/security', file: 'security.html', editable: true },
+  { route: '/about', file: 'about.html' },
+  { route: '/features', file: 'features.html' },
+  { route: '/docs', file: 'documentation.html' },
+  { route: '/download', file: 'download.html' },
+  { route: '/status', file: 'status.html' },
+];
+
 // Where the built client might be, in the order it is tried.
 //
 // An explicit location first, so a deployment that arranges its files its own way does
@@ -158,7 +177,8 @@ function mountClient(app, opts) {
 // root and any shared asset names. public/home.html is previewable at /welcome, since
 // an operator may serve public/ from the domain root in front of a reverse proxy.
 function mountPublicSite(app, opts) {
-  const { serverDir, clientDir, pages } = opts;
+  const { serverDir, clientDir, pages, originOf } = opts;
+  const siteOrigin = originOf || (() => '');
 
   let publicDir = null;
   for (const candidate of [
@@ -219,19 +239,15 @@ function mountPublicSite(app, opts) {
     };
   };
 
-  app.get('/terms', editablePage('terms.html', 'terms'));  app.get('/privacy', editablePage('privacy.html', 'privacy'));
-  app.get('/instances-terms', editablePage('instances-terms.html', 'instances-terms'));
-  app.get('/trust-and-safety', editablePage('trust-and-safety.html', 'trust-and-safety'));
-  app.get('/support', editablePage('support.html', 'support'));
-  app.get('/security', editablePage('security.html', 'security'));
-  app.get('/about', publicPage('about.html'));
+  // One list drives the routes, the sitemap, and the check that keeps them in
+  // agreement, so a route cannot exist here and be missing from the sitemap, or
+  // the other way round.
+  for (const p of CLEAN_PAGES) {
+    app.get(p.route, p.editable ? editablePage(p.file, p.route.replace(/^\//, '')) : publicPage(p.file));
+  }
   // Contact was merged into Support: /contact redirects rather than 404ing, so
   // existing inbound links and bookmarks keep working.
   app.get('/contact', (req, res) => res.redirect(301, '/support'));
-  app.get('/features', publicPage('features.html'));
-  app.get('/docs', publicPage('documentation.html'));
-  app.get('/download', publicPage('download.html'));
-  app.get('/status', publicPage('status.html'));
   // The origin root is the public site's front door. Registered before the client
   // is mounted, because Express matches the first route that answers and the
   // client claims "/" for its own shell.
@@ -241,6 +257,37 @@ function mountPublicSite(app, opts) {
 
   app.get('/welcome', publicPage('home.html'));
   app.get('/404', publicPage('404.html'));
+
+  // Robots and sitemap are derived from the same list the routes above mount:
+  // a page added to the site is added to the sitemap by construction, and a
+  // page removed stops being listed. The sitemap is absolute, per the protocol,
+  // so it is built from the request's own origin rather than a configured
+  // domain that could drift from what is actually served.
+  app.get('/robots.txt', (req, res) => {
+    const lines = [
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /api/',
+      'Disallow: /app/',
+      'Disallow: /uploads',
+      '',
+      'Sitemap: ' + siteOrigin(req) + '/sitemap.xml',
+    ];
+    res.type('text/plain').set('Cache-Control', 'no-cache').send(lines.join('\n') + '\n');
+  });
+
+  app.get('/sitemap.xml', (req, res) => {
+    const esc = (s) => String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const routes = ['/'].concat(
+      CLEAN_PAGES.filter((p) => fs.existsSync(path.join(publicDir, p.file))).map((p) => p.route)
+    );
+    const origin = siteOrigin(req);
+    const urls = routes.map((r) => '  <url><loc>' + esc(origin + r) + '</loc></url>').join('\n');
+    res.type('application/xml').set('Cache-Control', 'no-cache')
+      .send('<?xml version="1.0" encoding="UTF-8"?>\n'
+        + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls + '\n</urlset>\n');
+  });
 
   // Browsers auto-request /favicon.ico on every page: serve the brand icon instead of
   // logging a 404 into every console. The icon is read from the client tree, which is

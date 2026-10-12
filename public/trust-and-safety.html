@@ -8,6 +8,7 @@
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -15,9 +16,20 @@
   <header class="site-header">
     <div class="wrap nav-wrap">
       <a class="brand" href="/">
-        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="30" height="30">  <g color="#FF4D24"> <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/> <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/> <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/> <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/> </g> </svg>
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <g color="#FF4D24">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+          </g>
+        </svg>
         <span class="brand-name">Trycord</span>
       </a>
+      <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+        <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+        <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+      </button>
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
       <nav class="site-nav" id="site-nav" aria-label="Primary">
         <a href="/">Home</a>
@@ -25,87 +37,115 @@
         <a href="/docs">Docs</a>
         <a href="/download">Download</a>
         <a href="/about">About</a>
-        <a href="/support">Support</a><a href="/security">Security</a><a href="/status">Status</a>
+        <a href="/support">Support</a>
+        <a href="/security">Security</a>
+        <a href="/status">Status</a>
         <a class="btn-open" href="/app/">Open the app</a>
       </nav>
     </div>
   </header>
 
-  <main id="main" class="page tight">
-    <div class="prose-layout">
-    <!-- page:begin -->
-    <!-- Everything between the two markers below is the editable region. The page editor replaces it on publish; until a page is published this file is served as-is. Remove the markers only if you never intend to use the editor. -->
-    <div class="prose">
-      <h1>Trust &amp; Safety</h1>
-      <p class="lede">
+
+  <main id="main" class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <p class="kicker">Trust and safety</p>
+        <h1>Trust &amp; Safety</h1>
+        <p class="lede">
         How Trycord handles abuse, reports, and the people who get hurt by
         it. Each instance sets its own rules; this is the baseline the
         software is built to support.
       </p>
-
-      <h2>Reporting</h2>
-      <p>
-        Report from inside the app. A report reaches the moderators of the
-        community it happened in, and on an official instance it also
-        escalates to the project. Reports are not anonymous to moderators:
-        they include who filed them, because that is usually needed to act.
-      </p>
-
-      <h2>What the software enforces</h2>
-      <ul>
-        <li>Permission checks on every request, not only in the interface.</li>
-        <li>A role hierarchy, so a moderator cannot act on someone who outranks them.</li>
-        <li>File type and size limits on uploads.</li>
-        <li>Rate limits on registration and messaging.</li>
-      </ul>
-      <p>
-        Enforcement decisions are made by people, not only by software. That
-        is deliberate, and it is also why every instance must offer an appeal
-        route &mdash; see <a href="/support">Support</a>.
-      </p>
-
-      <h2>Appeals</h2>
-      <p>
-        Anyone actioned can appeal at the
-        <a href="/app/support/appeals/new">appeal form</a>, signed in or not.
-        On official instances appeals are reviewed centrally, so a community
-        you were removed from cannot refuse to hear you.
-      </p>
-
-      <h2>What we ask of you</h2>
-      <p>
-        Report in good faith, and say what you actually saw. Do not report
-        someone to settle a disagreement, and do not coordinate reports to
-        pressure an instance. Both make a moderation system worse for
-        everyone living inside it.
-      </p>
+      </div>
+      <div class="prose-layout">
+        <div class="prose">
+          <!-- page:begin -->
+          <!-- Everything between the two markers below is the editable region: publishing replaces it with the body of the draft. The title and lead above, the contents list to the side, and the header and footer all sit outside the markers, so publishing cannot change them. -->
+          <h2>Reporting</h2>
+                <p>
+                  Report from inside the app. A report reaches the moderators of the
+                  community it happened in, and on an official instance it also
+                  escalates to the project. Reports are not anonymous to moderators:
+                  they include who filed them, because that is usually needed to act.
+                </p>
+          
+                <h2>What the software enforces</h2>
+                <ul>
+                  <li>Permission checks on every request, not only in the interface.</li>
+                  <li>A role hierarchy, so a moderator cannot act on someone who outranks them.</li>
+                  <li>File type and size limits on uploads.</li>
+                  <li>Rate limits on registration and messaging.</li>
+                </ul>
+                <p>
+                  Enforcement decisions are made by people, not only by software. That
+                  is deliberate, and it is also why every instance must offer an appeal
+                  route &mdash; see <a href="/support">Support</a>.
+                </p>
+          
+                <h2>Appeals</h2>
+                <p>
+                  Anyone actioned can appeal at the
+                  <a href="/app/support/appeals/new">appeal form</a>, signed in or not.
+                  On official instances appeals are reviewed centrally, so a community
+                  you were removed from cannot refuse to hear you.
+                </p>
+          
+                <h2>What we ask of you</h2>
+                <p>
+                  Report in good faith, and say what you actually saw. Do not report
+                  someone to settle a disagreement, and do not coordinate reports to
+                  pressure an instance. Both make a moderation system worse for
+                  everyone living inside it.
+                </p>
+          <!-- page:end -->
+        </div>
+        <aside class="toc" aria-label="Table of contents">
+          <h2 class="toc-title">On this page</h2>
+        </aside>
+      </div>
     </div>
-    <!-- page:end -->
-    <aside class="toc" aria-label="Table of contents">
-      <h2 class="toc-title">On this page</h2>
-    </aside>
-  </div>
   </main>
 
   <footer class="site-footer">
+    <div class="wrap footer-band">
+      <h2>Run your own community</h2>
+      <p>Trycord is software you run yourself. Open the app to join a community, or read the documentation and start your own instance.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="/app/">Open the app</a>
+        <a class="btn btn-ghost" href="/docs">Read the documentation</a>
+      </div>
+    </div>
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <a class="brand" href="/">
-          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="30" height="30">  <g color="#FF4D24"> <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/> <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/> <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/> <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/> </g> </svg>
-          <span class="brand-name">Trycord</span>
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <g color="#FF4D24">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+          </g>
+        </svg>
+        <span class="brand-name">Trycord</span>
         </a>
-        <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>
+        <p>Private, self-hostable community messaging. Web and desktop.</p>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
-        <a href="/download">Download</a>
         <a href="/docs">Documentation</a>
+        <a href="/download">Download</a>
+        <a href="/status">Status</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Project</h2>
         <a href="/about">About</a>
         <a href="/support">Support</a>
+        <a href="/security">Security</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Communities</h2>
+        <a href="/app/discover">Browse communities</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Legal</h2>
@@ -120,6 +160,7 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
+
 
   <script src="/js/site.js"></script>
 </body>

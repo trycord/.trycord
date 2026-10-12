@@ -72,6 +72,7 @@ async function main() {
   const publicDir = serveClient.mountPublicSite(app, {
     serverDir: path.join(ROOT, 'src'),
     clientDir,
+    originOf: () => '',
     pages: { publishedHtml: async () => null },
   });
   serveClient.mountSpaFallback(app, {
@@ -206,52 +207,115 @@ async function main() {
     console.log('\n  the composition is the redesigned one');
 
     const home = await get(port, '/welcome');
-    ok('the hero is a two-column composition, not one centred block',
+
+    // 1. The hero is a two-column composition: copy on the left, and beside it a
+    //    framed specimen plate holding the brand mark, like the plate the design
+    //    tokens were documented in.
+    ok('the hero is a two-column composition',
       /hero-copy/.test(home.body) && /hero-aside/.test(home.body),
       'no .hero-copy / .hero-aside');
+    ok('the hero carries a framed specimen plate',
+      /hero-plate/.test(home.body) && /hero-mark/.test(home.body),
+      'no .hero-plate / .hero-mark');
 
-    // The brand mark is the library's SVG, crisp at any size and carrying the
-    // page's own accent, rather than a raster frozen at one colour.
+    // 2. The brand mark is the library's SVG, crisp at any size and carrying the
+    //    page's own accent, rather than a raster frozen at one colour.
     ok('the brand mark is the library SVG, not the raster',
       /<svg class="mark"/.test(home.body) && !/<img class="brand-mark"/.test(home.body));
 
-    // Feature cards carry an icon from the library, which is what gives them a
-    // focal point instead of opening straight onto a kicker.
-    const iconCards = (home.body.match(/<div class="card-icon"/g) || []).length;
-    ok('the feature cards carry library icons',
-      iconCards >= 4, iconCards + ' cards with an icon');
+    // 3. The hero leads with a ruled fact strip of three real capabilities,
+    //    not a wall of invented numbers or a grid of icon cards.
+    const facts = (home.body.match(/class="fact"/g) || []).length;
+    ok('the hero opens with a ruled fact strip',
+      /<dl class="facts"/.test(home.body) && facts >= 3, facts + ' facts');
 
-    // "Run it your way" is a numbered sequence rather than another card grid.
-    ok('the steps section is a numbered sequence',
-      /<div class="steps">/.test(home.body) && /<div class="step">/.test(home.body));
+    // 4. The body is a numbered plate sequence, and the capability lists inside
+    //    the plates are ruled rows, not the old card grid.
+    const plates = (home.body.match(/<section class="plate/g) || []).length;
+    ok('the page is a numbered plate sequence', plates >= 4, plates + ' plates');
+    ok('each plate is addressed by its index gutter', /<p class="plate-idx"/.test(home.body));
+    const rows = (home.body.match(/class="feature"/g) || []).length;
+    ok('features are ruled rows, not a card grid',
+      rows >= 4 && !/<div class="card-icon"/.test(home.body), rows + ' feature rows');
 
-    // A prose page is a document with a spine and a generated contents list.
+    // 5. Getting started is a sequence numbered in the same gutter.
+    ok('the getting-started section is a numbered sequence',
+      /class="steps"/.test(home.body) && /class="step"/.test(home.body));
+
+    // 6. The document closes on an ember statement plate that owns the accent.
+    ok('the page closes on an ember statement plate',
+      /class="plate statement"/.test(home.body));
+
+    // 7. The footer opens with its own call to action and names four link
+    //    columns, including the community directory route.
+    ok('the footer opens with a call to action', /footer-band/.test(home.body));
+    const cols = (home.body.match(/class="footer-col"/g) || []).length;
+    ok('the footer has four link columns', cols >= 4, cols + ' columns');
+    const discover = await get(port, '/app/discover');
+    ok('the community directory link resolves', discover.status < 400, 'status ' + discover.status);
+
+    // 8. A prose page is a document with a spine: the reading column beside a
+    //    generated contents list. The page opening, the layout wrapper, the
+    //    reading column and the contents list all live OUTSIDE the editable
+    //    markers, so publishing can replace the body and nothing else.
     const terms = await get(port, '/terms');
     ok('a prose page uses the two-column layout with a contents list',
       /prose-layout/.test(terms.body) && /<aside class="toc"/.test(terms.body),
       'no .prose-layout or .toc');
-    // The wrapper sits outside the editable markers, so publishing cannot
-    // destroy the contents list.
     const beginAt = terms.body.indexOf('page:begin');
     const layoutAt = terms.body.indexOf('prose-layout');
+    const proseAt = terms.body.indexOf('<div class="prose">');
+    const headAt = terms.body.indexOf('<h1>');
+    const tocAt = terms.body.indexOf('<aside class="toc"');
     ok('the layout wrapper is outside the editable region',
       layoutAt !== -1 && beginAt !== -1 && layoutAt < beginAt,
       'wrapper at ' + layoutAt + ', page:begin at ' + beginAt);
+    ok('the reading column is the thing that is edited',
+      proseAt !== -1 && beginAt !== -1 && proseAt < beginAt,
+      'prose at ' + proseAt + ', page:begin at ' + beginAt);
+    ok('the page title lives outside the editable region',
+      headAt !== -1 && beginAt !== -1 && headAt < beginAt,
+      'title at ' + headAt + ', page:begin at ' + beginAt);
+    ok('the contents list lives outside the editable region',
+      tocAt !== -1 && beginAt !== -1 && beginAt < tocAt,
+      'toc at ' + tocAt + ', page:begin at ' + beginAt);
 
-    // The stylesheet is the new one: the glows are derived, the cards lift, and
-    // the header marks itself when there is content behind it.
+    // 9. The stylesheet is the new one: the glows are derived, the plates run
+    //    down a fixed rail, and the motion respects the reduced-motion
+    //    preference by going rather than shortening.
     const css = fs.readFileSync(path.join(PUBLIC, 'css', 'site.css'), 'utf8');
     ok('the header marks itself once the page has moved',
       /data-scrolled/.test(css));
+    ok('the plates address themselves from a fixed rail',
+      /--rail: 72px/.test(css) && /\.plate-row \{[\s\S]*?grid-template-columns: var\(--rail\)/.test(css));
     ok('the hero collapses to one column on a narrow screen',
-      /@media \(max-width: 860px\)[\s\S]*?hero \.wrap \{ grid-template-columns: 1fr/.test(css));
+      /@media \(max-width: 900px\)[\s\S]*?\.hero \.wrap \{ grid-template-columns: 1fr/.test(css));
+    ok('the plate index yields to the kicker below the rail break',
+      /@media \(max-width: 1000px\)[\s\S]*?\.plate-idx \{ display: none/.test(css));
     ok('the contents list is sticky on a wide screen and gone on a narrow one',
       /\.toc \{[\s\S]*?position: sticky/.test(css)
       && /@media \(max-width: 1000px\)[\s\S]*?\.toc \{ display: none/.test(css));
+    ok('the fact strip rules itself on a narrow screen',
+      /@media \(max-width: 720px\)[\s\S]*?\.facts \{ grid-template-columns: 1fr/.test(css));
+    ok('reduced motion removes the motion rather than shortening it',
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition-duration: 0\.01ms/.test(css));
 
-    // The reduced-motion preference removes the motion rather than shortening it.
-    ok('reduced motion removes the hover lift',
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.card:hover/.test(css));
+    // ---- the site announces itself to search engines ----
+    console.log('\n  the site announces itself to search engines');
+
+    const robots = await get(port, '/robots.txt');
+    ok('GET /robots.txt serves crawl rules',
+      robots.status === 200 && /User-agent: \*/.test(robots.body) && /Sitemap:/.test(robots.body),
+      'status ' + robots.status);
+
+    const sitemap = await get(port, '/sitemap.xml');
+    const locs = [...(sitemap.body.match(/<loc>([^<]+)<\/loc>/g) || [])]
+      .map((m) => m.replace(/<\/?loc>/g, ''));
+    const expected = ['/', '/terms', '/privacy', '/instances-terms', '/trust-and-safety',
+      '/support', '/security', '/about', '/features', '/docs', '/download', '/status'];
+    const match = expected.every((route) => locs.some((l) => l === route || l.endsWith(route)));
+    ok('GET /sitemap.xml lists every clean URL and the home page',
+      sitemap.status === 200 && match, 'status ' + sitemap.status + ', ' + locs.join(', '));
   } finally {
     server.close();
   }
