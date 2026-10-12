@@ -67,6 +67,28 @@ function settingControl(cat, s) {
       onInput: (e) => { dirty.set(s.key, e.target.value); },
     });
     control.appendChild(input);
+  } else if (s.type === 'secret') {
+    // A credential is write-only. The server never sends it back, so the field is
+    // always blank and what is shown is whether one is stored. Saving an empty field
+    // leaves the stored one alone, which is what makes an empty input safe to show -
+    // otherwise every visit to this screen would wipe the credential.
+    const state = s.set
+      ? (s.readable === false ? 'stored but unreadable' : 'stored')
+      : 'not set';
+    const input = el('input', {
+      class: 'input', type: 'password',
+      value: '',
+      autocomplete: 'new-password',
+      placeholder: s.set ? 'Leave blank to keep the current one' : 'Not set',
+      'aria-label': s.label,
+      'aria-describedby': s.key + '-secret-state',
+      disabled: !!s.locked,
+      onInput: (e) => { dirty.set(s.key, e.target.value); },
+    });
+    control.appendChild(input);
+    control.appendChild(el('span', {
+      class: 'cfg-row__state', id: s.key + '-secret-state',
+    }, state));
   }
 
   // Where the value comes from, and whether a change takes effect now or needs a restart.
@@ -181,6 +203,125 @@ function quickSetupPanel() {
   return card;
 }
 
+// The mail console.
+//
+// The settings rows above describe each field. This answers the question an operator
+// actually has when they open the Email category: does any of it work, and what would
+// it take to make it work. It reads the provider registry from the server, so the
+// modes offered are the ones that exist rather than a list restated here.
+//
+// A test send is offered for every mode, including disabled. There is no way to ask a
+// provider whether it is reachable without sending mail, so the honest thing is to
+// send one and report what came back - and for disabled mode to say plainly that
+// nothing will be sent rather than pretending to test.
+function mailPanel() {
+  const card = el('div', { class: 'card cfg-card' });
+  card.appendChild(el('div', { class: 'cfg-card__head' },
+    el('h2', { class: 'cfg-card__title' }, 'Mail delivery')));
+
+  const status = el('p', { class: 'cfg-row__desc', role: 'status' });
+  const modes = el('div', { class: 'cfg-mail__modes', role: 'radiogroup', 'aria-label': 'Delivery mode' });
+  const detail = el('div', { class: 'cfg-mail__detail' });
+
+  let console_ = null;
+
+  const paint = () => {
+    if (!console_) return;
+    status.textContent = console_.status.ready
+      ? 'Mail is configured and ready to send.'
+      : 'Mail is not ready. ' + (console_.status.problems[0] || 'Nothing is configured.');
+
+    modes.replaceChildren();
+    for (const p of console_.providers) {
+      const current = console_.current === p.mode;
+      const btn = el('button', {
+        class: 'cfg-mail__mode' + (current ? ' active' : ''),
+        type: 'button',
+        role: 'radio',
+        'aria-checked': current ? 'true' : 'false',
+        onClick: async () => {
+          if (current) return;
+          try {
+            await Api.updateInstanceSettings({ 'mail.mode': p.mode });
+            await load();
+            await refresh();
+            toast(p.label + ' is now the delivery mode.', 'ok');
+          } catch (e) {
+            toast(e.message || 'Could not change the mode.', 'error');
+          }
+        },
+      }, [
+        el('strong', {}, p.label),
+        el('span', { class: 'cfg-mail__mode-summary' }, p.summary),
+      ]);
+      modes.appendChild(btn);
+    }
+
+    detail.replaceChildren();
+    const problems = console_.status.problems || [];
+    if (problems.length) {
+      detail.appendChild(el('p', { class: 'cfg-row__desc' }, 'What is missing:'));
+      for (const problem of problems) {
+        detail.appendChild(el('p', { class: 'cfg-row__desc cfg-mail__problem' }, problem));
+      }
+    }
+
+    // A test send, for every mode. Disabled says so rather than offering a button that
+    // would report a failure the operator did not cause.
+    const row = el('div', { class: 'cfg-row' });
+    row.appendChild(el('label', { class: 'cfg-row__title' }, 'Send a test message'));
+    if (console_.current === 'disabled') {
+      row.appendChild(el('p', { class: 'cfg-row__desc' },
+        'Mail delivery is disabled, so nothing will be sent. Choose another mode to test.'));
+    } else {
+      const addr = el('input', {
+        class: 'input', type: 'email', placeholder: 'you@example.com',
+        'aria-label': 'Address to send a test message to',
+      });
+      const result = el('span', { class: 'cfg-row__desc', role: 'status' });
+      const send = el('button', {
+        class: 'btn', type: 'button',
+        onClick: async () => {
+          const to = addr.value.trim();
+          if (!to) { result.textContent = 'Enter an address first.'; return; }
+          send.setAttribute('aria-busy', 'true');
+          result.textContent = 'Sending...';
+          try {
+            const out = await Api.mailTestSend(to);
+            result.textContent = out.detail || 'Sent.';
+          } catch (e) {
+            // The message is the server's own wording, which names the cause. Shown
+            // as it is: an operator who cannot see why a test failed cannot fix it.
+            result.textContent = e.message || 'Could not send.';
+          } finally {
+            send.removeAttribute('aria-busy');
+          }
+        },
+      }, 'Send');
+      row.appendChild(addr);
+      row.appendChild(send);
+      row.appendChild(result);
+    }
+    detail.appendChild(row);
+  };
+
+  async function refresh() {
+    try {
+      console_ = await Api.mailConsole();
+    } catch (e) {
+      status.textContent = e.message || 'The mail configuration could not be read.';
+      return;
+    }
+    paint();
+  }
+
+  card.appendChild(status);
+  card.appendChild(modes);
+  card.appendChild(detail);
+  refresh();
+  return card;
+}
+
 function repaint() {
   const region = document.getElementById('view-root');
   if (!region) return;
@@ -227,6 +368,13 @@ function repaint() {
   // a fresh install has to do.
   if (cat.id === 'general' && quickSetup.enabled) {
     region.appendChild(quickSetupPanel());
+  }
+
+  // The mail console, on the Email category. The settings rows above say what each
+  // field does; this says whether any of it works, which is a different question and
+  // the one an operator actually wants answered.
+  if (cat.id === 'mail') {
+    region.appendChild(mailPanel());
   }
 
   // Settings the application cannot change, named with the reason rather than hidden.

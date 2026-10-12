@@ -266,7 +266,7 @@ export function profileViewContext(profile, { membership, isSelf } = {}) {
 // Nothing here invents a statistic: a count that can't be read is omitted rather
 // than shown as zero, because a zero meaning "failed to load" is worse than no
 // number.
-export async function adminContext(section) {
+export async function adminContext(section, fetched) {
   const out = [];
   const card = (title, ...children) => contextBlock(title, ...children);
 
@@ -281,15 +281,23 @@ export async function adminContext(section) {
       // the whole reason this column exists.
     }
   };
-  // /admin/overview counts server-side. Deriving these from the list endpoints
-  // instead would mean counting a page the server caps at 100, so the number
-  // would quietly stop being the number.
-  const overview = await Api.adminOverview().catch(() => null);
+
+  // The section beside this column already asked /admin/overview. Using its
+  // response is the difference between the number beside the list and the number
+  // in the list coming from two different moments, and between one request and two.
+  const overview = (fetched && fetched.overview) || await Api.adminOverview().catch(() => null);
   if (overview) {
     totals.push(contextFact('Open reports', String(overview.openReports)));
     totals.push(contextFact('Appeals to review', String(overview.openAppeals)));
   }
-  await add('Deletion requests', () => Api.adminGdprRequests({ status: 'DELETION_REQUESTED', limit: 100 }));
+
+  // Same for the deletion count the GDPR section has already read.
+  const pending = fetched && fetched.pendingDeletions;
+  if (pending !== undefined && pending !== null) {
+    totals.push(contextFact('Deletion requests', String(pending)));
+  } else {
+    await add('Deletion requests', () => Api.adminGdprRequests({ status: 'DELETION_REQUESTED', limit: 100 }));
+  }
 
   if (totals.length) {
     out.push(card('Waiting on you', contextList(...totals),

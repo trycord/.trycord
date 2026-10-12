@@ -106,14 +106,22 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
     body.appendChild(node);
   };
   const sec = el('div', { class: 'admin-block' });
-  const showSec = (node) => { if (seq === currentSeq()) { clear(sec); sec.appendChild(node); } };
+  // What the section fetched, handed back so the context column beside it can use
+  // the same response. A section that fetches nothing hands back null and the
+  // column falls back to asking on its own, as it always did.
+  const fetched = {};
+  const showSec = (node) => {
+    if (seq !== currentSeq()) return;
+    clear(sec);
+    sec.appendChild(node);
+  };
   show(sec);
   sec.appendChild(loadingState('Loading'));
 
   try {
     const paint = SECTIONS[section] || renderOverview;
-    await paint(sec, showSec, seq);
-    await fillAdminContext(context, section);
+    await paint(sec, showSec, seq, fetched);
+    await fillAdminContext(context, section, fetched);
   } catch (ex) {
     if (seq !== currentSeq()) return;
     clear(body);
@@ -125,10 +133,10 @@ export async function renderAdmin(container, { section = 'overview' } = {}) {
 
 // Painted after the section so the column reads the same instance the list does. A
 // failure here must not take the console down with it.
-async function fillAdminContext(host, section) {
+async function fillAdminContext(host, section, fetched) {
   if (!host) return;
   try {
-    const nodes = await adminContext(section);
+    const nodes = await adminContext(section, fetched);
     for (const n of nodes) host.appendChild(n);
     if (nodes.length) host.closest('.settings-layout').dataset.hasContext = 'yes';
   } catch { /* a summary is a convenience, never a dependency */ }
