@@ -15,7 +15,11 @@
 // decrypted in another: reusing a raw JWT_SECRET across purposes would mean a
 // single derived key protects every secret in the installation.
 const crypto = require('crypto');
-const { secret } = require('../util');
+
+// clock, not util: util's module scope reaches the settings store, and this
+// module is reached from the settings store, so importing util here closed a
+// cycle through module scope.
+const { secret } = require('../clock');
 
 // Derived rather than used directly, because JWT_SECRET is written down in
 // .env and a container orchestrator will pass it to more than one process.

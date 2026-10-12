@@ -24,7 +24,7 @@
     "db:backup": "node scripts/db-backup.js",
     "seed": "node scripts/seed.js",
     "migrate": "node scripts/migrate.js",
-    "check": "node scripts/check.js && node scripts/check-routes.js && node scripts/check-schema-parity.js && node scripts/check-mount.js && node scripts/check-settings-wiring.js && node scripts/check-moderation.js && node scripts/check-public-site.js && node scripts/check-server-routes.js && node scripts/check-server-bindings.js && node scripts/check-client-modules.js && node scripts/check-client-bindings.js && node scripts/check-client-load.js && node scripts/check-sibling-bindings.js && node scripts/check-singletons.js && node scripts/check-client-headings.js && node scripts/check-client-registry.js && node scripts/check-origins.js && node scripts/check-contrast.js && node scripts/check-client-styles.js && node scripts/check-workflows.js && node scripts/check-doc-counts.js && node scripts/check-require-aliases.js && node scripts/check-crash-recovery.js && node scripts/check-signin.js && node scripts/check-split-loses.js && node scripts/check-desktop-shell.js && node scripts/check-mobile-layout.js && node scripts/check-mail.js && node scripts/verify-mail-admin.js && node scripts/check-events.js && node scripts/check-permissions.js",
+    "check": "node scripts/check.js && node scripts/check-routes.js && node scripts/check-schema-parity.js && node scripts/check-mount.js && node scripts/check-settings-wiring.js && node scripts/check-moderation.js && node scripts/check-public-site.js && node scripts/check-server-routes.js && node scripts/check-server-bindings.js && node scripts/check-client-modules.js && node scripts/check-client-bindings.js && node scripts/check-client-load.js && node scripts/check-sibling-bindings.js && node scripts/check-singletons.js && node scripts/check-client-headings.js && node scripts/check-client-registry.js && node scripts/check-origins.js && node scripts/check-contrast.js && node scripts/check-client-styles.js && node scripts/check-workflows.js && node scripts/check-doc-counts.js && node scripts/check-require-aliases.js && node scripts/check-crash-recovery.js && node scripts/check-signin.js && node scripts/check-split-loses.js && node scripts/check-desktop-shell.js && node scripts/check-mobile-layout.js && node scripts/check-mail.js && node scripts/verify-mail-admin.js && node scripts/check-events.js && node scripts/check-permissions.js && node scripts/check-loads.js",
     "css": "node ../frontend/scripts/build-css.js",
     "check-client-styles": "node scripts/check-client-styles.js",
     "check:desktop-shell": "node scripts/check-desktop-shell.js && node scripts/check-mobile-layout.js",
@@ -57,7 +57,8 @@
     "check:schema-parity": "node scripts/check-schema-parity.js",
     "check-mail:admin": "node scripts/verify-mail-admin.js",
     "check:events": "node scripts/check-events.js",
-    "check:permissions": "node scripts/check-permissions.js"
+    "check:permissions": "node scripts/check-permissions.js",
+    "check:loads": "node scripts/check-loads.js"
   },
   "license": "MIT",
   "dependencies": {

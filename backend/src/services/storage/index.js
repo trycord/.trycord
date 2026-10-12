@@ -55,11 +55,13 @@ function s3Config() {
   // The settings store owns precedence (default < database < environment), so reading
   // through it means an operator can configure S3 from the dashboard, and the .env
   // values still work because they outrank the stored ones.
-  const bucket = settings.isLoaded() ? settings.get('storage.s3Bucket') : process.env.S3_BUCKET;
-  const accessKeyId = settings.isLoaded() ? settings.get('storage.s3AccessKeyId') : process.env.S3_ACCESS_KEY_ID;
-  const secretAccessKey = settings.isLoaded()
-    ? settings.secretValue('storage.s3SecretKey')
-    : process.env.S3_SECRET_ACCESS_KEY;
+  // settings.read() takes the environment value as its fallback, which is the
+  // precedence the schema already implements: an operator who set the variable
+  // meant it, and before the store has loaded the environment is all there is.
+  // secretValue() applies the same rule itself, so it needs no branch here.
+  const bucket = settings.read('storage.s3Bucket', process.env.S3_BUCKET);
+  const accessKeyId = settings.read('storage.s3AccessKeyId', process.env.S3_ACCESS_KEY_ID);
+  const secretAccessKey = settings.secretValue('storage.s3SecretKey') || process.env.S3_SECRET_ACCESS_KEY;
 
   const missing = [];
   if (!bucket) missing.push('S3_BUCKET / storage.s3Bucket');
@@ -71,12 +73,12 @@ function s3Config() {
 
   return {
     bucket,
-    endpoint: (settings.isLoaded() ? settings.get('storage.s3Endpoint') : process.env.S3_ENDPOINT
-      || 'https://s3.amazonaws.com').replace(/\/+$/, ''),
-    region: settings.isLoaded() ? settings.get('storage.s3Region') : process.env.S3_REGION || 'us-east-1',
+    endpoint: settings.read('storage.s3Endpoint', process.env.S3_ENDPOINT || 'https://s3.amazonaws.com')
+      .replace(/\/+$/, ''),
+    region: settings.read('storage.s3Region', process.env.S3_REGION || 'us-east-1'),
     accessKeyId,
     secretAccessKey,
-    forcePathStyle: (settings.isLoaded() ? settings.get('storage.s3ForcePathStyle') : process.env.S3_FORCE_PATH_STYLE !== 'false'),
+    forcePathStyle: settings.read('storage.s3ForcePathStyle', process.env.S3_FORCE_PATH_STYLE !== 'false'),
   };
 }
 

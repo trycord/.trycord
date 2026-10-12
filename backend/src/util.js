@@ -1,17 +1,13 @@
-// Shared helpers: ids, timestamps, tokens, membership checks. All database
-// access goes through the db facade and is async.
-const crypto = require('crypto');
+// Token signing and membership checks. All database access goes through the db
+// facade and is async.
+//
+// now(), uuid() and secret() live in ./clock and are re-exported here, because
+// most of the tree already imports them from this file and moving them would be
+// a rename everywhere for no gain in clarity. What util.js keeps is what needs
+// the database: token signing and membership.
 const jwt = require('jsonwebtoken');
 const db = require('./db');
-
-function secret() {
-  const s = process.env.JWT_SECRET;
-  if (!s) throw new Error('JWT_SECRET is required. Set it in the environment or .env (see .env.example).');
-  return s;
-}
-
-const now = () => new Date().toISOString();
-const uuid = () => crypto.randomUUID();
+const { now, uuid, secret } = require('./clock');
 
 // jti is returned alongside the token so the caller can record the session.
 // The signature authenticates the request; jti is what lets one session be
@@ -28,8 +24,12 @@ const uuid = () => crypto.randomUUID();
 // session" exact.
 function signWithJti(user) {
   const jti = uuid();
+  // Required here, not at the top, and that is deliberate: services/settings.js
+  // requires this file for now() and uuid(), so a top-level require would close a
+  // cycle. settings.read() takes the fallback, which is what a token minted
+  // before the store has loaded needs anyway.
   const settings = require('./services/settings');
-  const days = settings.isLoaded() ? Number(settings.get('security.sessionTtlDays')) : 7;
+  const days = Number(settings.read('security.sessionTtlDays', 7));
   const expiresIn = (Number.isFinite(days) && days > 0 ? days : 7) + 'd';
   const token = jwt.sign(
     { id: user.id, username: user.username, jti, sv: Number(user.session_version || 0) },

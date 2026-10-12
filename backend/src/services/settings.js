@@ -15,7 +15,12 @@
 // explicit write, and a blank field leaves the stored one alone.
 
 const db = require('../db');
-const { now, uuid } = require('../util');
+// clock, not util: settings needs a timestamp and an id, and util needs the
+// settings store to read a session lifetime. Importing util here closed a cycle
+// through the module scope, which Node resolves by handing one side a partially
+// built exports object - it worked only because server.js happened to reach
+// settings before util.
+const { now, uuid } = require('../clock');
 const secrets = require('./secrets');
 
 // Every secret's stored (encrypted) value, kept alongside the other loaded state so
@@ -828,8 +833,25 @@ function secretValue(key) {
   }
 }
 
+// Read a setting for a caller that may run before the store has loaded, with the
+// value to use when it has not.
+//
+// Five call sites needed `isLoaded() ? get(key) : fallback`, and two of them
+// required this module from inside a function to break a require cycle with
+// util.js, which is how the cycle existed at all: the lowest-level module in the
+// tree was reaching up into the configuration store to sign a token. The
+// fallback moves here, so the cycle has nothing left to require.
+//
+// A caller that cannot proceed without a real value should use get() and let it
+// throw. This is for the ones that genuinely have a sane answer before boot.
+function read(key, fallback) {
+  if (!store.loaded) return fallback;
+  const value = store.values[key];
+  return value === undefined ? fallback : value;
+}
+
 module.exports = {
   SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY,
-  load, get, source, save, catalogue, validate, serialise, isLoaded,
+  load, get, read, source, save, catalogue, validate, serialise, isLoaded,
   secretStored, secretValue,
 };

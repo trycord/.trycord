@@ -32,11 +32,10 @@ function makeConfig(mode, overrides) {
     mode,
     get(key) {
       if (overrides && overrides[key] !== undefined) return overrides[key];
-      if (settings.isLoaded()) return settings.get(key);
-      // Before the store loads, the environment is the only thing that can be
-      // known. A boot-time send is not a thing that happens, but refusing here
-      // would turn a timing detail into a crash.
-      return undefined;
+      // undefined rather than a throw: the providers decide what a missing value
+      // means, and a send before the store has loaded is a timing detail rather
+      // than a reason to take the process down.
+      return settings.read(key, undefined);
     },
     getSecret(key) {
       if (overrides && overrides['secret:' + key] !== undefined) return overrides['secret:' + key];
@@ -60,8 +59,7 @@ function makeConfig(mode, overrides) {
 // previous default of logging message bodies is what put password reset links in
 // the server log in cleartext.
 function mode() {
-  if (!settings.isLoaded()) return 'disabled';
-  const configured = settings.get('mail.mode');
+  const configured = settings.read('mail.mode', 'disabled');
   return registry.isMode(configured) ? registry.normaliseMode(configured) : 'disabled';
 }
 
