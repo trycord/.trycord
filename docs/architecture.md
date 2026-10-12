@@ -494,9 +494,28 @@ reach the page that answers to them and cannot drift from it.
 A renderer lives next to its own domain — `community/`, `account/`, `admin/`,
 `messages/`, `global/`, `profile/`, `discovery/`, `support/`, `public/` — and binds
 to a page id in `pages/handlers.js`. Renderers are kept out of the registry because
-the rail, the sidebar and the settings navigation would otherwise have to import
+the the rail, the sidebar and the settings navigation would otherwise have to import
 every page module to read a label, and those modules import the shell, which reads
 the registry.
+
+## The shell
+
+`frontend/js/app-shell.js` draws the tree the rest of the application addresses by
+id — the rail, the place navigation, the workspace and the overlays — once, when the
+application starts. It also owns the keyboard shortcuts. Everything else about the
+chrome belongs to the region renderers in `shell/`: `renderAllChrome()` fills those
+regions on every route change, and each one is a module named for what it draws.
+This split is deliberate. The shell's *structure* is stable and read by id from
+everywhere; its *content* changes on every route and on every unread badge. One file
+doing both was a tree that got torn down and rebuilt to change a number.
+
+`components/base.js` is the component base: `render()`, `mount()`, `unmount()`
+and `on()`, which registers a listener that `unmount()` removes. It exists because
+a listener registered without a matching removal outlives the surface it draws for,
+and the symptom is a handler that responds to a page the reader has left. It is not
+a framework — there is no reactivity, no diffing, no virtual DOM, and no component
+library on top of it. The two things that needed it have it; everything else creates
+its own DOM the way the renderers always have.
 
 ## Theming
 
@@ -526,7 +545,14 @@ Real, known gaps. None blocks ordinary use.
   types - and the detected type is stored in preference to the declared one, so a
   GIF named `photo.png` is stored and served as a GIF. A file matching nothing is
   stored as `application/octet-stream`.
-- **Email verification and password reset need a working SMTP transport.**
+- **Mail has three modes and nothing else: smtp, api, disabled.** A mode is a
+  shape of transport; a provider is a specific service. The two are kept apart
+  so that no route, setting or screen names a vendor. The api adapter is generic
+  and configured: an operator points it at an endpoint and names where each part
+  of the message goes in the JSON body. `MAIL_MODE` outranks the dashboard, as
+  every environment variable does. Credentials are encrypted at rest with
+  AES-256-GCM under a key derived from `JWT_SECRET`, and are never returned by
+  the API, only reported as set or unset and readable or not.
 - **Full-text search is prefix-based.** There is no index and no ranking.
 - **`docs/selfhosting.md` is a deployment narrative, not a variable reference.**
   Every variable is documented in `backend/.env.example`.
