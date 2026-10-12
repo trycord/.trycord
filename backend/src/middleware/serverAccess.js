@@ -4,7 +4,7 @@
 const db = require('../db');
 const { fail } = require('../errors');
 const { isMember } = require('../util');
-const { getOwnerId, effectivePermissionsFor } = require('../services/permissions');
+const { getOwnerId, effectivePermissionsFor, isKnown } = require('../services/permissions');
 const { isPlatformAdmin } = require('../services/enforcement');
 const slugs = require('../services/slugs');
 
@@ -54,6 +54,18 @@ async function requireOwner(req, res, next) {
 }
 
 function requirePerm(perm) {
+  // Refused where the route is declared, not where it runs. A misspelled name
+  // compares equal to nothing a role holds, so the gate would answer 403 to
+  // every member including the ones who should get through - a lockout that
+  // reads as a permissions problem and is not one. Throwing at boot is the only
+  // moment the route's author is still looking at it.
+  if (!isKnown(perm)) {
+    throw new Error(
+      'requirePerm(' + JSON.stringify(perm) + ') names a permission that is not in '
+      + 'services/permissions.js. Add it there first, so it can be granted to a role.'
+    );
+  }
+
   return async (req, res, next) => {
     try {
       if (!req.server) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
