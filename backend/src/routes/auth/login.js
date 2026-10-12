@@ -22,8 +22,7 @@ const { signChallenge, readChallenge, CHALLENGE_TTL_SECONDS } = require('./chall
 // the dashboard applies to the next attempt. A rate limit captured at mount time
 // would make the setting decorative.
 function loginLimit() {
-  const settings = require('../../services/settings');
-  const configured = settings.isLoaded() ? Number(settings.get('security.loginRateLimit')) : 0;
+  const configured = Number(require('../../services/settings').read('security.loginRateLimit', 0));
   return rateLimit({ windowMs: 60000, max: Number.isFinite(configured) && configured > 0 ? configured : 30 });
 }
 

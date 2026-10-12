@@ -65,8 +65,9 @@ function auth(req, res, next) {
       if (user.sv !== undefined && Number(user.sv) !== Number(row.session_version || 0)) {
         return fail(res, 'SESSION_REVOKED', 'session revoked');
       }
-      const require2fa = require('../services/settings').isLoaded()
-        && require('../services/settings').get('security.require2fa');
+      // read() with a false fallback: before the store loads there is nothing to
+      // enforce, and the login that follows would refuse every account.
+      const require2fa = require('../services/settings').read('security.require2fa', false);
       const ef = enforced(user, row);
       if (ef) return fail(res, 'ACCOUNT_ENFORCED', 'account is subject to a moderation action', 403, ef);
 
