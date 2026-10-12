@@ -122,6 +122,11 @@ async function boot({ seed = false } = {}) {
     MAIL_MODE: 'log',
     ALLOW_TEST_HOOKS: 'true',
     JWT_SECRET: 'render-check-secret-0123456789abcdef',
+    // The admin surfaces are registered like any other page, so without a platform
+    // administrator they render nothing and every assertion about them measures a
+    // redirect. The harness user is the only account in this throwaway database, so
+    // naming it here is what makes the admin pages render at all.
+    ADMIN_USERNAMES: 'renderuser',
   };
 
   // The server reads .env on require, and dotenv does not override variables that are
@@ -794,6 +799,47 @@ async function settle(window, ms = 400) {
     ok('the rail marks the destination you are inside, not just the one you are on',
       !!dmsActive && dmsActive.getAttribute('href') === concreteHref('/dms', world),
       dmsActive ? 'active href is ' + dmsActive.getAttribute('href') : 'nothing is active on /dms/<id>');
+
+    // ---- the mail console on the admin settings page ----
+    //
+    // The admin settings page renders the catalogue generically, but the mail panel
+    // that shows which mode is active and offers a test send is drawn by
+    // admin/settings.js. If that panel throws or fails to render, the admin sees
+    // the generic settings rows but no way to know whether mail works.
+    console.log('\n  the mail console');
+
+    await visit(window, document, Router, '/admin/settings', base);
+    await settle(window, 400);
+
+    // The mail console lives on the Email category, which is not the default tab.
+    // Click it the way an administrator would rather than asserting against the
+    // general category and reporting the panel as missing.
+    const emailTab = [...document.querySelectorAll('.cfg-nav__item')]
+      .find((b) => b.textContent === 'Email');
+    if (emailTab) {
+      emailTab.click();
+      await settle(window, 400);
+    }
+
+    const mailModes = document.querySelectorAll('.cfg-mail__mode');
+    ok('the mail console offers the three delivery modes',
+      mailModes.length === 3,
+      mailModes.length + ' mode(s): '
+      + [...mailModes].map((m) => m.querySelector('strong')?.textContent).join(', '));
+
+    const mailStatus = document.querySelector('.cfg-card .cfg-row__desc[role="status"]');
+    ok('the mail console reports whether mail is ready',
+      !!mailStatus && mailStatus.textContent.length > 0,
+      mailStatus ? mailStatus.textContent : 'no status text');
+
+    // Disabled mode must say it will not send, rather than offering a button that
+    // would fail.
+    const activeMode = document.querySelector('.cfg-mail__mode.active strong');
+    if (activeMode && activeMode.textContent === 'Disabled') {
+      ok('disabled mode does not offer a test send button',
+        !document.querySelector('.cfg-mail__mode + .cfg-row button'),
+        'a disabled instance must not pretend to send');
+    }
 
     // A rail entry is a link, so left-click, middle-click and the keyboard all work
     // without any of them being wired by hand.

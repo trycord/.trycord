@@ -934,3 +934,55 @@
 }
 
 .rail-foot .btn { justify-content: flex-start; }
+
+/* --------------------------------------------------------------------------
+   The mail console
+   -------------------------------------------------------------------------- */
+
+.cfg-mail__modes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.cfg-mail__mode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-6);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text-primary);
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+}
+
+.cfg-mail__mode:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+}
+
+.cfg-mail__mode.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+}
+
+.cfg-mail__mode-summary {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.cfg-mail__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cfg-mail__problem {
+  color: var(--color-warning);
+}

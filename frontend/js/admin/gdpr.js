@@ -104,12 +104,12 @@ function processGdpr(r, refresh) {
   return modal;
 }
 
-export async function renderGdpr(sec) {
+export async function renderGdpr(sec, show, seq, fetched) {
   sec.appendChild(el('h2', { class: 'section-label' }, 'Data subject requests'));
   sec.appendChild(el('p', { class: 'muted small' },
     'Erasure requests a user submitted from Settings → Account. They are created by the user, not by an administrator, and every one of them is a GDPR request.'));
 
-  const sel = el('select', { class: 'select' });
+  const sel = el('select', { class: 'select', 'aria-label': 'Filter by status' });
   sel.appendChild(el('option', { value: '' }, 'All states'));
   for (const s of GDPR_STATUSES) sel.appendChild(el('option', { value: s }, s.replace(/_/g, ' ').toLowerCase()));
 
@@ -122,6 +122,11 @@ export async function renderGdpr(sec) {
     clear(listWrap);
     try {
       const rows = await Api.adminGdprRequests({ status: status || undefined });
+      // Handed back so the context column beside this list reuses the count it
+      // already has rather than asking the server the same question again.
+      if (fetched && (status === undefined || status === '')) {
+        fetched.pendingDeletions = rows.length;
+      }
       if (!rows.length) {
         listWrap.appendChild(emptyState('', 'No requests here.', status ? 'Change the filter to see other states.' : 'No one has requested deletion.'));
         return;

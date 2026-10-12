@@ -178,6 +178,19 @@ const Api = {
   quickSetupState: () => request('GET', '/api/admin/settings/quick-setup'),
   runQuickSetup: (body) => request('PUT', '/api/admin/settings/quick-setup', { body }),
   testQuickSetupMail: (to) => request('POST', '/api/admin/settings/quick-setup/test-mail', { body: { to } }),
+
+  // The mail console: which providers this instance offers, which one is in
+  // force, and whether it is configured. The catalogue comes from the server's
+  // registry so a provider that does not exist cannot be selected.
+  mailConsole: () => request('GET', '/api/admin/mail'),
+  mailValidate: () => request('POST', '/api/admin/mail/validate'),
+  mailTestSend: (to) => request('POST', '/api/admin/mail/test', { body: { to } }),
+  // A credential is write-only. Sending nothing clears it; sending a value
+  // replaces it. Neither the response nor the catalogue ever returns it.
+  mailSetSecret: (key, value) =>
+    request('PUT', '/api/admin/mail/secrets/' + encodeURIComponent(key), { body: { value } }),
+  mailClearSecret: (key) =>
+    request('DELETE', '/api/admin/mail/secrets/' + encodeURIComponent(key)),
   announcements: () => request('GET', '/api/announcements'),
   allAnnouncements: () => request('GET', '/api/announcements/all'),
   createAnnouncement: (data) => request('POST', '/api/announcements', { body: data }),

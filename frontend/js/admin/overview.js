@@ -5,7 +5,7 @@ import { currentSeq, statTile } from './shared.js';
 
 import { statusChip } from '../components.js';
 
-export async function renderOverview(body, show, seq) {
+export async function renderOverview(body, show, seq, fetched) {
   const data = await Api.adminOverview();
   if (seq !== currentSeq()) return;
   const grid = el('div', { class: 'admin-stats' });
@@ -31,5 +31,6 @@ export async function renderOverview(body, show, seq) {
   }
   recent.appendChild(el('div', { class: 'row-line admin-more' },
     el('button', { class: 'btn ghost sm', type: 'button', onClick: () => { navigate('/admin/audit'); } }, 'Open audit log')));
+  if (fetched) fetched.overview = data;
   show(el('div', { class: 'admin-block admin-block--sections' }, grid, recent));
 }
