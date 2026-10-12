@@ -39,15 +39,15 @@
     <div class="prose">
       <p class="kicker">Trust &amp; security</p>
       <h1>Security</h1>
-      <p class="lede">Trycord keeps authentication, authorization, uploads, sessions and community moderation behind explicit server-side controls.</p>
-      <h2>Authentication</h2>
-      <p>Passwords are hashed server-side. Sessions are token based and can be revoked individually or globally.</p>
-      <h2>Authorization</h2>
-      <p>Community permissions and platform administration are enforced by the server. The client only presents controls the current session can use.</p>
+      <p class="lede">Trycord enforces who can do what on the server, not in the browser. The server decides; the interface only shows you what you are allowed to do.</p>
+      <h2>Sign-in</h2>
+      <p>Passwords are hashed before they are stored. Sessions use tokens that can be revoked one at a time or all at once.</p>
+      <h2>Permissions</h2>
+      <p>Community roles and admin powers are checked on the server. The app never decides for itself what you can do.</p>
       <h2>Uploads</h2>
-      <p>Profile media and message attachments are served through authenticated routes rather than a public upload directory.</p>
-      <h2>Reporting</h2>
-      <p>Trust &amp; Safety actions, reports and appeals are recorded by the server and exposed only through authorized endpoints.</p>
+      <p>Profile pictures and file attachments are served through signed routes, not a public folder anyone can browse.</p>
+      <h2>Moderation</h2>
+      <p>Reports, appeals and admin actions are written to a server-side log. Only people who are allowed to see them can.</p>
     </div>
     <!-- page:end -->
     <aside class="toc" aria-label="Table of contents">
