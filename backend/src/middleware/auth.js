@@ -110,13 +110,17 @@ function auth(req, res, next) {
 // routes intentionally do NOT use this. See each router for its list.
 //
 // Verification is only enforceable when the instance can actually deliver a
-// verification email. With MAIL_MODE unset/log there is no way for anyone to
-// confirm an address, so gating on it would lock messaging off permanently on
-// self-hosted instances that never configure SMTP. In that case the guard is a
-// no-op and clients should not prompt for verification either.
+// verification email. With mail disabled there is no way for anyone to confirm an
+// address, so gating on it would lock messaging off permanently on self-hosted
+// instances that never configure mail. In that case the guard is a no-op and
+// clients should not prompt for verification either.
+//
+// Both delivering modes count: a relay and an HTTP endpoint can both deliver, so
+// asking "is it smtp" would refuse email verification on an instance configured
+// with an API and able to send perfectly well.
 function verificationEnforceable() {
   try {
-    return require('../auth/mail').mode() === 'smtp';
+    return require('../services/mail').mode() !== 'disabled';
   } catch (e) {
     return false;
   }

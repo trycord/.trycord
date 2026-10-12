@@ -67,9 +67,11 @@ const CASES = [
 
   { script: 'check-contrast', file: 'frontend/css/app.css',
     guards: 'a token pair below the contrast floor',
-    // Every theme has its own --t-txt and the check walks all of them, so one is not
-    // enough: the first declaration alone still leaves six themes passing.
-    break: (f) => replaceAll(f, /(--t-txt:\s*)#[0-9a-f]{3,6}/gi, (m, a) => a + '#4a4a4a'),
+    // Every theme carries its own body-text token and the check walks all of them, so
+    // one is not enough: the first declaration alone still leaves five themes passing.
+    // Pointing the token at its own background resolves to a 1:1 pair in every theme
+    // whatever the palette, which is the case the floor exists to catch.
+    break: (f) => replaceAll(f, /(--color-text-primary:\s*)[^;]+/gi, (m, a) => a + 'var(--color-background)'),
     word: 'against' },
 
   { script: 'check-client-headings', file: 'frontend/js/pages/handlers.js',
@@ -102,15 +104,6 @@ const CASES = [
     // being recorded and nothing else noticed.
     break: (f) => replaceIn(f, /db\.newRef\('last_seen_at'\)/, "newRef('last_seen_at')"),
     word: 'newRef' },
-
-  { script: 'check-server-bindings', file: 'backend/src/services/slugs.js',
-    guards: 'a name used bare that only one module in the tree exports',
-    // The check tracks exported names, not module basenames, and skips anything preceded
-    // by a dot - so `memberships.isTimedOut` is invisible to it and `clientLink` used
-    // bare is exactly what it is looking for. clientLink is exported by auth/mail.js
-    // alone, and slugs.js neither defines nor imports it.
-    break: (f) => append(f, '\nfunction __probe() { return clientLink; }\n'),
-    word: 'clientLink' },
 
   { script: 'check-singletons', file: 'frontend/js/global/notifications.js',
     guards: 'a capitalised name used as an object with nothing importing it',

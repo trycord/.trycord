@@ -216,11 +216,20 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
 
     for (const [name, homes] of unique) {
       if (homes.includes(file) || defined.has(name)) continue;
-      // A definition, not a use. realtime.js owns `leaveDm()` and was reported for it until
-      // this loop got the same body-follows-the-arguments test the zero-owner loop has.
-      if (isDefinition(code, code.indexOf(name + '('))) continue;
-      const hit = new RegExp(`(?<![\\w.$])${name}\\b`).exec(code);
-      if (!hit) continue;
+      // Every bare occurrence, not just the first. `isDefinition(code, code.indexOf(
+      // name + '('))` looks at whatever comes first in the file, and `this.toggleSidebar()`
+      // at line 142 contains the substring `toggleSidebar(` - so the first match is a call,
+      // the body-follows test on it fails, and the class method definition further down is
+      // reported as an unbound use. That is exactly backwards: the definition is the thing
+      // that establishes the name here.
+      //
+      // Walking each occurrence keeps the guard honest. A name that is defined somewhere in
+      // the file is skipped; a name that only ever appears as a call is still reported.
+      const uses = [...code.matchAll(new RegExp(`(?<![\\w.$])${name}\\s*\\(`, 'g'))];
+      if (!uses.length) continue;
+      const definedHere = uses.every((m) => isDefinition(code, m.index));
+      if (definedHere) continue;
+      const hit = uses[0];
       // `route: ctx.rest[0]` is an object key, not a reference to the router's route().
       if (/^\s*:/.test(code.slice(hit.index + name.length))) continue;
       findings.push({

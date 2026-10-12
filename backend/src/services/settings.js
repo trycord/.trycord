@@ -16,6 +16,12 @@
 
 const db = require('../db');
 const { now, uuid } = require('../util');
+const secrets = require('./secrets');
+
+// Every secret's stored (encrypted) value, kept alongside the other loaded state so
+// the catalogue can report whether one is set without a query per key. Never exposed
+// except through catalogue(), which reports presence only.
+const secretValues = {};
 
 // The catalogue. Only settings the application genuinely reads appear here - an entry
 // that changed nothing would be a decorative control, which is worse than no control.
@@ -136,11 +142,23 @@ const SCHEMA = [
     live: true,
   },
 
-  // Read at call time by auth/mail.js, so these are live.
+  // Read at call time by services/mail, so these are live.
+  {
+    key: 'mail.mode', env: 'MAIL_MODE', type: 'string', default: 'disabled',
+    category: 'mail', label: 'Delivery mode',
+    description: 'smtp sends through a relay, api posts JSON to an HTTPS endpoint, disabled sends nothing. Nothing is sent until this is set.',
+    live: true, consequential: true,
+  },
+  {
+    key: 'mail.from', env: 'MAIL_FROM', type: 'string', default: '',
+    category: 'mail', label: 'From address',
+    description: 'What recipients see. Required by every mode that delivers.',
+    live: true,
+  },
   {
     key: 'mail.smtpHost', env: 'SMTP_HOST', type: 'string', default: '',
     category: 'mail', label: 'SMTP host',
-    description: 'The relay that delivers verification and recovery mail. Empty means mail is captured to the server log instead.',
+    description: 'The relay that delivers mail in smtp mode.',
     live: true,
   },
   {
@@ -156,15 +174,67 @@ const SCHEMA = [
     live: true,
   },
   {
-    key: 'mail.from', env: 'MAIL_FROM', type: 'string', default: '',
-    category: 'mail', label: 'From address',
-    description: 'What recipients see. Defaults to a noreply address at the instance name.',
-    live: true,
-  },
-  {
     key: 'mail.smtpSecure', env: 'SMTP_SECURE', type: 'boolean', default: false,
     category: 'mail', label: 'Implicit TLS',
     description: 'On for port 465. Off for STARTTLS on 587.',
+    live: true,
+  },
+  {
+    key: 'mail.smtpRejectUnauthorized', env: 'SMTP_REJECT_UNAUTHORIZED', type: 'boolean', default: true,
+    category: 'mail', label: 'Verify the relay certificate',
+    description: 'Turn this off only for a self-signed relay on a private network. With it off, the connection can be intercepted.',
+    live: true, consequential: true,
+  },
+
+  // The HTTP mode. Which vendor these reach is the operator's business; what
+  // differs between vendors is which path in the request body holds each part,
+  // and that is configuration rather than code.
+  {
+    key: 'mail.apiEndpoint', env: 'MAIL_API_ENDPOINT', type: 'string', default: '',
+    category: 'mail', label: 'API endpoint',
+    description: 'The HTTPS URL that accepts a message. http is only allowed for localhost.',
+    live: true,
+  },
+  {
+    key: 'mail.apiAuthHeader', env: 'MAIL_API_AUTH_HEADER', type: 'string', default: 'Authorization',
+    category: 'mail', label: 'Auth header name',
+    description: 'Which header carries the key. Most providers use Authorization.',
+    live: true,
+  },
+  {
+    key: 'mail.apiAuthPrefix', env: 'MAIL_API_AUTH_PREFIX', type: 'string', default: 'Bearer ',
+    category: 'mail', label: 'Auth value prefix',
+    description: 'Put in front of the key. "Bearer " is what most providers expect.',
+    live: true, trim: false,
+  },
+  {
+    key: 'mail.apiFromField', env: 'MAIL_API_FROM_FIELD', type: 'string', default: 'from',
+    category: 'mail', label: 'From field',
+    description: 'Path in the JSON body that holds the sender. Dots nest, so personalisation.from becomes {"personalisation":{"from":...}}.',
+    live: true,
+  },
+  {
+    key: 'mail.apiToField', env: 'MAIL_API_TO_FIELD', type: 'string', default: 'to',
+    category: 'mail', label: 'Recipient field',
+    description: 'Path in the JSON body that holds the recipient.',
+    live: true,
+  },
+  {
+    key: 'mail.apiSubjectField', env: 'MAIL_API_SUBJECT_FIELD', type: 'string', default: 'subject',
+    category: 'mail', label: 'Subject field',
+    description: 'Path in the JSON body that holds the subject.',
+    live: true,
+  },
+  {
+    key: 'mail.apiTextField', env: 'MAIL_API_TEXT_FIELD', type: 'string', default: 'text',
+    category: 'mail', label: 'Plain text field',
+    description: 'Path in the JSON body that holds the plain text alternative.',
+    live: true,
+  },
+  {
+    key: 'mail.apiHtmlField', env: 'MAIL_API_HTML_FIELD', type: 'string', default: 'html',
+    category: 'mail', label: 'HTML field',
+    description: 'Path in the JSON body that holds the HTML version.',
     live: true,
   },
 
@@ -181,6 +251,39 @@ const SCHEMA = [
     category: 'storage', label: 'Upload quota per member (MB)',
     description: 'Enforced before a file is stored, so a refusal costs nothing.',
     min: 1, max: 1048576, live: true,
+  },
+
+  // S3 settings. Read through the settings store so the dashboard can configure them
+  // and the environment still wins, which is the same precedence everything else uses.
+  {
+    key: 'storage.s3Bucket', env: 'S3_BUCKET', type: 'string', default: '',
+    category: 'storage', label: 'S3 bucket',
+    description: 'The bucket that holds uploaded files.',
+    live: true,
+  },
+  {
+    key: 'storage.s3AccessKeyId', env: 'S3_ACCESS_KEY_ID', type: 'string', default: '',
+    category: 'storage', label: 'S3 access key ID',
+    description: 'The public half of the S3 credential.',
+    live: true,
+  },
+  {
+    key: 'storage.s3Endpoint', env: 'S3_ENDPOINT', type: 'url', default: '',
+    category: 'storage', label: 'S3 endpoint',
+    description: 'The service endpoint. Leave blank for AWS S3; set for R2, MinIO or others.',
+    live: true,
+  },
+  {
+    key: 'storage.s3Region', env: 'S3_REGION', type: 'string', default: 'us-east-1',
+    category: 'storage', label: 'S3 region',
+    description: 'The bucket region. us-east-1 for AWS S3; other services use different values.',
+    live: true,
+  },
+  {
+    key: 'storage.s3ForcePathStyle', env: 'S3_FORCE_PATH_STYLE', type: 'boolean', default: true,
+    category: 'storage', label: 'Force path-style addressing',
+    description: 'On for R2 and MinIO. Off for AWS S3 with DNS-safe bucket names.',
+    live: true,
   },
 
   {
@@ -229,8 +332,19 @@ const SCHEMA = [
 
 // Secret-bearing settings. Named explicitly rather than inferred, because a type of
 // 'secret' would leak into the schema and the schema is what the UI renders.
+//
+// A secret's value is encrypted before it is written (see services/secrets) and is
+// never returned by the catalogue. A blank write leaves the stored value alone, and
+// clearing one is an explicit request, so a dashboard that renders an empty secret
+// field cannot wipe a credential by accident.
+//
+// A secret is still declared in SCHEMA. That is what gives it a label, a category and
+// an environment variable, so an install configured through .env keeps working and the
+// dashboard has something to render. The entry is read as a marker: its `value` is
+// never the credential.
 const SECRETS = new Set([
   'mail.smtpPassword',
+  'mail.apiKey',
   'storage.s3SecretKey',
 ]);
 
@@ -245,6 +359,51 @@ const DEPLOYMENT_ONLY = [
 ];
 
 const BY_KEY = new Map(SCHEMA.map((s) => [s.key, s]));
+
+// A secret is declared in SCHEMA so it has a label, a category and an environment
+// variable, which is what lets an install configured through .env keep working and
+// gives the dashboard something to render. Its entry is read as a marker: the value
+// it carries is never the credential.
+//
+// This runs after BY_KEY exists, so each addition is registered as it is made.
+const SECRET_META = {
+  'mail.smtpPassword': {
+    env: 'SMTP_PASSWORD',
+    label: 'SMTP password',
+    category: 'mail',
+    description: 'The relay password or API key. Stored encrypted and never shown again.',
+  },
+  'mail.apiKey': {
+    env: 'MAIL_API_KEY',
+    label: 'API key',
+    category: 'mail',
+    description: 'The credential for the mail API. Stored encrypted and never shown again.',
+  },
+  'storage.s3SecretKey': {
+    env: 'S3_SECRET_KEY',
+    label: 'S3 secret key',
+    category: 'storage',
+    description: 'The secret half of the S3 credential. Stored encrypted and never shown again.',
+  },
+};
+
+for (const key of SECRETS) {
+  if (BY_KEY.has(key)) continue;
+  const meta = SECRET_META[key];
+  if (!meta) throw new Error('a secret was declared with no metadata: ' + key);
+  const entry = {
+    key,
+    env: meta.env,
+    type: 'secret',
+    default: '',
+    category: meta.category,
+    label: meta.label,
+    description: meta.description,
+    live: true,
+  };
+  SCHEMA.push(entry);
+  BY_KEY.set(key, entry);
+}
 
 const CATEGORIES = [
   { id: 'general', label: 'General' },
@@ -272,11 +431,11 @@ const store = {
   loaded: false,
 };
 
-function parse(raw, type, def) {
+function parse(raw, type, def, keepWhitespace) {
   if (raw === undefined || raw === null || String(raw).trim() === '') {
     return { ok: true, value: def };
   }
-  const text = String(raw).trim();
+  const text = keepWhitespace ? String(raw) : String(raw).trim();
   if (type === 'boolean') {
     if (['1', 'true', 'on', 'yes'].includes(text.toLowerCase())) return { ok: true, value: true };
     if (['0', 'false', 'off', 'no'].includes(text.toLowerCase())) return { ok: true, value: false };
@@ -306,7 +465,10 @@ function parse(raw, type, def) {
 }
 
 function validate(entry, raw) {
-  const parsed = parse(raw, entry.type, entry.default);
+  // A setting declared trim:false keeps its surrounding whitespace. The auth prefix
+  // is the reason: "Bearer" and "Bearer " are different header values, and trimming
+  // turned the default into a header of "Bearer" glued to the key.
+  const parsed = parse(raw, entry.type, entry.default, entry.trim === false);
   if (!parsed.ok) return { ok: false, error: parsed.error };
   const value = parsed.value;
 
@@ -337,7 +499,31 @@ async function load(force = false) {
   const rows = await db.all('SELECT `key`, value FROM instance_settings');
   const saved = new Map(rows.map((r) => [r.key, r.value]));
 
+  for (const key of Object.keys(secretValues)) delete secretValues[key];
+  for (const key of SECRETS) {
+    // A secret set through the environment never touches this table, so a stored row
+    // can only exist because an administrator wrote one.
+    if (saved.has(key)) secretValues[key] = saved.get(key);
+  }
+
   for (const entry of SCHEMA) {
+    // A secret follows the same precedence as anything else, but its value never
+    // becomes an effective value: an environment secret is read on demand by the
+    // service that needs it, and a stored one stays ciphertext until then. Only the
+    // source is recorded, which is what the dashboard shows beside the field.
+    if (SECRETS.has(entry.key)) {
+      const fromEnv = envValueOf(entry);
+      if (fromEnv !== undefined) {
+        store.values[entry.key] = '';
+        store.sources[entry.key] = 'environment';
+      } else {
+        store.raw[entry.key] = saved.get(entry.key);
+        store.values[entry.key] = '';
+        store.sources[entry.key] = saved.has(entry.key) ? 'instance' : 'default';
+      }
+      continue;
+    }
+
     const fromEnv = envValueOf(entry);
     if (fromEnv !== undefined) {
       const check = validate(entry, fromEnv);
@@ -371,9 +557,14 @@ async function load(force = false) {
 
 // The effective value. Throws if the store is not loaded, so a caller cannot read a
 // default and believe it is what the instance is configured with.
+//
+// Refuses a secret outright. The one caller that legitimately needs a credential
+// asks for it through secretValue(), which makes the privileged read visible in the
+// code rather than available to anything that can name a key.
 function get(key) {
   const entry = BY_KEY.get(key);
   if (!entry) throw new Error('unknown setting ' + key);
+  if (SECRETS.has(key)) throw new Error(key + ' is a secret; read it through secretValue');
   if (!store.loaded) throw new Error('the settings store is not loaded');
   return store.values[key];
 }
@@ -435,7 +626,28 @@ async function save(entries, adminId) {
   for (const [key, raw] of Object.entries(entries)) {
     const entry = BY_KEY.get(key);
     if (!entry) { problems.push(key + ': unknown setting'); continue; }
-    if (SECRETS.has(key)) continue;
+
+    // A secret is stored encrypted and is never read back into the value map. An
+    // empty write means "leave it alone", because the dashboard renders these as an
+    // empty field and a save that wiped the credential would break delivery for
+    // every setting on the same screen. Clearing one is explicit.
+    if (SECRETS.has(key)) {
+      if (store.sources[key] === 'environment') {
+        problems.push(key + ': set by the deployment environment and cannot be changed here');
+        continue;
+      }
+      if (raw === null || raw === undefined) {
+        writes.push({ key, value: null, seen: store.raw[key], clear: true });
+        before[key] = secretValues[key] ? '(set)' : '(unset)';
+        continue;
+      }
+      const text = String(raw);
+      if (!text.trim()) continue;
+      if (text.length > 4096) { problems.push(key + ': that value is too long to be a credential'); continue; }
+      writes.push({ key, value: secrets.encrypt('mail:' + key, text.trim()), seen: store.raw[key], secret: true });
+      before[key] = secretValues[key] ? '(set)' : '(unset)';
+      continue;
+    }
 
     const check = validate(entry, raw);
     if (!check.ok) { problems.push(key + ': ' + check.error); continue; }
@@ -473,6 +685,12 @@ async function save(entries, adminId) {
   const conflicts = [];
   await db.transaction(async (t) => {
     for (const w of writes) {
+      // Clearing a secret deletes the row rather than storing an empty string, so
+      // "unset" and "set to nothing" cannot mean two different things later.
+      if (w.clear) {
+        await t.run('DELETE FROM instance_settings WHERE `key` = ?', [w.key]);
+        continue;
+      }
       const row = await t.get('SELECT value FROM instance_settings WHERE `key` = ?', [w.key]);
       const stored = row ? row.value : undefined;
       // A key with no row is at its default, and that is what the write was made
@@ -505,6 +723,11 @@ async function save(entries, adminId) {
   // made at boot.
   try { require('../features').reload(); } catch { /* a voice config that cannot work is refused by reload, which is correct */ }
 
+  // The mail service caches the decrypted provider credentials, so it has to be told.
+  // A changed mode or a rotated key would otherwise keep being read from the values
+  // that were in force a moment ago.
+  try { require('./mail').invalidate(); } catch { /* the mail service is optional at boot */ }
+
   return { ok: true, changed: Object.keys(before) };
 }
 
@@ -524,29 +747,89 @@ function serialise(value) {
 
 // The catalogue as the dashboard renders it: the setting, its effective value, where that
 // value came from, and whether a change is live or needs a restart. Never a secret.
-function catalogue() {
+//
+// A secret is reported as set or unset and carries no value field at all, so there is
+// nothing for a client to display even if one tried. Whether the stored value can still
+// be decrypted is reported separately: an instance whose JWT_SECRET was rotated has
+// secrets it can no longer read, and that has to be visible rather than showing up as
+// an unexplained delivery failure.
+function catalogue(secretState) {
+  const state = secretState || secretValues;
   return CATEGORIES.map((cat) => ({
     id: cat.id,
     label: cat.label,
-    settings: SCHEMA.filter((s) => s.category === cat.id).map((s) => ({
-      key: s.key,
-      env: s.env || null,
-      label: s.label,
-      description: s.description,
-      type: s.type,
-      value: store.values[s.key],
-      source: store.sources[s.key],
-      live: !!s.live,
-      consequential: !!s.consequential,
-      locked: store.sources[s.key] === 'environment',
-      lockedReason: store.sources[s.key] === 'environment'
-        ? 'Set by the deployment environment (' + s.env + '). Change it there.'
-        : null,
-    })),
+    settings: SCHEMA.filter((s) => s.category === cat.id).map((s) => {
+      const base = {
+        key: s.key,
+        env: s.env || null,
+        label: s.label,
+        description: s.description,
+        type: s.type,
+        value: store.values[s.key],
+        source: store.sources[s.key],
+        live: !!s.live,
+        consequential: !!s.consequential,
+        locked: store.sources[s.key] === 'environment',
+        lockedReason: store.sources[s.key] === 'environment'
+          ? 'Set by the deployment environment (' + s.env + '). Change it there.'
+          : null,
+      };
+      if (!SECRETS.has(s.key)) return base;
+      const stored = state[s.key];
+      return {
+        key: s.key,
+        env: s.env || null,
+        label: s.label,
+        description: s.description,
+        type: 'secret',
+        set: !!stored,
+        readable: stored ? secrets.readable('mail:' + s.key, stored) : null,
+        source: store.sources[s.key],
+        live: !!s.live,
+        consequential: !!s.consequential,
+        locked: store.sources[s.key] === 'environment',
+        lockedReason: store.sources[s.key] === 'environment'
+          ? 'Set by the deployment environment (' + s.env + '). Change it there.'
+          : null,
+      };
+    }),
   })).filter((c) => c.settings.length);
+}
+
+// The stored, still-encrypted value of a secret, or null. This is the only way a
+// caller gets at one, and what comes back is ciphertext: a provider asks the mail
+// service for the decrypted value, and the mail service is the only thing that
+// decrypts.
+function secretStored(key) {
+  return secretValues[key] || null;
+}
+
+// The usable value of a secret, following the same precedence as everything else:
+// the environment wins, then the stored row, then nothing.
+//
+// An environment value is already plaintext because it was read from the process,
+// so it is returned as it is; a stored row is decrypted. A row that cannot be
+// decrypted (the instance's JWT_SECRET was rotated) is reported as absent, because
+// returning a partial credential would be worse than saying there is none.
+function secretValue(key) {
+  const entry = BY_KEY.get(key);
+  if (!entry) throw new Error('unknown setting ' + key);
+  if (!SECRETS.has(key)) return store.loaded ? store.values[key] : undefined;
+
+  const fromEnv = envValueOf(entry);
+  if (fromEnv !== undefined) return fromEnv;
+
+  const stored = secretValues[key];
+  if (!stored) return null;
+  try {
+    return secrets.decrypt('mail:' + key, stored);
+  } catch {
+    return null;
+  }
 }
 
 module.exports = {
   SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY,
   load, get, source, save, catalogue, validate, serialise, isLoaded,
+  secretStored, secretValue,
 };

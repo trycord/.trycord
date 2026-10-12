@@ -141,7 +141,7 @@ async function waitForHealth(child, attempts) {
     HOST: '127.0.0.1',
     UPLOAD_DIR: uploadDir,
     STORAGE_DRIVER: 'local',
-    MAIL_MODE: 'log',
+    MAIL_MODE: 'disabled',
     // A throwaway secret for a throwaway database. Every instance must supply its own;
     // the server refuses to start without one, which is correct.
     JWT_SECRET: 'flowcheck0123456789abcdef0123456789abcdef',
@@ -579,15 +579,15 @@ async function waitForHealth(child, attempts) {
       fs.existsSync(dbFile) && fs.statSync(dbFile).size > 0);
 
     console.log('\n  routing and static files');
-    const root = await call('GET', '/');
-    ok('the application is served at the root', root.status === 200 && /<base href="\/"/.test(root.text));
+    const root = await call('GET', '/app/');
+    ok('the application is served at the app mount', root.status === 200 && /<base href="\/app\/"/.test(root.text));
 
     // The reason this exists: a deep link that only works until you refresh is not a
     // route. It has to come back as the document, from a cold request.
-    for (const deep of ['/settings/privacy', '/dms', '/notifications']) {
+    for (const deep of ['/app/settings/privacy', '/app/dms', '/app/notifications']) {
       const r = await call('GET', deep);
       ok('a deep link serves the application (' + deep + ')',
-        r.status === 200 && /<base href="\/"/.test(r.text), 'status ' + r.status);
+        r.status === 200 && /<base href="\/app\/"/.test(r.text), 'status ' + r.status);
     }
 
     const support = await call('GET', '/support');
