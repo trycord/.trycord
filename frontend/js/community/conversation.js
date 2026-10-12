@@ -50,7 +50,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     }
   } catch (ex) {
     renderContextHeader({ title: 'Unavailable' });
-    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community'));
+    container.appendChild(el('div', { class: 'form-error' }, ex.message || "Couldn't open this community"));
     return;
   }
 
@@ -175,7 +175,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
       if (seq !== reloadSeq) return;
       loadingHistory = false;
       clear(feed);
-      feed.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load messages'));
+      feed.appendChild(el('div', { class: 'form-error' }, ex.message || "Couldn't load the messages"));
       const retry = el('button', { class: 'btn sm', type: 'button' }, 'Try again');
       retry.addEventListener('click', () => reload().catch(() => {}));
       feed.appendChild(retry);
@@ -396,7 +396,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
         await Api.updateMessage(channelId, m.id, { content: ta.value.trim() });
         backdrop.remove();
         await reload();
-      } catch (ex) { toast(ex.message || 'Cannot edit', 'error'); }
+      } catch (ex) { toast(ex.message || 'The edit could not be applied', 'error'); }
     });
     ta.focus();
   }
@@ -405,7 +405,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     confirmDialog({
       title: 'Delete message?', message: 'This cannot be undone.', danger: true, confirmText: 'Delete',
       onConfirm: async () => {
-        try { await Api.deleteMessage(channelId, m.id); } catch (ex) { toast(ex.message || 'Cannot delete', 'error'); }
+        try { await Api.deleteMessage(channelId, m.id); } catch (ex) { toast(ex.message || 'The message could not be deleted', 'error'); }
       },
     });
   }
@@ -414,7 +414,7 @@ async function renderChannel(container, serverId, channelId, opts = {}) {
     e.preventDefault();
     try {
       await downloadAttachment(att);
-    } catch (ex) { toast(ex.message || 'Cannot download', 'error'); }
+    } catch (ex) { toast(ex.message || 'The file could not be downloaded', 'error'); }
   }
 
 
@@ -683,7 +683,7 @@ async function renderChannelPins(container, serverId, channelId) {
     }
   } catch (ex) {
     renderContextHeader({ title: 'Unavailable' });
-    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community'));
+    container.appendChild(el('div', { class: 'form-error' }, ex.message || "Couldn't open this community"));
     return;
   }
   const layout = State.channels;

@@ -65,7 +65,7 @@ export async function renderBrowse(container, { previewId } = {}) {
     try {
       detail = await Api.discoverServer(id);
     } catch (ex) {
-      toast(ex.message || 'Cannot load community', 'error');
+      toast(ex.message || "Couldn't load this community", 'error');
       return;
     }
     previewPane.hidden = false;

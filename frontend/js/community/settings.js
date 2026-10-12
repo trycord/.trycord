@@ -46,7 +46,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   clear(container);
   let server;
   try { ({ detail: server } = await ensureServer(serverId)); }
-  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
+  catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message || "Couldn't open this community")); return; }
   if (!can('MANAGE_SERVER')) {
     renderContextHeader({ title: 'Settings', sub: server.name });
     container.appendChild(el('div', { class: 'form-error' },

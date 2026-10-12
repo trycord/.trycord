@@ -44,7 +44,7 @@ async function renderServerMembers(container, serverId) {
   container.appendChild(opening);
   let server;
   try { ({ detail: server } = await ensureServer(serverId)); }
-  catch (ex) { opening.remove(); container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community')); return; }
+  catch (ex) { opening.remove(); container.appendChild(el('div', { class: 'form-error' }, ex.message || "Couldn't open this community")); return; }
   renderContextHeader({ title: 'Members', sub: server.name });
   const wrap = el('div', { class: 'page community-manager' });
   const counts = el('div', { class: 'stat-inline' });

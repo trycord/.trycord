@@ -25,7 +25,7 @@ export async function renderProfile(container, { id } = {}) {
     // attaches membership both viewer and target share — nothing else leaks.
     profile = await Api.user(id, currentServerId());
   } catch (ex) {
-    primary.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot load this profile'));
+    primary.appendChild(el('div', { class: 'form-error' }, ex.message || "Couldn't load this profile"));
     container.appendChild(wrap);
     return;
   }

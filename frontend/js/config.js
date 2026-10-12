@@ -350,7 +350,7 @@ export const TrycordConfig = {
             + 'on that server (and restart it), then test again.',
         };
       }
-      return { ok: false, error: 'Cannot reach that backend (network error or CORS refusal).' };
+      return { ok: false, error: 'The server could not be reached. Check your connection and try again.' };
     } finally {
       clearTimeout(timer);
     }

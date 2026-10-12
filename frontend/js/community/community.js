@@ -18,7 +18,7 @@ async function renderServerLanding(container, serverId) {
     server = detail;
   } catch (ex) {
     renderContextHeader({ title: 'Unavailable' });
-    container.appendChild(el('div', { class: 'form-error' }, ex.message || 'Cannot open this community'));
+    container.appendChild(el('div', { class: 'form-error' }, ex.message || "Couldn't open this community"));
     return;
   }
   renderContextHeader({ title: server.name, sub: (server.description || 'Community') + ' · ' + plural(server.member_count || 0, 'member') });
