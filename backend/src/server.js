@@ -452,6 +452,7 @@ async function boot() {
     serverDir: __dirname,
     clientDir: null,
     pages,
+    originOf,
   });
 
   const clientDir = serveClient.mountClient(app, {

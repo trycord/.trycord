@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PAGE TITLE &mdash; Trycord</title>
-  <meta name="description" content="ONE SENTENCE, 120-160 CHARACTERS. Shown in search results and link previews.">
+  <title>Page title — Trycord</title>
+  <meta name="description" content="One sentence, 120-160 characters. Shown in search results and link previews.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
 </head>
 <body>
   <!--
@@ -22,9 +23,12 @@
     Two things drive the editor, and both must survive your edits:
 
       1. The page:begin / page:end markers. Everything between them is replaced
-         when an administrator publishes. The header and footer sit outside them
-         on purpose, so publishing cannot change the navigation or lose the
-         footer. A page with no markers is served as-is rather than guessed at.
+         when an administrator publishes. They sit INSIDE the reading column
+         (.prose), so publishing replaces only the body: the page title and lead
+         in the opening below the markers, the generated contents list beside
+         them, the header and the footer all survive a publish, because none of
+         them is inside the editable region. A page with no markers is served
+         as-is rather than guessed at.
 
       2. .op-field spans with a stable data-op name. These are the individual
          values an operator fills in, such as a contact address. data-op is the
@@ -39,15 +43,36 @@
 
     Legal pages additionally cannot be published without confirming the change,
     so an operator is made to acknowledge what they are editing.
+
+    Note for headings and the contents list: the list beside the prose is
+    generated from the page's own h2 and h3 elements by site.js. It cannot drift
+    from the document, and because it is generated after the browser has the
+    page, it survives publishing the same way the shell does.
+
+    The title and lead below set the page opening. They are outside the markers,
+    so an operator publishing cannot overwrite them - and they are also not part
+    of the stored content, so they cannot be edited in the page editor either.
+    If a page's title needs to change, change it here.
   -->
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="site-header">
     <div class="wrap nav-wrap">
       <a class="brand" href="/">
-        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="30" height="30">  <g color="#FF4D24"> <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/> <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/> <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/> <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/> </g> </svg>
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <g color="#FF4D24">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+          </g>
+        </svg>
         <span class="brand-name">Trycord</span>
       </a>
+      <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+        <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+        <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+      </button>
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
       <nav class="site-nav" id="site-nav" aria-label="Primary">
         <a href="/">Home</a>
@@ -55,78 +80,114 @@
         <a href="/docs">Docs</a>
         <a href="/download">Download</a>
         <a href="/about">About</a>
-        <a href="/support">Support</a><a href="/security">Security</a><a href="/status">Status</a>
+        <a href="/support">Support</a>
+        <a href="/security">Security</a>
+        <a href="/status">Status</a>
         <a class="btn-open" href="/app/">Open the app</a>
       </nav>
     </div>
   </header>
 
-  <main id="main" class="page tight">
-    <!-- page:begin -->
-    <h1>Page title</h1>
-    <p class="lede">One or two sentences on what this page is for and who it is for.</p>
+  <main id="main" class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <p class="kicker">Page category</p>
+        <h1>Page title</h1>
+        <p class="lede">One or two sentences on what this page is for and who it is for.</p>
+      </div>
+      <div class="prose-layout">
+        <div class="prose">
+          <!-- page:begin -->
+          <!-- Everything between the two markers below is the editable region: publishing replaces it with the body of the draft. The title and lead above, the contents list to the side, and the header and footer all sit outside the markers, so publishing cannot change them. -->
+          <h2>A section heading</h2>
+          <p>
+            Write the content directly. An administrator editing this page replaces
+            everything between the markers, so put anything that must survive a publish
+            above <code>&lt;!-- page:begin --&gt;</code> or below
+            <code>&lt;!-- page:end --&gt;</code>.
+          </p>
 
-    <h2>A section heading</h2>
-    <p>
-      Write the content directly. An administrator editing this page replaces
-      everything between the markers, so put anything that must survive a publish
-      above <code>&lt;!-- page:begin --&gt;</code> or below <code>&lt;!-- page:end --&gt;</code>.
-    </p>
+          <h2>What the operator fills in</h2>
+          <p>
+            Anything Trycord cannot know is an operator field. Each one needs its own
+            stable <code>data-op</code> name:
+          </p>
+          <ul>
+            <li>
+              Contact address:
+              <span class="op-field" data-op="contact-email">OPERATOR: the address people should contact you on</span>
+            </li>
+            <li>
+              Legal entity, if you have one:
+              <span class="op-field" data-op="legal-entity">OPERATOR: your registered name, or omit this line</span>
+            </li>
+            <li>
+              Jurisdiction:
+              <span class="op-field" data-op="jurisdiction">OPERATOR: the country or state your instance operates under</span>
+            </li>
+          </ul>
+          <p>
+            The all-caps prefix is the placeholder. It tells whoever is setting this
+            up that the value is still missing, and it disappears as soon as the field
+            is filled in.
+          </p>
 
-    <h2>What the operator fills in</h2>
-    <p>
-      Anything Trycord cannot know is an operator field. Each one needs its own
-      stable <code>data-op</code> name:
-    </p>
-    <ul>
-      <li>
-        Contact address:
-        <span class="op-field" data-op="contact-email">OPERATOR: the address people should contact you on</span>
-      </li>
-      <li>
-        Legal entity, if you have one:
-        <span class="op-field" data-op="legal-entity">OPERATOR: your registered name, or omit this line</span>
-      </li>
-      <li>
-        Jurisdiction:
-        <span class="op-field" data-op="jurisdiction">OPERATOR: the country or state your instance operates under</span>
-      </li>
-    </ul>
-    <p>
-      The all-caps prefix is the placeholder. It tells whoever is setting this
-      up that the value is still missing, and it disappears as soon as the field
-      is filled in.
-    </p>
-
-    <h2>Another section</h2>
-    <p>Use the same heading and paragraph elements as the rest of the site.</p>
-    <ul>
-      <li>Ordinary list item.</li>
-      <li>Another one.</li>
-    </ul>
-    <p><a href="/docs">Link to the documentation</a> the way other pages do.</p>
-    <!-- page:end -->
+          <h2>Another section</h2>
+          <p>Use the same heading and paragraph elements as the rest of the site.</p>
+          <ul>
+            <li>Ordinary list item.</li>
+            <li>Another one.</li>
+          </ul>
+          <p><a href="/docs">Link to the documentation</a> the way other pages do.</p>
+          <!-- page:end -->
+        </div>
+        <aside class="toc" aria-label="Table of contents">
+          <h2 class="toc-title">On this page</h2>
+        </aside>
+      </div>
+    </div>
   </main>
 
   <footer class="site-footer">
+    <div class="wrap footer-band">
+      <h2>Run your own community</h2>
+      <p>Trycord is software you run yourself. Open the app to join a community, or read the documentation and start your own instance.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="/app/">Open the app</a>
+        <a class="btn btn-ghost" href="/docs">Read the documentation</a>
+      </div>
+    </div>
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <a class="brand" href="/">
-          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="30" height="30">  <g color="#FF4D24"> <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/> <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/> <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/> <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/> </g> </svg>
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+            <g color="#FF4D24">
+              <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+              <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+              <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+              <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+            </g>
+          </svg>
           <span class="brand-name">Trycord</span>
         </a>
-        <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>
+        <p>Private, self-hostable community messaging. Web and desktop.</p>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
-        <a href="/download">Download</a>
         <a href="/docs">Documentation</a>
+        <a href="/download">Download</a>
+        <a href="/status">Status</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Project</h2>
         <a href="/about">About</a>
         <a href="/support">Support</a>
+        <a href="/security">Security</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Communities</h2>
+        <a href="/app/discover">Browse communities</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Legal</h2>
@@ -135,6 +196,10 @@
         <a href="/privacy">Privacy Policy</a>
         <a href="/trust-and-safety">Trust &amp; Safety</a>
       </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>&copy; <span data-year>2026</span> Trycord</span>
+      <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
 

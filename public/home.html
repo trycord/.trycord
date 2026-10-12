@@ -8,6 +8,7 @@
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -15,7 +16,7 @@
   <header class="site-header">
     <div class="wrap nav-wrap">
       <a class="brand" href="/">
-        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="26" height="26">
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
           <g color="#FF4D24">
             <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
             <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
@@ -25,6 +26,10 @@
         </svg>
         <span class="brand-name">Trycord</span>
       </a>
+      <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+        <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+        <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+      </button>
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
       <nav class="site-nav" id="site-nav" aria-label="Primary">
         <a href="/">Home</a>
@@ -42,14 +47,15 @@
 
   <main id="main">
     <!--
-      The hero is two columns on a wide screen and one on a narrow one. The brand
-      mark is the same symbol the header carries, at display size - it is the
-      library's artwork, not a second asset.
+      The hero opens the document: kicker, display headline, lede, and a ruled
+      fact strip of what the product actually is. The framed plate beside it is
+      the specimen the brand mark was mounted in for the design tokens, scaled
+      up, so the page is documenting the product with the product's own symbol.
     -->
     <section class="hero">
       <div class="wrap">
         <div class="hero-copy">
-          <p class="hero-eyebrow">Self-hostable</p>
+          <p class="kicker">Private community messaging</p>
           <h1>Talk together, <em>on your own terms.</em></h1>
           <p class="lede">
             Trycord is private community messaging you can run yourself.
@@ -57,132 +63,276 @@
             browser and in a desktop app for Windows.
           </p>
           <div class="cta">
-            <a class="btn btn-primary" href="/app/">
-              <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/><path d="M8 9h8M8 13h5"/></g></svg>
-              Open the app
-            </a>
+            <a class="btn btn-primary" href="/app/">Open the app</a>
             <a class="btn btn-ghost" href="/download">Get the desktop app</a>
           </div>
+          <dl class="facts">
+            <div class="fact">
+              <dt>Self-hosted</dt>
+              <dd>Run the server on SQLite or MySQL, configured from environment variables.</dd>
+            </div>
+            <div class="fact">
+              <dt>Web and Windows</dt>
+              <dd>The same client in your browser and in a desktop app with automatic updates.</dd>
+            </div>
+            <div class="fact">
+              <dt>Moderation built in</dt>
+              <dd>Permissions, reports and appeals, and platform-admin tooling ship with the server.</dd>
+            </div>
+          </dl>
         </div>
         <div class="hero-aside" aria-hidden="true">
-          <svg class="hero-mark" viewBox="0 0 100 100" role="img" focusable="false">
-            <g color="#FF4D24">
-              <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-              <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
-              <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
-              <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
-            </g>
-          </svg>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Everything a community needs</h2>
-          <p>A focused set of features for people who want a direct, dependable place to talk.</p>
-        </div>
-        <div class="grid">
-          <article class="card">
-            <div class="card-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/><path d="M8 9h8M8 13h5"/></g></svg>
-            </div>
-            <h3>Communities &amp; channels</h3>
-            <p>Organize conversations into communities with text channels, direct messages, friends, and presence.</p>
-          </article>
-          <article class="card">
-            <div class="card-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></g></svg>
-            </div>
-            <h3>Profiles that are yours</h3>
-            <p>Display name, status, avatar, and banner, plus per-community nicknames so everyone knows who you are.</p>
-          </article>
-          <article class="card">
-            <div class="card-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="m9 12 2 2 4-4"/></g></svg>
-            </div>
-            <h3>Moderation built in</h3>
-            <p>Permissions, reports and appeals, and platform-admin tooling for the people who run an instance.</p>
-          </article>
-          <article class="card">
-            <div class="card-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6"/></g></svg>
-            </div>
-            <h3>Self-hosting first</h3>
-            <p>Run the server yourself on SQLite or MySQL with strict defaults: JWT sessions, rate limits, and a locked-down header policy.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>One app, in the browser and on Windows</h2>
-          <p>The web client is served by the server itself; the desktop app wraps the same client with auto-updates.</p>
-        </div>
-        <div class="grid">
-          <article class="card lead">
-            <div class="card-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 0 20M12 2a15.3 15.3 0 0 0 0 20"/></g></svg>
-            </div>
-            <h3>In your browser</h3>
-            <p>Sign in at your instance's address. Nothing to install. Registration asks you to accept the Terms of Service and Privacy Policy before your account exists.</p>
-          </article>
-          <article class="card lead">
-            <div class="card-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></g></svg>
-            </div>
-            <h3>On Windows desktop</h3>
-            <p>An Electron app with an installer or a portable build, pointing at the instance you choose, with automatic updates from releases.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="wrap">
-        <div class="section-head">
-          <h2>Run it your way</h2>
-          <p>Configure the server from environment variables: instance name, public URL, mail for recovery, and the database. Then invite who you want.</p>
-        </div>
-        <div class="steps">
-          <div class="step">
-            <h3>Install the server</h3>
-            <p>Docker Compose, or Node with SQLite for a small instance and MySQL when you outgrow it. A fresh install works with the defaults and no configuration at all.</p>
-          </div>
-          <div class="step">
-            <h3>Point it at a domain</h3>
-            <p>Set the public URL so links in emails and invites are correct, and put a reverse proxy in front of it if you want TLS.</p>
-          </div>
-          <div class="step">
-            <h3>Invite who you want</h3>
-            <p>Keep registration open, close it and invite by code, or run an instance nobody outside it can see. The choice is yours, and it is enforced by the server.</p>
+          <div class="hero-plate">
+            <svg class="hero-mark" viewBox="0 0 100 100" role="img" focusable="false">
+              <g color="#FF4D24">
+                <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+                <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
+                <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
+                <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
+              </g>
+            </svg>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="section">
+    <!--
+      Plate 01. Every section has an address in its own gutter; below the rail
+      break the kicker carries the number instead. The capability lists are
+      ruled rows, each with its icon at the end, so they read like an index.
+    -->
+    <section class="plate">
       <div class="wrap">
-        <div class="section-head">
-          <h2>Start where you like</h2>
-          <p>The documentation covers both the self-hosting path and the day-to-day of running a community.</p>
+        <div class="plate-row">
+          <p class="plate-idx" aria-hidden="true">01</p>
+          <div class="plate-body">
+            <div class="plate-head">
+              <h2>Where a community lives</h2>
+              <p>Conversation is organised the way a room is: spaces you name, people you keep nearby, and a place for every topic.</p>
+            </div>
+            <div class="features">
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Communities and channels</h3>
+                  <p>Each community has its own channels, members, and permissions, so persistent conversation stays organised by topic.</p>
+                  <a class="text-link" href="/features">How the pieces fit together</a>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a3 3 0 0 1-3 3H8l-5 3V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/><path d="M8 9h8M8 13h5"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Direct messages and friends</h3>
+                  <p>One-to-one conversations outside any community, with a friends list and presence so you can see who is around.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Profiles and presence</h3>
+                  <p>Display name, status, avatar, and banner, with per-community nicknames so people can address you the way you prefer.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Attachments, handled safely</h3>
+                  <p>Images and files up to 8 MB per message, rendered sandboxed into the page rather than as raw HTML.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></g></svg>
+                </div>
+              </article>
+            </div>
+          </div>
         </div>
-        <p>
-          <a class="btn" href="/docs">Read the documentation</a>
-          <a class="btn btn-ghost" href="/features">See all features</a>
-        </p>
+      </div>
+    </section>
+
+    <section class="plate">
+      <div class="wrap">
+        <div class="plate-row">
+          <p class="plate-idx" aria-hidden="true">02</p>
+          <div class="plate-body">
+            <div class="plate-head">
+              <h2>Keeping it civil</h2>
+              <p>Moderation is a server responsibility, not a volunteer job. Roles and powers are enforced where the messages live, and every action leaves a record.</p>
+            </div>
+            <div class="features">
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Granular permissions</h3>
+                  <p>Community roles control who can post, moderate, or administer, and the server enforces them in every request.</p>
+                  <a class="text-link" href="/features">The moderation toolkit</a>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="m9 12 2 2 4-4"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Reports and appeals</h3>
+                  <p>Members flag problems, moderators and admins act on them, and a suspended account always has a path to appeal.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Platform administration</h3>
+                  <p>Designated admins manage accounts and enforce policy across the whole instance, with an audit log of every action.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Security defaults</h3>
+                  <p>JWT sessions, rate limits, and a locked-down header policy are on by default so a fresh instance is not a project.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></g></svg>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!--
+      Plate 03: a numbered sequence in the same gutter, addressed the same way
+      the plates are, because getting started is a route through the document.
+    -->
+    <section class="plate">
+      <div class="wrap">
+        <div class="plate-row">
+          <p class="plate-idx" aria-hidden="true">03</p>
+          <div class="plate-body">
+            <div class="plate-head">
+              <h2>Getting started</h2>
+              <p>Run your own instance in three steps. Nothing is created implicitly and a fresh install works with the defaults.</p>
+            </div>
+            <div class="steps">
+              <div class="step">
+                <h3>Install the server</h3>
+                <p>Docker Compose, or Node with SQLite for a small instance and MySQL when you outgrow it. A fresh install works with the defaults and no configuration at all.</p>
+              </div>
+              <div class="step">
+                <h3>Point it at a domain</h3>
+                <p>Set the public URL so links in emails and invites are correct, and put a reverse proxy in front of it if you want TLS.</p>
+              </div>
+              <div class="step">
+                <h3>Invite who you want</h3>
+                <p>Keep registration open, close it and invite by code, or run an instance nobody outside it can join. The choice is yours, and the server enforces it.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="plate">
+      <div class="wrap">
+        <div class="plate-row">
+          <p class="plate-idx" aria-hidden="true">04</p>
+          <div class="plate-body">
+            <div class="plate-head">
+              <h2>Run it your way</h2>
+              <p>An instance is configured from environment variables, and every setting is in one place in the admin console. Self-hosting is the product, not a plan.</p>
+            </div>
+            <div class="features">
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Configure from the environment</h3>
+                  <p>Instance name, public URL, mail for recovery, and the database are environment variables, with a configuration centre in the app to review them.</p>
+                  <a class="text-link" href="/docs">The configuration reference</a>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="21" y2="21"/><line x1="4" x2="20" y1="14" y2="14"/><line x1="4" x2="20" y1="7" y2="7"/><line x1="4" x2="20" y1="3" y2="3"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>SQLite or MySQL</h3>
+                  <p>Start small on SQLite with zero setup, move to MySQL for production, and choose the profile with one setting.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>Mail when you want it</h3>
+                  <p>Password recovery and email verification work in log mode for development and SMTP for real sends, so the instance never fakes a delivery.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></g></svg>
+                </div>
+              </article>
+              <article class="feature">
+                <div class="feature-copy">
+                  <h3>One app, two surfaces</h3>
+                  <p>The web client is served by the server itself, and the desktop app wraps the same client with automatic updates from releases.</p>
+                </div>
+                <div class="feature-icon" aria-hidden="true">
+                  <svg class="icon" viewBox="0 0 24 24" role="img" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></g></svg>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!--
+      The closing plate is the one surface the accent owns outright. Every other
+      surface on the page is read as charcoal with ember lights, so this one
+      reads as the point of the document.
+    -->
+    <section class="plate statement">
+      <div class="wrap">
+        <div class="plate-row">
+          <p class="plate-idx" aria-hidden="true">05</p>
+          <div class="plate-body">
+            <p class="kicker">Your call</p>
+            <h2>Your instance, your conversations, your rules.</h2>
+            <p>
+              Trycord is not a hosted service that holds anyone's conversations
+              for them. It is software you run, on a server you control, for the
+              people you choose. Open the app or read the documentation and go
+              from there.
+            </p>
+            <div class="cta">
+              <a class="btn btn-primary" href="/app/">Open the app</a>
+              <a class="btn btn-ghost" href="/docs">Read the documentation</a>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
+    <div class="wrap footer-band">
+      <h2>Run your own community</h2>
+      <p>Trycord is software you run yourself. Open the app to join a community, or read the documentation and start your own instance.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="/app/">Open the app</a>
+        <a class="btn btn-ghost" href="/docs">Read the documentation</a>
+      </div>
+    </div>
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <a class="brand" href="/">
-          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false" width="26" height="26">
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
             <g color="#FF4D24">
               <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
               <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
@@ -190,20 +340,26 @@
               <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
             </g>
           </svg>
-          <span class="brand-name">Trycord</span>
+        <span class="brand-name">Trycord</span>
         </a>
-        <p class="muted">Private, self-hostable community messaging. Web and desktop.</p>
+        <p>Private, self-hostable community messaging. Web and desktop.</p>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
-        <a href="/download">Download</a>
         <a href="/docs">Documentation</a>
+        <a href="/download">Download</a>
+        <a href="/status">Status</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Project</h2>
         <a href="/about">About</a>
         <a href="/support">Support</a>
+        <a href="/security">Security</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Communities</h2>
+        <a href="/app/discover">Browse communities</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Legal</h2>
