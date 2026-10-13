@@ -234,7 +234,7 @@ async function renderMenu(container) {
 
   if (!servers.length) {
     communities.appendChild(el('p', { class: 'muted small' },
-      'You are not in any communities yet. Everything above works without one.'));
+      'You are not in any communities yet. Everything above still works.'));
     const discover = el('button', {
       class: 'btn', type: 'button', onClick: () => { navigate('/discover'); },
     }, 'Find communities');
@@ -273,7 +273,7 @@ async function renderMenu(container) {
       // saying "no channels yet" about a server that would not load would be a
       // lie about the state of somebody's community.
       block.appendChild(el('p', { class: 'muted small' },
-        'Channels could not be loaded. Open the community to try again.'));
+        'Could not load channels. Open the community to try again.'));
       communities.appendChild(block);
       continue;
     }

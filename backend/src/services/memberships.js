@@ -9,9 +9,9 @@ const events = require('./events');
 function expiresAt(minutes) {
   if (minutes == null) return null;
   const m = Number(minutes);
-  if (!Number.isFinite(m) || m < 0) throw { code: 'VALIDATION_ERROR', message: 'minutes must be a non-negative number' };
+  if (!Number.isFinite(m) || m < 0) throw { code: 'VALIDATION_ERROR', message: 'Minutes must be a non-negative number.' };
   if (m === 0) return null;
-  if (m > 40320) throw { code: 'VALIDATION_ERROR', message: 'timeout/ban cannot exceed 28 days' };
+  if (m > 40320) throw { code: 'VALIDATION_ERROR', message: 'A timeout or ban cannot exceed 28 days.' };
   return new Date(Date.now() + m * 60000).toISOString();
 }
 
@@ -134,15 +134,15 @@ async function list(serverId, { limit = null, offset = 0, search = '' } = {}) {
 
 async function joinInner(serverId, userId, username, conn) {
   const srv = await conn.get('SELECT id, enforcement_state FROM servers WHERE id = ?', [serverId]);
-  if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'server not found' };
+  if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'Server not found' };
   // Trust & Safety: suspended servers are closed to new members. Existing
   // members are handled by the access chain (resolveServer).
   if (srv.enforcement_state === 'suspended') {
-    throw { code: 'SERVER_SUSPENDED', message: 'server is suspended' };
+    throw { code: 'SERVER_SUSPENDED', message: 'Server is suspended' };
   }
-  if (await get(serverId, userId, conn)) throw { code: 'ALREADY_MEMBER', message: 'already a member' };
+  if (await get(serverId, userId, conn)) throw { code: 'ALREADY_MEMBER', message: 'Already a member' };
   const ban = await conn.get('SELECT * FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, userId]);
-  if (isActive(ban)) throw { code: 'BANNED', message: 'you are banned from this server' };
+  if (isActive(ban)) throw { code: 'BANNED', message: 'You are banned from this community.' };
   if (ban) await conn.run('DELETE FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, userId]);
   await conn.run(
     'INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)',
@@ -174,7 +174,7 @@ async function join(serverId, user) {
 
 async function joinByCode(code, user) {
   const srv = await db.get('SELECT id FROM servers WHERE join_code = ?', [String(code).toLowerCase().trim()]);
-  if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'server not found' };
+  if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'Server not found' };
   return join(srv.id, user);
 }
 
@@ -207,19 +207,19 @@ async function setNickname(serverId, targetId, nickname, conn = db) {
 // below their own top role. Used by kick/ban/timeout alike.
 async function assertManageable(serverId, actorId, targetId, verb, conn = db) {
   const srv = await conn.get('SELECT owner_id FROM servers WHERE id = ?', [serverId]);
-  if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'server not found' };
+  if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'Server not found' };
   if (String(targetId) === String(srv.owner_id)) {
-    throw { code: 'VALIDATION_ERROR', message: 'the owner cannot be ' + verb };
+    throw { code: 'VALIDATION_ERROR', message: 'The owner cannot be ' + verb };
   }
   if (String(targetId) === String(actorId)) {
-    throw { code: 'VALIDATION_ERROR', message: 'you cannot ' + verb + ' yourself' };
+    throw { code: 'VALIDATION_ERROR', message: 'You cannot ' + verb + ' yourself' };
   }
   if (String(actorId) !== String(srv.owner_id)) {
     const [actorTop, targetTop] = await Promise.all([
       roles.topPosition(serverId, actorId, conn),
       roles.topPosition(serverId, targetId, conn),
     ]);
-    if (actorTop <= targetTop) throw { code: 'PERMISSION_DENIED', message: 'target outranks you' };
+    if (actorTop <= targetTop) throw { code: 'PERMISSION_DENIED', message: 'Target outranks you' };
   }
   return srv;
 }
@@ -250,7 +250,7 @@ async function recordEvent(serverId, userId, kind, reason, conn) {
 async function kick(serverId, actorId, targetId) {
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'kicked', t);
-    if (!(await get(serverId, targetId, t))) throw { code: 'NOT_A_MEMBER', message: 'user is not a member' };
+    if (!(await get(serverId, targetId, t))) throw { code: 'NOT_A_MEMBER', message: 'User is not a member' };
     await removeMembership(serverId, targetId, t, 'kicked');
     return { ok: true };
   });
@@ -262,10 +262,10 @@ async function kick(serverId, actorId, targetId) {
 async function leave(serverId, userId) {
   const out = await db.transaction(async (t) => {
     const srv = await t.get('SELECT owner_id FROM servers WHERE id = ?', [serverId]);
-    if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'server not found' };
-    if (!(await get(serverId, userId, t))) throw { code: 'NOT_A_MEMBER', message: 'not a member' };
+    if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'Server not found' };
+    if (!(await get(serverId, userId, t))) throw { code: 'NOT_A_MEMBER', message: 'Not a member' };
     if (srv.owner_id === userId) {
-      throw { code: 'OWNER_CANNOT_LEAVE', message: 'the owner cannot leave — transfer ownership or delete the server' };
+      throw { code: 'OWNER_CANNOT_LEAVE', message: 'The owner cannot leave. Transfer ownership or delete the community.' };
     }
     await removeMembership(serverId, userId, t, 'left');
     return { ok: true };
@@ -280,7 +280,7 @@ async function leave(serverId, userId) {
 // minutes null/omitted = permanent.
 async function ban(serverId, actorId, targetId, { reason, minutes } = {}) {
   const target = await db.get('SELECT id FROM users WHERE id = ?', [targetId]);
-  if (!target) throw { code: 'NOT_FOUND', message: 'user not found' };
+  if (!target) throw { code: 'NOT_FOUND', message: 'User not found' };
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'banned', t);
     await removeMembership(serverId, targetId, t, 'banned');
@@ -299,7 +299,7 @@ async function ban(serverId, actorId, targetId, { reason, minutes } = {}) {
 
 async function unban(serverId, targetId) {
   const row = await db.get('SELECT id FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
-  if (!row) throw { code: 'NOT_FOUND', message: 'that ban does not exist' };
+  if (!row) throw { code: 'NOT_FOUND', message: 'That ban does not exist' };
   await db.run('DELETE FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
   events.emit(serverId, 'member_unbanned', { userId: String(targetId) });
   return { ok: true };
@@ -330,7 +330,7 @@ async function listBans(serverId) {
 async function timeout(serverId, actorId, targetId, minutes) {
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'timed out', t);
-    if (!(await get(serverId, targetId, t))) throw { code: 'NOT_A_MEMBER', message: 'user is not a member' };
+    if (!(await get(serverId, targetId, t))) throw { code: 'NOT_A_MEMBER', message: 'User is not a member' };
     const exp = expiresAt(minutes);
     await t.run('UPDATE server_members SET timeout_expires_at = ? WHERE server_id = ? AND user_id = ?',
       [exp, serverId, targetId]);

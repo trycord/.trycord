@@ -242,7 +242,7 @@ function mountPublicSite(app, opts) {
     }
     res.status(status || 200).sendFile(name, { root: publicDir }, (err) => {
       if (err && !res.headersSent) {
-        res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
+        res.status(500).json({ error: { code: 'INTERNAL', message: 'Internal error' } });
       }
     });
   };

@@ -137,8 +137,8 @@ export function serverRemoveModal(server, onDone) {
     body: el('div', { class: 'admin-form' }, err,
       el('div', { class: 'field' }, el('label', {}, 'Reason'), reason),
       el('label', { class: 'field row-line admin-confirm' },
-        confirm, el('span', {}, 'I confirm this removes the community and its content permanently.')),
-      el('p', { class: 'muted small' }, 'This is irreversible. Members are removed and the community record is deleted.')),
+        confirm, el('span', {}, 'I confirm this permanently removes the community and its content.')),
+      el('p', { class: 'muted small' }, 'Irreversible. Members are removed and the community is deleted.')),
     footer: [
       btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
       el('button', { class: 'btn danger', type: 'button', onClick: submit }, 'Remove community'),

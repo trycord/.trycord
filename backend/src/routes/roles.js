@@ -24,7 +24,7 @@ async function assertAssignable(req, role) {
   if (req.access && req.access.isOwner) return;
   const top = await roles.topPosition(req.server.id, req.user.id);
   if (top <= role.position) {
-    throw { code: 'PERMISSION_DENIED', message: 'you can only manage roles below your own' };
+    throw { code: 'PERMISSION_DENIED', message: 'You can only manage roles below your own.' };
   }
 }
 
@@ -37,7 +37,7 @@ async function assertCanReorderAll(req, list) {
   if (blocked.length) {
     throw {
       code: 'PERMISSION_DENIED',
-      message: 'you can only reorder roles below your own',
+      message: 'You can only reorder roles below your own.',
       detail: { blocked: blocked.map((r) => r.name) },
     };
   }
@@ -90,7 +90,7 @@ function assertDelegable(req, requested) {
     if (forbidden.length) {
       throw {
         code: 'PERMISSION_DENIED',
-        message: 'you cannot grant permissions you do not have',
+        message: 'You cannot grant permissions you do not have.',
         detail: { permissions: forbidden },
       };
     }

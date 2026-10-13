@@ -23,7 +23,7 @@ const PROFILE_ID = /^pf-[a-f0-9-]{1,64}$/;
 const COMMUNITY_ID = /^sv-[a-f0-9-]{1,64}$/i;
 
 function sniffImage(buffer, message) {
-  if (!buffer || buffer.length === 0) return { error: 'VALIDATION_ERROR', message: 'empty file' };
+  if (!buffer || buffer.length === 0) return { error: 'VALIDATION_ERROR', message: 'Empty file' };
   const mime = sniffBinary(buffer);
   if (!mime || IMAGE_MIMES.indexOf(mime) === -1) {
     return { error: 'VALIDATION_ERROR', message };
@@ -80,7 +80,7 @@ function openProfileMedia(row) {
 
 async function storeServerMedia({ serverId, kind, buffer, originalName }) {
   if (COMMUNITY_MEDIA_KINDS.indexOf(kind) === -1) {
-    return { error: 'VALIDATION_ERROR', message: 'unknown community media kind' };
+    return { error: 'VALIDATION_ERROR', message: 'Unknown community media kind.' };
   }
   const sniffed = sniffImage(buffer, 'images must be PNG, JPEG, GIF, or WebP');
   if (sniffed.error) return sniffed;

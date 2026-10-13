@@ -39,7 +39,7 @@ function parseRow(r) {
 function cleanColor(color) {
   if (color == null || color === '') return null;
   const c = String(color).trim();
-  if (!/^#[0-9a-fA-F]{6}$/.test(c)) throw { code: 'VALIDATION_ERROR', message: 'role color must be a hex color like #ff8a24' };
+  if (!/^#[0-9a-fA-F]{6}$/.test(c)) throw { code: 'VALIDATION_ERROR', message: 'Role color must be a hex color like #ff8a24.' };
   return '#' + c.slice(1).toLowerCase();
 }
 
@@ -99,7 +99,7 @@ async function nextPosition(serverId, conn = db) {
 
 async function create(serverId, { name, permissions, color }) {
   const clean = String(name || '').trim().slice(0, 32);
-  if (!clean) throw { code: 'VALIDATION_ERROR', message: 'role name required' };
+  if (!clean) throw { code: 'VALIDATION_ERROR', message: 'Role name required' };
   const perms = Array.isArray(permissions) ? permissions.filter(isKnown) : [];
   const position = await nextPosition(serverId);
   try {
@@ -110,7 +110,7 @@ async function create(serverId, { name, permissions, color }) {
     );
     return get(id);
   } catch (e) {
-    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'a role with that name exists' };
+    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'A role with that name exists' };
     throw e;
   }
 }
@@ -125,13 +125,13 @@ async function update(role, { name, permissions, color }) {
     // permissions and colour stay fully editable - that is the point of it
     // being the community's baseline. Only its identity is fixed.
     const clean = String(name).trim().slice(0, 32);
-    if (!clean) throw { code: 'VALIDATION_ERROR', message: 'role name cannot be empty' };
+    if (!clean) throw { code: 'VALIDATION_ERROR', message: 'Role name cannot be empty' };
     if (role.is_default) {
       // Submitting the name it already has is not a rename. The editor always
       // posts the full object, so rejecting every name would make the baseline
       // impossible to configure at all - the exact thing it exists for.
       if (clean !== String(role.name || '').trim()) {
-        throw { code: 'VALIDATION_ERROR', message: '@everyone cannot be renamed - it is the community baseline role' };
+        throw { code: 'VALIDATION_ERROR', message: '@everyone cannot be renamed; it is the community baseline role.' };
       }
     } else {
       sets.push('name = ?');
@@ -139,7 +139,7 @@ async function update(role, { name, permissions, color }) {
     }
   }
   if (permissions !== undefined) {
-    if (!Array.isArray(permissions)) throw { code: 'VALIDATION_ERROR', message: 'permissions must be an array' };
+    if (!Array.isArray(permissions)) throw { code: 'VALIDATION_ERROR', message: 'Permissions must be an array' };
     sets.push('permissions = ?');
     vals.push(JSON.stringify(permissions.filter(isKnown)));
   }
@@ -147,21 +147,21 @@ async function update(role, { name, permissions, color }) {
     sets.push('color = ?');
     vals.push(cleanColor(color));
   }
-  if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'nothing to update' };
+  if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'Nothing to update' };
   vals.push(role.id);
   try {
     await db.run(`UPDATE roles SET ${sets.join(', ')} WHERE id = ?`, vals);
   } catch (e) {
-    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'a role with that name exists' };
+    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'A role with that name exists' };
     throw e;
   }
   return get(role.id);
 }
 
 async function remove(role) {
-  if (role.is_default) throw { code: 'VALIDATION_ERROR', message: 'the @everyone baseline role cannot be deleted' };
+  if (role.is_default) throw { code: 'VALIDATION_ERROR', message: 'The @everyone baseline role cannot be deleted.' };
   const n = await db.get('SELECT COUNT(*) AS n FROM member_roles WHERE role_id = ?', [role.id]);
-  if (n.n > 0) throw { code: 'ROLE_IN_USE', message: `role is assigned to ${n.n} member(s)` };
+  if (n.n > 0) throw { code: 'ROLE_IN_USE', message: `Role is assigned to ${n.n} member(s)` };
   await db.run('DELETE FROM roles WHERE id = ?', [role.id]);
   return { ok: true };
 }
@@ -171,14 +171,14 @@ async function remove(role) {
 // transaction so concurrent readers never see a half-applied order.
 async function reorder(serverId, orderedIds) {
   if (!Array.isArray(orderedIds) || !orderedIds.length) {
-    throw { code: 'VALIDATION_ERROR', message: 'orderedIds must be a non-empty array' };
+    throw { code: 'VALIDATION_ERROR', message: 'OrderedIds must be a non-empty array' };
   }
   return db.transaction(async (t) => {
     const rows = await t.all('SELECT id, is_default FROM roles WHERE server_id = ?', [serverId]);
     const known = new Set(rows.map((r) => String(r.id)));
     const clean = orderedIds.map(String);
     if (clean.length !== known.size || !clean.every((id) => known.has(id))) {
-      throw { code: 'VALIDATION_ERROR', message: 'orderedIds must contain exactly the server roles' };
+      throw { code: 'VALIDATION_ERROR', message: 'OrderedIds must contain exactly the server roles' };
     }
     // @everyone is always last, whatever order was sent. The client sends the
     // whole list, so without this a drag could float the baseline role above a

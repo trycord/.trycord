@@ -19,11 +19,11 @@ export async function renderAnnouncements(body, show, seq) {
 
   const form = el('form', { class: 'settings-form' },
     el('div', { class: 'field' }, el('label', {}, 'Message'), text,
-      el('span', { class: 'hint' }, 'Shown to every signed-in user on this instance until you retire it.')),
+      el('span', { class: 'hint' }, 'Shown to everyone signed in, until you retire it.')),
     el('div', { class: 'field' }, el('label', {}, 'Level'), level),
     el('div', { class: 'field' }, el('label', {}, 'Link label'), linkLabel),
     el('div', { class: 'field' }, el('label', {}, 'Link'), linkHref,
-      el('span', { class: 'hint' }, 'An in-app path, e.g. /support. Leave empty for no link.')),
+      el('span', { class: 'hint' }, 'An in-app path, e.g. /support. Empty means no link.')),
     el('div', { class: 'field' }, el('label', {}, 'Expires'), expires,
       el('span', { class: 'hint' }, 'Optional. Leave empty to run until you retire it.')),
     err,

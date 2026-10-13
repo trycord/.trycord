@@ -52,7 +52,7 @@ async function renderNewChannel(container, serverId) {
   try { await ensureServer(serverId); } catch { /* toast below */ }
   if (!can('MANAGE_CHANNELS')) {
     renderContextHeader({ title: 'New channel' });
-    container.appendChild(el('div', { class: 'form-error' }, 'You need permission to manage channels in this community.'));
+    container.appendChild(el('div', { class: 'form-error' }, 'You need permission to manage channels here.'));
     return;
   }
   renderContextHeader({ title: 'New channel' });
@@ -167,7 +167,7 @@ async function renderServerCategories(container, serverId) {
       del.addEventListener('click', () => {
         confirmDialog({
           title: 'Delete category?',
-          message: (cat.name || 'Category') + ' will be removed. Its ' + channels.length + ' channel(s) become uncategorized — channels are never deleted with it.',
+          message: (cat.name || 'Category') + ' will be removed. Its ' + channels.length + ' channel(s) become uncategorized; channels are not deleted.',
           danger: true, confirmText: 'Delete',
           onConfirm: async () => {
             try { await Api.deleteCategory(serverId, cat.id); await reload(); toast('Category deleted.', 'ok'); }

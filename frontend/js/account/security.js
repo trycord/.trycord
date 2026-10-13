@@ -51,7 +51,7 @@ export function renderTwoFactorSection(wrap) {
     err.hidden = false;
     // Fall back to the server's own wording; only when there is none, say
     // what to do rather than that something happened.
-    err.textContent = (ex && ex.message) || 'Could not save that change. Check your connection and try again.';
+    err.textContent = (ex && ex.message) || 'Could not save. Check your connection and try again.';
   };
 
   // Status drives the whole section, so it is fetched rather than assumed: a
@@ -68,7 +68,7 @@ export function renderTwoFactorSection(wrap) {
 
   function renderDisabled(host) {
     host.appendChild(el('p', { class: 'muted small' },
-      'Require a 6-digit code from an authenticator app in addition to your password. '
+      'Require a 6-digit code from your authenticator app as well as your password. '
       + 'A stolen password alone will not be enough to sign in.'));
     const start = el('button', { class: 'btn primary', type: 'button' }, 'Set up two-factor');
     start.addEventListener('click', async () => {
@@ -78,7 +78,7 @@ export function renderTwoFactorSection(wrap) {
       // stolen session token must not be enough to turn the factor off.
       const pw = await passwordDialog({
         title: 'Confirm your password',
-        message: 'Two-factor setup asks for your password again, so a stolen session token is not enough on its own.',
+        message: 'Setup asks for your password again, so a stolen session token is not enough.',
         confirmText: 'Continue',
       });
       if (pw === null) { start.removeAttribute('aria-busy'); return; }
@@ -130,7 +130,7 @@ export function renderTwoFactorSection(wrap) {
 
   function renderEnabled(host, st) {
     host.appendChild(el('p', { class: 'muted small' },
-      'Two-factor is on. Signing in needs your password and a code from your authenticator app.'));
+      'Two-factor is on. Signing in needs your password and an authenticator code.'));
     if (st.lockedUntil) {
       host.appendChild(el('p', { class: 'form-error' },
         'Too many failed sign-in attempts. Try again after ' + new Date(st.lockedUntil).toLocaleString() + '.'));
@@ -141,14 +141,14 @@ export function renderTwoFactorSection(wrap) {
     const form = el('form', { class: 'card card--auth' },
       el('div', { class: 'field' }, el('label', {}, 'Confirm your password'), pw),
       el('div', { class: 'field' }, el('label', {}, 'Current code'), code,
-        el('span', { class: 'hint' }, 'Required, so a borrowed session cannot switch this off.')),
+        el('span', { class: 'hint' }, 'Required, so a borrowed session cannot switch it off.')),
       el('div', {}, turnOff));
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       err.hidden = true;
       confirmDialog({
         title: 'Turn off two-factor?',
-        message: 'Your account will be protected by your password alone. Every other session stays signed in.',
+        message: 'Your account will be protected by your password alone. Other sessions stay signed in.',
         danger: true, confirmText: 'Turn off',
         onConfirm: async () => {
           try {
@@ -180,8 +180,7 @@ export function renderTwoFactorSection(wrap) {
   function renderRecoveryCodes(host, codes, headline) {
     host.appendChild(el('div', { class: 'section-label' }, headline));
     host.appendChild(el('p', { class: 'muted small' },
-      'Each code works once. Save them somewhere you can reach without this device - '
-      + 'they are not shown again, and they are the only way back in if you lose your authenticator.'));
+      'Each code works once. Save them somewhere else — they will not be shown again, and they are the only way back in if you lose your authenticator.'));
     host.appendChild(el('pre', { class: 'mono', style: { whiteSpace: 'pre-wrap' } }, codes.join('\n')));
     const done = el('button', { class: 'btn primary', type: 'button' }, 'I have saved them');
     done.addEventListener('click', () => { clear(host); renderEnabled(host, {}); });
@@ -234,7 +233,7 @@ export function renderSessionsSection(wrap, preloaded) {
     }
   });
   wrap.appendChild(el('div', { class: 'row-line' }, revokeOthers, revokeAll));
-  wrap.appendChild(el('p', { class: 'muted small' }, 'Token-based sessions expire after 7 days or when revoked.'));
+  wrap.appendChild(el('p', { class: 'muted small' }, 'Sessions expire after 7 days, or when revoked.'));
 }
 
 // Loaded here rather than by the caller: the sessions list is the only

@@ -42,7 +42,7 @@ const SELECT = `SELECT dm.*, u.username AS author_name, u.display_name AS author
 
 async function history(userId, conversationId, { before = null, after = null, limit = 50 } = {}) {
   const seen = await visibleConversation(conversationId, userId);
-  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
+  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'Conversation not found' };
   const lim = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 200);
 
   let rows;
@@ -56,7 +56,7 @@ async function history(userId, conversationId, { before = null, after = null, li
   } else if (before) {
     const raw = String(before);
     const anchorSeq = /^\d+$/.test(raw) ? Number(raw) : await resolveSeq(conversationId, raw);
-    if (anchorSeq === null) throw { code: 'NOT_FOUND', message: 'message not found' };
+    if (anchorSeq === null) throw { code: 'NOT_FOUND', message: 'Message not found' };
     rows = await db.all(
       `${SELECT} WHERE dm.conversation_id = ? AND dm.seq < ? ORDER BY dm.seq DESC LIMIT ${lim}`,
       [conversationId, anchorSeq]

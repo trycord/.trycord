@@ -32,9 +32,7 @@ export async function renderAdminPages(container, { route } = {}) {
   const wrap = el('div', { class: 'page' }, frame);
   wrap.appendChild(sectionHead('Pages', 'Public pages an editor can change.'));
   body.appendChild(el('p', { class: 'muted small' },
-    'These pages ship as templates. The sections describing what the software does are accurate as '
-    + 'written; the fields marked OPERATOR are yours to fill in. Editing a draft does not change what '
-    + 'visitors see until you publish it.'));
+    'These pages ship as templates. Sections describing the software are accurate as written; the fields marked OPERATOR are yours to fill in. Editing a draft does not change what visitors see until you publish.'));
   const list = el('div', {});
   list.appendChild(pageList(() => {}));
   body.appendChild(list);

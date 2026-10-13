@@ -45,9 +45,9 @@ async function memberIds(conversationId, t) {
 // decides the winner and the loser re-reads, so neither side is told a conversation does
 // not exist because someone beat them to it.
 async function getOrCreate(me, peerId) {
-  if (!peerId) throw { code: 'VALIDATION_ERROR', message: 'userId required' };
-  if (String(peerId) === String(me.id)) throw { code: 'VALIDATION_ERROR', message: 'you cannot DM yourself' };
-  if (!(await peerExists(peerId))) throw { code: 'NOT_FOUND', message: 'user not found' };
+  if (!peerId) throw { code: 'VALIDATION_ERROR', message: 'UserId required' };
+  if (String(peerId) === String(me.id)) throw { code: 'VALIDATION_ERROR', message: 'You cannot DM yourself' };
+  if (!(await peerExists(peerId))) throw { code: 'NOT_FOUND', message: 'User not found' };
   const pair = pairKey(me.id, peerId);
 
   const found = await db.get('SELECT * FROM dm_conversations WHERE pair_key = ?', [pair]);

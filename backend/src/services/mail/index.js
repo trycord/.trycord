@@ -71,7 +71,7 @@ function describe() {
   const configured = { mode: current, ready: false, problems: [], secrets: {} };
 
   if (!provider) {
-    configured.problems.push('the configured mail mode is not a registered provider');
+    configured.problems.push('The configured mail mode is not a registered provider.');
     return configured;
   }
 
@@ -148,14 +148,14 @@ async function send({ to, subject, text, html, kind }) {
 // A real delivery to a real address, through the configured provider.
 async function test(to) {
   const address = String(to || '').trim();
-  if (!address) return { ok: false, error: 'an address is required' };
+  if (!address) return { ok: false, error: 'An address is required' };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(address)) {
-    return { ok: false, error: 'that does not look like an email address' };
+    return { ok: false, error: 'That does not look like an email address.' };
   }
 
   const current = mode();
   const provider = registry.providerFor(current);
-  if (!provider) return { ok: false, error: 'the configured mail mode is not a registered provider' };
+  if (!provider) return { ok: false, error: 'The configured mail mode is not a registered provider.' };
 
   const cfg = makeConfig(current, { testRecipient: address });
 
@@ -168,7 +168,7 @@ async function test(to) {
 
   try {
     await send({ to: address, subject: 'Trycord test message', kind: 'test' });
-    return { ok: true, mode: current, detail: 'the message was accepted', delivered: true };
+    return { ok: true, mode: current, detail: 'The message was accepted', delivered: true };
   } catch (e) {
     return { ok: false, mode: current, error: (e && e.message) || String(e) };
   }
@@ -178,7 +178,7 @@ async function test(to) {
 function validateCurrent() {
   const current = mode();
   const provider = registry.providerFor(current);
-  if (!provider) return { ok: false, problems: ['the configured mail mode is not a registered provider'] };
+  if (!provider) return { ok: false, problems: ['The configured mail mode is not a registered provider.'] };
   return provider.validateConfig(makeConfig(current));
 }
 

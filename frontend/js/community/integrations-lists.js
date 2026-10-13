@@ -56,7 +56,7 @@ function commandEditor(ctx, appId) {
       return;
     }
     if (!commands.length) {
-      list.appendChild(el('p', { class: 'muted small' }, 'No commands yet. Anyone in this community can trigger one by typing /name.'));
+      list.appendChild(el('p', { class: 'muted small' }, 'No commands yet. Anyone here can trigger one by typing /name.'));
       return;
     }
     for (const c of commands) {
@@ -187,7 +187,7 @@ export async function renderWebhookList(node, serverId, ctx) {
 
     card.appendChild(settingRow({
       label: 'Rotate secret',
-      hint: 'Issues a new secret. The old one stops verifying immediately.',
+      hint: 'Issues a new secret; the old one stops verifying immediately.',
       control: el('button', {
         class: 'btn', type: 'button',
         onClick: async () => {
@@ -289,7 +289,7 @@ export async function renderAppList(node, serverId, ctx) {
     });
     card.appendChild(settingRow({
       label: 'Answering',
-      hint: 'A disabled application keeps its commands and stops replying to them.',
+      hint: 'A disabled application keeps its commands but stops replying to them.',
       control: live,
     }));
     card.appendChild(el('p', { class: 'muted small' },

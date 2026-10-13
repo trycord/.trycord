@@ -67,7 +67,7 @@ export function renderPrivacySocial(body) {
         control: dangerButton('Remove', async () => {
           confirmDialog({
             title: 'Remove ' + who + '?',
-            message: 'They stay on this instance and can send you another request.',
+            message: 'They stay on this instance and can send another request.',
             danger: true, confirmText: 'Remove',
             onConfirm: async () => {
               try { await Api.removeFriend(f.id); toast('Friend removed.', 'warn'); await refreshFriends(); renderPrivacySocial(clearAndRebuild(body)); }
@@ -82,8 +82,8 @@ export function renderPrivacySocial(body) {
 
   if (!incoming.length && !friends.length) {
     card.appendChild(State.friendsLoaded
-      ? setEmpty('No requests and no friends yet. People you talk to appear here.')
-      : setEmpty('Your friends could not be loaded. This is not the same as having none.'));
+      ? setEmpty('No requests or friends yet. People you talk to appear here.')
+      : setEmpty('Could not load your friends. That does not mean you have none.'));
   }
 
   body.appendChild(card);

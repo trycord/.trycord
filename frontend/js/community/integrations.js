@@ -21,7 +21,7 @@ const EVENT_LABELS = {
 
 function webhookPanel(ctx) {
   const box = el('div', { class: 'settings-panel' });
-  box.appendChild(sectionHead('Outgoing webhooks', 'This community POSTs an event to a URL you choose. Each request is signed, and the signature travels in x-trycord-signature so the receiver can verify it.'));
+  box.appendChild(sectionHead('Outgoing webhooks', 'This community POSTs events to a URL you choose. Each request is signed; the signature is sent in x-trycord-signature.'));
 
   const form = el('form', { class: 'secret-form' });
   const name = el('input', { class: 'input', type: 'text', placeholder: 'Deploy hook', maxlength: '64', 'aria-label': 'Webhook name' });
@@ -55,7 +55,7 @@ function webhookPanel(ctx) {
 
 function appsPanel(ctx) {
   const box = el('div', { class: 'settings-panel' });
-  box.appendChild(sectionHead('Applications', 'An application posts under its own name using a token instead of a session, and can answer slash commands typed in any channel it can reach.'));
+  box.appendChild(sectionHead('Applications', 'An application posts under its own name using a token instead of a session, and answers slash commands in any channel it can reach.'));
 
   const form = el('form', { class: 'secret-form' });
   const name = el('input', { class: 'input', type: 'text', placeholder: 'Reminder bot', maxlength: '64', 'aria-label': 'Application name' });
@@ -107,7 +107,7 @@ export async function renderIntegrations(container, serverId) {
     showWebhookSecret(hook, label) {
       showSecret(
         'Webhook secret',
-        'Shown once for ' + (label || hook.name) + '. It is stored hashed, so it cannot be shown again. Rotate it if it is lost.',
+        'Shown once for ' + (label || hook.name) + '. It is stored hashed, so it cannot be shown again. Rotate it if you lose it.',
         hook.secret || ''
       );
     },
@@ -129,7 +129,7 @@ export async function renderIntegrations(container, serverId) {
 
   const head = sectionHead(
     'Integrations',
-    'What can reach this community from outside it. Secrets are shown once at creation and stored hashed, so nothing here can reveal one later.'
+    'What can reach this community from outside. Secrets are shown once and stored hashed, so nothing here can reveal one later.'
   );
   const panel = el('div', { class: 'settings-stack' });
   // append(), not appendChild(): the latter takes one node and ignores the
@@ -142,7 +142,7 @@ function hookPanelNote() {
   const note = el('div', { class: 'settings-note' });
   note.appendChild(el('p', {}, 'Events: ' + Object.values(EVENT_LABELS).join(', ') + '.'));
   note.appendChild(el('p', { class: 'muted small' },
-    'Deliveries are signed with HMAC-SHA256 over the exact request body. Verify by recomputing the digest of the raw body with your secret and comparing it to x-trycord-signature in constant time.'));
+    'Deliveries are signed with HMAC-SHA256 over the exact request body. Verify by recomputing the digest with your secret and comparing it to x-trycord-signature in constant time.'));
   return note;
 }
 

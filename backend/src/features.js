@@ -257,7 +257,7 @@ function iceServers(features) {
 function healthOf(features) {
   const v = features.voiceVideo;
   if (!v.enabled) {
-    return { available: false, reason: 'disabled', detail: 'voice and video is off on this instance' };
+    return { available: false, reason: 'disabled', detail: 'Voice and video are off on this instance' };
   }
 
   const problems = [];
@@ -272,7 +272,7 @@ function healthOf(features) {
     return {
       available: false,
       reason: 'misconfigured',
-      detail: 'voice and video is enabled but its infrastructure is incomplete',
+      detail: 'Voice and video is on, but its infrastructure is incomplete',
       problems,
     };
   }

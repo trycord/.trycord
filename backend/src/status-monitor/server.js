@@ -209,7 +209,7 @@ function createServer(config, monitor) {
       return send(res, 200, 'text/html; charset=utf-8', renderHtml(monitor.report(), config), headOnly);
     }
     return send(res, 404, 'application/json; charset=utf-8',
-      JSON.stringify({ error: { code: 'NOT_FOUND', message: 'no such resource' } }) + '\n', headOnly);
+      JSON.stringify({ error: { code: 'NOT_FOUND', message: 'No such resource' } }) + '\n', headOnly);
   });
 }
 

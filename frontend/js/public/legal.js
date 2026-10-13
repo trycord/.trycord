@@ -28,7 +28,7 @@ export function legalPage(container, kind) {
   wrap.appendChild(el('h1', { class: 'pub-title' }, titles[kind] || 'Legal'));
   const body = el('div', { class: 'pub-prose' });
   body.appendChild(el('p', {},
-    'This instance manages its own legal documents. Signing in or registering records your acceptance of the versions this server exposes (v'
+    'This instance manages its own legal documents. Signing in or registering accepts the versions this server exposes (v'
     + esc(versions.termsVersion) + ' terms, v' + esc(versions.privacyVersion) + ' privacy).'));
   const cta = el('div', { class: 'pub-links' });
   cta.appendChild(el('a', { class: 'pub-link', href: docPath, 'data-document': '' },

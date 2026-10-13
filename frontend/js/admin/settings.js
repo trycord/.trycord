@@ -126,7 +126,7 @@ function quickSetupPanel() {
   const todo = (quickSetup.essentials || []).filter((e) => !e.done);
   if (!todo.length) {
     card.appendChild(el('p', { class: 'cfg-row__desc' },
-      'Every essential setting is already set. Nothing to do here.'));
+      'Every essential setting is set.'));
     return card;
   }
 
@@ -272,7 +272,7 @@ function mailPanel() {
     row.appendChild(el('label', { class: 'cfg-row__title' }, 'Send a test message'));
     if (console_.current === 'disabled') {
       row.appendChild(el('p', { class: 'cfg-row__desc' },
-        'Mail delivery is disabled, so nothing will be sent. Choose another mode to test.'));
+        'Mail delivery is off, so nothing will be sent. Choose another mode to test.'));
     } else {
       const addr = el('input', {
         class: 'input', type: 'email', placeholder: 'you@example.com',
@@ -382,7 +382,7 @@ function repaint() {
     const box = el('div', { class: 'card cfg-card' });
     box.appendChild(el('h2', { class: 'cfg-card__title' }, 'Set by the deployment'));
     box.appendChild(el('p', { class: 'cfg-row__desc' },
-      'These are not dashboard settings. Change them in the instance configuration file or the container.'));
+      'These are not dashboard settings. Change them in the instance config file or the container.'));
     for (const d of deploymentOnly) {
       const row = el('div', { class: 'cfg-row cfg-row--locked' });
       row.appendChild(el('code', { class: 'cfg-row__env' }, d.key));

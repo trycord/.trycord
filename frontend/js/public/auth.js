@@ -131,7 +131,7 @@ function secondFactorStep(challengeToken, err) {
         // A recovery code is spent. Saying so once, here, is the difference
         // between a member who re-provisions and one who is quietly down to
         // their last one.
-        toast('Signed in with a recovery code. That code is now used up.', 'ok');
+        toast('Signed in with a recovery code. That code is now used.', 'ok');
       } else {
         toast('Signed in.', 'ok');
       }
@@ -256,7 +256,7 @@ export function registerForm(container) {
   pw.input.addEventListener('input', (e) => pwLine.update(e.target.value));
   pw.field.appendChild(pwLine.line);
   const email = el('input', { class: 'input', id: 'reg-email', type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
-  const emailHint = el('span', { class: 'hint' }, 'Optional. Verification and recovery require email delivery on this instance.');
+  const emailHint = el('span', { class: 'hint' }, 'Optional. Verification and recovery need email delivery on this instance.');
   const emailField = el('div', { class: 'field' }, el('label', { for: 'reg-email' }, 'Email', el('span', { class: 'badge' }, 'optional')), email, emailHint);
   const submit = el('button', { class: 'btn primary block', type: 'submit' }, 'Create account');
 
@@ -266,8 +266,8 @@ export function registerForm(container) {
     email.disabled = !enabled;
     emailField.classList.toggle('is-disabled', !enabled);
     emailHint.textContent = enabled
-      ? 'Optional. A verification link will be sent after signup.'
-      : 'Optional email is unavailable until SMTP delivery is configured on this instance.';
+      ? 'Optional. We will send a verification link after signup.'
+      : 'Optional email is unavailable until SMTP is configured on this instance.';
   }).catch(() => {
     email.disabled = true;
     emailField.classList.add('is-disabled');

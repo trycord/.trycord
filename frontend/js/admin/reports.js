@@ -91,7 +91,7 @@ export async function renderReports(body, show, seq) {
   // contained established cases to action, which is the opposite of what a
   // reviewer has to determine.
   toolbar.append(sel, el('span', { class: 'muted small' },
-    'A report records what someone submitted. Decide for yourself whether it happened.'));
+    'A report is what someone submitted. Decide for yourself whether it happened.'));
   const listWrap = el('div', { class: 'admin-list' });
   show(el('div', { class: 'admin-block admin-block--sections' }, toolbar, listWrap));
   const render = async (status) => {

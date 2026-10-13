@@ -88,7 +88,7 @@ async function listMine(userId) {
 // receipts) and the latest page of history.
 async function detail(userId, conversationId, opts) {
   const seen = await visibleConversation(conversationId, userId);
-  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
+  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'Conversation not found' };
   // Peer, read positions and history are independent once membership is validated, so
   // they run concurrently rather than in sequence.
   const [peerRow, members, messages] = await Promise.all([

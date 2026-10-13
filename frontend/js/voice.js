@@ -46,26 +46,26 @@ function unavailableState(caps) {
   if (caps.reason === 'disabled') {
     return {
       title: 'Voice is off here',
-      body: 'The administrator of this instance has not enabled voice and video.',
+      body: 'Voice and video are not enabled on this instance.',
     };
   }
   if (caps.reason === 'misconfigured') {
     return {
       title: 'Voice is not configured',
-      body: 'This instance has voice switched on, but its media server is not set up. '
+      body: 'Voice is on, but the media server is not set up. '
         + 'An administrator needs to finish the configuration.',
     };
   }
   if (caps.reason === 'unreachable') {
     return {
       title: 'The media server is unreachable',
-      body: 'Voice is enabled here, but the media server could not be reached. '
+      body: 'Voice is on, but the media server could not be reached. '
         + 'An administrator needs to check its configuration.',
     };
   }
   return {
     title: 'Voice is unavailable',
-    body: 'Could not find out whether this instance supports voice.',
+    body: 'Could not check whether this instance supports voice.',
   };
 }
 

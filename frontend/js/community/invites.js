@@ -16,7 +16,7 @@ async function renderInvites(container, serverId) {
   catch (ex) { container.appendChild(el('div', { class: 'form-error' }, ex.message)); return; }
   if (!can('MANAGE_INVITES')) {
     renderContextHeader({ title: 'Invites', sub: server.name });
-    container.appendChild(el('div', { class: 'form-error' }, 'You need permission to manage invites in this community.'));
+    container.appendChild(el('div', { class: 'form-error' }, 'You need permission to manage invites here.'));
     return;
   }
   renderContextHeader({ title: 'Invites', sub: server.name });

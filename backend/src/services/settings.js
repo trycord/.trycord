@@ -444,24 +444,24 @@ function parse(raw, type, def, keepWhitespace) {
   if (type === 'boolean') {
     if (['1', 'true', 'on', 'yes'].includes(text.toLowerCase())) return { ok: true, value: true };
     if (['0', 'false', 'off', 'no'].includes(text.toLowerCase())) return { ok: true, value: false };
-    return { ok: false, error: 'must be on or off' };
+    return { ok: false, error: 'Must be on or off' };
   }
   if (type === 'integer') {
     const n = Number(text);
-    if (!Number.isInteger(n)) return { ok: false, error: 'must be a whole number' };
+    if (!Number.isInteger(n)) return { ok: false, error: 'Must be a whole number' };
     return { ok: true, value: n };
   }
   if (type === 'url') {
     try {
       const u = new URL(text);
-      if (!/^https?:$/.test(u.protocol)) return { ok: false, error: 'must be an http(s) URL' };
+      if (!/^https?:$/.test(u.protocol)) return { ok: false, error: 'Must be an http(s) URL' };
       // The path is kept, without its trailing slash, because an instance can be
       // served from a subdirectory. Dropping it is what this used to do, which
       // disagreed with features.js and quietly broke every emailed link on such
       // an instance.
       const path = u.pathname === '/' ? '' : u.pathname.replace(/\/+$/, '');
       return { ok: true, value: u.origin + path };
-    } catch { return { ok: false, error: 'must be a valid URL' }; }
+    } catch { return { ok: false, error: 'Must be a valid URL' }; }
   }
   if (type === 'list') {
     return { ok: true, value: text.split(',').map((s) => s.trim()).filter(Boolean) };
@@ -478,8 +478,8 @@ function validate(entry, raw) {
   const value = parsed.value;
 
   if (entry.type === 'integer') {
-    if (entry.min != null && value < entry.min) return { ok: false, error: 'must be at least ' + entry.min };
-    if (entry.max != null && value > entry.max) return { ok: false, error: 'must be at most ' + entry.max };
+    if (entry.min != null && value < entry.min) return { ok: false, error: 'Must be at least ' + entry.min };
+    if (entry.max != null && value > entry.max) return { ok: false, error: 'Must be at most ' + entry.max };
   }
   return { ok: true, value };
 }
@@ -709,7 +709,7 @@ async function save(entries, adminId) {
       await upsertSetting(t, w.key, w.value, adminId);
     }
     if (conflicts.length) {
-      throw { code: 'CONFLICT', message: 'changed by someone else: ' + conflicts.join(', ') };
+      throw { code: 'CONFLICT', message: 'Changed by someone else: ' + conflicts.join(', ') };
     }
     // The log records what changed and nothing sensitive. Written inside the same
     // transaction as the values, so an audit trail can never claim a change that was

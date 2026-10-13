@@ -66,24 +66,24 @@ export function privacyContext(privacy, blocks) {
   const nobody = privacy.dms === 'nobody' && privacy.friendRequests === 'nobody';
   out.push(contextBlock('What this means',
     contextPara(nobody
-      ? 'Nobody can reach you directly. Only people already in a community with you can, and only where that community allows it.'
+      ? 'Nobody can message you. People in a community you share can, where it allows.'
       : privacy.dms === 'nobody'
-        ? 'No one can open a conversation with you. Friend requests still arrive from ' + scopeText(privacy.friendRequests) + '.'
+        ? 'No one can start a chat with you. Friend requests still arrive from ' + scopeText(privacy.friendRequests) + '.'
         : privacy.dms === 'friends'
-          ? 'Only people you have accepted can message you. Anyone else has to send a friend request first.'
-          : 'Anyone on this instance can open a conversation with you. Turning this off is the single biggest thing you can do to stop unsolicited messages.'),
+          ? 'Only your friends can message you. Everyone else must send a friend request first.'
+          : 'Anyone here can message you. Restricting this is the best way to stop unwanted messages.'),
     contextPara(privacy.presence === 'nobody'
-      ? 'Your online status is hidden. You will still appear offline rather than away.'
+      ? 'Your online status is hidden — you appear offline.'
       : 'Your online status is visible to ' + scopeText(privacy.presence) + '.'),
     contextPara(privacy.discoverable
-      ? 'Your username can be found by searching. Turning this off hides you from search without affecting direct messages.'
-      : 'You are hidden from search. People can still reach you through a community you share.'),
+      ? 'You can be found in search. Turn this off to hide; direct messages are unaffected.'
+      : 'You are hidden from search. People in a shared community can still reach you.'),
   ));
 
   const requests = State.friendRequests || [];
   if (requests.length) {
     out.push(contextBlock('Waiting on you (' + requests.length + ')',
-      contextPara('These are answered on the Privacy page, under Friend requests.'),
+      contextPara('Answer these under Friend requests on the Privacy page.'),
       contextList(...requests.slice(0, 6).map((r) => contextFact(
         r.displayName || r.username || 'Someone',
         r.username ? '@' + r.username : '',
@@ -93,7 +93,7 @@ export function privacyContext(privacy, blocks) {
 
   if (blocks && blocks.length) {
     out.push(contextBlock('Blocked (' + blocks.length + ')',
-      contextPara('Blocked people cannot message you or send a friend request. Any friendship ended when you blocked them, and they are not told why.'),
+      contextPara('Blocked people cannot message you or add you. Blocking ends any friendship, and they are not told.'),
     ));
   }
   return out;
@@ -114,7 +114,7 @@ export function securityContext(sessions) {
   const when = (s) => (s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : 'Unknown');
   out.push(contextBlock('Signed in here',
     contextList(...here.map((s) => contextFact(s.label || 'This device', 'Current session'))),
-    contextPara('A session you do not recognise is not an emergency: sign it out, then change your password. Changing the password does not sign other devices out on its own.'),
+    contextPara('Do not recognise a session? Sign it out, then change your password. Changing it does not sign other devices out.'),
   ));
   if (others.length) {
     out.push(contextBlock('Other sessions (' + others.length + ')',
@@ -134,10 +134,10 @@ export function notificationsContext(prefs, wellbeing, mutedCount) {
   const off = Object.keys(prefs || {}).filter((k) => prefs[k] === false);
   out.push(contextBlock('Delivery',
     contextPara(wellbeing && wellbeing.dndEnabled
-      ? 'Do not disturb is on. Nothing notifies you until you turn it off, whatever the categories below say.'
+      ? 'Do not disturb is on — nothing notifies you.'
       : wellbeing && wellbeing.quietHoursOn
-        ? 'Quiet hours are on. Nothing notifies you between the hours set in the pane.'
-        : 'Every category is on. Turn off the ones you do not want to be interrupted for.'),
+        ? 'Quiet hours are on — nothing notifies you during them.'
+        : 'All categories are on.'),
     contextList(
       contextFact('Categories off', String(off.length)),
       contextFact('Muted channels', String(mutedCount || 0)),
@@ -147,7 +147,7 @@ export function notificationsContext(prefs, wellbeing, mutedCount) {
   ));
   if (off.length) {
     out.push(contextBlock('Turned off',
-      contextPara('These are not being delivered at all, which is different from muted: muted still counts, these do not reach you.'),
+      contextPara('These do not reach you at all. Muted channels still count; these do not.'),
       contextList(...off.map((k) => contextFact(k, 'Off'))),
     ));
   }
@@ -167,8 +167,8 @@ export function appearanceContext(theme, density, motion) {
         contextFact('Motion', motion ? 'Reduced' : 'Full'),
       ),
       contextPara(motion
-        ? 'Reduced motion removes transitions and animated movement. Your operating system may also ask for this independently of your choice here.'
-        : 'Your operating system setting for reduced motion still applies even with this off.'),
+        ? 'Transitions and animation are off. Your OS can ask for this too.'
+        : 'Your OS reduced-motion setting still applies.'),
     ),
   ];
 }
@@ -187,7 +187,7 @@ export function backendContext(config) {
   return [
     contextBlock('This device',
       contextList(...rows),
-      contextPara('Your account lives on one instance. If this device reaches a different one, you will see an empty community list rather than an error, because a different instance does not know your account. Trycord tells you when that happens rather than letting you conclude your account was deleted.'),
+      contextPara('Your account is on one instance. If this device connects to another, it will look empty — that is why, not a deleted account.'),
     ),
   ];
 }
@@ -301,24 +301,24 @@ export async function adminContext(section, fetched) {
 
   if (totals.length) {
     out.push(card('Waiting on you', contextList(...totals),
-      contextPara('Counts read from the same endpoints as the section beside them.')));
+      contextPara('Counted from the same data as the section beside it.')));
   }
 
   if (section === 'reports' || section === 'appeals' || section === 'audit') {
     out.push(card('How this list works',
       contextPara(section === 'audit'
-        ? 'Every action an operator takes is recorded here before it is visible anywhere else, with the actor and the reason.'
-        : 'Entries stay in the queue until an administrator resolves them. Resolving records the decision against your account, so it can be reviewed later.')));
+        ? 'Every operator action is recorded here, with who did it and why.'
+        : 'Entries stay queued until an admin resolves them; the decision is recorded on your account.')));
   }
 
   if (section === 'gdpr') {
     out.push(card('What deletion covers',
-      contextPara('A processed request erases the account and its content. Some records are retained by law or for integrity: moderation actions and audit entries, so that a decision made against a person remains defensible after they are gone.')));
+      contextPara('Processing erases the account and its content. Moderation and audit records are kept, as required.')));
   }
 
   if (section === 'users' || section === 'communities') {
     out.push(card('Before you act',
-      contextPara('These lists show what an instance knows about people. Everything you do here is attributed to your account and written to the audit log.')));
+      contextPara('These lists show what the instance knows about people. Every action here is written to the audit log against your account.')));
   }
 
   return out;

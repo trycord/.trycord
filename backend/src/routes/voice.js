@@ -159,7 +159,7 @@ router.get('/channels/:channelId/speak-requests', requireVerified, wrap(async (r
 // One refusal, asked once, so a disabled instance answers the same way on every route.
 async function gate() {
   if (!require('../features').current.voiceVideo.enabled) {
-    return { code: 'FEATURE_DISABLED', message: 'voice and video is disabled on this instance', status: 403 };
+    return { code: 'FEATURE_DISABLED', message: 'Voice and video are off on this instance.', status: 403 };
   }
   return null;
 }

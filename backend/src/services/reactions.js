@@ -49,9 +49,9 @@ async function summary(messageIds, meId) {
 
 async function add(userId, messageId, emoji) {
   const v = validEmoji(emoji);
-  if (!v) throw { code: 'VALIDATION_ERROR', message: 'invalid emoji' };
+  if (!v) throw { code: 'VALIDATION_ERROR', message: 'Invalid emoji' };
   const msg = await db.get('SELECT id, channel_id FROM messages WHERE id = ?', [messageId]);
-  if (!msg) throw { code: 'NOT_FOUND', message: 'message not found' };
+  if (!msg) throw { code: 'NOT_FOUND', message: 'Message not found' };
   try {
     await db.run(
       'INSERT INTO reactions (message_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)',
@@ -67,7 +67,7 @@ async function add(userId, messageId, emoji) {
 
 async function remove(userId, messageId, emoji) {
   const v = validEmoji(emoji);
-  if (!v) throw { code: 'VALIDATION_ERROR', message: 'invalid emoji' };
+  if (!v) throw { code: 'VALIDATION_ERROR', message: 'Invalid emoji' };
   await db.run('DELETE FROM reactions WHERE message_id = ? AND user_id = ? AND emoji = ?', [messageId, userId, v]);
   return v;
 }

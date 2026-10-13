@@ -189,11 +189,11 @@ async function beginSetup(userId, username) {
 
 async function enable(userId, code) {
   const row = await db.get('SELECT totp_secret FROM users WHERE id = ?', [userId]);
-  if (!row || !row.totp_secret) throw { code: 'VALIDATION_ERROR', message: 'start 2FA setup first' };
+  if (!row || !row.totp_secret) throw { code: 'VALIDATION_ERROR', message: 'Start 2FA setup first' };
   let plain;
-  try { plain = decryptSecret(row.totp_secret); } catch { throw { code: 'INTERNAL', message: 'stored 2FA secret is unreadable' }; }
+  try { plain = decryptSecret(row.totp_secret); } catch { throw { code: 'INTERNAL', message: 'The stored two-factor secret cannot be read.' }; }
   if (verifyCode(plain, code) === null) {
-    throw { code: 'VALIDATION_ERROR', message: 'that code is not correct' };
+    throw { code: 'VALIDATION_ERROR', message: 'That code is not correct' };
   }
   // Enable and mint the recovery set in one transaction: a member who ends up
   // enabled with no recovery codes has no way back in if they lose the
@@ -216,7 +216,7 @@ function hashRecovery(raw) {
 async function issueRecoveryCodes(userId) {
   const row = await db.get('SELECT totp_enabled_at FROM users WHERE id = ?', [userId]);
   if (!row || !row.totp_enabled_at) {
-    throw { code: 'VALIDATION_ERROR', message: '2FA is not enabled for this account' };
+    throw { code: 'VALIDATION_ERROR', message: 'Two-factor is not enabled for this account.' };
   }
   return mintRecoveryCodes(userId);
 }
@@ -244,7 +244,7 @@ async function disable(userId, code) {
   if (!row || !row.totp_secret) return;
   const plain = decryptSecret(row.totp_secret);
   if (verifyCode(plain, code) === null) {
-    throw { code: 'VALIDATION_ERROR', message: 'that code is not correct' };
+    throw { code: 'VALIDATION_ERROR', message: 'That code is not correct' };
   }
   await db.transaction(async (t) => {
     await t.run('UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL WHERE id = ?', [userId]);

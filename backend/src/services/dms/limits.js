@@ -15,7 +15,7 @@ const MAX_CONTENT = 2000;
 
 function assertLength(text) {
   if (text.length > MAX_CONTENT) {
-    throw { code: 'VALIDATION_ERROR', message: `message too long (max ${MAX_CONTENT} characters)` };
+    throw { code: 'VALIDATION_ERROR', message: `Message too long (max ${MAX_CONTENT} characters)` };
   }
 }
 

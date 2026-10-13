@@ -151,7 +151,7 @@ export function buildUserActions({ user, id, name, sid, isSelf, blocked = false 
         danger: true,
         onSelect: () => confirmDialog({
           title: 'Remove ' + name + '?',
-          message: 'They will lose access to this community. You can ban them instead to block them from rejoining.',
+          message: 'They lose access to this community. Ban them instead to block them from rejoining.',
           danger: true,
           confirmText: 'Remove',
           onConfirm: async () => {
@@ -208,7 +208,7 @@ export function buildUserActions({ user, id, name, sid, isSelf, blocked = false 
           const body = el2('div', { class: 'stack' });
           body.appendChild(el2('p', {}, 'Block ' + name + '?'));
           body.appendChild(el2('p', { class: 'set-note set-note--warn' },
-            'They will not be able to message you or send you a friend request. Any friendship ends now, and they are not told why.'));
+            'They cannot message you or send a friend request. Any friendship ends now, and they are not told.'));
           const reason = el2('input', {
             class: 'input', type: 'text', maxlength: '500',
             placeholder: 'Reason (optional, for you)',

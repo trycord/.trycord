@@ -206,7 +206,7 @@ export function renderProfileEditor(wrap) {
   const sendTo = async (address) => {
     try {
       await Api.verifyEmailResend({ email: address });
-      emailNote.textContent = 'Verification email sent to ' + address + ' — click the link inside to confirm. It is valid for 24 hours and single use.';
+      emailNote.textContent = 'Verification email sent to ' + address + ' — click the link inside to confirm. It works once, within 24 hours.';
       return true;
     } catch (ex) {
       emailNote.textContent = ex.message || 'Could not send the email.';
@@ -266,8 +266,7 @@ export function renderExportSection(wrap) {
   wrap.appendChild(panel);
 
   panel.appendChild(el('p', { class: 'muted small' },
-    'Everything this instance holds about you, as a JSON file. It is assembled when you ask, '
-    + 'from your own records, so it reflects what is there right now rather than when you signed up.'));
+    'Everything this instance holds about you, as a JSON file. It is assembled from your records when you ask.'));
 
   const status = el('div', { class: 'muted small', role: 'status', 'aria-live': 'polite' });
 
@@ -317,9 +316,7 @@ export function renderExportSection(wrap) {
   panel.appendChild(status);
 
   panel.appendChild(el('p', { class: 'muted small' },
-    'Not included, and not retrievable by anyone: your password, your two-factor secret, '
-    + 'your recovery codes, and your session tokens. Those are not things you can read back '
-    + 'even here - they are credentials, and an export is not a way to obtain one.'));
+    'Not included: your password, two-factor secret, recovery codes and session tokens. Credentials cannot be read back, so they are not exported.'));
 }
 
 export function renderDeletionSection(wrap) {
@@ -355,7 +352,7 @@ export function renderDeletionSection(wrap) {
     }
 
     panel.appendChild(el('p', { class: 'muted small' },
-      'Asks this instance to erase your account. It opens a request for an administrator to review.'));
+      'Asks this instance to erase your account. An admin reviews it first.'));
 
     const what = el('div', { class: 'field' });
     what.appendChild(el('strong', {}, 'Erased'));
@@ -366,7 +363,7 @@ export function renderDeletionSection(wrap) {
     const kept = el('div', { class: 'field' });
     kept.appendChild(el('strong', {}, 'Kept'));
     kept.appendChild(el('p', { class: 'muted small' },
-      'Messages you posted, and any moderation or audit record that names you. These stay so other people’s conversations and any action taken against your account remain intact. They are attributed to a deleted account rather than to you.'));
+      'Your messages, and any moderation or audit record naming you. They stay so other people’s conversations are not broken, labelled as a deleted account.'));
     panel.appendChild(kept);
 
     const pw = el('input', { class: 'input', id: 'deletion-password', type: 'password', placeholder: 'Your password', autocomplete: 'current-password' });
@@ -381,7 +378,7 @@ export function renderDeletionSection(wrap) {
       }
       confirmDialog({
         title: 'Request account deletion?',
-        message: 'Your account will be anonymised and you will not be able to sign in. Messages you posted stay behind, attributed to a deleted account. This cannot be undone.',
+        message: 'Your account is anonymised and you cannot sign in again. Your messages stay, labelled as a deleted account. This cannot be undone.',
         danger: true,
         confirmText: 'Request deletion',
         onConfirm: async () => {
@@ -400,7 +397,7 @@ export function renderDeletionSection(wrap) {
     ));
     panel.appendChild(el('div', { class: 'row-line' }, open));
     panel.appendChild(el('p', { class: 'muted small', id: 'deletion-warning' },
-      'This is a data subject request. Your instance records it against your account and keeps an audit trail of the decision.'));
+      'This is a GDPR request. It is recorded on your account, with an audit trail.'));
   };
 
   panel.appendChild(el('p', { class: 'muted small' }, 'Loading…'));

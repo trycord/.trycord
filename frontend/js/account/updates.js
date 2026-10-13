@@ -14,8 +14,8 @@ export function renderUpdates(wrap) {
 
   if (!desk) {
     const box = el('div', { class: 'card card--auth' });
-    box.appendChild(el('p', {}, 'You are running Trycord in a browser. The browser build does not auto-update.'));
-    box.appendChild(el('p', { class: 'muted small' }, 'The desktop app checks for and installs updates automatically.'));
+    box.appendChild(el('p', {}, 'You are running Trycord in a browser. The browser build does not update itself.'));
+    box.appendChild(el('p', { class: 'muted small' }, 'The desktop app updates itself automatically.'));
     wrap.appendChild(el('div', {},
       el('a', { class: 'btn primary', href: 'https://github.com/trycord/.trycord/releases', rel: 'noopener', target: '_blank' }, 'Download the desktop app')));
     return;
@@ -75,7 +75,7 @@ export function renderUpdates(wrap) {
 
   wrap.appendChild(el('div', {}, version));
   wrap.appendChild(el('div', { class: 'field' }, el('label', {}, 'Update channel'), el('div', { class: 'row-line' }, latestBtn, betaBtn),
-    el('span', { class: 'hint' }, 'Beta shows public test builds (PTB). Stable shows release builds.')));
+    el('span', { class: 'hint' }, 'Beta shows public test builds (PTB). Stable shows releases.')));
   wrap.appendChild(el('div', { class: 'field' }, el('div', { class: 'row-line' }, autoToggle, el('label', {}, 'Install updates automatically when quitting'))));
   wrap.appendChild(el('div', { class: 'row-line' }, checkBtn, installBtn, releaseLink));
   wrap.appendChild(status);

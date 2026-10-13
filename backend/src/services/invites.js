@@ -24,7 +24,7 @@ async function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
   if (maxUses !== undefined && maxUses !== null && maxUses !== '') {
     maxUses = Number(maxUses);
     if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100) {
-      throw { code: 'VALIDATION_ERROR', message: 'maxUses must be 1-100' };
+      throw { code: 'VALIDATION_ERROR', message: 'MaxUses must be 1-100' };
     }
   } else {
     maxUses = null;
@@ -33,7 +33,7 @@ async function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
   if (expiresInHours !== undefined && expiresInHours !== null && expiresInHours !== '') {
     const h = Number(expiresInHours);
     if (!Number.isFinite(h) || h <= 0 || h > 24 * 30) {
-      throw { code: 'VALIDATION_ERROR', message: 'expiry must be 1 hour to 30 days' };
+      throw { code: 'VALIDATION_ERROR', message: 'Expiry must be between 1 hour and 30 days.' };
     }
     expiresAt = new Date(Date.now() + h * 3600 * 1000).toISOString();
   }
@@ -53,7 +53,7 @@ async function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
       if (!/UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) && e.code !== 'ER_DUP_ENTRY' && e.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw e;
     }
   }
-  throw { code: 'CONFLICT', message: 'could not generate an invite code' };
+  throw { code: 'CONFLICT', message: 'Could not generate an invite code. Try again.' };
 }
 
 async function list(serverId) {
@@ -97,22 +97,22 @@ async function preview(code) {
 
 async function joinWithCode(code, user) {
   const invite = await getByCode(code);
-  if (!invite) throw { code: 'INVITE_INVALID', message: 'invite not found' };
-  if (invite.revoked) throw { code: 'INVITE_REVOKED', message: 'invite revoked' };
+  if (!invite) throw { code: 'INVITE_INVALID', message: 'Invite not found' };
+  if (invite.revoked) throw { code: 'INVITE_REVOKED', message: 'Invite revoked' };
   if (invite.expires_at && new Date(invite.expires_at).getTime() <= Date.now()) {
-    throw { code: 'INVITE_EXPIRED', message: 'invite expired' };
+    throw { code: 'INVITE_EXPIRED', message: 'Invite expired' };
   }
   if (invite.max_uses !== null && invite.uses >= invite.max_uses) {
-    throw { code: 'INVITE_EXHAUSTED', message: 'invite has no uses left' };
+    throw { code: 'INVITE_EXHAUSTED', message: 'Invite has no uses left' };
   }
   return db.transaction(async (t) => {
     const fresh = await t.get('SELECT * FROM invites WHERE id = ?', [invite.id]);
-    if (!fresh || fresh.revoked) throw { code: 'INVITE_REVOKED', message: 'invite revoked' };
+    if (!fresh || fresh.revoked) throw { code: 'INVITE_REVOKED', message: 'Invite revoked' };
     if (fresh.expires_at && new Date(fresh.expires_at).getTime() <= Date.now()) {
-      throw { code: 'INVITE_EXPIRED', message: 'invite expired' };
+      throw { code: 'INVITE_EXPIRED', message: 'Invite expired' };
     }
     if (fresh.max_uses !== null && fresh.uses >= fresh.max_uses) {
-      throw { code: 'INVITE_EXHAUSTED', message: 'invite has no uses left' };
+      throw { code: 'INVITE_EXHAUSTED', message: 'Invite has no uses left' };
     }
     await memberships.joinIn(fresh.server_id, user, t);
     await t.run('UPDATE invites SET uses = uses + 1 WHERE id = ?', [fresh.id]);

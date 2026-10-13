@@ -59,11 +59,11 @@ async function apply(values, adminId) {
 async function testMail(to) {
   const mail = require('../auth/mail');
   const address = String(to || '').trim();
-  if (!address) return { ok: false, error: 'an address is required' };
+  if (!address) return { ok: false, error: 'An address is required' };
   try {
     const described = mail.describe();
     if (described.mode !== 'smtp') {
-      return { ok: false, error: 'mail is in ' + described.mode + ' mode; set an SMTP host first' };
+      return { ok: false, error: 'Mail is in ' + described.mode + ' mode; set an SMTP host first' };
     }
     await mail.sendMail({
       to: address,

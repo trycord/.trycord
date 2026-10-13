@@ -35,7 +35,7 @@ function appealDecisionModal(appeal, decision, onDone) {
   const modal = openModal({
     title: (approve ? 'Approve' : 'Deny') + ' appeal — ' + appeal.user_name,
     body: el('div', { class: 'admin-form' }, err,
-      approve ? el('p', {}, 'Approving lifts the enforcement on this account or community.') : null,
+      approve ? el('p', {}, 'Approving lifts the enforcement.') : null,
       el('div', { class: 'field' }, el('label', {}, 'Note'), note)),
     footer: [
       btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),

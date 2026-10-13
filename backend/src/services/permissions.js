@@ -136,7 +136,7 @@ const OVERRIDE_TABLES = {
 // has to guess what "unset" looks like.
 async function overridesFor(table, id) {
   const idCol = OVERRIDE_TABLES[table];
-  if (!idCol) throw { code: 'VALIDATION_ERROR', message: 'unknown override table' };
+  if (!idCol) throw { code: 'VALIDATION_ERROR', message: 'Unknown override table' };
   const rows = await db.all(`SELECT permission, effect FROM ${table} WHERE ${idCol} = ?`, [id]);
   const out = {};
   for (const p of Object.keys(PERMISSIONS)) out[p] = 'inherit';
@@ -146,14 +146,14 @@ async function overridesFor(table, id) {
 
 async function setOverride(table, id, permission, effect) {
   const idCol = OVERRIDE_TABLES[table];
-  if (!idCol) throw { code: 'VALIDATION_ERROR', message: 'unknown override table' };
-  if (!isKnown(permission)) throw { code: 'VALIDATION_ERROR', message: 'unknown permission' };
+  if (!idCol) throw { code: 'VALIDATION_ERROR', message: 'Unknown override table' };
+  if (!isKnown(permission)) throw { code: 'VALIDATION_ERROR', message: 'Unknown permission' };
   if (effect === 'inherit') {
     await db.run(`DELETE FROM ${table} WHERE ${idCol} = ? AND permission = ?`, [id, permission]);
     return { permission, effect: 'inherit' };
   }
   if (effect !== 'allow' && effect !== 'deny') {
-    throw { code: 'VALIDATION_ERROR', message: 'effect must be allow, deny or inherit' };
+    throw { code: 'VALIDATION_ERROR', message: 'Effect must be allow, deny or inherit.' };
   }
   // Upsert: the PK is (entity, permission) so a second write replaces rather
   // than accumulating a contradictory pair.

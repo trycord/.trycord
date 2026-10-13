@@ -60,10 +60,10 @@ function isUniqueViolation(e) {
 
 async function create({ name, description, joinCode, isPublic, isDiscoverable }, owner) {
   const cleanName = String(name || '').trim().slice(0, 64);
-  if (!cleanName) throw { code: 'VALIDATION_ERROR', message: 'name required' };
+  if (!cleanName) throw { code: 'VALIDATION_ERROR', message: 'Name required' };
   const code = String(joinCode || crypto.randomBytes(4).toString('hex')).toLowerCase();
   if (!/^[a-z0-9-]{3,32}$/.test(code)) {
-    throw { code: 'VALIDATION_ERROR', message: 'join code must be 3-32 chars: a-z, 0-9, -' };
+    throw { code: 'VALIDATION_ERROR', message: 'Join code must be 3-32 characters: a-z, 0-9, -' };
   }
   try {
     return await db.transaction(async (t) => {
@@ -101,7 +101,7 @@ async function create({ name, description, joinCode, isPublic, isDiscoverable },
   } catch (e) {
     // Service-shaped errors pass through; raw driver errors get translated.
     if (e && e.code && Codes[e.code]) throw e;
-    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'join code taken' };
+    if (isUniqueViolation(e)) throw { code: 'CONFLICT', message: 'Join code taken' };
     throw e;
   }
 }
@@ -136,7 +136,7 @@ async function update(serverId, patch) {
   const sets = [];
   const vals = [];
   if (patch.name !== undefined) {
-    if (!String(patch.name).trim()) throw { code: 'VALIDATION_ERROR', message: 'name cannot be empty' };
+    if (!String(patch.name).trim()) throw { code: 'VALIDATION_ERROR', message: 'Name cannot be empty' };
     sets.push('name = ?');
     const name = String(patch.name).slice(0, 64);
     vals.push(name);
@@ -158,7 +158,7 @@ async function update(serverId, patch) {
     sets.push('is_discoverable = ?');
     vals.push(patch.isDiscoverable ? 1 : 0);
   }
-  if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'nothing to update' };
+  if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'Nothing to update' };
   vals.push(serverId);
   await db.run(`UPDATE servers SET ${sets.join(', ')} WHERE id = ?`, vals);
   return db.get('SELECT * FROM servers WHERE id = ?', [serverId]);
@@ -188,22 +188,22 @@ async function remove(serverId) {
 //   - exactly one owner exists before and after, and never none in between
 async function transferOwnership(serverId, actorId, targetUserId) {
   const target = String(targetUserId || '').trim();
-  if (!target) throw { code: 'VALIDATION_ERROR', message: 'a new owner is required' };
+  if (!target) throw { code: 'VALIDATION_ERROR', message: 'A new owner is required' };
   if (target === String(actorId)) {
-    throw { code: 'VALIDATION_ERROR', message: 'you already own this community' };
+    throw { code: 'VALIDATION_ERROR', message: 'You already own this community' };
   }
   return db.transaction(async (t) => {
     const srv = await t.get('SELECT id, owner_id FROM servers WHERE id = ?', [serverId]);
-    if (!srv) throw { code: 'NOT_FOUND', message: 'community not found' };
+    if (!srv) throw { code: 'NOT_FOUND', message: 'Community not found' };
     if (String(srv.owner_id) !== String(actorId)) {
-      throw { code: 'PERMISSION_DENIED', message: 'only the owner can transfer ownership' };
+      throw { code: 'PERMISSION_DENIED', message: 'Only the owner can transfer ownership' };
     }
     const member = await t.get(
       'SELECT 1 AS ok FROM server_members WHERE server_id = ? AND user_id = ?',
       [serverId, target]
     );
     if (!member) {
-      throw { code: 'NOT_A_MEMBER', message: 'the new owner must already be a member of this community' };
+      throw { code: 'NOT_A_MEMBER', message: 'The new owner must already be a member of this community' };
     }
 
     // The new owner inherits every permission from ownership alone, so there
@@ -234,7 +234,7 @@ async function transferOwnership(serverId, actorId, targetUserId) {
       [target, serverId, actorId]);
     const after = await t.get('SELECT id, owner_id, name FROM servers WHERE id = ?', [serverId]);
     if (!after || String(after.owner_id) !== target) {
-      throw { code: 'CONFLICT', message: 'ownership transfer did not apply' };
+      throw { code: 'CONFLICT', message: 'Ownership transfer did not apply' };
     }
     return { serverId: after.id, name: after.name, ownerId: target, previousOwnerId: String(actorId) };
   });
