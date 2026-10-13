@@ -28,13 +28,13 @@ const DEDUPE_SELECT = `SELECT dm.*, u.username AS author_name, u.display_name AS
 
 async function send(userId, username, conversationId, content, clientNonce = null, attachmentIds = [], replyToId = null) {
   const seen = await visibleConversation(conversationId, userId);
-  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
+  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'Conversation not found' };
 
   const text = String((content === null || content === undefined) ? '' : content).trim();
   const ids = uploads.sanitizeIds(attachmentIds);
   // A file on its own is a message. Requiring text here meant a picture could not be sent
   // in a DM at all.
-  if (!text && !ids.length) throw { code: 'VALIDATION_ERROR', message: 'message is empty' };
+  if (!text && !ids.length) throw { code: 'VALIDATION_ERROR', message: 'Message is empty' };
 
   // A reply to something that is not in this conversation is refused rather than quietly
   // posted flat.
@@ -98,7 +98,7 @@ async function send(userId, username, conversationId, content, clientNonce = nul
       }
     }
   }
-  if (!inserted) throw { code: 'CONFLICT', message: 'could not assign a message position, please retry' };
+  if (!inserted) throw { code: 'CONFLICT', message: 'Could not assign a message position, please retry' };
 
   const attachments = await uploads.attachToMessage(ids, msg.id, userId, { conversationId });
 

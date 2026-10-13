@@ -64,7 +64,7 @@ const findCategory = async (req) => {
 router.get('/:categoryId/overrides', requireMember, async (req, res, next) => {
   try {
     const cat = await findCategory(req);
-    if (!cat) return serviceError(res, { code: 'NOT_FOUND', message: 'category not found' });
+    if (!cat) return serviceError(res, { code: 'NOT_FOUND', message: 'Category not found' });
     res.json({
       categoryId: String(cat.id),
       overrides: await permissions.overridesFor('category_permission_overrides', cat.id),
@@ -76,7 +76,7 @@ router.get('/:categoryId/overrides', requireMember, async (req, res, next) => {
 router.put('/:categoryId/overrides/:permission', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
     const cat = await findCategory(req);
-    if (!cat) return serviceError(res, { code: 'NOT_FOUND', message: 'category not found' });
+    if (!cat) return serviceError(res, { code: 'NOT_FOUND', message: 'Category not found' });
     const { effect } = req.body || {};
     await permissions.setOverride('category_permission_overrides', cat.id, req.params.permission, effect);
     events.emit(req.server.id, 'category_updated', { categoryId: String(cat.id) });

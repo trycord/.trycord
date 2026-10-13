@@ -119,7 +119,7 @@ export async function renderPrivacySection(body, preloaded) {
   body.appendChild(el('div', { class: 'section-label' }, 'Blocked people'));
   if (!blocks.length) {
     body.appendChild(setEmpty('You have not blocked anyone.'));
-    body.appendChild(setNote('Blocking someone stops them messaging you or sending a friend request, and ends any friendship you had.'));
+    body.appendChild(setNote('Blocking stops them messaging you or sending a friend request, and ends any friendship.'));
   } else {
     const card = sectionCard();
     for (const b of blocks) {
@@ -153,7 +153,7 @@ export function blockButton(user, { onDone } = {}) {
 function confirmBlock(user, onDone) {
   const who = user.displayName || user.username || 'this person';
   const note = el('p', { class: 'set-note set-note--warn' },
-    'They will not be able to message you or send you a friend request. Any friendship you have ends now, and they are not told why.');
+    'They cannot message you or send a friend request. Any friendship ends now, and they are not told.');
   const reason = el('input', {
     class: 'input', type: 'text', maxlength: '500',
     placeholder: 'Reason (optional)', 'aria-label': 'Reason for blocking ' + who,

@@ -159,11 +159,11 @@ async function renderServerRoles(container, serverId) {
 
   if (!mayManage) {
     wrap.appendChild(el('div', { class: 'form-error' },
-      'You need Manage Roles permission to change roles. The hierarchy below is still shown.'));
+      'You need Manage Roles permission to change roles. The order below is still shown.'));
   } else {
     wrap.appendChild(el('p', { class: 'roles-hint' }, isOwner
       ? 'As the owner you can manage every role and set any order.'
-      : 'You can manage roles below your own highest role. Roles at or above it are locked.'));
+      : 'You can manage roles below your highest. Roles at or above it are locked.'));
   }
 
   const listCol = el('div', { class: 'roles-list-col' });
@@ -373,7 +373,7 @@ async function renderServerRoles(container, serverId) {
     if (!mayManage || !canManage(role)) {
       box.append(
         el('div', { class: 'form-error' }, mayManage
-          ? 'This role is at or above your own highest role, so you cannot change it.'
+          ? 'This role is at or above your highest, so you cannot change it.'
           : 'You need Manage Roles permission to change this role.'),
         el('div', { class: 'field' }, el('label', {}, 'Name'),
           el('input', { class: 'input', type: 'text', value: role.name || '', disabled: true })),
@@ -444,7 +444,7 @@ async function renderServerRoles(container, serverId) {
       box.appendChild(el('div', { class: 'role-protected' },
         el('strong', {}, '@everyone is protected'),
         el('span', { class: 'muted small' },
-          'Every member has this role, so it always exists. Its permissions and colour can be edited, but it cannot be renamed or deleted.')));
+          'Every member has this role, so it always exists. Its permissions and colour can be edited; it cannot be renamed or deleted.')));
     } else {
       const del = el('button', { class: 'btn danger', type: 'button' }, 'Delete role');
       del.addEventListener('click', () => confirmDeleteRole(role, n_for(role)));

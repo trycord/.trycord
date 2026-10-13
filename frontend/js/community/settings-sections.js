@@ -65,7 +65,7 @@ async function overview(ctx) {
       el('span', { class: 'hint' }, 'A private community can only be entered by invitation.')),
     el('div', { class: 'field' },
       el('label', { class: 'switch-row' }, isDisc, ' Discoverable: listed in the browse feed'),
-      el('span', { class: 'hint' }, 'Independent of Public: a private community can still be discoverable by name.')),
+      el('span', { class: 'hint' }, 'Independent of Public: a private community can still be found by name.')),
     el('div', { class: 'card-actions' }, saveBtn));
 
   form.addEventListener('submit', async (e) => {
@@ -114,7 +114,7 @@ async function appearance(ctx) {
   const box = el('div', { class: 'settings-panel' });
   box.appendChild(el('h2', { class: 'settings-panel__title' }, 'Community icon'));
   box.appendChild(el('p', { class: 'muted small settings-panel__blurb' },
-    'Shown in the community list, the member sidebar and the browse feed. A square image works best.'));
+    'Shown in the community list, member sidebar and browse feed. A square image works best.'));
 
   const media = el('div', { class: 'community-media' });
   const preview = el('div', { class: 'community-media__preview' });
@@ -214,7 +214,7 @@ function structure(ctx) {
   panel.appendChild(linkedSection({
     serverId,
     title: 'Categories',
-    blurb: 'Group channels so a busy community stays navigable. Categories can also carry their own permission overrides.',
+    blurb: 'Group channels to keep a busy community navigable. Categories can carry their own permission overrides.',
     href: route('/categories'),
     cta: 'Manage categories',
     counts: [categoryCount + ' categor' + (categoryCount === 1 ? 'y' : 'ies')],
@@ -286,10 +286,10 @@ async function ownership(ctx) {
   transfer.appendChild(el('h2', { class: 'settings-panel__title' }, 'Transfer ownership'));
   if (!isOwner) {
     transfer.appendChild(el('p', { class: 'muted small' },
-      'Only the current owner can transfer this community. You are not the owner.'));
+      'Only the owner can transfer this community. You are not the owner.'));
   } else {
     transfer.appendChild(el('p', { class: 'muted small' },
-      'Ownership moves to one member. You stay in the community as a member, and only the new owner can transfer it away or delete it.'));
+      'Ownership moves to one member. You stay as a member; only the new owner can transfer or delete the community.'));
     const err = el('div', { class: 'form-error', hidden: true });
     const select = el('select', { class: 'input', 'aria-label': 'New owner' });
     select.appendChild(el('option', { value: '' }, 'Choose a member…'));
@@ -310,7 +310,7 @@ async function ownership(ctx) {
       confirmDialog({
         title: 'Transfer ownership?',
         message: label + ' becomes the owner of ' + (server.name || 'this community') +
-          '. You will remain a member without owner rights. This cannot be undone by you.',
+          '. You stay as a member without owner rights. You cannot undo this.',
         danger: true,
         confirmText: 'Transfer',
         onConfirm: async () => {
@@ -370,7 +370,7 @@ async function ownership(ctx) {
       }
       confirmDialog({
         title: 'Delete ' + (server.name || 'this community') + '?',
-        message: 'This permanently deletes the community, its channels, messages, roles and memberships. This cannot be undone.',
+        message: 'Permanently deletes the community, its channels, messages, roles and memberships. This cannot be undone.',
         danger: true,
         confirmText: 'Delete forever',
         onConfirm: async () => {

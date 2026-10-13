@@ -55,7 +55,7 @@ function httpCheck(target, url, timeoutMs) {
     try {
       parsed = new URL(url);
     } catch (err) {
-      return resolve({ ok: false, ms: 0, error: 'invalid URL: ' + url });
+      return resolve({ ok: false, ms: 0, error: 'Invalid URL: ' + url });
     }
 
     const lib = parsed.protocol === 'https:' ? https : http;
@@ -82,14 +82,14 @@ function httpCheck(target, url, timeoutMs) {
           return finish({ ok: false, status, error: 'HTTP ' + status + ', wanted ' + acceptable.join(' or ') });
         }
         if (expect.contains !== undefined && body.indexOf(expect.contains) === -1) {
-          return finish({ ok: false, status, error: 'response did not contain ' + JSON.stringify(expect.contains) });
+          return finish({ ok: false, status, error: 'Response did not contain ' + JSON.stringify(expect.contains) });
         }
         if (expect.json) {
           let parsedBody;
           try {
             parsedBody = JSON.parse(body);
           } catch (err) {
-            return finish({ ok: false, status, error: 'response was not JSON' });
+            return finish({ ok: false, status, error: 'Response was not JSON' });
           }
           const reason = jsonMismatch(parsedBody, expect.json);
           if (reason) return finish({ ok: false, status, error: reason });
@@ -121,9 +121,9 @@ function tcpCheck(target, timeoutMs) {
     socket.on('connect', () => finish({ ok: true }));
     socket.on('error', (err) => finish({
       ok: false,
-      error: 'could not reach ' + target.host + ':' + target.port + ': ' + err.message,
+      error: 'Could not reach ' + target.host + ':' + target.port + ': ' + err.message,
     }));
-    socket.on('timeout', () => finish({ ok: false, error: 'timed out after ' + timeoutMs + 'ms' }));
+    socket.on('timeout', () => finish({ ok: false, error: 'Timed out after ' + timeoutMs + 'ms' }));
   });
 }
 

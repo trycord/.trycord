@@ -17,7 +17,7 @@ router.use(auth);
 router.post('/self-verify', async (req, res, next) => {
   try {
     const row = await db.get('SELECT email FROM users WHERE id = ?', [req.user.id]);
-    if (!row) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'user not found' } });
+    if (!row) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
     const email = row.email || ('test-' + String(req.user.id).slice(0, 8) + '@trycord.test');
     await db.run('UPDATE users SET email = ?, email_verified_at = ? WHERE id = ?', [email, now(), req.user.id]);
     res.json({ ok: true, verified: true });

@@ -100,7 +100,7 @@ export async function renderWellbeingSection() {
   const motionCard = sectionCard();
   motionCard.appendChild(toggleRow({
     label: 'Reduce motion',
-    hint: 'Removes transitions and animated movement across the application.',
+    hint: 'Turns off transitions and animation across the app.',
     checked: wellbeing.reducedMotion,
     onChange: async (next) => {
       try {

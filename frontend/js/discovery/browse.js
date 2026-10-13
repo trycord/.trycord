@@ -119,8 +119,8 @@ export async function renderBrowse(container, { previewId } = {}) {
           el('div', { class: 'empty-state__title' },
             searching ? 'Nothing matched that search' : 'No public communities here'),
           el('div', { class: 'empty-state__body' }, searching
-            ? 'This instance has communities, just not ones matching that. Try a different word.'
-            : 'This instance has not published any communities for anyone to discover. Ones you create stay private until you make them public.')));
+            ? 'No communities match that. Try a different word.'
+            : 'This instance has not published any communities. Ones you create stay private until you make them public.')));
       } else {
         for (const s of items) {
           listPane.appendChild(serverCard(s, () => showPreview(s.id)));

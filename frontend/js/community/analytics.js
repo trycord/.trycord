@@ -103,7 +103,7 @@ export async function renderAnalytics(container, serverId, opts = {}) {
     picker.appendChild(b);
   }
 
-  const head = sectionHead('Analytics', 'What this community has looked like over the window below. Figures are counted from the messages themselves, so they agree with the history.', [picker]);
+  const head = sectionHead('Analytics', 'This community over the window below. Counted from the messages, so it matches the history.', [picker]);
 
   let rep;
   try {
@@ -141,14 +141,14 @@ export async function renderAnalytics(container, serverId, opts = {}) {
 
   container.appendChild(panel(
     'Message volume',
-    'Bars are per day. A day with no messages is a zero, not a gap — a gap would read as missing data.',
+    'One bar per day. A day with no messages is a zero, not a gap.',
     sparkline(rep.daily, (d) => d.messages, { label: 'Messages per day' }),
     legendRow(rep.daily, (d) => d.messages, (d) => d.day)
   ));
 
   container.appendChild(panel(
     'Who is taking part',
-    'Counted by distinct messages, not by membership: someone who joined and never spoke is not participating.',
+    'Counted by messages, not membership: someone who never spoke does not count.',
     sparkline(rep.daily, (d) => d.posters, { label: 'Distinct posters per day', height: 64 }),
     barList(rep.topMembers || [], {
       valueKey: 'messages', labelKey: 'displayName', subKey: null, empty: 'Nobody has posted in this window.',
@@ -157,7 +157,7 @@ export async function renderAnalytics(container, serverId, opts = {}) {
 
   container.appendChild(panel(
     'Where the conversation happens',
-    'Channel volume over the same window. Channels with no messages are listed so a silent one is visible.',
+    'Channel volume over the same window. Quiet channels are listed too.',
     barList(rep.topChannels || [], {
       valueKey: 'messages', labelKey: 'name',
       subKey: 'posters', empty: 'No channels to report on.',
@@ -167,7 +167,7 @@ export async function renderAnalytics(container, serverId, opts = {}) {
   if ((rep.membership || []).some((d) => d.joined || d.left)) {
     container.appendChild(panel(
       'Membership change',
-      'Departures are counted from the join and leave history, which survives a member row being removed.',
+      'Departures come from join and leave history, which survives a member being removed.',
       sparkline(rep.membership, (d) => d.joined, { label: 'Members joining per day', height: 64 }),
       barList(
         (rep.membership || []).filter((d) => d.joined || d.left).slice(-14).reverse().map((d) => ({

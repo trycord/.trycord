@@ -42,7 +42,7 @@ export function renderAppearance(wrap) {
     grid.appendChild(b);
   }
   wrap.appendChild(grid);
-  wrap.appendChild(el('p', { class: 'muted small' }, 'Themes override design tokens. Switching applies immediately and persists for this device.'));
+  wrap.appendChild(el('p', { class: 'muted small' }, 'Themes override design tokens. Switching applies immediately, on this device.'));
 
   const customPanel = el('div', { class: 'theme-custom', hidden: active !== 'custom' });
   const palette = loadPalette();
@@ -70,7 +70,7 @@ export function renderAppearance(wrap) {
   toneLight.addEventListener('click', () => chooseTone('light'));
   customPanel.appendChild(el('div', { class: 'field' }, el('label', {}, 'Accent color'), accentInput));
   customPanel.appendChild(el('div', { class: 'field' }, el('label', {}, 'Base tone'), el('div', { class: 'row-line' }, toneDark, toneLight)));
-  customPanel.appendChild(el('p', { class: 'muted small' }, 'Two inputs derive the full custom theme (surfaces, text, ambient). Semantic colors stay from the base palette.'));
+  customPanel.appendChild(el('p', { class: 'muted small' }, 'Two colours build the whole custom theme (surfaces, text, ambient). Semantic colours stay from the base palette.'));
   wrap.appendChild(customPanel);
   renderThemeStudio(wrap);
 }
@@ -79,7 +79,7 @@ export function renderThemeStudio(wrap) {
   const studio = el('div', { class: 'theme-studio' });
   studio.appendChild(el('div', { class: 'section-label' }, 'Custom theme studio'));
   studio.appendChild(el('p', { class: 'muted small' },
-    'Guided controls adjust the Custom theme safely. Advanced CSS allows deep visual restyling, but structural layout, navigation, and safety surfaces are protected and unsafe CSS is rejected.'));
+    'Guided controls adjust the Custom theme safely. Advanced CSS can restyle deeply; layout, navigation and safety surfaces stay protected.'));
 
   const state = loadCustomTheme();
   const tokens = Object.assign({}, DEFAULT_CUSTOM_TOKENS, state.tokens || {});

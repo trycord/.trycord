@@ -34,7 +34,7 @@ async function check(userId, incoming) {
   if (used + incoming <= limit) return null;
   return {
     error: 'QUOTA_EXCEEDED',
-    message: 'storage quota reached; delete an attachment or ask a moderator to raise your limit',
+    message: 'Storage quota reached; delete an attachment or ask a moderator to raise your limit',
     detail: { used, limit, incoming },
   };
 }

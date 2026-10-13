@@ -27,17 +27,17 @@ async function pendingBetween(a, b) {
 }
 
 async function request(fromId, toId) {
-  if (!toId) throw { code: 'VALIDATION_ERROR', message: 'userId required' };
-  if (String(toId) === String(fromId)) throw { code: 'VALIDATION_ERROR', message: 'you cannot friend yourself' };
-  if (!(await userExists(toId))) throw { code: 'NOT_FOUND', message: 'user not found' };
-  if (await areFriends(fromId, toId)) throw { code: 'CONFLICT', message: 'already friends' };
+  if (!toId) throw { code: 'VALIDATION_ERROR', message: 'UserId required' };
+  if (String(toId) === String(fromId)) throw { code: 'VALIDATION_ERROR', message: 'You cannot friend yourself' };
+  if (!(await userExists(toId))) throw { code: 'NOT_FOUND', message: 'User not found' };
+  if (await areFriends(fromId, toId)) throw { code: 'CONFLICT', message: 'Already friends' };
   const existing = await pendingBetween(fromId, toId);
   if (existing) {
     // If they already asked us, accept instead of creating a mirror request.
     if (String(existing.to_user_id) === String(fromId)) {
       return { accepted: await accept(fromId, existing.id), autoAccepted: true };
     }
-    throw { code: 'CONFLICT', message: 'friend request already pending' };
+    throw { code: 'CONFLICT', message: 'Friend request already pending' };
   }
   const ts = now();
   const row = { id: uuid(), from_user_id: fromId, to_user_id: toId, status: 'pending', created_at: ts, updated_at: ts };
@@ -76,9 +76,9 @@ async function outgoing(userId) {
 
 async function accept(userId, requestId) {
   const req = await db.get('SELECT * FROM friend_requests WHERE id = ?', [requestId]);
-  if (!req || req.status !== 'pending') throw { code: 'NOT_FOUND', message: 'request not found' };
+  if (!req || req.status !== 'pending') throw { code: 'NOT_FOUND', message: 'Request not found' };
   if (String(req.to_user_id) !== String(userId)) {
-    throw { code: 'PERMISSION_DENIED', message: 'only the recipient can accept' };
+    throw { code: 'PERMISSION_DENIED', message: 'Only the recipient can accept' };
   }
   const ts = now();
   await db.transaction(async (t) => {
@@ -91,9 +91,9 @@ async function accept(userId, requestId) {
 
 async function decline(userId, requestId) {
   const req = await db.get('SELECT * FROM friend_requests WHERE id = ?', [requestId]);
-  if (!req || req.status !== 'pending') throw { code: 'NOT_FOUND', message: 'request not found' };
+  if (!req || req.status !== 'pending') throw { code: 'NOT_FOUND', message: 'Request not found' };
   if (String(req.to_user_id) !== String(userId)) {
-    throw { code: 'PERMISSION_DENIED', message: 'only the recipient can decline' };
+    throw { code: 'PERMISSION_DENIED', message: 'Only the recipient can decline' };
   }
   await db.run("UPDATE friend_requests SET status = 'declined', updated_at = ? WHERE id = ?", [now(), req.id]);
   // The other party's id is returned so the caller can tell them. Previously
@@ -105,9 +105,9 @@ async function decline(userId, requestId) {
 // Cancel your own outgoing pending request.
 async function cancel(userId, requestId) {
   const req = await db.get('SELECT * FROM friend_requests WHERE id = ?', [requestId]);
-  if (!req || req.status !== 'pending') throw { code: 'NOT_FOUND', message: 'request not found' };
+  if (!req || req.status !== 'pending') throw { code: 'NOT_FOUND', message: 'Request not found' };
   if (String(req.from_user_id) !== String(userId)) {
-    throw { code: 'PERMISSION_DENIED', message: 'only the sender can cancel' };
+    throw { code: 'PERMISSION_DENIED', message: 'Only the sender can cancel' };
   }
   await db.run('DELETE FROM friend_requests WHERE id = ?', [req.id]);
   return { id: req.id, cancelled: true, userId: String(req.to_user_id) };
@@ -131,7 +131,7 @@ async function remove(userId, friendId) {
     'SELECT 1 FROM friendships WHERE user_id = ? AND friend_id = ?',
     [userId, friendId]
   );
-  if (!row) throw { code: 'NOT_FOUND', message: 'not friends' };
+  if (!row) throw { code: 'NOT_FOUND', message: 'Not friends' };
   const other = String(friendId);
   await db.transaction(async (t) => {
     await t.run('DELETE FROM friendships WHERE user_id = ? AND friend_id = ?', [userId, friendId]);

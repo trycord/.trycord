@@ -346,11 +346,11 @@ export const TrycordConfig = {
       if (looksLikeAppOrigin()) {
         return {
           ok: false,
-          error: 'The backend refused this app’s origin. Add trycord://app to CLIENT_ORIGIN '
+          error: 'The backend refused this app: add trycord://app to CLIENT_ORIGIN. '
             + 'on that server (and restart it), then test again.',
         };
       }
-      return { ok: false, error: 'The server could not be reached. Check your connection and try again.' };
+      return { ok: false, error: 'Could not reach the server. Check your connection and try again.' };
     } finally {
       clearTimeout(timer);
     }

@@ -75,7 +75,7 @@ export async function renderNotificationPrefsSection(body, preloaded) {
   const servers = State.servers || [];
   if (servers.length) {
     body.appendChild(el('div', { class: 'section-label' }, 'Per community'));
-    body.appendChild(setNote('A community you set here overrides the categories above, for that community only.'));
+    body.appendChild(setNote('A community set here overrides the categories above, for that community only.'));
     const per = sectionCard();
     for (const s of servers) {
       const name = s.name || 'Community';

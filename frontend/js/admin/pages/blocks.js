@@ -183,7 +183,7 @@ export function pageEditor(container, route) {
     previewOut,
     el('div', { class: 'section-label' }, 'Formatting'),
     el('p', { class: 'muted small' },
-      'Text accepts BBCode, the notation most forums use, so a page can be copied out and keep its formatting. '
+      'Text accepts BBCode, so a page can be copied out and keep its formatting. '
       + 'Everything else is shown exactly as typed.'),
     el('ul', { class: 'bbcode-ref' }, ...BBCODE_TOOLS.map((t) => el('li', {},
       el('code', {}, '[' + t.tag + (t.arg ? '=' + t.arg : '') + ']' + (t.body || '…') + '[/' + t.tag + ']'),
@@ -202,7 +202,7 @@ export function pageEditor(container, route) {
     if (state.page.legal) {
       body.appendChild(el('div', { class: 'draft-note', role: 'note' },
         el('strong', {}, 'This is a legal page. '),
-        'Publishing is visible to everyone immediately and is written to the audit log. Check the content carefully before you publish.'));
+        'Publishing is visible to everyone immediately and written to the audit log. Check the content before you publish.'));
     }
 
     // An empty editor on a page that has never been drafted reads as a broken
@@ -213,7 +213,7 @@ export function pageEditor(container, route) {
     if (!state.blocks.length && state.page.status !== 'PUBLISHED') {
       const box = el('div', { class: 'draft-note', role: 'note' });
       box.appendChild(el('strong', {}, 'Nothing drafted yet. '));
-      box.appendChild(el('span', {}, 'Visitors are currently seeing the template that ships with Trycord. '
+      box.appendChild(el('span', {}, 'Visitors are seeing the template that ships with Trycord. '
         + 'Add blocks below, or save an empty draft to publish a blank page.'));
       body.appendChild(box);
     }
@@ -264,7 +264,7 @@ export function pageEditor(container, route) {
         class: 'btn', type: 'button',
         onClick: () => confirmDialog({
           title: 'Unpublish this page?',
-          message: 'Visitors will see the file on disk again until you publish a new draft.',
+          message: 'Visitors see the file on disk until you publish a new draft.',
           danger: true, confirmText: 'Unpublish',
           onConfirm: async () => {
             try {
@@ -315,7 +315,7 @@ export function pageEditor(container, route) {
       body: el('div', { class: 'admin-form' }, err,
         st.page.legal
           ? el('div', { class: 'draft-note', role: 'note' },
-            el('strong', {}, 'This page may contain legal or privacy terms. Verify the content before publishing.'))
+            el('strong', {}, 'This page may contain legal or privacy terms. Check it before publishing.'))
           : null,
         el('p', { class: 'muted small' }, 'Visitors see the change immediately.'),
         el('div', { class: 'field' },
@@ -353,7 +353,7 @@ export function pageEditor(container, route) {
         class: 'btn sm', type: 'button',
         onClick: () => confirmDialog({
           title: 'Restore revision ' + rev.revision + '?',
-          message: 'Its content becomes the current draft. Nothing is deleted: this creates a new revision.',
+          message: 'Its content becomes the current draft. Nothing is deleted; this adds a revision.',
           confirmText: 'Restore',
           onConfirm: async () => {
             try {

@@ -116,10 +116,10 @@ module.exports = {
 
     try {
       await transport.verify();
-      return { ok: true, detail: 'the relay answered and the credentials were accepted' };
+      return { ok: true, detail: 'The relay answered and the credentials were accepted' };
     } catch (e) {
       const code = (e && (e.code || e.responseCode)) || 'transport_error';
-      return { ok: false, detail: 'the relay refused the connection (' + code + ')' };
+      return { ok: false, detail: 'The relay refused the connection (' + code + ')' };
     }
   },
 };

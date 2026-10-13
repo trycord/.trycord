@@ -75,7 +75,7 @@ async function sfu(method, path, body) {
 
 const disabled = () => ({
   code: 'FEATURE_DISABLED',
-  message: 'voice and video is disabled on this instance',
+  message: 'Voice and video are off on this instance.',
   status: 403,
 });
 
@@ -87,7 +87,7 @@ const disabled = () => ({
 async function available() {
   const f = features.current;
   if (!f.voiceVideo.enabled) {
-    return { available: false, reason: 'disabled', detail: 'voice and video is off on this instance' };
+    return { available: false, reason: 'disabled', detail: 'Voice and video are off on this instance.' };
   }
   const health = features.healthOf(f);
   if (!health.available) return health;
@@ -101,7 +101,7 @@ async function available() {
     return {
       available: false,
       reason: 'unreachable',
-      detail: 'the media server could not be reached or refused the credentials',
+      detail: 'The media server could not be reached, or it refused the credentials.',
       problems: [e.message],
     };
   }
@@ -117,9 +117,9 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
   if (!f.voiceVideo.enabled) return { ok: false, ...disabled() };
 
   const ch = await db.get('SELECT id, server_id, type FROM channels WHERE id = ?', [channelId]);
-  if (!ch) return { ok: false, code: 'NOT_FOUND', message: 'channel not found', status: 404 };
+  if (!ch) return { ok: false, code: 'NOT_FOUND', message: 'Channel not found', status: 404 };
   if (ch.type !== 'voice' && ch.type !== 'stage') {
-    return { ok: false, code: 'VALIDATION_ERROR', message: 'that channel is not a voice channel', status: 400 };
+    return { ok: false, code: 'VALIDATION_ERROR', message: 'That is not a voice channel.', status: 400 };
   }
 
   const member = await db.get(
@@ -127,7 +127,7 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
     [ch.server_id, userId]
   );
   if (!member) {
-    return { ok: false, code: 'NOT_A_MEMBER', message: 'you are not a member of this community', status: 403 };
+    return { ok: false, code: 'NOT_A_MEMBER', message: 'You are not a member of this community.', status: 403 };
   }
 
   // hasPermission is the gate the rest of this package already uses, and it carries the
@@ -139,13 +139,13 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
     ? canConnect
     : await permissions.hasPermission(userId, ch.server_id, need);
   if (!canConnect && !canNeed) {
-    return { ok: false, code: 'PERMISSION_DENIED', message: 'you cannot connect to this channel', status: 403 };
+    return { ok: false, code: 'PERMISSION_DENIED', message: 'You cannot connect to this channel.', status: 403 };
   }
   if (screen && !f.voiceVideo.screenSharing) {
-    return { ok: false, code: 'FEATURE_DISABLED', message: 'screen sharing is disabled on this instance', status: 403 };
+    return { ok: false, code: 'FEATURE_DISABLED', message: 'Screen sharing is off on this instance.', status: 403 };
   }
   if (video && !await permissions.hasPermission(userId, ch.server_id, 'VIDEO')) {
-    return { ok: false, code: 'PERMISSION_DENIED', message: 'you cannot send video in this channel', status: 403 };
+    return { ok: false, code: 'PERMISSION_DENIED', message: 'You cannot send video in this channel.', status: 403 };
   }
 
   // A banned member is a non-member as far as the media server is concerned. The expiry is
@@ -156,7 +156,7 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
     [ch.server_id, userId]
   );
   if (ban && (!ban.expires_at || new Date(ban.expires_at).getTime() > Date.now())) {
-    return { ok: false, code: 'BANNED', message: 'you are banned from this community', status: 403 };
+    return { ok: false, code: 'BANNED', message: 'You are banned from this community.', status: 403 };
   }
 
   const room = await db.get('SELECT id FROM voice_rooms WHERE channel_id = ?', [channelId]);
@@ -169,7 +169,7 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
     return {
       ok: false,
       code: 'ROOM_FULL',
-      message: `this channel is full (${limit} participants)`,
+      message: `This channel is full (${limit} participants)`,
       status: 409,
     };
   }
@@ -320,12 +320,12 @@ async function closeTrack({ sessionId, mid }) {
 // provider knows about.
 async function participants(channelId, userId) {
   const ch = await db.get('SELECT server_id FROM channels WHERE id = ?', [channelId]);
-  if (!ch) throw { code: 'NOT_FOUND', message: 'channel not found', status: 404 };
+  if (!ch) throw { code: 'NOT_FOUND', message: 'Channel not found', status: 404 };
   const member = await db.get(
     'SELECT 1 FROM server_members WHERE server_id = ? AND user_id = ?',
     [ch.server_id, userId]
   );
-  if (!member) throw { code: 'NOT_A_MEMBER', message: 'you are not a member', status: 403 };
+  if (!member) throw { code: 'NOT_A_MEMBER', message: 'You are not a member', status: 403 };
 
   const rows = await db.all(
     `SELECT p.id, p.user_id, p.session_id, p.joined_at, p.muted, p.deafened,
@@ -371,19 +371,19 @@ async function setSelfState(channelId, userId, { muted, deafened }) {
 // forgot.
 async function moderate(channelId, actorId, targetUserId, { mute, deafen, disconnect }) {
   const ch = await db.get('SELECT server_id FROM channels WHERE id = ?', [channelId]);
-  if (!ch) throw { code: 'NOT_FOUND', message: 'channel not found', status: 404 };
+  if (!ch) throw { code: 'NOT_FOUND', message: 'Channel not found', status: 404 };
 
   const canMove = await permissions.hasPermission(actorId, ch.server_id, 'MOVE_MEMBERS');
   const canMute = await permissions.hasPermission(actorId, ch.server_id, 'MUTE_MEMBERS');
   if (!canMove && !canMute) {
-    throw { code: 'PERMISSION_DENIED', message: 'you cannot moderate voice in this channel', status: 403 };
+    throw { code: 'PERMISSION_DENIED', message: 'You cannot moderate voice in this channel.', status: 403 };
   }
 
   const target = await db.get(
     'SELECT * FROM voice_participants WHERE channel_id = ? AND user_id = ? AND left_at IS NULL',
     [channelId, targetUserId]
   );
-  if (!target) throw { code: 'NOT_FOUND', message: 'that person is not in this channel', status: 404 };
+  if (!target) throw { code: 'NOT_FOUND', message: 'That person is not in this channel.', status: 404 };
 
   if (disconnect) {
     await db.run('UPDATE voice_participants SET left_at = ? WHERE id = ?', [now(), target.id]);
@@ -413,7 +413,7 @@ async function moderate(channelId, actorId, targetUserId, { mute, deafen, discon
 async function requestSpeak(channelId, userId) {
   const ch = await db.get('SELECT type FROM channels WHERE id = ?', [channelId]);
   if (!ch || ch.type !== 'stage') {
-    throw { code: 'VALIDATION_ERROR', message: 'that is not a stage channel', status: 400 };
+    throw { code: 'VALIDATION_ERROR', message: 'That is not a stage channel', status: 400 };
   }
   await db.run(
     'INSERT INTO voice_speak_requests (id, channel_id, user_id, created_at) VALUES (?, ?, ?, ?)',

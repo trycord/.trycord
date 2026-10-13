@@ -65,7 +65,7 @@ function fail(res, code, message, status, extra) {
 function serviceError(res, e) {
   if (e && e.code && Codes[e.code]) return fail(res, e.code, e.message);
   console.error('[service]', (e && e.stack) || e);
-  return res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
+  return res.status(500).json({ error: { code: 'INTERNAL', message: 'Internal error' } });
 }
 
 // An async route handler that cannot forget its try/catch.

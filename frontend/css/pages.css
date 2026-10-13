@@ -377,12 +377,7 @@ html[data-auth-page='1'] .auth-page .btn.primary {
 }
 
 html[data-auth-page='1'] .auth-page .btn.primary:hover {
-  background: var(--color-accent-subtle);
-  border-color: var(--color-accent);
-}
-
-html[data-auth-page='1'] .auth-page .btn.primary:active {
-  background: var(--color-accent-muted);
+  border-color: var(--color-accent-text);
 }
 
 html[data-auth-page='1'] .auth-page .btn.block {

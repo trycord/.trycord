@@ -68,7 +68,7 @@ async function requestPasswordReset(email) {
 async function resetPassword(token, newPassword) {
   const pwErr = checkPassword(newPassword);
   if (pwErr) throw { code: 'VALIDATION_ERROR', message: pwErr };
-  if (!token) throw { code: 'VALIDATION_ERROR', message: 'reset token required' };
+  if (!token) throw { code: 'VALIDATION_ERROR', message: 'Reset token required' };
   const row = await db.get('SELECT * FROM password_resets WHERE token_hash = ?', [tokenHash(token)]);
   if (!row || row.used_at || new Date(row.expires_at).getTime() < Date.now()) {
     throw { code: 'AUTH_REQUIRED', message: 'This reset link is no longer valid. Request a new one.' };
@@ -76,7 +76,7 @@ async function resetPassword(token, newPassword) {
   const user = await db.get('SELECT * FROM users WHERE id = ?', [row.user_id]);
   if (!user) throw { code: 'AUTH_REQUIRED', message: 'This reset link is no longer valid. Request a new one.' };
   const reuse = await bcrypt.compare(String(newPassword), user.password_hash);
-  if (reuse) throw { code: 'VALIDATION_ERROR', message: 'new password must be different from the current one' };
+  if (reuse) throw { code: 'VALIDATION_ERROR', message: 'Your new password must be different from the current one.' };
   const hash = await bcrypt.hash(String(newPassword), BCRYPT_COST);
   const ts = now();
   // A reset terminates every existing session. Without this, whoever prompted
@@ -107,9 +107,9 @@ async function resetPassword(token, newPassword) {
 
 async function requestVerification(userId, email) {
   const normalized = normalizeEmail(email);
-  if (!normalized) throw { code: 'VALIDATION_ERROR', message: 'enter a valid email address' };
+  if (!normalized) throw { code: 'VALIDATION_ERROR', message: 'Enter a valid email address.' };
   const taken = await db.get('SELECT id FROM users WHERE email = ? AND id != ?', [normalized, userId]);
-  if (taken) throw { code: 'CONFLICT', message: 'that email is already in use' };
+  if (taken) throw { code: 'CONFLICT', message: 'That email is already in use.' };
   await db.run('DELETE FROM email_verifications WHERE user_id = ? AND used_at IS NULL', [userId]);
   await purgeUser('email_verifications', userId);
   const token = newToken();
@@ -131,14 +131,14 @@ async function requestVerification(userId, email) {
 }
 
 async function verifyEmail(token) {
-  if (!token) throw { code: 'VALIDATION_ERROR', message: 'verification token required' };
+  if (!token) throw { code: 'VALIDATION_ERROR', message: 'Verification token required.' };
   const row = await db.get('SELECT * FROM email_verifications WHERE token_hash = ?', [tokenHash(token)]);
   if (!row || row.used_at || new Date(row.expires_at).getTime() < Date.now()) {
     throw { code: 'AUTH_REQUIRED', message: 'This verification link is no longer valid. Request a new one.' };
   }
   const ts = now();
   const taken = await db.get('SELECT id FROM users WHERE email = ? AND id != ?', [row.email, row.user_id]);
-  if (taken) throw { code: 'CONFLICT', message: 'that email is already in use by another account' };
+  if (taken) throw { code: 'CONFLICT', message: 'That email is already in use by another account.' };
   await db.transaction(async (t) => {
     await t.run('UPDATE users SET email = ?, email_verified_at = ? WHERE id = ?', [row.email, ts, row.user_id]);
     await t.run('UPDATE email_verifications SET used_at = ? WHERE id = ?', [ts, row.id]);
@@ -152,13 +152,13 @@ async function verifyEmail(token) {
 // The old address (if any) is only replaced on confirmation.
 async function requestEmailChange(userId, currentPassword, newEmail) {
   const normalized = normalizeEmail(newEmail);
-  if (!normalized) throw { code: 'VALIDATION_ERROR', message: 'enter a valid email address' };
-  if (!currentPassword) throw { code: 'VALIDATION_ERROR', message: 'current password required' };
+  if (!normalized) throw { code: 'VALIDATION_ERROR', message: 'Enter a valid email address.' };
+  if (!currentPassword) throw { code: 'VALIDATION_ERROR', message: 'Current password required.' };
   const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
-  if (!user) throw { code: 'NOT_FOUND', message: 'user not found' };
+  if (!user) throw { code: 'NOT_FOUND', message: 'User not found' };
   const ok = await bcrypt.compare(String(currentPassword), user.password_hash);
-  if (!ok) throw { code: 'BAD_PASSWORD', message: 'current password is incorrect' };
-  if (user.email === normalized) throw { code: 'VALIDATION_ERROR', message: 'that is already your recovery email' };
+  if (!ok) throw { code: 'BAD_PASSWORD', message: 'Current password is incorrect.' };
+  if (user.email === normalized) throw { code: 'VALIDATION_ERROR', message: 'That is already your recovery email.' };
   return requestVerification(userId, normalized);
 }
 

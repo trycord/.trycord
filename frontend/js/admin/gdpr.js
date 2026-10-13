@@ -53,8 +53,8 @@ function reviewGdpr(r, decision, refresh) {
     title: (approve ? 'Approve' : 'Decline') + ' erasure request - ' + (r.username || r.userId),
     body: el('div', { class: 'admin-form' }, err,
       el('p', { class: 'muted small' }, approve
-        ? 'Approving moves this to the processing queue. Nothing is erased until you run it.'
-        : 'The user is told the request was declined and can submit a new one.'),
+        ? 'Approving queues it for processing. Nothing is erased until you run it.'
+        : 'The user is told it was declined and can submit another.'),
       el('div', { class: 'field' }, el('label', {}, 'Note'), note)),
     footer: [
       btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
@@ -81,9 +81,7 @@ function processGdpr(r, refresh) {
     body: el('div', { class: 'admin-form' }, err,
       el('p', {}, 'This erases the identity of ' + (r.username || r.userId) + ':'),
       el('p', { class: 'muted small' },
-        'Username, email, display name, profile, avatar and banner, every uploaded file, and all sessions. '
-        + 'Messages stay, attributed to a deleted account. Communities they owned are handed to their '
-        + 'longest-standing member. Moderation and audit records that name them are kept.'),
+        'Username, email, display name, profile, avatar and banner, every uploaded file, and all sessions. Messages stay, labelled as a deleted account. Communities they owned pass to their longest-standing member. Moderation and audit records that name them are kept.'),
       el('p', { class: 'muted small' }, 'This cannot be undone.')),
     footer: [
       btn('Cancel', { variant: 'ghost', onClick: () => modal.close() }),
@@ -107,7 +105,7 @@ function processGdpr(r, refresh) {
 export async function renderGdpr(sec, show, seq, fetched) {
   sec.appendChild(el('h2', { class: 'section-label' }, 'Data subject requests'));
   sec.appendChild(el('p', { class: 'muted small' },
-    'Erasure requests a user submitted from Settings → Account. They are created by the user, not by an administrator, and every one of them is a GDPR request.'));
+    'Erasure requests users submitted from Settings → Account. Users create these, not admins, and each one is a GDPR request.'));
 
   const sel = el('select', { class: 'select', 'aria-label': 'Filter by status' });
   sel.appendChild(el('option', { value: '' }, 'All states'));

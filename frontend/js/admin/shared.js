@@ -37,7 +37,7 @@ export function adminError(ex, fallback) {
   const code = ex && ex.code;
   if (code === 'AUTH_REQUIRED') return 'You need to sign in to perform this action.';
   if (code === 'PERMISSION_DENIED') return 'You do not have permission to perform this action.';
-  if (code === 'NOT_FOUND' || code === 'SERVER_NOT_FOUND') return 'This community could not be found. It may already be gone.';
+  if (code === 'NOT_FOUND' || code === 'SERVER_NOT_FOUND') return 'Community not found. It may already be gone.';
   if (code === 'USER_NOT_FOUND') return 'This account could not be found.';
   return (ex && ex.message) || fallback || 'The request could not be completed. Please try again.';
 }

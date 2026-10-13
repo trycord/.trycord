@@ -32,7 +32,7 @@ function publicRow(r) {
 async function store({ uploaderId, channelId, conversationId, buffer, originalName }) {
   assertScope({ channelId, conversationId });
   if (!buffer || buffer.length === 0) {
-    return { error: 'VALIDATION_ERROR', message: 'empty file' };
+    return { error: 'VALIDATION_ERROR', message: 'Empty file' };
   }
   const mime = detect.detectMime(buffer, originalName);
   const over = await quota.check(uploaderId, buffer.length);

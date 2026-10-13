@@ -436,7 +436,7 @@ async function boot() {
         'SELECT id, username, display_name AS displayName, created_at AS createdAt FROM users WHERE id = ?',
         [req.user.id]
       );
-      if (!row) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'user not found' } });
+      if (!row) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'User not found' } });
       res.json(row);
     } catch (e) { next(e); }
   });
@@ -556,7 +556,7 @@ async function boot() {
     res.status(404).json({
       error: {
         code: 'NOT_FOUND',
-        message: `no API route for ${req.method} ${req.path}`,
+        message: `No API route for ${req.method} ${req.path}`,
       },
     });
   });
@@ -580,7 +580,7 @@ async function boot() {
       return res.status(status).json({ error: { code, message } });
     }
     console.error('[error]', err && err.message ? err.message : err);
-    res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
+    res.status(500).json({ error: { code: 'INTERNAL', message: 'Internal error' } });
   });
 
   // Drop expired token revocations (uses JS time, portable across databases).

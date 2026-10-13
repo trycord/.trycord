@@ -50,7 +50,7 @@ async function renderServerSettings(container, serverId, section = 'overview') {
   if (!can('MANAGE_SERVER')) {
     renderContextHeader({ title: 'Settings', sub: server.name });
     container.appendChild(el('div', { class: 'form-error' },
-      "You need permission to manage this community's settings."));
+      "You need permission to manage this community."));
     return;
   }
   // An unknown section is not an error, it is the overview: a stale bookmark to a
@@ -116,14 +116,14 @@ function paintCommunityContext(host, section, server, counts) {
     fact('Roles', String(counts.roles)),
   ))];
   const NOTES = {
-    overview: 'These counts move when you change anything on the left.',
-    structure: 'Deleting a channel removes its messages with it. A category is only an ordering; moving one does not move its channels anywhere.',
-    members: 'A role grants exactly what its permissions say. Holding several roles does not add their permissions together beyond what each grants.',
-    roles: 'An override on a channel or category beats the role list for that place only.',
-    invites: 'An invite is single-use and expires. Revoking one stops it being used again but does not undo it for anyone who already accepted.',
-    moderation: 'A timeout lifts itself when it expires. A ban does not, and only an administrator can lift it.',
+    overview: 'These counts change as you edit on the left.',
+    structure: 'Deleting a channel removes its messages. A category is only ordering; moving one does not move its channels.',
+    members: 'A role grants exactly what its permissions say. Holding several roles does not add them together.',
+    roles: 'An override on a channel or category beats the role list, for that place only.',
+    invites: 'An invite works once and expires. Revoking one stops it being used again, but does not undo it for anyone who already accepted.',
+    moderation: 'A timeout lifts when it expires. A ban does not; only an admin can lift it.',
     ownership: 'Transferring ownership is immediate and cannot be undone from here.',
-    appearance: 'Appearance is per member. Nobody else sees the theme you choose.',
+    appearance: 'Appearance is per member. Nobody else sees your theme.',
   };
   const note = NOTES[section];
   if (note) out.push(block('About this section', para(note)));

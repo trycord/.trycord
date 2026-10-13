@@ -39,6 +39,6 @@ module.exports = {
   async checkConnection() {
     // Nothing to check, and saying "ok" here would be a claim about a transport
     // that does not exist.
-    return { ok: true, detail: 'mail delivery is disabled, so there is nothing to reach', delivers: false };
+    return { ok: true, detail: 'Mail delivery is disabled, so there is nothing to reach', delivers: false };
   },
 };

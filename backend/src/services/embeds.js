@@ -59,7 +59,7 @@ async function fetchHead(url) {
         'user-agent': 'TrycordBot/1.0 (+link preview)',
       },
     });
-    if (!r.ok) return { error: 'http ' + r.status };
+    if (!r.ok) return { error: 'Http ' + r.status };
     // A redirect can land on a private host, so the final URL is re-checked.
     await assertPublicHost(new URL(r.url).hostname);
     const type = String(r.headers.get('content-type') || '');

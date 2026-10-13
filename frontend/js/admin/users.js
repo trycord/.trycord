@@ -85,7 +85,7 @@ export function userEnforceModal(user, onDone) {
   const hoursField = el('div', { class: 'field', hidden: true }, el('label', {}, 'Duration (hours)'), hours);
   const confirm = el('input', { type: 'checkbox' });
   const confirmField = el('label', { class: 'field row-line admin-confirm', hidden: true },
-    confirm, el('span', {}, 'I confirm a permanent account ban. It invalidates all sessions and closes live sockets.'));
+    confirm, el('span', {}, 'I confirm a permanent ban. It ends every session immediately.'));
   const reason = el('textarea', { class: 'input', rows: 3, required: true, placeholder: 'Reason — recorded and visible in the user\u2019s enforcement record' });
   typeSel.addEventListener('change', () => {
     const t = typeSel.value;

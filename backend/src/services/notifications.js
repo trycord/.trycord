@@ -15,7 +15,7 @@ const TYPES = ['dm', 'friend_request', 'friend_accepted', 'mention', 'reply'];
 // Without this the setting was stored, returned by the API and shown in Settings, and
 // nothing ever read it - a toggle that changes nothing.
 async function create(userId, type, actorId, referenceId) {
-  if (TYPES.indexOf(type) === -1) throw { code: 'VALIDATION_ERROR', message: 'unknown notification type' };
+  if (TYPES.indexOf(type) === -1) throw { code: 'VALIDATION_ERROR', message: 'Unknown notification type.' };
   const row = {
     id: uuid(), user_id: userId, type,
     actor_id: actorId || null, reference_id: referenceId || null,
@@ -142,7 +142,7 @@ async function list(userId, limit, cursor) {
 
 async function markRead(userId, id) {
   const n = await db.get('SELECT * FROM notifications WHERE id = ? AND user_id = ?', [id, userId]);
-  if (!n) throw { code: 'NOT_FOUND', message: 'notification not found' };
+  if (!n) throw { code: 'NOT_FOUND', message: 'Notification not found' };
   await db.run('UPDATE notifications SET read_at = ? WHERE id = ?', [now(), id]);
   return { id, read: true };
 }

@@ -200,7 +200,7 @@ async function fillContext(frame, host, tab) {
       });
     } else if (tab === 'updates') {
       nodes = guideContext('About this build',
-        el('p', { class: 'muted small' }, 'Version and build information for the instance this device is talking to. Trycord does not update itself: a new build appears here when the instance you are connected to is running one.'));
+        el('p', { class: 'muted small' }, 'Version and build of the instance this device talks to. Trycord does not update itself — a new build appears here when the instance runs one.'));
     } else if (tab === 'profile') {
       nodes = profileContext(State.me, State.serverDetail);
     }

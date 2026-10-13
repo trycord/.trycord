@@ -16,15 +16,15 @@ const { assertLength } = require('./limits');
 
 async function edit(userId, conversationId, messageId, content, username) {
   const seen = await visibleConversation(conversationId, userId);
-  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
+  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'Conversation not found' };
   const msg = await db.get(
     'SELECT * FROM dm_messages WHERE id = ? AND conversation_id = ?',
     [messageId, conversationId]
   );
-  if (!msg) throw { code: 'NOT_FOUND', message: 'message not found' };
-  if (msg.author_id !== userId) throw { code: 'PERMISSION_DENIED', message: 'only the author can edit' };
+  if (!msg) throw { code: 'NOT_FOUND', message: 'Message not found' };
+  if (msg.author_id !== userId) throw { code: 'PERMISSION_DENIED', message: 'Only the author can edit' };
   const text = String(content === null || content === undefined ? '' : content).trim();
-  if (!text) throw { code: 'VALIDATION_ERROR', message: 'message is empty' };
+  if (!text) throw { code: 'VALIDATION_ERROR', message: 'Message is empty' };
   assertLength(text);
 
   const editedAt = now();
@@ -43,13 +43,13 @@ async function edit(userId, conversationId, messageId, content, username) {
 // Hard delete, author only - same model as channel messages.
 async function remove(userId, conversationId, messageId) {
   const seen = await visibleConversation(conversationId, userId);
-  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
+  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'Conversation not found' };
   const msg = await db.get(
     'SELECT * FROM dm_messages WHERE id = ? AND conversation_id = ?',
     [messageId, conversationId]
   );
-  if (!msg) throw { code: 'NOT_FOUND', message: 'message not found' };
-  if (msg.author_id !== userId) throw { code: 'PERMISSION_DENIED', message: 'cannot delete this message' };
+  if (!msg) throw { code: 'NOT_FOUND', message: 'Message not found' };
+  if (msg.author_id !== userId) throw { code: 'PERMISSION_DENIED', message: 'Cannot delete this message' };
 
   // The rows go with the message by cascade; the objects on disk do not, so they are
   // named before the delete.
@@ -69,7 +69,7 @@ async function remove(userId, conversationId, messageId) {
 // list does not mark everything read behind the reader's back.
 async function markRead(userId, conversationId) {
   const seen = await visibleConversation(conversationId, userId);
-  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'conversation not found' };
+  if (!seen) throw { code: 'NOT_A_MEMBER', message: 'Conversation not found' };
   const ts = now();
   await db.run(
     'UPDATE dm_members SET last_read_at = ? WHERE conversation_id = ? AND user_id = ?',

@@ -20,7 +20,7 @@ export async function renderSupport(container) {
   const wrap = el('div', { class: 'pub-page' });
   wrap.appendChild(el('h1', { class: 'pub-title' }, 'Support'));
   wrap.appendChild(el('p', { class: 'pub-lede' },
-    'Get help with your account, report a problem, or appeal a moderation decision. Appeals go directly to the people who run this instance.'));
+    'Get help with your account, report a problem, or appeal a moderation decision. Appeals go straight to the people who run this instance.'));
 
   let instanceName = '';
   try {
@@ -146,7 +146,7 @@ export async function renderMyAppeals(container) {
 
   if (!items || !items.length) {
     list.appendChild(appealState('flag', 'Nothing to appeal',
-      'If an action is taken against your account or a community it comes with an action ID, and you can appeal it from here. Nothing has been actioned against you.'));
+      'Nothing has been actioned against you. If something is, it comes with an action ID you can appeal from here.'));
     return;
   }
 
@@ -208,7 +208,7 @@ export function renderNewAppeal(container) {
     el('div', { class: 'field' },
       el('label', {}, 'Action ID'),
       actionInput,
-      el('span', { class: 'hint' }, 'On the notice you were sent, and filled in for you if you arrived from it.')),
+      el('span', { class: 'hint' }, 'On the notice you were sent, already filled in if you came from it.')),
     el('div', { class: 'field' },
       el('label', {}, 'Your appeal'),
       reason,

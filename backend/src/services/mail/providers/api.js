@@ -265,7 +265,7 @@ module.exports = {
     if (!v.ok) return { ok: false, detail: v.problems.join('; ') };
 
     const to = cfg.pending('testRecipient');
-    if (!to) return { ok: false, detail: 'a recipient address is required for a real delivery check' };
+    if (!to) return { ok: false, detail: 'A recipient address is required for a real delivery check' };
 
     try {
       const out = await this.sendMessage(cfg, {
@@ -274,7 +274,7 @@ module.exports = {
         text: 'This instance is configured to deliver mail over an HTTP API. If you are reading it, the configuration works.',
         html: undefined,
       });
-      return { ok: true, detail: 'the provider accepted the message' + (out.id ? ' (' + out.id + ')' : '') };
+      return { ok: true, detail: 'The provider accepted the message' + (out.id ? ' (' + out.id + ')' : '') };
     } catch (e) {
       return { ok: false, detail: e && e.message ? e.message : String(e) };
     }
