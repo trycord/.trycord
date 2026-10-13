@@ -33,17 +33,21 @@ const APP_ROUTE_PREFIXES = new Set([
 // the pages served through the page editor; everything else is served verbatim
 // from disk.
 const CLEAN_PAGES = [
+  { route: '/demo', file: 'demo.html' },
+  { route: '/communities', file: 'communities.html' },
+  { route: '/features', file: 'features.html' },
+  { route: '/docs', file: 'documentation.html' },
+  { route: '/download', file: 'download.html' },
+  { route: '/about', file: 'about.html' },
+  { route: '/changelog', file: 'changelog.html' },
+  { route: '/roadmap', file: 'roadmap.html' },
+  { route: '/status', file: 'status.html' },
   { route: '/terms', file: 'terms.html', editable: true },
   { route: '/privacy', file: 'privacy.html', editable: true },
   { route: '/instances-terms', file: 'instances-terms.html', editable: true },
   { route: '/trust-and-safety', file: 'trust-and-safety.html', editable: true },
   { route: '/support', file: 'support.html', editable: true },
   { route: '/security', file: 'security.html', editable: true },
-  { route: '/about', file: 'about.html' },
-  { route: '/features', file: 'features.html' },
-  { route: '/docs', file: 'documentation.html' },
-  { route: '/download', file: 'download.html' },
-  { route: '/status', file: 'status.html' },
 ];
 
 // Where the built client might be, in the order it is tried.
@@ -196,8 +200,47 @@ function mountPublicSite(app, opts) {
   }
   if (!publicDir) return null;
 
-  const sendPublic = (res, name, status) => {
-    res.status(status || 200).set('Cache-Control', 'no-cache').sendFile(name, { root: publicDir }, (err) => {
+  const injectOriginMeta = (html, req, route) => {
+    const origin = siteOrigin(req);
+    if (!origin) return html;
+    const esc = (s) => String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const path = route ? (route.startsWith('/') ? route : '/' + route) : '/';
+    const url = origin + path;
+    const titleM = /<title>([\s\S]*?)<\/title>/i.exec(html);
+    const descM = /<meta\s+name="description"\s+content="([^"]*)"/i.exec(html);
+    const title = titleM ? esc(titleM[1].trim()) : 'Trycord';
+    const image = origin + '/assets/og-image.png';
+    const meta = [
+      '<link rel="canonical" href="' + esc(url) + '">',
+      '<meta property="og:url" content="' + esc(url) + '">',
+      '<meta property="og:type" content="website">',
+      '<meta property="og:site_name" content="Trycord">',
+      '<meta property="og:title" content="' + title + '">',
+      '<meta property="og:image" content="' + esc(image) + '">',
+      '<meta name="twitter:card" content="summary_large_image">',
+      '<meta name="twitter:title" content="' + title + '">',
+      '<meta name="twitter:image" content="' + esc(image) + '">',
+    ];
+    if (descM) {
+      meta.push('<meta property="og:description" content="' + esc(descM[1]) + '">');
+      meta.push('<meta name="twitter:description" content="' + esc(descM[1]) + '">');
+    }
+    const monitorUrl = String(process.env.STATUS_MONITOR_PUBLIC_URL || '').trim();
+    if (monitorUrl && route === '/status') {
+      meta.push('<meta name="status-monitor" content="' + esc(monitorUrl) + '">');
+    }
+    return html.replace('</head>', '  ' + meta.join('\n  ') + '\n</head>');
+  };
+
+  const sendPublic = (res, name, status, req, route) => {
+    res.set('Cache-Control', 'no-cache');
+    const full = path.join(publicDir, name);
+    if (name.endsWith('.html') && fs.existsSync(full)) {
+      const html = injectOriginMeta(fs.readFileSync(full, 'utf8'), req, route);
+      return res.status(status || 200).type('html').send(html);
+    }
+    res.status(status || 200).sendFile(name, { root: publicDir }, (err) => {
       if (err && !res.headersSent) {
         res.status(500).json({ error: { code: 'INTERNAL', message: 'internal error' } });
       }
@@ -213,7 +256,7 @@ function mountPublicSite(app, opts) {
       const exists = fs.existsSync(path.join(publicDir, name));
       const body = exists ? await pages.publishedHtml(route) : null;
       if (!body) {
-        return sendPublic(res, exists ? name : '404.html', exists ? 200 : 404);
+        return sendPublic(res, exists ? name : '404.html', exists ? 200 : 404, req, req.path);
       }
       const file = fs.readFileSync(path.join(publicDir, name), 'utf8');
       const marked = '<!-- page:begin -->';
@@ -221,12 +264,13 @@ function mountPublicSite(app, opts) {
       if (!file.includes(marked) || !file.includes(markedEnd)) {
         // The file has no editable region, so there is nowhere safe to substitute
         // content. Serving the file is better than guessing.
-        return sendPublic(res, name, 200);
+        return sendPublic(res, name, 200, req, route);
       }
       const start = file.indexOf(marked) + marked.length;
       const end = file.indexOf(markedEnd);
       const html = file.slice(0, start) + '\n' + body + '\n' + file.slice(end);
-      res.status(200).set('Cache-Control', 'no-cache').type('html').send(html);
+      res.status(200).set('Cache-Control', 'no-cache').type('html')
+        .send(injectOriginMeta(html, req, route));
     };
   };
 
@@ -235,7 +279,7 @@ function mountPublicSite(app, opts) {
   const publicPage = (name) => {
     return (req, res) => {
       const exists = fs.existsSync(path.join(publicDir, name));
-      sendPublic(res, exists ? name : '404.html', exists ? 200 : 404);
+      sendPublic(res, exists ? name : '404.html', exists ? 200 : 404, req, req.path);
     };
   };
 
@@ -255,7 +299,10 @@ function mountPublicSite(app, opts) {
     app.get('/', publicPage('home.html'));
   }
 
-  app.get('/welcome', publicPage('home.html'));
+  app.get('/welcome', (req, res) => {
+    res.set('X-Robots-Tag', 'noindex');
+    return publicPage('home.html')(req, res);
+  });
   app.get('/404', publicPage('404.html'));
 
   // Robots and sitemap are derived from the same list the routes above mount:

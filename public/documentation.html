@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Documentation — Trycord</title>
-  <meta name="description" content="Run Trycord yourself: set up the server, choose a database, create admin accounts, and deploy.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Trycord">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <title>Documentation: run and configure your own instance</title>
+  <meta name="description" content="Install Trycord with Docker or by hand, choose SQLite or MySQL, configure mail and origins, put it behind a reverse proxy, back it up, and upgrade it. A self-hosting guide.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
@@ -14,221 +20,279 @@
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="site-header">
-    <div class="wrap nav-wrap">
+    <div class="wrap masthead">
       <a class="brand" href="/">
         <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
-          <g color="#FF4D24">
-            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
-            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
-            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
-          </g>
+          <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+          <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+          <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+          <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
         </svg>
-        <span class="brand-name">Trycord</span>
+        <span class="brand-word">Trycord</span>
       </a>
-      <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
-        <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
-        <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+
+      <button class="menu-toggle" type="button" data-menu-toggle aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
+        <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></svg>
       </button>
-      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
+
       <nav class="site-nav" id="site-nav" aria-label="Primary">
-        <a href="/">Home</a>
-        <a href="/features">Features</a>
-        <a href="/docs">Docs</a>
-        <a href="/download">Download</a>
-        <a href="/about">About</a>
-        <a href="/support">Support</a>
-        <a href="/security">Security</a>
-        <a href="/status">Status</a>
-        <a class="btn-open" href="/app/">Open the app</a>
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Product
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
+              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
+              <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
+              <a href="/changelog"><strong>Changelog</strong><span>What's new in Trycord.</span></a>
+              <a href="/roadmap"><strong>Roadmap</strong><span>What's done and what's coming.</span></a>
+              <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
+            </div>
+            <div class="nav-menu-foot">
+              <p>Private, self-hostable community messaging.</p>
+              <a class="text-link" href="/demo">Try the live demo</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Explore
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
+            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Community
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/support"><strong>Support</strong><span>Get help and reach the project.</span></a>
+              <a href="https://discord.gg/dSF7eqsJuP" rel="noopener"><strong>Discord</strong><span>Join the community chat.</span></a>
+              <a href="/security"><strong>Security</strong><span>How to report a vulnerability.</span></a>
+              <a href="/trust-and-safety"><strong>Trust and safety</strong><span>Rules, reporting, and appeals.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            About
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/about"><strong>About Trycord</strong><span>Why Trycord exists and how it's built.</span></a>
+            <a href="/changelog"><strong>Changelog</strong><span>What's shipped recently.</span></a>
+            <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
+          </div>
+        </div>
       </nav>
+
+      <div class="masthead-actions">
+        <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+          <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+          <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+        </button>
+        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+      </div>
     </div>
   </header>
-
 
   <main id="main" class="page">
     <div class="wrap">
       <div class="page-head">
-        <p class="kicker">Self-hosting</p>
-        <h1>Documentation</h1>
+        <p class="kicker">Documentation</p>
+        <h1>Run and configure your own instance</h1>
         <p class="lede">
-        Trycord is a Node.js server plus a web client it serves itself.
-        This page covers running it, building the desktop app, and deploying an
-        instance. It assumes a checkout of the repository.
-      </p>
+          One process serves the web client, the REST API, the WebSocket gateway
+          and this public site on a single port. This guide covers the two install
+          paths, the settings that matter, and the deployment details that catch
+          people out. The full reference lives in <code>docs/</code>.
+        </p>
       </div>
+
       <div class="prose-layout">
-        <div class="prose">
-          <h2 id="requirements">Requirements</h2>
-                <ul>
-                  <li>Node.js (the modern release line).</li>
-                  <li>SQLite (default, zero setup) or a MySQL database for production.</li>
-                  <li>Nothing else is required to run the server and serve the web client.</li>
-                </ul>
-          
-                <h2 id="server">Running the server</h2>
-                <p>From <code>backend/</code>:</p>
-                <pre><code>copy .env.example .env   # then edit .env</code></pre>
-                <p>The server refuses to start without two things: a <code>JWT_SECRET</code> and a database. Generate a secret with:</p>
-                <pre><code>node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code></pre>
-                <p>For local development, the example file configures SQLite with a file database:</p>
-                <pre><code>DB_CLIENT=sqlite
-          DB_FILE=./dev.db</code></pre>
-                <p>Start the server:</p>
-                <pre><code>node src/server.js</code></pre>
-                <p>
-                  The server serves the web client at its root — open
-                  <code>http://localhost:&lt;PORT&gt;</code> (default <code>9971</code>) in a browser.
-                  Some transports are only served over real <code>http(s)://</code> origins,
-                  so open it over the network rather than <code>file://</code>.
-                </p>
-                <p>
-                  Add <code>ADMIN_USERNAMES=alice,bob</code> (comma-separated) to promote
-                  existing accounts to platform admins at boot. The operation is
-                  idempotent, so it is safe to leave in <code>.env</code> permanently.
-                  Accounts that do not exist yet are skipped with a warning — create the
-                  account first, then restart (or re-run) to promote it.
-                </p>
-          
-                <h2 id="config">Configuration reference</h2>
-                <p>
-                  Every setting is an environment variable documented in
-                  <code>backend/.env.example</code>. Highlights:
-                </p>
-                <table class="plain">
-                  <thead>
-                    <tr><th>Variable</th><th>Purpose</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td><code>SERVER_HOST_TYPE</code></td><td><code>express</code> (direct) or <code>nginx</code> (behind a reverse proxy). Exactly one; anything else fails at startup.</td></tr>
-                    <tr><td><code>PORT</code></td><td>Listen port (default <code>9971</code>).</td></tr>
-                    <tr><td><code>JWT_SECRET</code></td><td>Required signing secret, unique per instance.</td></tr>
-                    <tr><td><code>TRYCORD_NAME</code></td><td>Instance display name shown to users.</td></tr>
-                    <tr><td><code>TRYCORD_PUBLIC_URL</code></td><td>Public base URL of this instance (optional, informational).</td></tr>
-                    <tr><td><code>PUBLIC_URL</code></td><td>Used for absolute links such as password-reset emails. Never derived from request headers.</td></tr>
-                    <tr><td><code>MAIL_MODE</code></td><td><code>log</code> (dev default) or <code>smtp</code> for real password-reset and verification email.</td></tr>
-                    <tr><td><code>DB_CLIENT</code></td><td><code>sqlite</code> or <code>mysql</code>. Pick exactly one profile.</td></tr>
-                    <tr><td><code>ADMIN_USERNAMES</code></td><td>Comma-separated usernames promoted to platform admin at boot.</td></tr>
-                    <tr><td><code>CSP_CONNECT_ORIGINS</code></td><td>Extra origins the client may reach (for browsing other instances).</td></tr>
-                    <tr><td><code>TRUST_PROXY</code></td><td>Set to <code>1</code> only when nginx fronts the server on the same host.</td></tr>
-                  </tbody>
-                </table>
-          
-                <h2 id="client">The web client</h2>
-                <p>
-                  The client lives in <code>frontend/</code> and resolves its API
-                  origin at runtime with a strict precedence: a <code>?api=</code> query
-                  parameter, a saved setting, the server-pinned runtime config, the page's
-                  own origin, and finally <code>http://localhost:9971</code>. You can point
-                  the client at a different instance by launching the app with
-                  <code>--api</code> or by opening the page with <code>?api=&lt;url&gt;</code>.
-                </p>
-          
-                <h2 id="desktop">Desktop builds</h2>
-                <p>From <code>trycord-desktop/</code> (requires an Electron toolchain):</p>
-                <pre><code>npm run build:win     # Windows (installer + portable)
-          npm run build:linux   # Linux AppImage
-          npm run build:mac     # macOS
-          npm run smoke         # quick headless smoke test of the packaged app</code></pre>
-                <p>
-                  Releases are published to the repository's
-                  <a href="https://github.com/trycord/.trycord/releases" rel="external">Releases</a>
-                  page and the desktop app auto-updates from them.
-                </p>
-          
-                <h2 id="deploy">Deployment</h2>
-                <p>
-                  For direct exposure, use <code>SERVER_HOST_TYPE=express</code>. For a
-                  reverse-proxy setup, set <code>SERVER_HOST_TYPE=nginx</code> (Express then
-                  binds loopback), <code>TRUST_PROXY=1</code>, and have nginx forward
-                  <code>X-Forwarded-*</code>; the server pins trust to loopback so remote
-                  clients cannot spoof forwarded headers.
-                </p>
-                <p>
-                  The static <code>public/</code> website can be hosted from anywhere —
-                  it is plain HTML, CSS, and one JavaScript file with relative links. In a
-                  reverse proxy you may serve it directly from the domain root and keep the
-                  app on a path, or serve it beside the app exactly as the Trycord server
-                  does. The server also exposes clean URLs for each page (for example
-                  <a href="/terms">/terms</a>, <a href="/privacy">/privacy</a>,
-                  <a href="/features">/features</a>, <a href="/docs">/docs</a>).
-                </p>
-          
-                <h2 id="security">Security &amp; API notes</h2>
-                <p>
-                  Every page is served with a strict Content-Security-Policy:
-                  <code>default-src 'self'</code>, no inline scripts, no cross-origin
-                  framing. Clients get a JSON error envelope,
-                  <code>{ error: { code, message } }</code>, so failures are always
-                  machine-readable. The server applies rate limits to auth endpoints and
-                  WebSockets enforce a maximum payload size. Uploaded files are validated
-                  and rendered safely.
-                </p>
-                <p>
-                  Lawful access endpoints of note: <code>/api/health</code> for liveness,
-                  <code>/api/legal</code> for the current legal document versions, and the
-                  WebSocket gateway for the real-time transport.
-                </p>
-          
-                <h2 id="tests">Testing</h2>
-                <p>From <code>backend/scripts/</code>:</p>
-                <pre><code>node check.js            # general checks
-          node test-regression.js  # API regression suite
-          node test-trustsafety.js # trust &amp; safety flows
-          node test-phase2.js      # phase-two feature coverage</code></pre>
-        </div>
-        <aside class="toc" aria-label="Table of contents">
-          <h2 class="toc-title">On this page</h2>
+        <article class="prose">
+          <h2>What you need</h2>
+          <p>Trycord runs as a single Node process. The default install needs little:</p>
+          <ul>
+            <li><strong>Docker path:</strong> Docker with Compose. Nothing else on the host.</li>
+            <li><strong>Manual path:</strong> Node 22 or newer, and a place to keep the SQLite file.</li>
+            <li><strong>Either path:</strong> a <code>JWT_SECRET</code>. The server has no default for it and will not start without one.</li>
+          </ul>
+          <p>Generate a secret with:</p>
+          <pre><code>node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code></pre>
+          <p>Every instance needs its own value. Changing it later signs everyone out and invalidates outstanding password-reset links.</p>
+
+          <h2>Install with Docker</h2>
+          <p>This is the recommended path, and the image is built for it.</p>
+          <pre><code>git clone https://github.com/trycord/.trycord.git
+cd .trycord
+cp .env.docker.example .env
+# edit .env and set JWT_SECRET
+docker compose up -d</code></pre>
+          <p>Three steps, and the only required value is the secret. Then open <code>http://your-host:9971</code>, create the first account, and promote it to platform administrator by adding its username to <code>ADMIN_USERNAMES</code> in <code>.env</code> and restarting.</p>
+          <pre><code>docker compose logs -f          # follow the boot log
+docker compose ps               # health status
+curl -fsS localhost:9971/api/health</code></pre>
+          <p><code>/api/health</code> answers <code>200</code> only when the database is reachable, so it is a real readiness signal rather than "the process is up".</p>
+
+          <h2>Install by hand</h2>
+          <p>Choose this if you need systemd units, a specific Node version, or a reverse proxied layout that a container makes awkward.</p>
+          <pre><code>cd backend
+npm install
+cp .env.example .env
+# edit .env: JWT_SECRET, SERVER_HOST_TYPE and a database profile
+npm run seed
+npm start</code></pre>
+          <p>The server finds the web client next to itself in the default layout. If yours differs, point it at the directory holding <code>index.html</code>:</p>
+          <pre><code>TRYCORD_CLIENT_DIR=/srv/trycord npm start</code></pre>
+          <p>A relative value resolves against <code>backend/</code>. If no client is found, the API still runs and the server lists every path it looked at.</p>
+
+          <h2>The settings that matter</h2>
+          <p><code>backend/.env.example</code> documents every variable; <code>.env.docker.example</code> covers the container. The ones worth understanding:</p>
+          <table class="plain">
+            <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>JWT_SECRET</code></td><td>Signs sessions and reset tokens. Required, no default.</td></tr>
+              <tr><td><code>SERVER_HOST_TYPE</code></td><td><code>express</code> when the server is the public endpoint, <code>nginx</code> when a reverse proxy fronts it. Anything else is a startup error.</td></tr>
+              <tr><td><code>TRUST_PROXY</code></td><td>Set to <code>1</code> only when a reverse proxy on the same host fronts the server.</td></tr>
+              <tr><td><code>CLIENT_ORIGIN</code></td><td>Comma-separated allowlist of origins allowed to read API responses. Empty means a restricted development profile.</td></tr>
+              <tr><td><code>ADMIN_USERNAMES</code></td><td>Usernames promoted to platform administrator at boot. Idempotent.</td></tr>
+              <tr><td><code>TRYCORD_NAME</code></td><td>The instance's display name.</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Choose a database</h2>
+          <p>The database is a profile, not a different build. SQLite is a single file and is fine for small and mid-size instances; move to MySQL when you outgrow it.</p>
+          <pre><code>DB_CLIENT=sqlite
+DB_FILE=/data/trycord.db
+
+# or
+DB_CLIENT=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_NAME=trycord
+DB_USER=trycord
+DB_PASSWORD=change-me</code></pre>
+          <p>A database host that is not loopback is refused unless <code>ALLOW_REMOTE_DB</code> is exactly <code>true</code>, so a CI job that inherits a copied <code>.env</code> cannot quietly write to a live database.</p>
+
+          <h2>Configure mail</h2>
+          <p>Mail powers email verification and password recovery, and nothing else depends on it. There are three modes:</p>
+          <ul>
+            <li><strong>disabled</strong> (the default): nothing is sent, and recovery flows refuse rather than claim success.</li>
+            <li><strong>smtp</strong>: delivery through a relay. Port 465 implies TLS, 587 implies STARTTLS.</li>
+            <li><strong>api</strong>: the server posts JSON to an HTTPS endpoint you name field by field, so no vendor is baked in.</li>
+          </ul>
+          <p>With mail off, email verification is not enforceable and the app will not ask anyone to verify an address.</p>
+
+          <h2>Put it behind a reverse proxy</h2>
+          <p>Forward both HTTP and WebSocket traffic, set <code>SERVER_HOST_TYPE=nginx</code> and <code>TRUST_PROXY=1</code>, and keep the upgrade headers, or the realtime gateway will not connect:</p>
+          <pre><code>location / {
+    proxy_pass http://127.0.0.1:9971;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 7d;
+}</code></pre>
+          <p>The first WebSocket frame carries a single-use ticket, so a short idle timeout looks like a silent disconnect every minute. Set the read timeout generously.</p>
+
+          <h2>Who may call the API</h2>
+          <p><code>CLIENT_ORIGIN</code> is a comma-separated allowlist. Leave it empty and the server runs a restricted development profile; set it and the allowlist is enforced exactly, which is what a public instance wants. Three forms are accepted:</p>
+          <table class="plain">
+            <thead><tr><th>Entry</th><th>Matches</th></tr></thead>
+            <tbody>
+              <tr><td><code>https://trycord.example</code></td><td>that exact origin only</td></tr>
+              <tr><td><code>http://*.trycord.example</code></td><td>any single subdomain, not the apex</td></tr>
+              <tr><td><code>trycord://app</code></td><td>the desktop app</td></tr>
+            </tbody>
+          </table>
+          <p>Scheme and port must match exactly, a wildcard never bridges them, and a bare <code>*</code> is rejected. Always include <code>trycord://app</code> if the desktop client should reach the instance.</p>
+
+          <h2>Back up and upgrade</h2>
+          <p>With Docker, your data lives in two named volumes that survive <code>docker compose down</code> and upgrades: <code>trycord-data</code> for the database and <code>trycord-uploads</code> for avatars and attachments. Back up a volume by copying it out:</p>
+          <pre><code>docker run --rm -v trycord-data:/data -v "$PWD":/backup \
+  alpine tar czf /backup/trycord-data.tar.gz -C /data .</code></pre>
+          <p>To upgrade, pull and rebuild. Your volumes are untouched.</p>
+          <pre><code>git pull
+docker compose build --pull
+docker compose up -d</code></pre>
+
+          <h2>Point the desktop app at it</h2>
+          <p>The packaged desktop app picks its backend at launch. Give it yours and it runs against that instance and nothing else:</p>
+          <pre><code>Trycord --api-url=https://chat.example.org</code></pre>
+          <p>The shipped build reaches the official instance by default. That is a default, not a requirement. See the <a href="/download">download page</a> for how the app is put together.</p>
+
+          <h2>Run a status monitor</h2>
+          <p>The status page at <code>/status</code> works on its own: it probes the instance from the reader's browser. You can also run the bundled status monitor, a second process on its own port that checks the instance on a schedule and serves a report. Because it is a separate process, it keeps answering when the API cannot.</p>
+          <pre><code>cd backend
+npm run status-monitor</code></pre>
+          <p>It checks <code>/</code>, <code>/health</code> and <code>/api/health</code> by default, and exposes an HTML dashboard, <code>/status.json</code> and Prometheus metrics. Every setting is configurable, by environment variable or by a JSON file. Set <code>STATUS_MONITOR_PUBLIC_URL</code> on the server to have the public status page read the monitor's live report instead of probing from the browser.</p>
+          <p>With Docker, start the same image a second time through the override file:</p>
+          <pre><code>docker compose -f docker-compose.yml -f docker-compose.monitor.yml up -d</code></pre>
+
+          <h2>Where the rest lives</h2>
+          <p>The <code>docs/</code> directory holds the long-form references: <code>selfhosting.md</code> for deployment, <code>status-monitor.md</code> for the optional status monitor, <code>architecture.md</code> for how the system is assembled, <code>theming.md</code> for themes, and <code>desktop.md</code> and <code>launcher.md</code> for the desktop shell. If you find an error in this page, the <a href="/support">support page</a> explains where to say so.</p>
+        </article>
+
+        <aside class="toc" aria-label="On this page">
+          <p class="toc-title">On this page</p>
         </aside>
       </div>
     </div>
   </main>
 
   <footer class="site-footer">
-    <div class="wrap footer-band">
-      <h2>Run your own community</h2>
-      <p>Trycord is software you run yourself. Open the app to join a community, or read the documentation and start your own instance.</p>
-      <div class="cta">
-        <a class="btn btn-primary" href="/app/">Open the app</a>
-        <a class="btn btn-ghost" href="/docs">Read the documentation</a>
-      </div>
-    </div>
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <a class="brand" href="/">
-        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
-          <g color="#FF4D24">
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
             <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
-            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
-            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
-          </g>
-        </svg>
-        <span class="brand-name">Trycord</span>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+          </svg>
+          <span class="brand-word">Trycord</span>
         </a>
-        <p>Private, self-hostable community messaging. Web and desktop.</p>
+        <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
+        <a class="btn btn-sm" href="/app/">Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
         <a href="/docs">Documentation</a>
         <a href="/download">Download</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Explore</h2>
+        <a href="/communities">Communities</a>
+        <a href="/demo">Live demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Project</h2>
         <a href="/about">About</a>
         <a href="/support">Support</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
         <a href="/security">Security</a>
-      </div>
-      <div class="footer-col">
-        <h2 class="footer-heading">Communities</h2>
-        <a href="/app/discover">Browse communities</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Legal</h2>
         <a href="/terms">Terms of Service</a>
-        <a href="/instances-terms">Official instance terms</a>
+        <a href="/instances-terms">Instance terms</a>
         <a href="/privacy">Privacy Policy</a>
         <a href="/trust-and-safety">Trust &amp; Safety</a>
       </div>
@@ -238,7 +302,6 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
 
   <script src="/js/site.js"></script>
 </body>

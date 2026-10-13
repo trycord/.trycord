@@ -10,7 +10,7 @@ import { renderRail } from './shell/rail.js';
 import { renderPlaceNavigation } from './shell/navigation.js';
 import { renderMemberSidebar, membersHidden, toggleMembers } from './shell/members.js';
 import { renderContextHeader } from './shell/context-header.js';
-import { renderMobileTabs, isTabBarHidden, setTabBarHidden } from './shell/tabs.js';
+import { renderMobileTabs } from './shell/tabs.js';
 import { setNavRoute, currentRoute } from './shell/route.js';
 import { isSidebarCollapsed, toggleSidebar, applySidebarState, toggleContextSidebar } from './shell/sidebar.js';
 import { memberActions } from './shell/menus.js';
@@ -69,8 +69,6 @@ export {
   toggleSidebar,
   applySidebarState,
   toggleContextSidebar,
-  isTabBarHidden,
-  setTabBarHidden,
   memberActions,
   sidebarContext,
   loadAnnouncements,

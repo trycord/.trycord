@@ -50,8 +50,8 @@ async function overview(ctx) {
   const err = el('div', { class: 'form-error', hidden: true });
   const name = el('input', { class: 'input', type: 'text', value: server.name || '', maxlength: 64 });
   const desc = el('textarea', { class: 'textarea', maxlength: 400, rows: 3, placeholder: 'What is this community about?' }, server.description || '');
-  const isPublic = el('input', { type: 'checkbox', checked: !!server.is_public });
-  const isDisc = el('input', { type: 'checkbox', checked: !!server.is_discoverable });
+  const isPublic = el('input', { type: 'checkbox', class: 'switch', checked: !!server.is_public });
+  const isDisc = el('input', { type: 'checkbox', class: 'switch', checked: !!server.is_discoverable });
   const saveBtn = el('button', { class: 'btn primary', type: 'submit' }, 'Save changes');
 
   const form = el('form', { class: 'settings-panel' }, err,
@@ -61,10 +61,10 @@ async function overview(ctx) {
       el('span', { class: 'hint' }, 'Shown on the community landing page and in browse.')),
     el('h2', { class: 'settings-panel__title' }, 'Visibility'),
     el('div', { class: 'field' },
-      el('label', { class: 'switch' }, isPublic, ' Public: anyone with a join code or invite can join'),
+      el('label', { class: 'switch-row' }, isPublic, ' Public: anyone with a join code or invite can join'),
       el('span', { class: 'hint' }, 'A private community can only be entered by invitation.')),
     el('div', { class: 'field' },
-      el('label', { class: 'switch' }, isDisc, ' Discoverable: listed in the browse feed'),
+      el('label', { class: 'switch-row' }, isDisc, ' Discoverable: listed in the browse feed'),
       el('span', { class: 'hint' }, 'Independent of Public: a private community can still be discoverable by name.')),
     el('div', { class: 'card-actions' }, saveBtn));
 
@@ -260,9 +260,9 @@ function moderation(ctx) {
     const list = el('div', { class: 'role-members' });
     for (const b of bans.slice(0, 20)) {
       list.appendChild(el('div', { class: 'role-holder' },
-        el('span', { class: 'role-holder__name' }, '@' + (b.username || b.user_id || 'Unknown')),
+        el('span', { class: 'role-holder__name' }, '@' + (b.username || b.userId || 'Unknown')),
         el('span', { class: 'muted small' },
-          b.expires_at ? 'until ' + relTime(b.expires_at) : 'permanent')));
+          b.expiresAt ? 'until ' + relTime(b.expiresAt) : 'permanent')));
     }
     box.appendChild(list);
     if (bans.length > 20) box.appendChild(el('p', { class: 'muted small' }, '+ ' + (bans.length - 20) + ' more'));

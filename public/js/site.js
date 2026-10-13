@@ -1,48 +1,93 @@
 // Public site behaviour. Loaded as an external file (the server CSP forbids
-// inline scripts), so everything here is an enhancement: the page is complete
 // and readable without it.
-
 (function () {
   'use strict';
 
-  /* ---- the header knows when there is content behind it ------------------
-     The rule only appears once the page has moved, so the header is unmarked at
-     the top of a document and marked the moment there is anything behind it.
-     One scroll listener, in the passive phase, doing one attribute write. */
+  var groups = Array.prototype.slice.call(document.querySelectorAll('[data-nav-group]'));
+  var menuToggle = document.querySelector('[data-menu-toggle]');
   var header = document.querySelector('.site-header');
-  if (header) {
-    var setScrolled = function () {
-      header.setAttribute('data-scrolled', window.scrollY > 8 ? 'true' : 'false');
-    };
-    setScrolled();
-    window.addEventListener('scroll', setScrolled, { passive: true });
+
+  function setGroup(group, open) {
+    var trigger = group.querySelector('[data-nav-trigger]');
+    if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function closeAllGroups(except) {
+    groups.forEach(function (g) { if (g !== except) setGroup(g, false); });
   }
 
-  /* ---- the navigation toggle ---------------------------------------------
-     The visual state is the aria-expanded attribute the stylesheet reads, so
-     there is exactly one source of truth for whether the menu is open. The old
-     version also toggled a class that nothing read. */
-  var toggle = document.querySelector('[data-nav-toggle]');
-  var nav = document.getElementById('site-nav');
-  if (toggle && nav) {
-    var setOpen = function (open) {
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    };
-    toggle.addEventListener('click', function () {
-      setOpen(toggle.getAttribute('aria-expanded') !== 'true');
+  groups.forEach(function (group) {
+    var trigger = group.querySelector('[data-nav-trigger]');
+    if (!trigger) return;
+
+    trigger.addEventListener('click', function () {
+      var open = trigger.getAttribute('aria-expanded') !== 'true';
+      closeAllGroups(group);
+      setGroup(group, open);
     });
-    // Close after choosing a destination, when tapping outside, or on Escape.
-    nav.addEventListener('click', function (e) {
-      if (e.target && e.target.tagName === 'A') setOpen(false);
+
+    trigger.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'Down') {
+        e.preventDefault();
+        setGroup(group, true);
+        var first = group.querySelector('.nav-menu a');
+        if (first) first.focus();
+      }
     });
+
+    group.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        setGroup(group, false);
+        trigger.focus();
+      }
+    });
+
+    group.addEventListener('focusout', function (e) {
+      if (!group.contains(e.relatedTarget)) setGroup(group, false);
+    });
+
+    if (window.matchMedia && window.matchMedia('(hover: hover)').matches) {
+      var timer = null;
+      group.addEventListener('pointerenter', function (e) {
+        if (e.pointerType !== 'mouse') return;
+        if (timer) { clearTimeout(timer); timer = null; }
+        closeAllGroups(group);
+        setGroup(group, true);
+      });
+      group.addEventListener('pointerleave', function (e) {
+        if (e.pointerType !== 'mouse') return;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () { setGroup(group, false); }, 120);
+      });
+    }
+  });
+
+  if (groups.length) {
     document.addEventListener('click', function (e) {
-      var inside = toggle.contains(e.target) || nav.contains(e.target);
-      if (!inside && toggle.getAttribute('aria-expanded') === 'true') setOpen(false);
+      if (!e.target.closest || !e.target.closest('[data-nav-group]')) closeAllGroups();
     });
+  }
+
+  if (menuToggle && header) {
+    menuToggle.addEventListener('click', function () {
+      var open = header.getAttribute('data-menu-open') !== 'true';
+      header.setAttribute('data-menu-open', open ? 'true' : 'false');
+      menuToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) closeAllGroups();
+    });
+    var nav = document.getElementById('site-nav');
+    if (nav) {
+      nav.addEventListener('click', function (e) {
+        if (e.target && e.target.tagName === 'A') {
+          header.setAttribute('data-menu-open', 'false');
+          menuToggle.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
-        setOpen(false);
-        toggle.focus();
+      if (e.key === 'Escape' && header.getAttribute('data-menu-open') === 'true') {
+        header.setAttribute('data-menu-open', 'false');
+        menuToggle.setAttribute('aria-expanded', 'false');
+        menuToggle.focus();
       }
     });
   }
@@ -60,48 +105,31 @@
   var themeButton = document.querySelector('[data-theme-toggle]');
 
   function resolvedIsLight() {
-    // theme.js already resolved 'system' against the OS before paint, so the
-    // attribute is the answer. Reading matchMedia again here would misread the
-    // default dark theme on a light-OS machine as light, and the switch would
-    // then stay dark when it was clicked.
     return document.documentElement.getAttribute('data-theme') === 'light';
   }
-
   function applyTheme(name) {
     document.documentElement.setAttribute('data-theme', name);
-    if (themeButton) {
-      themeButton.setAttribute('aria-pressed', name === 'light' ? 'true' : 'false');
-    }
+    if (themeButton) themeButton.setAttribute('aria-pressed', name === 'light' ? 'true' : 'false');
   }
-
   if (themeButton) {
     themeButton.hidden = false;
     themeButton.addEventListener('click', function () {
-      // The two states this site is built for: its default dark and Light.
       var name = resolvedIsLight() ? 'trycord' : 'light';
-      // A write that fails (private mode, storage disabled) still changes the
-      // document for this page; only the memory across pages is lost, which is
-      // the same deal as any other blocked-storage browser.
       try { localStorage.setItem(THEME_KEY, name); } catch (e) { /* storage blocked */ }
       applyTheme(name);
     });
   }
-
-  // When the visitor follows the OS, watch for the OS changing under them.
   try {
-    var mq = window.matchMedia('(prefers-color-scheme: dark)');
     var savedName = null;
     try { savedName = localStorage.getItem(THEME_KEY); } catch (e) { /* storage blocked */ }
     if (savedName === 'system') {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
       var onSystemChange = function (e) { applyTheme(e.matches ? 'trycord' : 'light'); };
       if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
       else if (mq.addListener) mq.addListener(onSystemChange);
     }
   } catch (e) { /* matchMedia unsupported */ }
 
-  /* ---- the current section in the nav ------------------------------------
-     A page knows which link is itself, rather than the server being asked to
-     stamp it on every document. */
   function toRoute(pathname) {
     var p = String(pathname || '').split('?')[0].split('#')[0];
     p = p.replace(/\.html$/i, '');
@@ -109,11 +137,32 @@
     return p || '/';
   }
   var here = toRoute(window.location.pathname);
-  document.querySelectorAll('.site-nav a').forEach(function (link) {
-    if (toRoute(link.getAttribute('href')) === here) {
+  document.querySelectorAll('.site-nav a, .site-footer a').forEach(function (link) {
+    var href = link.getAttribute('href') || '';
+    if (href.charAt(0) !== '/') return;
+    if (toRoute(href) === here) {
       link.setAttribute('aria-current', 'page');
+      var group = link.closest ? link.closest('[data-nav-group]') : null;
+      if (group) {
+        var trigger = group.querySelector('[data-nav-trigger]');
+        if (trigger) trigger.classList.add('is-current');
+      }
     }
   });
+
+  var reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  if (reveals.length && 'IntersectionObserver' in window) {
+    document.documentElement.classList.add('js');
+    var revealObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-in');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -10% 0px' });
+    reveals.forEach(function (el) { revealObserver.observe(el); });
+  }
 
   /* ---- the table of contents ---------------------------------------------
      Generated from the page's own headings, so it cannot drift from the
@@ -137,8 +186,6 @@
         }
         var item = document.createElement('li');
         if (h.tagName === 'H3') {
-          // Third-level headings nest under the last second-level one, so the
-          // list stays two levels rather than becoming flat.
           if (!sub) {
             sub = document.createElement('ul');
             sub.className = 'toc-sub';
@@ -155,9 +202,6 @@
       });
       toc.appendChild(list);
 
-      // Which section is being read. An IntersectionObserver rather than a
-      // scroll handler, so the cost is one callback per crossing rather than one
-      // per frame.
       var links = {};
       toc.querySelectorAll('a').forEach(function (a) {
         links[a.getAttribute('href').slice(1)] = a;
@@ -170,7 +214,6 @@
             else seen.delete(entry.target.id);
           });
           var active = null;
-          // The first heading still on screen is the one being read.
           heads.forEach(function (h) { if (seen.has(h.id) && !active) active = h.id; });
           toc.querySelectorAll('a').forEach(function (a) {
             a.classList.toggle('is-active', a.getAttribute('href') === '#' + active);
@@ -182,7 +225,5 @@
   }
 
   var yearEl = document.querySelector('[data-year]');
-  if (yearEl) {
-    yearEl.textContent = String(new Date().getFullYear());
-  }
+  if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 })();

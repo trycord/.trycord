@@ -17,7 +17,7 @@ import { navigate, route } from '../nav.js';
 import State from '../state.js';
 import { railPages } from '../pages/registry.js';
 import { labelFor } from '../badges.js';
-import { communityIconUrl, loadAuthedImage } from '../components/media.js';
+import { communityMark } from '../components/media.js';
 import { confirmSignOut } from './sign-out.js';
 
 /**
@@ -87,16 +87,7 @@ function communityChip(server, { active = false } = {}) {
   });
 
   const mark = el('span', { class: 'rail-mark', 'aria-hidden': 'true' });
-  const src = communityIconUrl(server);
-  if (src) {
-    // Falls back to the coloured mark rather than to an empty box, which is what a
-    // bare <img> with no bytes would leave behind. `.rail-community img` sizes it.
-    loadAuthedImage(src).then((url) => {
-      if (!url || !mark.isConnected) return;
-      mark.classList.add('has-img');
-      mark.appendChild(el('img', { src: url, alt: '', loading: 'lazy' }));
-    }).catch(() => { /* the mark stays as it is; that is what it is for */ });
-  }
+  mark.appendChild(communityMark(name, { server }));
   chip.appendChild(mark);
   chip.appendChild(el('span', { class: 'rail-community__name' }, name));
   return chip;

@@ -82,24 +82,22 @@
   /* -- type ------------------------------------------------------------- */
   --color-text-primary: var(--tc-text);
   --color-text-secondary: var(--tc-text-muted);
-  /* Solved against every surface it can land on, not only --color-surface: the interior
-     surfaces are lighter, and muted on surface-active was 4.01:1. #978c82 clears 4.5 on
-     the whole set, worst case 4.59. */
-  --color-text-muted: #978c82;
+  --color-text-muted: #a49a90;
   --color-text-inverse: #140f0c;
 
-  /* -- Ember, the accent ------------------------------------------------- */
   --color-accent: var(--tc-brand);
   --color-accent-hover: var(--tc-brand-hover);
   --color-accent-active: var(--tc-brand-strong);
-  --color-accent-muted: var(--tc-brand-strong);
-  --color-accent-subtle: var(--tc-brand-strong);
+  --color-accent-text: #ff6a44;
+  --color-accent-muted: #3d1a10;
+  --color-accent-subtle: #2e140c;
   --color-on-accent: var(--tc-text-on-brand);
 
   /* -- meaning ----------------------------------------------------------- */
   --color-success: #6fbf73;
   --color-warning: #e3b341;
   --color-danger: #e0574f;
+  --color-danger-text: #f08e88;
   --color-info: #6aa9d8;
   --color-success-muted: #1c2c1d;
   --color-warning-muted: #2e2714;
@@ -159,7 +157,7 @@
   --shadow-md: 0 4px 12px rgba(6, 4, 3, 0.55);
   --shadow-lg: 0 12px 32px rgba(6, 4, 3, 0.62);
   --shadow-pop: 0 16px 48px rgba(4, 3, 2, 0.7);
-  --glow-accent: 0 0 0 1px rgba(255, 122, 41, 0.34), 0 0 18px rgba(255, 122, 41, 0.16);
+  --glow-accent: 0 0 0 1px rgba(255, 77, 36, 0.34), 0 0 18px rgba(255, 77, 36, 0.16);
 
   /* -- motion ----------------------------------------------------------- */
   --ease-out: var(--tc-ease);
@@ -231,13 +229,15 @@
   --color-accent: var(--tc-brand);
   --color-accent-hover: var(--tc-brand-hover);
   --color-accent-active: var(--tc-brand-strong);
-  --color-accent-muted: var(--tc-brand-strong);
-  --color-accent-subtle: var(--tc-brand-strong);
+  --color-accent-text: #a83408;
+  --color-accent-muted: #fbd5c8;
+  --color-accent-subtle: #fde8e0;
   --color-on-accent: var(--tc-text-on-brand);
 
   --color-success: #2f7a34;
   --color-warning: #9a6b09;
   --color-danger: #b8332b;
+  --color-danger-text: #b8332b;
   --color-info: #2b6c9c;
   --color-success-muted: #e4f2e5;
   --color-warning-muted: #f7ecd8;
@@ -310,6 +310,7 @@
   --color-accent: #62a8e8;
   --color-accent-hover: #7fbbef;
   --color-accent-active: #4a8fcc;
+  --color-accent-text: #62a8e8;
   --color-accent-muted: #16304a;
   --color-accent-subtle: #0e1f30;
   --color-on-accent: #05121d;
@@ -317,6 +318,7 @@
   --color-success: #5fbf8f;
   --color-warning: #e0b055;
   --color-danger: #e2695f;
+  --color-danger-text: #e2695f;
   --color-info: #62a8e8;
   --color-success-muted: #12291f;
   --color-warning-muted: #2c2415;
@@ -354,6 +356,7 @@
   --color-accent: #9b8cf0;
   --color-accent-hover: #b0a3f4;
   --color-accent-active: #8071e0;
+  --color-accent-text: #9b8cf0;
   --color-accent-muted: #2b2456;
   --color-accent-subtle: #1b1736;
   --color-on-accent: #0b0818;
@@ -361,6 +364,7 @@
   --color-success: #63c194;
   --color-warning: #dfb85c;
   --color-danger: #e86b6b;
+  --color-danger-text: #e86b6b;
   --color-info: #7fa8e8;
   --color-success-muted: #122a20;
   --color-warning-muted: #2c2617;
@@ -398,6 +402,7 @@
   --color-accent: #ff8c1a;
   --color-accent-hover: #ffa347;
   --color-accent-active: #e0720c;
+  --color-accent-text: #ff8c1a;
   --color-accent-muted: #59290a;
   --color-accent-subtle: #331707;
   --color-on-accent: #1a0c02;
@@ -405,6 +410,7 @@
   --color-success: #7bc45f;
   --color-warning: #f0bb3c;
   --color-danger: #ef6a3c;
+  --color-danger-text: #ef6a3c;
   --color-info: #e0a878;
   --color-success-muted: #1f2c16;
   --color-warning-muted: #33280f;
@@ -443,6 +449,7 @@
   --color-accent: #ffb020;
   --color-accent-hover: #ffc24d;
   --color-accent-active: #e09400;
+  --color-accent-text: #ffb020;
   --color-accent-muted: #4a3200;
   --color-accent-subtle: #241900;
   --color-on-accent: #000000;
@@ -450,6 +457,7 @@
   --color-success: #6ee79a;
   --color-warning: #ffd166;
   --color-danger: #ff8f85;
+  --color-danger-text: #ff8f85;
   --color-info: #8fd0ff;
   --color-success-muted: #0a2416;
   --color-warning-muted: #2a2200;

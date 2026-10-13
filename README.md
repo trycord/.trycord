@@ -99,7 +99,8 @@ is a default rather than a requirement.
 `backend/.env.example` documents every variable. The ones with no
 default, where the server refuses to start without them, are `JWT_SECRET`,
 `SERVER_HOST_TYPE` and the database profile. See `docs/selfhosting.md` for
-deployment, including the nginx topology and the Docker volume layout, and
+deployment, including the nginx topology and the Docker volume layout,
+`docs/status-monitor.md` for the optional status monitor, and
 `docs/architecture.md` for how the system is put together.
 
 ## Deployment

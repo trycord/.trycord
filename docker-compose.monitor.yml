@@ -1,0 +1,58 @@
+# Trycord status monitor - optional second container.
+#
+# This is an override file: on its own it defines one service, and used
+# together with the base file it adds the monitor and nothing else. The
+# default `docker compose up -d` is unchanged.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.monitor.yml up -d
+#
+# Why a second container rather than a second process in the first one: a
+# monitor that shares a container with the API dies when the API does, which is
+# exactly when a status page matters. Separate processes, separate failure.
+#
+# The monitor reaches the API over the compose network by service name. Its own
+# default base URL is loopback, which inside this container is the container
+# itself, so STATUS_MONITOR_BASE_URL is set explicitly below.
+#
+# To make the public /status page read this monitor (instead of probing from the
+# browser), set STATUS_MONITOR_PUBLIC_URL in .env to the address a browser uses,
+# for example http://your-host:9972. See docs/status-monitor.md.
+
+services:
+  status-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: trycord-status-monitor:local
+    container_name: trycord-status-monitor
+    restart: unless-stopped
+    command: ["node", "src/status-monitor/index.js"]
+    depends_on:
+      - trycord
+    ports:
+      # Host port (change STATUS_MONITOR_PORT in .env) to container port 9972.
+      - "${STATUS_MONITOR_PORT:-9972}:9972"
+    env_file:
+      - .env
+    environment:
+      # The container always listens on 9972; the port mapping above is what
+      # moves it on the host.
+      STATUS_MONITOR_HOST: 0.0.0.0
+      STATUS_MONITOR_PORT: "9972"
+      # The API on the compose network, not loopback.
+      STATUS_MONITOR_BASE_URL: http://trycord:9971
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:9972/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

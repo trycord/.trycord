@@ -280,7 +280,11 @@ export default { avatar, navRow, serverChip, emptyState, messageRow, paintReacti
 
 // A status as a badge. Slugified so a status can style itself without every caller
 // knowing the class name - OPEN and UNDER_REVIEW are both rendered here.
+const STATUS_OK = new Set(['resolved', 'approved', 'active', 'published', 'complete', 'completed', 'accepted', 'delivered', 'granted', 'verified']);
+const STATUS_BAD = new Set(['rejected', 'denied', 'banned', 'suspended', 'failed', 'expired', 'revoked', 'blocked', 'dismissed', 'cancelled', 'canceled', 'deleted']);
+
 export function statusChip(status, text) {
-  const cls = String(status).toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  return el('span', { class: 'status-chip ' + cls }, text || String(status).replace(/_/g, ' '));
+  const slug = String(status).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const tone = STATUS_OK.has(slug) ? ' status-chip--ok' : STATUS_BAD.has(slug) ? ' status-chip--bad' : '';
+  return el('span', { class: 'status-chip ' + slug + tone }, text || String(status).replace(/_/g, ' '));
 }

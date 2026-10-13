@@ -32,7 +32,7 @@
 
 .role-row--owner {
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .role-row--owner:hover {
@@ -147,11 +147,11 @@
 }
 
 .role-unassign:hover {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .owner {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: var(--weight-semibold);
 }
 
@@ -224,6 +224,11 @@
   margin: 0 var(--space-5);
 }
 
+.settings-context .ctx-card,
+.settings-context .ctx-card__body {
+  margin-inline: 0;
+}
+
 .ctx-card__body {
   padding: var(--space-5);
   background: var(--color-surface-elevated);
@@ -278,37 +283,12 @@
   margin-left: auto;
 }
 
-/* --------------------------------------------------------------------------
-   Mobile tab switcher
-
-   Below the tablet breakpoint the tab bar is a strip; the toggle reveals the
-   places a rail would have carried. Same destinations as the rail, a different
-   presentation - which is the whole point of a mobile composition.
-   -------------------------------------------------------------------------- */
 
 .mobile-tab-navigation__strip {
-  display: contents;
-}
-
-.mobile-tab-navigation__toggle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   height: 100%;
-  padding: 0 var(--space-6);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-}
-
-.mobile-tab-navigation__toggle-icon {
-  width: 16px;
-  height: 16px;
 }
 
 /* --------------------------------------------------------------------------
@@ -343,7 +323,7 @@
 }
 
 .settings-panel--danger .settings-panel__title {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .settings-panel__blurb {
@@ -447,7 +427,7 @@
   width: 100%;
   padding: var(--space-4) var(--space-5);
   border-radius: var(--radius-md);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
   font-size: var(--text-base);
   text-align: left;
   cursor: pointer;

@@ -46,7 +46,7 @@ export async function channelHeader({ serverId, channelId, server, onSearch }) {
       btn.setAttribute('aria-label', btn.title);
       btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
     },
-  }, icon('menu'));
+  }, icon('users'));
   // The server's own channel-scoped permission answer for this viewer. Fetched
   // per channel because an override on this channel, or on its category, is
   // invisible to the community-level list the composer used to consult.
@@ -73,14 +73,14 @@ export async function channelHeader({ serverId, channelId, server, onSearch }) {
         }
         const now = isMuted(channelId);
         renderAllChrome();
-        btn.textContent = now ? '⊘' : '◉';
+        btn.replaceChildren(icon(now ? 'bell-off' : 'bell'));
         btn.title = now ? 'Unmute this channel' : 'Mute this channel';
         btn.setAttribute('aria-label', btn.title);
         btn.setAttribute('aria-pressed', now ? 'true' : 'false');
         toast(now ? 'Channel muted.' : 'Channel unmuted.', 'ok');
       } catch (ex) { toast(ex.message || 'Could not change mute.', 'error'); }
     },
-  }, muted ? '⊘' : '◉');
+  }, icon(muted ? 'bell-off' : 'bell'));
   const searchBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Search in this community', 'aria-label': 'Search messages',
     onClick: () => onSearch(),
@@ -92,8 +92,8 @@ export async function channelHeader({ serverId, channelId, server, onSearch }) {
   const moreBtn = el('button', {
     class: 'btn icon', type: 'button', title: 'Community actions', 'aria-label': 'Community actions',
     onClick: () => {
-      const menu = document.querySelector('#place-navigation .place-header__menu');
-      if (menu) menu.click();
+      const trigger = document.querySelector('#place-navigation .ctx-switcher__trigger');
+      if (trigger) trigger.click();
     },
   }, icon('more'));
   renderContextHeader({ title: '#' + chanName, sub: (channel && channel.topic) ? esc(channel.topic) : server.name, icon: '#', actions: [searchBtn, pinsBtn, bellBtn, moreBtn, memberToggle] });

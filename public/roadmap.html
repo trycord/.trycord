@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Trycord">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <title>Roadmap: what is shipped, in progress and planned</title>
+  <meta name="description" content="Where Trycord is going: what is shipped and in use, what is being built now and off by default, and what is only an idea. Statuses are drawn from the code, not from ambition.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/design-tokens.css">
+  <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="wrap masthead">
+      <a class="brand" href="/">
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+          <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+          <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+          <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+        </svg>
+        <span class="brand-word">Trycord</span>
+      </a>
+
+      <button class="menu-toggle" type="button" data-menu-toggle aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
+        <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></svg>
+      </button>
+
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Product
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
+              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
+              <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
+              <a href="/changelog"><strong>Changelog</strong><span>What's new in Trycord.</span></a>
+              <a href="/roadmap"><strong>Roadmap</strong><span>What's done and what's coming.</span></a>
+              <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
+            </div>
+            <div class="nav-menu-foot">
+              <p>Private, self-hostable community messaging.</p>
+              <a class="text-link" href="/demo">Try the live demo</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Explore
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
+            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Community
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/support"><strong>Support</strong><span>Get help and reach the project.</span></a>
+              <a href="https://discord.gg/dSF7eqsJuP" rel="noopener"><strong>Discord</strong><span>Join the community chat.</span></a>
+              <a href="/security"><strong>Security</strong><span>How to report a vulnerability.</span></a>
+              <a href="/trust-and-safety"><strong>Trust and safety</strong><span>Rules, reporting, and appeals.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            About
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/about"><strong>About Trycord</strong><span>Why Trycord exists and how it's built.</span></a>
+            <a href="/changelog"><strong>Changelog</strong><span>What's shipped recently.</span></a>
+            <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
+          </div>
+        </div>
+      </nav>
+
+      <div class="masthead-actions">
+        <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+          <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+          <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+        </button>
+        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <p class="kicker">Roadmap</p>
+        <h1>Where the project is going</h1>
+        <p class="lede">
+          The labels below separate what works today, what is built but still
+          off by default, and what is only an idea. They reflect the state of the
+          code: if a capability is off by default, backed by a single provider,
+          or only a setting and a name, it is described that way.
+        </p>
+      </div>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">Shipped</p>
+          <h2>Working, and in use</h2>
+          <p>These are implemented and available today. The <a href="/features">features page</a> covers them in detail.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <span class="tag tag--shipped">Shipped</span>
+            <h3>Core conversation</h3>
+            <p>Communities, channels and categories, direct messages, friends, reactions, attachments, search, presence and in-app notifications.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag--shipped">Shipped</span>
+            <h3>Community and platform moderation</h3>
+            <p>Roles and permissions, invites, reports, warnings, timeouts and bans, appeals, announcements, and a platform administration surface.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag--shipped">Shipped</span>
+            <h3>Accounts and data rights</h3>
+            <p>Registration with optional approval, two-factor authentication, email verification and recovery, data export and account deletion.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag--shipped">Shipped</span>
+            <h3>Self-hosting</h3>
+            <p>Docker and manual installs, SQLite or MySQL, mail through SMTP or an API, public discovery, bots and webhooks, themes, and the desktop app.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">In progress</p>
+          <h2>Built, but off by default</h2>
+          <p>These have real code behind them and are deliberately off by default. They stay off until the work is finished.</p>
+        </div>
+        <div class="features">
+          <article class="feature">
+            <div class="feature-copy">
+              <h3>Voice and video <span class="tag tag--progress">In progress</span></h3>
+              <p>The room and signalling model exist behind one provider, with participant limits, optional screen sharing and stage channels. It is off by default and there is no second provider. Turn it on if you want to test it; do not plan a product around it yet.</p>
+            </div>
+          </article>
+          <article class="feature">
+            <div class="feature-copy">
+              <h3>Push notifications to devices <span class="tag tag--progress">In progress</span></h3>
+              <p>The flag and the delivery plumbing exist and default to off. Notifications are dependable in-app today. A notification that reliably wakes a backgrounded phone is a different piece of work, and it is not done.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">Planned and exploratory</p>
+          <h2>Ideas with a name, not a date</h2>
+          <p>Something here may change shape or may not arrive. Treat it as direction, not as a schedule.</p>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <span class="tag tag--planned">Exploratory</span>
+            <h3>Cross-instance federation</h3>
+            <p>Instances are independent today, and there is a global sync setting and the beginning of a shared vocabulary for connecting them. A working federation of separate instances does not exist yet.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag--planned">Planned</span>
+            <h3>Messaging polish</h3>
+            <p>Continued work on the everyday surfaces: message editing and history, richer notification controls, and the small things that make a long conversation easier to follow.</p>
+          </article>
+          <article class="card">
+            <span class="tag tag--planned">Planned</span>
+            <h3>Operator experience</h3>
+            <p>More of the deployment lifecycle in one place: clearer upgrade and backup guidance, and fewer places where an operator has to read the source to find out what a setting does.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">Not currently planned</p>
+          <h2>Things it is fair to assume are not coming</h2>
+        </div>
+        <div class="features">
+          <article class="feature">
+            <div class="feature-copy">
+              <h3>A central hosted service</h3>
+              <p>Trycord is software you run. There is an official instance, but the architecture does not assume a single company in the middle, and that is not going to change into the usual arrangement.</p>
+            </div>
+          </article>
+          <article class="feature">
+            <div class="feature-copy">
+              <h3>Advertising or data brokerage</h3>
+              <p>There is no advertising surface and no plan to build one. An instance's data belongs to the instance, and there is no mechanism to send it anywhere else.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="wrap">
+          <div class="band">
+            <p class="kicker">Have a say</p>
+            <h2>The roadmap is a conversation, not an announcement.</h2>
+            <p>If something here matters to you, or you think the ordering is wrong, the support page explains where to say so.</p>
+            <div class="cta">
+              <a class="btn" href="/support">Get in touch</a>
+              <a class="btn btn-ghost" href="https://github.com/trycord/.trycord/issues" rel="noopener">Open issues on GitHub</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/">
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+          </svg>
+          <span class="brand-word">Trycord</span>
+        </a>
+        <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
+        <a class="btn btn-sm" href="/app/">Open the app</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Product</h2>
+        <a href="/features">Features</a>
+        <a href="/docs">Documentation</a>
+        <a href="/download">Download</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Explore</h2>
+        <a href="/communities">Communities</a>
+        <a href="/demo">Live demo</a>
+        <a href="/status">Status</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Project</h2>
+        <a href="/about">About</a>
+        <a href="/support">Support</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
+        <a href="/security">Security</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Legal</h2>
+        <a href="/terms">Terms of Service</a>
+        <a href="/instances-terms">Instance terms</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/trust-and-safety">Trust &amp; Safety</a>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>&copy; <span data-year>2026</span> Trycord</span>
+      <span class="muted">Your instance, your conversations, your rules.</span>
+    </div>
+  </footer>
+
+  <script src="/js/site.js"></script>
+</body>
+</html>

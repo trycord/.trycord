@@ -12,7 +12,7 @@ export const CUSTOM_TOKEN_DEFS = [
 ];
 
 export const DEFAULT_CUSTOM_TOKENS = {
-  accent: '#ff914d',
+  accent: '#FF4D24',
   tone: 'dark',
   contrast: 'standard',
   radius: 'soft',

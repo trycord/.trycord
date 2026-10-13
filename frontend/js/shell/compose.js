@@ -46,7 +46,6 @@ const LS_KEY = 'trycord.shell';
 const DEFAULTS = {
   channelsCollapsed: false,
   membersVisible: true,
-  tabsVisible: true,
 };
 
 function readState() {
@@ -129,7 +128,6 @@ export function compose() {
       // one. The tab bar is not the phone's only navigation - the drawer is - so this is
       // a shortcut bar, not the nav.
       show: width < WIDTH.phone,
-      visible: width < WIDTH.phone && s.tabsVisible,
     },
   };
 }

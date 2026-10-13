@@ -596,11 +596,47 @@
   color: var(--color-warning);
 }
 
-.msg-actions,
-.msg-hoverbar {
+.msg-actions {
   display: flex;
   align-items: center;
   gap: 1px;
+}
+
+.msg-hoverbar {
+  position: absolute;
+  top: -14px;
+  right: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.msg:hover .msg-hoverbar,
+.msg:focus-within .msg-hoverbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.msg-hoverbar button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+}
+
+.msg-hoverbar button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
 }
 
 .msg-inline-actions {
@@ -623,6 +659,10 @@
   gap: var(--space-3);
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+.msg-inline-actions__item.is-danger {
+  color: var(--color-danger-text);
 }
 
 .msg-inline-actions__sep {
@@ -794,6 +834,47 @@
   color: var(--color-text-muted);
 }
 
+.composer-dock > .composer {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.composer-dock > .composer > .file-btn,
+.composer-dock > .composer > .composer-actions > .emoji-btn,
+.composer-dock > .composer > .composer-actions > .preview-toggle,
+.composer-dock > .composer > .composer-actions > .btn {
+  flex: 0 0 auto;
+  min-width: var(--composer-min);
+  min-height: var(--composer-min);
+}
+
+.composer-dock > .composer > textarea {
+  flex: 1 1 8rem;
+  min-width: 0;
+  min-height: var(--composer-min);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  resize: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.composer-dock > .composer > textarea:focus {
+  border-color: var(--color-border-strong);
+}
+
+.composer-dock > .composer > .composer-actions {
+  margin-left: auto;
+}
+
 .emoji-btn {
   display: grid;
   place-items: center;
@@ -832,6 +913,16 @@
   font-size: var(--text-sm);
 }
 
+.attach-row--error {
+  border-color: var(--color-danger);
+  background: var(--color-danger-muted);
+}
+
+.attach-row--error .attach-name,
+.attach-row--error .attach-state {
+  color: var(--color-danger-text);
+}
+
 .attach-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -856,7 +947,7 @@
 }
 
 .attach-remove:hover {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .attach-bar {
@@ -1019,12 +1110,24 @@
   cursor: pointer;
 }
 
+.react-pill.mine {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-muted);
+  color: var(--color-accent-text);
+}
+
 /* --------------------------------------------------------------------------
    Home
    -------------------------------------------------------------------------- */
 
-.home-layout,
 .home-environment {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.home-layout {
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1050,8 +1153,7 @@
 /* Past this width the aside earns its space. Below it, everything the aside
    holds moves inline rather than disappearing. */
 @media (min-width: 1280px) {
-  .home-layout,
-  .home-environment {
+  .home-layout {
     grid-template-columns: minmax(0, 1fr) 300px;
   }
 
@@ -1061,8 +1163,7 @@
 }
 
 @media (min-width: 1700px) {
-  .home-layout,
-  .home-environment {
+  .home-layout {
     grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
@@ -1103,6 +1204,8 @@
 .home-section__hint {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .home-conversations,
@@ -1309,9 +1412,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-6);
   padding: var(--space-6);
   border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.card--list--row .grow {
+  flex-basis: 220px;
 }
 
 .card--list--row:last-child {
@@ -1329,8 +1437,11 @@
 .card--list__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: var(--space-4);
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  margin-left: auto;
 }
 
 .card--auth {
@@ -1341,8 +1452,6 @@
   box-shadow: var(--shadow-lg);
 }
 
-.card--profile,
-.profile-primary,
 .profile-context,
 .settings-context {
   display: flex;
@@ -1352,6 +1461,19 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
+}
+
+.card--profile,
+.prof-preview {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.settings-context {
+  padding: var(--space-6);
 }
 
 .card-actions,
@@ -1541,7 +1663,7 @@
   border: 1px solid var(--color-danger-muted);
   background: var(--color-danger-muted);
   border-radius: var(--radius-lg);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .state-block__actions {
@@ -1569,7 +1691,7 @@
 
 .prose a,
 .pub-prose a {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .eyebrow + h1,
@@ -1593,7 +1715,7 @@
 .set-note--warn,
 .bad,
 .danger {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .form-error {
@@ -1634,7 +1756,7 @@
 .flash {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .is-loading {
@@ -1654,7 +1776,7 @@
 
 .is-on,
 .active {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .is-dnd,
@@ -1750,7 +1872,7 @@
 
 .status-chip--bad {
   background: var(--color-danger-muted);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .presence-dot {
@@ -1944,6 +2066,7 @@
   flex-direction: column;
   gap: 1px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .context-header__icon {
@@ -1977,10 +2100,10 @@
    bare <button> around a glyph and take the glyph's box - 18x18 and 13x13 have both
    been measured. Setting it centrally means a control added later is not accidentally
    unhittable, which is the failure the layout check keeps finding. */
-button:not(.btn):not(.btn--icon):not([aria-disabled="true"]):not([hidden]):not([disabled]),
-input:not([type="checkbox"]):not([type="radio"]):not([hidden]):not([disabled]),
-select:not([hidden]),
-textarea:not([hidden]) {
+button:where(:not(.btn):not(.btn--icon):not([aria-disabled="true"]):not([hidden]):not([disabled])),
+input:where(:not([type="checkbox"]):not([type="radio"]):not([hidden]):not([disabled])),
+select:where(:not([hidden])),
+textarea:where(:not([hidden])) {
   min-height: var(--target-min);
   min-width: var(--target-min);
 }

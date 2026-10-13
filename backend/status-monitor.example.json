@@ -1,0 +1,50 @@
+{
+  "title": "Trycord status",
+  "instance": "my-instance",
+  "host": "0.0.0.0",
+  "port": 9972,
+  "intervalMs": 30000,
+  "timeoutMs": 5000,
+  "failureThreshold": 2,
+  "recoveryThreshold": 1,
+  "slowMs": 1500,
+  "history": 180,
+  "refreshSeconds": 15,
+  "corsOrigins": "*",
+  "baseUrl": "http://127.0.0.1:9971",
+  "targets": [
+    {
+      "id": "website",
+      "name": "Public website",
+      "description": "The website this instance serves over HTTP.",
+      "type": "http",
+      "url": "/",
+      "expect": { "status": [200] }
+    },
+    {
+      "id": "api",
+      "name": "Application API",
+      "description": "The process that answers API requests.",
+      "type": "http",
+      "url": "/health",
+      "expect": { "status": [200], "json": { "ok": true } }
+    },
+    {
+      "id": "database",
+      "name": "Database",
+      "description": "Answers one read for the API.",
+      "type": "http",
+      "url": "/api/health",
+      "expect": { "status": [200], "json": { "db": "ok" } }
+    },
+    {
+      "id": "mysql",
+      "name": "Database port (example)",
+      "description": "An example of the tcp check type. Replace it, or leave it disabled.",
+      "type": "tcp",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "enabled": false
+    }
+  ]
+}
