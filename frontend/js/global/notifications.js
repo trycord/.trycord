@@ -109,7 +109,7 @@ export async function renderNotifications(container) {
   const renderRow = (n) => {
     const dest = destination(n);
     const row = el(dest ? 'button' : 'div', {
-      class: 'row notif-row' + (n.readAt ? '' : ' unread'),
+      class: 'row notif-row' + (n.readAt ? '' : ' notif-row--unread'),
       type: dest ? 'button' : undefined,
     });
     attachContextMenu(row, () => notifActions(n, dest), {

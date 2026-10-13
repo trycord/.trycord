@@ -58,12 +58,12 @@ async function renderServerMembers(container, serverId) {
   presFilter.appendChild(el('option', { value: 'all' }, 'All statuses'));
   presFilter.appendChild(el('option', { value: 'online' }, 'Online'));
   presFilter.appendChild(el('option', { value: 'offline' }, 'Offline'));
-  const botsOnly = el('input', { type: 'checkbox' });
+  const botsOnly = el('input', { type: 'checkbox', class: 'switch' });
   const sortSel = el('select', { class: 'input sm', title: 'Sort members' });
   [['name', 'Sort: name'], ['newest', 'Sort: newest'], ['oldest', 'Sort: oldest'], ['role', 'Sort: top role']].forEach(([v, label]) => {
     sortSel.appendChild(el('option', { value: v }, label));
   });
-  toolbar.append(search, roleFilter, presFilter, el('label', { class: 'switch' }, botsOnly, ' Bots only'), sortSel);
+  toolbar.append(search, roleFilter, presFilter, el('label', { class: 'switch-row' }, botsOnly, ' Bots only'), sortSel);
   wrap.appendChild(toolbar);
 
   const list = el('div', { class: 'community-list' });

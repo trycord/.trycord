@@ -91,7 +91,7 @@
 
 .msg__author--admin,
 .msg__author--owner {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .msg__time {
@@ -114,14 +114,14 @@
 }
 
 .msg__text a {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .msg__mention {
   padding: 0 2px;
   border-radius: var(--radius-sm);
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: var(--weight-medium);
 }
 
@@ -209,7 +209,7 @@
 .reaction.is-mine {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .reaction__count {
@@ -291,7 +291,7 @@
 .msg__failed-note {
   margin-top: var(--space-3);
   font-size: var(--text-sm);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 /* System messages: joins, pins, boosts. Present, legible, and clearly not a

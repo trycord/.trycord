@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Status — Trycord</title>
-  <meta name="description" content="A lightweight browser check of the Trycord instance you are connected to.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Trycord">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <title>Status: is this Trycord instance answering?</title>
+  <meta name="description" content="A live check of whether the Trycord instance you are on is reachable and ready.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
@@ -14,34 +20,89 @@
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="site-header">
-    <div class="wrap nav-wrap">
+    <div class="wrap masthead">
       <a class="brand" href="/">
         <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
-          <g color="#FF4D24">
-            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
-            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
-            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
-          </g>
+          <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+          <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+          <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+          <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
         </svg>
-        <span class="brand-name">Trycord</span>
+        <span class="brand-word">Trycord</span>
       </a>
-      <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
-        <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
-        <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+
+      <button class="menu-toggle" type="button" data-menu-toggle aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
+        <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></svg>
       </button>
-      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
+
       <nav class="site-nav" id="site-nav" aria-label="Primary">
-        <a href="/">Home</a>
-        <a href="/features">Features</a>
-        <a href="/docs">Docs</a>
-        <a href="/download">Download</a>
-        <a href="/about">About</a>
-        <a href="/support">Support</a>
-        <a href="/security">Security</a>
-        <a href="/status">Status</a>
-        <a class="btn-open" href="/app/">Open the app</a>
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Product
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
+              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
+              <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
+              <a href="/changelog"><strong>Changelog</strong><span>What's new in Trycord.</span></a>
+              <a href="/roadmap"><strong>Roadmap</strong><span>What's done and what's coming.</span></a>
+              <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
+            </div>
+            <div class="nav-menu-foot">
+              <p>Private, self-hostable community messaging.</p>
+              <a class="text-link" href="/demo">Try the live demo</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Explore
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
+            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Community
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/support"><strong>Support</strong><span>Get help and reach the project.</span></a>
+              <a href="https://discord.gg/dSF7eqsJuP" rel="noopener"><strong>Discord</strong><span>Join the community chat.</span></a>
+              <a href="/security"><strong>Security</strong><span>How to report a vulnerability.</span></a>
+              <a href="/trust-and-safety"><strong>Trust and safety</strong><span>Rules, reporting, and appeals.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            About
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/about"><strong>About Trycord</strong><span>Why Trycord exists and how it's built.</span></a>
+            <a href="/changelog"><strong>Changelog</strong><span>What's shipped recently.</span></a>
+            <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
+          </div>
+        </div>
       </nav>
+
+      <div class="masthead-actions">
+        <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+          <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+          <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+        </button>
+        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+      </div>
     </div>
   </header>
 
@@ -49,61 +110,172 @@
     <div class="wrap">
       <div class="page-head">
         <p class="kicker">Service status</p>
-        <h1>Trycord status</h1>
-        <p class="lede">This page provides a lightweight browser check for the local instance.</p>
+        <h1>Is this instance answering?</h1>
+        <p class="lede">
+          A live snapshot of the instance that served this page. Each part is reported
+          separately: that the web server answered, that the application process is up,
+          whether the database answers a query, and whether the web app itself was found.
+          This is one instance at one moment. It is not a project-wide status board, and
+          it cannot see services the server does not expose.
+        </p>
       </div>
-      <div class="status-panel">
-        <p id="status-text" role="status" data-state="pending">Checking health.</p>
-        <p class="muted small" id="status-detail"></p>
-      </div>
+
+      <section class="status-panel" data-status aria-live="polite" aria-busy="true">
+        <div class="status-head">
+          <div>
+            <h2 id="status-summary">Checking this instance...</h2>
+            <p class="status-checked" id="status-checked">Running the checks now.</p>
+          </div>
+          <button class="btn btn-sm" type="button" data-status-refresh>Check again</button>
+        </div>
+        <table class="status-table">
+          <caption class="sr-only">Live component checks for this instance</caption>
+          <thead>
+            <tr><th scope="col">Component</th><th scope="col">What it is</th><th scope="col">State</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">This website</th>
+              <td>The public page you are reading, served by the instance over HTTP.</td>
+              <td><span class="state state--unknown" data-state-cell="site">Checking</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Application API</th>
+              <td>The process that answers requests from the app and from this site.</td>
+              <td><span class="state state--unknown" data-state-cell="api">Checking</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Database</th>
+              <td>Where accounts, communities, messages and permissions are stored.</td>
+              <td><span class="state state--unknown" data-state-cell="db">Checking</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Web app</th>
+              <td>The client the server serves when you open the app.</td>
+              <td><span class="state state--unknown" data-state-cell="app">Checking</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="status-when" id="status-when">Times are shown in your browser's local time.</p>
+        <noscript><p class="small muted">These checks need JavaScript, because they run in your browser. With JavaScript off, no live state can be shown.</p></noscript>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">What the checks show</p>
+          <h2>What a green check does and does not mean</h2>
+        </div>
+        <p class="muted">A passing check is deliberately narrow. It confirms one thing answered, not that everything works.</p>
+        <div class="split">
+          <div>
+            <h3>The API check proves a process answered</h3>
+            <p class="muted">It calls the instance's own health endpoint. A reply means the API process is running and can answer a request. It does not prove that every dependency, background job or feature is healthy.</p>
+          </div>
+          <div>
+            <h3>The database check proves one query returned</h3>
+            <p class="muted">It runs a single read against the database. That catches an unreachable database, which is the failure that stops everything. It is not a check of every table or every write path.</p>
+          </div>
+        </div>
+        <div class="split">
+          <div>
+            <h3>It cannot see what the server does not expose</h3>
+            <p class="muted">This instance publishes health for the API and the database only. The realtime gateway, mail delivery, uploads and voice have no individual check here, so this page stays silent about them rather than guessing.</p>
+          </div>
+          <div>
+            <h3>A failure can also be the connection to the source</h3>
+            <p class="muted">A check that fails means the checker could not complete it, which can be the instance or the network between the two. When your browser ran the check, reload before concluding the instance is down.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">The states</p>
+          <h2>What each state means</h2>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <span class="state state--ok">Operational</span>
+            <h3>The check passed</h3>
+            <p>The component answered as expected at the time shown. It says nothing about the moment after that.</p>
+          </article>
+          <article class="card">
+            <span class="state state--warn">Degraded</span>
+            <h3>It answered, but a part is missing</h3>
+            <p>The component responded and something it depends on is not in place. The clearest case here is a server that runs the API but was never given the web app to serve.</p>
+          </article>
+          <article class="card">
+            <span class="state state--bad">Unavailable</span>
+            <h3>The check did not pass</h3>
+            <p>The component was reached but did not answer as expected, or refused. This is a real failure, not a warning.</p>
+          </article>
+          <article class="card">
+            <span class="state state--unknown">Unknown</span>
+            <h3>The check could not run</h3>
+            <p>The request never completed. That can be a network problem, a blocked request, or an instance that is not there. No conclusion is safe, so none is drawn.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">When something is wrong</p>
+          <h2>What to do next</h2>
+        </div>
+        <div class="prose">
+          <ol>
+            <li>Reload this page and run the checks again. A single failure can be a dropped connection.</li>
+            <li>If the website is operational but the API or database is not, the problem is on the server, and nothing you change locally will help. If it is your instance, see the <a href="/docs">documentation</a>; if it is not, its operator is the person who can fix it.</li>
+            <li>If every check is unknown, suspect the connection between you and the instance first. Try another network or a different device.</li>
+            <li>Still down, or you have a detail this page cannot show? The <a href="/support">support page</a> explains who to tell, and the project's <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a> is where the community talks.</li>
+          </ol>
+          <h3>How far this record goes back</h3>
+          <p>When the instance runs the bundled status monitor, the results above are that monitor's most recent checks, held in memory for a short window and reported with the time each one was taken. Restart the monitor and the window begins again, so it is a recent snapshot, not a permanent incident history. Without the monitor, your browser runs each check once and nothing is stored. Either way there is no uptime percentage and no incident timeline, because neither would rest on a durable record.</p>
+        </div>
+      </section>
     </div>
   </main>
 
   <footer class="site-footer">
-    <div class="wrap footer-band">
-      <h2>Run your own community</h2>
-      <p>Trycord is software you run yourself. Open the app to join a community, or read the documentation and start your own instance.</p>
-      <div class="cta">
-        <a class="btn btn-primary" href="/app/">Open the app</a>
-        <a class="btn btn-ghost" href="/docs">Read the documentation</a>
-      </div>
-    </div>
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <a class="brand" href="/">
           <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
-            <g color="#FF4D24">
-              <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-              <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
-              <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
-              <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
-            </g>
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
           </svg>
-        <span class="brand-name">Trycord</span>
+          <span class="brand-word">Trycord</span>
         </a>
-        <p>Private, self-hostable community messaging. Web and desktop.</p>
+        <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
+        <a class="btn btn-sm" href="/app/">Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
         <a href="/docs">Documentation</a>
         <a href="/download">Download</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Explore</h2>
+        <a href="/communities">Communities</a>
+        <a href="/demo">Live demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Project</h2>
         <a href="/about">About</a>
         <a href="/support">Support</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
         <a href="/security">Security</a>
-      </div>
-      <div class="footer-col">
-        <h2 class="footer-heading">Communities</h2>
-        <a href="/app/discover">Browse communities</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Legal</h2>
         <a href="/terms">Terms of Service</a>
-        <a href="/instances-terms">Official instance terms</a>
+        <a href="/instances-terms">Instance terms</a>
         <a href="/privacy">Privacy Policy</a>
         <a href="/trust-and-safety">Trust &amp; Safety</a>
       </div>
@@ -115,5 +287,6 @@
   </footer>
 
   <script src="/js/status.js"></script>
+  <script src="/js/site.js"></script>
 </body>
 </html>

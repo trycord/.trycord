@@ -128,6 +128,13 @@ function build() {
     console.log('  tokens written: ' + TOKENS_OUT + ' (' + (tokensOnly.length / 1024).toFixed(1) + ' KB)');
   }
 
+  const PUBLIC_TOKENS_OUT = path.join(__dirname, '..', '..', 'public', 'css', 'design-tokens.css');
+  const publicExisted = fs.existsSync(PUBLIC_TOKENS_OUT) ? fs.readFileSync(PUBLIC_TOKENS_OUT, 'utf8') : null;
+  if (publicExisted !== tokensOnly) {
+    fs.writeFileSync(PUBLIC_TOKENS_OUT, tokensOnly);
+    console.log('  tokens written: ' + PUBLIC_TOKENS_OUT + ' (' + (tokensOnly.length / 1024).toFixed(1) + ' KB)');
+  }
+
   const existing = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : null;
   if (existing === css) {
     console.log('  css up to date (' + LAYERS.length + ' layers)');

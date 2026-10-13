@@ -121,8 +121,9 @@ export function avatar(user, { size = 'sm', withPresence = true } = {}) {
     });
   }
   if (withPresence && user && user.id) {
-    const dot = el('span', { class: 'presence-dot ' + (peerPresence(user.id) === 'online' ? 'online' : '') });
-    a.appendChild(dot);
+    const presence = peerPresence(user.id);
+    const known = presence === 'online' || presence === 'idle' || presence === 'dnd';
+    a.appendChild(el('span', { class: 'presence-dot' + (known ? ' presence-dot--' + presence : '') }));
   }
   return a;
 }

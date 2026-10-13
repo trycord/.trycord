@@ -1,10 +1,6 @@
 // The public website, verified the way the application is verified.
 //
 // The render harness covers the client, and the client is not the whole frontend: the
-// public site is fourteen plain HTML documents served from public/, and until now nothing
-// asserted they were reachable, that they were on the canonical design system, or that
-// their own navigation went anywhere. They were the half of the frontend that lost its
-// server entirely during the backend cutover - every page 404d on the live instance.
 //
 //   node scripts/check-public-site.js              reachability, content, no dead links
 //   node scripts/check-public-site.js --tokens     also assert the design tokens
@@ -17,21 +13,24 @@ const ROOT = path.join(__dirname, '..');
 const REPO = path.join(ROOT, '..');
 const PUBLIC = path.join(ROOT, '..', 'public');
 
-// The clean URLs serve-client.js mounts, and what each is for.
 const PAGES = [
+  ['/', 'home.html', 'Home'],
+  ['/demo', 'demo.html', 'Demo'],
+  ['/communities', 'communities.html', 'Communities'],
+  ['/features', 'features.html', 'Features'],
+  ['/docs', 'documentation.html', 'Documentation'],
+  ['/download', 'download.html', 'Download'],
+  ['/about', 'about.html', 'About'],
+  ['/changelog', 'changelog.html', 'Changelog'],
+  ['/roadmap', 'roadmap.html', 'Roadmap'],
+  ['/status', 'status.html', 'Status'],
+  ['/support', 'support.html', 'Support'],
+  ['/security', 'security.html', 'Security'],
   ['/terms', 'terms.html', 'Terms of Service'],
   ['/privacy', 'privacy.html', 'Privacy Policy'],
   ['/instances-terms', 'instances-terms.html', 'Instance terms'],
   ['/trust-and-safety', 'trust-and-safety.html', 'Trust and safety'],
-  ['/support', 'support.html', 'Support'],
-  ['/security', 'security.html', 'Security'],
-  ['/about', 'about.html', 'About'],
-  ['/features', 'features.html', 'Features'],
-  ['/docs', 'documentation.html', 'Documentation'],
-  ['/download', 'download.html', 'Download'],
-  ['/status', 'status.html', 'Status'],
   ['/welcome', 'home.html', 'Home (preview at /welcome)'],
-  ['/404', '404.html', 'Not found'],
 ];
 
 const REDIRECTS = [['/contact', '/support']];
@@ -54,6 +53,8 @@ function get(port, urlPath) {
   });
 }
 
+const count = (body, re) => (body.match(re) || []).length;
+
 async function main() {
   const express = require(path.join(ROOT, 'node_modules', 'express'));
   const serveClient = require(path.join(ROOT, 'src', 'serve-client.js'));
@@ -63,17 +64,17 @@ async function main() {
   // point there, and a scan that cannot serve /app/* would report every one of them as a
   // dead link that in fact resolves.
   const APP_MOUNT = '/app';
+  const publicDir = serveClient.mountPublicSite(app, {
+    serverDir: path.join(ROOT, 'src'),
+    clientDir: null,
+    originOf: () => 'https://trycord.test',
+    pages: { publishedHtml: async () => null },
+  });
   const clientDir = serveClient.mountClient(app, {
     serverDir: path.join(ROOT, 'src'),
     appMount: APP_MOUNT,
     originOf: () => '',
     cspOriginOf: () => '',
-  });
-  const publicDir = serveClient.mountPublicSite(app, {
-    serverDir: path.join(ROOT, 'src'),
-    clientDir,
-    originOf: () => '',
-    pages: { publishedHtml: async () => null },
   });
   serveClient.mountSpaFallback(app, {
     clientDir, publicDir, appMount: APP_MOUNT, mountOf: () => APP_MOUNT,
@@ -92,8 +93,10 @@ async function main() {
 
   try {
     console.log('\n  every public page is reachable at its clean URL');
+    const bodies = new Map();
     for (const [url, file, label] of PAGES) {
       const r = await get(port, url);
+      bodies.set(url, r.body);
       ok(url.padEnd(20) + ' ' + label,
         r.status === 200 && /<!doctype html>/i.test(r.body),
         'status ' + r.status);
@@ -116,14 +119,13 @@ async function main() {
     // this same server, so what is measured is what a reader would get.
     const internal = new Set();
     for (const [url] of PAGES) {
-      const r = await get(port, url);
-      for (const m of r.body.matchAll(/href="(\/[^"#?]*)"/g)) internal.add(m[1]);
+      for (const m of (bodies.get(url) || '').matchAll(/href="(\/[^"#?]*)"/g)) internal.add(m[1]);
     }
     // Routes that belong to the application, not the public site.
-    const appRoutes = new Set(['/app/', '/']);
+    const isAppRoute = (href) => href === '/' || href.startsWith('/app');
     const dead = [];
     for (const href of [...internal].sort()) {
-      if (appRoutes.has(href)) continue;
+      if (isAppRoute(href)) continue;
       const r = await get(port, href);
       if (r.status >= 400) dead.push(href + ' (' + r.status + ')');
     }
@@ -147,9 +149,6 @@ async function main() {
       console.log('\n  the public site is on the canonical design system');
       const css = fs.readFileSync(path.join(PUBLIC, 'css', 'site.css'), 'utf8');
 
-      // 1. It consumes the semantic names the asset library is mapped onto. Naming them
-      //    is not enough on its own, but not naming them means the palette was
-      //    redeclared locally, which is the thing being checked for.
       const canonical = ['--color-background', '--color-surface', '--color-accent',
         '--color-text-primary', '--space-', '--radius-', '--text-'];
       const missing = canonical.filter((t) => !css.includes(t));
@@ -168,6 +167,13 @@ async function main() {
       const tokens = path.join(REPO, 'frontend', 'css', 'design-tokens.css');
       ok('the generated token layer exists',
         fs.existsSync(tokens), tokens);
+      const publicTokens = path.join(REPO, 'public', 'css', 'design-tokens.css');
+      ok('the standalone public copy of the tokens exists',
+        fs.existsSync(tokens) && fs.existsSync(publicTokens), tokens + ' / ' + publicTokens);
+      if (fs.existsSync(tokens) && fs.existsSync(publicTokens)) {
+        ok('the standalone copy matches the generated one',
+          fs.readFileSync(tokens, 'utf8') === fs.readFileSync(publicTokens, 'utf8'));
+      }
       if (fs.existsSync(tokens)) {
         const body = fs.readFileSync(tokens, 'utf8');
         const asset = fs.readFileSync(
@@ -199,6 +205,25 @@ async function main() {
         'status ' + served.status);
     }
 
+    console.log('\n  every page carries the same masthead and footer');
+    const shellMissing = { skip: [], header: [], footer: [], nav: [], theme: [], discord: [] };
+    for (const [url, , label] of PAGES) {
+      const b = bodies.get(url) || '';
+      if (!/class="skip-link"/.test(b)) shellMissing.skip.push(url);
+      if (!/class="site-header"/.test(b)) shellMissing.header.push(url);
+      if (!/class="site-footer"/.test(b)) shellMissing.footer.push(url);
+      if (!/class="nav-trigger"/.test(b)) shellMissing.nav.push(url);
+      if (!/data-theme-toggle/.test(b)) shellMissing.theme.push(url);
+      if (!/discord\.gg\/dSF7eqsJuP/.test(b)) shellMissing.discord.push(url);
+      void label;
+    }
+    ok('every page offers a skip link', shellMissing.skip.length === 0, shellMissing.skip.join(', '));
+    ok('every page has the site header', shellMissing.header.length === 0, shellMissing.header.join(', '));
+    ok('every page has the site footer', shellMissing.footer.length === 0, shellMissing.footer.join(', '));
+    ok('every page has the grouped navigation', shellMissing.nav.length === 0, shellMissing.nav.join(', '));
+    ok('every page offers the theme switch', shellMissing.theme.length === 0, shellMissing.theme.join(', '));
+    ok('every page links the Discord community', shellMissing.discord.length === 0, shellMissing.discord.join(', '));
+
     // ---- the composition, which is the part that was actually redesigned ----
     //
     // A page that serves fine and still carries the old composition passes every
@@ -206,67 +231,77 @@ async function main() {
     // system is not the same as being redesigned.
     console.log('\n  the composition is the redesigned one');
 
-    const home = await get(port, '/welcome');
+    const home = bodies.get('/') || '';
 
-    // 1. The hero is a two-column composition: copy on the left, and beside it a
-    //    framed specimen plate holding the brand mark, like the plate the design
-    //    tokens were documented in.
+    ok('the masthead pairs the brand with grouped navigation',
+      /class="[^"]*masthead"/.test(home) && /class="brand"/.test(home)
+      && /class="site-nav"/.test(home) && /class="masthead-actions"/.test(home));
+    ok('the brand mark is the library SVG, not a raster',
+      /<svg class="mark"/.test(home) && !/<img class="brand-mark"/.test(home));
+
     ok('the hero is a two-column composition',
-      /hero-copy/.test(home.body) && /hero-aside/.test(home.body),
-      'no .hero-copy / .hero-aside');
-    ok('the hero carries a framed specimen plate',
-      /hero-plate/.test(home.body) && /hero-mark/.test(home.body),
-      'no .hero-plate / .hero-mark');
+      /class="hero-grid"/.test(home) && /class="hero-copy"/.test(home) && /class="hero-stage"/.test(home),
+      'no .hero-grid / .hero-copy / .hero-stage');
+    ok('the hero holds the live client, not a screenshot',
+      /class="app-window"/.test(home) && /data-demo="compact"/.test(home),
+      'no .app-window[data-demo] in the hero');
 
-    // 2. The brand mark is the library's SVG, crisp at any size and carrying the
-    //    page's own accent, rather than a raster frozen at one colour.
-    ok('the brand mark is the library SVG, not the raster',
-      /<svg class="mark"/.test(home.body) && !/<img class="brand-mark"/.test(home.body));
+    const points = (home.match(/<li>/g) || []).length;
+    ok('the hero states its case in a short list',
+      /class="hero-points"/.test(home) && points >= 3, points + ' list items');
 
-    // 3. The hero leads with a ruled fact strip of three real capabilities,
-    //    not a wall of invented numbers or a grid of icon cards.
-    const facts = (home.body.match(/class="fact"/g) || []).length;
-    ok('the hero opens with a ruled fact strip',
-      /<dl class="facts"/.test(home.body) && facts >= 3, facts + ' facts');
+    const sections = (home.match(/<section class="section/g) || []).length;
+    ok('the body is a sequence of copy-led sections', sections >= 3, sections + ' sections');
+    const rows = (home.match(/class="feature"/g) || []).length;
+    ok('the narrative uses ruled feature rows',
+      rows >= 4 && /class="feature-copy"/.test(home) && !/<div class="card-icon"/.test(home),
+      rows + ' feature rows');
 
-    // 4. The body is a numbered plate sequence, and the capability lists inside
-    //    the plates are ruled rows, not the old card grid.
-    const plates = (home.body.match(/<section class="plate/g) || []).length;
-    ok('the page is a numbered plate sequence', plates >= 4, plates + ' plates');
-    ok('each plate is addressed by its index gutter', /<p class="plate-idx"/.test(home.body));
-    const rows = (home.body.match(/class="feature"/g) || []).length;
-    ok('features are ruled rows, not a card grid',
-      rows >= 4 && !/<div class="card-icon"/.test(home.body), rows + ' feature rows');
+    const cardCount = (home.match(/<article class="card"/g) || []).length;
+    ok('the capability inventory is a card grid', cardCount >= 4, cardCount + ' cards');
 
-    // 5. Getting started is a sequence numbered in the same gutter.
     ok('the getting-started section is a numbered sequence',
-      /class="steps"/.test(home.body) && /class="step"/.test(home.body));
+      /class="steps"/.test(home) && /class="step"/.test(home));
 
-    // 6. The document closes on an ember statement plate that owns the accent.
-    ok('the page closes on an ember statement plate',
-      /class="plate statement"/.test(home.body));
+    ok('the page closes on an ember statement band', /class="band"/.test(home));
 
-    // 7. The footer opens with its own call to action and names four link
-    //    columns, including the community directory route.
-    ok('the footer opens with a call to action', /footer-band/.test(home.body));
-    const cols = (home.body.match(/class="footer-col"/g) || []).length;
+    ok('the footer opens with a call to action',
+      /class="footer-brand"/.test(home) && /class="footer-brand"[\s\S]*?class="btn/.test(home));
+    const cols = (home.match(/class="footer-col"/g) || []).length;
     ok('the footer has four link columns', cols >= 4, cols + ' columns');
     const discover = await get(port, '/app/discover');
     ok('the community directory link resolves', discover.status < 400, 'status ' + discover.status);
 
-    // 8. A prose page is a document with a spine: the reading column beside a
-    //    generated contents list. The page opening, the layout wrapper, the
-    //    reading column and the contents list all live OUTSIDE the editable
-    //    markers, so publishing can replace the body and nothing else.
-    const terms = await get(port, '/terms');
+    const demo = bodies.get('/demo') || '';
+    ok('the demo mounts the full client with its controls',
+      /data-demo="full"/.test(demo) && /data-demo-controls/.test(demo),
+      'no [data-demo="full"] / [data-demo-controls]');
+    ok('the demo states what is live and what is simulated',
+      /live:/i.test(demo) && /simulat/i.test(demo),
+      'no live/simulated note');
+
+    const dir = bodies.get('/communities') || '';
+    ok('the directory offers search, sort, preview and paging',
+      /data-directory/.test(dir) && /class="dir-search"/.test(dir)
+      && /class="dir-sort"/.test(dir) && /data-dir-preview/.test(dir)
+      && /data-dir-pager/.test(dir));
+    ok('the directory reads the public discovery API',
+      /\/api\/discover\/servers/.test((await get(port, '/js/public-api.js')).body),
+      'endpoint not found in public-api.js');
+
+    const terms = bodies.get('/terms') || '';
     ok('a prose page uses the two-column layout with a contents list',
-      /prose-layout/.test(terms.body) && /<aside class="toc"/.test(terms.body),
+      /prose-layout/.test(terms) && /<aside class="toc"/.test(terms),
       'no .prose-layout or .toc');
-    const beginAt = terms.body.indexOf('page:begin');
-    const layoutAt = terms.body.indexOf('prose-layout');
-    const proseAt = terms.body.indexOf('<div class="prose">');
-    const headAt = terms.body.indexOf('<h1>');
-    const tocAt = terms.body.indexOf('<aside class="toc"');
+    const beginAt = terms.indexOf('page:begin');
+    const endCount = (terms.match(/page:end/g) || []).length;
+    const beginCount = (terms.match(/page:begin/g) || []).length;
+    const layoutAt = terms.indexOf('prose-layout');
+    const proseAt = terms.indexOf('<div class="prose">');
+    const headAt = terms.indexOf('<h1>');
+    const tocAt = terms.indexOf('<aside class="toc"');
+    ok('the editable region is marked exactly once',
+      beginCount === 1 && endCount === 1, beginCount + ' begin, ' + endCount + ' end');
     ok('the layout wrapper is outside the editable region',
       layoutAt !== -1 && beginAt !== -1 && layoutAt < beginAt,
       'wrapper at ' + layoutAt + ', page:begin at ' + beginAt);
@@ -280,28 +315,35 @@ async function main() {
       tocAt !== -1 && beginAt !== -1 && beginAt < tocAt,
       'toc at ' + tocAt + ', page:begin at ' + beginAt);
 
-    // 9. The stylesheet is the new one: the glows are derived, the plates run
-    //    down a fixed rail, and the motion respects the reduced-motion
-    //    preference by going rather than shortening.
     const css = fs.readFileSync(path.join(PUBLIC, 'css', 'site.css'), 'utf8');
-    ok('the header marks itself once the page has moved',
-      /data-scrolled/.test(css));
-    ok('the plates address themselves from a fixed rail',
-      /--rail: 72px/.test(css) && /\.plate-row \{[\s\S]*?grid-template-columns: var\(--rail\)/.test(css));
-    ok('the hero collapses to one column on a narrow screen',
-      /@media \(max-width: 900px\)[\s\S]*?\.hero \.wrap \{ grid-template-columns: 1fr/.test(css));
-    ok('the plate index yields to the kicker below the rail break',
-      /@media \(max-width: 1000px\)[\s\S]*?\.plate-idx \{ display: none/.test(css));
     ok('the contents list is sticky on a wide screen and gone on a narrow one',
       /\.toc \{[\s\S]*?position: sticky/.test(css)
-      && /@media \(max-width: 1000px\)[\s\S]*?\.toc \{ display: none/.test(css));
-    ok('the fact strip rules itself on a narrow screen',
-      /@media \(max-width: 720px\)[\s\S]*?\.facts \{ grid-template-columns: 1fr/.test(css));
+      && /@media \(max-width: 1080px\)[\s\S]*?\.toc \{ display: none/.test(css));
+    ok('the hero collapses to one column on a narrow screen',
+      /@media \(max-width: 1000px\)[\s\S]*?\.hero-grid \{ grid-template-columns: 1fr/.test(css));
+    ok('the navigation becomes a panel and yields to the menu control',
+      /@media \(max-width: 1000px\)[\s\S]*?\.menu-toggle \{ display: inline-flex/.test(css)
+      && /class="menu-toggle"/.test(home));
+    ok('the feature rows and footer collapse on a narrow screen',
+      /@media \(max-width: 760px\)[\s\S]*?\.feature \{ grid-template-columns: 1fr/.test(css)
+      && /@media \(max-width: 760px\)[\s\S]*?\.footer-grid \{ grid-template-columns: 1fr 1fr/.test(css));
     ok('reduced motion removes the motion rather than shortening it',
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition-duration: 0\.01ms/.test(css));
 
     // ---- the site announces itself to search engines ----
     console.log('\n  the site announces itself to search engines');
+
+    const badCanonical = [];
+    for (const [url] of PAGES) {
+      const b = bodies.get(url) || '';
+      const want = 'https://trycord.test' + url;
+      const m = /<link rel="canonical" href="([^"]*)"/.exec(b);
+      const og = /<meta property="og:url" content="([^"]*)"/.exec(b);
+      if (!m || m[1] !== want || !og || og[1] !== want) {
+        badCanonical.push(url + ' -> ' + (m ? m[1] : 'none'));
+      }
+    }
+    ok('every page carries a correct canonical URL', badCanonical.length === 0, badCanonical.slice(0, 6).join(', '));
 
     const robots = await get(port, '/robots.txt');
     ok('GET /robots.txt serves crawl rules',
@@ -311,11 +353,39 @@ async function main() {
     const sitemap = await get(port, '/sitemap.xml');
     const locs = [...(sitemap.body.match(/<loc>([^<]+)<\/loc>/g) || [])]
       .map((m) => m.replace(/<\/?loc>/g, ''));
-    const expected = ['/', '/terms', '/privacy', '/instances-terms', '/trust-and-safety',
-      '/support', '/security', '/about', '/features', '/docs', '/download', '/status'];
-    const match = expected.every((route) => locs.some((l) => l === route || l.endsWith(route)));
+    const expected = PAGES.map(([r]) => r).filter((r) => r !== '/welcome');
+    const match = expected.every((route) => locs.some((l) => l === route || l === 'https://trycord.test' + route));
     ok('GET /sitemap.xml lists every clean URL and the home page',
       sitemap.status === 200 && match, 'status ' + sitemap.status + ', ' + locs.join(', '));
+
+    console.log('\n  the status page is wired to real health endpoints, not static labels');
+    const statusHtml = bodies.get('/status') || '';
+    const statusJs = fs.readFileSync(path.join(PUBLIC, 'js', 'status.js'), 'utf8');
+    const serverSrc = fs.readFileSync(path.join(ROOT, 'src', 'server.js'), 'utf8');
+    ok('the status page lists a state cell per component',
+      ['site', 'api', 'db', 'app'].every((k) => statusHtml.includes('data-state-cell="' + k + '"')));
+    ok('the status script probes the real health routes',
+      statusJs.includes("'/health'") && statusJs.includes("'/api/health'"));
+    ok('the server defines the health routes the page probes',
+      serverSrc.includes("app.get('/health'") && serverSrc.includes("app.get('/api/health'"));
+
+    console.log('\n  the status page learns about a configured status monitor');
+    const previousMonitor = process.env.STATUS_MONITOR_PUBLIC_URL;
+    try {
+      process.env.STATUS_MONITOR_PUBLIC_URL = 'http://monitor.test:9972';
+      const withMonitor = await get(port, '/status');
+      const otherPage = await get(port, '/about');
+      ok('a configured monitor URL is stamped into the status page',
+        withMonitor.body.includes('<meta name="status-monitor" content="http://monitor.test:9972">'));
+      ok('and not into any other page', !otherPage.body.includes('status-monitor'));
+      delete process.env.STATUS_MONITOR_PUBLIC_URL;
+      const withoutMonitor = await get(port, '/status');
+      ok('with no monitor configured the status page is unchanged',
+        !withoutMonitor.body.includes('status-monitor'));
+    } finally {
+      if (previousMonitor === undefined) delete process.env.STATUS_MONITOR_PUBLIC_URL;
+      else process.env.STATUS_MONITOR_PUBLIC_URL = previousMonitor;
+    }
   } finally {
     server.close();
   }

@@ -8,7 +8,7 @@ export const DEFAULT_THEME = 'trycord';
 
 export const THEMES = [
   { id: 'system', label: 'System', blurb: 'Follows your OS light/dark setting.' },
-  { id: 'trycord', label: 'Trycord', blurb: 'Charcoal depth with amber ambient energy.' },
+  { id: 'trycord', label: 'Trycord', blurb: "Charcoal depth with Trycord's bright orange." },
   { id: 'orthocord', label: 'Orthocord', blurb: 'Cool steel hues on neutral charcoal.' },
   { id: 'midnight', label: 'Midnight', blurb: 'Deep indigo-blue, dim and focused.' },
   { id: 'ember', label: 'Ember', blurb: 'Hotter, saturated amber foreground.' },
@@ -40,7 +40,7 @@ export function getTheme() {
 export function resolveTheme(name) {
   if (name !== 'system') return name;
   try {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'ember';
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) return DEFAULT_THEME;
   } catch { /* unsupported: fall through to light */ }
   return 'light';
 }

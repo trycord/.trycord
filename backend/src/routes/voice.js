@@ -10,6 +10,7 @@ const limit = require('../middleware/ratelimit');
 const auth = require('../middleware/auth');
 const requireVerified = auth.requireVerified;
 const voice = require('../services/voice');
+const permissions = require('../services/permissions');
 const db = require('../db');
 
 const router = express.Router();
@@ -89,6 +90,16 @@ router.post('/channels/:channelId/screen', requireVerified, limit({ windowMs: 60
   res.status(201).json(await voice.publishScreenShare({ sessionId }));
 }));
 
+router.put('/channels/:channelId/state', requireVerified, wrap(async (req, res) => {
+  const blocked = await gate();
+  if (blocked) return fail(res, blocked.code, blocked.message, blocked.status);
+
+  const sessionId = await sessionOf(req.params.channelId, req.user.id);
+  if (!sessionId) return fail(res, 'NOT_FOUND', 'join the channel first');
+
+  res.json(await voice.setSelfState(req.params.channelId, req.user.id, req.body || {}));
+}));
+
 router.get('/channels/:channelId/participants', wrap(async (req, res) => {
   res.json(await voice.participants(req.params.channelId, req.user.id));
 }));
@@ -118,7 +129,21 @@ router.post('/channels/:channelId/request-speak', requireVerified, wrap(async (r
   res.json(await voice.requestSpeak(req.params.channelId, req.user.id));
 }));
 
-router.get('/channels/:channelId/speak-requests', wrap(async (req, res) => {
+router.get('/channels/:channelId/speak-requests', requireVerified, wrap(async (req, res) => {
+  const blocked = await gate();
+  if (blocked) return fail(res, blocked.code, blocked.message, blocked.status);
+
+  const ch = await db.get('SELECT server_id FROM channels WHERE id = ?', [req.params.channelId]);
+  if (!ch) return fail(res, 'NOT_FOUND', 'channel not found');
+  const member = await db.get(
+    'SELECT 1 FROM server_members WHERE server_id = ? AND user_id = ?',
+    [ch.server_id, req.user.id]
+  );
+  if (!member) return fail(res, 'NOT_A_MEMBER', 'you are not a member of this community', 403);
+  if (!await permissions.hasPermission(req.user.id, ch.server_id, 'MUTE_MEMBERS')) {
+    return fail(res, 'PERMISSION_DENIED', 'you cannot manage stage requests', 403);
+  }
+
   const rows = await db.all(
     `SELECT r.id, r.user_id, r.created_at, u.username, u.display_name
        FROM voice_speak_requests r JOIN users u ON u.id = r.user_id

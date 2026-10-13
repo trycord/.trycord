@@ -174,7 +174,7 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
     };
   }
 
-  return { ok: true, channel: ch, permissions: perms, roomId: room ? room.id : null };
+  return { ok: true, channel: ch, roomId: room ? room.id : null };
 }
 
 // A voice channel gets a room when its first participant arrives.

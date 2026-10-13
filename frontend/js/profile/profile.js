@@ -56,7 +56,12 @@ export async function renderProfile(container, { id } = {}) {
     el('div', { class: 'prof-preview-body' },
       nameLine,
       el('div', { class: 'muted small' }, '@' + profile.username),
-      el('div', { class: 'prof-presence' }, profile.presence === 'online' ? '● online' : 'offline'),
+      el('div', { class: 'prof-presence' },
+        el('span', {
+          class: 'presence-dot' + (profile.presence === 'online' ? ' presence-dot--online' : ''),
+          'aria-hidden': 'true',
+        }),
+        el('span', {}, profile.presence === 'online' ? 'Online' : 'Offline')),
       profile.statusText ? el('div', { class: 'prof-status' }, profile.statusText) : null,
       profile.bio ? el('div', { class: 'prof-bio' }, profile.bio) : el('div', { class: 'muted small' }, 'No bio yet.'),
       el('div', { class: 'muted small', style: { marginTop: 'var(--space-2)' } }, 'Member since ' + fullTime(profile.createdAt))));

@@ -178,7 +178,7 @@ async function renderFriendsList(wrap) {
         '@' + f.username + ' · friend since ' + relTime(f.friendsSince)));
       row.appendChild(m);
       const dmBtn = el('button', { class: 'btn sm', type: 'button' }, 'Message');
-      const rmBtn = el('button', { class: 'btn ghost sm', type: 'button', style: { color: 'var(--t-err)' } }, 'Remove');
+      const rmBtn = el('button', { class: 'btn ghost sm', type: 'button', style: { color: 'var(--color-danger-text)' } }, 'Remove');
       dmBtn.addEventListener('click', async () => {
         try {
           const { id } = await Api.openDm(f.id);

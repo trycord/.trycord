@@ -105,8 +105,8 @@ async function renderNewServer(container, serverId) {
   const name = el('input', { class: 'input', type: 'text', placeholder: 'My community', maxlength: 64, required: true });
   const desc = el('textarea', { class: 'textarea', placeholder: 'What is your community about? (optional)', maxlength: 400 });
   const joinCode = el('input', { class: 'input', type: 'text', placeholder: 'Public code (letters + numbers, optional)', maxlength: 32 });
-  const isPublic = el('input', { type: 'checkbox', checked: true });
-  const isDisc = el('input', { type: 'checkbox', checked: true });
+  const isPublic = el('input', { type: 'checkbox', class: 'switch', checked: true });
+  const isDisc = el('input', { type: 'checkbox', class: 'switch', checked: true });
   const createBtn = el('button', { class: 'btn primary block', type: 'submit' }, 'Create community');
 
   const form = el('form', {}, err,
@@ -114,8 +114,8 @@ async function renderNewServer(container, serverId) {
     el('div', { class: 'field' }, el('label', {}, 'Description'), desc),
     el('div', { class: 'field' }, el('label', {}, 'Join code'), joinCode,
       el('span', { class: 'hint' }, 'Leave blank to auto-generate one.')),
-    el('div', { class: 'field' }, el('label', { class: 'switch' }, isPublic, ' Public — joinable by code or invite link')),
-    el('div', { class: 'field' }, el('label', { class: 'switch' }, isDisc, ' Discoverable in the browse feed')),
+    el('div', { class: 'field' }, el('label', { class: 'switch-row' }, isPublic, ' Public — joinable by code or invite link')),
+    el('div', { class: 'field' }, el('label', { class: 'switch-row' }, isDisc, ' Discoverable in the browse feed')),
     createBtn);
 
   form.addEventListener('submit', async (e) => {

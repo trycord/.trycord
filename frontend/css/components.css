@@ -74,7 +74,7 @@
 
 .btn--quiet-danger {
   background: transparent;
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .btn--quiet-danger:hover {
@@ -115,7 +115,7 @@
 .btn[aria-pressed="true"] {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* --------------------------------------------------------------------------
@@ -198,7 +198,7 @@
 
 .field__error {
   font-size: var(--text-sm);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 /* Checkbox and radio, drawn rather than themed, so they match the palette. */
@@ -259,6 +259,7 @@
   flex: 0 0 auto;
   width: 40px;
   height: var(--target-min);
+  min-height: var(--target-min);
   appearance: none;
   background: var(--color-surface-active);
   border: 1px solid var(--color-border-strong);
@@ -356,6 +357,13 @@
   opacity: 0.45;
 }
 
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  cursor: pointer;
+}
+
 /* --------------------------------------------------------------------------
    Surfaces
    -------------------------------------------------------------------------- */
@@ -428,7 +436,7 @@
 
 .badge--accent {
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .badge--success {
@@ -443,7 +451,7 @@
 
 .badge--danger {
   background: var(--color-danger-muted);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .badge--info {
@@ -473,7 +481,7 @@
 .pill.is-active {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* --------------------------------------------------------------------------
@@ -647,7 +655,7 @@
 }
 
 .menu__item--danger {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .menu__item--danger:hover {

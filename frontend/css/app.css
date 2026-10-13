@@ -97,24 +97,22 @@
   /* -- type ------------------------------------------------------------- */
   --color-text-primary: var(--tc-text);
   --color-text-secondary: var(--tc-text-muted);
-  /* Solved against every surface it can land on, not only --color-surface: the interior
-     surfaces are lighter, and muted on surface-active was 4.01:1. #978c82 clears 4.5 on
-     the whole set, worst case 4.59. */
-  --color-text-muted: #978c82;
+  --color-text-muted: #a49a90;
   --color-text-inverse: #140f0c;
 
-  /* -- Ember, the accent ------------------------------------------------- */
   --color-accent: var(--tc-brand);
   --color-accent-hover: var(--tc-brand-hover);
   --color-accent-active: var(--tc-brand-strong);
-  --color-accent-muted: var(--tc-brand-strong);
-  --color-accent-subtle: var(--tc-brand-strong);
+  --color-accent-text: #ff6a44;
+  --color-accent-muted: #3d1a10;
+  --color-accent-subtle: #2e140c;
   --color-on-accent: var(--tc-text-on-brand);
 
   /* -- meaning ----------------------------------------------------------- */
   --color-success: #6fbf73;
   --color-warning: #e3b341;
   --color-danger: #e0574f;
+  --color-danger-text: #f08e88;
   --color-info: #6aa9d8;
   --color-success-muted: #1c2c1d;
   --color-warning-muted: #2e2714;
@@ -174,7 +172,7 @@
   --shadow-md: 0 4px 12px rgba(6, 4, 3, 0.55);
   --shadow-lg: 0 12px 32px rgba(6, 4, 3, 0.62);
   --shadow-pop: 0 16px 48px rgba(4, 3, 2, 0.7);
-  --glow-accent: 0 0 0 1px rgba(255, 122, 41, 0.34), 0 0 18px rgba(255, 122, 41, 0.16);
+  --glow-accent: 0 0 0 1px rgba(255, 77, 36, 0.34), 0 0 18px rgba(255, 77, 36, 0.16);
 
   /* -- motion ----------------------------------------------------------- */
   --ease-out: var(--tc-ease);
@@ -246,13 +244,15 @@
   --color-accent: var(--tc-brand);
   --color-accent-hover: var(--tc-brand-hover);
   --color-accent-active: var(--tc-brand-strong);
-  --color-accent-muted: var(--tc-brand-strong);
-  --color-accent-subtle: var(--tc-brand-strong);
+  --color-accent-text: #a83408;
+  --color-accent-muted: #fbd5c8;
+  --color-accent-subtle: #fde8e0;
   --color-on-accent: var(--tc-text-on-brand);
 
   --color-success: #2f7a34;
   --color-warning: #9a6b09;
   --color-danger: #b8332b;
+  --color-danger-text: #b8332b;
   --color-info: #2b6c9c;
   --color-success-muted: #e4f2e5;
   --color-warning-muted: #f7ecd8;
@@ -325,6 +325,7 @@
   --color-accent: #62a8e8;
   --color-accent-hover: #7fbbef;
   --color-accent-active: #4a8fcc;
+  --color-accent-text: #62a8e8;
   --color-accent-muted: #16304a;
   --color-accent-subtle: #0e1f30;
   --color-on-accent: #05121d;
@@ -332,6 +333,7 @@
   --color-success: #5fbf8f;
   --color-warning: #e0b055;
   --color-danger: #e2695f;
+  --color-danger-text: #e2695f;
   --color-info: #62a8e8;
   --color-success-muted: #12291f;
   --color-warning-muted: #2c2415;
@@ -369,6 +371,7 @@
   --color-accent: #9b8cf0;
   --color-accent-hover: #b0a3f4;
   --color-accent-active: #8071e0;
+  --color-accent-text: #9b8cf0;
   --color-accent-muted: #2b2456;
   --color-accent-subtle: #1b1736;
   --color-on-accent: #0b0818;
@@ -376,6 +379,7 @@
   --color-success: #63c194;
   --color-warning: #dfb85c;
   --color-danger: #e86b6b;
+  --color-danger-text: #e86b6b;
   --color-info: #7fa8e8;
   --color-success-muted: #122a20;
   --color-warning-muted: #2c2617;
@@ -413,6 +417,7 @@
   --color-accent: #ff8c1a;
   --color-accent-hover: #ffa347;
   --color-accent-active: #e0720c;
+  --color-accent-text: #ff8c1a;
   --color-accent-muted: #59290a;
   --color-accent-subtle: #331707;
   --color-on-accent: #1a0c02;
@@ -420,6 +425,7 @@
   --color-success: #7bc45f;
   --color-warning: #f0bb3c;
   --color-danger: #ef6a3c;
+  --color-danger-text: #ef6a3c;
   --color-info: #e0a878;
   --color-success-muted: #1f2c16;
   --color-warning-muted: #33280f;
@@ -458,6 +464,7 @@
   --color-accent: #ffb020;
   --color-accent-hover: #ffc24d;
   --color-accent-active: #e09400;
+  --color-accent-text: #ffb020;
   --color-accent-muted: #4a3200;
   --color-accent-subtle: #241900;
   --color-on-accent: #000000;
@@ -465,6 +472,7 @@
   --color-success: #6ee79a;
   --color-warning: #ffd166;
   --color-danger: #ff8f85;
+  --color-danger-text: #ff8f85;
   --color-info: #8fd0ff;
   --color-success-muted: #0a2416;
   --color-warning-muted: #2a2200;
@@ -538,7 +546,7 @@ p {
 p:last-child { margin-bottom: 0; }
 
 a {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   text-decoration: none;
   transition: color var(--duration-fast) var(--ease-out);
 }
@@ -580,6 +588,10 @@ select:disabled,
 textarea:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 hr {
@@ -760,6 +772,10 @@ th {
   padding: var(--space-9) var(--gutter) var(--space-11);
 }
 
+.view-root > .page {
+  width: 100%;
+}
+
 .page--narrow { max-width: 760px; }
 .page--reading { max-width: var(--reading-max); }
 .page--flush { padding: 0; }
@@ -898,7 +914,7 @@ th {
 
 .btn--quiet-danger {
   background: transparent;
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .btn--quiet-danger:hover {
@@ -939,7 +955,7 @@ th {
 .btn[aria-pressed="true"] {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* --------------------------------------------------------------------------
@@ -1022,7 +1038,7 @@ th {
 
 .field__error {
   font-size: var(--text-sm);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 /* Checkbox and radio, drawn rather than themed, so they match the palette. */
@@ -1083,6 +1099,7 @@ th {
   flex: 0 0 auto;
   width: 40px;
   height: var(--target-min);
+  min-height: var(--target-min);
   appearance: none;
   background: var(--color-surface-active);
   border: 1px solid var(--color-border-strong);
@@ -1180,6 +1197,13 @@ th {
   opacity: 0.45;
 }
 
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  cursor: pointer;
+}
+
 /* --------------------------------------------------------------------------
    Surfaces
    -------------------------------------------------------------------------- */
@@ -1252,7 +1276,7 @@ th {
 
 .badge--accent {
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .badge--success {
@@ -1267,7 +1291,7 @@ th {
 
 .badge--danger {
   background: var(--color-danger-muted);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .badge--info {
@@ -1297,7 +1321,7 @@ th {
 .pill.is-active {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* --------------------------------------------------------------------------
@@ -1471,7 +1495,7 @@ th {
 }
 
 .menu__item--danger {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .menu__item--danger:hover {
@@ -1828,15 +1852,24 @@ th {
    ========================================================================== */
 
 .trycord-app {
+  min-height: 100vh;
   min-height: 100dvh;
 }
 
 .shell {
   display: grid;
   grid-template-columns: var(--rail-width) var(--sidebar-width) minmax(0, 1fr);
+  grid-template-rows: 100vh;
   grid-template-rows: 100dvh;
   background: var(--color-background);
   overflow: hidden;
+  min-height: 0;
+}
+
+.app-rail,
+.context-sidebar,
+.main-content {
+  min-height: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -1886,6 +1919,14 @@ th {
   box-shadow: var(--glow-accent);
 }
 
+.rail-mark .community-mark {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  font-size: var(--text-md);
+}
+
 .rail-global-nav,
 .app-rail__items {
   display: flex;
@@ -1926,7 +1967,7 @@ th {
 .rail-link.is-active,
 .rail-link[aria-current="page"] {
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 /* The one place an accent bar is used as a position indicator: on the rail, a
@@ -2010,13 +2051,10 @@ th {
 
 .rail-community--add:hover {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   background: var(--color-accent-subtle);
 }
 
-/* --------------------------------------------------------------------------
-   Context navigation
-   -------------------------------------------------------------------------- */
 
 .context-sidebar {
   grid-column: 2;
@@ -2027,52 +2065,6 @@ th {
   border-right: 1px solid var(--color-border-subtle);
 }
 
-.context-sidebar__head {
-  flex: 0 0 auto;
-  height: var(--header-height);
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: 0 var(--space-6);
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.context-sidebar__name {
-  font-size: var(--text-base);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-
-.context-sidebar__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-5) var(--space-4) var(--space-7);
-}
-
-.context-sidebar__foot {
-  flex: 0 0 auto;
-  padding: var(--space-4);
-  border-top: 1px solid var(--color-border-subtle);
-}
-
-.context-sidebar__user {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  width: 100%;
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-out);
-}
-
-.context-sidebar__user:hover {
-  background: var(--color-surface-hover);
-}
-
-/* Channel groups. Nested type is real hierarchy, so it is indented and quieter
-   rather than given a different colour that would read as a category. */
 .nav-group {
   margin-bottom: var(--space-6);
 }
@@ -2094,66 +2086,6 @@ th {
   color: var(--color-text-secondary);
 }
 
-.nav-group__chevron {
-  width: 11px;
-  height: 11px;
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-
-.nav-group.is-collapsed .nav-group__chevron {
-  transform: rotate(-90deg);
-}
-
-.nav-group.is-collapsed .nav-group__items {
-  display: none;
-}
-
-.nav-group__items {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-top: var(--space-2);
-}
-
-
-
-.nav-item.is-active,
-
-.nav-item__icon {
-  flex: 0 0 auto;
-  width: 17px;
-  height: 17px;
-  opacity: 0.85;
-}
-
-.nav-item__label {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nav-item__badge {
-  flex: 0 0 auto;
-  min-width: 18px;
-  height: 17px;
-  padding: 0 5px;
-  display: grid;
-  place-items: center;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  border-radius: var(--radius-pill);
-  font-size: 10px;
-  font-weight: var(--weight-bold);
-  line-height: 1;
-}
-
-
-.nav-item--muted {
-  opacity: 0.55;
-}
-
 /* --------------------------------------------------------------------------
    Workspace
    -------------------------------------------------------------------------- */
@@ -2167,11 +2099,6 @@ th {
   background: var(--color-background);
 }
 
-/* A surface that carries its own navigation inside the content pane - settings, admin,
-   a profile, the legal documents, the sign-up form - does not get the shell's context
-   column, and the track has to go with it. Without this the 244px stayed reserved and
-   rendered as an empty panel beside a page that had nothing to put in it, which is
-   244px of nothing on every one of those surfaces. */
 .shell.no-community-nav {
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
 }
@@ -2185,55 +2112,26 @@ th {
 }
 
 .context-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
   flex: 0 0 auto;
   height: var(--header-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-6);
-  padding: 0 var(--space-7);
+  padding-left: max(var(--space-7), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--space-7), env(safe-area-inset-right, 0px));
   background: var(--color-background);
   border-bottom: 1px solid var(--color-border-subtle);
-  z-index: var(--z-sticky);
-}
-
-.context-header__title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-.context-header__name {
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-
-.context-header__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.context-header__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex: 0 0 auto;
 }
 
 .chat-environment {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 0;
-}
-
-.chat-environment--with-members {
-  grid-template-columns: minmax(0, 1fr) var(--members-width);
 }
 
 .view-root {
@@ -2244,47 +2142,29 @@ th {
   overflow: hidden;
 }
 
-/* A page that is not a message list scrolls itself; a message list does not,
-   because its composer has to stay put. */
-.view-root--scroll {
+.shell[data-layout='settings'] .view-root,
+.shell[data-layout='admin'] .view-root,
+.shell[data-layout='profile'] .view-root,
+.shell[data-layout='plain'] .view-root {
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-/* --------------------------------------------------------------------------
-   Member and context panel
-   -------------------------------------------------------------------------- */
 
 .member-sidebar {
   grid-column: 2;
   display: none;
   flex-direction: column;
   min-height: 0;
+  width: var(--members-width);
   background: var(--color-surface);
   border-left: 1px solid var(--color-border-subtle);
 }
 
-/* Scoped away from the hidden state on purpose. The shell hides this region with the
-   `hidden` attribute, and an author `display: flex` would beat the UA's `display: none`
-   for it - which is how a closed panel stayed on screen. */
-.chat-environment--with-members .member-sidebar:not([hidden]) {
-  display: flex;
-}
-
-.member-sidebar__head {
-  flex: 0 0 auto;
-  height: var(--header-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--space-6);
-  border-bottom: 1px solid var(--color-border-subtle);
-}
-
-.member-sidebar__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-6) var(--space-4);
+@media (min-width: 1000px) {
+  #shell[data-members="yes"] .member-sidebar:not([hidden]) {
+    display: flex;
+  }
 }
 
 .member-group + .member-group {
@@ -2300,43 +2180,6 @@ th {
   color: var(--color-text-muted);
 }
 
-.member-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
-  width: 100%;
-  padding: var(--space-3) var(--space-5);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  text-align: left;
-  transition: background var(--duration-fast) var(--ease-out);
-}
-
-.member-row:hover {
-  background: var(--color-surface-hover);
-}
-
-.member-row__name {
-  font-size: var(--text-base);
-  color: var(--color-text-secondary);
-}
-
-.member-row:hover .member-row__name {
-  color: var(--color-text-primary);
-}
-
-.member-row__tag {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-}
-
-.member-row--offline {
-  opacity: 0.45;
-}
-
-/* --------------------------------------------------------------------------
-   Mobile navigation
-   -------------------------------------------------------------------------- */
 
 .mobile-tab-navigation {
   display: none;
@@ -2345,9 +2188,15 @@ th {
 .nav-backdrop {
   position: fixed;
   inset: 0;
-  z-index: var(--z-drawer);
+  z-index: calc(var(--z-drawer) - 1);
   background: var(--overlay-scrim-soft);
+  touch-action: none;
   animation: fade-in var(--duration-fast) var(--ease-out);
+}
+
+html.is-nav-open,
+html.is-nav-open body {
+  overflow: hidden;
 }
 
 /* --------------------------------------------------------------------------
@@ -2363,8 +2212,8 @@ th {
     grid-template-columns: var(--rail-width) 268px minmax(0, 1fr);
   }
 
-  .chat-environment--with-members {
-    grid-template-columns: minmax(0, 1fr) 280px;
+  .member-sidebar {
+    width: 280px;
   }
 }
 
@@ -2373,8 +2222,8 @@ th {
     grid-template-columns: var(--rail-width) 288px minmax(0, 1fr);
   }
 
-  .chat-environment--with-members {
-    grid-template-columns: minmax(0, 1fr) 320px;
+  .member-sidebar {
+    width: 320px;
   }
 
   :root {
@@ -2387,8 +2236,8 @@ th {
     grid-template-columns: var(--rail-width) 320px minmax(0, 1fr);
   }
 
-  .chat-environment--with-members {
-    grid-template-columns: minmax(0, 1fr) 360px;
+  .member-sidebar {
+    width: 360px;
   }
 
   :root {
@@ -2397,19 +2246,7 @@ th {
     --reading-max: 74ch;
   }
 }
-/* --------------------------------------------------------------------------
-   Routes that are documents rather than places.
 
-   Sign-in, registration, password reset, email verification, the legal
-   documents and /support are read, not navigated. They have no rail, no
-   context navigation and no header, and a sign-in form inside the
-   application chrome is a form inside somebody else's navigation.
-
-   This is one place, and it is data-driven off the document's own route
-   attribute rather than written per page, so a route added here cannot
-   forget to hide the chrome. check-client-headings reads these same selectors
-   to know which surfaces own their own h1 - if the two disagree, it fails.
-   -------------------------------------------------------------------------- */
 
 html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
         [data-route^='/reset-password'], [data-route^='/verify-email'],
@@ -2533,7 +2370,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 
 .msg__author--admin,
 .msg__author--owner {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .msg__time {
@@ -2556,14 +2393,14 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 }
 
 .msg__text a {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .msg__mention {
   padding: 0 2px;
   border-radius: var(--radius-sm);
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: var(--weight-medium);
 }
 
@@ -2651,7 +2488,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 .reaction.is-mine {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .reaction__count {
@@ -2733,7 +2570,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 .msg__failed-note {
   margin-top: var(--space-3);
   font-size: var(--text-sm);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 /* System messages: joins, pins, boosts. Present, legible, and clearly not a
@@ -3267,6 +3104,109 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 
 .announce-banner__text { flex: 1 1 auto; min-width: 0; }
 
+
+html[data-auth-page='1'] .auth-page {
+  overflow-x: hidden;
+  padding-bottom: max(var(--space-9), env(safe-area-inset-bottom, 0px));
+}
+
+
+html[data-auth-page='1'] .auth-page .btn {
+  text-decoration: none;
+}
+
+html[data-auth-page='1'] .auth-page .btn.primary {
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: var(--weight-semibold);
+}
+
+html[data-auth-page='1'] .auth-page .btn.primary:hover {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+}
+
+html[data-auth-page='1'] .auth-page .btn.primary:active {
+  background: var(--color-accent-muted);
+}
+
+html[data-auth-page='1'] .auth-page .btn.block {
+  display: flex;
+  width: 100%;
+}
+
+html[data-auth-page='1'] .auth-page .btn.ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+html[data-auth-page='1'] .auth-page .btn.ghost:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+
+html[data-auth-page='1'] .auth-page .field > label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+}
+
+html[data-auth-page='1'] .auth-page .form-error,
+html[data-auth-page='1'] .auth-page .form-success {
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+html[data-auth-page='1'] .auth-page .form-error {
+  background: var(--color-danger-muted);
+  border-color: var(--color-danger);
+  color: var(--color-danger-text);
+}
+
+html[data-auth-page='1'] .auth-page .form-success {
+  background: var(--color-success-muted);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+
+html[data-auth-page='1'] .auth-page .auth-secondary .row-line {
+  flex-wrap: wrap;
+}
+
+html[data-auth-page='1'] .auth-page .auth-secondary__title {
+  font-size: var(--text-md);
+}
+
+
+html[data-auth-page='1'] .auth-page .pw-toggle:focus-visible,
+html[data-auth-page='1'] .auth-page a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+
+@media (max-width: 560px) {
+  html[data-auth-page='1'] .auth-page {
+    padding-top: var(--space-7);
+    padding-bottom: max(var(--space-7), env(safe-area-inset-bottom, 0px));
+  }
+
+  html[data-auth-page='1'] .auth-page .auth-brand {
+    margin-bottom: var(--space-6);
+  }
+
+  html[data-auth-page='1'] .auth-page .auth-secondary .row-line {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* ---- cfg ------------------------------------------------------- */
 /* Instance configuration. One row per setting, because a row carries a
    description, a control, a source and a side effect at once - a grid of cards
@@ -3298,7 +3238,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 
 .cfg-nav__item.active {
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   background: var(--color-accent-subtle);
 }
 
@@ -4163,11 +4103,47 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   color: var(--color-warning);
 }
 
-.msg-actions,
-.msg-hoverbar {
+.msg-actions {
   display: flex;
   align-items: center;
   gap: 1px;
+}
+
+.msg-hoverbar {
+  position: absolute;
+  top: -14px;
+  right: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.msg:hover .msg-hoverbar,
+.msg:focus-within .msg-hoverbar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.msg-hoverbar button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+}
+
+.msg-hoverbar button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
 }
 
 .msg-inline-actions {
@@ -4190,6 +4166,10 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   gap: var(--space-3);
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+.msg-inline-actions__item.is-danger {
+  color: var(--color-danger-text);
 }
 
 .msg-inline-actions__sep {
@@ -4361,6 +4341,47 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   color: var(--color-text-muted);
 }
 
+.composer-dock > .composer {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.composer-dock > .composer > .file-btn,
+.composer-dock > .composer > .composer-actions > .emoji-btn,
+.composer-dock > .composer > .composer-actions > .preview-toggle,
+.composer-dock > .composer > .composer-actions > .btn {
+  flex: 0 0 auto;
+  min-width: var(--composer-min);
+  min-height: var(--composer-min);
+}
+
+.composer-dock > .composer > textarea {
+  flex: 1 1 8rem;
+  min-width: 0;
+  min-height: var(--composer-min);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  resize: none;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.composer-dock > .composer > textarea:focus {
+  border-color: var(--color-border-strong);
+}
+
+.composer-dock > .composer > .composer-actions {
+  margin-left: auto;
+}
+
 .emoji-btn {
   display: grid;
   place-items: center;
@@ -4399,6 +4420,16 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   font-size: var(--text-sm);
 }
 
+.attach-row--error {
+  border-color: var(--color-danger);
+  background: var(--color-danger-muted);
+}
+
+.attach-row--error .attach-name,
+.attach-row--error .attach-state {
+  color: var(--color-danger-text);
+}
+
 .attach-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -4423,7 +4454,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 }
 
 .attach-remove:hover {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .attach-bar {
@@ -4586,12 +4617,24 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   cursor: pointer;
 }
 
+.react-pill.mine {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-muted);
+  color: var(--color-accent-text);
+}
+
 /* --------------------------------------------------------------------------
    Home
    -------------------------------------------------------------------------- */
 
-.home-layout,
 .home-environment {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.home-layout {
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -4617,8 +4660,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 /* Past this width the aside earns its space. Below it, everything the aside
    holds moves inline rather than disappearing. */
 @media (min-width: 1280px) {
-  .home-layout,
-  .home-environment {
+  .home-layout {
     grid-template-columns: minmax(0, 1fr) 300px;
   }
 
@@ -4628,8 +4670,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 }
 
 @media (min-width: 1700px) {
-  .home-layout,
-  .home-environment {
+  .home-layout {
     grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
@@ -4670,6 +4711,8 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 .home-section__hint {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .home-conversations,
@@ -4876,9 +4919,14 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--space-6);
   padding: var(--space-6);
   border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.card--list--row .grow {
+  flex-basis: 220px;
 }
 
 .card--list--row:last-child {
@@ -4896,8 +4944,11 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 .card--list__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: var(--space-4);
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  margin-left: auto;
 }
 
 .card--auth {
@@ -4908,8 +4959,6 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   box-shadow: var(--shadow-lg);
 }
 
-.card--profile,
-.profile-primary,
 .profile-context,
 .settings-context {
   display: flex;
@@ -4919,6 +4968,19 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
+}
+
+.card--profile,
+.prof-preview {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.settings-context {
+  padding: var(--space-6);
 }
 
 .card-actions,
@@ -5108,7 +5170,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   border: 1px solid var(--color-danger-muted);
   background: var(--color-danger-muted);
   border-radius: var(--radius-lg);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .state-block__actions {
@@ -5136,7 +5198,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 
 .prose a,
 .pub-prose a {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .eyebrow + h1,
@@ -5160,7 +5222,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 .set-note--warn,
 .bad,
 .danger {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .form-error {
@@ -5201,7 +5263,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 .flash {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .is-loading {
@@ -5221,7 +5283,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 
 .is-on,
 .active {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .is-dnd,
@@ -5317,7 +5379,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
 
 .status-chip--bad {
   background: var(--color-danger-muted);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .presence-dot {
@@ -5511,6 +5573,7 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
   flex-direction: column;
   gap: 1px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .context-header__icon {
@@ -5544,10 +5607,10 @@ html:is([data-route='/login'], [data-route='/register'], [data-route='/forgot'],
    bare <button> around a glyph and take the glyph's box - 18x18 and 13x13 have both
    been measured. Setting it centrally means a control added later is not accidentally
    unhittable, which is the failure the layout check keeps finding. */
-button:not(.btn):not(.btn--icon):not([aria-disabled="true"]):not([hidden]):not([disabled]),
-input:not([type="checkbox"]):not([type="radio"]):not([hidden]):not([disabled]),
-select:not([hidden]),
-textarea:not([hidden]) {
+button:where(:not(.btn):not(.btn--icon):not([aria-disabled="true"]):not([hidden]):not([disabled])),
+input:where(:not([type="checkbox"]):not([type="radio"]):not([hidden]):not([disabled])),
+select:where(:not([hidden])),
+textarea:where(:not([hidden])) {
   min-height: var(--target-min);
   min-width: var(--target-min);
 }
@@ -5613,6 +5676,26 @@ textarea:not([hidden]) {
     align-items: start;
     gap: var(--space-10);
   }
+
+  .settings-layout[data-has-context='yes'] .settings-context {
+    grid-column: 2;
+  }
+}
+
+@media (min-width: 1280px) {
+  .settings-layout[data-has-context='yes'] {
+    grid-template-columns: 212px minmax(0, 1fr) 260px;
+    max-width: 1340px;
+  }
+
+  .settings-layout[data-has-context='yes'] .settings-context {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+.settings-layout:not([data-has-context='yes']) .settings-context {
+  display: none;
 }
 
 .settings-nav {
@@ -5773,6 +5856,11 @@ textarea:not([hidden]) {
   min-width: 210px;
 }
 
+.set-row.is-danger .set-row__label,
+.set-row.is-danger .set-row__hint {
+  color: var(--color-danger-text);
+}
+
 /* Danger needs to be findable but never the first thing a stray click hits. */
 .set-danger {
   border-color: var(--color-danger-muted);
@@ -5787,7 +5875,7 @@ textarea:not([hidden]) {
 .set-danger__title {
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .set-danger__blurb {
@@ -5901,7 +5989,7 @@ textarea:not([hidden]) {
 }
 
 .admin-row-state--active { color: var(--color-success); }
-.admin-row-state--danger { color: var(--color-danger); }
+.admin-row-state--danger { color: var(--color-danger-text); }
 .admin-row-state--warn { color: var(--color-warning); }
 
 .admin-avatar {
@@ -6021,7 +6109,7 @@ textarea:not([hidden]) {
 
 .role-badge--owner {
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .role-color-dot {
@@ -6174,7 +6262,7 @@ textarea:not([hidden]) {
 .perm-override-opt[aria-pressed="true"] {
   background: var(--color-accent-subtle);
   border-color: var(--color-accent-muted);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .perm-group__head + .permission-grid {
@@ -6376,19 +6464,11 @@ textarea:not([hidden]) {
   margin-top: var(--space-3);
 }
 
-.no-community-nav {
-  padding: var(--space-9) var(--space-6);
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
 /* --------------------------------------------------------------------------
    Profiles
    -------------------------------------------------------------------------- */
 
-.profile-layout,
-.prof-preview {
+.profile-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-7);
@@ -6404,23 +6484,45 @@ textarea:not([hidden]) {
   }
 }
 
+.profile-layout:not([data-has-context='yes']) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.profile-layout:not([data-has-context='yes']) .profile-context {
+  display: none;
+}
+
+.profile-layout:not([data-has-context='yes']) .profile-primary {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.profile-primary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
 .prof-preview-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  padding: var(--space-6);
 }
 
 .prof-banner {
   height: 128px;
   background: var(--color-surface-elevated);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   overflow: hidden;
 }
 
 .prof-avatar {
   width: 76px;
   height: 76px;
-  margin: -38px 0 var(--space-5);
+  margin: -38px 0 var(--space-5) var(--space-6);
   border: 3px solid var(--color-surface);
   border-radius: var(--radius-circle);
   overflow: hidden;
@@ -6452,6 +6554,11 @@ textarea:not([hidden]) {
   gap: var(--space-4);
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
+  padding: 0 var(--space-6) var(--space-6);
+}
+
+.card--profile > .row-line {
+  padding: 0 var(--space-6) var(--space-6);
 }
 
 .profile-editor {
@@ -6589,7 +6696,7 @@ textarea:not([hidden]) {
   background: var(--color-danger-muted);
   border: 1px solid var(--color-danger);
   border-radius: var(--radius-md);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
@@ -6710,7 +6817,7 @@ textarea:not([hidden]) {
 }
 
 .announce-banner__link {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: var(--weight-medium);
 }
 
@@ -6747,7 +6854,7 @@ textarea:not([hidden]) {
 
 mark {
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   border-radius: 2px;
   padding: 0 1px;
 }
@@ -6775,10 +6882,9 @@ mark {
   color: var(--color-text-primary);
 }
 
-.tab-button[aria-selected="true"],
-.tab-button.is-active {
+.tab-button[aria-current="page"] {
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .tab-button__glyph {
@@ -7116,7 +7222,6 @@ mark {
   color: var(--color-success);
 }
 
-.no-community-nav + .auth-page__inner,
 .auth-secondary__body + * {
   margin-top: var(--space-6);
 }
@@ -7156,7 +7261,7 @@ mark {
 
 .role-row--owner {
   background: var(--color-accent-subtle);
-  color: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
 .role-row--owner:hover {
@@ -7271,11 +7376,11 @@ mark {
 }
 
 .role-unassign:hover {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .owner {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   font-weight: var(--weight-semibold);
 }
 
@@ -7348,6 +7453,11 @@ mark {
   margin: 0 var(--space-5);
 }
 
+.settings-context .ctx-card,
+.settings-context .ctx-card__body {
+  margin-inline: 0;
+}
+
 .ctx-card__body {
   padding: var(--space-5);
   background: var(--color-surface-elevated);
@@ -7402,37 +7512,12 @@ mark {
   margin-left: auto;
 }
 
-/* --------------------------------------------------------------------------
-   Mobile tab switcher
-
-   Below the tablet breakpoint the tab bar is a strip; the toggle reveals the
-   places a rail would have carried. Same destinations as the rail, a different
-   presentation - which is the whole point of a mobile composition.
-   -------------------------------------------------------------------------- */
 
 .mobile-tab-navigation__strip {
-  display: contents;
-}
-
-.mobile-tab-navigation__toggle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  width: 100%;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   height: 100%;
-  padding: 0 var(--space-6);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-}
-
-.mobile-tab-navigation__toggle-icon {
-  width: 16px;
-  height: 16px;
 }
 
 /* --------------------------------------------------------------------------
@@ -7467,7 +7552,7 @@ mark {
 }
 
 .settings-panel--danger .settings-panel__title {
-  color: var(--color-danger);
+  color: var(--color-danger-text);
 }
 
 .settings-panel__blurb {
@@ -7571,7 +7656,7 @@ mark {
   width: 100%;
   padding: var(--space-4) var(--space-5);
   border-radius: var(--radius-md);
-  color: var(--color-danger);
+  color: var(--color-danger-text);
   font-size: var(--text-base);
   text-align: left;
   cursor: pointer;
@@ -7723,10 +7808,6 @@ mark {
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   Wide desktop: the member panel can afford to be a column again.
-   -------------------------------------------------------------------------- */
-
-/* --------------------------------------------------------------------------
    Small desktop and tablet: the context navigation becomes a drawer.
 
    Below 1100px three columns stop being three readable columns, so the shell
@@ -7747,6 +7828,9 @@ mark {
     bottom: 0;
     width: min(288px, 84vw);
     z-index: var(--z-drawer);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
     transform: translateX(-100%);
     transition: transform var(--duration-normal) var(--ease-out);
     box-shadow: var(--shadow-pop);
@@ -7756,79 +7840,71 @@ mark {
     transform: none;
   }
 
+  .nav-backdrop:not([hidden]) {
+    display: block;
+  }
+
   .main-content {
     grid-column: 2;
   }
+}
 
-  /* The member panel becomes a sheet on the right rather than a third column. */
-  .member-sidebar {
+@media (max-width: 999px) {
+  .member-toggle {
     display: none;
-  }
-
-  .chat-environment--with-members {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* The member panel becomes a sheet on the right. display:flex is what makes it a
-     panel at all, so it is scoped away from the hidden state rather than left to be
-     overridden - `hidden` cannot win against a display rule, which is how a closed panel
-     stayed on screen as an empty black box. */
-  .chat-environment--with-members .member-sidebar:not([hidden]) {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: min(300px, 86vw);
-    z-index: var(--z-drawer);
-    display: flex;
-    box-shadow: var(--shadow-pop);
-    transform: translateX(100%);
-    transition: transform var(--duration-normal) var(--ease-out);
-  }
-
-  .chat-environment--with-members .member-sidebar.is-open:not([hidden]) {
-    transform: none;
   }
 }
 
-/* --------------------------------------------------------------------------
-   Tablet: the rail goes, the context navigation becomes a sheet.
-   -------------------------------------------------------------------------- */
 
 @media (max-width: 820px) {
-  /* The bar occupies space rather than covering it. A grid that is 100dvh tall with a
-     fixed bar over its bottom 56px puts the composer, the last setting and the bottom of
-     every list behind the bar - which is what "under .mobile-tab-navigation" means in the
-     layout check, and it is a real defect: those controls cannot be hit. */
-  .shell {
+  .shell,
+  .shell.no-community-nav {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: calc(100vh - var(--tabbar-height));
     grid-template-rows: calc(100dvh - var(--tabbar-height) - env(safe-area-inset-bottom, 0px));
   }
 
-  /* The rail is gone on a phone. Its destinations live in the tab bar, which is the
-     same list from the same registry - one navigation model, two presentations. */
   .app-rail {
     display: none;
   }
 
-  .main-content {
+  .main-content,
+  .shell.no-community-nav .main-content {
     grid-column: 1;
   }
 
   .context-header {
-    /* The header sits above the tab bar and below the status bar, so nothing
-       important is ever under a phone's home indicator. */
     height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: max(var(--space-5), env(safe-area-inset-left, 0px));
     padding-right: max(var(--space-5), env(safe-area-inset-right, 0px));
   }
 
-  /* The drawer's scrim. display:block on its own would beat the element's `hidden`
-     attribute, which is what left a black box over the whole phone that nothing could
-     dismiss - the rail was not even open. */
-  .nav-backdrop:not([hidden]) {
-    display: block;
+  .nav-toggle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .context-actions {
+    flex: 0 0 auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .context-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .context-header .btn {
+    min-height: 40px;
+  }
+
+  .context-header .btn.icon {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
   }
 
   /* Bottom tab bar. Deliberately a bar and not a bottom rail: it holds text
@@ -7839,89 +7915,42 @@ mark {
     right: 0;
     bottom: 0;
     z-index: var(--z-sticky);
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
+    display: block;
     height: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     background: var(--color-surface);
     border-top: 1px solid var(--color-border);
   }
 
-  .mobile-tab {
-    display: flex;
+  .mobile-tab-navigation__strip .tab-button {
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    gap: 3px;
-    color: var(--color-text-muted);
-    font-size: 10px;
-    font-weight: var(--weight-medium);
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
+    gap: 2px;
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
+    border-radius: 0;
+    font-size: var(--text-xs);
+    line-height: 1.1;
   }
 
-  .mobile-tab__icon {
-    width: 21px;
-    height: 21px;
+  .mobile-tab-navigation__strip .tab-button__glyph {
+    position: relative;
+    width: 22px;
+    height: 22px;
   }
 
-  .mobile-tab.is-active,
-  .mobile-tab[aria-current="page"] {
-    color: var(--color-accent);
+  .mobile-tab-navigation__strip .tab-button__label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .mobile-tab__badge {
+  .mobile-tab-navigation__strip .tab-button__count {
     position: absolute;
-    transform: translate(14px, -6px);
-    min-width: 15px;
-    height: 15px;
-    padding: 0 4px;
-    display: grid;
-    place-items: center;
-    background: var(--color-accent);
-    color: var(--color-on-accent);
-    border-radius: var(--radius-pill);
-    font-size: 9px;
-    font-weight: var(--weight-bold);
-  }
-
-  /* Settings and community navigation move into the sheet rather than
-     stacking above the content, so a phone shows one thing at a time. */
-  .settings {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-7);
-  }
-
-  .settings__nav {
-    position: static;
-    flex-direction: row;
-    overflow-x: auto;
-    gap: var(--space-4);
-    padding-bottom: var(--space-4);
-    scrollbar-width: none;
-  }
-
-  .settings__nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .settings__nav-title {
-    display: none;
-  }
-
-  .settings__nav .nav-item {
-    flex: 0 0 auto;
-    padding: var(--space-4) var(--space-6);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
-    background: var(--color-surface);
-  }
-
-  .settings__nav .nav-item.is-active {
-    background: var(--color-accent-subtle);
-    border-color: var(--color-accent-muted);
-    color: var(--color-accent);
+    top: -4px;
+    right: -8px;
   }
 
   .community-hero {
@@ -7930,16 +7959,7 @@ mark {
     padding: var(--space-7) var(--space-6);
   }
 
-  .community-hero__actions {
-    margin-left: 0;
-    width: 100%;
-  }
-
-
-  .home__head,
-  .community-body,
-  .search-results,
-  .settings {
+  .search-results {
     padding-left: var(--space-6);
     padding-right: var(--space-6);
   }
@@ -7962,14 +7982,11 @@ mark {
     padding: 0 var(--space-7);
   }
 
-  .btn--icon,
-  .composer__tool {
-    width: 40px;
-    height: 40px;
-  }
-
-  .btn--sm {
-    min-height: 32px;
+  .file-btn,
+  .emoji-btn,
+  .preview-toggle {
+    min-width: 40px;
+    min-height: 40px;
   }
 
   .input,
@@ -7980,48 +7997,36 @@ mark {
     /* Below 16px iOS zooms the page when a field takes focus. */
   }
 
-  .nav-item,
-  .list__item,
-  .dm-row,
-  .member-row {
+  .context-header {
+    gap: var(--space-2);
+    padding-left: max(var(--space-3), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--space-3), env(safe-area-inset-right, 0px));
+  }
+
+  .context-actions {
+    gap: var(--space-2);
+  }
+
+  .row,
+  .row--nav,
+  .row--dm,
+  .row--member,
+  .member-row-wrap,
+  .ctx-channel,
+  .tab-button {
     min-height: 44px;
   }
 
-  /* Hover actions do not exist on a phone, so they are always on. */
-  .msg__actions {
-    position: static;
-    opacity: 1;
-    pointer-events: auto;
-    box-shadow: none;
-    background: transparent;
-    border: 0;
-    padding: var(--space-3) 0 0;
-    justify-content: flex-end;
-  }
-
-  .msg__actions button {
-    width: 38px;
-    height: 38px;
-  }
-
-  .msg__timestamp-hover {
-    opacity: 1;
-  }
-
-  .msg-group:hover > .msg:not(.msg-group--start)::before {
-    opacity: 1;
+  .msg-actions button,
+  .msg-hoverbar button {
+    min-width: 40px;
+    min-height: 40px;
   }
 
   /* The composer respects the home indicator and the keyboard. */
   .composer {
     padding-bottom: max(var(--space-5), env(safe-area-inset-bottom, 0px));
     background: var(--color-background);
-  }
-
-  .message-list__inner,
-  .composer__inner {
-    padding-left: var(--space-4);
-    padding-right: var(--space-4);
   }
 
   .msg {
@@ -8031,11 +8036,6 @@ mark {
     padding-right: var(--space-3);
   }
 
-  .msg:not(.msg-group--start)::before {
-    left: calc(var(--space-3) + 17px - 9px);
-  }
-
-
   .modal {
     max-width: none;
     max-height: 92dvh;
@@ -8044,13 +8044,11 @@ mark {
     animation: sheet-in var(--duration-normal) var(--ease-out);
   }
 
-  .modal__foot {
-    border-radius: 0;
-    /* Room for a home indicator under the buttons. */
+  .modal > .row-line {
     padding-bottom: max(var(--space-6), env(safe-area-inset-bottom, 0px));
   }
 
-  .modal__foot .btn {
+  .modal .row-line .btn {
     flex: 1 1 auto;
   }
 
@@ -8077,31 +8075,12 @@ mark {
     justify-content: center;
   }
 
-
-
-  .setting-row__control .input,
-  .setting-row__control .select {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .community-hero__icon {
-    width: 52px;
-    height: 52px;
-  }
-
   .community-hero__name {
     font-size: var(--text-xl);
   }
 
   .stat-grid {
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  }
-
-  .admin-table__row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-4);
   }
 
   .auth-card {
@@ -8118,17 +8097,9 @@ mark {
   }
 
   .page,
-  .home__scroll,
-  .community-body,
-  .search-results,
-  .settings {
+  .search-results {
     padding-left: var(--space-5);
     padding-right: var(--space-5);
-  }
-
-  .tab {
-    padding: var(--space-4);
-    font-size: var(--text-sm);
   }
 
   .stat-grid {
@@ -8140,9 +8111,8 @@ mark {
    the message list get it and the header shrinks. */
 @media (max-height: 480px) and (orientation: landscape) {
   .context-header {
-    height: 40px;
+    height: calc(40px + env(safe-area-inset-top, 0px));
   }
-
 
   .composer {
     padding-bottom: var(--space-3);
@@ -8169,8 +8139,6 @@ mark {
     padding-bottom: var(--space-9);
   }
 
-  .community-body,
-  .settings,
   .search-results {
     padding-top: var(--space-7);
     padding-bottom: var(--space-9);

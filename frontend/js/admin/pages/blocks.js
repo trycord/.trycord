@@ -17,7 +17,7 @@ export const BLOCK_TYPES = [
 ];
 
 export function statusChipFor(page) {
-  if (page.status === 'PUBLISHED') return ['Published', 'resolved'];
+  if (page.status === 'PUBLISHED') return ['Published', 'resolved status-chip--ok'];
   if (page.status === 'DRAFT') return ['Draft', 'open'];
   return ['Not edited', 'dismissed'];
 }
@@ -343,7 +343,7 @@ export function pageEditor(container, route) {
     if (!list.length) box.appendChild(emptyState('', 'No revisions yet.', 'Save a draft to start the history.'));
     for (const rev of list) {
       const row = el('div', { class: 'card card--list--row' });
-      row.appendChild(el('span', { class: 'status-chip ' + (rev.state === 'PUBLISHED' ? 'resolved' : 'open') }, '#' + rev.revision));
+      row.appendChild(el('span', { class: 'status-chip ' + (rev.state === 'PUBLISHED' ? 'resolved status-chip--ok' : 'open') }, '#' + rev.revision));
       const info = el('div', { class: 'grow' });
       info.appendChild(el('div', { class: 'muted small' },
         rev.state.toLowerCase() + ' · ' + new Date(rev.created_at).toLocaleString()));

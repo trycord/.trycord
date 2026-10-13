@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Trycord">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <title>Public communities: browse and join</title>
+  <meta name="description" content="Browse the public communities listed on this Trycord instance. Search by name, sort by members, newest or name, preview a community's channels, and open it in the app to join.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/design-tokens.css">
+  <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="wrap masthead">
+      <a class="brand" href="/">
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+          <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+          <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+          <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+        </svg>
+        <span class="brand-word">Trycord</span>
+      </a>
+
+      <button class="menu-toggle" type="button" data-menu-toggle aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
+        <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></svg>
+      </button>
+
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Product
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
+              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
+              <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
+              <a href="/changelog"><strong>Changelog</strong><span>What's new in Trycord.</span></a>
+              <a href="/roadmap"><strong>Roadmap</strong><span>What's done and what's coming.</span></a>
+              <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
+            </div>
+            <div class="nav-menu-foot">
+              <p>Private, self-hostable community messaging.</p>
+              <a class="text-link" href="/demo">Try the live demo</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Explore
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
+            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Community
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/support"><strong>Support</strong><span>Get help and reach the project.</span></a>
+              <a href="https://discord.gg/dSF7eqsJuP" rel="noopener"><strong>Discord</strong><span>Join the community chat.</span></a>
+              <a href="/security"><strong>Security</strong><span>How to report a vulnerability.</span></a>
+              <a href="/trust-and-safety"><strong>Trust and safety</strong><span>Rules, reporting, and appeals.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            About
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/about"><strong>About Trycord</strong><span>Why Trycord exists and how it's built.</span></a>
+            <a href="/changelog"><strong>Changelog</strong><span>What's shipped recently.</span></a>
+            <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
+          </div>
+        </div>
+      </nav>
+
+      <div class="masthead-actions">
+        <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+          <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+          <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+        </button>
+        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <p class="kicker">Directory</p>
+        <h1>Public communities</h1>
+        <p class="lede">
+          These are the communities whose owners have made them public and
+          discoverable on this instance. Search them, sort them, and preview their
+          channels. Only information an owner has chosen to publish is shown.
+        </p>
+      </div>
+
+      <section data-directory>
+        <div class="dir-bar">
+          <div class="dir-search">
+            <label class="field-label" for="dir-q">Search</label>
+            <input class="dir-control" id="dir-q" type="search" data-dir-search placeholder="Search communities by name or description" autocomplete="off">
+          </div>
+          <div class="dir-sort">
+            <label class="field-label" for="dir-sort">Sort by</label>
+            <select class="dir-control" id="dir-sort" data-dir-sort>
+              <option value="members">Most members</option>
+              <option value="newest">Newest</option>
+              <option value="name">Name</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="dir-layout">
+          <div>
+            <div class="dir-list" data-dir-results></div>
+            <div class="pager" data-dir-pager></div>
+          </div>
+          <aside class="dir-preview" data-dir-preview aria-live="polite"></aside>
+        </div>
+      </section>
+
+      <section class="section reveal">
+        <div class="section-head">
+          <p class="kicker">How listing works</p>
+          <h2>Who gets listed</h2>
+        </div>
+        <div class="split">
+          <div>
+            <h3>A community is listed when its owner says so</h3>
+            <p class="muted">Being public and being discoverable are two separate choices. A private community never appears in this directory, and a public one that is not discoverable is reachable by link but not listed.</p>
+          </div>
+          <div>
+            <h3>This is a directory, not the whole instance</h3>
+            <p class="muted">The directory covers communities on this instance only. If discovery is switched off, it is off for everyone, including this page.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="/">
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+          </svg>
+          <span class="brand-word">Trycord</span>
+        </a>
+        <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
+        <a class="btn btn-sm" href="/app/">Open the app</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Product</h2>
+        <a href="/features">Features</a>
+        <a href="/docs">Documentation</a>
+        <a href="/download">Download</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Explore</h2>
+        <a href="/communities">Communities</a>
+        <a href="/demo">Live demo</a>
+        <a href="/status">Status</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Project</h2>
+        <a href="/about">About</a>
+        <a href="/support">Support</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
+        <a href="/security">Security</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Legal</h2>
+        <a href="/terms">Terms of Service</a>
+        <a href="/instances-terms">Instance terms</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/trust-and-safety">Trust &amp; Safety</a>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>&copy; <span data-year>2026</span> Trycord</span>
+      <span class="muted">Your instance, your conversations, your rules.</span>
+    </div>
+  </footer>
+
+  <script src="/js/public-api.js"></script>
+  <script src="/js/communities.js"></script>
+  <script src="/js/site.js"></script>
+</body>
+</html>

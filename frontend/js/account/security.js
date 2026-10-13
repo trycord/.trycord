@@ -100,7 +100,11 @@ export function renderTwoFactorSection(wrap) {
     const form = el('form', { class: 'card card--auth' },
       el('div', { class: 'field' }, el('label', {}, '1. Add this key to your authenticator'),
         secretInput,
-        el('span', { class: 'hint' }, 'Or use the setup link: ')),
+        el('span', { class: 'hint' }, [
+          'Or scan it directly: ',
+          el('a', { href: setup.uri }, 'open the setup link'),
+          ' in an authenticator app.',
+        ])),
       el('div', { class: 'field' }, el('label', {}, '2. Enter the 6-digit code it shows'), code),
       el('div', {}, confirm));
     form.addEventListener('submit', async (e) => {

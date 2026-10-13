@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Download — Trycord</title>
-  <meta name="description" content="Download the Trycord desktop app for Windows, or use the web client from your instance's address.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Trycord">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <title>Download the desktop app, or use it in the browser</title>
+  <meta name="description" content="Trycord runs in the browser with nothing to install, and ships a desktop app for Windows, macOS and Linux. The desktop app can point at any instance, including yours.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
@@ -14,135 +20,228 @@
   <a class="skip-link" href="#main">Skip to main content</a>
 
   <header class="site-header">
-    <div class="wrap nav-wrap">
+    <div class="wrap masthead">
       <a class="brand" href="/">
         <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
-          <g color="#FF4D24">
-            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
-            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
-            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
-          </g>
+          <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+          <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+          <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+          <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
         </svg>
-        <span class="brand-name">Trycord</span>
+        <span class="brand-word">Trycord</span>
       </a>
-      <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
-        <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
-        <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+
+      <button class="menu-toggle" type="button" data-menu-toggle aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
+        <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></svg>
       </button>
-      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="site-nav" aria-expanded="false">Menu</button>
+
       <nav class="site-nav" id="site-nav" aria-label="Primary">
-        <a href="/">Home</a>
-        <a href="/features">Features</a>
-        <a href="/docs">Docs</a>
-        <a href="/download">Download</a>
-        <a href="/about">About</a>
-        <a href="/support">Support</a>
-        <a href="/security">Security</a>
-        <a href="/status">Status</a>
-        <a class="btn-open" href="/app/">Open the app</a>
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Product
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
+              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
+              <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
+              <a href="/changelog"><strong>Changelog</strong><span>What's new in Trycord.</span></a>
+              <a href="/roadmap"><strong>Roadmap</strong><span>What's done and what's coming.</span></a>
+              <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
+            </div>
+            <div class="nav-menu-foot">
+              <p>Private, self-hostable community messaging.</p>
+              <a class="text-link" href="/demo">Try the live demo</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Explore
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
+            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Community
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/support"><strong>Support</strong><span>Get help and reach the project.</span></a>
+              <a href="https://discord.gg/dSF7eqsJuP" rel="noopener"><strong>Discord</strong><span>Join the community chat.</span></a>
+              <a href="/security"><strong>Security</strong><span>How to report a vulnerability.</span></a>
+              <a href="/trust-and-safety"><strong>Trust and safety</strong><span>Rules, reporting, and appeals.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            About
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/about"><strong>About Trycord</strong><span>Why Trycord exists and how it's built.</span></a>
+            <a href="/changelog"><strong>Changelog</strong><span>What's shipped recently.</span></a>
+            <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
+          </div>
+        </div>
       </nav>
+
+      <div class="masthead-actions">
+        <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+          <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+          <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+        </button>
+        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+      </div>
     </div>
   </header>
-
 
   <main id="main" class="page">
     <div class="wrap">
       <div class="page-head">
-        <p class="kicker">Get Trycord</p>
-        <h1>Download</h1>
+        <p class="kicker">Download</p>
+        <h1>Use it in the browser, or install the app</h1>
         <p class="lede">
-        Trycord is the same app in your browser and on your desktop. There is
-        nothing to install to get started — but a Windows desktop app is
-        available if you prefer a standalone window.
-      </p>
+          Nothing to install to try Trycord: the web client is the same code the
+          desktop app wraps. The desktop build puts that client in its own window
+          and can point at any instance, including one you run.
+        </p>
       </div>
-      <div class="prose-layout">
-        <div class="prose">
-          <h2>Use it right now (no install)</h2>
-                <p>
-                  Open the app in any modern browser at your instance's address.
-                  <a class="btn btn-primary" href="/app/">Open the app</a>
-                </p>
-          
-                <h2>Windows desktop app</h2>
-                <ul>
-                  <li><strong>Installer</strong> — the NSIS setup: choose your directory, get Start-menu and desktop shortcuts, and benefit from automatic updates.</li>
-                  <li><strong>Portable</strong> — a single portable executable that needs no installation.</li>
-                </ul>
-                <p>
-                  Download the latest builds from the repository's
-                  <a href="https://github.com/trycord/.trycord/releases" rel="external">Releases</a>
-                  page (files are named <code>Trycord.exe</code> and
-                  <code>TrycordPTB.exe</code>). Artifacts are Windows
-                  x64. Linux (AppImage) and macOS builds are produced from the same
-                  project when released.
-                </p>
-          
-                <h2>First run</h2>
-                <p>
-                  On launch the desktop app opens the client and lets you choose the
-                  instance to connect to. The eye icon toggles password visibility and the
-                  registration screen asks you to accept the current
-                  <a href="/terms">Terms of Service</a>
-                  <a href="/instances-terms">Official instance terms</a> and
-                  <a href="/privacy">Privacy Policy</a> before your account is
-                  created. See the <a href="/docs">documentation</a> if you
-                  also want to run your own server.
-                </p>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">Two ways in</p>
+          <h2>Use it in a tab, or install the app</h2>
+          <p>Same client either way. Look around in the browser with nothing to install; install a build when you want Trycord out of the tab.</p>
         </div>
-        <aside class="toc" aria-label="Table of contents">
-          <h2 class="toc-title">On this page</h2>
-        </aside>
-      </div>
+        <div class="cards">
+          <article class="card">
+            <span class="tag tag--shipped">No install</span>
+            <h3>In the browser</h3>
+            <p>The web client is served by the instance itself. Open it, and you are in: no download, no store, and it always matches the server it came from.</p>
+            <p class="mt-5"><a class="btn btn-primary btn-sm" href="/app/">Open the web app</a></p>
+          </article>
+          <article class="card">
+            <span class="tag tag--shipped">Desktop</span>
+            <h3>The desktop app</h3>
+            <p>A window around the same client, for people who want Trycord off the browser tab. Published builds are attached to <a href="https://github.com/trycord/.trycord/releases" rel="noopener">GitHub releases</a>.</p>
+            <p class="mt-5"><a class="btn btn-sm" href="https://github.com/trycord/.trycord/releases" rel="noopener">See releases</a></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">How the desktop app works</p>
+          <h2>One client, pointed at any instance</h2>
+          <p>
+            The desktop app is the same client in its own window. Nothing is kept
+            in sync, and a feature that works in the browser works in the window.
+          </p>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div>
+              <h3>It picks a backend at launch</h3>
+              <p>First the <code>--api-url</code> argument, then the bundled backend file. There is no hidden third option and no silent fallback to somewhere you did not choose.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div>
+              <h3>Point it at your instance</h3>
+              <p>Run it with your server's address and it talks to that one and nothing else:</p>
+              <pre><code>Trycord --api-url=https://chat.example.org</code></pre>
+            </div>
+          </div>
+          <div class="step">
+            <div>
+              <h3>The official instance is a default, not a requirement</h3>
+              <p>The shipped build reaches the official instance out of the box, because most people arrive without a server. Self-hosters replace that with theirs, and the desktop origin must be on the instance's allowed list for API responses to be readable.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <p class="kicker">Build from source</p>
+          <h2>If there is no build for your platform yet</h2>
+          <p>Each target builds on its own platform. Cross-building from Linux is not reliable for Windows or macOS, so build on the system you are targeting.</p>
+        </div>
+        <pre><code>cd trycord-desktop
+npm install
+npm run build:linux      # AppImage
+npm run build:win        # NSIS installer and portable exe
+npm run build:mac        # dmg</code></pre>
+        <p class="muted">The desktop shell's internals, startup behaviour and update model are documented in <code>docs/desktop.md</code> and <code>docs/launcher.md</code>.</p>
+      </section>
+
+      <section class="section">
+        <div class="wrap">
+          <div class="band">
+            <p class="kicker">Hosting it yourself</p>
+            <h2>If you run the instance, you decide who gets in.</h2>
+            <p>The documentation covers Docker, manual installs, databases, mail and reverse proxies.</p>
+            <div class="cta">
+              <a class="btn" href="/docs">Read the documentation</a>
+              <a class="btn btn-ghost" href="/demo">Try the demo first</a>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 
   <footer class="site-footer">
-    <div class="wrap footer-band">
-      <h2>Run your own community</h2>
-      <p>Trycord is software you run yourself. Open the app to join a community, or read the documentation and start your own instance.</p>
-      <div class="cta">
-        <a class="btn btn-primary" href="/app/">Open the app</a>
-        <a class="btn btn-ghost" href="/docs">Read the documentation</a>
-      </div>
-    </div>
     <div class="wrap footer-grid">
       <div class="footer-brand">
         <a class="brand" href="/">
-        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
-          <g color="#FF4D24">
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
             <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout, #18191D)"/>
-            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout, #18191D)"/>
-            <circle cx="72" cy="58" r="7" fill="var(--cutout, #18191D)"/>
-          </g>
-        </svg>
-        <span class="brand-name">Trycord</span>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+          </svg>
+          <span class="brand-word">Trycord</span>
         </a>
-        <p>Private, self-hostable community messaging. Web and desktop.</p>
+        <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
+        <a class="btn btn-sm" href="/app/">Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
         <a href="/docs">Documentation</a>
         <a href="/download">Download</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Explore</h2>
+        <a href="/communities">Communities</a>
+        <a href="/demo">Live demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Project</h2>
         <a href="/about">About</a>
         <a href="/support">Support</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
         <a href="/security">Security</a>
-      </div>
-      <div class="footer-col">
-        <h2 class="footer-heading">Communities</h2>
-        <a href="/app/discover">Browse communities</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Legal</h2>
         <a href="/terms">Terms of Service</a>
-        <a href="/instances-terms">Official instance terms</a>
+        <a href="/instances-terms">Instance terms</a>
         <a href="/privacy">Privacy Policy</a>
         <a href="/trust-and-safety">Trust &amp; Safety</a>
       </div>
@@ -152,7 +251,6 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
 
   <script src="/js/site.js"></script>
 </body>

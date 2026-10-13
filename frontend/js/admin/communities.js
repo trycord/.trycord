@@ -14,7 +14,7 @@ function serverRow(s, onChanged) {
     el('div', { class: 'muted small' }, (s.description ? esc(String(s.description).slice(0, 120)) + ' · ' : '') + 'Created ' + relTime(s.createdAt)));
   row.append(who, idt);
   if (s.enforcement_state === 'suspended') {
-    row.appendChild(el('span', { class: 'status-chip suspended', title: s.enforcement_reason || '' }, 'SUSPENDED'));
+    row.appendChild(el('span', { class: 'status-chip suspended status-chip--bad', title: s.enforcement_reason || '' }, 'SUSPENDED'));
   }
 
   const acts = el('div', { class: 'card--list__actions' });

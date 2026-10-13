@@ -178,6 +178,30 @@ desktop app too:
 CLIENT_ORIGIN=https://trycord.example,http://*.trycord.example,trycord://app
 ```
 
+### Optional: the status monitor
+
+A second, independent container that checks the instance on a schedule and
+serves a report on its own port. It is off by default; start it with the
+override file so the monitor keeps reporting when the API container does not:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.monitor.yml up -d
+```
+
+It reaches the API over the compose network (`http://trycord:9971`) and
+publishes its report on host port `9972` (change `STATUS_MONITOR_PORT` in
+`.env`). By default it checks `/`, `/health` and `/api/health`.
+
+To have the public `/status` page read this monitor instead of probing from the
+browser, set the address a browser uses and restart the API container:
+
+```env
+STATUS_MONITOR_PUBLIC_URL=http://your-host:9972
+```
+
+Leave it unset and the page keeps probing from the browser. Every value is
+configurable; `docs/status-monitor.md` is the reference.
+
 #### The desktop app and `trycord://app`
 
 The packaged desktop client loads the renderer from `trycord://app`, a custom
@@ -309,6 +333,13 @@ journalctl -u trycord -f
 
 `ProtectSystem=strict` makes the whole filesystem read-only except the paths
 in `ReadWritePaths`; add any others your setup needs.
+
+To also run the status monitor, add a second unit that is this same file with
+`Description=Trycord status monitor` and
+`ExecStart=/usr/bin/node src/status-monitor/index.js`, then
+`systemctl enable --now trycord-status-monitor`. It reads the same `.env`; set
+`STATUS_MONITOR_PUBLIC_URL` there to have the public `/status` page read it.
+See `docs/status-monitor.md`.
 
 ### 7. Open the firewall
 

@@ -19,6 +19,7 @@ have defaults that work out of the box.
 | Serving | `TRYCORD_CLIENT_DIR`, `TRYCORD_APP_MOUNT` | Where the web client is, and whether it is mounted under a prefix. |
 | Features | the flags below | One switch per capability. |
 | Voice | `VOICE_VIDEO_*` | Off until a media server is configured. |
+| Status | `STATUS_MONITOR_*` | Optional second process that checks the instance on a schedule and serves a report. See `docs/status-monitor.md`. |
 
 ## Feature flags
 
@@ -131,6 +132,26 @@ Everything lives in `server/src/services/voice.js`, including the provider
 calls. Adding a second provider means adding its calls beside the Cloudflare
 ones and a branch where the provider is selected — no interface is reserved for
 it, because nothing consumes one polymorphically today.
+
+## Status monitor
+
+An optional second process, off unless you start it, that checks the instance
+on a schedule and serves the result on its own port (`9972` by default). It is
+deliberately separate from the API: it can keep reporting when the API cannot.
+
+```
+cd backend
+npm run status-monitor
+```
+
+It reads the same `.env`, checks the instance's own `/`, `/health` and
+`/api/health` by default, and serves an HTML dashboard at `/`, a machine
+report at `/status.json`, and Prometheus metrics at `/metrics`.
+
+Set `STATUS_MONITOR_PUBLIC_URL` on the API server to the monitor's address and
+the public status page reads the monitor's live report instead of probing from
+the browser. Every value is configurable, by environment or by a JSON file; the
+full reference is `docs/status-monitor.md`.
 
 ## Backups
 

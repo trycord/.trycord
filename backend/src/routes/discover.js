@@ -19,7 +19,9 @@ router.get('/servers', rateLimit({ windowMs: 60000, max: 120 }), async (req, res
     if (!require('../features').current.communityDiscovery) {
       return fail(res, 'FEATURE_DISABLED', 'community discovery is off on this instance', 403);
     }
-    res.json(await discovery.search({ q: req.query.q, page: req.query.page, limit: req.query.limit }));
+    res.json(await discovery.search({
+      q: req.query.q, page: req.query.page, limit: req.query.limit, sort: req.query.sort,
+    }));
   } catch (e) { next(e); }
 });
 

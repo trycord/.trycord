@@ -210,7 +210,7 @@ export async function renderWebhookList(node, serverId, ctx) {
           try {
             await Api.deleteWebhook(serverId, h.id);
             toast('Webhook deleted.', 'ok');
-            renderWebhookList(node);
+            renderWebhookList(node, serverId, ctx);
           } catch (ex) { toast(ex.message || 'Could not delete the webhook.', 'error'); }
         },
       });
@@ -281,7 +281,7 @@ export async function renderAppList(node, serverId, ctx) {
       try {
         await Api.updateApp(ctx.serverId, app.id, { status: live.checked ? 'active' : 'disabled' });
         toast(live.checked ? 'Application enabled.' : 'Application disabled. It will answer nobody.', 'ok');
-        renderAppList(node);
+        renderAppList(node, serverId, ctx);
       } catch (ex) {
         live.checked = !live.checked;
         toast(ex.message || 'Could not change the application.', 'error');
@@ -310,7 +310,7 @@ export async function renderAppList(node, serverId, ctx) {
           try {
             await Api.deleteApp(serverId, app.id);
             toast('Application deleted. Its token no longer works.', 'ok');
-            renderAppList(node);
+            renderAppList(node, serverId, ctx);
           } catch (ex) { toast(ex.message || 'Could not delete the application.', 'error'); }
         },
       });

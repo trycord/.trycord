@@ -11,10 +11,6 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   Wide desktop: the member panel can afford to be a column again.
-   -------------------------------------------------------------------------- */
-
-/* --------------------------------------------------------------------------
    Small desktop and tablet: the context navigation becomes a drawer.
 
    Below 1100px three columns stop being three readable columns, so the shell
@@ -35,6 +31,9 @@
     bottom: 0;
     width: min(288px, 84vw);
     z-index: var(--z-drawer);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
     transform: translateX(-100%);
     transition: transform var(--duration-normal) var(--ease-out);
     box-shadow: var(--shadow-pop);
@@ -44,79 +43,71 @@
     transform: none;
   }
 
+  .nav-backdrop:not([hidden]) {
+    display: block;
+  }
+
   .main-content {
     grid-column: 2;
   }
+}
 
-  /* The member panel becomes a sheet on the right rather than a third column. */
-  .member-sidebar {
+@media (max-width: 999px) {
+  .member-toggle {
     display: none;
-  }
-
-  .chat-environment--with-members {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* The member panel becomes a sheet on the right. display:flex is what makes it a
-     panel at all, so it is scoped away from the hidden state rather than left to be
-     overridden - `hidden` cannot win against a display rule, which is how a closed panel
-     stayed on screen as an empty black box. */
-  .chat-environment--with-members .member-sidebar:not([hidden]) {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: min(300px, 86vw);
-    z-index: var(--z-drawer);
-    display: flex;
-    box-shadow: var(--shadow-pop);
-    transform: translateX(100%);
-    transition: transform var(--duration-normal) var(--ease-out);
-  }
-
-  .chat-environment--with-members .member-sidebar.is-open:not([hidden]) {
-    transform: none;
   }
 }
 
-/* --------------------------------------------------------------------------
-   Tablet: the rail goes, the context navigation becomes a sheet.
-   -------------------------------------------------------------------------- */
 
 @media (max-width: 820px) {
-  /* The bar occupies space rather than covering it. A grid that is 100dvh tall with a
-     fixed bar over its bottom 56px puts the composer, the last setting and the bottom of
-     every list behind the bar - which is what "under .mobile-tab-navigation" means in the
-     layout check, and it is a real defect: those controls cannot be hit. */
-  .shell {
+  .shell,
+  .shell.no-community-nav {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: calc(100vh - var(--tabbar-height));
     grid-template-rows: calc(100dvh - var(--tabbar-height) - env(safe-area-inset-bottom, 0px));
   }
 
-  /* The rail is gone on a phone. Its destinations live in the tab bar, which is the
-     same list from the same registry - one navigation model, two presentations. */
   .app-rail {
     display: none;
   }
 
-  .main-content {
+  .main-content,
+  .shell.no-community-nav .main-content {
     grid-column: 1;
   }
 
   .context-header {
-    /* The header sits above the tab bar and below the status bar, so nothing
-       important is ever under a phone's home indicator. */
     height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: max(var(--space-5), env(safe-area-inset-left, 0px));
     padding-right: max(var(--space-5), env(safe-area-inset-right, 0px));
   }
 
-  /* The drawer's scrim. display:block on its own would beat the element's `hidden`
-     attribute, which is what left a black box over the whole phone that nothing could
-     dismiss - the rail was not even open. */
-  .nav-backdrop:not([hidden]) {
-    display: block;
+  .nav-toggle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .context-actions {
+    flex: 0 0 auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .context-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .context-header .btn {
+    min-height: 40px;
+  }
+
+  .context-header .btn.icon {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
   }
 
   /* Bottom tab bar. Deliberately a bar and not a bottom rail: it holds text
@@ -127,89 +118,42 @@
     right: 0;
     bottom: 0;
     z-index: var(--z-sticky);
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
+    display: block;
     height: calc(var(--tabbar-height) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     background: var(--color-surface);
     border-top: 1px solid var(--color-border);
   }
 
-  .mobile-tab {
-    display: flex;
+  .mobile-tab-navigation__strip .tab-button {
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    gap: 3px;
-    color: var(--color-text-muted);
-    font-size: 10px;
-    font-weight: var(--weight-medium);
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
+    gap: 2px;
+    min-width: 0;
+    padding: var(--space-2) var(--space-1);
+    border-radius: 0;
+    font-size: var(--text-xs);
+    line-height: 1.1;
   }
 
-  .mobile-tab__icon {
-    width: 21px;
-    height: 21px;
+  .mobile-tab-navigation__strip .tab-button__glyph {
+    position: relative;
+    width: 22px;
+    height: 22px;
   }
 
-  .mobile-tab.is-active,
-  .mobile-tab[aria-current="page"] {
-    color: var(--color-accent);
+  .mobile-tab-navigation__strip .tab-button__label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .mobile-tab__badge {
+  .mobile-tab-navigation__strip .tab-button__count {
     position: absolute;
-    transform: translate(14px, -6px);
-    min-width: 15px;
-    height: 15px;
-    padding: 0 4px;
-    display: grid;
-    place-items: center;
-    background: var(--color-accent);
-    color: var(--color-on-accent);
-    border-radius: var(--radius-pill);
-    font-size: 9px;
-    font-weight: var(--weight-bold);
-  }
-
-  /* Settings and community navigation move into the sheet rather than
-     stacking above the content, so a phone shows one thing at a time. */
-  .settings {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-7);
-  }
-
-  .settings__nav {
-    position: static;
-    flex-direction: row;
-    overflow-x: auto;
-    gap: var(--space-4);
-    padding-bottom: var(--space-4);
-    scrollbar-width: none;
-  }
-
-  .settings__nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  .settings__nav-title {
-    display: none;
-  }
-
-  .settings__nav .nav-item {
-    flex: 0 0 auto;
-    padding: var(--space-4) var(--space-6);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
-    background: var(--color-surface);
-  }
-
-  .settings__nav .nav-item.is-active {
-    background: var(--color-accent-subtle);
-    border-color: var(--color-accent-muted);
-    color: var(--color-accent);
+    top: -4px;
+    right: -8px;
   }
 
   .community-hero {
@@ -218,16 +162,7 @@
     padding: var(--space-7) var(--space-6);
   }
 
-  .community-hero__actions {
-    margin-left: 0;
-    width: 100%;
-  }
-
-
-  .home__head,
-  .community-body,
-  .search-results,
-  .settings {
+  .search-results {
     padding-left: var(--space-6);
     padding-right: var(--space-6);
   }
@@ -250,14 +185,11 @@
     padding: 0 var(--space-7);
   }
 
-  .btn--icon,
-  .composer__tool {
-    width: 40px;
-    height: 40px;
-  }
-
-  .btn--sm {
-    min-height: 32px;
+  .file-btn,
+  .emoji-btn,
+  .preview-toggle {
+    min-width: 40px;
+    min-height: 40px;
   }
 
   .input,
@@ -268,48 +200,36 @@
     /* Below 16px iOS zooms the page when a field takes focus. */
   }
 
-  .nav-item,
-  .list__item,
-  .dm-row,
-  .member-row {
+  .context-header {
+    gap: var(--space-2);
+    padding-left: max(var(--space-3), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--space-3), env(safe-area-inset-right, 0px));
+  }
+
+  .context-actions {
+    gap: var(--space-2);
+  }
+
+  .row,
+  .row--nav,
+  .row--dm,
+  .row--member,
+  .member-row-wrap,
+  .ctx-channel,
+  .tab-button {
     min-height: 44px;
   }
 
-  /* Hover actions do not exist on a phone, so they are always on. */
-  .msg__actions {
-    position: static;
-    opacity: 1;
-    pointer-events: auto;
-    box-shadow: none;
-    background: transparent;
-    border: 0;
-    padding: var(--space-3) 0 0;
-    justify-content: flex-end;
-  }
-
-  .msg__actions button {
-    width: 38px;
-    height: 38px;
-  }
-
-  .msg__timestamp-hover {
-    opacity: 1;
-  }
-
-  .msg-group:hover > .msg:not(.msg-group--start)::before {
-    opacity: 1;
+  .msg-actions button,
+  .msg-hoverbar button {
+    min-width: 40px;
+    min-height: 40px;
   }
 
   /* The composer respects the home indicator and the keyboard. */
   .composer {
     padding-bottom: max(var(--space-5), env(safe-area-inset-bottom, 0px));
     background: var(--color-background);
-  }
-
-  .message-list__inner,
-  .composer__inner {
-    padding-left: var(--space-4);
-    padding-right: var(--space-4);
   }
 
   .msg {
@@ -319,11 +239,6 @@
     padding-right: var(--space-3);
   }
 
-  .msg:not(.msg-group--start)::before {
-    left: calc(var(--space-3) + 17px - 9px);
-  }
-
-
   .modal {
     max-width: none;
     max-height: 92dvh;
@@ -332,13 +247,11 @@
     animation: sheet-in var(--duration-normal) var(--ease-out);
   }
 
-  .modal__foot {
-    border-radius: 0;
-    /* Room for a home indicator under the buttons. */
+  .modal > .row-line {
     padding-bottom: max(var(--space-6), env(safe-area-inset-bottom, 0px));
   }
 
-  .modal__foot .btn {
+  .modal .row-line .btn {
     flex: 1 1 auto;
   }
 
@@ -365,31 +278,12 @@
     justify-content: center;
   }
 
-
-
-  .setting-row__control .input,
-  .setting-row__control .select {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .community-hero__icon {
-    width: 52px;
-    height: 52px;
-  }
-
   .community-hero__name {
     font-size: var(--text-xl);
   }
 
   .stat-grid {
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  }
-
-  .admin-table__row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-4);
   }
 
   .auth-card {
@@ -406,17 +300,9 @@
   }
 
   .page,
-  .home__scroll,
-  .community-body,
-  .search-results,
-  .settings {
+  .search-results {
     padding-left: var(--space-5);
     padding-right: var(--space-5);
-  }
-
-  .tab {
-    padding: var(--space-4);
-    font-size: var(--text-sm);
   }
 
   .stat-grid {
@@ -428,9 +314,8 @@
    the message list get it and the header shrinks. */
 @media (max-height: 480px) and (orientation: landscape) {
   .context-header {
-    height: 40px;
+    height: calc(40px + env(safe-area-inset-top, 0px));
   }
-
 
   .composer {
     padding-bottom: var(--space-3);
@@ -457,8 +342,6 @@
     padding-bottom: var(--space-9);
   }
 
-  .community-body,
-  .settings,
   .search-results {
     padding-top: var(--space-7);
     padding-bottom: var(--space-9);

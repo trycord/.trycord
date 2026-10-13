@@ -45,6 +45,7 @@ export function openNav() {
   // straight back to itself on close.
   returnFocus = document.activeElement;
   place.classList.add('is-open');
+  document.documentElement.classList.add('is-nav-open');
   const backdrop = document.getElementById('desktop-backdrop');
   if (backdrop) backdrop.hidden = false;
   const toggle = document.querySelector('.nav-toggle');
@@ -57,6 +58,7 @@ export function closeNav() {
   const place = document.getElementById('place-navigation');
   if (!place || !place.classList.contains('is-open')) return;
   place.classList.remove('is-open');
+  document.documentElement.classList.remove('is-nav-open');
   const backdrop = document.getElementById('desktop-backdrop');
   if (backdrop) backdrop.hidden = true;
   const toggle = document.querySelector('.nav-toggle');
@@ -78,10 +80,8 @@ export function onPresentationChange(fn) {
 
 
 // The drawer is modal, so it has to behave like one: Escape closes it, and Tab
-// cycles inside it rather than walking out into the view it is covering. Where the
-// context navigation is a column there is nothing to trap and both branches stand down.
 function drawerKeys(e) {
-  if (presentationMode() !== 'mobile' || !isNavOpen()) return;
+  if (!isNavOpen()) return;
 
   if (e.key === 'Escape') {
     e.preventDefault();

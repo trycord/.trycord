@@ -85,6 +85,20 @@ const MEASURE = String.raw`
     return r.width > 0 && r.height > 0;
   };
 
+  const clippedByAncestor = (el) => {
+    const er = el.getBoundingClientRect();
+    let node = el.parentElement;
+    while (node && node.nodeType === 1) {
+      const cs = getComputedStyle(node);
+      if (cs.overflowY !== 'visible' || cs.overflowX !== 'visible') {
+        const r = node.getBoundingClientRect();
+        if (er.bottom > r.bottom + 1 || er.top < r.top - 1) return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  };
+
   // Composite the background actually behind an element, walking ancestors until one is
   // not transparent. getComputedStyle alone gives you this element's background, which is
   // transparent for most text and tells you nothing about what it reads as.
@@ -242,6 +256,7 @@ const MEASURE = String.raw`
     for (const el of document.querySelectorAll('#view-root button, #view-root input, #view-root textarea, #view-row, #view-root .card')) {
       if (!visible(el)) continue;
       if (fixed.some((o) => o.el.contains(el))) continue;
+      if (clippedByAncestor(el)) continue;
       const r = el.getBoundingClientRect();
       const overlapY = Math.min(f.r.bottom, r.bottom) - Math.max(f.r.top, r.top);
       const overlapX = Math.min(f.r.right, r.right) - Math.max(f.r.left, r.left);
