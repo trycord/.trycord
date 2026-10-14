@@ -477,6 +477,7 @@
 .cfg-mail__mode-summary { font-size: 0.8rem; color: var(--text-3); }
 .cfg-mail__detail { display: flex; flex-direction: column; gap: 6px; }
 .cfg-mail__problem { color: var(--danger); }
+.cfg-mail__status { margin: 0; }
 
 /* == the page system =====================================================
  *

@@ -7,12 +7,12 @@ Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
 client segments are served; `npm run check:flows` boots a server and passes 72
 assertions against real flows; `npm run check:render` boots a server and renders all
-40 routable pages in jsdom, passing 99 assertions;
+40 routable pages in jsdom, passing 125 assertions;
 `npm run check:realtime` puts three accounts on three sockets and confirms a
 message crosses between the two that share a community and does not reach the third, who
 never joined the room; `npm run check:contrast` measures every theme against WCAG AA
 and finds 100 ratios that pass; and `npm run check:client-load`
-evaluates all 37 client modules.
+evaluates all 38 client modules.
 
 ## Where things live
 

@@ -9,7 +9,8 @@ import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
 import { avatar } from '../components.js';
 import { State } from '../store.js';
-import { openMenu, openDialog, confirmDialog, errorToast } from '../ui.js';
+import { openMenu, openDialog, confirmDialog, errorToast, attachContextMenu } from '../ui.js';
+import { attachUserMenu } from '../user-menu.js';
 import { mediaUrl, isServerPath } from '../media.js';
 import { dayLabel, toDate, timeOfDay, fullTimestamp, fileSize } from '../format.js';
 import realtime, { EVENTS } from '../realtime.js';
@@ -159,22 +160,32 @@ function reactionRow(message, handlers) {
 }
 
 function messageRow(message, previous, handlers) {
+  const who = authorOf(message);
   const compact = previous
     && previous.authorId === message.authorId
     && dayKey(previous.createdAt) === dayKey(message.createdAt)
     && (toDate(message.createdAt) - toDate(previous.createdAt)) < 1000 * 60 * 7;
 
   const node = el('article', { class: 'msg' + (compact ? ' msg--compact' : ''), dataset: { id: message.id }, id: 'm-' + message.id });
+  // The same actions as the More button, on the whole row: right-click on a desk,
+  // long press on a phone.
+  attachContextMenu(node, () => handlers.menu(message));
 
   const gutter = el('div', { class: 'msg-gutter' });
-  if (compact) gutter.appendChild(el('span', { class: 'msg-time-gutter' }, timeOfDay(message.createdAt)));
-  else gutter.appendChild(avatar(authorOf(message), { size: 'md' }));
+  if (compact) {
+    gutter.appendChild(el('span', { class: 'msg-time-gutter' }, timeOfDay(message.createdAt)));
+  } else {
+    const face = avatar(who, { size: 'md' });
+    attachUserMenu(face, who);
+    gutter.appendChild(face);
+  }
 
   const main = el('div', { class: 'msg-main' });
 
   if (!compact) {
     const author = el('button', { class: 'msg-author', type: 'button' }, message.authorDisplay || message.authorName);
     author.addEventListener('click', () => handlers.openProfile(message.authorId));
+    attachUserMenu(author, who);
     main.appendChild(el('div', { class: 'msg-head' },
       author,
       el('time', { class: 'msg-time', datetime: message.createdAt || '' }, fullTimestamp(message.createdAt)),
@@ -544,7 +555,9 @@ export function renderConversation(ctx, scope) {
         })),
       });
     },
-    more(message, anchor) {
+    // One list for a message, drawn under the More button and, through the row's
+    // context menu, at the pointer. Kept in one place so the two cannot drift.
+    menu(message) {
       const mine = State.user && String(State.user.id) === String(message.authorId);
       const items = [
         { label: 'Copy text', icon: 'copy', onSelect: () => copyText(message.content) },
@@ -560,7 +573,10 @@ export function renderConversation(ctx, scope) {
         items.push({ label: 'Edit', icon: 'edit', onSelect: () => edit(message) });
         items.push({ label: 'Delete', icon: 'trash', danger: true, onSelect: () => removeMessage(message) });
       }
-      openMenu({ anchor, items, align: 'right' });
+      return items;
+    },
+    more(message, anchor) {
+      openMenu({ anchor, items: handlers.menu(message), align: 'right' });
     },
     toggleReaction,
   };

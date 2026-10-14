@@ -829,7 +829,7 @@ async function settle(window, ms = 400) {
       mailModes.length + ' mode(s): '
       + [...mailModes].map((m) => m.querySelector('strong')?.textContent).join(', '));
 
-    const mailStatus = document.querySelector('.cfg-card .cfg-row__desc[role="status"]');
+    const mailStatus = document.querySelector('.cfg-mail__status[role="status"]');
     ok('the mail console reports whether mail is ready',
       !!mailStatus && mailStatus.textContent.length > 0,
       mailStatus ? mailStatus.textContent : 'no status text');
@@ -839,7 +839,7 @@ async function settle(window, ms = 400) {
     const activeMode = document.querySelector('.cfg-mail__mode.active strong');
     if (activeMode && activeMode.textContent === 'Disabled') {
       ok('disabled mode does not offer a test send button',
-        !document.querySelector('.cfg-mail__mode + .cfg-row button'),
+        !document.querySelector('.cfg-mail__detail button'),
         'a disabled instance must not pretend to send');
     }
 
@@ -960,6 +960,59 @@ async function settle(window, ms = 400) {
       'a reply was posted but no thread count rendered');
     ok('a reaction shows on the message it is on', (marks.reactions || 0) > 0,
       'a reaction was added but no reaction rendered');
+
+    // ---- the menu a right-click opens ----
+    //
+    // A menu that is wired but never drawn is the same as no menu. The message row
+    // and the channel link are the two surfaces a desk right-clicks and a phone
+    // long-presses, so both are opened here the way a browser opens them, and closed
+    // the way Escape is supposed to close them.
+    console.log('\n  the context menus');
+
+    await visit(window, document, Router,
+      concrete('/server/:id/channel/:channel', world), base);
+    const msgRow = document.querySelector('.msg');
+    ok('a message row exists to open a menu on', !!msgRow,
+      'the channel rendered no .msg row, so there is nothing to right-click');
+
+    if (msgRow) {
+      msgRow.dispatchEvent(new window.MouseEvent('contextmenu', {
+        bubbles: true, cancelable: true, clientX: 120, clientY: 120,
+      }));
+      await settle(window, 60);
+      const menu = document.querySelector('.menu');
+      const labels = menu ? [...menu.querySelectorAll('.menu-item')].map((b) => b.textContent) : [];
+      ok('right-clicking a message opens its menu', !!menu,
+        'no .menu appeared after a contextmenu event on the row');
+      ok('the message menu carries the actions the More button carries',
+        !!menu && labels.includes('Copy link') && labels.includes('Reply'),
+        'menu items were: ' + (labels.join(', ') || '(none)'));
+
+      // Escape is the one close every dialog and menu shares.
+      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await settle(window, 60);
+      ok('Escape closes the open menu', !document.querySelector('.menu'),
+        'a .menu is still in the document after Escape');
+    }
+
+    // The community column's channel rows carry the channel menu, so a channel can
+    // be muted without opening it first.
+    const channelLink = document.querySelector('#place-navigation .nav-item--channel');
+    ok('a channel in the column exists to open a menu on', !!channelLink,
+      '#place-navigation rendered no .nav-item--channel');
+    if (channelLink) {
+      channelLink.dispatchEvent(new window.MouseEvent('contextmenu', {
+        bubbles: true, cancelable: true, clientX: 90, clientY: 90,
+      }));
+      await settle(window, 60);
+      const menu = document.querySelector('.menu');
+      const labels = menu ? [...menu.querySelectorAll('.menu-item')].map((b) => b.textContent) : [];
+      ok('right-clicking a channel opens the channel menu',
+        !!menu && labels.includes('Mute') && labels.includes('Copy link'),
+        'menu items were: ' + (labels.join(', ') || '(none)'));
+      document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await settle(window, 60);
+    }
 
     // ---- what a failure looks like ----
     //

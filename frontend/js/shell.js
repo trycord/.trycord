@@ -16,7 +16,8 @@ import { avatar, countBadge, serverMark } from './components.js';
 import { State, nameOf } from './store.js';
 import { path, currentRoute, navigate, canGoBack } from './nav.js';
 import { globalPages, mobilePages } from './pages/registry.js';
-import { openMenu } from './ui.js';
+import { openMenu, attachContextMenu } from './ui.js';
+import { serverMenuItems } from './sidebars.js';
 import { currentTheme, setTheme } from './theme.js';
 import { toggleNav, isNavOpen, closeNav, presentationMode } from './presentation.js';
 
@@ -426,13 +427,15 @@ function renderRail() {
   const list = el('div', { class: 'rail-list' });
   for (const s of State.servers) {
     const isActive = !!server && server.id === s.id;
-    list.appendChild(el('a', {
+    const mark = el('a', {
       class: 'rail-item rail-community' + (isActive ? ' is-active' : ''),
       href: path('/server/' + s.id),
       title: s.name,
       'aria-label': s.name + ' community',
       'aria-current': isActive ? 'page' : null,
-    }, serverMark(s, { size: 'sm' })));
+    }, serverMark(s, { size: 'sm' }));
+    attachContextMenu(mark, () => serverMenuItems(s));
+    list.appendChild(mark);
   }
   list.appendChild(el('button', {
     class: 'rail-item rail-add', type: 'button',

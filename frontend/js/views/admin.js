@@ -734,7 +734,7 @@ function settingsSection() {
   // not of any one key. A mode change writes mail.mode through the same save path as
   // every other setting, so it is stored, audited and restart-checked identically.
   function mailPanel() {
-    const status = el('p', { class: 'prow-sub', role: 'status' }, 'Reading the mail configuration...');
+    const status = el('p', { class: 'cfg-mail__status prow-sub', role: 'status' }, 'Reading the mail configuration...');
     const modes = el('div', { class: 'cfg-mail__modes', role: 'radiogroup', 'aria-label': 'Delivery mode' });
     const detail = el('div', { class: 'cfg-mail__detail' });
 
