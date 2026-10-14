@@ -22,6 +22,7 @@ function freePort() {
   const env = {
     ...process.env,
     DB_CLIENT: 'sqlite', DB_FILE: dbFile,
+    TRYCOD_DB_ENV_ONLY: '1',
     PORT: String(port), HOST: '127.0.0.1',
     UPLOAD_DIR: path.dirname(dbFile),
     STORAGE_DRIVER: 'local',

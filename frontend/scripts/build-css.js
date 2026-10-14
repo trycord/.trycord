@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
-// Concatenate the CSS layers into the one stylesheet the document loads.
+// Concatenate the CSS layers into the one stylesheet the document loads, and build
+// the public site's token layer from the same library.
 //
-// Why a build step rather than @import: @import is serialized by specification. Seven
-// imports means seven dependent round trips, which on a phone on a bad connection is the
-// difference between the first paint and the second one - and a page that paints twice
-// reads as a page that is not working. One <link> to one file has no such ordering.
-//
-// The output is committed. A self-hoster clones the repository and serves a working
-// application without running a build, which is the only property that matters here.
+// @import is serialized by specification, so a dozen imports is a dozen dependent
+// round trips before the first paint. One <link> to one committed file has no such
+// ordering, and a self-hoster serves a working application without running a build.
 //
 //   node frontend/scripts/build-css.js
 //   npm run css
@@ -18,92 +15,68 @@ const fs = require('fs');
 const path = require('path');
 
 const CSS = path.join(__dirname, '..', 'css');
-// The canonical design-token library. Its file is the first layer of the build rather
-// than a copy, so a value changed there reaches the application without anything being
-// duplicated into frontend/css.
+const PUBLIC_CSS = path.join(__dirname, '..', '..', 'public', 'css');
+const PUBLIC_ASSETS = path.join(__dirname, '..', '..', 'public', 'assets');
+// The canonical design-token library. It is the first layer rather than a copy,
+// so a value changed there reaches the application without being duplicated.
 const ASSET_TOKENS = path.join(__dirname, '..', 'assets', 'trycord-assets', 'tokens', 'trycord.css');
+// The canonical app icons. The public site serves its own copy of these, staged
+// here so the copy cannot drift from the library the way a hand-maintained one
+// does. `favicon.svg` keeps the path the pages already ask for; the app icon is
+// served as `app-icon.svg`, the touch icon the application itself points at.
+const ASSET_APP = path.join(__dirname, '..', 'assets', 'trycord-assets', 'app');
 
-// Order is the dependency order, not alphabetical: tokens before anything that
-// reads them, primitives before the surfaces built from them, responsive last
-// because a media query that loses to a later rule is a breakpoint that does nothing.
+// Dependency order, not alphabetical: the token library, then the application's
+// semantic tokens, then the layers that consume them. `mobile.css` is last: it
+// is the phone presentation, keyed to the same breakpoint the shell's desk
+// composition is, so it must be free to override every desk layer.
 const LAYERS = [
   'tokens.css',
   'base.css',
   'components.css',
   'shell.css',
   'messages.css',
-  'pages.css',
-  'cfg.css',
+  'views.css',
+  'views-admin.css',
+  'views-community.css',
+  'views-messages.css',
+  'views-auth.css',
+  'views-plain.css',
   'voice.css',
-  'features.css',
-  'surfaces.css',
-  'roles.css',
-  'responsive.css',
+  'mobile.css',
 ];
 
-const OUT = path.join(CSS, 'app.css');
-// The token layer on its own, for everything that is not the application.
-//
-// The public website is the same product with the same brand, and it used to carry its
-// own palette in public/css/site.css - a second set of warm-oranges that agreed with the
-// application by coincidence rather than by construction. This file is the asset
-// library's tokens plus the semantic mapping, generated from exactly the same two sources
-// the application is built from, so a value changed in the library reaches both. One
-// source, two consumers, no copy.
-const TOKENS_OUT = path.join(CSS, 'design-tokens.css');
+// The public website is the same product with the same brand. It carries no palette
+// of its own: this layer is the asset library plus the semantic names in
+// public/css/tokens.css, so a value changed in the library reaches both the
+// application and the marketing pages from one source.
+const PUBLIC_TOKEN_SOURCE = path.join(PUBLIC_CSS, 'tokens.css');
+const PUBLIC_TOKEN_OUT = path.join(PUBLIC_CSS, 'design-tokens.css');
 
-function build() {
-  const header = [
-    '/*',
-    ' * The one stylesheet. Generated - edit the layers in frontend/css and run npm run css.',
-    ' *',
-    ' * The first layer is the canonical token library in assets/trycord-assets/tokens.',
-    ' * Its values are not duplicated here: this layer is that file, unchanged, and the',
-    ' * semantic names in tokens.css are mapped from it.',
-    ' *',
-    ' * Order is the dependency order, not alphabetical:',
-    ' *   design-tokens (assets/trycord-assets/tokens/trycord.css)',
-    ' *   ' + LAYERS.join('\n *   '),
-    ' */',
-    '',
-  ].join('\n');
+const header = '/* The application stylesheet. Built from frontend/css by '
+  + 'frontend/scripts/build-css.js - edit the layers, not this file. */\n';
 
-  const parts = [header];
-
-  // The asset library's own file, first, so everything below it can read --tc-*.
-  let tokenBody;
-  try {
-    tokenBody = fs.readFileSync(ASSET_TOKENS, 'utf8').trim();
-  } catch {
-    console.error('  missing design tokens: ' + ASSET_TOKENS);
-    process.exitCode = 1;
-    return null;
+function buildApplication(library) {
+  const parts = [header, library];
+  for (const layer of LAYERS) {
+    const file = path.join(CSS, layer);
+    if (!fs.existsSync(file)) continue;
+    parts.push('\n/* ---- ' + layer + ' ---- */\n');
+    parts.push(fs.readFileSync(file, 'utf8'));
   }
-  const tokenSource = fs.readFileSync(path.join(CSS, 'tokens.css'), 'utf8').trim();
-
-  parts.push('/* ---- design-tokens (assets/trycord-assets/tokens/trycord.css) ' + '-'.repeat(8) + ' */');
-  parts.push(tokenBody);
-  parts.push('');
-
-  for (const name of LAYERS) {
-    const file = path.join(CSS, name);
-    let body;
-    try {
-      body = fs.readFileSync(file, 'utf8').trim();
-    } catch {
-      console.error('  missing layer: ' + name);
-      process.exitCode = 1;
-      return null;
-    }
-    // Each layer opens with its own banner, which would read as a second header
-    // once they are all one file. Keep the separator, drop the comment block.
-    parts.push('/* ---- ' + name.replace(/\.css$/, '') + ' ' + '-'.repeat(Math.max(0, 62 - name.length)) + ' */');
-    parts.push(body);
-    parts.push('');
-  }
-
+  const out = path.join(CSS, 'app.css');
   const css = parts.join('\n');
-  const tokensOnly = [
+  if (fs.existsSync(out) && fs.readFileSync(out, 'utf8') === css) {
+    console.log('app.css is up to date (' + LAYERS.length + ' layers)');
+    return;
+  }
+  fs.writeFileSync(out, css);
+  console.log('wrote ' + path.relative(process.cwd(), out) + ' (' + css.length + ' bytes)');
+}
+
+function buildPublicTokens(library) {
+  const semantic = fs.readFileSync(PUBLIC_TOKEN_SOURCE, 'utf8').trim();
+  const lines = [
     '/*',
     ' * The design tokens, on their own. Generated - run npm run css.',
     ' *',
@@ -112,38 +85,39 @@ function build() {
     ' * share one palette by construction rather than by coincidence.',
     ' */',
     '',
-    tokenBody,
+    library,
     '',
-    '/* ---- semantic names (frontend/css/tokens.css) ' + '-'.repeat(22) + ' */',
+    '/* ---- semantic names (public/css/tokens.css) ' + '-'.repeat(22) + ' */',
     '',
-    tokenSource,
+    semantic,
     '',
   ].join('\n');
-
-  // Both outputs, every run. The "up to date" branch below used to return before this,
-  // which left the token file absent on a machine whose app.css was already current.
-  const tokensExisted = fs.existsSync(TOKENS_OUT) ? fs.readFileSync(TOKENS_OUT, 'utf8') : null;
-  if (tokensExisted !== tokensOnly) {
-    fs.writeFileSync(TOKENS_OUT, tokensOnly);
-    console.log('  tokens written: ' + TOKENS_OUT + ' (' + (tokensOnly.length / 1024).toFixed(1) + ' KB)');
+  if (fs.existsSync(PUBLIC_TOKEN_OUT) && fs.readFileSync(PUBLIC_TOKEN_OUT, 'utf8') === lines) {
+    console.log('public tokens are up to date');
+    return;
   }
-
-  const PUBLIC_TOKENS_OUT = path.join(__dirname, '..', '..', 'public', 'css', 'design-tokens.css');
-  const publicExisted = fs.existsSync(PUBLIC_TOKENS_OUT) ? fs.readFileSync(PUBLIC_TOKENS_OUT, 'utf8') : null;
-  if (publicExisted !== tokensOnly) {
-    fs.writeFileSync(PUBLIC_TOKENS_OUT, tokensOnly);
-    console.log('  tokens written: ' + PUBLIC_TOKENS_OUT + ' (' + (tokensOnly.length / 1024).toFixed(1) + ' KB)');
-  }
-
-  const existing = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : null;
-  if (existing === css) {
-    console.log('  css up to date (' + LAYERS.length + ' layers)');
-    return { changed: false, bytes: css.length };
-  }
-  fs.writeFileSync(OUT, css);
-  console.log('  css written: ' + OUT);
-  console.log('  layers: ' + LAYERS.length + ', ' + (css.length / 1024).toFixed(1) + ' KB');
-  return { changed: true, bytes: css.length };
+  fs.writeFileSync(PUBLIC_TOKEN_OUT, lines);
+  console.log('wrote ' + path.relative(process.cwd(), PUBLIC_TOKEN_OUT) + ' (' + lines.length + ' bytes)');
 }
 
-build();
+// Stage the canonical app icons into the public site. Written only when they
+// differ, so a normal build leaves the working tree quiet.
+function buildPublicIcons() {
+  fs.mkdirSync(PUBLIC_ASSETS, { recursive: true });
+  for (const [from, to] of [['favicon.svg', 'favicon.svg'], ['trycord-app-icon.svg', 'app-icon.svg']]) {
+    const source = path.join(ASSET_APP, from);
+    const out = path.join(PUBLIC_ASSETS, to);
+    const content = fs.readFileSync(source);
+    if (fs.existsSync(out) && fs.readFileSync(out).equals(content)) {
+      console.log('public ' + to + ' is up to date');
+      continue;
+    }
+    fs.writeFileSync(out, content);
+    console.log('wrote ' + path.relative(process.cwd(), out));
+  }
+}
+
+const library = fs.readFileSync(ASSET_TOKENS, 'utf8').trim();
+buildApplication(library);
+buildPublicTokens(library);
+buildPublicIcons();

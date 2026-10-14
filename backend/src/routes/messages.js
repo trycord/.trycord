@@ -231,8 +231,8 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       const existing = await db.get(
         `SELECT m.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
          FROM messages m JOIN users u ON u.id = m.author_id
-         WHERE m.channel_id = ? AND m.client_nonce = ?`,
-        [ch.id, nonce]
+         WHERE m.channel_id = ? AND m.client_nonce = ? AND m.author_id = ?`,
+        [ch.id, nonce, req.user.id]
       );
       if (existing) {
         const byId = await uploads.getForMessages([existing.id]);

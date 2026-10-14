@@ -1,55 +1,51 @@
 // The page registry: one entry per destination in Trycord.
 //
-//   {id, route, scope, render}
+//   { id, route, scope, layout, sidebar, access, nav }
 //
-// id is the stable identity - navigation and tests reference it, and routes change. route
-// is the address and may contain :params. scope is which navigation tree it belongs to.
-// render is attached by handlers.js at load; see bind() below.
+// id is the stable identity that navigation and tests reference. route is the
+// address and may contain :params. layout says which shell shape the page needs,
+// sidebar which navigation tree sits beside it, access who may be here.
 //
-// Optional: access (who may be here), layout (which shell shape it needs), sidebar, label,
-// icon, blurb, tabs, nav, hidden.
-//
-// Matching is longest-prefix on segment boundaries, so the array order is a reading
-// convenience - moving an entry cannot change what a URL means.
+// Matching is longest-prefix on segment boundaries, so array order is a reading
+// convenience only: moving an entry cannot change what a URL means.
 
-const p = (id, route, rest) => ({ id, route, access: 'session', layout: 'list', sidebar: null, ...rest });
+const p = (id, route, rest) => ({
+  id,
+  route,
+  access: 'session',
+  layout: 'list',
+  sidebar: null,
+  ...rest,
+});
 
 export const PAGES = [
-  // ---- global destinations. These are the ones that appear in the rail, and most
-  // of them in the phone tab bar as well.
+  // ---- global destinations. These are the ones the rail carries, and most of
+  // them the phone tab bar as well.
   p('home', '/home', {
-    nav: { label: 'Home', short: 'Home', icon: 'home', rail: true, mobile: true, tabOrder: 1 },
+    nav: { label: 'Home', short: 'Home', icon: 'home', global: true, mobile: true, tabOrder: 1 },
   }),
   p('dms', '/dms', {
     sidebar: 'dms',
-    nav: { label: 'Direct messages', short: 'Messages', icon: 'mail', rail: true, mobile: true, tabLabel: 'DMs', tabOrder: 2 },
+    nav: { label: 'Direct messages', short: 'Messages', icon: 'message', global: true, mobile: true, tabLabel: 'DMs', tabOrder: 2 },
   }),
-  // /dms/:id is the same place as /dms with a conversation open.
-  //
-  // It carried a parent: 'dms' field so the sidebar and the rail would highlight the
-  // same entry here as they do on /dms. Nothing ever read it - the highlighting is done
-  // by prefix match, since /dms/<id> starts with /dms/ - so the field said nothing and
-  // the comment described a mechanism that did not exist. What does the job is noted
-  // here instead, so nobody adds the field back.
-  p('dms.conversation', '/dms/:id', {
-    sidebar: 'dms',
-    nav: null,
-  }),
+  // /dms/:id is the same place as /dms with a conversation open. Highlighting is
+  // by prefix, so it needs no parent field.
+  p('dms.conversation', '/dms/:id', { sidebar: 'dms', nav: null }),
   p('notifications', '/notifications', {
     sidebar: 'notifications',
-    nav: { label: 'Notifications', short: 'Alerts', icon: 'bell', rail: true, mobile: true, tabOrder: 4 },
+    nav: { label: 'Notifications', short: 'Alerts', icon: 'bell', global: true, mobile: true, tabOrder: 4 },
   }),
   p('discover', '/discover', {
     access: 'public',
     layout: 'plain',
-    nav: { label: 'Discover', short: 'Discover', icon: 'search', rail: true },
+    nav: { label: 'Discover', short: 'Discover', icon: 'compass', global: true },
   }),
   p('friends', '/friends', {
     sidebar: 'friends',
-    nav: { label: 'Friends', short: 'Friends', icon: 'users', rail: true, mobile: true, tabOrder: 3 },
+    nav: { label: 'Friends', short: 'Friends', icon: 'users', global: true, mobile: true, tabOrder: 3 },
   }),
-  // The directory. Lists every community and channel itself, so it takes no
-  // sidebar - a column beside it repeated the rail a third time.
+  // The directory: every community and channel. It lists them itself, so it takes
+  // no sidebar.
   p('menu', '/menu', {
     layout: 'plain',
     sidebar: 'home',
@@ -57,172 +53,125 @@ export const PAGES = [
   }),
 
   // ---- the community tree. /c/:slug is the current spelling and /server/:id the
-  // legacy one; both resolve here and the shell only ever sees the id form, which
-  // is why publishRoute() rewrites the route once the slug has been resolved.
-  p('community', '/c/:slug', {
-    layout: 'channel',
-    sidebar: 'community',
-    hidden: true,
-  }),
-  // The same destination under its other address. /c/<slug> is what a reader shares;
-  // /server/<id> is what the app builds and what every sub-page below hangs off. One
-  // page with two spellings, so it says so: otherwise "which page is this" has two
-  // answers for one URL, and a comparison written against the wrong one silently stops
-  // matching rather than failing loudly.
+  // legacy one; both resolve here and the shell only ever sees the id form.
+  p('community', '/c/:slug', { layout: 'channel', sidebar: 'community', hidden: true }),
   p('community.legacy', '/server/:id', {
-    layout: 'channel',
-    sidebar: 'community',
-    hidden: true,
-    aliasOf: 'community',
+    layout: 'channel', sidebar: 'community', hidden: true, aliasOf: 'community',
   }),
   p('community.channel', '/server/:id/channel/:channel', {
-    layout: 'channel',
-    sidebar: 'community',
-    hidden: true,
+    layout: 'channel', sidebar: 'community', hidden: true,
   }),
   p('community.channelPins', '/server/:id/channel/:channel/pins', {
-    layout: 'channel',
-    sidebar: 'community',
-    hidden: true,
-  }),
-  p('community.members', '/server/:id/members', {
     layout: 'channel', sidebar: 'community', hidden: true,
   }),
-  p('community.roles', '/server/:id/roles', {
-    layout: 'channel', sidebar: 'community', hidden: true,
-  }),
-  p('community.invites', '/server/:id/invites', {
-    layout: 'channel', sidebar: 'community', hidden: true,
-  }),
-  p('community.categories', '/server/:id/categories', {
-    layout: 'channel', sidebar: 'community', hidden: true,
-  }),
+  p('community.members', '/server/:id/members', { layout: 'channel', sidebar: 'community', hidden: true }),
+  p('community.roles', '/server/:id/roles', { layout: 'channel', sidebar: 'community', hidden: true }),
+  p('community.invites', '/server/:id/invites', { layout: 'channel', sidebar: 'community', hidden: true }),
+  p('community.categories', '/server/:id/categories', { layout: 'channel', sidebar: 'community', hidden: true }),
+  p('community.settings', '/server/:id/settings', { layout: 'channel', sidebar: 'community', hidden: true }),
 
-  // ---- community settings. Same shape as the account tree below, but the address
-  // needs the community in it, so `href` is a function of the id the shell already
-  // has rather than a string.
-  p('community.settings', '/server/:id/settings', {
-    layout: 'channel', sidebar: 'community', hidden: true,
-  }),
-
-  // ---- account settings. /account/* is the older spelling of all of this.
+  // ---- account settings. /account/* is the older spelling.
   p('settings', '/settings', {
-    layout: 'settings',
-    scope: 'account', group: 'You', order: 1,
-    label: 'Profile', icon: 'users',
-    blurb: 'Your name, photo and status',
-    tabs: ['profile'],
-    nav: null,
+    layout: 'settings', scope: 'account', group: 'You', order: 1,
+    label: 'Profile', icon: 'users', blurb: 'Your name, photo and status',
+    tabs: ['profile'], nav: null,
   }),
   p('settings.security', '/settings/security', {
-    layout: 'settings',
-    scope: 'account', group: 'Safety', order: 1,
+    layout: 'settings', scope: 'account', group: 'Safety', order: 1,
     label: 'Security', icon: 'shield',
     blurb: 'Your password, two-step sign-in, and signed-in devices',
-    // One screen, three old addresses.
     tabs: ['security', 'password', 'sessions', 'twofactor'],
   }),
   p('settings.privacy', '/settings/privacy', {
-    layout: 'settings',
-    scope: 'account', group: 'Safety', order: 2,
+    layout: 'settings', scope: 'account', group: 'Safety', order: 2,
     label: 'Privacy', icon: 'ban',
     blurb: 'Who can contact you and see what you are doing',
     tabs: ['privacy'],
   }),
   p('settings.notifications', '/settings/notifications', {
-    layout: 'settings',
-    scope: 'account', group: 'Safety', order: 3,
+    layout: 'settings', scope: 'account', group: 'Safety', order: 3,
     label: 'Notifications', icon: 'bell',
     blurb: 'Which channels stay quiet, and what you are told about',
     tabs: ['notifications'],
   }),
   p('settings.appearance', '/settings/appearance', {
-    layout: 'settings',
-    scope: 'account', group: 'Preferences', order: 1,
+    layout: 'settings', scope: 'account', group: 'Preferences', order: 1,
     label: 'Appearance', icon: 'image',
     blurb: 'Colours, how much you see at once, and animation',
     tabs: ['appearance'],
   }),
   p('settings.backend', '/settings/backend', {
-    layout: 'settings',
-    scope: 'account', group: 'Server', order: 1,
-    label: 'Connected server', icon: 'layers',
-    blurb: 'Which server this device signs in to',
+    layout: 'settings', scope: 'account', group: 'Preferences', order: 2,
+    label: 'Connection', icon: 'server',
+    blurb: 'Which server this client talks to',
     tabs: ['backend'],
   }),
   p('settings.updates', '/settings/updates', {
-    layout: 'settings',
-    scope: 'account', group: 'Server', order: 2,
-    label: 'Updates', icon: 'download',
-    blurb: 'Which version you are on and what changed',
+    layout: 'settings', scope: 'account', group: 'Preferences', order: 3,
+    label: 'Updates', icon: 'sparkle',
+    blurb: 'What this build is and what changed',
     tabs: ['updates'],
   }),
 
-  // ---- admin. Ordered the way the console reads, and the same order the nav used,
-  // so the title and the nav cannot come from different lists any more.
+  // ---- admin.
   p('admin', '/admin', {
-    layout: 'admin',
-    scope: 'admin', group: 'Console', order: 1,
-    label: 'Overview', icon: 'home',
-    blurb: 'Whether anything is wrong, and what happened recently',
-    tabs: ['overview'],
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 1,
+    label: 'Overview', icon: 'activity', tabs: ['overview'],
+    blurb: 'Health, counts and what changed lately',
   }),
   p('admin.users', '/admin/users', {
-    layout: 'admin',
-    scope: 'admin', group: 'People', order: 1,
-    label: 'Users', icon: 'users', tabs: ['users'],
-      blurb: 'Find an account, and act on it',
+    layout: 'admin', scope: 'admin', group: 'Moderation', order: 1,
+    label: 'People', icon: 'users', tabs: ['users'],
+    blurb: 'Search an account and act on it',
   }),
   p('admin.communities', '/admin/communities', {
-    layout: 'admin',
-    scope: 'admin', group: 'People', order: 2,
+    layout: 'admin', scope: 'admin', group: 'Moderation', order: 2,
     label: 'Communities', icon: 'layers', tabs: ['communities'],
-      blurb: 'Every community on this server',
+    blurb: 'Every community on this instance',
   }),
   p('admin.reports', '/admin/reports', {
-    layout: 'admin',
-    scope: 'admin', group: 'Trust and safety', order: 1,
-    label: 'Reports', icon: 'warn', tabs: ['reports'],
-      blurb: 'What people have reported, and what you decided',
+    layout: 'admin', scope: 'admin', group: 'Moderation', order: 3,
+    label: 'Reports', icon: 'flag', tabs: ['reports'],
+    blurb: 'Reports raised by members',
   }),
   p('admin.appeals', '/admin/appeals', {
-    layout: 'admin',
-    scope: 'admin', group: 'Trust and safety', order: 2,
-    label: 'Appeals', icon: 'flag', tabs: ['appeals'],
-      blurb: 'Requests to undo a moderation decision',
+    layout: 'admin', scope: 'admin', group: 'Moderation', order: 4,
+    label: 'Appeals', icon: 'mail', tabs: ['appeals'],
+    blurb: 'Requests to reconsider an enforcement',
   }),
   p('admin.audit', '/admin/audit', {
-    layout: 'admin',
-    scope: 'admin', group: 'Trust and safety', order: 3,
-    label: 'Audit log', icon: 'document', tabs: ['audit'],
-      blurb: 'Administrative actions, most recent first',
-  }),
-  p('admin.announcements', '/admin/announcements', {
-    layout: 'admin',
-    scope: 'admin', group: 'Trust and safety', order: 4,
-    label: 'Announcements', icon: 'bell', tabs: ['announcements'],
-      blurb: 'Messages shown to everyone on this server',
-  }),
-  p('admin.pages', '/admin/pages', {
-    layout: 'admin',
-    scope: 'admin', group: 'Server', order: 1,
-    label: 'Pages', icon: 'document', tabs: ['pages'],
+    layout: 'admin', scope: 'admin', group: 'Moderation', order: 5,
+    label: 'Audit log', icon: 'book', tabs: ['audit'],
+    blurb: 'Administrative actions, most recent first',
   }),
   p('admin.gdpr', '/admin/gdpr', {
-    layout: 'admin',
-    scope: 'admin', group: 'Server', order: 2,
-    label: 'GDPR requests', icon: 'shield', tabs: ['gdpr'],
-      blurb: 'Erasure and access requests from account holders',
+    layout: 'admin', scope: 'admin', group: 'Moderation', order: 6,
+    label: 'Data requests', icon: 'lock', tabs: ['gdpr'],
+    blurb: 'Erasure and access requests',
+  }),
+  p('admin.announcements', '/admin/announcements', {
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 2,
+    label: 'Announcements', icon: 'bell', tabs: ['announcements'],
+    blurb: 'Messages shown to everyone',
+  }),
+  p('admin.pages', '/admin/pages', {
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 3,
+    label: 'Pages', icon: 'file', tabs: ['pages'],
+    blurb: 'The public site pages this instance serves',
   }),
   p('admin.settings', '/admin/settings', {
-    layout: 'admin',
-    scope: 'admin', group: 'Server', order: 3,
-    label: 'Instance configuration', icon: 'settings', tabs: ['settings'],
-    blurb: 'Everything an administrator can change on this server',
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 4,
+    label: 'Configuration', icon: 'settings', tabs: ['settings'],
+    blurb: 'Instance settings, changed here and applied as they are saved',
+  }),
+  p('admin.database', '/admin/database', {
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 5,
+    label: 'Database', icon: 'database', tabs: ['database'],
+    blurb: 'Where this instance keeps its data, and how to move it',
   }),
 
-  // ---- community settings, declared for navigation. The router resolves the
-  // address; these give the settings nav its labels, order and blurbs.
+  // ---- community settings sections. No path: each is addressed relative to
+  // whichever community is open, and the shell owns that resolver.
   ...[
     ['overview', 'Overview', 'home', 'Community profile and public details'],
     ['appearance', 'Appearance', 'image', 'Banner, accent and layout'],
@@ -231,44 +180,28 @@ export const PAGES = [
     ['members', 'Members', 'users', 'Everyone here, and what they can do'],
     ['roles', 'Roles', 'shield', 'What each role may manage'],
     ['invites', 'Invites', 'mail', 'Codes and their uses'],
-    ['moderation', 'Moderation', 'warn', 'Reports and automod'],
-    ['ownership', 'Ownership', 'flag', 'Transfer or hand over'],
-    ['analytics', 'Analytics', 'compass', 'Activity, channels, members'],
-    ['integrations', 'Integrations', 'rocket', 'Webhooks, apps, commands'],
+    ['moderation', 'Moderation', 'flag', 'Reports and enforcement'],
+    ['ownership', 'Ownership', 'crown', 'Transfer or take over'],
+    ['analytics', 'Analytics', 'chart', 'Activity, channels, members'],
+    ['integrations', 'Integrations', 'rocket', 'Webhooks and apps'],
   ].map(([id, label, icon, blurb], i) => p('community.settings.' + id, '', {
     layout: 'channel', sidebar: 'community',
     scope: 'community', group: groupForCommunitySetting(id), order: i,
     label, icon, blurb, tabs: [id],
-    // No path: a community section is addressed relative to whichever community is
-    // open, and resolveCommunityHref already owns that. The registry owns what the
-    // section is called and where it sits; it does not need a second copy of where
-    // it lives to say so.
   })),
 
   // ---- profile, support, legal, and the signed-out screens.
-  p('profile', '/users/:id', {
-    layout: 'profile', sidebar: 'profile', hidden: true,
-  }),
+  p('profile', '/users/:id', { layout: 'profile', sidebar: 'profile', hidden: true }),
   p('community.new', '/servers/new', { layout: 'plain', hidden: true }),
   p('support', '/support', { access: 'public', layout: 'plain' }),
-  p('support.appeals', '/support/appeals', {
-    layout: 'plain', hidden: true,
-  }),
-  p('support.newAppeal', '/support/appeals/new', {
-    access: 'public', layout: 'plain', hidden: true,
-  }),
   p('legal', '/legal/:doc', { access: 'public', layout: 'plain' }),
   p('invite', '/invite/:code', { access: 'session', layout: 'plain', hidden: true }),
 
   p('login', '/login', { access: 'guest', guestTo: '/home', layout: 'plain' }),
   p('register', '/register', { access: 'guest', guestTo: '/home', layout: 'plain' }),
   p('forgot', '/forgot', { access: 'guest', guestTo: '/home', layout: 'plain' }),
-  p('resetPassword', '/reset-password/:token', {
-    access: 'guest', guestTo: '/home', layout: 'plain',
-  }),
-  p('verifyEmail', '/verify-email/:token', {
-    access: 'public', layout: 'plain',
-  }),
+  p('resetPassword', '/reset-password/:token', { access: 'guest', guestTo: '/home', layout: 'plain' }),
+  p('verifyEmail', '/verify-email/:token', { access: 'public', layout: 'plain' }),
 ];
 
 function groupForCommunitySetting(id) {
@@ -279,22 +212,30 @@ function groupForCommunitySetting(id) {
   return 'Reach';
 }
 
-// ---- lookup tables, built once.
-
 const BY_ID = new Map(PAGES.map((page) => [page.id, page]));
 const BY_ROUTE = new Map();
 for (const page of PAGES) {
   if (page.route) BY_ROUTE.set(page.route, page);
 }
 
-// /account/* was the whole settings tree before it was renamed, and both spellings
-// are still in the wild. Rather than generate a second set of entries, the legacy
-// prefix is rewritten before matching - which also means the account settings page
-// is reached by exactly one identity, and the shell cannot end up with two navs.
 const LEGACY_PREFIX = '/account';
 
+// /account/* was the settings tree before it was renamed, and /admin/servers was
+// the communities section. Folded in before matching so a page has one identity.
+function normalise(rawPath) {
+  const path = String(rawPath || '/');
+  if (path === '/') return '/home';
+  if (path === LEGACY_PREFIX || path.startsWith(LEGACY_PREFIX + '/')) {
+    return '/settings' + path.slice(LEGACY_PREFIX.length);
+  }
+  if (path === '/admin/servers' || path.startsWith('/admin/servers/')) {
+    return '/admin/communities' + path.slice('/admin/servers'.length);
+  }
+  return path;
+}
+
 export function matchPath(rawPath) {
-  const path = normalise(String(rawPath || '/'));
+  const path = normalise(rawPath);
   let best = null;
   let bestLength = -1;
   for (const page of PAGES) {
@@ -304,64 +245,33 @@ export function matchPath(rawPath) {
     best = page;
     bestLength = page.route.length;
   }
-  return best || null;
+  return best;
 }
 
-function normalise(path) {
-  if (path === '/') return '/home';
-  if (path === LEGACY_PREFIX || path.startsWith(LEGACY_PREFIX + '/')) {
-    return '/settings' + path.slice(LEGACY_PREFIX.length);
-  }
-  // /admin/servers is what the communities section used to be called.
-  if (path === '/admin/servers' || path.startsWith('/admin/servers/')) {
-    return '/admin/communities' + path.slice('/admin/servers'.length);
-  }
-  return path;
-}
-
-/**
- * Segment-aware, with :params.
- *
- * A pattern ending in a segment matches that segment and anything under it, so
- * /server/:id/channel/:channel also covers /server/1/channel/2/pins - which is how
- * pins got matched before, as a literal prefix row.
- */
+// Segment-aware, with :params. A pattern ending in a :param swallows the rest of
+// the path, so /server/:id/channel/:channel also covers .../pins.
 function matches(pattern, path) {
   const want = pattern.split('/').filter(Boolean);
   const have = path.split('/').filter(Boolean);
-
-  // Every leading segment must match literally or as a param.
   const fixed = want.length;
   for (let i = 0; i < fixed; i++) {
-    const w = want[i];
-    if (w.startsWith(':')) continue;
-    if (have[i] !== w) return false;
+    if (want[i].startsWith(':')) continue;
+    if (have[i] !== want[i]) return false;
   }
-  // A pattern with a trailing :param swallows the rest of the path.
+  // A pattern ending in a :param swallows the rest of the path, so /server/:id
+  // still answers /server/<id>/members when nothing more specific does. A pattern
+  // ending in a literal is itself: comparing the joined segments made
+  // /server/:id/members unmatchable, because the path holds an id where the
+  // pattern holds ":id".
   if (want.length && want[want.length - 1].startsWith(':')) return have.length >= fixed;
-
-  // Otherwise the path must be exactly the pattern or below it.
-  if (have.length < fixed) return false;
-  if (have.length > fixed && want[fixed - 1] && want[fixed - 1].startsWith(':')) return true;
-  return have.slice(0, fixed).join('/') === want.join('/') || path.startsWith(pattern + '/');
+  return have.length === fixed;
 }
 
-/**
- * Match an address and pull its parameters out at the same time.
- *
- * One implementation, because two consumers need it: the lifecycle to hand params
- * to a renderer, and the shell to know which community it is looking at. They were
- * deriving it separately, which is how the sidebar and the router can disagree
- * about what page you are on.
- *
- * `rest` is what is left after the pattern - /admin/pages/terms is one page
- * addressing something inside itself, and the page editor needs to know which.
- */
 export function matchRoute(rawPath) {
-  const path = normalise(String(rawPath || '/'));
+  const path = normalise(rawPath);
   const page = matchPath(path);
   if (!page) return null;
-  return { page, ...splitPath(page.route, path) };
+  return Object.assign({ page }, splitPath(page.route, path));
 }
 
 function splitPath(pattern, path) {
@@ -369,7 +279,7 @@ function splitPath(pattern, path) {
   const have = String(path || '').split('/').filter(Boolean);
   const params = {};
   for (let i = 0; i < want.length; i++) {
-    if (!want[i].startsWith(':') || have[i] == null) continue;
+    if (!want[i].startsWith(':') || have[i] === undefined) continue;
     params[want[i].slice(1)] = decodeURIComponent(have[i]);
   }
   return { params, rest: have.slice(want.length).map(decodeURIComponent) };
@@ -383,12 +293,7 @@ export function pageAt(route) {
   return BY_ROUTE.get(route) || null;
 }
 
-/**
- * Every destination in a navigation scope, grouped and in order.
- *
- * A community section has no `path`: it is addressed relative to whichever
- * community is open, and its caller already has a resolver for that.
- */
+// Every destination in a navigation scope, grouped and in order.
 export function scopeNav(scope) {
   const groups = new Map();
   for (const page of PAGES) {
@@ -401,92 +306,74 @@ export function scopeNav(scope) {
       icon: page.icon,
       blurb: page.blurb || '',
       route: page.route || null,
-      order: page.order == null ? 999 : page.order,
+      order: page.order === undefined || page.order === null ? 999 : page.order,
     };
-    const g = groups.get(page.group) || [];
-    g.push(item);
-    groups.set(page.group, g);
+    const list = groups.get(page.group) || [];
+    list.push(item);
+    groups.set(page.group, list);
   }
-  return [...groups.entries()].map(([group, items]) => ({
+  return Array.from(groups.entries()).map(([group, items]) => ({
     group,
     items: items.sort((a, b) => a.order - b.order),
   }));
 }
 
-/** The rail's destinations, in the order the rail reads. */
-export function railPages() {
-  return PAGES.filter((page) => page.nav && page.nav.rail);
+export function globalPages() {
+  return PAGES.filter((page) => page.nav && page.nav.global);
 }
 
-/**
- * The phone tab bar's destinations.
- *
- * Same pages as the rail, sorted by tabOrder when they give one. The order is
- * separate because it genuinely differs - Friends sat before Alerts on the phone
- * bar and after it on the rail - and putting that in one shared ordering would
- * mean moving a tab on one surface to move it on the other.
- */
 export function mobilePages() {
   return PAGES
     .filter((page) => page.nav && page.nav.mobile)
     .map((page, i) => ({ page, i }))
     .sort((a, b) => {
-      const ao = a.page.nav.tabOrder == null ? a.i : a.page.nav.tabOrder;
-      const bo = b.page.nav.tabOrder == null ? b.i : b.page.nav.tabOrder;
+      const ao = a.page.nav.tabOrder === undefined || a.page.nav.tabOrder === null ? a.i : a.page.nav.tabOrder;
+      const bo = b.page.nav.tabOrder === undefined || b.page.nav.tabOrder === null ? b.i : b.page.nav.tabOrder;
       return ao - bo;
     })
     .map((entry) => entry.page);
 }
 
-/** Does this scope answer to that section name, under any of its addresses? */
 export function scopeHasTab(scope, tab) {
-  for (const g of scopeNav(scope)) {
-    for (const item of g.items) if (item.tabs.includes(tab)) return true;
+  for (const group of scopeNav(scope)) {
+    for (const item of group.items) if (item.tabs.indexOf(tab) !== -1) return true;
   }
   return false;
 }
 
-/** Which scope's navigation a path belongs to, or null. */
 export function scopeFor(page) {
   return page && page.scope ? page.scope : null;
 }
 
-// The renderer, attached to the page by handlers.js at load. Binding is separate from
-// declaring because the renderers import the shell, and the shell reads this file -
-// importing them from here would close the loop.
-//
-// Community sections are the exception: they have no route and are navigation entries
-// for tabs inside /server/:id/settings, which community.settings draws.
-let bound = false;
+// Renderers are attached after load by the router. Binding is separate from
+// declaring because a renderer imports the shell and the shell reads this table;
+// importing renderers here would close that loop.
+const RENDERERS = new Map();
 
 export function bind(renderers) {
-  for (const page of PAGES) {
-    if (page.route) page.render = renderers[page.id] || null;
+  for (const id of Object.keys(renderers)) {
+    if (renderers[id]) RENDERERS.set(id, renderers[id]);
   }
-  bound = true;
 }
 
-/** Whether bind() has run. Cheap enough for a check to ask. */
 export function isBound() {
-  return bound;
+  return RENDERERS.size > 0;
 }
 
-/**
- * Draw a page.
- *
- * Through the page rather than through the map, so the thing that decides where to go
- * and the thing that draws it are the same object.
- */
+export function rendererFor(page) {
+  if (!page) return null;
+  return RENDERERS.get(page.id) || null;
+}
+
 export function renderPage(page, ctx) {
-  if (!page || typeof page.render !== 'function') {
-    throw new Error('No renderer for page ' + (page && page.id));
-  }
-  return page.render(ctx, page);
+  const render = rendererFor(page);
+  if (typeof render !== 'function') throw new Error('No renderer for page ' + (page && page.id));
+  return render(ctx, page);
 }
 
 export const HOME_PAGE = BY_ID.get('home');
 
 export default {
   PAGES, matchPath, matchRoute, pageById, pageAt, scopeNav, scopeHasTab,
-  railPages, mobilePages, scopeFor, HOME_PAGE, bind, isBound, renderPage,
+  globalPages, mobilePages, scopeFor, HOME_PAGE, bind, isBound, rendererFor, renderPage,
 };

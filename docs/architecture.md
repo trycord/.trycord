@@ -12,7 +12,7 @@ assertions against real flows; `npm run check:render` boots a server and renders
 message crosses between the two that share a community and does not reach the third, who
 never joined the room; `npm run check:contrast` measures every theme against WCAG AA
 and finds 100 ratios that pass; and `npm run check:client-load`
-evaluates all 124 client modules.
+evaluates all 37 client modules.
 
 ## Where things live
 
@@ -184,12 +184,12 @@ connection error.
 | `npm run check:shots` | photographs every surface at eight widths in a real browser; skips where t
 | `node scripts/check-sibling-bindings.js` | a module in a split directory references a name a sibling exports, without importing it |
 | `node scripts/check-require-aliases.js` | a service is called by a name it was not bound to, is imported where it is not exported, or is called bare and never imported |
-| `node scripts/check-crash-recovery.js` | the crash surface recovers by itself from a half-updated module graph, and does not reload for an ordinary fault |
+| `node scripts/check-crash-screen.js` | the crash report covers the viewport however tall the mount is, names the file that failed, and stays out of the way for a cancelled request |
 | `node scripts/check-signin.js` | a correct password returns a token. A regression test for the sign-in bug below, which no other check could see |
 | `npm run check-doc-counts` | every number in the summary of this document is still the number the suite prints. A figure in prose is the one claim no check looks at. |
 | `npm run check:graph` | **every import the server is asked for, over HTTP** — boots a throwaway instance and walks the module graph from `/js/app.js`, so a specifier that resolves on disk and still 404s cannot pass as green. |
 | `npm run check-workflows` | every CI file: no mapping repeats a key, every line is block-style YAML it can read, every job that runs npm installs dependencies first, every check is run somewhere or says why not, and nothing runs a script that is not there. There is no YAML dependency, so it reads the block subset directly. |
-| `npm run check:checks-can-fail` | runs twenty checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
+| `npm run check:checks-can-fail` | runs eighteen checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
 | `npm run check-client-styles` | every class name the client emits has a rule in app.css. Finds a forgotten rule; names the two that are handles with no rule on purpose. |
 | `npm run check:dialects` | both database dialects. Boots SQLite and runs the upsert end to end, then has the live MySQL instance **parse** the statement the other branch produces. Not in `check`, because it needs the live database. |
 | `npm run db:backup` | dumps the live database read-only and verifies the dump against what the server reported |he browser cannot load `http` |
@@ -243,14 +243,17 @@ single one:
 
 Each of those was found by the checks-can-fail harness, not by reading the check.
 
-It caught a second one after that: `check-split-loses` passed on nothing. It reads each
+It caught a second one after that: `check-split-loses` passed on nothing. It read each
 file as it was before its split with `git show`, and every `git show` in a shallow clone,
-a tarball export or a copy without `.git` throws, which the check treated as "nothing to
-compare" and counted as a pass. It now fails on zero comparisons, and the harness runs it
-against the repository rather than the copy, because a copy has no history to read.
+a tarball export or a copy without `.git` threw, which the check treated as "nothing to
+compare" and counted as a pass. It was made to fail on zero comparisons and to run against
+the repository rather than the copy, and then the rewrite retired it: the split directories
+it guarded were deliberately collapsed back into single files, and the names it remembered
+were renamed, so its only remaining choices were to bless every departure or to fail.
 
 That harness also caught a check that was not running at all.
-`check-crash-recovery.js` reached into `/home/ultim/trycord/.trycord` twice: once to
+`check-crash-screen.js` — then called `check-crash-recovery.js` — reached into
+`/home/ultim/trycord/.trycord` twice: once to
 `require` jsdom by absolute path and once to read the `crash.js` it mounts. It passed on
 this machine because this machine is that path. Everywhere else — CI, a fresh clone, the
 copy the harness makes — neither resolved, and a check that cannot read its subject is a

@@ -40,7 +40,10 @@ function auth(req, res, next) {
   if (!token) return fail(res, 'AUTH_REQUIRED', 'authentication required');
   let user;
   try {
-    user = jwt.verify(token, secret());
+    // Pinned to the one algorithm this server issues. jwt.verify without a list
+    // accepts whatever the token's own header names, which is how an "alg: none"
+    // or a mismatched-algorithm token gets treated as a signature to check.
+    user = jwt.verify(token, secret(), { algorithms: ['HS256'] });
   } catch {
     return fail(res, 'AUTH_REQUIRED', 'invalid or expired session');
   }

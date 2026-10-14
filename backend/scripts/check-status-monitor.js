@@ -79,7 +79,7 @@ function configuration() {
   console.log('\n  configuration defaults');
   const base = loadConfig({}, { cwd: backendDir });
   ok('the default port is the monitor port', DEFAULT_PORT, 9972);
-  ok('the default host is not loopback-only', base.host, '0.0.0.0');
+  ok('the default host is loopback', base.host, '127.0.0.1');
   ok('the default interval is 30s', base.intervalMs, 30000);
   ok('the default timeout is 5s', base.timeoutMs, 5000);
   ok('one failure is not enough to call it down', base.failureThreshold, 2);

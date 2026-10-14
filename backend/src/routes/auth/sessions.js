@@ -130,7 +130,7 @@ router.post('/sessions/revoke', auth, rateLimit({ windowMs: 60000, max: 30 }), a
       jti, all: false, actorJti: req.user.jti || null,
     });
     if (!revoked) return fail(res, 'NOT_FOUND', 'session not found or already revoked');
-    const exp = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+    const exp = new Date((Number(req.user.exp) || Math.floor(Date.now() / 1000) + 7 * 24 * 3600) * 1000).toISOString();
     try {
       await db.upsert(
         'revoked_tokens',

@@ -21,7 +21,10 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const BACKEND_EVENTS = path.join(ROOT, 'src', 'ws', 'events.js');
-const FRONTEND_EVENTS = path.join(ROOT, '..', 'frontend', 'js', 'realtime-events.js');
+// The client's event module is realtime.js: the rewrite folded the separate
+// realtime-events.js back into the gateway module it belongs to, and the EVENTS and
+// SESSION_EVENTS maps live there under the same names this check reads.
+const FRONTEND_EVENTS = path.join(ROOT, '..', 'frontend', 'js', 'realtime.js');
 
 let failures = 0;
 const ok = (label, cond, detail) => {

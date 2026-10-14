@@ -67,8 +67,8 @@ const PROVIDERS = ['cloudflare'];
 
 // Settings the configuration centre owns. Each of these has a row in
 // services/settings.js, and that module already implements the precedence this
-// package needs: default < database < environment, with the environment winning
-// and being reported as the source.
+// package needs: the saved value wins, the environment seeds a setting nobody has
+// saved, and the schema default is the floor.
 //
 // features.js used to read these straight from process.env, which meant the
 // dashboard could save a value and nothing would read it - the toggle moved, the
@@ -132,11 +132,19 @@ function build() {
   const registration = valueOf('REGISTRATION_ENABLED', true);
   const registrationApproval = valueOf('REGISTRATION_APPROVAL', false);
   const emailVerification = valueOf('EMAIL_VERIFICATION_REQUIRED', false);
-  const uploads = flag('FILE_UPLOADS_ENABLED', true);
+  // A typo in a flag's environment spelling is still a startup error, so each is parsed
+  // here - but the value comes from the store, which owns precedence. Reading it straight
+  // from the environment would let a stray .env value outrank a saved one and put the
+  // toggle-moved-the-application-did-not failure back.
+  flag('FILE_UPLOADS_ENABLED', true);
+  flag('BOTS_ENABLED', true);
+  flag('WEBHOOKS_ENABLED', true);
+  flag('PUSH_NOTIFICATIONS_ENABLED', false);
+  const uploads = !!valueOf('FILE_UPLOADS_ENABLED', true);
   const discovery = valueOf('COMMUNITY_DISCOVERY_ENABLED', true);
-  const bots = flag('BOTS_ENABLED', true);
-  const webhooks = flag('WEBHOOKS_ENABLED', true);
-  const push = flag('PUSH_NOTIFICATIONS_ENABLED', false);
+  const bots = !!valueOf('BOTS_ENABLED', true);
+  const webhooks = !!valueOf('WEBHOOKS_ENABLED', true);
+  const push = !!valueOf('PUSH_NOTIFICATIONS_ENABLED', false);
 
   // Voice and video carries the master switch plus the two sub-capabilities beneath it.
   // A sub-capability can be off while the master is on, but never on while the master is
@@ -154,11 +162,11 @@ function build() {
     registration: !!registration,
     registrationApproval: !!registrationApproval,
     emailVerificationRequired: !!emailVerification,
-    uploads: uploads.value && !!valueOf('FILE_UPLOADS_ENABLED', true),
+    uploads: !!uploads,
     communityDiscovery: !!discovery,
-    bots: bots.value && !!valueOf('BOTS_ENABLED', true),
-    webhooks: webhooks.value && !!valueOf('WEBHOOKS_ENABLED', true),
-    pushNotifications: push.value && !!valueOf('PUSH_NOTIFICATIONS_ENABLED', false),
+    bots: !!bots,
+    webhooks: !!webhooks,
+    pushNotifications: !!push,
     maxUploadBytes: Number(maxUploadBytes),
     quotaBytes: Number(valueOf('STORAGE_QUOTA_MB', 512)) * 1024 * 1024,
     rateLimitMax: Number(valueOf('RATE_LIMIT_MAX', 0)) || 0,

@@ -36,9 +36,14 @@ const files = [];
 const sources = new Map();
 for (const f of files) {
   // Strip comments so a key mentioned only in prose does not count as a read.
+  // Line comments go first. A comment can carry a URL that ends in `//*`, and
+  // stripping block comments before line comments read that as an opening `/*`
+  // running to the next `*/` in the file, deleting the real code in between.
+  // That is how this check once reported that nothing reads a setting it was
+  // looking straight at, when the function reading four of them was swallowed.
   const raw = fs.readFileSync(f, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/.*$/gm, '$1');
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
   sources.set(f, raw);
 }
 

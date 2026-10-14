@@ -20,21 +20,6 @@ let ticketIssuer = () => {
 
 function setGateway(gw) {
   if (gw && typeof gw.disconnectUser === 'function') disconnectUser = gw.disconnectUser;
-  if (gw && typeof gw.issueTicket === 'function') ticketIssuer = gw.issueTicket;
-}
-
-// Set separately from the gateway because the two arrive independently: the ticket issuer
-// is only meaningful once the socket server exists.
-function setTicketIssuer(fn) {
-  if (typeof fn === 'function') ticketIssuer = fn;
-}
-
-// The gateway is not wired until the socket server exists. Checked rather than assumed so
-// /ws/ticket can answer "unavailable" instead of throwing.
-let ticketReady = false;
-
-function setGateway(gw) {
-  if (gw && typeof gw.disconnectUser === 'function') disconnectUser = gw.disconnectUser;
   if (gw && typeof gw.issueTicket === 'function') {
     ticketIssuer = gw.issueTicket;
     ticketReady = true;
@@ -50,6 +35,10 @@ function setTicketIssuer(fn) {
   }
 }
 
+// The gateway is not wired until the socket server exists. Checked rather than assumed so
+// /ws/ticket can answer "unavailable" instead of throwing.
+let ticketReady = false;
+
 function isWsTicketIssuerReady() {
   return ticketReady;
 }
@@ -64,8 +53,11 @@ module.exports = {
   setGateway,
   setTicketIssuer,
   isWsTicketIssuerReady,
-  // Exported under its own name rather than renamed at every call site: the routes call
-  // disconnectUser and should keep reading that way.
-  disconnectUser,
+  // A live dispatcher, not the snapshot value. routes/auth/{sessions,password}.js
+  // destructure this property once at require time, long before the socket gateway is
+  // wired; exporting the current `disconnectUser` here would hand them the initial
+  // no-op and they would keep it forever, so a revoked session's socket never closed.
+  // Reading the module-level binding on every call makes a later setGateway visible.
+  disconnectUser: (...args) => disconnectUser(...args),
   issueWsTicket,
 };

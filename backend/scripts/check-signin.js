@@ -63,6 +63,8 @@ async function main() {
   const child = spawn(process.execPath, [path.join(ROOT, 'src', 'server.js')], {
     cwd: ROOT,
     env: Object.assign({}, process.env, {
+      // Pinned connection: ignore any database configuration saved on this machine.
+      TRYCOD_DB_ENV_ONLY: '1',
       PORT: String(PORT), HOST: '127.0.0.1', DB_CLIENT: 'sqlite',
       DB_FILE: path.join(tmp, 'signin.sqlite'), MAIL_MODE: 'log',
       ALLOW_TEST_HOOKS: '', JWT_SECRET: 'signin-probe-secret-0123456789',

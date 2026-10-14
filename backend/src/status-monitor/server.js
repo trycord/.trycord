@@ -12,6 +12,17 @@ const http = require('http');
 const STATE_LABEL = { up: 'Operational', degraded: 'Degraded', down: 'Down', unknown: 'Unknown' };
 const STATE_CLASS = { up: 'ok', degraded: 'warn', down: 'bad', unknown: 'unknown' };
 
+// The canonical trycord-assets monogram, inlined so the dashboard carries the
+// product's mark without depending on the web client's asset tree - the monitor
+// can be dropped next to any deployment. The flame is currentColor and the
+// cutouts are the page background, so it reads in both colour schemes.
+// check-brand.js asserts the path data against the library.
+const BRAND_MARK = '<svg class="brandmark" viewBox="0 0 100 100" aria-hidden="true">'
+  + '<path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>'
+  + '<path d="M39 70 L50 51 L61 70 Z" fill="var(--brand-cutout)"/>'
+  + '<path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--brand-cutout)"/>'
+  + '<circle cx="72" cy="58" r="7" fill="var(--brand-cutout)"/></svg>';
+
 function escapeHtml(value) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -111,7 +122,7 @@ function renderHtml(report, config) {
   }).join('\n');
 
   const css = [
-    ':root{--bg:#fff;--fg:#1a1a1a;--muted:#5b5b5b;--line:rgba(0,0,0,.12);',
+    ':root{--brand:#FF4D24;--brand-cutout:var(--bg);--bg:#fff;--fg:#1a1a1a;--muted:#5b5b5b;--line:rgba(0,0,0,.12);',
     '--ok-bg:#d9f2df;--ok-fg:#12662a;--warn-bg:#f3e2bd;--warn-fg:#6b4900;',
     '--bad-bg:#f6d3d0;--bad-fg:#8f1e18;--unknown-bg:#ececec;--unknown-fg:#565656}',
     '@media (prefers-color-scheme:dark){:root{--bg:#141414;--fg:#ededed;--muted:#a8a8a8;',
@@ -119,9 +130,10 @@ function renderHtml(report, config) {
     '--warn-fg:#f0cf7a;--bad-bg:#3d1b18;--bad-fg:#f2a29b;--unknown-bg:#2b2b2b;--unknown-fg:#c2c2c2}}',
     '*{box-sizing:border-box}',
     'body{margin:0;padding:2rem 1rem;background:var(--bg);color:var(--fg);',
-    'font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}',
+    'font:16px/1.5 "Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}',
     'main{max-width:780px;margin:0 auto}',
     'h1{font-size:1.4rem;margin:0 0 .25rem}',
+    '.brandmark{width:22px;height:22px;vertical-align:-4px;margin-right:.45rem;color:var(--brand)}',
     '.sub{margin:0 0 1.5rem;color:var(--muted)}',
     'table{width:100%;border-collapse:collapse}',
     'th,td{text-align:left;padding:.65rem .5rem;border-bottom:1px solid var(--line);vertical-align:top}',
@@ -150,7 +162,7 @@ function renderHtml(report, config) {
     + '  <title>' + escapeHtml(report.title) + '</title>' + refreshMeta + '\n'
     + '  <style>' + css + '</style>\n'
     + '</head>\n<body>\n  <main>\n'
-    + '    <h1>' + escapeHtml(report.title) + '</h1>\n'
+    + '    <h1>' + BRAND_MARK + escapeHtml(report.title) + '</h1>\n'
     + '    <p class="sub">' + escapeHtml(report.instance) + ' &middot; checked every '
     + Math.round(report.intervalMs / 1000) + 's &middot; '
     + '<span class="state state--' + (STATE_CLASS[report.overall] || 'unknown') + '">'

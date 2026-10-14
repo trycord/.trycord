@@ -233,8 +233,11 @@ async function listCommands(appId) {
   return rows.map(commandShape);
 }
 
-async function setCommand(appId, input) {
-  const app = await db.get('SELECT * FROM bot_applications WHERE id = ?', [appId]);
+async function setCommand(appId, serverId, input) {
+  // Scoped by server, not by id alone: an app id from another community must not be
+  // writable through this community's route just because the route resolved a server.
+  const app = await getApp(appId, serverId);
+  if (!app) return null;
   if (!app) return null;
   const name = String((input && input.name) || '').trim().toLowerCase();
   if (!COMMAND_RE.exec('/' + name)) {
@@ -265,9 +268,13 @@ async function setCommand(appId, input) {
   return commandShape(await db.get('SELECT * FROM bot_commands WHERE id = ?', [id]));
 }
 
-async function removeCommand(commandId, appId) {
+async function removeCommand(commandId, appId, serverId) {
+  // The command's app has to be this community's, the same way the app lookup is
+  // scoped here and everywhere else. application_id alone is not ownership.
+  const app = await getApp(appId, serverId);
+  if (!app) return false;
   const row = await db.get(
-    'SELECT * FROM bot_commands WHERE id = ? AND application_id = ?', [commandId, appId]
+    'SELECT * FROM bot_commands WHERE id = ? AND application_id = ?', [commandId, app.id]
   );
   if (!row) return false;
   await db.run('DELETE FROM bot_commands WHERE id = ?', [commandId]);

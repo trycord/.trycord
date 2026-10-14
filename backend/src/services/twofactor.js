@@ -176,6 +176,36 @@ async function remainingLockMs(userId) {
   return new Date(row.login_locked_until).getTime() - Date.now();
 }
 
+// --- sensitive-action re-confirmation --------------------------------------
+//
+// A counter of its own, not the login one. These failures arrive from an
+// already-authenticated session, and the shared counter meant a stolen token
+// could fail a few re-confirmations and lock the real holder out of signing in.
+// Separate still throttles the thing that matters - guessing the password to
+// change it from a stolen session - without handing that session a way to deny
+// the holder their own login.
+async function remainingConfirmLockMs(userId) {
+  const row = await db.get('SELECT confirm_locked_until FROM users WHERE id = ?', [userId]);
+  const until = row && row.confirm_locked_until;
+  if (!until || new Date(until).getTime() <= Date.now()) return 0;
+  return new Date(until).getTime() - Date.now();
+}
+
+async function recordConfirmFailure(userId) {
+  const row = await db.get('SELECT confirm_fail_count FROM users WHERE id = ?', [userId]);
+  const count = Number((row && row.confirm_fail_count) || 0) + 1;
+  const locked = count >= MAX_FAILURES;
+  await db.run(
+    'UPDATE users SET confirm_fail_count = ?, confirm_locked_until = ? WHERE id = ?',
+    [count, locked ? new Date(Date.now() + LOCKOUT_MS).toISOString() : null, userId]
+  );
+  return locked;
+}
+
+async function recordConfirmSuccess(userId) {
+  await db.run('UPDATE users SET confirm_fail_count = 0, confirm_locked_until = NULL WHERE id = ?', [userId]);
+}
+
 // --- enable / disable -----------------------------------------------------
 
 // Setup does not enable anything: it returns a secret the member scans, and
@@ -289,6 +319,7 @@ module.exports = {
   DIGITS, STEP_SECONDS, MAX_FAILURES, LOCKOUT_MS,
   beginSetup, enable, disable, verifySecondFactor, status, issueRecoveryCodes,
   recordFailure, recordSuccess, remainingLockMs, isLocked,
+  recordConfirmFailure, recordConfirmSuccess, remainingConfirmLockMs,
   // exported for tests
   base32Encode, base32Decode, codeAt, stepFor, verifyCode, encryptSecret, decryptSecret, otpauthUri,
 };

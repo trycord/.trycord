@@ -20,6 +20,13 @@
 // names a sibling module in the same directory exports, which is a set it can compute
 // exactly, and it reports nothing at all on a tree that is correct.
 //
+// Comments, strings and regex literals are removed by strip-comments.mjs, the scanner
+// every binding check shares. A local regex strip had been written here, and it read the
+// '/*' inside `accept: 'image/*'` as the start of a block comment, blanked the twelve
+// hundred lines to the next real '*/', and reported a page of names from the fragments.
+// That is the failure strip-comments.mjs documents at length, so the rules for what
+// counts as bound are handled here and the reading of the source is not.
+//
 // node scripts/check-sibling-bindings.js [dir ...]
 //   defaults to every directory under js/ that has more than one module in it
 
@@ -28,17 +35,6 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
 const JS = path.join(ROOT, 'frontend', 'js');
-
-function strip(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '')
-    // Module specifiers are paths, not code. Without this, `from '../resolve.js'` matches
-    // a name called `resolve` and the check reports a binding that does not exist - which
-    // is how it found three on its first run, all of them false.
-    .replace(/(?:from|import)\s*\(?\s*'[^']*'\s*\)?/g, "from ''")
-    .replace(/'[^']*'/g, "''");
-}
 
 function walk(dir) {
   const out = [];
@@ -74,65 +70,118 @@ function targetDirs(explicit) {
   return dirs;
 }
 
-const findings = [];
-const dirCount = targetDirs(process.argv.slice(2)).length;
+// A comma-separated list of names, as it appears in a parameter list, a destructuring
+// pattern or a declarator run. Keys and defaults are dropped and the name is what is
+// left, so `{ route } = {}` binds `route` and `a: alias` binds `alias`.
+function addNames(target, list) {
+  for (const part of list.split(',')) {
+    const name = part.trim().split('=')[0].split(':').pop().trim();
+    if (/^[A-Za-z_$][\w$]*$/.test(name)) target.add(name);
+  }
+}
 
-for (const dir of targetDirs(process.argv.slice(2))) {
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.js'));
-  if (files.length < 2) continue;
+// Everything the file binds for itself: imports, declarations at any depth, function and
+// arrow parameters, and destructuring. A file may use a name it binds even when a sibling
+// exports one with the same name, and the declaration itself is what tells the two apart.
+function boundNames(code) {
+  const bound = new Set();
 
-  const sources = {};
+  for (const m of code.matchAll(/import\s+([A-Za-z_$][\w$]*)\s*(?:,|from)/g)) bound.add(m[1]);
+  for (const m of code.matchAll(/import\s*\{([^}]*)\}/g)) addNames(bound, m[1]);
+
+  // `function name`, and `const name`, wherever they are. The declaration does not have
+  // to start the line: `reactionRow` holds a `const row` two levels in, and a for loop
+  // holds `const row of`.
+  for (const m of code.matchAll(/\bfunction\s*\*?\s*([A-Za-z_$][\w$]*)/g)) bound.add(m[1]);
+  // `let a = 0, b = false, c = false` declares three names, not one. Split the run on the
+  // commas that are not inside brackets.
+  for (const m of code.matchAll(/\b(?:const|let|var)\s+([^;\n]+)/g)) {
+    let depth = 0;
+    let piece = '';
+    const flush = () => {
+      const name = piece.match(/^\s*([A-Za-z_$][\w$]*)/);
+      if (name) bound.add(name[1]);
+      piece = '';
+    };
+    for (const ch of m[1]) {
+      if ('{[('.includes(ch)) depth++;
+      if ('}])'.includes(ch)) depth--;
+      if (ch === ',' && depth === 0) flush();
+      else piece += ch;
+    }
+    flush();
+  }
+
+  for (const m of code.matchAll(/\(([^()]*)\)\s*=>/g)) addNames(bound, m[1]);
+  for (const m of code.matchAll(/\bfunction\s*\*?\s*[A-Za-z_$][\w$]*\s*\(([^()]*)\)/g)) addNames(bound, m[1]);
+  for (const m of code.matchAll(/(?:const|let|var)\s*[{[][^}\]]*[}\]]\s*=/g)) addNames(bound, m[0].slice(m[0].indexOf('const') + 5));
+
+  return bound;
+}
+
+function ownerOf(code) {
   const exported = new Map();
-  for (const f of files) {
-    const code = strip(fs.readFileSync(path.join(dir, f), 'utf8'));
-    sources[f] = code;
-    for (const m of code.matchAll(/^export (?:async )?(?:function|const|let|class) ([A-Za-z_$][\w$]*)/gm)) {
-      if (!exported.has(m[1])) exported.set(m[1], f);
+  for (const m of code.matchAll(/^export\s+(?:async\s+)?(?:function|const|let|class)\s+([A-Za-z_$][\w$]*)/gm)) {
+    if (!exported.has(m[1])) exported.set(m[1], true);
+  }
+  for (const m of code.matchAll(/^export\s*\{([^}]*)\}/gm)) {
+    for (const part of m[1].split(',')) {
+      const name = part.trim().split(/\s+as\s+/).pop().trim();
+      if (/^[A-Za-z_$][\w$]*$/.test(name)) exported.set(name, true);
     }
-    for (const m of code.matchAll(/^export \{([^}]*)\}/gm)) {
-      for (const part of m[1].split(',')) {
-        const name = part.trim().split(':')[0].trim();
-        if (/^[A-Za-z_$][\w$]*$/.test(name) && !exported.has(name)) exported.set(name, f);
+  }
+  return new Set(exported.keys());
+}
+
+(async () => {
+  const { stripComments } = await import('./strip-comments.mjs');
+
+  const findings = [];
+  const dirs = targetDirs(process.argv.slice(2));
+
+  for (const dir of dirs) {
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.js'));
+    if (files.length < 2) continue;
+
+    const sources = {};
+    const exported = new Map();
+    for (const f of files) {
+      const code = stripComments(fs.readFileSync(path.join(dir, f), 'utf8'));
+      sources[f] = code;
+      for (const name of ownerOf(code)) if (!exported.has(name)) exported.set(name, f);
+    }
+
+    for (const [file, code] of Object.entries(sources)) {
+      const bound = boundNames(code);
+      for (const [name, home] of exported) {
+        if (home === file || bound.has(name)) continue;
+        // The first use that is a reference. A name followed by a colon is a property key
+        // or a label, which is not a reference to anything.
+        const re = new RegExp('(?<![\\w.$])' + name + '\\b', 'g');
+        let m;
+        let at = -1;
+        while ((m = re.exec(code))) {
+          if (code[m.index + name.length] === ':') continue;
+          at = m.index;
+          break;
+        }
+        if (at < 0) continue;
+        findings.push({
+          file: path.join(path.relative(ROOT, dir), file),
+          name,
+          home: path.join(path.relative(ROOT, dir), home),
+          line: code.slice(0, at).split('\n').length,
+        });
       }
     }
   }
 
-  for (const [file, code] of Object.entries(sources)) {
-    const bound = new Set();
-    for (const m of code.matchAll(/import \{([^}]*)\}/g)) {
-      for (const part of m[1].split(',')) bound.add(part.trim().split(/\s+as\s+/).pop().trim());
+  if (findings.length) {
+    console.error(`\n  sibling binding check FAILED - ${findings.length} unbound cross-module reference(s)\n`);
+    for (const f of findings) {
+      console.error(`  ${f.file}:${f.line}  ${f.name}  (exported by ${f.home})`);
     }
-    for (const m of code.matchAll(/^(?:export )?(?:async )?function ([A-Za-z_$][\w$]*)/gm)) bound.add(m[1]);
-    for (const m of code.matchAll(/^(?:export )?(?:const|let) ([A-Za-z_$][\w$]*)/gm)) bound.add(m[1]);
-    // Destructuring binds names too, and it is how a page renderer receives most of what
-    // it uses: `const { region, parts, onCleanup } = ctx`. Without this the check reports
-    // every name a handler pulls out of its context as a cross-module reference.
-    for (const m of code.matchAll(/(?:const|let)\s*\{([^{}]*)\}\s*=/g)) {
-      for (const part of m[1].split(',')) {
-        const name = part.trim().split(':').pop().split('=')[0].trim();
-        if (/^[A-Za-z_$][\w$]*$/.test(name)) bound.add(name);
-      }
-    }
-
-    for (const [name, home] of exported) {
-      if (home === file || bound.has(name)) continue;
-      const m = new RegExp('(?<![\\w.$])' + name + '\\b').exec(code);
-      if (!m) continue;
-      findings.push({
-        file: path.join(path.relative(ROOT, dir), file),
-        name,
-        home: path.join(path.relative(ROOT, dir), home),
-        line: code.slice(0, m.index).split('\n').length,
-      });
-    }
+    process.exit(1);
   }
-}
-
-if (findings.length) {
-  console.error(`\n  sibling binding check FAILED - ${findings.length} unbound cross-module reference(s)\n`);
-  for (const f of findings) {
-    console.error(`  ${f.file}:${f.line}  ${f.name}  (exported by ${f.home})`);
-  }
-  process.exit(1);
-}
-console.log(`sibling binding check passed (${dirCount} module directories, no reference to a sibling's export is unbound)`);
+  console.log(`sibling binding check passed (${dirs.length} module directories, no reference to a sibling's export is unbound)`);
+})();

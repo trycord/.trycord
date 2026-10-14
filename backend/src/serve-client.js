@@ -406,10 +406,15 @@ function mountSpaFallback(app, opts) {
       // disagree about the mount.
       fs.readFile(path.join(clientDir, 'index.html'), 'utf8', (err, html) => {
         if (err) { if (!res.headersSent) next(err); return; }
+        // The base is the client's own mount, not the route's prefix. A root-level
+        // app route (/login, /home) is still served by the client tree, and stamping
+        // its own path as the base made it ask for /js/theme.js - which on an origin
+        // that also serves a public site is the site's theme, and the module graph
+        // died on a missing export before the first paint.
         res.status(200)
           .set('Cache-Control', 'no-store')
           .type('html')
-          .send(html.replace(/<base href="[^"]*">/i, `<base href="${mount || ''}/">`));
+          .send(html.replace(/<base href="[^"]*">/i, `<base href="${appMount || ''}/">`));
       });
     });
   }

@@ -45,8 +45,8 @@ async function send(userId, username, conversationId, content, clientNonce = nul
 
   if (nonce) {
     const existing = await db.get(
-      DEDUPE_SELECT + ' WHERE dm.conversation_id = ? AND dm.client_nonce = ?',
-      [conversationId, nonce]
+      DEDUPE_SELECT + ' WHERE dm.conversation_id = ? AND dm.client_nonce = ? AND dm.author_id = ?',
+      [conversationId, nonce, userId]
     );
     if (existing) {
       return {

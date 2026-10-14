@@ -25,7 +25,9 @@ function signChallenge(userId) {
 
 function readChallenge(token) {
   try {
-    const claims = jwt.verify(token, secret());
+    // Same pinned algorithm as the auth middleware: the challenge is a token this
+    // server minted, so it may only be verified the way it was signed.
+    const claims = jwt.verify(token, secret(), { algorithms: ['HS256'] });
     return claims && claims.purpose === 'mfa' && claims.sub ? String(claims.sub) : null;
   } catch {
     return null;

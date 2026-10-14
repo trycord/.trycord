@@ -1,37 +1,128 @@
-// Validated config, one active adapter, shared query API, transactions.
+// One active connection, shared query API, transactions, and where that
+// connection came from.
 //
 //   const db = require('./db');   // or '../db' - no side effects on require
-//   await db.connect();           // reads + validates env, verifies connectivity
+//   await db.connect();           // resolves config, connects, applies the schema
 //   await db.get('SELECT * FROM users WHERE id = ?', [id]);
 //   await db.transaction(async (t) => { ... t.run(...) ... });
-const { loadDbConfig } = require('./config');
+//
+// ./config owns the precedence: an administrator's saved override, then the
+// environment, then nothing. Boot walks that list and takes the first
+// configuration that actually connects, so a saved value that has become
+// unreachable falls back to the one it replaced rather than stopping the
+// instance. Which one won, and which ones failed, is reported through status() -
+// an administrator whose saved configuration stopped working is told about it,
+// not quietly rescued.
+const dbConfig = require('./config');
 const { applySchema } = require('./schema');
 
 let conn = null;
+let source = null;
+let openedAt = null;
+let failures = [];
+// The configuration the live connection was opened with. Kept so the interface can
+// say what the process is actually using, rather than what it was asked to use.
+let activeConfig = null;
 
 function active() {
   if (!conn) throw new Error('database not connected — call db.connect() during startup first');
   return conn;
 }
 
+// Open one connection and bring its schema up to date. Separate from connect()
+// because a live apply needs exactly this and nothing else.
+async function open(cfg) {
+  const next = cfg.client === 'sqlite'
+    ? await require('./sqlite').connect(cfg.file)
+    : await require('./mysql').connect(cfg);
+  await applySchema(next);
+  return next;
+}
+
 async function connect() {
   if (conn) return conn;
-  const cfg = loadDbConfig();
-  if (cfg.client === 'sqlite') {
-    const sqlite = require('./sqlite');
-    conn = await sqlite.connect(cfg.file);
-  } else if (cfg.client === 'mysql') {
-    const mysql = require('./mysql');
-    conn = await mysql.connect(cfg);
-  } else {
-    throw new Error(`unsupported DB_CLIENT="${cfg.client}"`);
+  const tried = dbConfig.candidates();
+  if (!tried.length) {
+    const problem = dbConfig.environmentProblem();
+    throw new Error(
+      (problem ? problem + '\n' : '')
+      + 'No database is configured. Set DB_CLIENT and its connection settings in the environment '
+      + 'for the first start, or save a configuration from the administration panel.'
+    );
   }
-  await applySchema(conn);
-  return conn;
+
+  failures = [];
+  let lastError = null;
+  for (const candidate of tried) {
+    try {
+      conn = await open(candidate.config);
+      source = candidate.source;
+      activeConfig = candidate.config;
+      openedAt = new Date().toISOString();
+      return conn;
+    } catch (e) {
+      lastError = e;
+      failures.push({ source: candidate.source, error: e.message });
+      console.error('[warn] database configuration "' + candidate.source + '" did not connect: ' + e.message);
+    }
+  }
+  conn = null;
+  throw lastError;
+}
+
+// Open the resolved configuration and swap it in as the live connection.
+//
+// The replacement is fully connected and migrated before conn is replaced, so a
+// failure here leaves the running connection exactly as it was - that is the
+// rollback. The outgoing connection is closed after a brief grace period so
+// queries already in flight finish on it rather than being cut off.
+//
+// Only the highest-precedence candidate is tried: an explicit "apply now" is a
+// request to use that configuration, so a failure to reach it is reported rather
+// than silently replaced by the fallback.
+async function reconnect() {
+  const tried = dbConfig.candidates();
+  if (!tried.length) return { ok: false, error: 'No database is configured.' };
+  const candidate = tried[0];
+  let next;
+  try {
+    next = await open(candidate.config);
+  } catch (e) {
+    failures = [{ source: candidate.source, error: e.message }];
+    return { ok: false, error: e.message };
+  }
+  const previous = conn;
+  conn = next;
+  source = candidate.source;
+  activeConfig = candidate.config;
+  openedAt = new Date().toISOString();
+  failures = [];
+  if (previous && previous !== next) {
+    const timer = setTimeout(() => { try { previous.close(); } catch { /* already gone */ } }, 500);
+    if (timer.unref) timer.unref();
+  }
+  return { ok: true, dialect: next.dialect, source };
+}
+
+// What the connection actually is right now, for the administration panel.
+function status() {
+  return {
+    connected: !!conn,
+    dialect: conn ? conn.dialect : null,
+    source,
+    config: dbConfig.mask(activeConfig),
+    openedAt,
+    failures: failures.slice(),
+  };
 }
 
 module.exports = {
   connect,
+  reconnect,
+  status,
+  // The live connection's configuration, unmasked. Server-side only: it carries the
+  // password and must never be serialised into a response.
+  liveConfig: () => activeConfig,
   get config() {
     return conn ? { dialect: conn.dialect } : null;
   },
@@ -98,5 +189,15 @@ module.exports = {
   run: (...args) => active().run(...args),
   exec: (...args) => active().exec(...args),
   transaction: (fn) => active().transaction(fn),
-  close: () => (conn ? conn.close() : Promise.resolve()),
+  // Closing clears the reference rather than leaving a handle to a shut connection
+  // behind, so a caller that closes and connects again gets a real new connection
+  // instead of a dead one.
+  close: async () => {
+    const closing = conn;
+    conn = null;
+    source = null;
+    activeConfig = null;
+    openedAt = null;
+    if (closing) await closing.close();
+  },
 };

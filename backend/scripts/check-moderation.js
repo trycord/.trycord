@@ -62,6 +62,7 @@ const stamp = Date.now().toString(36);
   const dbFile = '/tmp/opencode/moderation-' + stamp + '.db';
   const env = Object.assign({}, process.env, {
     DB_CLIENT: 'sqlite', DB_FILE: dbFile, HOST: '127.0.0.1', PORT: String(port),
+    TRYCOD_DB_ENV_ONLY: '1',
     MAIL_MODE: 'log', JWT_SECRET: 'moderation-check-secret-0123456789abcdef',
     TRYCORD_INSTANCE_ID: 'modcheck', TRYCORD_NAME: 'Moderation Check',
     STORAGE_DRIVER: 'local', UPLOAD_DIR: '/tmp/opencode/moderation-uploads',

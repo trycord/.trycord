@@ -1,7 +1,15 @@
+// Presentation.
+//
+// One question - is this a phone or a wide screen - answered once and written to
+// <html data-presentation>, so the stylesheet arranges one tree rather than three.
+// The same module owns the drawer on a narrow screen: open, close, focus, Escape
+// and the edge swipe, because all of those are the drawer being a drawer rather
+// than the shell's business. The shell owns the one backdrop, because it is the
+// backdrop for the context panel too.
+
 const BREAKPOINT = 600;
 let onChange = null;
 let returnFocus = null;
-
 
 export function presentationMode() {
   return document.documentElement.dataset.presentation === 'mobile' ? 'mobile' : 'desktop';
@@ -12,59 +20,59 @@ export function setPresentation(mode) {
   const prev = presentationMode();
   document.documentElement.dataset.presentation = next;
   if (next === prev) return next;
-  // Leaving the drawer open across a rotation would leave an overlay with no
-  // column behind it, so the layout change closes it.
+  // A drawer left open across a rotation would sit over a column that is back.
   if (next === 'desktop') closeNav();
   const scroller = document.getElementById('view-root');
   if (scroller) scroller.scrollTop = 0;
-  if (onChange) try { onChange(next); } catch { /* ignore */ }
+  if (onChange) {
+    try { onChange(next); } catch { /* a listener is not the layout's problem */ }
+  }
   return next;
 }
 
 export function updateFromViewport() {
-  return setPresentation(window.innerWidth < BREAKPOINT ? 'mobile' : 'desktop');
+  const width = typeof window !== 'undefined' && window.innerWidth ? window.innerWidth : 1024;
+  return setPresentation(width < BREAKPOINT ? 'mobile' : 'desktop');
 }
 
+export function onPresentationChange(fn) {
+  onChange = fn;
+}
 
-// The rail is permanent on desktop and hidden on a phone, but "is navigation showing"
-// is still one question with one answer - and the answer belongs to the context
-// navigation, which is the drawer at both breakpoints where one exists.
+// ---- the drawer ------------------------------------------------------------
 //
-// It used to be asked of #app-rail, which no stylesheet ever turns into a drawer: below
-// 820px the rail is display:none and the toggle opened a hidden element, so on a phone
-// and on a tablet the only way into the sidebar was a button that did nothing.
+// The spine (#spine) is a column on a wide screen and a drawer on a phone. "Is
+// navigation open" is one attribute on #shell - the same one the stylesheet draws the
+// drawer and its scrim from - so the state, the scrim and the focus trap cannot
+// disagree about whether it is open. It is asked of the spine rather than of the rail
+// the shell no longer has: the spine is the one navigation column at every breakpoint.
+
 export function isNavOpen() {
-  const place = document.getElementById('place-navigation');
-  return !!place && place.classList.contains('is-open');
+  const shell = document.getElementById('shell');
+  return !!shell && shell.dataset.drawer === 'spine';
 }
 
 export function openNav() {
-  const place = document.getElementById('place-navigation');
-  if (!place || place.classList.contains('is-open')) return;
-  // Captured before the first control is focused, or the drawer would hand focus
-  // straight back to itself on close.
+  const shell = document.getElementById('shell');
+  if (!shell || shell.dataset.drawer === 'spine') return;
   returnFocus = document.activeElement;
-  place.classList.add('is-open');
+  shell.dataset.drawer = 'spine';
   document.documentElement.classList.add('is-nav-open');
-  const backdrop = document.getElementById('desktop-backdrop');
-  if (backdrop) backdrop.hidden = false;
   const toggle = document.querySelector('.nav-toggle');
   if (toggle) toggle.setAttribute('aria-expanded', 'true');
-  const first = place.querySelector('a[href], button:not([disabled]), input');
+  const spine = document.getElementById('spine');
+  const first = spine && spine.querySelector('a[href], button:not([disabled]), input');
   if (first && first.focus) first.focus();
 }
 
 export function closeNav() {
-  const place = document.getElementById('place-navigation');
-  if (!place || !place.classList.contains('is-open')) return;
-  place.classList.remove('is-open');
+  const shell = document.getElementById('shell');
+  if (shell && shell.dataset.drawer === 'spine') shell.dataset.drawer = 'closed';
   document.documentElement.classList.remove('is-nav-open');
-  const backdrop = document.getElementById('desktop-backdrop');
-  if (backdrop) backdrop.hidden = true;
   const toggle = document.querySelector('.nav-toggle');
   if (toggle) toggle.setAttribute('aria-expanded', 'false');
   if (returnFocus && typeof returnFocus.focus === 'function') {
-    try { returnFocus.focus(); } catch { /* ignore */ }
+    try { returnFocus.focus(); } catch { /* the element may be gone */ }
   }
   returnFocus = null;
 }
@@ -74,120 +82,85 @@ export function toggleNav() {
   else openNav();
 }
 
-export function onPresentationChange(fn) {
-  onChange = fn;
-}
-
-
-// The drawer is modal, so it has to behave like one: Escape closes it, and Tab
-function drawerKeys(e) {
+// The drawer is modal, so it behaves like one: Escape closes it and Tab stays
+// inside it for as long as it is open.
+function drawerKeys(event) {
   if (!isNavOpen()) return;
-
-  if (e.key === 'Escape') {
-    e.preventDefault();
+  if (event.key === 'Escape') {
+    event.preventDefault();
     closeNav();
     return;
   }
-  if (e.key !== 'Tab') return;
-
-  const place = document.getElementById('place-navigation');
-  const f = [...place.querySelectorAll('a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])')]
-    .filter((n) => n.offsetParent !== null || n === document.activeElement);
-  if (!f.length) return;
-  const first = f[0];
-  const last = f[f.length - 1];
+  if (event.key !== 'Tab') return;
+  const spine = document.getElementById('spine');
+  if (!spine) return;
+  const focusable = [...spine.querySelectorAll('a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])')]
+    .filter((node) => node.offsetParent !== null || node === document.activeElement);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
   const at = document.activeElement;
-  if (e.shiftKey && (at === first || !place.contains(at))) {
-    e.preventDefault();
+  if (event.shiftKey && (at === first || !spine.contains(at))) {
+    event.preventDefault();
     last.focus();
-  } else if (!e.shiftKey && at === last) {
-    e.preventDefault();
+  } else if (!event.shiftKey && at === last) {
+    event.preventDefault();
     first.focus();
   }
 }
 
-export function wireNav() {
-  document.addEventListener('keydown', drawerKeys);
-  // Tapping the dimmed area beside the drawer is how a drawer gets closed on a
-  // phone - more often than the gesture, and the only way for anyone using a
-  // pointer with a keyboard-free setup. Escape and the swipe are alternatives to
-  // this, not replacements for it: without it the scrim is a picture of a door.
-  const backdrop = document.getElementById('desktop-backdrop');
-  if (backdrop) {
-    backdrop.addEventListener('click', () => {
-      if (isNavOpen()) closeNav();
-    });
-  }
-}
-
-
-// --- swipe ----------------------------------------------------------------
+// ---- edge swipe ------------------------------------------------------------
 //
-// A drawer you cannot swipe is half a drawer: on a phone the edge swipe is the
-// fastest way in and the flick is the fastest way out.
-//
-// Three things it must not do, or it makes the app worse than no gesture:
+// A drawer that cannot be swiped is half a drawer. Three things it must not do:
 // hijack a vertical scroll, hijack a horizontal scroller (the community strip
-// scrolls sideways inside the drawer), or leave the drawer parked mid-way when
-// the gesture is abandoned.
+// scrolls sideways inside), or leave the drawer parked when the gesture stops.
 
-// px from the left edge that begins an open gesture.
 const EDGE_ZONE = 24;
-// px of travel that commits the open or close.
 const COMMIT_DIST = 56;
-// horizontal travel must beat vertical by this much to win the gesture.
 const AXIS_LOCK = 1.5;
 
 function horizontallyScrollable(node) {
-  // The target can be the document or a text node, neither of which has a
-  // style or a parentElement.
   let n = node && node.nodeType === 1 ? node : (node && node.parentElement);
   for (; n && n !== document.body; n = n.parentElement) {
-    const ox = getComputedStyle(n).overflowX;
-    if (ox === 'auto' || ox === 'scroll') return true;
+    const overflowX = getComputedStyle(n).overflowX;
+    if (overflowX === 'auto' || overflowX === 'scroll') return true;
   }
   return false;
 }
 
 export function wireDrawerGestures() {
   let id = null;
-  let x0 = 0, y0 = 0;
-  let axis = null;          // 'x' once the gesture is known horizontal
+  let x0 = 0;
+  let y0 = 0;
+  let axis = null;
   let width = 0;
   let wasOpen = false;
-  let offset = 0;           // live travel, negative = closed
+  let offset = 0;
 
-  const drawerEl = () => document.getElementById('place-navigation');
+  const drawerEl = () => document.getElementById('spine');
 
-  function begin(e) {
+  function begin(event) {
     if (presentationMode() !== 'mobile') return;
-    if (e.touches.length !== 1) return;
-    // A control press is a tap, not a drag. closest() only exists on elements,
-    // and a touch can legitimately land on the document or a text node.
-    const hit = e.target;
+    if (event.touches.length !== 1) return;
+    const hit = event.target;
     if (hit && typeof hit.closest === 'function'
       && hit.closest('button, a[href], input, textarea, select')) return;
-
     wasOpen = isNavOpen();
-    const x = e.touches[0].clientX;
-    if (!wasOpen && x > EDGE_ZONE) return;          // closed: edge only
-    if (horizontallyScrollable(e.target)) return;    // let the strip scroll
-
-    id = e.touches[0].identifier;
-    x0 = x; y0 = e.touches[0].clientY;
+    const x = event.touches[0].clientX;
+    if (!wasOpen && x > EDGE_ZONE) return;
+    if (horizontallyScrollable(event.target)) return;
+    id = event.touches[0].identifier;
+    x0 = x;
+    y0 = event.touches[0].clientY;
     axis = null;
     offset = 0;
     const drawer = drawerEl();
     if (!drawer) return;
     width = drawer.getBoundingClientRect().width || 1;
-    // Detach from the open/closed transform so the finger can drive it directly.
     drawer.style.transition = 'none';
     if (wasOpen) drawer.style.transform = 'translateX(0)';
   }
 
-  // Hand the drawer back to the stylesheet. Called on every exit path: a gesture
-  // that turns out to be a vertical scroll must not leave `transition: none`
-  // inline, or the drawer never animates again.
   function release() {
     const drawer = drawerEl();
     if (!drawer) return;
@@ -195,23 +168,18 @@ export function wireDrawerGestures() {
     drawer.style.transform = '';
   }
 
-  function move(e) {
+  function move(event) {
     if (id === null) return;
-    const t = [...e.touches].find((x) => x.identifier === id);
-    if (!t) return;
-    const dx = t.clientX - x0;
-    const dy = t.clientY - y0;
-
+    const touch = [...event.touches].find((t) => t.identifier === id);
+    if (!touch) return;
+    const dx = touch.clientX - x0;
+    const dy = touch.clientY - y0;
     if (axis === null) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;   // not decided yet
-      // Decided on the larger axis, with a bias toward vertical so a sideways
-      // drift while scrolling does not capture the gesture.
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
       axis = Math.abs(dx) > Math.abs(dy) * AXIS_LOCK ? 'x' : 'y';
       if (axis === 'y') { id = null; release(); return; }
     }
-    if (e.cancelable) e.preventDefault();
-
-    // Opening travels positive, closing negative; past either end it stops.
+    if (event.cancelable) event.preventDefault();
     offset = Math.max(-width, Math.min(width, dx));
     const drawer = drawerEl();
     if (drawer) drawer.style.transform = `translateX(${offset}px)`;
@@ -222,10 +190,11 @@ export function wireDrawerGestures() {
     id = null;
     release();
     if (wasOpen ? offset < -COMMIT_DIST : offset > COMMIT_DIST) {
-      if (wasOpen) closeNav(); else openNav();
+      if (wasOpen) closeNav();
+      else openNav();
     } else if (wasOpen !== isNavOpen()) {
-      // Came back short: snap to whichever end it started from.
-      if (wasOpen) openNav(); else closeNav();
+      if (wasOpen) openNav();
+      else closeNav();
     }
   }
 
@@ -233,6 +202,11 @@ export function wireDrawerGestures() {
   document.addEventListener('touchmove', move, { passive: false });
   document.addEventListener('touchend', end, { passive: true });
   document.addEventListener('touchcancel', end, { passive: true });
+}
+
+export function wireNav() {
+  document.addEventListener('keydown', drawerKeys);
+  window.addEventListener('resize', () => { updateFromViewport(); });
 }
 
 const TrycordPresentation = {
@@ -247,7 +221,6 @@ const TrycordPresentation = {
   wire: wireNav,
   onChange: onPresentationChange,
 };
-
 
 export { TrycordPresentation };
 export default TrycordPresentation;

@@ -1,0 +1,6 @@
+/* Community management.
+ *
+ * A community's own settings, roles, members, invites and moderation. These are
+ * the screens a member with a role sees inside a server, so they lean on the page
+ * system in views.css; everything here is the community-specific furniture.
+ */

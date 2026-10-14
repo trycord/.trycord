@@ -170,6 +170,19 @@ router.post('/:roleId/assign', auth.requireVerified, requirePerm('MANAGE_ROLES')
     try {
       await assertAssignable(req, role);
     } catch (e) { return serviceError(res, e); }
+    // Granting a role is as much an escalation as stripping one: without this a
+    // mid-ranked moderator could hand a role to someone ranked above them and
+    // change an outcome they do not outrank. Self-grant is allowed for the same
+    // reason self-removal is - it can only ever lower the actor's own reach.
+    if (!req.access.isOwner && String(userId) !== String(req.user.id)) {
+      const [actorTop, targetTop] = await Promise.all([
+        roles.topPosition(req.server.id, req.user.id),
+        roles.topPosition(req.server.id, userId),
+      ]);
+      if (actorTop <= targetTop) {
+        return fail(res, 'PERMISSION_DENIED', 'target outranks you');
+      }
+    }
     const out = await roles.assign(req.server.id, userId, role.id);
     events.emit(req.server.id, 'member_roles_updated', { userId: String(userId) });
     res.json(out);

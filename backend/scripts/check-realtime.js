@@ -124,6 +124,7 @@ async function main() {
   const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'trycord-rt-'));
   for (const [k, v] of Object.entries({
     DB_CLIENT: 'sqlite',
+    TRYCOD_DB_ENV_ONLY: '1',
     DB_FILE: path.join(dir, 'realtime.db'),
     PORT: String(port),
     HOST: '127.0.0.1',

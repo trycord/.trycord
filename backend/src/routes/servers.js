@@ -202,9 +202,9 @@ router.post('/:id/ban', resolveServer, auth.requireVerified, requirePerm('BAN_ME
 
 router.post('/:id/unban', resolveServer, auth.requireVerified, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
   try {
-    const { userId } = req.body || {};
+    const { userId, reason } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
-    res.json(await memberships.unban(req.server.id, userId));
+    res.json(await memberships.unban(req.server.id, req.user.id, userId, reason));
   } catch (e) { serviceError(res, e); }
 });
 

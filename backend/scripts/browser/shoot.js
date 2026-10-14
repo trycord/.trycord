@@ -52,6 +52,7 @@ function health(origin) {
     // and the last one wins, so a DB_FILE on its own resolves to the live remote
     // MySQL rather than anything local.
     DB_CLIENT: 'sqlite',
+    TRYCOD_DB_ENV_ONLY: '1',
     DB_FILE: path.join(dir, 'shots.db'),
     PORT: String(port),
     HOST: '127.0.0.1',

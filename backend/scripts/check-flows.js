@@ -137,6 +137,8 @@ async function waitForHealth(child, attempts) {
     ...env,
     DB_CLIENT: 'sqlite',
     DB_FILE: dbFile,
+    // A saved database override must not redirect this check away from its own file.
+    TRYCOD_DB_ENV_ONLY: '1',
     PORT: String(PORT),
     HOST: '127.0.0.1',
     UPLOAD_DIR: uploadDir,
@@ -164,7 +166,8 @@ async function waitForHealth(child, attempts) {
   const probe = spawnSync(process.execPath, [
     '-e',
     "require('dotenv').config();" +
-    "process.stdout.write(JSON.stringify(require('./src/db/config').loadDbConfig()));",
+    "const c=require('./src/db/config').candidates();"
+      + "process.stdout.write(JSON.stringify(c.length ? c[0].config : null));",
   ], { cwd: ROOT, env: childEnv, encoding: 'utf8' });
 
   let resolved = null;

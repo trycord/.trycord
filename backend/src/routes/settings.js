@@ -12,19 +12,30 @@ const rateLimit = require('../middleware/ratelimit');
 const adminGuard = require('../middleware/adminGuard');
 const settings = require('../services/settings');
 const quickSetup = require('../services/quick-setup');
-const db = require('../db');
-const { now, uuid } = require('../util');
 
 const router = express.Router();
 router.use(adminGuard);
 
-// The whole catalogue, plus the settings that cannot be changed here and why.
+// The whole catalogue, plus the settings that cannot be changed here and why, and the
+// runtime status: whether anything is waiting for a restart to take effect.
+//
+// The catalogue is the source of truth for the configuration page - labels, types,
+// bounds, current values, effective sources and editability all come from here rather
+// than being restated in the client, so a setting cannot drift between the two.
 router.get('/', wrap(async (req, res) => {
   await settings.load();
   res.json({
     categories: settings.catalogue(),
     deploymentOnly: settings.DEPLOYMENT_ONLY,
+    status: settings.status(),
   });
+}));
+
+// Just the runtime status, for a page that polls after a save without re-reading the
+// whole catalogue.
+router.get('/status', wrap(async (req, res) => {
+  await settings.load();
+  res.json(settings.status());
 }));
 
 // ---- quick setup ------------------------------------------------------------
@@ -99,29 +110,25 @@ router.put('/', rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req, res) =
   }
   if (!result.ok) return fail(res, 'VALIDATION_ERROR', result.problems.join('; '), 400);
 
-  res.json({ ok: true, changed: result.changed, categories: settings.catalogue() });
+  res.json({
+    ok: true,
+    changed: result.changed,
+    categories: settings.catalogue(),
+    status: settings.status(),
+  });
 }));
 
-// Reset one setting back to its default. Deletes the stored row, which puts the source
-// back on 'default' rather than writing the default over it.
+// Reset one setting to whatever the deployment and the schema say without a saved value.
 router.delete('/:key', rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req, res) => {
   await settings.load();
-  const entry = settings.SCHEMA.find((s) => s.key === req.params.key);
-  if (!entry) return fail(res, 'NOT_FOUND', 'unknown setting');
-  if (settings.source(req.params.key) === 'environment') {
-    return fail(res, 'PERMISSION_DENIED',
-      'that value comes from the deployment environment and cannot be reset here', 403);
+  try {
+    await settings.reset(req.params.key, req.user.id);
+  } catch (e) {
+    if (e && e.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'unknown setting');
+    if (e && e.code === 'LOCKED') return fail(res, 'PERMISSION_DENIED', e.message, 403);
+    throw e;
   }
-
-  await db.run('DELETE FROM instance_settings WHERE `key` = ?', [req.params.key]);
-  await db.run(
-    `INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at)
-     VALUES (?, ?, 'reset_setting', 'instance', ?, NULL, ?)`,
-    [uuid(), req.user.id, req.params.key, now()]
-  );
-  await settings.load(true);
-
-  res.json({ ok: true, categories: settings.catalogue() });
+  res.json({ ok: true, categories: settings.catalogue(), status: settings.status() });
 }));
 
 // A sanitised export: every value, with the secret-bearing ones left as a placeholder

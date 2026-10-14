@@ -12,7 +12,6 @@ const rateLimit = require('../../middleware/ratelimit');
 // Forgot password: ALWAYS generic, so nobody can probe for accounts.
 router.post('/forgot-password', rateLimit({ windowMs: 60000, max: 5 }), async (req, res, next) => {
   try {
-    const recovery = require('../auth/recovery');
     await recovery.requestPasswordReset((req.body || {}).email);
     res.json({ ok: true, message: "If an account exists for that email, you'll receive a password reset link." });
   } catch (e) { next(e); }
@@ -25,7 +24,6 @@ router.post('/reset-password', rateLimit({ windowMs: 60000, max: 10 }), async (r
     if (confirmPassword !== undefined && confirmPassword !== newPassword) {
       return fail(res, 'VALIDATION_ERROR', 'passwords do not match');
     }
-    const recovery = require('../auth/recovery');
     res.json(await recovery.resetPassword(token, newPassword));
   } catch (e) { serviceError(res, e); }
 });

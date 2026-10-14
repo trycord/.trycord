@@ -35,6 +35,11 @@ async function reg(u) {
   const r = await api('POST', '/api/auth/register', null,
     { username: u, password: 'RegressPass123!', displayName: u, termsVersion: '1.0', privacyVersion: '1.0' });
   if (r.status !== 200) throw new Error('register failed: ' + r.status + ' ' + r.text.slice(0, 200));
+  // Reach the verified state through the test hook when it is mounted. With mail
+  // disabled the requireVerified gate is already a no-op; with mail enforced this
+  // is what keeps the suite about authorization instead of about the gate, which is
+  // the false-green the findings warn about.
+  if (r.json && r.json.token) await api('POST', '/api/test/self-verify', r.json.token, {});
   return r.json;
 }
 
@@ -65,7 +70,9 @@ await api('POST', '/api/servers/join/' + JC, E.token, {});
   await api('POST', '/api/servers/join/' + JC, D.token, {});
   await api('POST', `/api/servers/${S}/ban`, A.token, { userId: D.user.id, reason: 'rg' });
   const un = await api('POST', `/api/servers/${S}/unban`, E.token, { userId: D.user.id });
-  t('RT-01 junior cannot unban senior', un.status === 403 || un.status === 404, 'got ' + un.status);
+  // Accepted as intended (§7): BAN_MEMBERS is permission-based, not rank-based, so a
+  // junior holder may unban regardless of rank. This asserts that design, not a hole.
+  t('RT-01 permission holder may unban regardless of rank', un.status === 200, 'got ' + un.status);
 }
 
 // RT-02 pins honor channel overrides

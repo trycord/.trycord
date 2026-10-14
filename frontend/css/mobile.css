@@ -1,0 +1,273 @@
+/* The phone presentation.
+ *
+ * A phone is its own arrangement of the shell regions, not a narrowed desk, so
+ * it lives here as one layer rather than as `max-width` patches scattered
+ * through the desk layers. Every rule is keyed to
+ * `html[data-presentation="mobile"]`, the single attribute presentation.js owns
+ * and the bootstrap in index.html writes before the first paint. The layout, the
+ * drawer, the tab bar and the touch sizing therefore switch from one source, and
+ * the desk layers carry no phone rules at all.
+ *
+ * Colour, type and timing are the trycord-assets token library; this layer names
+ * the phone and never a raw hex. Touch targets are a finger, not a cursor:
+ * 44px minimum, 48px for the primary rows, and fields stay at 16px so iOS does
+ * not zoom the page when one takes focus. Safe-area insets are honoured on every
+ * edge so the shell sits inside the notch and above the home indicator. */
+
+/* -- the frame ----------------------------------------------------------- */
+
+html[data-presentation="mobile"] .ws,
+html[data-presentation="mobile"] .ws[data-spine="collapsed"],
+html[data-presentation="mobile"] .ws[data-context="open"],
+html[data-presentation="mobile"] .ws[data-spine="collapsed"][data-context="open"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html[data-presentation="mobile"] .stage { grid-column: 1; }
+
+/* The rail is a desk affordance - on a phone its communities are a section of
+   the drawer, so the drawer is the only way in and the rail is not painted. */
+html[data-presentation="mobile"] .community-rail { display: none; }
+
+/* Leading control by depth: drawer on a tab root, Back on a detail. */
+html[data-presentation="mobile"] .ws[data-depth="detail"] .nav-toggle { display: none; }
+html[data-presentation="mobile"] .ws[data-depth="detail"] .nav-back { display: grid; }
+
+/* Slide the arriving screen in the direction of travel. The shell toggles the
+   class; reduced motion is handled before it is added. */
+html[data-presentation="mobile"] .screen.nav-forward { animation: screen-forward var(--dur-2) var(--ease-out); }
+html[data-presentation="mobile"] .screen.nav-back { animation: screen-back var(--dur-2) var(--ease-out); }
+@keyframes screen-forward { from { opacity: 0; transform: translateX(16px); } }
+@keyframes screen-back { from { opacity: 0; transform: translateX(-16px); } }
+
+/* The place bar is the phone's top bar: it holds the drawer control, the title
+   and the actions, and it is the one strip that stays put while the body
+   scrolls. It owns the top inset so the safe area is above the controls rather
+   than at the document's edge. */
+html[data-presentation="mobile"] .stage-head {
+  height: calc(var(--head-h) + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: max(6px, env(safe-area-inset-left, 0px));
+  padding-right: max(6px, env(safe-area-inset-right, 0px));
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: saturate(140%) blur(12px);
+}
+html[data-presentation="mobile"] .stage-head-title { font-size: 1.05rem; }
+/* The controls scroll sideways rather than wrapping the bar onto a second line. */
+html[data-presentation="mobile"] .stage-head-actions {
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+html[data-presentation="mobile"] .stage-head-actions::-webkit-scrollbar { display: none; }
+html[data-presentation="mobile"] .stage-head-actions > * { flex: none; }
+
+/* The body keeps a gutter of its own, and its last row clears the tab bar on a
+   surface that has no composer (a settings page, a directory). */
+html[data-presentation="mobile"] .stage-body {
+  overscroll-behavior-y: contain;
+}
+
+/* -- the spine, as a drawer ---------------------------------------------- */
+/* The spine is a column on a desk and a drawer on a phone: off-canvas until
+   asked for, over the stage, with the scrim the shell already owns behind it.
+   The collapse state is a desk affordance, so the drawer is always the spine. */
+html[data-presentation="mobile"] .spine {
+  position: fixed; top: 0; bottom: 0; left: 0;
+  width: min(304px, 86vw);
+  z-index: var(--z-drawer);
+  box-shadow: var(--shadow-3);
+  transform: translateX(-104%);
+  transition: transform var(--dur-2) var(--ease-out);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+html[data-presentation="mobile"] .ws[data-spine="collapsed"] .spine { display: flex; }
+html[data-presentation="mobile"] .ws[data-drawer="spine"] .spine { transform: translateX(0); }
+
+/* -- the tab bar --------------------------------------------------------- */
+/* The tab bar is the phone's primary navigation and its last row, so it honours
+   the bottom inset itself. */
+html[data-presentation="mobile"] .tabbar {
+  display: flex;
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+html[data-presentation="mobile"] .tab-button { min-height: 48px; }
+html[data-presentation="mobile"] .tab-button svg { width: 24px; height: 24px; }
+html[data-presentation="mobile"] .tab-button__label { font-size: 0.72rem; }
+
+/* -- the context panel, as a sheet --------------------------------------- */
+html[data-presentation="mobile"] .context-panel { border-left: 0; }
+html[data-presentation="mobile"] .context-panel:not([hidden]) {
+  position: fixed; inset: 0; width: 100%; z-index: var(--z-overlay);
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* -- touch targets ------------------------------------------------------- */
+/* A 34px control is a mouse target. Every control a thumb lands on grows to a
+   finger, and the icon controls keep their look while the box grows. */
+html[data-presentation="mobile"] .icon-btn { width: 44px; height: 44px; }
+html[data-presentation="mobile"] .icon-btn svg { width: 20px; height: 20px; }
+html[data-presentation="mobile"] .members-close { width: 44px; height: 44px; }
+
+html[data-presentation="mobile"] .btn { min-height: 44px; }
+html[data-presentation="mobile"] .btn--sm { min-height: 38px; }
+html[data-presentation="mobile"] .btn--lg { min-height: 50px; }
+html[data-presentation="mobile"] .btn--icon { width: 44px; height: 44px; }
+html[data-presentation="mobile"] .btn--icon.btn--sm { width: 38px; height: 38px; }
+
+/* Drawer rows, list rows and navigation rows are all the same thumb-sized line. */
+html[data-presentation="mobile"] .nav-item,
+html[data-presentation="mobile"] .nav-item--dm,
+html[data-presentation="mobile"] .member-row,
+html[data-presentation="mobile"] .menu-item,
+html[data-presentation="mobile"] .list-row,
+html[data-presentation="mobile"] .tab,
+html[data-presentation="mobile"] .segmented-item,
+html[data-presentation="mobile"] .perm-item,
+html[data-presentation="mobile"] .settings-nav-item,
+html[data-presentation="mobile"] .cfg-nav__item,
+html[data-presentation="mobile"] .directory-link { min-height: 44px; }
+html[data-presentation="mobile"] .nav-item { padding: 9px 12px; font-size: 0.95rem; }
+html[data-presentation="mobile"] .nav-item svg { width: 20px; height: 20px; }
+html[data-presentation="mobile"] .menu-item { padding: 11px 14px; font-size: 0.95rem; }
+html[data-presentation="mobile"] .segmented { flex-wrap: wrap; }
+
+html[data-presentation="mobile"] .place-switcher { height: 48px; }
+html[data-presentation="mobile"] .spine-account { min-height: 56px; }
+html[data-presentation="mobile"] .spine-head { padding: 12px 12px 8px; }
+html[data-presentation="mobile"] .spine-global { padding: 6px 10px 12px; }
+html[data-presentation="mobile"] .spine-foot { padding: 10px; }
+
+/* -- fields -------------------------------------------------------------- */
+/* Below 16px iOS zooms the page the instant a field takes focus, so a field is
+   never smaller, and it is never shorter than a finger to tap. */
+html[data-presentation="mobile"] .input,
+html[data-presentation="mobile"] .textarea,
+html[data-presentation="mobile"] .select { min-height: 48px; font-size: 16px; }
+html[data-presentation="mobile"] .textarea { min-height: 108px; }
+html[data-presentation="mobile"] .select { padding-right: 40px; }
+html[data-presentation="mobile"] .checkbox { gap: 12px; padding: 6px 0; }
+html[data-presentation="mobile"] .checkbox input { width: 22px; height: 22px; }
+html[data-presentation="mobile"] .switch { width: 50px; height: 30px; }
+html[data-presentation="mobile"] .switch::after { width: 24px; height: 24px; }
+html[data-presentation="mobile"] .switch[aria-checked="true"]::after { transform: translateX(20px); }
+
+/* -- menus and sheets ---------------------------------------------------- */
+/* A menu is anchored to a control, so it must fit the viewport it opened into
+   instead of the width it would prefer. A longer menu scrolls inside itself. */
+html[data-presentation="mobile"] .menu {
+  min-width: min(220px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: 70dvh; overflow-y: auto;
+}
+
+/* A dialog stops being a floating card and rises as a sheet from the bottom
+   edge, full width, never taller than the screen it is on. */
+html[data-presentation="mobile"] .overlay { align-items: flex-end; padding: 0; }
+html[data-presentation="mobile"] .dialog {
+  max-width: none; width: 100%; max-height: 92dvh; margin: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0; border-bottom: 0;
+  animation: sheet-in var(--dur-2) var(--ease-out);
+  display: flex; flex-direction: column;
+}
+html[data-presentation="mobile"] .dialog-body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+html[data-presentation="mobile"] .dialog-foot {
+  padding-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  flex-wrap: wrap;
+}
+html[data-presentation="mobile"] .dialog-foot .btn { flex: 1 1 auto; }
+
+html[data-presentation="mobile"] .toast { font-size: 0.9rem; }
+html[data-presentation="mobile"] .empty { padding: 36px 18px; }
+html[data-presentation="mobile"] .toasts {
+  bottom: calc(var(--tabbar-h) + 16px);
+  right: 12px; left: 12px; width: auto;
+}
+/* The connection pill sits above the tab bar rather than behind it. */
+html[data-presentation="mobile"] .connection { bottom: calc(var(--tabbar-h) + 16px); }
+
+@keyframes sheet-in { from { opacity: 0; transform: translateY(28px); } }
+
+/* -- the composer -------------------------------------------------------- */
+/* The composer is the last thing above the tab bar, so it owns the bottom
+   inset and gives the input the room a thumb needs. */
+html[data-presentation="mobile"] .composer-slot {
+  padding: 8px 10px max(8px, env(safe-area-inset-bottom, 0px));
+}
+html[data-presentation="mobile"] .composer { border-radius: var(--radius-lg); padding: 8px; }
+html[data-presentation="mobile"] .composer-bar .icon-btn { width: 44px; height: 44px; }
+
+/* -- the conversation ---------------------------------------------------- */
+/* The desk spends a gutter on a hover affordance. A phone has no hover and a
+   360px line, so the avatar column tightens and the text takes the width back;
+   a tap opens the same actions. */
+html[data-presentation="mobile"] .convo-intro { padding: 24px 14px 16px; }
+html[data-presentation="mobile"] .date-sep { padding: 12px 14px 6px; }
+html[data-presentation="mobile"] .typing { padding: 4px 14px 6px; }
+html[data-presentation="mobile"] .search-wrap { padding: 12px 14px; }
+html[data-presentation="mobile"] .search-result { padding: 12px; }
+
+html[data-presentation="mobile"] .msg {
+  grid-template-columns: 40px minmax(0, 1fr); gap: 10px; padding: 2px 12px;
+}
+html[data-presentation="mobile"] .msg-actions { right: 10px; }
+html[data-presentation="mobile"] .msg-tool { width: 38px; height: 38px; }
+html[data-presentation="mobile"] .msg-tool svg { width: 18px; height: 18px; }
+html[data-presentation="mobile"] .msg-head { flex-wrap: wrap; gap: 6px; }
+html[data-presentation="mobile"] .msg-text { font-size: 0.95rem; }
+
+html[data-presentation="mobile"] .attachment { max-width: 100%; width: 100%; }
+html[data-presentation="mobile"] .attachment img { max-height: 260px; }
+html[data-presentation="mobile"] .embed { max-width: 100%; }
+
+/* -- pages --------------------------------------------------------------- */
+/* A page keeps a guttered column, its head wraps rather than pushing the
+   actions off the edge, and a table scrolls as one unit rather than dragging
+   the whole page sideways. */
+html[data-presentation="mobile"] .page { padding: 20px 16px 56px; }
+html[data-presentation="mobile"] .page-head { flex-wrap: wrap; }
+html[data-presentation="mobile"] .page-title { font-size: 1.3rem; }
+html[data-presentation="mobile"] .profile-title { font-size: 1.3rem; }
+html[data-presentation="mobile"] .page-actions { flex-wrap: wrap; }
+html[data-presentation="mobile"] .stats { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); }
+html[data-presentation="mobile"] .perm-grid { grid-template-columns: 1fr; }
+html[data-presentation="mobile"] .hero { padding: 20px 16px; }
+html[data-presentation="mobile"] .row-item { flex-wrap: wrap; }
+html[data-presentation="mobile"] .row-item-actions { width: 100%; justify-content: flex-end; }
+html[data-presentation="mobile"] .settings-card,
+html[data-presentation="mobile"] .cfg-card { padding: 14px; }
+html[data-presentation="mobile"] .settings-actions { flex-wrap: wrap; }
+html[data-presentation="mobile"] .view-error { padding: 16px 14px; }
+
+html[data-presentation="mobile"] .pub-head { padding: 14px 16px; }
+html[data-presentation="mobile"] .pub-body { padding: 24px 16px; }
+html[data-presentation="mobile"] .media-row { flex-wrap: wrap; }
+html[data-presentation="mobile"] .media-preview--wide { width: 100%; }
+/* "flex: 1" shrinks a label to a sliver before the row wraps; a real basis makes
+   the controls drop under the label instead of crushing it. */
+html[data-presentation="mobile"] .field-row { flex-wrap: wrap; }
+html[data-presentation="mobile"] .field-row-main { flex: 1 1 100%; }
+
+html[data-presentation="mobile"] .cfg-nav { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+html[data-presentation="mobile"] .cfg-row { flex-wrap: wrap; }
+html[data-presentation="mobile"] .table {
+  display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+
+/* -- small and landscape ------------------------------------------------- */
+/* A 360px viewport cannot spare the full gutter, so the page gives it back. */
+@media (max-width: 380px) {
+  html[data-presentation="mobile"] .page { padding: 16px 12px 48px; }
+  html[data-presentation="mobile"] .stats { grid-template-columns: 1fr; }
+  html[data-presentation="mobile"] .stage-head { padding-left: max(4px, env(safe-area-inset-left, 0px)); }
+}
+
+/* In landscape the header is the vertical space to spend, so it stays tight and
+   the body keeps the height. */
+@media (orientation: landscape) and (max-height: 480px) {
+  html[data-presentation="mobile"] .stage-head { height: calc(48px + env(safe-area-inset-top, 0px)); }
+  html[data-presentation="mobile"] .stage-head-inner { gap: 8px; }
+  html[data-presentation="mobile"] .tabbar { padding-bottom: max(2px, env(safe-area-inset-bottom, 0px)); }
+}

@@ -164,22 +164,25 @@ async function main() {
 
       // 3. The generated token layer exists and is the one the build wrote, so the site
       //    cannot be reading a stale copy that has drifted from the library.
-      const tokens = path.join(REPO, 'frontend', 'css', 'design-tokens.css');
-      ok('the generated token layer exists',
+      //
+      //    The application carries no token file of its own: its stylesheet inlines the
+      //    library, so the public layer is the only generated one. Its semantic source
+      //    is public/css/tokens.css, and the check that the generated file still carries
+      //    that source is what makes a hand-edited copy fail.
+      const source = path.join(PUBLIC, 'css', 'tokens.css');
+      ok('the public semantic token source exists',
+        fs.existsSync(source), source);
+      const tokens = path.join(PUBLIC, 'css', 'design-tokens.css');
+      ok('the generated public token layer exists',
         fs.existsSync(tokens), tokens);
-      const publicTokens = path.join(REPO, 'public', 'css', 'design-tokens.css');
-      ok('the standalone public copy of the tokens exists',
-        fs.existsSync(tokens) && fs.existsSync(publicTokens), tokens + ' / ' + publicTokens);
-      if (fs.existsSync(tokens) && fs.existsSync(publicTokens)) {
-        ok('the standalone copy matches the generated one',
-          fs.readFileSync(tokens, 'utf8') === fs.readFileSync(publicTokens, 'utf8'));
-      }
-      if (fs.existsSync(tokens)) {
+      if (fs.existsSync(source) && fs.existsSync(tokens)) {
         const body = fs.readFileSync(tokens, 'utf8');
         const asset = fs.readFileSync(
           path.join(REPO, 'frontend', 'assets', 'trycord-assets', 'tokens', 'trycord.css'), 'utf8');
         ok('it is the asset library, not a copy',
           body.includes(asset.trim().slice(0, 200)), 'first 200 chars of the library not found');
+        ok('it carries the public semantic names, not a hand-edited copy',
+          body.includes(fs.readFileSync(source, 'utf8').trim()));
       }
 
       // 4. Every page links it, and links it before the file that consumes it.

@@ -97,6 +97,19 @@ async function resetPassword(token, newPassword) {
     return after ? Number(after.session_version || 0) : 0;
   });
   console.log(`[security] password_reset_completed user=${user.id} sessions_revoked=1`);
+  // A reset proves control of the mailbox, not of the authenticator. On an
+  // account with a second factor, hand back the same challenge login returns
+  // rather than a session: otherwise whoever can read the recovery email takes
+  // the account outright, skipping the factor that is supposed to survive a
+  // compromised credential. The password change stands; only the session waits.
+  if (user.totp_enabled_at) {
+    const challenge = require('../routes/auth/challenge');
+    return {
+      mfaRequired: true,
+      challengeToken: challenge.signChallenge(user.id),
+      expiresInSeconds: challenge.CHALLENGE_TTL_SECONDS,
+    };
+  }
   return {
     token: sign({ id: user.id, username: user.username, session_version: version }),
     user: { id: user.id, username: user.username, displayName: user.display_name, createdAt: user.created_at },

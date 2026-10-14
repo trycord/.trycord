@@ -33,6 +33,11 @@ router.post('/ws/ticket', auth, rateLimit({ windowMs: 60000, max: 60 }), (req, r
       username: req.user.username,
       jti: req.user.jti || null,
       iat: req.user.iat,
+      // The session version is what makes "sign out everywhere" reach the socket. A
+      // bearer token carries it and the HTTP layer compares it; without it here, a
+      // ticket minted before the revocation connects after it, because the handshake
+      // only checked the one-second-resolution timestamps.
+      sv: req.user.sv,
     }),
   });
 });

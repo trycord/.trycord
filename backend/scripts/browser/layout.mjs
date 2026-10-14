@@ -181,6 +181,9 @@ const MEASURE = String.raw`
     // whole design of it, and it is verified by keyboard order rather than by geometry,
     // so measuring its box reports a control that is working exactly as intended.
     if (el.classList.contains('skip-link')) continue;
+    // A visually-hidden input is a proxy: the label around it is what a thumb hits, and
+    // its 1x1 box is the hiding mechanism, not a target anyone aims at.
+    if (r.width <= 2 && r.height <= 2) continue;
     const record = {
       tag: el.tagName.toLowerCase(),
       cls: String(el.className || '').slice(0, 50),
@@ -326,6 +329,11 @@ async function main() {
   // an inline <style> because there is no network to fetch a link from. Stripping it here
   // changes nothing about the product: this document is not served by anything.
   const head = '<style>' + css + '</style>';
+  // Geometry, not motion. A transitioned drawer or a slide-in screen photographed the
+  // instant the presentation flips is photographed mid-flight, and every measurement then
+  // describes a frame nobody sees. Kill transitions and animations so the cascade settles
+  // on its final values and the harness measures the layout instead of an animation.
+  const noMotion = '<style>*,*::before,*::after{transition:none!important;animation:none!important}</style>';
   let failures = 0;
   let assertions = 0;
   let advisoryTotal = 0;
@@ -343,9 +351,16 @@ async function main() {
         await new Promise((r) => setTimeout(r, 60));
         await setWidth(b, w);
         await b.eval(
-          'document.open(); document.write(' + JSON.stringify(stripped.replace('</head>', head + '</head>'))
+          'document.open(); document.write(' + JSON.stringify(stripped.replace('</head>', head + noMotion + '</head>'))
           + '); document.close(); true'
         );
+        // The dumped DOM boots once, at one viewport, so it carries one presentation.
+        // Narrowing that document is not the phone layout - it is the desktop shell in a
+        // small box, and the whole phone layer (mobile.css, the tab bar, the drawer) would
+        // go unmeasured. Put it in the presentation the width calls for, the way the app
+        // itself would, then measure what a phone actually gets.
+        const mode = w.width < 600 ? 'mobile' : 'desktop';
+        await b.eval('document.documentElement.dataset.presentation = ' + JSON.stringify(mode) + '; true');
         const m = await b.eval(MEASURE);
         rows.push({ w, m });
 
