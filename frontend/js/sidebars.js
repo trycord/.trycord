@@ -8,9 +8,11 @@
 import { el } from './dom.js';
 import { icon } from './icons.js';
 import { avatar, iconButton, serverMark } from './components.js';
-import { State, nameOf } from './store.js';
+import { State, nameOf, isMuted, refreshMutes, refreshServers } from './store.js';
 import { path, currentRoute, navigate } from './nav.js';
-import { openMenu } from './ui.js';
+import { openMenu, attachContextMenu, confirmDialog, toast, errorToast } from './ui.js';
+import { attachUserMenu } from './user-menu.js';
+import Api from './api.js';
 
 function head(title, actions) {
   const list = Array.isArray(actions) ? actions.filter(Boolean) : (actions ? [actions] : []);
@@ -53,12 +55,31 @@ function homeSidebar() {
     body([
       el('div', { class: 'nav-label' }, 'Your communities'),
       State.servers.length
-        ? el('div', { class: 'nav-group' }, State.servers.map((server) => el('a', {
-          class: 'nav-item' + (here.startsWith('/server/' + server.id) ? ' is-active' : ''),
-          href: path('/server/' + server.id),
-        }, serverMark(server, { size: 'xs' }), el('span', { class: 'truncate' }, server.name))))
+        ? el('div', { class: 'nav-group' }, State.servers.map((server) => {
+          const link = el('a', {
+            class: 'nav-item' + (here.startsWith('/server/' + server.id) ? ' is-active' : ''),
+            href: path('/server/' + server.id),
+          }, serverMark(server, { size: 'xs' }), el('span', { class: 'truncate' }, server.name));
+          attachContextMenu(link, () => serverMenuItems(server));
+          return link;
+        }))
         : el('div', { class: 'sidebar-empty' }, 'No communities yet.'),
     ]),
+  ];
+}
+
+// The actions a community carries wherever its name is drawn - the home column
+// and the far-left rail. One list, so the two never disagree.
+export function serverMenuItems(server) {
+  const id = server.id;
+  return [
+    { header: server.name },
+    { label: 'Open', icon: 'arrow-right', onSelect: () => navigate('/server/' + id) },
+    { label: 'Copy link', icon: 'link', onSelect: () => copyLink('/server/' + id) },
+    { separator: true },
+    { label: 'Invite people', icon: 'mail', onSelect: () => navigate('/server/' + id + '/settings/invites') },
+    { label: 'Members', icon: 'users', onSelect: () => navigate('/server/' + id + '/members') },
+    { label: 'Community settings', icon: 'settings', onSelect: () => navigate('/server/' + id + '/settings') },
   ];
 }
 
@@ -82,7 +103,7 @@ function dmRow(dm, here) {
   const peer = dmUsers(dm);
   const name = peer.map((u) => nameOf(u)).join(', ') || 'Conversation';
   const active = here === '/dms/' + dm.id;
-  return el('a', {
+  const row = el('a', {
     class: 'nav-item nav-item--dm' + (active ? ' is-active' : ''),
     href: path('/dms/' + dm.id),
     'aria-current': active ? 'page' : null,
@@ -92,6 +113,10 @@ function dmRow(dm, here) {
       : el('span', { class: 'dm-stack' }, peer.slice(0, 2).map((u) => avatar(u, { size: 'xs' }))),
     el('span', { class: 'truncate' }, name),
   );
+  // On a person, the conversation is only one of the things the row can do, so
+  // the row carries the whole person menu on a right-click or a long press.
+  if (peer.length === 1) attachUserMenu(row, peer[0]);
+  return row;
 }
 
 function dmUsers(dm) {
@@ -158,15 +183,18 @@ export function communitySidebar(ctx, serverId) {
   const channelItem = (channel) => {
     const route = '/server/' + serverId + '/channel/' + channel.id;
     const active = here.startsWith(route);
-    return el('a', {
+    const link = el('a', {
       class: 'nav-item nav-item--channel' + (active ? ' is-active' : ''),
       href: path(route),
       'aria-current': active ? 'page' : null,
     },
       icon(channel.type === 'voice' ? 'volume' : channel.type === 'announcement' ? 'bell' : 'hash', { size: 16 }),
       el('span', { class: 'truncate' }, channel.name),
+      isMuted(channel.id) ? el('span', { class: 'nav-muted', title: 'Muted' }, icon('bell', { size: 13 })) : null,
       channel.unread ? el('span', { class: 'nav-dot' }) : null,
     );
+    attachContextMenu(link, () => channelMenuItems(serverId, channel));
+    return link;
   };
 
   const byCategory = new Map();
@@ -207,7 +235,6 @@ function openCommunityMenu(event, serverId, server) {
 }
 
 async function leaveCommunity(serverId, server) {
-  const { confirmDialog, toast, errorToast } = await import('./ui.js');
   const sure = await confirmDialog({
     title: 'Leave ' + (server ? server.name : 'this community') + '?',
     body: 'You will need an invite to come back.',
@@ -216,15 +243,57 @@ async function leaveCommunity(serverId, server) {
   });
   if (!sure) return;
   try {
-    const { default: Api } = await import('./api.js');
     await Api.leaveServer(serverId);
-    const { refreshServers } = await import('./store.js');
     await refreshServers();
     toast('You left the community.', { type: 'success' });
     navigate('/home');
   } catch (error) {
     errorToast(error);
   }
+}
+
+// ---- a channel and a person carry a menu too -------------------------------
+
+// A channel's own actions. Mute reads the viewer's list rather than a guessed
+// default, so the label is what pressing it will actually do.
+function channelMenuItems(serverId, channel) {
+  const muted = isMuted(channel.id);
+  const items = [
+    { header: (channel.type === 'voice' ? '' : '#') + channel.name },
+    { label: 'Copy link', icon: 'link', onSelect: () => copyLink('/server/' + serverId + '/channel/' + channel.id) },
+    { label: muted ? 'Unmute' : 'Mute', icon: 'bell', onSelect: () => toggleMute(channel) },
+  ];
+  if (channel.topic) items.push({ label: 'Copy topic', icon: 'copy', onSelect: () => copyValue(channel.topic) });
+  return items;
+}
+
+async function toggleMute(channel) {
+  const muted = isMuted(channel.id);
+  try {
+    if (muted) await Api.unmuteChannel(channel.id);
+    else await Api.muteChannel(channel.id);
+    await refreshMutes();
+    toast(muted ? 'Unmuted.' : 'Muted.', { type: 'success' });
+  } catch (error) {
+    errorToast(error);
+  }
+}
+
+// Both helpers fall back to showing the value when the clipboard is unavailable,
+// rather than claiming a copy that did not happen.
+function writeClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+  return Promise.reject(new Error('clipboard unavailable'));
+}
+
+function copyLink(route) {
+  copyValue(window.location.origin + path(route), 'Link copied.');
+}
+
+function copyValue(text, message) {
+  writeClipboard(text)
+    .then(() => toast(message || 'Copied.', { type: 'success' }))
+    .catch(() => toast(text, { type: 'info' }));
 }
 
 // ---- dispatch --------------------------------------------------------------

@@ -161,6 +161,8 @@
 .nav-item--channel .truncate, .nav-item--dm .truncate { flex: 1; min-width: 0; }
 .nav-item--dm { padding: 5px 10px; }
 .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); flex: none; margin-left: auto; }
+.nav-muted { color: var(--text-3); flex: none; display: inline-flex; align-items: center; margin-left: auto; }
+.nav-muted ~ .nav-dot { margin-left: 6px; }
 
 .sidebar-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; }
 .sidebar-empty { padding: 14px 12px; font-size: 0.85rem; color: var(--text-3); }

@@ -13,7 +13,8 @@ import {
   refreshServerMembers, refreshServerRoles, channelsOf, categoriesOf, can, isOwner, serverById,
 } from '../store.js';
 import { path, navigate } from '../nav.js';
-import { openDialog, confirmDialog, toast, errorToast, openMenu } from '../ui.js';
+import { openDialog, confirmDialog, toast, errorToast, attachContextMenu } from '../ui.js';
+import { openUserMenu, userMenuItems } from '../user-menu.js';
 import { relativeTime } from '../format.js';
 import Api from '../api.js';
 import { page, heading, loading, failure, nothing, stat } from './util.js';
@@ -278,15 +279,20 @@ function memberLine(serverId, item) {
     controls.appendChild(button('Roles', { kind: 'default', onClick: () => openMemberRoles(serverId, item, loadMembersInto) }));
   }
   if (!item.is_owner && (can(serverId, 'KICK_MEMBERS') || can(serverId, 'BAN_MEMBERS'))) {
-    controls.appendChild(button('Manage', { kind: 'ghost', onClick: (event) => memberMenu(event, serverId, item, user) }));
+    controls.appendChild(button('Manage', {
+      kind: 'ghost',
+      onClick: (event) => openUserMenu(event.currentTarget, user, { extra: memberMenuItems(serverId, item, user) }),
+    }));
   }
   const roles = (item.roles || []).map((r) => (typeof r === 'string' ? r : r.name)).filter(Boolean);
-  return el('div', { class: 'row-item' },
+  const row = el('div', { class: 'row-item' },
     avatar(user, { size: 'md' }),
     el('div', { class: 'row-item-main' },
       el('div', { class: 'row-item-title' }, nameOf(user)),
       el('div', { class: 'row-item-sub' }, '@' + (user.username || '') + (roles.length ? ' - ' + roles.join(', ') : ''))),
     controls);
+  attachContextMenu(row, () => userMenuItems(user, { extra: memberMenuItems(serverId, item, user) }));
+  return row;
 }
 
 let loadMembersInto = null;
@@ -321,22 +327,25 @@ function membersSection(serverId) {
   return { node: host, load };
 }
 
-function memberMenu(event, serverId, item, user) {
-  const anchor = event.currentTarget;
+// The actions a moderator can take on a member. One list, used by both the row's
+// context menu and its Manage button, so the two can never drift apart. Items carry
+// `onSelect`, which is what the menu actually calls - `onClick` here silently did
+// nothing, which is why the Manage button looked responsive and was not.
+function memberMenuItems(serverId, item, user) {
   const items = [];
   if (can(serverId, 'MANAGE_ROLES')) {
-    items.push({ label: 'Edit roles', onClick: () => openMemberRoles(serverId, item, loadMembersInto) });
+    items.push({ label: 'Edit roles', onSelect: () => openMemberRoles(serverId, item, loadMembersInto) });
   }
   if (can(serverId, 'BAN_MEMBERS')) {
-    items.push({ label: 'Timeout', onClick: () => openTimeout(serverId, item, user) });
+    items.push({ label: 'Timeout', onSelect: () => openTimeout(serverId, item, user) });
   }
   if (can(serverId, 'KICK_MEMBERS')) {
-    items.push({ label: 'Kick', danger: true, onClick: () => kickMember(serverId, user) });
+    items.push({ label: 'Kick', danger: true, onSelect: () => kickMember(serverId, user) });
   }
   if (can(serverId, 'BAN_MEMBERS')) {
-    items.push({ label: 'Ban', danger: true, onClick: () => banMember(serverId, user) });
+    items.push({ label: 'Ban', danger: true, onSelect: () => banMember(serverId, user) });
   }
-  openMenu({ anchor, items });
+  return items;
 }
 
 async function openTimeout(serverId, item, user) {

@@ -50,9 +50,15 @@ function describe() {
   const fromEnv = dbConfig.fromEnvironment();
   const candidate = runtime.connected ? live : (dbConfig.candidates()[0] || {}).config || null;
 
+  // An administrator's saved configuration that is also the live one is what is in
+  // force, even when the process happened to open the identical connection from the
+  // environment first. Reporting "the environment" there is the one reading that
+  // makes a save look like it did nothing - which is exactly how it was read.
+  const savedInForce = saved.config && runtime.connected && dbConfig.same(saved.config, live);
+
   return {
     effective: dbConfig.mask(candidate),
-    source: runtime.source,
+    source: savedInForce ? 'instance' : runtime.source,
     dialect: runtime.dialect,
     runtime: { connected: runtime.connected, openedAt: runtime.openedAt, failures: runtime.failures },
     saved: {
