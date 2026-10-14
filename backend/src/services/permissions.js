@@ -8,7 +8,7 @@ const PERMISSIONS = {
   MANAGE_ROLES: 'Create, edit, assign, and delete roles.',
   MANAGE_INVITES: 'Create and revoke invites.',
   KICK_MEMBERS: 'Remove members from the server.',
-  BAN_MEMBERS: 'Ban/unban members and manage timeouts.',
+  BAN_MEMBERS: 'Ban or unban members and manage timeouts. Unbanning is not limited by rank.',
   MANAGE_MESSAGES: 'Delete any message in the server.',
   SEND_MESSAGES: 'Post messages in channels.',
   // Voice and video. CONNECT and VIDEO belong to @everyone because a community that turns

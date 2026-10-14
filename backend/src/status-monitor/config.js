@@ -171,7 +171,7 @@ function loadConfig(env, opts) {
   }
 
   const config = {
-    host: String(pick('host', 'STATUS_MONITOR_HOST', '0.0.0.0')).trim() || '0.0.0.0',
+    host: String(pick('host', 'STATUS_MONITOR_HOST', '127.0.0.1')).trim() || '127.0.0.1',
     port: toInt(pick('port', 'STATUS_MONITOR_PORT', DEFAULT_PORT), DEFAULT_PORT),
     intervalMs: Math.max(1000, toInt(pick('intervalMs', 'STATUS_MONITOR_INTERVAL_MS', 30000), 30000)),
     timeoutMs: Math.max(100, toInt(pick('timeoutMs', 'STATUS_MONITOR_TIMEOUT_MS', 5000), 5000)),

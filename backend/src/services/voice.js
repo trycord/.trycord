@@ -134,11 +134,8 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
   // owner short-circuit and the role/override precedence with it. A caller that built its
   // own permission set would have to get both of those right a second time.
   const need = screen ? 'STREAM' : 'CONNECT';
-  const canConnect = await permissions.hasPermission(userId, ch.server_id, 'CONNECT');
-  const canNeed = need === 'CONNECT'
-    ? canConnect
-    : await permissions.hasPermission(userId, ch.server_id, need);
-  if (!canConnect && !canNeed) {
+  const canNeed = await permissions.hasPermission(userId, ch.server_id, need);
+  if (!canNeed) {
     return { ok: false, code: 'PERMISSION_DENIED', message: 'You cannot connect to this channel.', status: 403 };
   }
   if (screen && !f.voiceVideo.screenSharing) {

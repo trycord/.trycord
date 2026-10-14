@@ -120,6 +120,8 @@ async function boot(port) {
   child = spawn(process.execPath, [path.join(ROOT, 'src', 'server.js')], {
     cwd: ROOT,
     env: Object.assign({}, process.env, {
+      // Pinned connection: ignore any database configuration saved on this machine.
+      TRYCOD_DB_ENV_ONLY: '1',
       PORT: String(port), HOST: '127.0.0.1', DB_CLIENT: 'sqlite',
       DB_FILE: path.join(tmp, 'g.sqlite'), MAIL_MODE: 'log',
       JWT_SECRET: 'graph-check-secret-0123456789abcdef', BCRYPT_COST: '4',

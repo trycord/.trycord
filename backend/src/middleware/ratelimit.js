@@ -4,6 +4,11 @@
 // deployments replace with a shared store; the middleware signature stays.
 //
 // Usage: app.use('/api/dms', rateLimit({ windowMs: 60_000, max: 60 }));
+//
+// The bucket is keyed by the router the request landed on (`req.baseUrl`), so every
+// rate-limited route in one router shares a budget. A route that needs its own budget
+// - because its cost is not the router's cost - passes `key`, which replaces the
+// router name in the key and leaves every other route on that router untouched.
 const { fail } = require('../errors');
 
 const buckets = new Map();
@@ -27,21 +32,21 @@ function maxFor(max) {
   return Number.isFinite(override) && override > 0 ? override : max;
 }
 
-function keyFor(req) {
+function keyFor(req, bucket) {
   const user = (req.user && req.user.id) || 'anon';
   const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
-  return `${req.baseUrl || ''}|${user}|${ip}`;
+  return `${bucket || req.baseUrl || ''}|${user}|${ip}`;
 }
 
-function rateLimit({ windowMs = 60000, max = 60 } = {}) {
+function rateLimit({ windowMs = 60000, max = 60, key } = {}) {
   const limit = maxFor(max);
   return (req, res, next) => {
     const nowMs = Date.now();
-    const key = keyFor(req);
-    let entry = buckets.get(key);
+    const bucket = keyFor(req, key);
+    let entry = buckets.get(bucket);
     if (!entry || nowMs - entry.start >= windowMs) {
       entry = { start: nowMs, count: 0 };
-      buckets.set(key, entry);
+      buckets.set(bucket, entry);
     }
     entry.count += 1;
     // Opportunistic cleanup so the map cannot grow without bound.

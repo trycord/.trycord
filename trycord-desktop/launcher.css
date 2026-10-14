@@ -1,23 +1,26 @@
-/* Ember orange on near-black, same tokens as the WAC so both windows read as
-   one product. */
+/* Flame orange on charcoal, the trycord-assets library's own values, so the
+   launcher and the application window read as one product. The launcher runs
+   under a strict CSP and loads no stylesheet of its own, so it names the values
+   here rather than fetching a second file at runtime; check-brand.js asserts
+   every one of them against the library, so they cannot drift. */
 
 :root {
-  --bg: #0d0b0a;
-  --bg-2: #16110e;
-  --surface: #1c1512;
-  --line: rgba(255, 190, 150, 0.14);
-  --line-strong: rgba(255, 190, 150, 0.28);
-  --text: #fff6ec;
-  --text-2: #e3c9b4;
-  --muted: #a5856d;
-  --ember: #ff8a24;
-  --ember-2: #ff4d1f;
-  --ember-dim: rgba(255, 138, 36, 0.16);
+  --bg: #121317;            /* trycord-assets --tc-bg-deep */
+  --bg-2: #18191D;          /* --tc-bg */
+  --surface: #22242A;       /* --tc-surface */
+  --line: #30323A;          /* --tc-border */
+  --line-strong: #3A3D46;
+  --text: #F4F5F7;          /* --tc-text */
+  --text-2: #C4C7CE;
+  --muted: #A4A7B0;         /* --tc-text-muted */
+  --ember: #FF4D24;         /* --tc-brand */
+  --ember-2: #E9431D;       /* --tc-brand-hover */
+  --ember-dim: rgba(255, 77, 36, 0.16);
 
-  --sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, monospace;
+  --sans: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;   /* --tc-font-sans */
+  --mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;       /* --tc-font-mono */
 
-  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease: cubic-bezier(.2, 0, 0, 1);
   --fast: 140ms;
   --slow: 420ms;
 }
@@ -38,7 +41,7 @@ html, body {
 body {
   /* Lit from above, the same direction as the WAC's ambient glow. */
   background-image:
-    radial-gradient(120% 80% at 50% -20%, rgba(255, 138, 36, 0.10), transparent 60%),
+    radial-gradient(120% 80% at 50% -20%, color-mix(in srgb, var(--ember) 10%, transparent), transparent 60%),
     linear-gradient(180deg, var(--bg-2), var(--bg) 55%);
 }
 
@@ -59,14 +62,15 @@ body {
   gap: 10px;
 }
 
-/* Drawn rather than loaded: a launcher should not wait on an image decode to
-   show a word. Same shape as the rail chip and the app icon. */
+/* The canonical trycord-assets monogram, inlined in the document rather than
+   fetched: a launcher should not wait on an image decode to show a word. The
+   flame is currentColor; the cutouts are the surface behind it. */
 .brand__mark {
   width: 22px;
   height: 22px;
-  border-radius: 7px;
-  background: linear-gradient(140deg, var(--ember), var(--ember-2));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  display: block;
+  color: var(--ember);
+  --mark-cutout: var(--bg-2);
 }
 
 .brand__name {
@@ -185,7 +189,7 @@ body {
   width: 100%;
   height: 3px;
   border-radius: 2px;
-  background: rgba(255, 190, 150, 0.12);
+  background: color-mix(in srgb, var(--text) 12%, transparent);
   overflow: hidden;
 }
 
@@ -237,7 +241,7 @@ body {
               border-color var(--fast) var(--ease);
 }
 
-.btn:hover { background: #241a16; color: var(--text); }
+.btn:hover { background: color-mix(in srgb, var(--ember) 10%, var(--surface)); color: var(--text); }
 .btn:focus-visible {
   outline: 2px solid var(--ember);
   outline-offset: 2px;

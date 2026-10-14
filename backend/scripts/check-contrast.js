@@ -106,18 +106,18 @@ function ok(label, cond, detail) {
 }
 
 const PAIRS = [
-  ['--color-text-primary', 'the workspace', '--color-background', MIN_BODY],
-  ['--color-text-secondary', 'the workspace', '--color-background', MIN_BODY],
-  ['--color-text-muted', 'the workspace', '--color-background', MIN_BODY],
-  ['--color-text-primary', 'a rail or sidebar', '--color-surface-sunken', MIN_BODY],
-  ['--color-text-secondary', 'a rail or sidebar', '--color-surface-sunken', MIN_BODY],
-  ['--color-text-muted', 'in a rail or sidebar', '--color-surface-sunken', MIN_BODY],
-  ['--color-text-primary', 'a raised card', '--color-surface-elevated', MIN_BODY],
-  ['--color-text-secondary', 'on a raised card', '--color-surface-elevated', MIN_BODY],
-  ['--color-text-muted', 'muted text on a raised card', '--color-surface-elevated', MIN_BODY],
-  ['--color-accent', 'accent text in the workspace', '--color-background', MIN_LARGE],
-  ['--color-accent', 'the accent itself in a sidebar', '--color-surface-sunken', MIN_LARGE],
-  ['--color-accent', 'the accent itself on a raised card', '--color-surface-elevated', MIN_LARGE],
+  ['--text-1', 'the workspace', '--app-bg', MIN_BODY],
+  ['--text-2', 'the workspace', '--app-bg', MIN_BODY],
+  ['--text-3', 'the workspace', '--app-bg', MIN_BODY],
+  ['--text-1', 'a rail or sidebar', '--panel-2', MIN_BODY],
+  ['--text-2', 'a rail or sidebar', '--panel-2', MIN_BODY],
+  ['--text-3', 'in a rail or sidebar', '--panel-2', MIN_BODY],
+  ['--text-1', 'a raised card', '--raised', MIN_BODY],
+  ['--text-2', 'on a raised card', '--raised', MIN_BODY],
+  ['--text-3', 'muted text on a raised card', '--raised', MIN_BODY],
+  ['--brand', 'accent text in the workspace', '--app-bg', MIN_LARGE],
+  ['--brand', 'the accent itself in a sidebar', '--panel-2', MIN_LARGE],
+  ['--brand', 'the accent itself on a raised card', '--raised', MIN_LARGE],
 ];
 
 for (const [themeName, theme] of all) {
@@ -137,9 +137,9 @@ for (const [themeName, theme] of all) {
 
 // Muted is the floor for anything unread: it still has to be legible enough to
 // recognise, so 2:1 rather than body-text minimum.
-const dim = resolve('--color-text-muted', all.get('trycord') || {}, all);
-if (dim) ok('muted text is at least recognisable', ratio(dim, resolve('--color-surface', all.get('trycord') || {}, all)), 2.0);
-else failures.push('--color-text-muted could not be resolved');
+const dim = resolve('--text-3', all.get('trycord') || {}, all);
+if (dim) ok('muted text is at least recognisable', ratio(dim, resolve('--panel', all.get('trycord') || {}, all)), 2.0);
+else failures.push('--text-3 could not be resolved');
 
 console.log(`\n  ${passed} passed, ${failures.length} failed`);
 if (failures.length) {

@@ -11,27 +11,28 @@
 const multer = require('multer');
 const { fail } = require('../errors');
 
-// Multer takes a number, not a function, so its own ceiling is the widest value the
-// configuration centre allows. The real limit is checked after the parse, against the
-// live setting, which also means the refusal can say how large the file may be rather
-// than emitting a busboy string.
-const WIDEST_LIMIT = 100 * 1024 * 1024;
-
-const memory = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: WIDEST_LIMIT, files: 1 },
-});
-
-// Check the live size limit and turn anything multer rejected into a 4xx.
+// The multipart ceiling is the live setting, not a fixed widest value.
 //
-// `single('file')` is called per request rather than at mount time because the parse
-// happens against req, and a shared pre-bound instance would be one closure for every
-// request.
+// It used to be a single module-level multer instance pinned to 100 MB that buffered the
+// whole body into RAM before the real limit (8 MB by default) was ever consulted, so an
+// unauthenticated or merely careless client could hold 100 MB per connection. The instance
+// is now built per request against `features.current.maxUploadBytes`, so the parser stops at
+// the limit that actually applies and never buffers more than it. Multer takes a number,
+// not a function, which is why the instance has to be rebuilt rather than configured once.
+//
+// Turn anything multer rejected into a 4xx.
 function guard(field) {
   return (req, res, next) => {
+    const max = require('../features').current.maxUploadBytes;
+    const memory = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: max, files: 1 },
+    });
     memory.single(field)(req, res, (err) => {
       if (!err) {
-        const max = require('../features').current.maxUploadBytes;
+        // Multer already enforces `fileSize`, but the live setting can shrink between the
+        // parse and this line, so the file is measured once more. This is also where the
+        // refusal can say how large the file may be rather than emitting a busboy string.
         if (req.file && req.file.size > max) {
           return fail(res, 'PAYLOAD_TOO_LARGE',
             'that file is ' + Math.round(req.file.size / 1024) + ' KB, and the limit is '
@@ -40,7 +41,9 @@ function guard(field) {
         return next();
       }
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return fail(res, 'PAYLOAD_TOO_LARGE', 'that file is larger than this instance allows', 413);
+        return fail(res, 'PAYLOAD_TOO_LARGE',
+          'that file is larger than this instance allows (up to '
+            + Math.round(max / 1024) + ' KB)', 413);
       }
       if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
         return fail(res, 'VALIDATION_ERROR', 'send exactly one file, in a field named "' + field + '"');
@@ -54,8 +57,8 @@ function guard(field) {
 // Identity media and message attachments use the same rules and the same limit, so
 // they share one guard rather than two that can drift.
 const singleFile = guard('file');
-const singleImage = guard('image');
+// Both fields are "file". Profile uploads used to expect "image" while every client
+// sent "file", so the official client's avatar and banner uploads always 400ed.
+const singleImage = guard('file');
 
-module.exports = { singleFile };
-
-module.exports = { singleImage, singleFile, memory };
+module.exports = { singleImage, singleFile };

@@ -177,8 +177,17 @@ router.get('/presence', async (req, res, next) => {
     try {
       out = gateway.getPresence ? gateway.getPresence(ids) : {};
     } catch { /* presence is best-effort */ }
-    ids.forEach((id) => { if (!out[id]) out[id] = 'offline'; });
-    res.json(out);
+    // The same filter search already applies, applied here too: a hidden presence
+    // that still arrives in the payload is not hidden, and bulk is the easiest
+    // place to read one. null, not 'offline', so the caller cannot tell a
+    // withheld answer apart from a genuinely offline account.
+    const me = req.user.id;
+    const filtered = {};
+    for (const id of ids) {
+      const state = out[id] || 'offline';
+      filtered[id] = (await privacy.canSeePresence(me, id)) ? state : null;
+    }
+    res.json(filtered);
   } catch (e) { next(e); }
 });
 
@@ -191,7 +200,9 @@ router.get('/:id', async (req, res, next) => {
     );
     if (!row) return fail(res, 'NOT_FOUND', 'user not found');
     const me = req.user.id;
-    const profile = Object.assign(publicUser(row), { presence: presenceOf(row.id) });
+    const profile = Object.assign(publicUser(row), {
+      presence: (await privacy.canSeePresence(me, row.id)) ? presenceOf(row.id) : null,
+    });
     if (String(row.id) === String(me)) {
       profile.relation = 'self';
     } else {

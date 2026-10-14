@@ -125,6 +125,11 @@ router.post('/:channelId/pins', auth.requireVerified, requirePerm('MANAGE_MESSAG
   try {
     const ch = await pinChannel(req);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    // Community-level MANAGE_MESSAGES is not enough: a channel override can deny it,
+    // and a pin is a channel write. The same gate the message routes use decides it.
+    if (!(await permissions.hasChannelPermission(req.user.id, ch.server_id, ch.id, 'MANAGE_MESSAGES'))) {
+      return fail(res, 'PERMISSION_DENIED', 'requires MANAGE_MESSAGES');
+    }
     const messageId = String((req.body || {}).messageId || '');
     const msg = await db.get('SELECT id FROM messages WHERE id = ? AND channel_id = ?', [messageId, ch.id]);
     if (!msg) return fail(res, 'NOT_FOUND', 'message not found in this channel');
@@ -147,6 +152,9 @@ router.delete('/:channelId/pins/:messageId', auth.requireVerified, requirePerm('
   try {
     const ch = await pinChannel(req);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
+    if (!(await permissions.hasChannelPermission(req.user.id, ch.server_id, ch.id, 'MANAGE_MESSAGES'))) {
+      return fail(res, 'PERMISSION_DENIED', 'requires MANAGE_MESSAGES');
+    }
     await db.run('DELETE FROM pinned_messages WHERE message_id = ? AND channel_id = ?', [req.params.messageId, ch.id]);
     broadcastChannel(ch.server_id, ch.id, { type: EVENTS.MESSAGE_UNPINNED, id: req.params.messageId, channel_id: ch.id });
     res.json({ ok: true });

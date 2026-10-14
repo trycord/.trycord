@@ -1,21 +1,21 @@
-// Navigation. Routes live in the path, not the fragment, so a shared link and a refresh
-// are the same request.
+// Navigation.
 //
-// adoptLegacyHash() is the only thing that still understands the old form. It upgrades
-// bookmarks; nothing here produces one.
+// The client is mounted under a prefix the server alone knows (/app/ on the
+// hosted instance, / for a self-hoster). The module's own address carries that
+// prefix, so every address is built from it and no module hardcodes where the
+// client lives. Deriving it from <base> instead reads the wrong thing on a page
+// served off disk, where the base is a directory rather than a mount.
+
 const EXTERNAL = /^(https?:|mailto:|tel:|#$|blob:|data:)/i;
 
-// This module is served at /js/nav.js on a self-hosted instance and
-// /app/js/nav.js on the hosted one. Routes are absolute, so without knowing the
-// mount '/settings' would leave the app entirely from under /app/.
 function mountPoint() {
   let pathname;
   try {
-    const u = new URL('.', import.meta.url);
-    // file:// would give a filesystem path as a URL prefix. Desktop builds
-    // served off disk get no mount.
-    if (u.protocol === 'file:' || u.protocol === 'data:') return '';
-    pathname = u.pathname;
+    const url = new URL('.', import.meta.url);
+    // file:// and data: would give a filesystem path as a URL prefix. Desktop
+    // builds served off disk get no mount.
+    if (url.protocol === 'file:' || url.protocol === 'data:') return '';
+    pathname = url.pathname;
   } catch {
     return '';
   }
@@ -26,151 +26,133 @@ function mountPoint() {
 
 export const BASE = mountPoint();
 
-// '/settings' -> '/app/settings'.
-//
-// Idempotent on purpose: serverPath() and channelPath() already return a
-// mounted path and those results get passed to navigate(), which routes again.
-// Not being idempotent is what turned /c/slug into /app/app/c/slug on a subpath
-// deployment.
-export function route(path) {
-  if (!path) return BASE || '/';
-  if (EXTERNAL.test(path) || /^\/\//.test(path)) return path;
-  if (!path.startsWith('/')) return path;
-  if (BASE && (path === BASE || path.startsWith(BASE + '/'))) return path;
-  return BASE + path;
+// Cursor into the in-app history, so a back/forward can be told apart by index.
+// Read from history.state so a reload keeps its place.
+let cursor = readCursor();
+// The first paint is not a move between screens, so it is not animated.
+let direction = 'initial';
+
+function readCursor() {
+  try {
+    const state = window.history && window.history.state;
+    if (state && typeof state.index === 'number') return state.index;
+  } catch { /* no history */ }
+  return 0;
 }
 
-/** '/app/settings' -> '/settings'. */
-export function unroute(path) {
-  if (!BASE || !path) return path;
-  if (path === BASE) return '/';
-  return path.startsWith(BASE + '/') ? path.slice(BASE.length) : path;
+function entry(route, index) {
+  return { route, index };
 }
 
-// A navigation target as a path, or null if it isn't one of ours.
-//
-// Deliberately doesn't strip a leading '#'. Accepting it would mean a typo like
-// '#/dms' still worked, which keeps two addressing schemes alive in a codebase
-// that has one. Old fragment URLs are handled once, by adoptLegacyHash.
-export function routePath(target) {
-  if (target == null) return null;
-  const raw = String(target).trim();
-  if (!raw || EXTERNAL.test(raw)) return null;
-  return raw.startsWith('/') ? raw : '/' + raw;
+// 'forward' | 'back' | 'replace' | 'same'. Only the first two are animated.
+export function navigationDirection() {
+  return direction;
 }
 
-/**
- * Go to a route.
- *
- * @param {string} target  '/home', or a full URL to somewhere else
- * @param {object} [opts]
- * @param {boolean} [opts.replace]  replace this entry instead of pushing one
- * @param {boolean} [opts.external]  a different origin: a real navigation
- */
-export function navigate(target, opts = {}) {
-  const path = routePath(target);
-  if (path === null) {
-    // Another origin has to be a real navigation or the SPA stays mounted on the
-    // old origin, which reads as the link not working.
-    if (/^(https?:)?\/\//i.test(String(target).trim())) {
-      window.location.assign(String(target).trim());
-      return;
-    }
-    // A fragment with no path is a real anchor on this page, not a route.
-    location.hash = String(target);
+// False on a first-load deep link, where Back would leave the app.
+export function canGoBack() {
+  return cursor > 0;
+}
+
+// An absolute, in-document address for a route. Route strings never carry the
+// mount prefix themselves. Idempotent, because some callers hand over a path
+// that was already mounted.
+export function path(route) {
+  const clean = String(route || '/');
+  if (EXTERNAL.test(clean) || clean.startsWith('//')) return clean;
+  if (!clean.startsWith('/')) return clean;
+  if (BASE && (clean === BASE || clean.startsWith(BASE + '/'))) return clean;
+  return BASE + clean;
+}
+
+// The current route as the router sees it: always leading-slash, never
+// carrying the mount prefix.
+export function currentRoute() {
+  const pathname = String(window.location.pathname || '/');
+  if (!BASE) return '/' + pathname.replace(/^\/+/, '');
+  if (pathname === BASE) return '/';
+  const rest = pathname.startsWith(BASE + '/') ? pathname.slice(BASE.length) : pathname;
+  return '/' + rest.replace(/^\/+/, '');
+}
+
+export function currentQuery() {
+  try { return new URLSearchParams(window.location.search); } catch { return new URLSearchParams(); }
+}
+
+export function currentHash() {
+  try { return window.location.hash || ''; } catch { return ''; }
+}
+
+export function navigate(route, options) {
+  const opts = options || {};
+  const clean = String(route || '/');
+  const target = path(clean);
+  if (target === window.location.pathname && !opts.force) {
+    direction = 'same';
+    notify(clean, { same: true });
     return;
   }
-  if (opts.external) {
-    // route() can't hand a relative route to another origin: it no-ops on a full
-    // URL and otherwise adds the mount.
-    window.location.assign(route(path));
-    return;
+  if (opts.replace) {
+    // A redirect does not grow the stack: it corrects the entry that is already
+    // showing, so it keeps the cursor where it is and does not animate.
+    window.history.replaceState(entry(clean, cursor), '', target);
+    direction = 'replace';
+  } else {
+    cursor += 1;
+    window.history.pushState(entry(clean, cursor), '', target);
+    direction = 'forward';
   }
-  const current = location.pathname + location.search;
-  // route() is idempotent, so a caller that passed an already-mounted path is
-  // unaffected.
-  const next = route(path.startsWith('/') ? path : '/' + path);
-  if (next === current && !opts.force) {
-    // Pushing a duplicate entry makes Back do nothing visible.
-    return;
-  }
-  if (opts.replace) history.replaceState(null, '', next);
-  else history.pushState(null, '', next);
-  window.dispatchEvent(new PopStateEvent('popstate'));
+  notify(clean, opts);
 }
 
-/** Current route as the app sees it: '/settings/privacy'. */
-export function currentPath() {
-  return (location.pathname || '/') + (location.search || '');
+// pushState does not fire popstate, and the router has to hear about a route it
+// itself asked for, so the notification is explicit rather than assumed.
+function notify(route, options) {
+  window.dispatchEvent(new window.CustomEvent('trycord:navigate', { detail: { route, options: options || {} } }));
 }
 
-/** Build a query string from an object. */
-export function withQuery(path, query) {
-  const entries = Object.entries(query || {}).filter(([, v]) => v !== undefined && v !== null && v !== '');
-  if (!entries.length) return path;
-  return path + '?' + new URLSearchParams(entries).toString();
-}
+// Intercept internal link clicks at the document, so a view writes a plain
+// <a href> and still gets client-side navigation, middle-click and copy-link
+// included. Modified clicks and external origins are left to the browser.
+export function installLinkHandler() {
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented) return;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
-// Upgrade a fragment URL on arrival. These exist in bookmarks, in the desktop
-// build's saved window state, and in messages people have sent each other.
-export function adoptLegacyHash() {
-  const hash = location.hash;
-  if (!hash || hash.length < 2) return false;
-  // Stripped here, not in routePath() - this is the only code left that knows
-  // the fragment form.
-  const path = routePath(hash.slice(1) || '/');
-  if (path === null) return false;
-  // Through route() like every other navigation. Writing the path straight into
-  // history dropped the mount, which only shows up on a subpath deployment -
-  // the fragment form is the one way an old URL arrives already under a mount.
-  history.replaceState(null, '', route(path.startsWith('/') ? path : '/' + path) + location.search);
-  return true;
-}
-
-// Intercept plain left clicks on same-origin app links so navigation doesn't
-// throw away the running application and boot it again.
-//
-// Anchors stay the right element: middle-clickable, real destination in the
-// status bar, and they work if this script never runs.
-//
-// Modified clicks are left to the browser. So is `data-document` - the legal
-// pages and public site are documents on this origin, not routes, and routing
-// them would show the app instead of the page.
-export function interceptLinks(doc = document) {
-  doc.addEventListener('click', (e) => {
-    if (e.defaultPrevented || e.button !== 0) return;
-    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-    const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-    if (!a || !doc.contains(a)) return;
-    if (a.hasAttribute('download') || a.hasAttribute('data-document')) return;
-    if (a.target && a.target !== '_self') return;
-
-    const raw = a.getAttribute('href');
-    if (!raw) return;
-    // A legacy '#/route' href, from a page rendered before the move to paths.
-    // Treating it as an in-page fragment is what left these links looking right
-    // and doing nothing. Only the route shape qualifies, and the '#' is stripped
-    // here rather than by routePath(), which no longer understands the fragment
-    // form. Passing it through would navigate to '/#/route'.
-    if (raw === '#/' || raw.startsWith('#/')) {
-      e.preventDefault();
-      navigate(routePath(raw.slice(1) || '/'));
-      return;
-    }
-    // Every other '#...' is a same-page jump (the skip link, mostly) and the
-    // browser already handles it.
-    if (raw.startsWith('#')) return;
+    const anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+    if (!anchor) return;
+    if (anchor.target && anchor.target !== '_self') return;
+    if (anchor.hasAttribute('download') || anchor.dataset.external === 'true') return;
 
     let url;
-    try { url = new URL(raw, location.href); } catch { return; }
-    if (url.origin !== location.origin) return;
-    // Outside the app's mount: a document belonging to the origin, not a route.
-    if (BASE && url.pathname !== BASE && !url.pathname.startsWith(BASE + '/')) return;
+    try { url = new URL(anchor.href, window.location.href); } catch { return; }
+    if (url.origin !== window.location.origin) return;
+    if (url.pathname.indexOf(BASE) !== 0) return;
 
-    // Back to an app route: the router works in paths without the mount.
-    e.preventDefault();
-    navigate(unroute(url.pathname) + url.search + url.hash);
-  }, { passive: false });
+    const route = '/' + url.pathname.slice(BASE.length).replace(/^\/+/, '');
+    const here = window.location.pathname + window.location.search;
+    const there = url.pathname + url.search;
+    event.preventDefault();
+    if (here === there) {
+      notify(route, { same: true });
+      return;
+    }
+    cursor += 1;
+    window.history.pushState(entry(route, cursor), '', there + url.hash);
+    direction = 'forward';
+    notify(route, { fromLink: true });
+    window.scrollTo(0, 0);
+  });
 }
 
-export default { navigate, route, unroute, routePath, currentPath, withQuery, adoptLegacyHash, interceptLinks, BASE };
+export function installPopStateHandler() {
+  window.addEventListener('popstate', () => {
+    // The platform moved the cursor: the entry it landed on carries the index it
+    // was stamped with, and comparing it with where we were is the one honest way
+    // to know whether this was a step back or a step forward.
+    const next = readCursor();
+    direction = next < cursor ? 'back' : 'forward';
+    cursor = next;
+    notify(currentRoute(), { pop: true });
+  });
+}

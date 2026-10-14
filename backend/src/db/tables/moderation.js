@@ -60,6 +60,10 @@ module.exports = (engine) => [
       target_id  VARCHAR(64),
       reason     TEXT,
       report_id  VARCHAR(64),
+      -- The community a server-scoped moderation entry belongs to. Platform
+      -- entries (enforcement, bot flags) leave it NULL, which is why it is
+      -- nullable rather than NOT NULL.
+      server_id  VARCHAR(64),
       created_at VARCHAR(64) NOT NULL,
       FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,

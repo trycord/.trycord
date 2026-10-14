@@ -114,6 +114,7 @@ async function boot({ seed = false } = {}) {
   const env = {
     ...process.env,
     DB_CLIENT: 'sqlite',
+    TRYCOD_DB_ENV_ONLY: '1',
     DB_FILE: path.join(dbDir, 'render.db'),
     PORT: String(PORT),
     HOST: '127.0.0.1',
@@ -718,52 +719,53 @@ async function settle(window, ms = 400) {
     console.log('  navigated ' + loopTargets.length + ' routes without an uncaught error,'
       + ' plus ' + guestPages.length + ' signed-out screens rendered with no session');
 
-    // ---- the application rail is actually painted ----
+    // ---- the spine is actually painted ----
     //
-    // renderRail() existed and nothing called it, so #global-navigation and
-    // #identity-region were empty elements on every page and the only live thing in the
-    // rail was the community list. Every check in this file passed the whole time,
-    // because all of them read #view-root and the rail is not in #view-root.
+    // The same failure happened here once: a render function existed and nothing called
+    // it, so #global-navigation and the identity region were empty on every page and the
+    // only live thing in the navigation column was the community list. Every check in
+    // this file passed the whole time, because all of them read #view-root and the
+    // navigation column is not in #view-root.
     //
-    // So: read the rail. It is the one part of the shell that decides where "here" is
+    // So: read the spine. It is the one part of the shell that decides where "here" is
     // globally, and it is the one part nothing was looking at.
-    console.log('\n  the application rail');
+    console.log('\n  the spine');
 
     const { renderAllChrome: paintChrome } = await import(pathToUrl(path.join(CLIENT, 'js/shell.js')));
     const { updateFromViewport } = await import(pathToUrl(path.join(CLIENT, 'js/presentation.js')));
-    const { railPages, mobilePages } = registry;
+    const { globalPages, mobilePages } = registry;
     await setViewport(window, 1440, 900);
     updateFromViewport();
     await visit(window, document, Router, concrete('/home', world), base);
     paintChrome();
     await settle(window, 200);
 
-    const railDestinations = railPages();
-    const railLinks = [...document.querySelectorAll('#global-navigation a[href]')];
-    ok('the rail offers every destination the registry marks for it',
-      railLinks.length === railDestinations.length,
-      railLinks.length + ' of ' + railDestinations.length + ': '
-      + railDestinations.map((p) => p.id).join(', '));
+    const globalDestinations = globalPages();
+    const globalLinks = [...document.querySelectorAll('#global-navigation a[href]')];
+    ok('the spine offers every destination the registry marks for it',
+      globalLinks.length === globalDestinations.length,
+      globalLinks.length + ' of ' + globalDestinations.length + ': '
+      + globalDestinations.map((p) => p.id).join(', '));
 
-    // Same list, read off the hrefs rather than counted, so a rail that renders five
+    // Same list, read off the hrefs rather than counted, so a spine that renders five
     // links to three places still fails.
-    const railHrefs = new Set(railLinks.map((a) => a.getAttribute('href')));
-    ok('the rail\'s destinations are the registry\'s, not a second list',
-      railDestinations.every((p) => railHrefs.has(concreteHref(p.route, world))),
-      'registry wants ' + railDestinations.map((p) => p.route).join(', ')
-      + ' but the rail has ' + [...railHrefs].join(', '));
+    const globalHrefs = new Set(globalLinks.map((a) => a.getAttribute('href')));
+    ok('the spine\'s destinations are the registry\'s, not a second list',
+      globalDestinations.every((p) => globalHrefs.has(concreteHref(p.route, world))),
+      'registry wants ' + globalDestinations.map((p) => p.route).join(', ')
+      + ' but the spine has ' + [...globalHrefs].join(', '));
 
-    const railNames = railLinks.map((a) => a.getAttribute('aria-label')).filter(Boolean);
-    ok('every rail destination has an accessible name',
-      railNames.length === railLinks.length,
-      (railLinks.length - railNames.length) + ' unnamed of ' + railLinks.length);
+    const globalNames = globalLinks.map((a) => a.getAttribute('aria-label')).filter(Boolean);
+    ok('every global destination has an accessible name',
+      globalNames.length === globalLinks.length,
+      (globalLinks.length - globalNames.length) + ' unnamed of ' + globalLinks.length);
 
     // The boot's session -> gateway -> cache path, which had no assertion of its own.
     //
     // A step() helper that swallowed its return value left `restored` undefined, so the
     // gateway was never connected and the caches were never warmed - and every route
     // still rendered, because each page fetches what it needs itself. Nothing in this
-    // file could see it, and on a live instance the symptom is a rail with no unread
+    // file could see it, and on a live instance the symptom is a spine with no unread
     // badge and no presence.
     const sessionMod = await import(pathToUrl(path.join(CLIENT, 'js/state.js')));
     ok('boot restores the session it was handed',
@@ -777,26 +779,26 @@ async function settle(window, ms = 400) {
 
     const warmHits = bootLog.filter((r) => /\/api\/(dms|friends)/.test(String(r.path || '')));
     ok('boot warms the caches the shell paints from', warmHits.length > 0,
-      'no DM or friend request was made during boot, so the rail badges start empty');
+      'no DM or friend request was made during boot, so the spine badges start empty');
 
-    ok('the rail carries the Trycord identity',
-      !!document.querySelector('#identity-region a[href], #identity-region button'),
-      '#identity-region is empty');
+    ok('the spine carries the Trycord identity',
+      !!document.querySelector('#spine-head a[href]'),
+      '#spine-head is empty - there is no brand link at the top of the column');
 
-    const account = document.querySelector('#rail-foot a[href], #rail-foot button');
-    ok('the rail has an account control at its foot', !!account,
-      '#rail-foot is empty - no way to reach your own profile or sign out from the rail');
+    const account = document.querySelector('#spine-foot a[href], #spine-foot button');
+    ok('the spine has an account control at its foot', !!account,
+      '#spine-foot is empty - no way to reach your own profile or sign out from the column');
     ok('the account control opens a menu rather than going nowhere',
       !!account && account.tagName === 'BUTTON' && account.getAttribute('aria-haspopup') === 'menu',
       account ? account.tagName.toLowerCase() + ' has no menu' : 'no account control');
 
-    // The rail's own active state, which is the one thing it does that a list of links
+    // The spine's own active state, which is the one thing it does that a list of links
     // does not: /dms/<id> has to keep Direct messages lit.
     await visit(window, document, Router, concrete('/dms/:id', world), base);
     paintChrome();
     await settle(window, 200);
     const dmsActive = document.querySelector('#global-navigation a.is-active');
-    ok('the rail marks the destination you are inside, not just the one you are on',
+    ok('the spine marks the destination you are inside, not just the one you are on',
       !!dmsActive && dmsActive.getAttribute('href') === concreteHref('/dms', world),
       dmsActive ? 'active href is ' + dmsActive.getAttribute('href') : 'nothing is active on /dms/<id>');
 
@@ -841,14 +843,14 @@ async function settle(window, ms = 400) {
         'a disabled instance must not pretend to send');
     }
 
-    // A rail entry is a link, so left-click, middle-click and the keyboard all work
-    // without any of them being wired by hand.
+    // A global destination is a link, so left-click, middle-click and the keyboard all
+    // work without any of them being wired by hand.
     const isAnchor = [...document.querySelectorAll('#global-navigation a')]
       .every((a) => a.tagName === 'A');
-    ok('the rail\'s destinations are real links, not scripted buttons', isAnchor,
-      'a rail destination is not an anchor');
+    ok('the global destinations are real links, not scripted buttons', isAnchor,
+      'a global destination is not an anchor');
 
-    // ---- the shell is laid out as three columns ----
+    // ---- the shell is laid out as the rail, the column and the stage ----
     //
     // The layout defect this is here for: #place-navigation was built inside #app-rail,
     // where it was a flex item of a 68px column. The conversation list, the channel list
@@ -856,23 +858,46 @@ async function settle(window, ms = 400) {
     // 244px context column instead of the 1fr one - so a third of every screen was blank
     // and the rest was unusable. Nothing in the stylesheet was wrong; the tree was.
     //
+    // The client is a community client: a rail of community marks on the far left, the
+    // spine carrying the open place's navigation beside it, the stage as the third
+    // column, and the context panel a fourth only while it is open on a wide screen (an
+    // overlay anywhere narrower). The rail is not the old #app-rail - it does not carry
+    // the place navigation, and the place navigation does not live in it.
+    //
     // jsdom has no layout engine, so this asserts the structure the grid depends on
     // rather than the widths it produces. The widths are checked by the browser check.
     const shellEl = document.getElementById('shell');
-    const railEl = document.getElementById('app-rail');
+    const railEl = document.getElementById('community-rail');
+    const spineEl = document.getElementById('spine');
     const placeEl = document.getElementById('place-navigation');
     const mainEl = document.getElementById('trycord-main');
 
-    ok('the rail, the context navigation and the workspace are the shell\'s own children',
-      !!shellEl && !!railEl && !!placeEl && !!mainEl
+    ok('the rail, the spine and the stage are the shell\'s own children',
+      !!shellEl && !!railEl && !!spineEl && !!placeEl && !!mainEl
       && railEl.parentElement === shellEl
-      && placeEl.parentElement === shellEl
+      && spineEl.parentElement === shellEl
       && mainEl.parentElement === shellEl,
       'a region is nested inside another, so it inherits the wrong width');
 
-    ok('the context navigation is not inside the rail',
-      !!placeEl && !railEl.contains(placeEl),
-      '#place-navigation is inside #app-rail - the sidebar is being laid out in 68px');
+    ok('the place navigation is inside the spine rather than a column of its own',
+      !!placeEl && !!spineEl && spineEl.contains(placeEl),
+      '#place-navigation is not in the spine - the one navigation column is not one column');
+
+    // The rail is the communities list: a row of marks. It must not grow the place
+    // navigation back, or the two columns have become one column again.
+    ok('the rail carries the communities, not the navigation column',
+      !!railEl && !!spineEl && !railEl.contains(placeEl) && !spineEl.contains(railEl),
+      'the rail holds the place navigation, so the communities have no column of their own');
+
+    ok('the old two-column navigation has not come back',
+      !document.getElementById('app-rail'),
+      '#app-rail still exists - navigation is two columns again');
+
+    const contextEl = document.getElementById('context-panel');
+    ok('the context panel is the shell\'s own child and starts closed',
+      !!contextEl && contextEl.parentElement === shellEl
+      && !!shellEl && shellEl.dataset.context === 'closed' && contextEl.hidden === true,
+      'the context panel is nested or starts open, so it covers the stage before it is asked for');
 
     const overlay = document.getElementById('desktop-backdrop');
     const tabbar = document.getElementById('mobile-tab-navigation');
@@ -1018,12 +1043,12 @@ async function settle(window, ms = 400) {
         ok(name + ': the navigation drawer is available from the header',
           !!document.querySelector('#context-header .nav-toggle'),
           'no .nav-toggle in the context header');
-        // On a phone the context navigation is a drawer rather than a column, and the
-        // rail is hidden entirely. Both are the same regions as desktop - only the
-        // presentation differs - so the same ids have to still be in the tree.
-        ok(name + ': the sidebar and the rail are the same regions as desktop',
-          !!document.getElementById('place-navigation')
-          && !!document.getElementById('app-rail'),
+        // On a phone the spine is a drawer rather than a column. It is the same region
+        // as desktop - only the presentation differs - so the same ids have to still be
+        // in the tree.
+        ok(name + ': the spine and its navigation are the same regions as desktop',
+          !!document.getElementById('spine')
+          && !!document.getElementById('place-navigation'),
           'a phone-only navigation tree was built instead of reusing the shell');
       }
     }
@@ -1335,7 +1360,7 @@ function concrete(template, world) {
     .replace(':token', 'nope');
 }
 
-// The href a rail destination is drawn with. nav.js's route() adds the mount, and this
+// The href a global destination is drawn with. nav.js's route() adds the mount, and this
 // harness serves the client from the origin root, so the href is the route itself -
 // but going through one named helper on both sides is what keeps the comparison from
 // being accidentally right.

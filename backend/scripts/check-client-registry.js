@@ -12,7 +12,8 @@
 // can hold in their head, and the first field added for one page becomes an obligation
 // for the next forty.
 //
-// The navigation: rail and phone tab bar both come from this one file, so a destination
+// The navigation: the spine's global group and the phone tab bar both come from this one
+// file, so a destination
 // that is offered must be a page that exists, and a page that is offered must not be
 // hidden. A nav entry pointing at nothing is a dead control, and one pointing at a page
 // marked hidden is the same thing wearing a different hat.
@@ -66,7 +67,7 @@ function ok(label, condition, detail) {
 (async () => {
   const registry = await import(pathToFileURL(REGISTRY).href);
   const PAGES = registry.PAGES;
-  const { mobilePages, railPages } = registry;
+  const { mobilePages, globalPages } = registry;
 
   console.log('\n  the page contract');
   console.log(`    ${PAGES.length} pages, read from the module rather than the source`);
@@ -115,16 +116,16 @@ function ok(label, condition, detail) {
   ok('no navigation entry points at a hidden page', hiddenInNav.length === 0,
     hiddenInNav.map((p) => p.id).join(', '));
 
-  // A nav entry has to resolve. The rail and the tab bar both go through the matcher, so
-  // a path in nav that no page declares is a control that navigates nowhere.
+  // A nav entry has to resolve. The spine's global group and the tab bar both go through
+  // the matcher, so a path in nav that no page declares is a control that navigates nowhere.
   const known = new Set(paths);
   const dangling = withNav.filter((p) => p.route && !known.has(p.route));
   ok('every navigation destination is a page that exists', dangling.length === 0,
     dangling.map((p) => p.id + ' -> ' + p.route).join(', '));
 
-  const rail = railPages();
+  const global = globalPages();
   const tabs = mobilePages();
-  ok('the rail is not empty', rail.length > 0, rail.length + ' destinations');
+  ok('the spine is not empty', global.length > 0, global.length + ' destinations');
   ok('the phone tab bar is not empty', tabs.length > 0, tabs.length + ' destinations');
 
   // A page in no navigation at all is either reached by circumstance or orphaned, and the
@@ -139,7 +140,7 @@ function ok(label, condition, detail) {
   //
   // Orphaned would be a page with a session access, no nav, no tabs and no parent, which
   // nothing links to.
-  const inNavigation = new Set([...rail, ...tabs].map((p) => p.id));
+  const inNavigation = new Set([...global, ...tabs].map((p) => p.id));
   const isSubPage = (p) => p.route.split('/').filter(Boolean)
     .some((segment, i, all) => i > 0 && segment.startsWith(':')
       && all.slice(0, i).join('/') !== '');
@@ -152,7 +153,7 @@ function ok(label, condition, detail) {
     orphaned.map((p) => p.id + ' (access=' + (p.access || 'session') + ')').join(', '));
 
   // Tab order is what puts Friends before Alerts on a phone and the other way round in
-  // the rail. A tab with no order silently falls back to registry order, which looks
+  // the spine. A tab with no order silently falls back to registry order, which looks
   // deliberate and is not.
   const inTabs = PAGES.filter((p) => p.nav && p.nav.mobile);
   const unordered = inTabs.filter((p) => p.nav.tabOrder == null);

@@ -125,6 +125,8 @@ function requiresOf(file) {
   // its own code rather than refusing to boot for want of configuration.
   process.env.JWT_SECRET = process.env.JWT_SECRET || 'check-loads-0123456789abcdef';
   process.env.DB_CLIENT = process.env.DB_CLIENT || 'sqlite';
+  // Pinned connection: ignore any database configuration saved on this machine.
+  process.env.TRYCOD_DB_ENV_ONLY = '1';
 
   const failed = [];
   for (const file of files) {

@@ -30,7 +30,7 @@ const path = require('path');
 const REPO = path.join(__dirname, '..', '..');
 const ONLY = process.argv.slice(2);
 
-const NOTIFICATIONS = 'frontend/js/global/notifications.js';
+const NOTIFICATIONS = 'frontend/js/views/notifications.js';
 
 // Each case names the file it edits, so the run can put that file back exactly as it was
 // without having to work out afterwards which file a closure happened to have touched.
@@ -52,10 +52,12 @@ const CASES = [
       + 'export function __probe2() { return nothingDefinesThis(); }\n'),
     word: 'nothingDefinesThis' },
 
-  { script: 'check-sibling-bindings', file: 'frontend/js/shell/sidebar.js',
+  { script: 'check-sibling-bindings', file: 'frontend/js/views/util.js',
     guards: 'a sibling module used through a bare name',
-    break: (f) => append(f, '\nexport function __probe() { return WIDTH; }\n'),
-    word: 'WIDTH' },
+    // renderAdmin is exported by views/admin.js and util.js does not import it, which is
+    // the shape the check is for: a name a sibling exports, used bare in this file.
+    break: (f) => append(f, '\nexport function __probe() { return renderAdmin; }\n'),
+    word: 'renderAdmin' },
 
   { script: 'check-require-aliases', file: 'backend/src/services/slugs.js',
     guards: 'a require of a name the module does not export',
@@ -68,17 +70,16 @@ const CASES = [
   { script: 'check-contrast', file: 'frontend/css/app.css',
     guards: 'a token pair below the contrast floor',
     // Every theme carries its own body-text token and the check walks all of them, so
-    // one is not enough: the first declaration alone still leaves five themes passing.
+    // one is not enough: the first declaration alone still leaves four themes passing.
     // Pointing the token at its own background resolves to a 1:1 pair in every theme
     // whatever the palette, which is the case the floor exists to catch.
-    break: (f) => replaceAll(f, /(--color-text-primary:\s*)[^;]+/gi, (m, a) => a + 'var(--color-background)'),
+    break: (f) => replaceAll(f, /(--text-1:\s*)[^;]+/gi, (m, a) => a + 'var(--app-bg)'),
     word: 'against' },
 
-  { script: 'check-client-headings', file: 'frontend/js/pages/handlers.js',
-    guards: 'a surface that emits its own h1 beside the context header',
-    break: (f) => append(f,
-      "\nexport function __probe(container) {\n  container.appendChild(el('h1', { text: 'Probe' }));\n  renderContextHeader(container, { title: 'Probe' });\n}\n"),
-    word: 'h1' },
+  { script: 'check-client-headings', file: 'frontend/js/shell.js',
+    guards: 'a heading the shell draws on top of every page it wraps',
+    break: (f) => append(f, "\nexport function __probe() { return el('h1', {}, 'Probe'); }\n"),
+    word: 'outside a view' },
 
   { script: 'check-origins', file: 'backend/src/origins.js',
     guards: 'a pattern that would match an origin it should not',
@@ -105,7 +106,7 @@ const CASES = [
     break: (f) => replaceIn(f, /db\.newRef\('last_seen_at'\)/, "newRef('last_seen_at')"),
     word: 'newRef' },
 
-  { script: 'check-singletons', file: 'frontend/js/global/notifications.js',
+  { script: 'check-singletons', file: NOTIFICATIONS,
     guards: 'a capitalised name used as an object with nothing importing it',
     // The check looks for `Name.member` where Name is capitalised and unbound in that
     // file. It is not about `new` - a module cannot reach a service at all if it never
@@ -126,7 +127,7 @@ const CASES = [
       "\nPAGES.push({ id: '__probe', route: '/app/__probe', scope: 'me', render: () => {} });\n"),
     word: 'route' },
 
-  { script: 'check-client-load', file: 'frontend/js/global/notifications.js',
+  { script: 'check-client-load', file: NOTIFICATIONS,
     guards: 'a module that does not load',
     // Throwing at module scope is the failure it exists for: every source check reads
     // this file and finds it fine, and the application dies on it.
@@ -140,7 +141,7 @@ const CASES = [
     break: (f) => removeStep(f, 'Install server dependencies'),
     word: 'installs' },
 
-  { script: 'check-client-modules', file: 'frontend/js/global/notifications.js',
+  { script: 'check-client-modules', file: NOTIFICATIONS,
     guards: 'a client import that does not resolve',
     break: (f) => append(f, "\nimport { nothingHere } from './no-such-module.js';\n"),
     word: 'no-such-module' },
@@ -161,28 +162,14 @@ const CASES = [
       'return res.json(Object.assign({\n    token: undefined,'),
     word: 'token' },
 
-  // Reads the committed pre-split file, so it needs the repository and not a copy.
-  { script: 'check-split-loses', file: 'frontend/js/theme/registry.js',
-    needsHistory: true,
-    guards: 'a module-scope declaration that no split file carries',
-    // Only a name that was *there* and is now gone counts: the check compares the
-    // committed pre-split theme.js against the directory it became, so adding one proves
-    // nothing and neither does touching a split the pre-split file never had. It also
-    // Deleting the whole line, not just the export keyword: the name is still declared
-    // either way, and the remaining two uses of it below are references, not
-    // declarations, so only removing it counts as a loss.
-    break: (f) => replaceIn(f, /^export const DEFAULT_THEME = .*\n/m, ''),
-    word: 'DEFAULT_THEME' },
-
-  { script: 'check-crash-recovery', file: 'frontend/js/crash.js',
-    guards: 'a stale module graph with nothing that recovers from it',
-    // Dropping the arm is the real defect: without it the one-shot guard can never fire,
-    // so a stale graph reloads forever and the reader never sees the crash screen. The
-    // check names this exact behaviour in its first assertion.
-    // The whole recoverFromStaleGraph body, which is what the six assertions are about.
-    break: (f) => replaceIn(f, /function recoverFromStaleGraph\(text\) \{[\s\S]*?\n  \}\n/,
-      'function recoverFromStaleGraph(text) {\n    return false;\n  }\n'),
-    word: 'one-shot' },
+  { script: 'check-crash-screen', file: 'frontend/js/crash.js',
+    guards: 'a report that scrolls the page instead of covering it',
+    // The mobile bug this check guards: the report was laid out inside the full-height
+    // mount, so on a phone it sat below the fold and the reader had to scroll to find it.
+    // Taking it out of the flow is the fix, so putting it back is the breakage.
+    break: (f) => replaceIn(f, /position:fixed;inset:0;z-index:99999;/,
+      'position:static;'),
+    word: 'page flow' },
 ];
 
 function run(dir, script) {
@@ -220,10 +207,11 @@ if (!cases.length) {
 console.log(`\n  ${cases.length} check(s), against a copy at ${work}\n`);
 
 for (const c of cases) {
-  // A check that reads git history cannot run against a copy - there is no .git there,
-  // which is how check-split-loses came to pass on nothing at all. Those run in the
-  // working copy with the file put back afterwards, which is the one thing this harness
-  // does that could leave something behind if it were killed mid-run.
+  // A check that reads git history cannot run against a copy - there is no .git there. No
+  // case needs that any more (check-split-loses was the only one, and it went when the
+  // rewrite collapsed the split directories), but the flag stays: a case that sets it runs
+  // in the working copy with the file put back afterwards, which is the one thing this
+  // harness does that could leave something behind if it were killed mid-run.
   const dir = c.needsHistory ? REPO : work;
   const target = path.join(dir, c.file);
   if (!fs.existsSync(target)) {

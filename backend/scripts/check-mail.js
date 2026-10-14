@@ -15,7 +15,7 @@
 //   secret storage    encrypts at rest, never returns the value, needs a write to change
 //   the API adapter   builds the request the operator described, nested paths included
 //   the API adapter   reports a provider refusal as a failure with its own reason
-//   precedence        an environment value outranks a stored one, as everywhere else
+//   precedence        a saved value outranks an environment seed; a deployment secret outranks a stored one
 //   test sends        a real request reaches a real listener and comes back accepted
 //
 // The HTTP half stands up a local server and points the adapter at it. That proves
@@ -33,6 +33,8 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'check-mail-' + Date.now();
 process.env.DB_CLIENT = 'sqlite';
+// Pinned connection: ignore any database configuration saved on this machine.
+process.env.TRYCOD_DB_ENV_ONLY = '1';
 process.env.DB_FILE = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-mail-')), 'check.db');
 // The stored precedence must be observed in this test, so the deployment variables it
 // would otherwise read are cleared. They are restored afterwards.
@@ -241,9 +243,17 @@ async function main() {
 
   process.env.MAIL_MODE = 'smtp';
   await settings.load(true);
-  ok('MAIL_MODE=smtp still selects smtp, as an existing install expects', mail.mode() === 'smtp');
+  ok('a saved mode outranks an environment seed',
+    mail.mode() === 'api', 'stored api, seed smtp, got ' + mail.mode());
+
+  await settings.reset('mail.mode', adminId);
+  await settings.load(true);
+  ok('with no saved value the environment seeds the setting',
+    mail.mode() === 'smtp', mail.mode());
   delete process.env.MAIL_MODE;
   await settings.load(true);
+  ok('with the seed gone it falls back to the schema default',
+    mail.mode() === 'disabled', mail.mode());
 
   console.log('\n  smtp validates without touching the network');
   await settings.save({ 'mail.mode': 'smtp' }, adminId);

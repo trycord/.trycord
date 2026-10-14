@@ -20,22 +20,30 @@ const twofactor = require('../../services/twofactor');
 // every other session alive, which is the thing a reader of this file most needs
 // to see next to it.
 
-// Password re-confirmation. Failures are throttled into the same lockout counter
-// as login, so a stolen session token cannot be brute-forced through here.
+// Password re-confirmation. Failures are throttled on their own counter, so a
+// stolen session token cannot be brute-forced through here without also being able
+// to lock the account holder out of ordinary sign-in.
 async function requirePassword(req, res) {
   const { password } = req.body || {};
   if (!password) {
     fail(res, 'VALIDATION_ERROR', 'password required');
     return false;
   }
+  const lockMs = await twofactor.remainingConfirmLockMs(req.user.id);
+  if (lockMs > 0) {
+    fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+      retryAfterSeconds: Math.ceil(lockMs / 1000),
+    });
+    return false;
+  }
   const row = await db.get('SELECT password_hash FROM users WHERE id = ?', [req.user.id]);
   const ok = row && await bcrypt.compare(String(password), row.password_hash);
   if (!ok) {
-    await twofactor.recordFailure(req.user.id);
+    await twofactor.recordConfirmFailure(req.user.id);
     fail(res, 'AUTH_REQUIRED', 'password is not correct');
     return false;
   }
-  await twofactor.recordSuccess(req.user.id);
+  await twofactor.recordConfirmSuccess(req.user.id);
   return true;
 }
 

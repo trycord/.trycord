@@ -104,8 +104,27 @@ router.post('/2fa/verify', rateLimit({ windowMs: 60000, max: 10 }), async (req, 
     // The factor may have been turned off between the challenge and the code.
     if (!user.totp_enabled_at) return fail(res, 'VALIDATION_ERROR', '2FA is not enabled for this account');
 
+    // Wrong codes count into the login lockout. Without a count a six-digit
+    // factor is a few thousand guesses, and the rate limiter alone (ten a minute)
+    // still permits that within a day; the password half already had this loop and
+    // the second factor is the half that is supposed to be stronger.
+    const lockMs = await twofactor.remainingLockMs(user.id);
+    if (lockMs > 0) {
+      return fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+        retryAfterSeconds: Math.ceil(lockMs / 1000),
+      });
+    }
+
     const result = await twofactor.verifySecondFactor(user.id, code);
-    if (!result.ok) return fail(res, 'AUTH_REQUIRED', 'invalid code');
+    if (!result.ok) {
+      const locked = await twofactor.recordFailure(user.id);
+      return locked
+        ? fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+          retryAfterSeconds: Math.ceil(twofactor.LOCKOUT_MS / 1000),
+        })
+        : fail(res, 'AUTH_REQUIRED', 'invalid code');
+    }
+    await twofactor.recordSuccess(user.id);
 
     issued(res, user, req, { usedRecoveryCode: result.via === 'recovery' });
   } catch (e) { next(e); }

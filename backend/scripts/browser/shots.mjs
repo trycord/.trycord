@@ -98,10 +98,10 @@ async function main() {
     await wait(600);
     const seen = await page.eval(`
       const reg = document.querySelector('#reg-username');
-      const card = document.querySelector('.auth-card');
+      const card = document.querySelector('.auth-formwrap');
       return {
         path: location.pathname,
-        title: (document.querySelector('.context-title') || {}).textContent || '',
+        title: (document.querySelector('.stage-head-title') || {}).textContent || '',
         hasRegisterField: !!reg,
         hasAuthCard: !!card,
         bodyStart: (document.body.innerText || '').trim().slice(0, 120),
@@ -120,7 +120,7 @@ async function main() {
     // regression show up here as a clean screenshot of an error page.
     await page.goto(ORIGIN + '/c/' + acct.serverId, { waitMs: 2400 });
     await wait(900);
-    await page.eval(`const b = document.querySelector('.ctx-channel'); if (b) b.click(); return 1;`);
+    await page.eval(`const b = document.querySelector('.nav-item--channel'); if (b) b.click(); return 1;`);
     await wait(2800);
     const channelRoute = await page.eval('return location.pathname;');
     if (!channelRoute || channelRoute.endsWith('/c/' + acct.serverId)) {
@@ -222,19 +222,17 @@ async function main() {
           const sh = document.getElementById('shell');
           const NL = String.fromCharCode(10);
           return [
-            'shell data-layout=' + (sh && sh.dataset.layout)
-              + ' data-members=' + (sh && sh.dataset.members)
+            'shell data-spine=' + (sh && sh.dataset.spine)
+              + ' data-context=' + (sh && sh.dataset.context)
               + ' data-presentation=' + document.documentElement.dataset.presentation,
-            tracks('.shell', 'gridTemplateColumns'),
-            tracks('.main-content', 'gridTemplateColumns'),
-            tracks('.main-content', 'gridTemplateRows'),
-            tracks('.chat-environment', 'gridTemplateColumns'),
-            'rootVar rail=' + getComputedStyle(document.documentElement).getPropertyValue('--ui-rail').trim()
-              + ' members=' + getComputedStyle(document.documentElement).getPropertyValue('--ui-members').trim()
-              + ' shellCols=' + getComputedStyle(document.documentElement).getPropertyValue('--ui-shell-cols').trim(),
-            box('#app'), box('.shell'), box('.app-rail'), box('.main-content'),
-            box('.context-header'), box('.chat-environment'), box('.view-root'),
-            box('.member-sidebar'), box('.conversation'),
+            tracks('#shell', 'gridTemplateColumns'),
+            tracks('#trycord-main', 'gridTemplateColumns'),
+            tracks('#trycord-main', 'gridTemplateRows'),
+            'rootVar spine=' + getComputedStyle(document.documentElement).getPropertyValue('--spine-w').trim()
+              + ' context=' + getComputedStyle(document.documentElement).getPropertyValue('--context-w').trim(),
+            box('#app'), box('#shell'), box('#spine'), box('#place-navigation'),
+            box('#trycord-main'), box('#context-header'), box('#view-root'),
+            box('#context-panel'), box('.convo'),
           ].join(NL);
         `);
         console.log(String(geo).split(String.fromCharCode(10)).map((x) => '          ' + x).join(String.fromCharCode(10)));
@@ -243,9 +241,10 @@ async function main() {
     }
 
     // The navigation open, at the widths where it is not a docked column. On a
-    // phone the community sidebar lives in this drawer, so a screenshot set that
-    // never opens it cannot tell a working mobile shell from a deleted one - which
-    // is exactly how the sidebar went missing once without the pictures showing it.
+    // phone the whole spine - the place switcher, the global destinations and the
+    // place's own navigation - lives in this drawer, so a screenshot set that never
+    // opens it cannot tell a working mobile shell from a deleted one - which is
+    // exactly how the sidebar went missing once without the pictures showing it.
     for (const [w, h, tag] of SIZES) {
       if (w >= 1000) continue;
       await page.setViewport(w, h);
@@ -260,8 +259,8 @@ async function main() {
       // What is actually in the drawer, and whether all of it fits above the fold.
       const nav = await page.eval(`
         const NL = String.fromCharCode(10);
-        const rail = document.querySelector('.app-rail');
-        const r = rail ? rail.getBoundingClientRect() : null;
+        const spine = document.querySelector('#spine');
+        const r = spine ? spine.getBoundingClientRect() : null;
         const vis = (sel) => {
           const e = document.querySelector(sel);
           if (!e) return sel + ' = MISSING';
@@ -272,19 +271,20 @@ async function main() {
             + ' y=' + Math.round(b.top) + '..' + Math.round(b.bottom)
             + (b.height > 0 ? '' : ' ZERO-H');
         };
-        const dests = [...document.querySelectorAll('.rail-nav')].map((e) => e.textContent.trim());
-        const comms = [...document.querySelectorAll('.rail-community')].map((e) => e.textContent.trim());
-        const chans = [...document.querySelectorAll('.ctx-channel')].map((e) => e.textContent.trim());
-        const sb = document.querySelector('.context-sidebar');
+        const COMMUNITY = '#place-navigation .nav-item:not(.nav-item--channel):not(.nav-item--dm)';
+        const dests = [...document.querySelectorAll('#global-navigation .nav-item')].map((e) => e.textContent.trim());
+        const comms = [...document.querySelectorAll(COMMUNITY)].map((e) => e.textContent.trim());
+        const chans = [...document.querySelectorAll('.nav-item--channel')].map((e) => e.textContent.trim());
+        const sb = document.querySelector('#place-navigation');
         const sbb = sb ? sb.getBoundingClientRect() : null;
-        const scrollable = [...document.querySelectorAll('.app-rail__items, .context-sidebar')]
+        const scrollable = [...document.querySelectorAll('.spine-place, .members-scroll')]
           .map((e) => e.scrollHeight > e.clientHeight + 1
             ? e.className.split(' ')[0] + ' scrolls ' + e.scrollHeight + '/' + e.clientHeight : '');
         return [
           'drawer x=' + (r ? Math.round(r.left) + '..' + Math.round(r.right) : '?')
             + ' y=' + (r ? Math.round(r.top) + '..' + Math.round(r.bottom) : '?'),
-          vis('.app-rail'), vis('.app-rail__items'), vis('.context-sidebar'),
-          'community sidebar box x=' + (sbb ? Math.round(sbb.left) + '..' + Math.round(sbb.right) : '?')
+          vis('#spine'), vis('.spine-place'), vis('#place-navigation'),
+          'place navigation box x=' + (sbb ? Math.round(sbb.left) + '..' + Math.round(sbb.right) : '?')
             + ' y=' + (sbb ? Math.round(sbb.top) + '..' + Math.round(sbb.bottom) : '?'),
           'destinations(' + dests.length + '): ' + dests.join(' | '),
           'communities(' + comms.length + '): ' + comms.join(' | '),
@@ -298,44 +298,44 @@ async function main() {
       // Closing has to work as well as opening, or the drawer is a trap. Click the
       // scrim the way a person does and check the navigation went away and the
       // conversation underneath is whole again.
-      await page.eval(`const b = document.querySelector('.nav-backdrop'); if (b) b.click(); return 1;`);
+      await page.eval(`const b = document.querySelector('#desktop-backdrop'); if (b) b.click(); return 1;`);
       await wait(700);
       const closed = await page.eval(`
-        const rail = document.querySelector('.app-rail');
-        const b = rail ? rail.getBoundingClientRect() : null;
-        const header = document.querySelector('.context-header');
+        const spine = document.querySelector('#spine');
+        const b = spine ? spine.getBoundingClientRect() : null;
+        const header = document.querySelector('#context-header');
         const hb = header ? header.getBoundingClientRect() : null;
-        return 'closed: rail x=' + (b ? Math.round(b.left) : '?')
+        return 'closed: spine x=' + (b ? Math.round(b.left) : '?')
           + ' width=' + (b ? Math.round(b.width) : '?')
           + ' | header x=' + (hb ? Math.round(hb.left) : '?')
           + ' w=' + (hb ? Math.round(hb.width) : '?')
-          + ' | scrim=' + (document.querySelector('.nav-backdrop') ? 'present' : 'gone')
+          + ' | scrim=' + (document.querySelector('#desktop-backdrop') ? 'present' : 'gone')
           + ' | composer=' + (document.querySelector('.composer') ? 'present' : 'MISSING')
           + ' | messages=' + document.querySelectorAll('.msg').length
           + ' | overflow=' + (document.documentElement.scrollWidth > window.innerWidth + 1);
       `);
       console.log('          ' + closed);
 
-      // Switching community from the drawer: the sidebar under it has to become the
-      // new community's, not the old one's with a new name on it.
+      // Switching community from the drawer: the place navigation under it has to
+      // become the new community's, not the old one's with a new name on it.
       const before = await page.eval(`
-        const sb = document.querySelector('.context-sidebar');
+        const sb = document.querySelector('#place-navigation');
         return (sb ? sb.textContent.replace(/\\s+/g, ' ').trim().slice(0, 90) : 'MISSING');`);
       await page.eval(`const b = document.querySelector('.nav-toggle'); if (b) b.click(); return 1;`);
       await wait(600);
       const switched = await page.eval(`
-        const comms = [...document.querySelectorAll('.rail-community')];
-        const other = comms.find((e) => !e.classList.contains('is-active') && !e.classList.contains('rail-nav'));
+        const comms = [...document.querySelectorAll('#place-navigation .nav-item:not(.nav-item--channel):not(.nav-item--dm)')];
+        const other = comms.find((e) => !e.classList.contains('is-active'));
         if (!other) return 'only one community seeded, switching not exercised';
         other.click();
         return 'clicked ' + other.textContent.trim();`);
       await wait(1800);
       const after = await page.eval(`
-        const sb = document.querySelector('.context-sidebar');
-        const rail = document.querySelector('.app-rail');
+        const sb = document.querySelector('#place-navigation');
+        const spine = document.querySelector('#spine');
         return 'route=' + location.pathname
-          + ' | rail=' + getComputedStyle(rail).display
-          + ' | sidebar=' + (sb ? sb.textContent.replace(/\\s+/g, ' ').trim().slice(0, 90) : 'MISSING');`);
+          + ' | spine=' + getComputedStyle(spine).display
+          + ' | place-nav=' + (sb ? sb.textContent.replace(/\\s+/g, ' ').trim().slice(0, 90) : 'MISSING');`);
       console.log('          switch: ' + switched);
       console.log('            before: ' + before);
       console.log('            after:  ' + after);
@@ -344,7 +344,7 @@ async function main() {
       // you to ignore the warning.
       if (!/only one community/.test(switched) && after.startsWith('route=/c/')
           && before && after.includes(before)) {
-        console.log('          WARNING the sidebar did not change with the community');
+        console.log('          WARNING the place navigation did not change with the community');
       }
     }
 
@@ -364,10 +364,10 @@ async function main() {
           const shell = document.getElementById('shell');
           return [
             'url=' + location.pathname + location.hash,
-            'shell=' + (shell ? 'yes layout=' + (shell.dataset.layout || '-') : 'MISSING')
-              + ' rails=' + document.querySelectorAll('.rail-nav').length
-              + ' communities=' + document.querySelectorAll('.rail-community').length
-              + ' channels=' + document.querySelectorAll('.ctx-channel').length
+            'shell=' + (shell ? 'yes spine=' + (shell.dataset.spine || '-') : 'MISSING')
+              + ' globals=' + document.querySelectorAll('#global-navigation .nav-item').length
+              + ' communities=' + document.querySelectorAll('#place-navigation .nav-item:not(.nav-item--channel):not(.nav-item--dm)').length
+              + ' channels=' + document.querySelectorAll('.nav-item--channel').length
               + ' view=' + (document.querySelector('#view-root') ? document.querySelector('#view-root').children.length + ' child' : 'MISSING'),
           ].join(NL);`);
         console.log('  route  ' + label.padEnd(26) + ' ' + String(m).split(String.fromCharCode(10))[0]);
@@ -375,8 +375,8 @@ async function main() {
       };
 
       await step('open community', () => page.goto(ORIGIN + '/c/' + acct.serverId, { waitMs: 2300 }));
-      await step('open a channel', () => page.eval(`const b = document.querySelector('.ctx-channel'); if (b) b.click(); return 1;`));
-      await step('go to home', () => page.eval(`const b = [...document.querySelectorAll('.rail-nav')].find(x => /home/i.test(x.dataset.label || '')); if (b) b.click(); return 1;`));
+      await step('open a channel', () => page.eval(`const b = document.querySelector('.nav-item--channel'); if (b) b.click(); return 1;`));
+      await step('go to home', () => page.eval(`const b = [...document.querySelectorAll('#global-navigation .nav-item')].find(x => /home/i.test(x.textContent || '')); if (b) b.click(); return 1;`));
       await step('back', () => page.eval(`history.back(); return 1;`));
       await step('back again', () => page.eval(`history.back(); return 1;`));
       await step('forward', () => page.eval(`history.forward(); return 1;`));
@@ -388,7 +388,7 @@ async function main() {
       // screen.
       const unknown = await page.eval(`
         return 'text=' + JSON.stringify((document.body.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 120))
-          + ' | authPage=' + (document.documentElement.hasAttribute('data-auth-page') ? 'yes' : 'no')
+          + ' | rawPage=' + (document.documentElement.dataset.raw ? 'yes' : 'no')
           + ' | token=' + (localStorage.getItem('trycord.token') ? 'present' : 'gone');`);
       console.log('          ' + unknown);
       // The route walk is the last thing that runs before the signed-out capture, so
@@ -419,7 +419,7 @@ async function main() {
         written.push(file);
         const form = await page.eval(`
           const NL = String.fromCharCode(10);
-          const card = document.querySelector('.auth-card, .auth-box, .card--auth');
+          const card = document.querySelector('.auth-formwrap, .auth-formside');
           const f = document.querySelector('.auth-form');
           const b = card ? card.getBoundingClientRect() : null;
           return [

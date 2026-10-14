@@ -144,6 +144,8 @@ const LEGACY_ALTERS = [
   ['users', 'totp_enabled_at', 'ALTER TABLE users ADD COLUMN totp_enabled_at VARCHAR(64)'],
   ['users', 'login_fail_count', 'ALTER TABLE users ADD COLUMN login_fail_count INTEGER NOT NULL DEFAULT 0'],
   ['users', 'login_locked_until', 'ALTER TABLE users ADD COLUMN login_locked_until VARCHAR(64)'],
+  ['users', 'confirm_fail_count', 'ALTER TABLE users ADD COLUMN confirm_fail_count INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'confirm_locked_until', 'ALTER TABLE users ADD COLUMN confirm_locked_until VARCHAR(64)'],
   ['users', 'session_version', 'ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0'],
   // Human-readable URL segments. Mirrored in MYSQL_ADD.
   ['servers', 'slug', 'ALTER TABLE servers ADD COLUMN slug VARCHAR(64)'],
@@ -152,6 +154,7 @@ const LEGACY_ALTERS = [
   ['attachments', 'dm_message_id', 'ALTER TABLE attachments ADD COLUMN dm_message_id VARCHAR(64)'],
   ['messages', 'thread_root_id', 'ALTER TABLE messages ADD COLUMN thread_root_id VARCHAR(64)'],
   ['dm_messages', 'thread_root_id', 'ALTER TABLE dm_messages ADD COLUMN thread_root_id VARCHAR(64)'],
+  ['audit_logs', 'server_id', 'ALTER TABLE audit_logs ADD COLUMN server_id VARCHAR(64)'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -207,6 +210,8 @@ const MYSQL_ADD = [
   ['users', 'totp_enabled_at', 'ALTER TABLE users ADD COLUMN totp_enabled_at VARCHAR(64)'],
   ['users', 'login_fail_count', 'ALTER TABLE users ADD COLUMN login_fail_count INTEGER NOT NULL DEFAULT 0'],
   ['users', 'login_locked_until', 'ALTER TABLE users ADD COLUMN login_locked_until VARCHAR(64)'],
+  ['users', 'confirm_fail_count', 'ALTER TABLE users ADD COLUMN confirm_fail_count INTEGER NOT NULL DEFAULT 0'],
+  ['users', 'confirm_locked_until', 'ALTER TABLE users ADD COLUMN confirm_locked_until VARCHAR(64)'],
   ['users', 'session_version', 'ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0'],
   // Human-readable URL segments. See services/slugs.js.
   ['servers', 'slug', 'ALTER TABLE servers ADD COLUMN slug VARCHAR(64)'],
@@ -246,6 +251,7 @@ const MYSQL_ADD = [
   ['attachments', 'dm_message_id', 'ALTER TABLE attachments ADD COLUMN dm_message_id VARCHAR(64)'],
   ['messages', 'thread_root_id', 'ALTER TABLE messages ADD COLUMN thread_root_id VARCHAR(64)'],
   ['dm_messages', 'thread_root_id', 'ALTER TABLE dm_messages ADD COLUMN thread_root_id VARCHAR(64)'],
+  ['audit_logs', 'server_id', 'ALTER TABLE audit_logs ADD COLUMN server_id VARCHAR(64)'],
 ];
 
 const INDEXES = [

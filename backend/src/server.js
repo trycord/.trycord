@@ -20,8 +20,6 @@ const pages = require('./services/pages');
 const features = require('./features');
 const settings = require('./services/settings');
 
-const PORT = parseInt(process.env.PORT || '9971', 10);
-
 /**
  * Reduce a configured API location to the origin the client should talk to.
  *
@@ -40,27 +38,16 @@ function apiOriginOnly(value) {
   }
 }
 
-// Where the web client is mounted, if anywhere. Declared at module scope because
-// both the static handler and the route fallback need it, and the fallback runs
-// before the point where it used to be defined - which put it in the temporal
-// dead zone and failed startup with "Cannot access before initialization".
-// Empty means the client is served from the origin root, which is the ordinary
-// self-hosted case.
-const APP_MOUNT = (process.env.TRYCORD_APP_MOUNT || '').trim().replace(/\/+$/, '');
-// Validated strictly: exactly "express" (direct exposure) or "nginx"
-// (reverse-proxy deployment). Anything else is a hard startup error - never
-// silently fall back to a different topology, which is how an instance ends up
-// bound to a public interface nobody chose.
-const HOST_TYPE = String(process.env.SERVER_HOST_TYPE || '').trim().toLowerCase();
-if (HOST_TYPE && HOST_TYPE !== 'express' && HOST_TYPE !== 'nginx') {
-  throw new Error('Invalid SERVER_HOST_TYPE. Expected "express" or "nginx".');
-}
-const nginxMode = HOST_TYPE === 'nginx';
-// Normal bind: in nginx mode the public listener is nginx, so Express
-// binds loopback unless the deployment explicitly requires another interface.
-// In express mode keep the existing direct-exposure default. dotenv injects
-// HOST from .env, so the per-mode default only applies when HOST is unset.
-const HOST = nginxMode ? (process.env.HOST || '127.0.0.1') : (process.env.HOST || '0.0.0.0');
+// What a first start falls back to, before the configuration centre has been read.
+//
+// The listener and the mount are not decided here. They are decided after the
+// store loads, because they are settings like any other - an administrator changes
+// them in the dashboard, and the change takes effect at the next start. These are
+// the environment's seed values, which is what the dashboard shows before anything
+// is saved and what an instance with no saved value uses.
+const ENV_PORT = parseInt(process.env.PORT || '9971', 10);
+const ENV_APP_MOUNT = (process.env.TRYCORD_APP_MOUNT || '').trim().replace(/\/+$/, '');
+const ENV_HOST_TYPE = String(process.env.SERVER_HOST_TYPE || '').trim().toLowerCase();
 const isLoopbackHost = (h) => h === '127.0.0.1' || h === '::1' || h === '[::1]' || h === 'localhost' || /^127\./.test(h);
 
 function instanceConfig() {
@@ -100,7 +87,7 @@ function instanceConfig() {
 // helpful, and an operator who has already configured everything does not need
 // to be offered a wizard. With it on, one line at boot pointing at where to run
 // it is the whole feature.
-function announceQuickSetup() {
+function announceQuickSetup(mount) {
   const settings = require('./services/settings');
   if (!settings.get('instance.quickSetup')) return;
   const essentials = require('./services/quick-setup').essentials();
@@ -111,29 +98,46 @@ function announceQuickSetup() {
   }
   console.log('[quick setup] ' + todo.length + ' setting(s) still need a value:');
   todo.forEach((e) => console.log('             ' + e.label + ' (' + e.key + ')'));
-  console.log('             run it at ' + quickSetupUrl());
+  console.log('             run it at ' + quickSetupUrl(mount));
 }
 
 // Where the setup lives. The app is mounted under a prefix on some deployments,
 // so the link has to be the mounted one rather than a hardcoded path.
-function quickSetupUrl() {
-  const mount = (process.env.TRYCORD_APP_MOUNT || '').replace(/\/+$/, '');
+function quickSetupUrl(mount) {
   const base = (process.env.TRYCORD_PUBLIC_URL || '').replace(/\/+$/, '');
-  return base + mount + '/admin/settings';
+  return base + (mount || '') + '/admin/settings';
 }
 
-async function boot() {
-  if (!process.env.JWT_SECRET) {
-    throw new Error(
-      'JWT_SECRET is required. Each instance must have its own secret: ' +
-      'generate one and set it in .env (see .env.example). The official secret is never shared.'
-    );
+// The listener and the mount, read after the configuration centre so a value saved
+// in the dashboard is the one in force. The environment seeds them, which is what
+// an instance with nothing saved uses and what the dashboard shows as the starting
+// point. All three are restart-required: a process cannot rebind a listening socket
+// or move its own asset paths while it is running.
+function resolveListenSettings() {
+  const loaded = settings.isLoaded();
+  const port = settings.isLoaded() ? settings.get('server.port') : ENV_PORT;
+  const hostType = String((settings.isLoaded() ? settings.get('server.hostType') : ENV_HOST_TYPE) || '').trim().toLowerCase();
+  if (hostType && hostType !== 'express' && hostType !== 'nginx') {
+    throw new Error('Invalid host type "' + hostType + '". Expected "express" or "nginx".');
   }
-  const inst = instanceConfig();
-  console.log('[info] host type: ' + (nginxMode ? 'nginx (reverse proxy in front of :' + PORT + ')' : 'express (direct)'));
-  // Mode-specific validation: surface obviously inconsistent topology at
-  // boot instead of failing later at request time.
-  if (nginxMode) {
+  const nginx = hostType === 'nginx';
+  const savedHost = String((settings.isLoaded() ? settings.get('server.host') : '') || '').trim();
+  // In nginx mode the public listener is nginx, so Express binds loopback unless
+  // the deployment explicitly requires another interface. In express mode the
+  // server is the public listener, so it binds every interface by default.
+  const host = savedHost || (nginx ? '127.0.0.1' : '0.0.0.0');
+  const mount = String((settings.isLoaded() ? settings.get('app.mount') : ENV_APP_MOUNT) || '')
+    .trim().replace(/\/+$/, '');
+  return { port, host, hostType, nginx, mount };
+}
+
+// Say the topology at boot, once. Reads the resolved listener rather than the
+// environment, so it describes the configuration actually in force.
+function reportListen(listen, inst) {
+  console.log('[info] host type: ' + (listen.nginx
+    ? 'nginx (reverse proxy in front of :' + listen.port + ')'
+    : 'express (direct)'));
+  if (listen.nginx) {
     if (inst.publicUrl) {
       try {
         const pub = new URL(inst.publicUrl);
@@ -145,8 +149,8 @@ async function boot() {
         }
       } catch { /* publicUrl invalid; other paths handle it */ }
     }
-    if (process.env.HOST && !isLoopbackHost(process.env.HOST)) {
-      console.warn('[warn] nginx mode: HOST=' + process.env.HOST + ' is not a loopback interface. The public listener is nginx, so keep Express on 127.0.0.1 unless the deployment explicitly requires another interface.');
+    if (listen.host && !isLoopbackHost(listen.host)) {
+      console.warn('[warn] nginx mode: the bind address ' + listen.host + ' is not loopback. The public listener is nginx, so keep Trycord on 127.0.0.1 unless the deployment explicitly requires another interface.');
     }
     if (String(process.env.TRUST_PROXY || '').trim() !== '1') {
       console.warn('[warn] nginx mode: TRUST_PROXY=1 is not set. Client IPs and HTTPS detection will be wrong behind the proxy. Set it only when a proxy on the same host (nginx) is actually in front of Express.');
@@ -154,11 +158,26 @@ async function boot() {
   } else if (inst.publicUrl) {
     try {
       const u = new URL(inst.publicUrl);
-      if (u.port && String(parseInt(u.port, 10)) !== String(PORT)) {
-        console.warn('[warn] express mode: PUBLIC URL port ' + u.port + ' differs from listener port ' + PORT + ', so public links may not reach this listener as configured.');
+      if (u.port && String(parseInt(u.port, 10)) !== String(listen.port)) {
+        console.warn('[warn] express mode: the public URL port ' + u.port + ' differs from the listening port ' + listen.port + ', so public links may not reach this listener as configured.');
       }
     } catch { /* publicUrl invalid; other paths handle it */ }
   }
+}
+
+async function boot() {
+  // The signing secret is the one value that cannot come from the configuration
+  // store: it is the key the store's encrypted values are derived from. An
+  // instance that has none gets one generated on the spot and kept, so nobody
+  // has to invent one before they can start. A deployment that sets JWT_SECRET
+  // keeps using that.
+  const { secret, secretOrigin, secretFilePath } = require('./clock');
+  const secretFrom = secretOrigin();
+  secret();
+  console.log(secretFrom === 'environment'
+    ? '[info] signing secret: JWT_SECRET'
+    : '[info] signing secret: ' + secretFilePath());
+  const inst = instanceConfig();
 
   // The desktop app cannot be inferred the way a browser origin can: it is a
   // custom scheme, so it has to be allowlisted explicitly, and a backend that
@@ -183,7 +202,12 @@ async function boot() {
   // saved dashboard value be ignored.
   await settings.load();
   features.load();
-  announceQuickSetup();
+  // Resolved after the store, because the listener and the mount are settings: an
+  // administrator changes them in the dashboard and the change takes effect at the
+  // next start. This is where a saved value replaces the environment's seed.
+  const listen = resolveListenSettings();
+  reportListen(listen, inst);
+  announceQuickSetup(listen.mount);
 
   const app = express();
   const server = http.createServer(app);
@@ -244,7 +268,6 @@ async function boot() {
       return u.origin;
     } catch { return null; }
   };
-  const wsOriginOf = (origin) => origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:');
   // The backup has to be allowed here as well as the primary. A failover the
   // policy then refuses presents as an empty application rather than as a
   // switch, which is the same symptom as having no failover at all.
@@ -267,14 +290,16 @@ async function boot() {
   function originOf(req) {
     const host = req.headers && req.headers.host;
     if (!host || !/^[^\s/]+$/.test(String(host))) return null;
-    const proto = String((req.headers['x-forwarded-proto'] || '').split(',')[0]).trim()
-      || (req.protocol === 'https:' ? 'https' : 'http');
-    if (proto !== 'http' && proto !== 'https') return null;
+    // req.protocol already honours X-Forwarded-Proto when - and only when - Express
+    // is told to trust the proxy (TRUST_PROXY=1, loopback only). Reading the header
+    // directly here skipped that gate, so a plain http caller could send
+    // X-Forwarded-Proto: https and have backend.json hand the client an https origin.
+    const proto = req.protocol === 'https' ? 'https' : 'http';
     return proto + '://' + host;
   }
 
-  const buildCsp = (allowInlineScripts, extraOrigins) => {
-    const connect = [...new Set([...cspConnect, ...(extraOrigins || [])])];
+  const buildCsp = (allowInlineScripts) => {
+    const connect = [...new Set(cspConnect)];
     return [
       "default-src 'self'",
       `connect-src ${connect.join(' ')}`,
@@ -289,18 +314,20 @@ async function boot() {
     ].join('; ');
   };
   app.use((req, res, next) => {
-    // The client's top-precedence backend travels in ?api= (desktop exe,
-    // bookmarks, backend-selector reloads). Reflect that configured origin
-    // and only that origin into connect-src so the served page may
-    // reach exactly the backend it was told to use. Anything else still
-    // requires the allowlist above (TRYCORD_API_URL, backend.json,
-    // CSP_CONNECT_ORIGINS, localhost, trycord.dev).
-    const extra = [];
-    const apiParam = cspOriginOf(req.query && req.query.api);
-    if (apiParam) extra.push(apiParam, wsOriginOf(apiParam));
-    res.setHeader('Content-Security-Policy', req.path.indexOf('showcase') !== -1 ? buildCsp(true, extra) : buildCsp(false, extra));
+    // The policy is built from configured origins and nothing else - never from
+    // request input. The client can be pointed at another API origin at runtime
+    // through backend.json or the settings selector, both of which the operator
+    // controls, but a query parameter must not be able to authorize one: an
+    // attacker link carrying ?api=<their origin> would otherwise be granted the
+    // exact connect-src allowance it needs to receive the reader's bearer-carrying
+    // requests, which is the policy defeating the thing it exists for. An origin
+    // the operator has not configured stays refused by the browser.
+    res.setHeader('Content-Security-Policy', req.path.indexOf('showcase') !== -1 ? buildCsp(true) : buildCsp(false));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
+    // Only over TLS: browsers ignore the header on a plain-http response, and keying
+    // it off the request's own scheme keeps it correct behind a terminating proxy.
+    if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
     res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
@@ -421,6 +448,7 @@ async function boot() {
   app.use('/api/admin', require('./routes/admin'));
   app.use('/api/admin/pages', require('./routes/adminPages'));
   app.use('/api/admin/settings', require('./routes/settings'));
+  app.use('/api/admin/database', require('./routes/database'));
   app.use('/api/admin/mail', require('./routes/mail'));
   // Test hooks for automated suites (email verification without an inbox).
   // Strictly opt-in: unmounted in every other boot, where the paths 404.
@@ -457,7 +485,7 @@ async function boot() {
 
   const clientDir = serveClient.mountClient(app, {
     serverDir: __dirname,
-    appMount: APP_MOUNT,
+    appMount: listen.mount,
     originOf,
     cspOriginOf,
   });
@@ -520,9 +548,9 @@ async function boot() {
   // segment only when it is not itself an application route. Returns '' when
   // there is no mount, '' meaning "the base is the origin root".
   function appMount(reqPath) {
-    if (APP_MOUNT) {
+    if (listen.mount) {
       const seg = reqPath.split('/').filter(Boolean)[0] || '';
-      return seg === APP_MOUNT.replace(/^\//, '') ? APP_MOUNT : '';
+      return seg === listen.mount.replace(/^\//, '') ? listen.mount : '';
     }
     return '';
   }
@@ -539,7 +567,7 @@ async function boot() {
   serveClient.mountSpaFallback(app, {
     clientDir,
     publicDir,
-    appMount: APP_MOUNT,
+    appMount: listen.mount,
     mountOf: appMount,
   });
 
@@ -604,13 +632,13 @@ async function boot() {
   // The WebSocket gateway shares this HTTP server: same bind address, no second port.
   await new Promise((resolve, reject) => {
     server.on('error', reject);
-    server.listen(PORT, HOST, () => {
-      console.log(`Trycord server "${inst.instanceId}" listening on http://${HOST}:${PORT}`);
+    server.listen(listen.port, listen.host, () => {
+      console.log(`Trycord server "${inst.instanceId}" listening on http://${listen.host}:${listen.port}`);
       if (inst.publicUrl) {
         console.log(`Web client available at ${inst.publicUrl}`);
       } else {
-        const displayHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
-        console.log(`Web client available at http://${displayHost}:${PORT}`);
+        const displayHost = listen.host === '0.0.0.0' ? 'localhost' : listen.host;
+        console.log(`Web client available at http://${displayHost}:${listen.port}`);
       }
       resolve();
     });

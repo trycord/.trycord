@@ -1,27 +1,32 @@
 // Voice and video.
 //
-// This module owns the voice panel: whether the instance has voice at all, joining and
-// leaving, the participant list, and this user's own mute and deafen state.
+// The panel and the media session in one module, because the panel is the only way a
+// person reaches the session and nothing else in the client needs either.
 //
-// It does not own the WebRTC peer connection. That needs a real browser with real media
-// devices and a real SFU, and building it here untested would be pretending. What this
-// module does own is everything either side of the media: the honest capability check,
-// the room membership the server enforces, and the state the server persists.
+// The server owns membership and authorisation: join, leave, the participant list and
+// this user's mute and deafen state are all server facts. This module owns the media,
+// which is the part only a browser can do - capturing the microphone, holding one
+// RTCPeerConnection, and relaying the SDP offer and answer through the provider.
 //
-// So the states are: voice is off (say so, offer nothing), voice is on (offer a join
-// button), joining, connected, and every failure the server actually returned.
+// The receive path follows the provider's remote-track flow, driven by polling the
+// participant list rather than by a signalling socket. It is written against the same
+// negotiate endpoint the publish path uses. Neither path can be exercised without a
+// live media server, so this is the one part of the client that a self-hoster running
+// voice must confirm on their own instance.
 
-import Api from './api.js';
-import { esc, el, clear, icon, toast, relTime, confirmDialog } from './ui.js';
+import { el, clear } from './dom.js';
+import { icon } from './icons.js';
 import { avatar } from './components.js';
-import { navigate } from './nav.js';
+import { relativeTime } from './format.js';
+import { toast, errorToast } from './ui.js';
+import Api from './api.js';
 
-// One panel per channel, so switching channels leaves the old one behind.
-const panels = new Map();
+// One live session per channel, so leaving a channel and coming back reuses the
+// connection rather than opening a second one against the media server.
+const sessions = new Map();
 
-// Cached once per session: the answer only changes when the operator restarts the instance
-// with a different configuration, and re-asking on every render would be a request per
-// panel open.
+// Cached for the session: the answer only changes when the operator reconfigures the
+// instance, and re-asking on every panel open would be a request per channel.
 let capabilities = null;
 let capabilitiesAsked = false;
 
@@ -30,18 +35,36 @@ export async function voiceCapabilities(force = false) {
   capabilitiesAsked = true;
   try {
     const res = await Api.voiceCapabilities();
-    capabilities = (res && res.voiceVideo) || { available: false, reason: 'disabled' };
+    const media = (res && res.voiceVideo) || {};
+    const flags = (res && res.features && res.features.voiceVideo) || {};
+    capabilities = {
+      available: !!media.available,
+      reason: media.reason || (media.available ? 'ready' : 'unknown'),
+      detail: media.detail || '',
+      screenSharing: !!flags.screenSharing,
+      stageChannels: !!flags.stageChannels,
+      maxParticipants: flags.maxParticipants || 0,
+    };
   } catch {
-    // An unreachable backend is not "voice is off", and calling it that would hide a real
-    // problem behind a feature flag that was never read.
-    capabilities = { available: false, reason: 'unknown', detail: 'could not reach the server' };
+    // An unreachable backend is not the same as voice being off, and calling it that
+    // would hide a real problem behind a feature flag that was never read.
+    capabilities = {
+      available: false,
+      reason: 'unknown',
+      detail: 'Could not reach the server.',
+      screenSharing: false,
+      maxParticipants: 0,
+    };
   }
   return capabilities;
 }
 
-// What the panel says when voice is not available. Three genuinely different reasons, and
-// they need three different messages: an instance that has no voice, one whose media
-// server is unreachable, and one the client could not ask.
+function mediaSupported() {
+  return typeof navigator !== 'undefined'
+    && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+    && typeof RTCPeerConnection === 'function';
+}
+
 function unavailableState(caps) {
   if (caps.reason === 'disabled') {
     return {
@@ -52,275 +75,313 @@ function unavailableState(caps) {
   if (caps.reason === 'misconfigured') {
     return {
       title: 'Voice is not configured',
-      body: 'Voice is on, but the media server is not set up. '
-        + 'An administrator needs to finish the configuration.',
+      body: 'Voice is on, but the media server is not set up. An administrator needs to finish the configuration.',
     };
   }
   if (caps.reason === 'unreachable') {
     return {
       title: 'The media server is unreachable',
-      body: 'Voice is on, but the media server could not be reached. '
-        + 'An administrator needs to check its configuration.',
+      body: 'Voice is on, but the media server could not be reached. An administrator needs to check its configuration.',
     };
   }
   return {
     title: 'Voice is unavailable',
-    body: 'Could not check whether this instance supports voice.',
+    body: caps.detail || 'Could not check whether this instance supports voice.',
   };
 }
 
-// The panel. Always rendered for a voice channel; what it contains depends on the
-// capability and whether this user has joined.
-export async function renderVoicePanel(container, channel, context = {}) {
-  const key = channel.id;
-  const existing = panels.get(key);
-  if (existing) {
-    // Re-rendering must not discard a live session, so the panel object is kept and only
-    // its contents are rebuilt.
-    existing.region = container;
-    paintPanel(existing, channel, context);
-    return existing;
-  }
-
-  const panel = {
-    channelId: channel.id,
-    region: container,
+function createSession(channel) {
+  return {
+    channel,
+    region: null,
     joined: false,
-    sessionId: null,
-    participants: [],
+    busy: false,
     muted: false,
     deafened: false,
-    loading: false,
-    error: null,
+    participants: [],
+    iceServers: [],
+    pc: null,
+    localStream: null,
+    remoteStream: null,
+    audio: null,
+    poll: null,
+    subscribed: new Set(),
+    // Serialises renegotiation, because two offers in flight on one connection is a
+    // race the provider resolves by rejecting one of them.
+    queue: Promise.resolve(),
   };
-  panels.set(key, panel);
-  paintPanel(panel, channel, context);
+}
+
+export async function voiceChannelPanel({ channel }) {
+  const caps = await voiceCapabilities();
+  let session = sessions.get(channel.id);
+  if (!session) {
+    session = createSession(channel);
+    sessions.set(channel.id, session);
+  }
+  session.caps = caps;
+  const panel = el('div', { class: 'voice' });
+  session.region = panel;
+  paint(session);
   return panel;
 }
 
-function paintPanel(panel, channel, context) {
-  const region = panel.region;
+function paint(session) {
+  const region = session.region;
   if (!region) return;
   clear(region);
 
-  voiceCapabilities().then((caps) => {
-    if (panel.region !== region) return; // the channel was switched mid-request
-    clear(region);
-    region.appendChild(panelBody(panel, channel, context, caps));
-  });
+  region.appendChild(el('div', { class: 'voice-head' },
+    el('div', {},
+      el('div', { class: 'voice-title' }, session.channel.name),
+      el('div', { class: 'voice-sub' },
+        session.channel.type === 'stage' ? 'Stage channel' : 'Voice channel'))));
+
+  // The remote audio element outlives a repaint, so it is put back rather than rebuilt.
+  if (session.audio) region.appendChild(session.audio);
+
+  if (!session.caps || !session.caps.available) {
+    const state = unavailableState(session.caps || {});
+    region.appendChild(el('div', { class: 'voice-state' },
+      icon('phone-off', { size: 26 }),
+      el('div', { class: 'voice-state-title' }, state.title),
+      el('div', { class: 'voice-state-body' }, state.body)));
+    return;
+  }
+
+  if (!session.joined) {
+    const join = el('button', {
+      class: 'btn btn--primary', type: 'button', disabled: session.busy,
+      onClick: () => joinChannel(session),
+    }, icon('phone', { size: 16 }), el('span', {}, session.busy ? 'Connecting' : 'Join voice'));
+    region.appendChild(el('div', { class: 'voice-join' },
+      join,
+      session.caps.maxParticipants
+        ? el('div', { class: 'voice-hint' }, 'Up to ' + session.caps.maxParticipants + ' people in this channel.')
+        : null));
+    return;
+  }
+
+  region.appendChild(controls(session));
+  region.appendChild(participantList(session));
 }
 
-function panelBody(panel, channel, context, caps) {
-  const wrap = el('div', { class: 'voice' });
-  wrap.appendChild(el('div', { class: 'voice__head' }, [
-    el('div', { class: 'voice__title' }, channel.name),
-    el('div', { class: 'voice__sub' },
-      channel.type === 'stage' ? 'Stage channel' : 'Voice channel'),
-  ]));
-
-  if (!caps.available) {
-    const state = unavailableState(caps);
-    wrap.appendChild(el('div', { class: 'voice__empty' }, [
-      el('div', { class: 'voice__empty-title' }, state.title),
-      el('div', { class: 'voice__empty-body' }, state.body),
-    ]));
-    return wrap;
-  }
-
-  // The sub-capability flags are read from the capability response rather than assumed, so
-  // a provider that cannot screen-share does not show a screen-share button.
-  const limit = caps.maxParticipants || 0;
-
-  if (!panel.joined) {
-    const joinBtn = el('button', {
-      class: 'btn primary', type: 'button',
-      disabled: panel.loading,
-      onClick: () => joinPanel(panel, channel, caps),
-    }, panel.loading ? 'Connecting…' : 'Join voice');
-    wrap.appendChild(el('div', { class: 'voice__join' }, [
-      joinBtn,
-      limit ? el('div', { class: 'voice__hint' },
-        'Up to ' + limit + ' people in this channel.') : null,
-    ]));
-    return wrap;
-  }
-
-  // Connected. Controls first, because that is what someone in a call reaches for.
-  const controls = el('div', { class: 'voice__controls' });
-  controls.appendChild(stateButton(panel, 'muted', 'Mute', 'mute'));
-  controls.appendChild(stateButton(panel, 'deafened', 'Deafen', 'volume'));
-  if (caps.screenSharing) {
-    controls.appendChild(el('button', {
-      class: 'btn sm', type: 'button',
-      title: 'Share your screen',
-      'aria-label': 'Share your screen',
-      onClick: () => shareScreen(panel, channel),
-    }, icon('image')));
-  }
-  controls.appendChild(el('button', {
-    class: 'btn sm danger', type: 'button',
-    onClick: () => leavePanel(panel, channel),
+function controls(session) {
+  const bar = el('div', { class: 'voice-controls' });
+  bar.appendChild(toggle(session, 'muted', 'Mute', 'Unmute', 'mic', 'mic-off', () => setOwnState(session, { muted: !session.muted })));
+  bar.appendChild(toggle(session, 'deafened', 'Deafen', 'Undeafen', 'headphones', 'headphones-off', () => setOwnState(session, { deafened: !session.deafened })));
+  bar.appendChild(el('button', {
+    class: 'btn btn--default btn--sm', type: 'button',
+    onClick: () => leaveChannel(session),
   }, 'Leave'));
-
-  wrap.appendChild(controls);
-  wrap.appendChild(participantList(panel, context));
-  return wrap;
+  return bar;
 }
 
-function stateButton(panel, key, label, iconName) {
-  const on = panel[key];
+function toggle(session, key, onLabel, offLabel, onIcon, offIcon, onClick) {
+  const on = session[key];
   return el('button', {
-    class: 'btn sm' + (on ? ' active' : ''),
+    class: 'btn btn--default btn--sm voice-control' + (on ? ' is-on' : ''),
     type: 'button',
     'aria-pressed': on ? 'true' : 'false',
-    title: on ? 'Turn off ' + label.toLowerCase() : 'Turn on ' + label.toLowerCase(),
-    onClick: () => setOwnState(panel, { [key]: !on }),
-  }, [icon(iconName), el('span', {}, label)]);
+    onClick,
+  }, icon(on ? onIcon : offIcon, { size: 15 }), el('span', {}, on ? offLabel : onLabel));
 }
 
-function participantList(panel, context) {
-  const list = el('div', { class: 'voice__participants' });
-  if (!panel.participants.length) {
-    list.appendChild(el('div', { class: 'voice__empty-body' }, 'Nobody else is here yet.'));
+function participantList(session) {
+  const list = el('div', { class: 'voice-participants' });
+  if (!session.participants.length) {
+    list.appendChild(el('div', { class: 'voice-state-body' }, 'Nobody else is here yet.'));
     return list;
   }
-
-  list.appendChild(el('div', { class: 'voice__section-label' },
-    panel.participants.length + (panel.participants.length === 1 ? ' person' : ' people')));
-
-  for (const p of panel.participants) {
-    const row = el('div', { class: 'voice__participant' });
-    row.appendChild(avatar({
-      id: p.userId, username: p.username, displayName: p.displayName, avatarUrl: p.avatarUrl,
-    }, { withPresence: true }));
-
-    const main = el('div', { class: 'voice__participant-main' });
-    const name = el('div', { class: 'voice__participant-name' });
-    name.appendChild(el('span', {}, p.displayName || p.username));
-    if (p.muted) {
-      name.appendChild(el('span', { class: 'voice__flag', title: 'Muted' }, 'muted'));
-    }
-    if (p.deafened) {
-      name.appendChild(el('span', { class: 'voice__flag', title: 'Deafened' }, 'deafened'));
-    }
-    main.appendChild(name);
-    if (p.joinedAt) {
-      main.appendChild(el('div', { class: 'voice__participant-sub' }, 'joined ' + relTime(p.joinedAt)));
-    }
-    row.appendChild(main);
-
-    // A moderator's controls only appear where the server says this user may moderate.
-    if (context.canModerateVoice) {
-      row.appendChild(moderateMenu(panel, p));
-    }
+  const count = session.participants.length;
+  list.appendChild(el('div', { class: 'voice-section-label' },
+    count + (count === 1 ? ' person' : ' people')));
+  for (const person of session.participants) {
+    const row = el('div', { class: 'voice-participant' },
+      avatar({ id: person.userId, username: person.username, displayName: person.displayName, avatarUrl: person.avatarUrl }, { size: 'sm' }),
+      el('div', { class: 'voice-participant-main' },
+        el('div', { class: 'voice-participant-name' },
+          el('span', {}, person.displayName || person.username),
+          person.muted ? el('span', { class: 'voice-flag', title: 'Muted' }, 'muted') : null,
+          person.deafened ? el('span', { class: 'voice-flag', title: 'Deafened' }, 'deafened') : null),
+        person.joinedAt ? el('div', { class: 'voice-participant-sub' }, 'joined ' + relativeTime(person.joinedAt)) : null));
     list.appendChild(row);
   }
   return list;
 }
 
-function moderateMenu(panel, participant) {
-  const menu = el('div', { class: 'voice__moderate' });
-  menu.appendChild(el('button', {
-    class: 'btn sm', type: 'button', title: 'Mute', 'aria-label': 'Mute ' + (participant.displayName || participant.username),
-    onClick: () => Api.voiceModerate(panel.channelId, participant.userId, { mute: true })
-      .then(() => refreshPanel(panel))
-      .catch((e) => toast(e.message || 'Could not mute', 'error')),
-  }, icon('mute')));
-
-  menu.appendChild(el('button', {
-    class: 'btn sm danger', type: 'button',
-    title: 'Disconnect', 'aria-label': 'Disconnect ' + (participant.displayName || participant.username),
-    onClick: () => confirmDialog({
-      title: 'Disconnect ' + (participant.displayName || participant.username) + '?',
-      message: 'They will be removed from this voice channel.',
-      danger: true, confirmText: 'Disconnect',
-      onConfirm: () => Api.voiceModerate(panel.channelId, participant.userId, { disconnect: true })
-        .then(() => refreshPanel(panel))
-        .catch((e) => toast(e.message || 'Could not disconnect', 'error')),
-    }),
-  }, icon('logout')));
-  return menu;
-}
-
-async function joinPanel(panel, channel, caps) {
-  panel.loading = true;
-  panel.error = null;
-  paintPanel(panel, channel, {});
-
+async function joinChannel(session) {
+  if (!mediaSupported()) {
+    toast('This browser cannot make voice calls.', { type: 'error' });
+    return;
+  }
+  session.busy = true;
+  paint(session);
   try {
-    const res = await Api.voiceJoin(channel.id);
-    panel.joined = true;
-    panel.sessionId = res.sessionId;
-    panel.roomId = res.roomId;
-    if (res.iceServers) panel.iceServers = res.iceServers;
-    panel.participants = [];
-    await refreshPanel(panel);
-  } catch (e) {
-    panel.error = e;
-    // The server's own reason, not a generic failure: ROOM_FULL and FEATURE_DISABLED are
-    // different problems with different fixes.
-    toast(e.message || 'Could not join voice', 'error');
+    const out = await Api.voiceJoin(session.channel.id);
+    session.iceServers = (out && out.iceServers) || [];
+    await publishLocal(session);
+    session.joined = true;
+    await refreshParticipants(session);
+    startPolling(session);
+  } catch (error) {
+    // A failed publish must not leave a half-open session behind on the server.
+    teardownMedia(session);
+    try { await Api.voiceLeave(session.channel.id); } catch { /* best effort */ }
+    errorToast(error);
   } finally {
-    panel.loading = false;
-    paintPanel(panel, channel, {});
+    session.busy = false;
+    paint(session);
   }
 }
 
-async function leavePanel(panel, channel) {
-  try {
-    await Api.voiceLeave(channel.id);
-  } catch (e) {
-    toast(e.message || 'Could not leave voice', 'error');
-  }
-  panel.joined = false;
-  panel.sessionId = null;
-  panel.participants = [];
-  paintPanel(panel, channel, {});
+async function publishLocal(session) {
+  session.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  const pc = new RTCPeerConnection({ iceServers: session.iceServers });
+  session.pc = pc;
+  session.remoteStream = new MediaStream();
+
+  pc.addEventListener('track', (event) => {
+    for (const track of event.streams[0] ? event.streams[0].getTracks() : [event.track]) {
+      if (!session.remoteStream.getTracks().includes(track)) session.remoteStream.addTrack(track);
+    }
+    attachAudio(session);
+  });
+
+  for (const track of session.localStream.getAudioTracks()) pc.addTrack(track, session.localStream);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  const tracks = session.localStream.getAudioTracks().map((track) => {
+    const transceiver = pc.getTransceivers().find((t) => t.sender && t.sender.track === track);
+    return { location: 'local', mid: transceiver ? transceiver.mid : undefined, trackName: 'audio' };
+  });
+  const answer = await Api.voiceNegotiate(session.channel.id, { tracks, sessionDescription: pc.localDescription });
+  if (answer && answer.sessionDescription) await pc.setRemoteDescription(answer.sessionDescription);
 }
 
-async function setOwnState(panel, patch) {
-  try {
-    await Api.voiceState(panel.channelId, patch);
-    Object.assign(panel, patch);
-    paintPanel(panel, { id: panel.channelId, name: panel.channelName || '' }, {});
-  } catch (e) {
-    toast(e.message || 'Could not change that', 'error');
+function attachAudio(session) {
+  if (!session.audio) {
+    session.audio = el('audio', { autoplay: true, class: 'voice-audio' });
+    session.audio.setAttribute('playsinline', '');
   }
+  session.audio.srcObject = session.remoteStream;
+  session.audio.play().catch(() => { /* autoplay policies are the browser's call */ });
+  // The element may have been dropped by a repaint between the track arriving and now.
+  if (session.region && !session.region.contains(session.audio)) session.region.appendChild(session.audio);
 }
 
-async function shareScreen(panel, channel) {
-  try {
-    await Api.voiceScreen(channel.id);
-    toast('Screen sharing is starting', 'ok');
-  } catch (e) {
-    toast(e.message || 'Screen sharing is not available', 'error');
-  }
+function startPolling(session) {
+  stopPolling(session);
+  session.poll = setInterval(() => { refreshParticipants(session); }, 5000);
 }
 
-async function refreshPanel(panel) {
+function stopPolling(session) {
+  if (session.poll) { clearInterval(session.poll); session.poll = null; }
+}
+
+async function refreshParticipants(session) {
+  let people = [];
   try {
-    const list = await Api.voiceParticipants(panel.channelId);
-    panel.participants = Array.isArray(list) ? list : [];
+    const list = await Api.voiceParticipants(session.channel.id);
+    people = Array.isArray(list) ? list : [];
   } catch {
     // A failed participant read is not a reason to drop a live session.
-    panel.participants = [];
+    return;
   }
-  paintPanel(panel, { id: panel.channelId, name: panel.channelName || '' }, {});
+  session.participants = people;
+
+  // Subscribe to anyone new, drop the subscriptions of anyone who left.
+  const present = new Set(people.map((p) => p.sessionId).filter(Boolean));
+  for (const sessionId of Array.from(session.subscribed)) {
+    if (!present.has(sessionId)) session.subscribed.delete(sessionId);
+  }
+  for (const person of people) {
+    if (person.sessionId && !session.subscribed.has(person.sessionId)) {
+      subscribeRemote(session, person).catch(() => { /* retried on the next poll */ });
+    }
+  }
+  if (session.joined) paint(session);
 }
 
+// Ask the provider for a participant's published track. The offer carries one receiving
+// transceiver so the answer has somewhere to land.
+function subscribeRemote(session, person) {
+  session.queue = session.queue.then(async () => {
+    if (!session.pc || session.subscribed.has(person.sessionId)) return;
+    const pc = session.pc;
+    pc.addTransceiver('audio', { direction: 'recvonly' });
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const answer = await Api.voiceNegotiate(session.channel.id, {
+      tracks: [{ location: 'remote', sessionId: person.sessionId, trackName: 'audio' }],
+      sessionDescription: pc.localDescription,
+    });
+    if (answer && answer.sessionDescription) await pc.setRemoteDescription(answer.sessionDescription);
+    session.subscribed.add(person.sessionId);
+  });
+  return session.queue;
+}
+
+async function setOwnState(session, patch) {
+  try {
+    await Api.voiceState(session.channel.id, patch);
+    Object.assign(session, patch);
+    // Muting is local as well as server-reported: the track stops carrying audio without
+    // tearing down the connection.
+    applyMute(session);
+    paint(session);
+  } catch (error) {
+    errorToast(error);
+  }
+}
+
+function applyMute(session) {
+  if (!session.localStream) return;
+  for (const track of session.localStream.getAudioTracks()) track.enabled = !session.muted;
+}
+
+async function leaveChannel(session) {
+  stopPolling(session);
+  teardownMedia(session);
+  session.joined = false;
+  session.participants = [];
+  sessions.delete(session.channel.id);
+  paint(session);
+  try { await Api.voiceLeave(session.channel.id); } catch (error) { errorToast(error); }
+}
+
+function teardownMedia(session) {
+  stopPolling(session);
+  session.subscribed.clear();
+  if (session.pc) {
+    try { session.pc.close(); } catch { /* already closed */ }
+    session.pc = null;
+  }
+  if (session.localStream) {
+    for (const track of session.localStream.getTracks()) track.stop();
+    session.localStream = null;
+  }
+  session.remoteStream = null;
+  if (session.audio) {
+    session.audio.srcObject = null;
+    if (session.audio.parentNode) session.audio.parentNode.removeChild(session.audio);
+    session.audio = null;
+  }
+}
+
+// Called when the view is torn down, so navigating away ends the call rather than
+// leaving a microphone open in a panel nobody can see.
 export function leaveVoice(channelId) {
-  const panel = panels.get(channelId);
-  if (!panel || !panel.joined) return Promise.resolve();
-  return Api.voiceLeave(channelId).then(() => {
-    panel.joined = false;
-    panels.delete(channelId);
-  }).catch(() => { /* leaving cleanly is best-effort at teardown */ });
+  const session = sessions.get(channelId);
+  if (!session) return;
+  sessions.delete(channelId);
+  teardownMedia(session);
+  Api.voiceLeave(channelId).catch(() => { /* leaving cleanly is best-effort at teardown */ });
 }
 
 export function voicePanelFor(channelId) {
-  return panels.get(channelId) || null;
+  return sessions.get(channelId) || null;
 }
 
-export default {
-  renderVoicePanel, voiceCapabilities, leaveVoice, voicePanelFor,
-};
+export default { voiceChannelPanel, voiceCapabilities, leaveVoice, voicePanelFor };

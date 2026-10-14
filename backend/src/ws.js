@@ -84,7 +84,7 @@ function createGateway(server) {
     // everywhere" are dead. Socket sessions must never outlive them.
     const row = await db.get(
       'SELECT password_changed_at, sessions_invalidated_at, enforcement_state, enforcement_expires_at,'
-      + ' email_verified_at FROM users WHERE id = ?',
+      + ' email_verified_at, session_version FROM users WHERE id = ?',
       [claims.id]
     );
     if (!row) {
@@ -92,6 +92,14 @@ function createGateway(server) {
       return null;
     }
     if (tokenStale(claims, row)) {
+      ws.close(1008, 'session revoked');
+      return null;
+    }
+    // The session version rides in the ticket exactly as it rides in the bearer
+    // token, and is judged the same way. The timestamp markers alone are whole-second
+    // and a ticket issued and spent inside the second a revoke-others landed would
+    // otherwise connect with a credential the HTTP layer already refuses.
+    if (claims.sv !== undefined && Number(claims.sv) !== Number(row.session_version || 0)) {
       ws.close(1008, 'session revoked');
       return null;
     }

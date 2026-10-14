@@ -96,6 +96,7 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
     'location', 'navigator', 'screen', 'Notification', 'IntersectionObserverEntry',
     'XMLHttpRequest', 'PopStateEvent', 'CustomEvent', 'Image', 'Audio', 'Option',
     'WebSocket', 'CSSStyleSheet', 'MediaQueryList', 'ShadowRoot', 'ReadableStream',
+    'RTCPeerConnection', 'MediaStream',
   ]);
 
   // Every exported name, with the modules that export it - not only the ones with a single

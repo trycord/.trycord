@@ -46,6 +46,12 @@ module.exports = (engine) => [
       -- the counter at zero.
       login_fail_count INTEGER NOT NULL DEFAULT 0,
       login_locked_until VARCHAR(64),
+      -- Re-confirmation throttling, kept separate from the login counter on
+      -- purpose: these failures come from an already-authenticated session, so
+      -- burning the login counter here would let a thief holding a stolen token
+      -- lock the account holder out of signing in.
+      confirm_fail_count INTEGER NOT NULL DEFAULT 0,
+      confirm_locked_until VARCHAR(64),
       -- Bumped to revoke every outstanding session at once. A counter rather
       -- than a timestamp because JWT iat has one-second resolution. See
       -- invalidateSessions in routes/auth.js.

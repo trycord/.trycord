@@ -1,15 +1,19 @@
 // Instance configuration: the schema, the store, and the precedence.
 //
-// Configuration has three sources and they are not equal:
+// Configuration has three sources and they resolve in this order:
 //
-//   default     what the schema declares
 //   database    what a system administrator saved through the dashboard
 //   environment what the deployment set, in .env or a container
+//   default     what the schema declares
 //
-// Environment wins over database, and database wins over default. An operator who put a
-// value in .env meant it, and a dashboard that silently overwrote it would be worse than
-// no dashboard. So the store records which of the three is in force, and the UI shows
-// the source next to every value.
+// For an application setting the saved value is the one in force: the environment seeds
+// a setting nobody has saved yet and then stops overriding it, so a restart cannot undo
+// a change made in the dashboard. A value the deployment must force belongs in the
+// deployment-managed list, which the interface explains. Secrets are the exception - a
+// secret the deployment set stays the deployment's, because rotating a credential is not
+// an application setting.
+//
+// The store records which source is in force, and the UI shows it next to every value.
 //
 // Secrets are never returned. A secret is stored as a marker, replaced only by an
 // explicit write, and a blank field leaves the stored one alone.
@@ -333,6 +337,36 @@ const SCHEMA = [
     description: 'Offer a guided first-run setup that sets the instance name, public URL, registration and mail in one pass.',
     live: true,
   },
+
+  // How the process is reached. These were environment-only and listed as
+  // untouchable, which told an operator to go and edit a file to move a port. They
+  // are ordinary settings that happen to be read once at startup, so saving one
+  // works and the pinned notice says when it applies.
+  {
+    key: 'server.port', env: 'PORT', type: 'integer', default: 9971,
+    category: 'deployment', label: 'Listening port',
+    description: 'The port this server accepts connections on. Applied when the process next starts.',
+    min: 1, max: 65535, live: false,
+  },
+  {
+    key: 'server.host', env: 'HOST', type: 'string', default: '',
+    category: 'deployment', label: 'Bind address',
+    description: 'The interface to accept connections on. Blank binds every interface when exposed directly, and loopback behind a proxy. Applied when the process next starts.',
+    live: false,
+  },
+  {
+    key: 'server.hostType', env: 'SERVER_HOST_TYPE', type: 'string', default: '',
+    allowed: ['', 'express', 'nginx'],
+    category: 'deployment', label: 'Exposure',
+    description: 'express when this server is reached directly; nginx when it sits behind a reverse proxy. Applied when the process next starts.',
+    live: false,
+  },
+  {
+    key: 'app.mount', env: 'TRYCOD_APP_MOUNT', type: 'string', default: '',
+    category: 'deployment', label: 'Mount prefix',
+    description: 'Serve the application under a path such as /app. Blank serves it from the site root. Applied when the process next starts.',
+    live: false,
+  },
 ];
 
 // Secret-bearing settings. Named explicitly rather than inferred, because a type of
@@ -355,13 +389,18 @@ const SECRETS = new Set([
 
 // Settings that cannot be changed from the dashboard at all, with the reason. Listed
 // rather than hidden, so an administrator knows what they are and why.
-const DEPLOYMENT_ONLY = [
-  { key: 'db.connection', reason: 'Changing the database requires a migration and a restart. Use the documented deployment configuration.' },
-  { key: 'server.port', reason: 'The listening port is set by the container or the process manager, not the application.' },
-  { key: 'server.host', reason: 'The bind address is a deployment setting. The app cannot safely rebind itself.' },
-  { key: 'jwt.secret', reason: 'Rotating the signing secret invalidates every session. Rotate it through the deployment configuration.' },
-  { key: 'app.mount', reason: 'The mount prefix is decided when the server starts, because every asset path depends on it.' },
-];
+// Settings an administrator cannot change from here at all.
+//
+// Empty, and meant to stay that way. It held a database connection, a listening
+// port, a bind address and a mount prefix, which told an operator to edit a
+// deployment file to move a port - on a page whose whole purpose is to be where
+// deployment settings are changed. The database has its own page now, and the
+// rest are settings like any other, distinguished only by being read once, so
+// they carry a restart notice instead of a refusal.
+//
+// The shape stays: the settings API returns this list and the interface renders
+// it as a read-only section, so a future entry has somewhere to go.
+const DEPLOYMENT_ONLY = [];
 
 const BY_KEY = new Map(SCHEMA.map((s) => [s.key, s]));
 
@@ -421,6 +460,7 @@ const CATEGORIES = [
   { id: 'storage', label: 'Storage' },
   { id: 'features', label: 'Feature availability' },
   { id: 'limits', label: 'Limits and performance' },
+  { id: 'deployment', label: 'Server and deployment' },
 ];
 
 // The live values, and where each came from. Loaded at boot, re-read after a save.
@@ -433,6 +473,15 @@ const store = {
   // comparing the effective value against the stored one reports a conflict on
   // every legitimate save.
   raw: {},
+  // A saved value that a deployment variable also sets. The seed is remembered so the
+  // field can say an environment default exists behind the saved override, but it is
+  // never applied: an application setting belongs to the application once it is saved.
+  seeded: {},
+  // Settings the application reads once at boot. A value saved for one of these is
+  // stored at once and in force only after the next start, so it is held here until
+  // then rather than reported as live.
+  pendingRestart: new Set(),
+  lastSavedAt: null,
   loaded: false,
 };
 
@@ -481,6 +530,11 @@ function validate(entry, raw) {
     if (entry.min != null && value < entry.min) return { ok: false, error: 'Must be at least ' + entry.min };
     if (entry.max != null && value > entry.max) return { ok: false, error: 'Must be at most ' + entry.max };
   }
+  // A closed set of answers. `allowed` is also what the form renders as a dropdown,
+  // so a value outside it can only come from a hand-written request.
+  if (entry.allowed && !entry.allowed.includes(value)) {
+    return { ok: false, error: 'Must be one of: ' + entry.allowed.filter((v) => v !== '').join(', ') };
+  }
   return { ok: true, value };
 }
 
@@ -500,6 +554,7 @@ async function load(force = false) {
   store.values = {};
   store.sources = {};
   store.raw = {};
+  store.seeded = {};
   store.loaded = false;
   const rows = await db.all('SELECT `key`, value FROM instance_settings');
   const saved = new Map(rows.map((r) => [r.key, r.value]));
@@ -512,10 +567,11 @@ async function load(force = false) {
   }
 
   for (const entry of SCHEMA) {
-    // A secret follows the same precedence as anything else, but its value never
-    // becomes an effective value: an environment secret is read on demand by the
-    // service that needs it, and a stored one stays ciphertext until then. Only the
-    // source is recorded, which is what the dashboard shows beside the field.
+    // A secret's value never becomes an effective value: an environment secret is read
+    // on demand by the service that needs it, and a stored one stays ciphertext until
+    // then. Only the source is recorded, which is what the dashboard shows beside the
+    // field. A deployment-set secret is the deployment's to rotate and stays locked; a
+    // stored one belongs to the instance.
     if (SECRETS.has(entry.key)) {
       const fromEnv = envValueOf(entry);
       if (fromEnv !== undefined) {
@@ -529,7 +585,34 @@ async function load(force = false) {
       continue;
     }
 
+    // An application setting: the administrator's saved value is the one in force.
+    //
+    // The deployment environment seeds a setting that has never been saved, and that is
+    // all it does. Once a value is saved here the environment stops overriding it, so a
+    // restart cannot quietly undo a change made in the dashboard - which is the whole
+    // point of a control plane. A value the deployment must force belongs in the
+    // deployment-managed list instead, where the interface says why.
+    const fromDb = saved.get(entry.key);
     const fromEnv = envValueOf(entry);
+
+    if (fromDb !== undefined) {
+      store.raw[entry.key] = fromDb;
+      const check = validate(entry, fromDb);
+      if (check.ok) {
+        store.values[entry.key] = check.value;
+        store.sources[entry.key] = 'instance';
+        // The seed is remembered, not applied, so the field can show that a deployment
+        // default exists behind the saved value.
+        if (fromEnv !== undefined) store.seeded[entry.key] = fromEnv;
+        continue;
+      }
+      // A stored value that no longer validates - a bound was tightened, a type changed -
+      // is reported rather than silently honoured or silently dropped.
+      store.values[entry.key] = entry.default;
+      store.sources[entry.key] = 'default (stored value was invalid)';
+      continue;
+    }
+
     if (fromEnv !== undefined) {
       const check = validate(entry, fromEnv);
       if (check.ok) {
@@ -542,16 +625,7 @@ async function load(force = false) {
       store.sources[entry.key] = 'default (environment value was invalid)';
       continue;
     }
-    const fromDb = saved.get(entry.key);
-    store.raw[entry.key] = fromDb;
-    if (fromDb !== undefined) {
-      const check = validate(entry, fromDb);
-      if (check.ok) {
-        store.values[entry.key] = check.value;
-        store.sources[entry.key] = 'instance';
-        continue;
-      }
-    }
+
     store.values[entry.key] = entry.default;
     store.sources[entry.key] = 'default';
   }
@@ -578,8 +652,7 @@ function source(key) {
   return store.sources[key] || 'default';
 }
 
-// Whether the store has been read yet.
-//
+// Whether the store has been read yet.//
 // features.js consults this before asking for a value, so a flag still resolves
 // during startup validation when the database connection is not up yet, rather than
 // throwing about a store that is merely not ready.
@@ -733,7 +806,65 @@ async function save(entries, adminId) {
   // that were in force a moment ago.
   try { require('./mail').invalidate(); } catch { /* the mail service is optional at boot */ }
 
-  return { ok: true, changed: Object.keys(before) };
+  notePending(writes);
+  return { ok: true, changed: Object.keys(before), pendingRestart: Array.from(store.pendingRestart) };
+}
+
+// What a save actually did to the running process.
+//
+// A setting the application reads once at boot is stored but not in force, so it is
+// held as pending rather than reported as live. The administrator is told exactly that
+// rather than shown a green tick over a change nothing has picked up.
+function notePending(writes) {
+  for (const w of writes) {
+    const entry = BY_KEY.get(w.key);
+    if (entry && !entry.live) store.pendingRestart.add(w.key);
+  }
+  store.lastSavedAt = now();
+}
+
+// Whether the application is waiting on a restart to pick up stored configuration.
+function status() {
+  return {
+    loaded: store.loaded,
+    pendingRestart: Array.from(store.pendingRestart),
+    lastSavedAt: store.lastSavedAt,
+  };
+}
+
+// Reset one setting to whatever the deployment and the schema say without a saved
+// value: the environment seed if one exists, otherwise the schema default. Deleting the
+// row is what does it, so an absent override and an override equal to the default stay
+// distinguishable afterwards.
+//
+// A secret the deployment owns cannot be reset here - there is nothing of the instance's
+// to remove - and that is the only case that refuses.
+async function reset(key, adminId) {
+  await load();
+  const entry = BY_KEY.get(key);
+  if (!entry) { const e = new Error('unknown setting ' + key); e.code = 'NOT_FOUND'; throw e; }
+  if (SECRETS.has(key) && store.sources[key] === 'environment') {
+    const e = new Error('that secret is set by the deployment environment and cannot be reset here');
+    e.code = 'LOCKED';
+    throw e;
+  }
+
+  await db.transaction(async (t) => {
+    await t.run('DELETE FROM instance_settings WHERE `key` = ?', [key]);
+    await t.run(
+      `INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at)
+       VALUES (?, ?, 'reset_setting', 'instance', ?, NULL, ?)`,
+      [uuid(), adminId, key, now()]
+    );
+  });
+
+  // A boot-time setting still needs a restart to actually go back, exactly as saving one
+  // does; recording it keeps the pending badge honest in both directions.
+  if (!entry.live) store.pendingRestart.add(key);
+  await load(true);
+  try { require('../features').reload(); } catch { /* refused by reload, which is correct */ }
+  try { require('./mail').invalidate(); } catch { /* the mail service is optional at boot */ }
+  return { ok: true, key, source: store.sources[key] };
 }
 
 function changed(before) {
@@ -771,13 +902,23 @@ function catalogue(secretState) {
         description: s.description,
         type: s.type,
         value: store.values[s.key],
+        defaultValue: s.default,
+        min: s.min != null ? s.min : null,
+        max: s.max != null ? s.max : null,
         source: store.sources[s.key],
         live: !!s.live,
+        allowed: s.allowed || null,
+        restartRequired: !s.live,
+        pendingRestart: store.pendingRestart.has(s.key),
         consequential: !!s.consequential,
-        locked: store.sources[s.key] === 'environment',
-        lockedReason: store.sources[s.key] === 'environment'
-          ? 'Set by the deployment environment (' + s.env + '). Change it there.'
-          : null,
+        // A deployment variable that seeds a setting an administrator has since saved.
+        // The saved value is in force; this names the seed so the field can say one
+        // exists without implying it still decides anything.
+        seededFrom: store.seeded[s.key] !== undefined ? s.env : null,
+        // An application setting is editable whatever seeded it. Only a secret the
+        // deployment owns, and the deployment-managed list, are read-only here.
+        locked: false,
+        lockedReason: null,
       };
       if (!SECRETS.has(s.key)) return base;
       const stored = state[s.key];
@@ -791,10 +932,12 @@ function catalogue(secretState) {
         readable: stored ? secrets.readable('mail:' + s.key, stored) : null,
         source: store.sources[s.key],
         live: !!s.live,
+        restartRequired: !s.live,
+        pendingRestart: store.pendingRestart.has(s.key),
         consequential: !!s.consequential,
         locked: store.sources[s.key] === 'environment',
         lockedReason: store.sources[s.key] === 'environment'
-          ? 'Set by the deployment environment (' + s.env + '). Change it there.'
+          ? 'Set by the deployment environment (' + s.env + '). Rotate it there.'
           : null,
       };
     }),
@@ -852,6 +995,6 @@ function read(key, fallback) {
 
 module.exports = {
   SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY,
-  load, get, read, source, save, catalogue, validate, serialise, isLoaded,
+  load, get, read, source, save, reset, catalogue, validate, serialise, isLoaded, status,
   secretStored, secretValue,
 };

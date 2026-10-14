@@ -3,12 +3,17 @@
 // Deliberately length-based: long passphrases welcome, no arbitrary
 // complexity theater, never truncated, never normalized.
 const MIN_LENGTH = 8;
-const MAX_LENGTH = 256;
+// bcrypt reads only the first 72 bytes of its input. A policy that accepted more
+// would tell a member their 200-character passphrase was the password while in fact
+// any string sharing its first 72 bytes opened the account, so the ceiling is
+// bcrypt's own, not an arbitrary one. Measured in bytes, not characters: a shorter
+// run of multibyte characters can still cross 72.
+const MAX_LENGTH = 72;
 
 function checkPassword(pw) {
   if (typeof pw !== 'string') return 'password must be a string';
   if (pw.length < MIN_LENGTH) return `password must be ${MIN_LENGTH}+ characters`;
-  if (pw.length > MAX_LENGTH) return `password must be ${MAX_LENGTH} characters or fewer`;
+  if (Buffer.byteLength(pw, 'utf8') > MAX_LENGTH) return `password must be ${MAX_LENGTH} bytes or fewer`;
   if (!pw.trim()) return 'password cannot be blank';
   return null;
 }

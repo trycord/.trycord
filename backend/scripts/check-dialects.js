@@ -91,6 +91,9 @@ async function bootSqlite() {
   const child = spawn(process.execPath, [path.join(ROOT, 'src', 'server.js')], {
     cwd: ROOT,
     env: Object.assign({}, process.env, {
+      // This check pins its own throwaway database, so a configuration saved in the
+      // admin panel on the developer's machine must not change what it measures.
+      TRYCOD_DB_ENV_ONLY: '1',
       PORT: String(PORT), HOST: '127.0.0.1', DB_CLIENT: 'sqlite',
       DB_FILE: path.join(tmp, 'd.sqlite'), MAIL_MODE: 'log',
       JWT_SECRET: 'dialect-check-secret-0123456789ab', BCRYPT_COST: '4',

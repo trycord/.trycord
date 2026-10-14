@@ -247,6 +247,20 @@ async function recordEvent(serverId, userId, kind, reason, conn) {
   } catch { /* history is never worth failing a membership change */ }
 }
 
+// Moderation trail. server_membership_events answers churn; this answers "who
+// did what to whom, and why", which an unban in particular had no record of at
+// all. Failure is swallowed for the same reason history is: an action that
+// succeeded must not report failure because a log line could not be written.
+async function recordModeration(serverId, actorId, action, targetId, reason) {
+  try {
+    await db.run(
+      `INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, server_id, created_at)
+       VALUES (?, ?, ?, 'user', ?, ?, ?, ?)`,
+      [uuid(), actorId, action, targetId, String(reason || '').slice(0, 500) || null, serverId, now()]
+    );
+  } catch { /* the trail is never worth failing the action it records */ }
+}
+
 async function kick(serverId, actorId, targetId) {
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'kicked', t);
@@ -256,6 +270,7 @@ async function kick(serverId, actorId, targetId) {
   });
   events.emit(serverId, 'member_kicked', { userId: String(targetId) });
   events.evict(serverId, targetId, 'kicked from server');
+  await recordModeration(serverId, actorId, 'member_kick', targetId, null);
   return out;
 }
 
@@ -294,14 +309,19 @@ async function ban(serverId, actorId, targetId, { reason, minutes } = {}) {
   });
   events.emit(serverId, 'member_banned', { userId: String(targetId) });
   events.evict(serverId, targetId, 'banned from server');
+  await recordModeration(serverId, actorId, 'member_ban', targetId, reason || null);
   return out;
 }
 
-async function unban(serverId, targetId) {
+async function unban(serverId, actorId, targetId, reason = null) {
   const row = await db.get('SELECT id FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
   if (!row) throw { code: 'NOT_FOUND', message: 'That ban does not exist' };
   await db.run('DELETE FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, targetId]);
   events.emit(serverId, 'member_unbanned', { userId: String(targetId) });
+  // The row is gone; this is the only durable record that the unban happened and
+  // who did it. It matters most here because BAN_MEMBERS unbanning is not
+  // rank-limited, so there is no other check on the action.
+  await recordModeration(serverId, actorId, 'member_unban', targetId, reason);
   return { ok: true };
 }
 
@@ -337,6 +357,7 @@ async function timeout(serverId, actorId, targetId, minutes) {
     return { ok: true, expiresAt: exp };
   });
   events.emit(serverId, 'member_timeout', { userId: String(targetId), expiresAt: out.expiresAt });
+  await recordModeration(serverId, actorId, 'member_timeout', targetId, null);
   return out;
 }
 

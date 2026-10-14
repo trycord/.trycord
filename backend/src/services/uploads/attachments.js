@@ -172,12 +172,15 @@ async function removeFiles(rows) {
 // never becomes a permanent disk leak.
 async function purgePending() {
   const cutoff = new Date(Date.now() - PENDING_TTL_MS).toISOString();
+  // The storage key is built from the row, so the row has to be read before it is
+  // deleted. Deleting first left removeFiles holding an id it could no longer look
+  // up, and the file it was supposed to drop stayed on disk for good.
   const rows = await db.all(
-    'SELECT id FROM attachments WHERE message_id IS NULL AND dm_message_id IS NULL AND created_at < ?', [cutoff]
+    'SELECT id, channel_id, dm_conversation_id FROM attachments WHERE message_id IS NULL AND dm_message_id IS NULL AND created_at < ?', [cutoff]
   );
   if (!rows.length) return;
   await db.run('DELETE FROM attachments WHERE message_id IS NULL AND dm_message_id IS NULL AND created_at < ?', [cutoff]);
-  await removeFiles(rows.map((r) => r.id));
+  await removeFiles(rows);
 }
 
 // Read helper for the serving route. Same scoping rule as store(): a DM file is filed

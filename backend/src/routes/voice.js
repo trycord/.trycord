@@ -18,7 +18,11 @@ router.use(auth);
 
 // What this instance can do, and what it costs. Carries no credentials: the TURN URL is
 // public by design, and its credential never appears here.
-router.get('/capabilities', wrap(async (req, res) => {
+//
+// The probe behind `voice.available()` opens a session with the provider on every call, so
+// this is throttled like any other route that reaches a paid upstream: an unauthenticated
+// loop against it would otherwise be a free way to spend the instance's provider budget.
+router.get('/capabilities', limit({ windowMs: 60000, max: 30, key: 'voice-capabilities' }), wrap(async (req, res) => {
   const f = require('../features').current;
   res.json({
     voiceVideo: await voice.available(),
@@ -125,7 +129,7 @@ router.post('/channels/:channelId/moderate/:userId', requireVerified, limit({ wi
 }));
 
 // Stage channels: an audience member asks to speak, and a moderator grants it.
-router.post('/channels/:channelId/request-speak', requireVerified, wrap(async (req, res) => {
+router.post('/channels/:channelId/request-speak', requireVerified, limit({ windowMs: 60000, max: 30, key: 'voice-request-speak' }), wrap(async (req, res) => {
   res.json(await voice.requestSpeak(req.params.channelId, req.user.id));
 }));
 

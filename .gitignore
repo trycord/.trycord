@@ -9,6 +9,12 @@ node_modules/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# The instance's own state: the bootstrap file naming the database, and the signing
+# secret when the deployment did not set JWT_SECRET. Both are generated on first
+# start. The database file carries an encrypted password and the key file is the
+# signing secret itself, so an ordinary `git add -A` must not be able to pick them up.
+/backend/instance/
 # Where uploaded files land. Anchored, because an unanchored `uploads/` also matched
 # backend/src/services/uploads/ - the source of the uploads service - and four of its five
 # modules were silently missing from every clone, so a fresh checkout could not start the
@@ -85,3 +91,8 @@ backend/shots/
 !.env.docker.example
 *.env.bak*
 .env.bak.*
+
+# Local red-team findings handoff. Untracked on purpose: it is a working
+# document for the developer AI on this machine, not a public advisory.
+# Publishing it would disclose live vulnerabilities.
+/REDTEAM-FINDINGS.md

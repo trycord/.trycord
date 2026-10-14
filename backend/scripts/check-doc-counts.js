@@ -56,7 +56,7 @@ const REPORTED = {
   'check:contrast': 100,
   'check:origins': 35,
   'check-client-styles': 596,
-  'check:checks-can-fail': 19,
+  'check:checks-can-fail': 18,
 };
 for (const [name, n] of Object.entries(REPORTED)) {
   ok(`${name} is described without a stale count`,

@@ -44,7 +44,18 @@ router.post('/webhooks', auth, resolveServer, requirePerm('MANAGE_SERVER'),
 
 router.patch('/webhooks/:webhookId', auth, resolveServer, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
   try {
-    const out = await webhooks.update(req.params.webhookId, req.server.id, req.body || {});
+    const body = Object.assign({}, req.body || {});
+    // The same check create makes, made again on update. Create refuses a channel
+    // from another community; without this an update could repoint a webhook at
+    // one, which is a delivery into a room the operator never chose.
+    if (body.channelId) {
+      const ch = await visibleChannel(body.channelId, req.user.id);
+      if (!ch || ch.server_id !== req.server.id) {
+        return fail(res, 'NOT_FOUND', 'channel not found in this community');
+      }
+      body.channelId = ch.id;
+    }
+    const out = await webhooks.update(req.params.webhookId, req.server.id, body);
     if (!out) return fail(res, 'NOT_FOUND', 'webhook not found');
     res.json({ webhook: out });
   } catch (e) { serviceError(res, e); }
@@ -123,7 +134,7 @@ router.get('/apps/:appId/commands', auth, resolveServer, requirePerm('MANAGE_SER
 
 router.put('/apps/:appId/commands', auth, resolveServer, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
   try {
-    const out = await bots.setCommand(req.params.appId, req.body || {});
+    const out = await bots.setCommand(req.params.appId, req.server.id, req.body || {});
     if (!out) return fail(res, 'NOT_FOUND', 'application not found');
     res.json({ command: out });
   } catch (e) { serviceError(res, e); }
@@ -132,7 +143,7 @@ router.put('/apps/:appId/commands', auth, resolveServer, requirePerm('MANAGE_SER
 router.delete('/apps/:appId/commands/:commandId', auth, resolveServer, requirePerm('MANAGE_SERVER'),
   async (req, res, next) => {
     try {
-      const ok = await bots.removeCommand(req.params.commandId, req.params.appId);
+      const ok = await bots.removeCommand(req.params.commandId, req.params.appId, req.server.id);
       if (!ok) return fail(res, 'NOT_FOUND', 'command not found');
       res.json({ ok: true });
     } catch (e) { next(e); }
