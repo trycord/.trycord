@@ -4,11 +4,11 @@
 // screens are. Invitations, creating a community and a missing page are ordinary
 // pages that happen to need very little.
 
-import { el } from '../dom.js';
-import { icon } from '../icons.js';
-import { State, refreshServers } from '../store.js';
-import Api from '../api.js';
-import { path, publicPath, navigate } from '../nav.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
+import { State, refreshServers } from '../../packages/store.js';
+import Api from '../../packages/api.js';
+import { path, publicPath, navigate } from '../../packages/nav.js';
 import { toast, errorToast } from '../ui.js';
 import { page, heading, section } from './util.js';
 

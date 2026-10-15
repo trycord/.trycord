@@ -95,12 +95,12 @@ const MONOGRAM = pathData(SYMBOL);
     && /assets\/trycord-assets\/app\/site\.webmanifest/.test(index),
     'index.html points somewhere other than the asset library');
 
-  const crash = read(path.join(REPO, 'frontend', 'js', 'crash.js')) || '';
+  const crash = read(path.join(REPO, 'frontend', 'packages', 'crash.js')) || '';
   ok('the crash screen draws its brand from the token library',
     crash.indexOf('var(--tc-brand') !== -1 && crash.indexOf('--tc-bg-deep') !== -1,
     'crash.js still names its own colours');
 
-  const theme = read(path.join(REPO, 'frontend', 'js', 'theme.js')) || '';
+  const theme = read(path.join(REPO, 'frontend', 'packages', 'theme.js')) || '';
   ok('the custom-theme defaults come from the library',
     theme.indexOf("token('--tc-brand'") !== -1,
     'theme.js keeps a copy of the palette instead of reading the tokens');

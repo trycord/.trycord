@@ -4,16 +4,16 @@
 // left column is built from the registry, so a settings page that exists is a
 // page the navigation offers and the other way round.
 
-import { el } from '../dom.js';
-import { icon } from '../icons.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { avatar, bannerNode } from '../components.js';
-import { State, loadSession } from '../store.js';
-import Api from '../api.js';
-import { TrycordConfig } from '../config.js';
-import { path, publicPath } from '../nav.js';
-import { scopeNav } from '../pages/registry.js';
+import { State, loadSession } from '../../packages/store.js';
+import Api from '../../packages/api.js';
+import { TrycordConfig } from '../../packages/config.js';
+import { path, publicPath } from '../../packages/nav.js';
+import { scopeNav } from '../../packages/registry.js';
 import { toast, errorToast, confirmDialog, openDialog } from '../ui.js';
-import { currentTheme, setTheme } from '../theme.js';
+import { currentTheme, setTheme } from '../../packages/theme.js';
 import { page, band, panel, prow, notice, loading, failure, empty, relative } from './util.js';
 
 const SCOPES = [

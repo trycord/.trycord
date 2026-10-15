@@ -22,7 +22,7 @@ const { pathToFileURL } = require('url');
 
 const ROOT = path.join(__dirname, '..');
 const REPO = path.join(ROOT, '..');
-const REGISTRY = path.join(REPO, 'frontend', 'js', 'pages', 'registry.js');
+const REGISTRY = path.join(REPO, 'frontend', 'packages', 'registry.js');
 const OUT = path.join(REPO, 'docs', 'verification-matrix.md');
 const RECORD = path.join(ROOT, '..', '..', 'trycord-assets', 'matrix-last.json');
 

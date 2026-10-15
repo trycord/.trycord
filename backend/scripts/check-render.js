@@ -423,7 +423,7 @@ async function settle(window, ms = 400) {
       console.log('    seeded in window : ' + (window.localStorage.getItem('trycord.token') ? 'yes' : 'NO'));
       console.log('    globalStorage same object as window.localStorage: '
         + (globalThis.localStorage === window.localStorage));
-      const apiMod = await import(pathToUrl(path.join(CLIENT, 'js/api.js')));
+      const apiMod = await import(pathToUrl(path.join(CLIENT, 'packages/api.js')));
       console.log('    Api.token()      : ' + (apiMod.token() ? 'present' : 'ABSENT'));
       console.log('    Api.apiBase()    : ' + apiMod.apiBase());
       try {
@@ -489,7 +489,7 @@ async function settle(window, ms = 400) {
     const { default: Router } = await import(pathToUrl(path.join(CLIENT, 'js/router.js')));
     console.log('  booted; signed in as ' + (document.documentElement.dataset.session || 'out'));
     if (process.env.RENDER_TRACE) {
-      const after = await import(pathToUrl(path.join(CLIENT, 'js/api.js')));
+      const after = await import(pathToUrl(path.join(CLIENT, 'packages/api.js')));
       console.log('    after boot, token: ' + (after.token() ? 'present' : 'WIPED'));
       console.log('    document route   : ' + (document.documentElement.dataset.route || '(none)'));
       console.log('    body has auth page: ' + !!document.querySelector('.auth-page'));
@@ -499,7 +499,7 @@ async function settle(window, ms = 400) {
         .map((l) => '      ' + l.slice(0, 130)).join('\n'));
     }
 
-    const registry = await import(pathToUrl(path.join(CLIENT, 'js/pages/registry.js')));
+    const registry = await import(pathToUrl(path.join(CLIENT, 'packages/registry.js')));
     const { PAGES, matchRoute } = registry;
     const registryModule = registry;
     console.log('  pages in the registry: ' + PAGES.length);
@@ -809,7 +809,7 @@ async function settle(window, ms = 400) {
     // still rendered, because each page fetches what it needs itself. Nothing in this
     // file could see it, and on a live instance the symptom is a spine with no unread
     // badge and no presence.
-    const sessionMod = await import(pathToUrl(path.join(CLIENT, 'js/state.js')));
+    const sessionMod = await import(pathToUrl(path.join(CLIENT, 'packages/state.js')));
     ok('boot restores the session it was handed',
       !!sessionMod.default.me,
       'State.me is null after boot, so nothing downstream knows who this is');
@@ -1306,7 +1306,7 @@ async function settle(window, ms = 400) {
     // that is listed in the picker and has no rule behind it is a button that does
     // nothing.
     console.log('\n  themes');
-    const theme = await import(pathToUrl(path.join(CLIENT, 'js/theme.js')));
+    const theme = await import(pathToUrl(path.join(CLIENT, 'packages/theme.js')));
     const current = () => document.documentElement.getAttribute('data-theme') || '';
 
     theme.setTheme(theme.DEFAULT_THEME);

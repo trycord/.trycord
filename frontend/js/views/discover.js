@@ -4,13 +4,13 @@
 // because the point of a directory is to be browsed before you join one. Joining
 // needs a session, so a signed-out reader is sent to sign in and brought back.
 
-import { el } from '../dom.js';
-import { icon } from '../icons.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { serverMark } from '../components.js';
-import { State, refreshServers } from '../store.js';
-import { navigate } from '../nav.js';
+import { State, refreshServers } from '../../packages/store.js';
+import { navigate } from '../../packages/nav.js';
 import { openDialog, toast, errorToast } from '../ui.js';
-import Api from '../api.js';
+import Api from '../../packages/api.js';
 import { page, band, panel, prow, loading, failure, empty } from './util.js';
 
 const PAGE_SIZE = 12;

@@ -29,7 +29,7 @@ const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const path = require('path');
 
-const CRASH = path.join(__dirname, '..', '..', 'frontend', 'js', 'crash.js');
+const CRASH = path.join(__dirname, '..', '..', 'frontend', 'packages', 'crash.js');
 
 let failures = 0;
 const ok = (label, cond, detail) => {
