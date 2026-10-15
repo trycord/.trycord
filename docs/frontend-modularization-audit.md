@@ -16,6 +16,14 @@ Companion records: `docs/community-channel-audit.md` (community/channel family),
 > each specifier, and the check harness now reads both roots. The `frontend/js/...`
 > paths in §1 below describe the tree **at audit time**; §4 and `IMPLEMENTATION_STATE.md`
 > give the current layout.
+>
+> **Phases D and E have since executed too.** The Mobile module now exists as a real
+> second module at `frontend/mobile/` — its own entry document, entry module, shell, view
+> tree and stylesheet bundle — importing only `frontend/packages/`, and `serve-client.js`
+> serves both entries from one origin with the base stamped per request. Phase F (retire
+> the Desktop module's phone arrangement, `frontend/js/presentation.js` and
+> `frontend/css/mobile.css`) is not started. See `IMPLEMENTATION_STATE.md` for the
+> current phase.
 
 ## 1. What exists today
 

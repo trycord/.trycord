@@ -72,6 +72,27 @@ function candidatePaths(serverDir, asked) {
   return out;
 }
 
+// Serves the Mobile module's own entry document, with its base rewritten to wherever
+// that module is mounted.
+//
+// The desktop tree and the mobile tree are two independent entry documents over one
+// shared platform, and each one is right on an origin-root self-host and under /app.
+// The base is stamped per request rather than written into the file for the same
+// reason the desktop entry's is: the file on disk carries the hosted mount so the
+// static deployment is correct, and a self-hoster's server corrects it.
+//
+// Shared by the front door and the SPA fallback so a cold visit to /mobile/ and a
+// deep link inside it cannot disagree about the base.
+function sendMobileDocument(clientDir, mount, res, next) {
+  fs.readFile(path.join(clientDir, 'mobile', 'index.html'), 'utf8', (err, html) => {
+    if (err) { if (!res.headersSent) next(err); return; }
+    res.status(200)
+      .set('Cache-Control', 'no-store')
+      .type('html')
+      .send(html.replace(/<base href="[^"]*">/i, `<base href="${mount || ''}/mobile/">`));
+  });
+}
+
 // Locates and mounts the web client. Returns its directory, or null if there is none,
 // which is a supported deployment: an API-only instance.
 function mountClient(app, opts) {
@@ -98,6 +119,17 @@ function mountClient(app, opts) {
     };
     app.get(['/', '/index.html'], (req, res, next) => sendIndex(appMount, res, next));
 
+    // The Mobile module's front door, beside the desktop one. Registered before
+    // express.static because the static handler is configured with index:false, so a
+    // request for the directory itself is answered by hand and the embedded base can
+    // be corrected.
+    app.get(['/mobile', '/mobile/', '/mobile/index.html'], (req, res, next) =>
+      sendMobileDocument(candidate, appMount, res, next));
+    if (appMount) {
+      app.get([appMount + '/mobile', appMount + '/mobile/', appMount + '/mobile/index.html'],
+        (req, res, next) => sendMobileDocument(candidate, appMount, res, next));
+    }
+
     // backend.json, repointed at whoever is serving it.
     //
     // The shipped file names the official instance so the hosted front end has
@@ -107,8 +139,8 @@ function mountClient(app, opts) {
     // api.trycord.dev while sitting on their own API. Repointing the file here makes
     // the rule one line: a client served by a backend talks to that backend. It holds
     // for the official deployment too, with no domain written into the client.
-    const sendBackendJson = (req, res, next) => {
-      fs.readFile(path.join(candidate, 'backend.json'), 'utf8', (err, raw) => {
+    const sendBackendJson = (relative) => (req, res, next) => {
+      fs.readFile(path.join(candidate, relative), 'utf8', (err, raw) => {
         if (err) return next();
         let json;
         try { json = JSON.parse(raw); } catch { return next(); }
@@ -128,7 +160,17 @@ function mountClient(app, opts) {
           .send(JSON.stringify(json, null, 2) + '\n');
       });
     };
-    app.get('/backend.json', sendBackendJson);
+    app.get('/backend.json', sendBackendJson('backend.json'));
+
+    // The Mobile module carries its own backend.json beside its own entry document,
+    // because loadStaticConfig fetches './backend.json' relative to the document base
+    // - which is the module root, not the client root. Repointed the same way, so a
+    // phone on a self-hosted instance talks to that instance rather than the official
+    // network.
+    app.get('/mobile/backend.json', sendBackendJson('mobile/backend.json'));
+    if (appMount) {
+      app.get(appMount + '/mobile/backend.json', sendBackendJson('mobile/backend.json'));
+    }
 
     // Entry points are never cached (a stale index.html paired with fresh or stale
     // JS/CSS is what renders a blank page). Versioned assets use conditional
@@ -156,7 +198,7 @@ function mountClient(app, opts) {
       app.get(appMount + '/', (req, res) => sendIndex(appMount, res, () => {}));
       // Before the mount's static handler: Express is first-match-wins, so the order is
       // what decides whether the repointed file or the shipped one is served.
-      app.get(appMount + '/backend.json', sendBackendJson);
+      app.get(appMount + '/backend.json', sendBackendJson('backend.json'));
       app.use(appMount, express.static(candidate, staticOptions({ redirect: false })));
     }
 
@@ -390,6 +432,15 @@ function mountSpaFallback(app, opts) {
       // answering it with HTML would turn a broken script tag into a syntax error
       // far from the cause.
       if (/\.[a-z0-9]+$/i.test(rest)) return next();
+      if (/\.[a-z0-9]+$/i.test(rest)) return next();
+      // The Mobile module is a subdirectory of the same client tree with its own entry
+      // document, so a deep link inside it has to be answered with that document rather
+      // than the desktop one - otherwise a refresh inside /mobile/settings dropped the
+      // reader back into the desktop composition. Tested on the mount-relative path, so
+      // both /app/mobile/... and /mobile/... resolve to the same base.
+      if (rest === '/mobile' || rest.startsWith('/mobile/')) {
+        return sendMobileDocument(clientDir, appMount || '', res, next);
+      }
       // An instance can also serve a marketing site from the same origin. Those clean
       // URLs belong to it, so the app only claims its own prefixes and anything else
       // falls through to the public site's own 404.

@@ -28,7 +28,24 @@ function mountPoint() {
   return mountFromModuleUrl(import.meta.url);
 }
 
-export const BASE = mountPoint();
+// The address prefix this document's routes live under. It is derived from this
+// module's own URL, which is right for the Desktop entry (packages/nav.js sits one
+// directory under the client root) but wrong for the Mobile entry, whose routes
+// live in a subdirectory of the same client tree. The Mobile entry therefore
+// calls setBase() with its own module's directory before anything navigates; the
+// binding is live, so every importer reads the corrected value.
+export let BASE = mountPoint();
+
+// Override the derived mount. Only a mount the server actually serves is
+// accepted: an empty string (an origin-root deployment or a page off disk) and a
+// rooted, slash-free-of-trailing section are both legitimate, a value that is not
+// a rooted path is refused so a mistake cannot silently break every link.
+export function setBase(value) {
+  const clean = value === undefined || value === null ? '' : String(value);
+  if (clean !== '' && !clean.startsWith('/')) return BASE;
+  BASE = clean === '/' ? '' : clean.replace(/\/$/, '');
+  return BASE;
+}
 
 // Cursor into the in-app history, so a back/forward can be told apart by index.
 // Read from history.state so a reload keeps its place.

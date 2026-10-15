@@ -98,12 +98,16 @@ Generated: 2026-10-12T07:56:40.422Z
 Recorded rather than hidden, so nobody reads a dash as a pass:
 
 - **States, Responsive and a11y are not yet measured per page.** The harness
-  asserts them across the whole run (1365 controls carry accessible names, and
-  `check-mobile-layout.js` covers the phone composition), but not per route.
-  Filling those columns is phase one of the rebuild.
+  asserts them across the whole run (every control carries an accessible name,
+  and `check-mobile-layout.js` covers the Desktop module's phone arrangement),
+  but not per route. Filling those columns is phase one of the rebuild.
+- **This matrix covers the Desktop module.** The Mobile module is a second,
+  independent entry - its own document, entry module and shell over the same
+  platform - with its own routes. It is rendered and checked by
+  `check:mobile-render.js`, whose per-route results are not merged into this
+  table.
 - **The public site is redesigned for desktop; its phone composition is not.
   It is on the canonical tokens and its desktop layout is the new one - verified
-  by `check-public-site.js` - but it has no purpose-built mobile interface,
-  which is what the mobile brief asks for. A responsive desktop layout is not
-  a mobile design, and that work is queued behind the rest of the frontend.
+  by `check-public-site.js` - but it has no purpose-built phone layout of its
+  own. A responsive desktop layout is not a mobile design.
 

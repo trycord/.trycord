@@ -14,22 +14,51 @@ Update this file after every meaningful unit of work, before stopping.
 
 ## Current phase
 
-Frontend modularization directive — **Phase A (audit) and Phase B (shared platform
-extraction) complete**. The nonvisual platform now lives in `frontend/packages/`; the
-Desktop presentation is the desktop module at `frontend/js/`; both are served exactly as
-before. **Next is the Mobile rebuild (Phase D), then serving (Phase E) and retiring the
-responsive layer (Phase F).**
+Frontend modularization directive — **Phase A (audit), Phase B (shared platform
+extraction), Phase D (Mobile module) and Phase E (serving) are complete**. The
+nonvisual platform lives in `frontend/packages/`; the Desktop presentation is the
+desktop module at `frontend/js/`; the Mobile module is a second, independent entry at
+`frontend/mobile/` with its own document, entry module, shell, view tree and stylesheet.
+Both are served by `serve-client.js` from one origin. **Phase F (retire the desktop
+responsive layer — `frontend/js/presentation.js` and `frontend/css/mobile.css`) is not
+started.**
 
 Delivered in earlier phases: the community/channel route rework and the admin-settings
 expansion.
 
 ## Last verified baseline
 
-- `npm run check` (backend) — **green**, including the new `check-frontend-modules`
-  boundary check and `check:doc-counts`.
-- `check:render` — **green, 128 assertions.**
+- `npm run check` (backend) — **green**, including the new `check-backend-agnostic`
+  check, plus the mobile branches of `check-mount`, `check-client-modules`,
+  `check-client-load`, `check-client-bindings`, `check-client-styles` and
+  `check-doc-counts`.
+- `check:render` (Desktop) — **green, 128 assertions.**
+- `check:mobile-render` (Mobile) — **green**; boots a throwaway backend, loads
+  `frontend/mobile/index.html` in jsdom, imports the mobile entry, seeds a community
+  and a message, and renders every routable mobile page and every community-settings
+  section.
 - `check:graph` — **green**; every import the server is asked for is one it serves.
-- Client module count unchanged at **38** (`frontend/js` 25 + `frontend/packages` 13).
+- Client module count **59** (`frontend/js` + `frontend/packages` + `frontend/mobile`).
+
+## What Phases D and E did
+
+- Created `frontend/mobile/` as a real module: `index.html`, `js/main.js`,
+  `js/shell.js` (app bar + view + composer + bottom tab bar), `js/router.js`,
+  `js/components.js` and `js/views/` (home, dms, messages, notifications, friends,
+  discover, menu, profile, plain, auth, community, settings, admin). It imports only
+  `frontend/packages/`.
+- Added `frontend/mobile/css/mobile.css` and a second `app.css` bundle built by the
+  same `frontend/scripts/build-css.js`, plus `frontend/mobile/backend.json` (the mobile
+  document fetches it relative to its own root).
+- Wired `serve-client.js` for the mobile document, deep links, its assets and its
+  `backend.json`, at the origin root and under the configured mount; the base is
+  stamped per request.
+- Bound the mobile renderer table through the same `registry.bind()`; mobile pages opt
+  into the tab bar with `nav.mobile`, and community routes use `sidebar: 'community'`.
+- Implemented the mobile-to-desktop front door (chosen override `desktop` reloads into
+  the desktop document). Desktop-to-mobile is deferred to Phase F.
+- Added `check-mobile-render`, `check-backend-agnostic` and the mobile branches of the
+  existing per-module checks.
 
 ## What Phase B did
 
@@ -45,17 +74,28 @@ expansion.
 
 ## Active task (next)
 
-Frontend modularization **Phase D** — build the Mobile module under `frontend/mobile/`:
-its own entry, shell, navigation, view tree and CSS bundle, importing only
-`frontend/packages/`. Then **Phase E** (serve both entries; Cloudflare build; Electron)
-and **Phase F** (delete `frontend/js/presentation.js` and `frontend/css/mobile.css`).
-Desktop is not touched except where a boundary needs it. See §5 of the audit.
+Frontend modularization **Phase F** — retire the Desktop module's phone arrangement:
+delete `frontend/js/presentation.js` and `frontend/css/mobile.css` (removing
+`mobile.css` from the desktop `LAYERS` in `frontend/scripts/build-css.js`) and add the
+desktop-to-mobile front door so a narrow viewport on the desktop document can hand off
+to the mobile one. Desktop is not touched except where the boundary needs it. See §5 of
+the audit.
 
 ## Decisions (with evidence)
 
-- **Frontend is one responsive tree today, not two modules.** `index.html` writes
-  `data-presentation`, `js/presentation.js` drives the drawer, `css/mobile.css` is the
-  phone arrangement. Evidence: audit §1.5.1. This is what the directive replaces.
+- **Frontend is now two independent modules over one platform.** `frontend/packages/`
+  is the shared, nonvisual platform; `frontend/js/` is the Desktop module and
+  `frontend/mobile/` is the Mobile module, each with its own entry document, entry
+  module, shell, view tree and stylesheet bundle. Evidence:
+  `backend/scripts/check-frontend-modules.js` (the boundary), `backend/scripts/check-mobile-render.js`
+  (the second module renders). The old single responsive tree (`js/presentation.js` +
+  `css/mobile.css`) is the Desktop module's phone arrangement and is retired in Phase F.
+- **The client names exactly one backend, in one place.** `check-backend-agnostic.js`
+  enforces that only `packages/config.js` mentions a production host, that one module
+  stores the chosen address, that one module attaches the `Authorization` header, that
+  the socket derives from the resolver, and that both modules ship the same
+  `backend.json`. A presentation component that hardcodes an address is how a token
+  reaches the wrong instance silently.
 - **No bundler is introduced.** "Independent builds" = independent entry documents,
   main modules, shells, view trees and CSS bundles over one `packages/` tree. Evidence:
   audit §1.6, A5.
@@ -103,7 +143,8 @@ Desktop is not touched except where a boundary needs it. See §5 of the audit.
 
 ## Next action
 
-Begin Phase D: create `frontend/mobile/` with a real (not scaffolded) entry and shell,
-then its screens, importing only `frontend/packages/`. Mobile reaches the platform
-through the same `packages/` contracts; it must not import `frontend/js/`. Then Phase E
-serving and Phase F cleanup.
+Begin Phase F: remove the Desktop module's responsive phone arrangement
+(`frontend/js/presentation.js`, `frontend/css/mobile.css` and its `LAYERS` entry in
+`frontend/scripts/build-css.js`), move the phone layout coverage to the Mobile module's
+own checks, and add the desktop-to-mobile handoff. Then commit; push once the user
+supplies credentials.

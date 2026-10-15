@@ -124,6 +124,15 @@ jobs:
         working-directory: backend
         run: npm run check:render
 
+      # The same treatment for the other module. The two entries share the platform
+      # and nothing else, so a shared package can be right for one and wrong for the
+      # other, and a mobile view that throws at mount is invisible to every check
+      # that only reads source. This loads frontend/mobile/index.html, imports the
+      # mobile entry, seeds a community and a message, and visits every page.
+      - name: Render every mobile route
+        working-directory: backend
+        run: npm run check:mobile-render
+
       # Two accounts, two sockets, one message. Every other check drives HTTP, so
       # nothing else can tell "the event reached the sender" from "the event reached
       # the room" - and an event emitted to nobody looks identical to a working one

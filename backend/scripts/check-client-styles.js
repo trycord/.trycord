@@ -33,14 +33,26 @@ const path = require('path');
 
 const REPO = path.join(__dirname, '..', '..');
 const CLIENT = process.argv[2] ? path.resolve(process.argv[2]) : path.join(REPO, 'frontend');
-const CSS = path.join(CLIENT, 'css', 'app.css');
+// Two presentation modules, two stylesheets. A class emitted by the Desktop module
+// has to have a rule in the Desktop bundle and a class emitted by the Mobile module
+// has to have a rule in the Mobile bundle: they are separate documents and neither
+// loads the other's stylesheet, so checking one against the other only ever
+// produces a green result for a class that is invisible on the phone that asked.
+const CSS_BY_KIND = {
+  desktop: path.join(CLIENT, 'css', 'app.css'),
+  mobile: path.join(CLIENT, 'mobile', 'css', 'app.css'),
+};
 
-if (!fs.existsSync(CSS)) {
-  console.error('no stylesheet at ' + CSS);
-  process.exit(1);
+for (const [kind, css] of Object.entries(CSS_BY_KIND)) {
+  if (!fs.existsSync(css)) {
+    console.error('no ' + kind + ' stylesheet at ' + css);
+    process.exit(1);
+  }
 }
 
-const css = fs.readFileSync(CSS, 'utf8');
+const stylesheet = Object.fromEntries(
+  Object.entries(CSS_BY_KIND).map(([k, f]) => [k, fs.readFileSync(f, 'utf8')])
+);
 
 function sourcesIn(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -82,22 +94,38 @@ const UNSTYLED_ON_PURPOSE = new Set(['modal-root', 'popover-root']);
 // fragments, ternaries and stray words all fall out here.
 const PLAUSIBLE = /^[a-z][a-z0-9_-]*$/;
 
-const emitted = new Map(); // class -> first file that mentions it
+const emitted = new Map(); // class -> Set of kinds ('desktop', 'mobile')
 
-for (const file of [...sourcesIn(path.join(CLIENT, 'js')), ...sourcesIn(path.join(CLIENT, 'packages'))]) {
-  const src = fs.readFileSync(file, 'utf8');
-  for (const re of PATTERNS) {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(src)) !== null) {
-      for (const raw of m[1].split(/[\s,]+/)) {
-        const name = raw.trim().replace(/^['"]|['"]$/g, '');
-        if (!name || !PLAUSIBLE.test(name)) continue;
-        if (!emitted.has(name)) emitted.set(name, path.relative(REPO, file));
+const KIND_ROOTS = [
+  ['desktop', ['js', 'packages']],
+  ['mobile', ['mobile']],
+];
+
+for (const [kind, roots] of KIND_ROOTS) {
+  for (const file of roots.flatMap((r) => sourcesIn(path.join(CLIENT, r)))) {
+    const src = fs.readFileSync(file, 'utf8');
+    for (const re of PATTERNS) {
+      re.lastIndex = 0;
+      let m;
+      while ((m = re.exec(src)) !== null) {
+        for (const raw of m[1].split(/[\s,]+/)) {
+          const name = raw.trim().replace(/^['"]|['"]$/g, '');
+          if (!name || !PLAUSIBLE.test(name)) continue;
+          if (!emitted.has(name)) emitted.set(name, new Set());
+          emitted.get(name).add(kind);
+        }
       }
     }
   }
 }
+
+// A class is styled when every stylesheet that would need to render it has a rule
+// for it. The two modules never share a document, so "the other one has it" is not
+// an answer the phone can use.
+const selectorFor = (name, css) => {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+  return new RegExp('(^|[^a-zA-Z0-9_-])(\\.[a-zA-Z0-9_-]*)*\\.' + escaped + '(?![a-zA-Z0-9_-])');
+};
 
 // Coverage has two tiers, and conflating them produces either silent misses or a
 // wall of false alarms.
@@ -110,29 +138,34 @@ for (const file of [...sourcesIn(path.join(CLIENT, 'js')), ...sourcesIn(path.joi
 // Only the first tier is a failure. The second is listed, because a class that is
 // only ever compound and is sometimes used alone is a real bug that no static test
 // can distinguish from a correctly used modifier.
-const selectorFor = (name) => {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
-  return new RegExp('(^|[^a-zA-Z0-9_-])(\\.[a-zA-Z0-9_-]*)*\\.' + escaped + '(?![a-zA-Z0-9_-])');
-};
-const compoundOnly = (name) => {
-  const escaped = name.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
-  return new RegExp('\\.[a-zA-Z0-9_-]+\\.' + escaped + '(?![a-zA-Z0-9_-])').test(css);
-};
-
 const rows = [...emitted.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-const unstyled = rows.filter(([name]) => !css.includes('.' + name)
-  && !UNSTYLED_ON_PURPOSE.has(name));
-const onPurpose = rows.filter(([name]) => !css.includes('.' + name)
-  && UNSTYLED_ON_PURPOSE.has(name));
-const modifier = rows.filter(([name]) => css.includes('.' + name) && !selectorFor(name).test(css));
 
-for (const [name, file] of unstyled) {
-  console.log('  FAIL  .' + name + ' is emitted by ' + file + ' and appears nowhere in app.css');
+// A class has a rule in one stylesheet but not the other: the two trees are
+// independent documents, and reaching for a helper class defined in the module you
+// are not shipping is how a control becomes invisible on one of them.
+const unstyled = [];
+const onPurpose = [];
+const modifier = [];
+
+for (const [name, kinds] of rows) {
+  for (const kind of kinds) {
+    const css = stylesheet[kind];
+    if (!css.includes('.' + name)) {
+      (UNSTYLED_ON_PURPOSE.has(name) ? onPurpose : unstyled).push([name, kind]);
+    } else if (!selectorFor(name, css).test(css)) {
+      modifier.push([name, kind]);
+    }
+  }
+}
+
+for (const [name, kind] of unstyled) {
+  console.log('  FAIL  .' + name + ' is emitted by the ' + kind
+    + ' module and appears nowhere in its stylesheet');
 }
 if (modifier.length) {
   console.log('  note  ' + modifier.length + ' class(es) only ever appear in a compound selector,'
     + ' which is correct for a modifier used with a base class:');
-  console.log('        ' + modifier.map(([n]) => '.' + n).join(' '));
+  console.log('        ' + [...new Set(modifier.map(([n]) => '.' + n))].join(' '));
 }
 if (onPurpose.length) {
   console.log('  note  ' + onPurpose.length + ' class(es) are handles with no rule by design: '

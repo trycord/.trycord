@@ -7,12 +7,20 @@ Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
 client segments are served; `npm run check:flows` boots a server and passes 77
 assertions against real flows; `npm run check:render` boots a server and renders all
-40 routable pages in jsdom, passing 128 assertions;
+40 routable pages of the Desktop module in jsdom, passing 128 assertions;
+`npm run check:mobile-render` does the same for the Mobile module - its own document,
+its own entry and its own shell - rendering every routable mobile page and each
+community-settings section and requiring that none throws, none paints an empty view
+and every control has a name;
 `npm run check:realtime` puts three accounts on three sockets and confirms a
 message crosses between the two that share a community and does not reach the third, who
 never joined the room; `npm run check:contrast` measures every theme against WCAG AA
-and finds 100 ratios that pass; and `npm run check:client-load`
-evaluates all 38 client modules.
+and finds 100 ratios that pass; `npm run check:backend-agnostic` checks that no
+component names a backend, that one module stores the chosen address, that one module
+attaches credentials, and that both modules ship the same `backend.json`; and
+`npm run check:client-load`
+evaluates all 59 client modules across the shared platform and the two
+presentation modules.
 
 ## Where things live
 
@@ -21,6 +29,7 @@ The eleven questions worth being able to answer without searching.
 | | |
 |---|---|
 | The application tree | `frontend/js/shell.js`, mounted by `frontend/js/main.js` - builds the workspace into the one element in `index.html`. The document itself holds nothing but metadata, `<base>`, the crash screen and the entry module. |
+| The Mobile module | `frontend/mobile/js/shell.js`, mounted by `frontend/mobile/js/main.js` into `frontend/mobile/index.html` - an app bar, a view, an optional composer and a bottom tab bar. An independent entry document, entry module and stylesheet over the same `frontend/packages/` platform; it never imports the desktop module. |
 | What is on screen | `frontend/js/router.js` - resolves the address to a page, asks its renderer for the regions, and fills the shell from that one answer. No region decides for itself. |
 | Routing | `frontend/js/router.js` - parses `location`, matches the longest prefix on segment boundaries, resolves the community by slug or id, and mounts. No hash. |
 | Page definitions | `frontend/packages/registry.js` - the one source of truth for every page, route and nav entry. |
@@ -30,7 +39,7 @@ The eleven questions worth being able to answer without searching.
 | Signed-out surfaces | `frontend/js/views/auth.js` (sign-in, registration, two-step) and `frontend/js/views/plain.js` (the public documents, invite and community-creation screens). |
 | Account settings | `frontend/js/views/settings.js` - profile, security, privacy, notifications, appearance, backend and updates, driven by the `settings.*` entries in the registry. |
 | The admin console | `frontend/js/views/admin.js` - the frame plus each section. The configuration centre renders itself from the catalogue the API returns rather than from a hardcoded field list. |
-| Renderers | `frontend/js/views/index.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
+| Renderers | `frontend/js/views/index.js` and `frontend/mobile/js/views/index.js` - id to renderer, and nothing else, one table per module. Metadata stays in the registry so the registry is not a cycle. |
 | Lifecycle | `frontend/js/router.js` - teardown of the previous page, access gate, renderer call, then painting the chrome and catching what the renderer throws. |
 | Authentication state | `frontend/packages/state.js`, with `frontend/packages/store.js` for the loading and refresh. The token is in `api.js`; everything else reads `State.me`. |
 | Client-side permissions | `frontend/packages/store.js#can`, mirrored from `services/permissions.js`. **Display only** - the server decides. |
@@ -175,11 +184,13 @@ connection error.
 | `npm run check-server-bindings` | no server module uses a name it did not require or define |
 | `npm run check:client-bindings` | the same, for the client |
 | `npm run check:client-load` | **evaluates** every client module against a stub DOM |
+| `npm run check-backend-agnostic` | the client names one backend: only `packages/config.js` mentions a production host, one module stores the chosen address, one module attaches credentials, the socket follows the resolver, both modules build on `packages/` and neither reaches outside `frontend/` |
 | `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
 | `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
 | `npm run check:contrast` | every theme's contrast ratios against WCAG AA, and no colour written into a component rule |
 | `npm run check:headings` | one `h1` per surface; a page that adds its own beside the context header's fails |
 | `npm run check:render` | **renders every route in jsdom** against a real backend, and checks accessible names, the phone composition and themes |
+| `npm run check:mobile-render` | **renders every mobile route in jsdom** against a real backend: a second entry document, entry module and shell over the shared platform, with its own stylesheet and its own `backend.json` |
 | `npm run check:realtime` | **two clients, two sockets** - one person's message reaches somebody else's open tab and is still there after a reload |
 | `npm run check:shots` | photographs every surface at eight widths in a real browser; skips where t
 | `node scripts/check-sibling-bindings.js` | a module in a split directory references a name a sibling exports, without importing it |
@@ -190,7 +201,7 @@ connection error.
 | `npm run check:graph` | **every import the server is asked for, over HTTP** — boots a throwaway instance and walks the module graph from `/js/app.js`, so a specifier that resolves on disk and still 404s cannot pass as green. |
 | `npm run check-workflows` | every CI file: no mapping repeats a key, every line is block-style YAML it can read, every job that runs npm installs dependencies first, every check is run somewhere or says why not, and nothing runs a script that is not there. There is no YAML dependency, so it reads the block subset directly. |
 | `npm run check:checks-can-fail` | runs eighteen checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
-| `npm run check-client-styles` | every class name the client emits has a rule in app.css. Finds a forgotten rule; names the two that are handles with no rule on purpose. |
+| `npm run check-client-styles` | every class name a module emits has a rule in that module's own stylesheet. Finds a forgotten rule; names the two that are handles with no rule on purpose. |
 | `npm run check:dialects` | both database dialects. Boots SQLite and runs the upsert end to end, then has the live MySQL instance **parse** the statement the other branch produces. Not in `check`, because it needs the live database. |
 | `npm run db:backup` | dumps the live database read-only and verifies the dump against what the server reported |he browser cannot load `http` |
 
@@ -476,6 +487,9 @@ Everything else asks that file rather than deciding for itself:
 - the router resolves an address to a page
 - `frontend/js/router.js` runs the previous page's teardown, gates access, calls the
   renderer, paints the chrome afterwards and catches what the renderer throws
+- `frontend/mobile/js/router.js` does the same for the Mobile module: it reads the
+  same registry, resolves the same addresses, and paints the mobile shell from the
+  renderer's answer
 - the rail, the phone tab bar, the settings navigation and the admin navigation all
   read the same definitions
 
@@ -501,6 +515,12 @@ holds the one table that maps a page id to the renderer that draws it, which
 because the rail, the sidebar and the settings navigation read page definitions to
 draw a label, and a renderer imports the shell, which in turn reads the registry.
 
+The Mobile module keeps the same shape in its own tree: `frontend/mobile/js/views/`
+holds its renderers and `frontend/mobile/js/views/index.js` is its id-to-renderer table,
+bound by the same `registry.bind()`. A page id resolves to the desktop renderer in the
+desktop module and the mobile renderer in the mobile module, and neither table imports
+the other.
+
 ## The shell
 
 `frontend/js/shell.js` draws the tree the rest of the application addresses by
@@ -514,11 +534,60 @@ route. One file doing both was a tree that got torn down and rebuilt to change a
 number.
 
 There is no component framework. A screen builds DOM with `el()` from
-`frontend/js/packages/dom.js`; the shared pieces are plain functions in
+`frontend/packages/dom.js`; the shared pieces are plain functions in
 `frontend/js/components.js`, and overlays, dialogs and toasts live in
 `frontend/js/ui.js`. A surface that registers a document listener removes it when it
 is torn down — the lifecycle the router runs — because a listener left behind answers
 for a page the reader has left.
+
+The Mobile module has its own `frontend/mobile/js/shell.js` — an app bar, a scrolling
+view, an optional composer and a bottom tab bar — and shares nothing with this one but
+the platform. Its overlays are bottom sheets through one manager, and only the topmost
+answers Escape.
+
+## Two modules, one platform
+
+The web client is two independent modules over one shared platform:
+
+| | |
+|---|---|
+| Shared platform | `frontend/packages/` — the registry, the API, config, state, store, realtime, nav, theme and the DOM helpers. Nonvisual: it never draws. |
+| Desktop module | `frontend/js/` — entry document `index.html`, entry module `js/main.js`, the desktop shell, the view tree, the `frontend/css/` bundle. |
+| Mobile module | `frontend/mobile/` — entry document `mobile/index.html`, entry module `mobile/js/main.js`, the mobile shell, the view tree, the `frontend/mobile/css/` bundle. |
+
+"Independent" is a property of the dependency graph, not of a directory name. The
+platform may import only itself; each presentation module may import itself and the
+platform; neither may import the other. `check-frontend-modules.js` resolves every local
+import — static and dynamic — and fails on a crossing, because the first `../` that
+reaches the wrong root is how two modules quietly become one tree again.
+
+What is shared is shared on purpose. `frontend/packages/registry.js` is still the one
+source of truth for every page, route and nav entry: both routers match against it, and
+the mobile renderer table binds its own ids to the same page definitions. An address
+means the same thing in both modules; only the drawing differs.
+
+Serving is one origin. `serve-client.js` serves both entry documents and stamps each
+one's `<base>` per request, so a hosted mount and a self-hoster's origin root are the same
+code with one constant changed. Each module carries its own `backend.json`, because
+`config.loadStaticConfig()` fetches it relative to the document root and the mobile
+document sits one directory deeper; the server repoints both copies at whoever is serving
+them.
+
+Only the mobile-to-desktop front door is implemented: a reader who has chosen "desktop
+site" is sent to the desktop document before the mobile shell boots. The reverse handoff
+is deferred.
+
+### Coupling that is unavoidable, and named
+
+The Desktop module still carries its own phone arrangement: `frontend/js/presentation.js`
+drives a drawer and `frontend/css/mobile.css` is the responsive layer that arranges the
+desktop shell at phone widths. That is **not** the Mobile module. It is the desktop module
+rendering itself responsively, and it stays until Phase F retires it. Two files named
+`mobile.css` in one repository is a trap for a reader: `frontend/css/mobile.css` belongs
+to the desktop bundle (aggregated by `frontend/css/app.css`), and
+`frontend/mobile/css/mobile.css` is the Mobile module's own stylesheet, built separately.
+`check-client-styles.js` reads each class against the stylesheet of the module that emits
+it, so a class moved between modules without its rule is caught.
 
 ## Theming
 

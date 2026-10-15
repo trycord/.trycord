@@ -120,6 +120,33 @@ async function build(appMount) {
     const css = await get(port, '/app/css/app.css');
     ok('GET /app/css/app.css is the stylesheet', css.status === 200 && !/^\s*</.test(css.body.trim()));
 
+    console.log('\n  the Mobile module under the mount');
+    // A second entry document under the same mount, with its own base. The front
+    // door and a deep link have to agree on it, or a phone that refreshes inside
+    // /mobile/settings reloads /app/settings - the desktop module - instead.
+    for (const p of ['/app/mobile/', '/app/mobile/home', '/app/mobile/settings']) {
+      const r = await get(port, p);
+      ok('GET ' + p + ' is the mobile shell',
+        r.status === 200 && /<base href="\/app\/mobile\/">/.test(r.body), 'status ' + r.status);
+    }
+
+    const mobileCss = await get(port, '/app/mobile/css/app.css');
+    ok('GET /app/mobile/css/app.css is the mobile stylesheet',
+      mobileCss.status === 200 && !/^\s*</.test(mobileCss.body.trim()));
+
+    // And it carries its own backend.json, repointed the same way - the file sits
+    // beside the mobile entry, and loadStaticConfig fetches it relative to the
+    // module root rather than the client root.
+    const mobileJson = await get(port, '/app/mobile/backend.json');
+    ok('GET /app/mobile/backend.json answers 200', mobileJson.status === 200, 'status ' + mobileJson.status);
+    let mobileCfg = null;
+    try { mobileCfg = JSON.parse(mobileJson.body); } catch { /* handled below */ }
+    ok('GET /app/mobile/backend.json is JSON', !!mobileCfg, mobileJson.body.slice(0, 60));
+    if (mobileCfg) {
+      ok('the mobile backend.json names this instance, not the official one',
+        !String(mobileCfg.backendUrl || '').includes(OFFICIAL), 'backendUrl=' + mobileCfg.backendUrl);
+    }
+
     console.log('\n  the mount the client computes for itself');
     // The client derives its mount from the module's own URL (`packages/nav.js`), so
     // the answer has to survive the module moving between directories in the source
@@ -183,6 +210,41 @@ async function build(appMount) {
     ok('an unknown non-API path still gets the public 404', miss.status === 404, 'status ' + miss.status);
   } finally {
     server.close();
+  }
+
+  // A self-hoster runs the same tree from the origin root, where there is no mount to
+  // strip and the mobile module's base has to be /mobile/ rather than /app/mobile/.
+  // A check that only ever builds the mounted deployment cannot see the difference,
+  // and the two are one constant apart in serve-client.js.
+  console.log('\n  the origin root');
+  {
+    const port2 = await new Promise((resolve) => {
+      const probe = require('http').createServer();
+      probe.listen(0, '127.0.0.1', () => {
+        const p = probe.address().port;
+        probe.close(() => resolve(p));
+      });
+    });
+    const app = await build('');
+    const server2 = await new Promise((resolve) => {
+      const s = app.listen(port2, '127.0.0.1', () => resolve(s));
+    });
+    try {
+      for (const p of ['/mobile/', '/mobile/home', '/mobile/settings']) {
+        const r = await get(port2, p);
+        ok('GET ' + p + ' is the origin-root mobile shell',
+          r.status === 200 && /<base href="\/mobile\/">/.test(r.body), 'status ' + r.status);
+      }
+      const mobileJson = await get(port2, '/mobile/backend.json');
+      ok('GET /mobile/backend.json is repointed at this instance',
+        mobileJson.status === 200 && /127\.0\.0\.1/.test(mobileJson.body),
+        mobileJson.body.slice(0, 60));
+      const desktop = await get(port2, '/home');
+      ok('GET /home is the desktop shell with no mount',
+        desktop.status === 200 && /<base href="\/">/.test(desktop.body), 'status ' + desktop.status);
+    } finally {
+      server2.close();
+    }
   }
 
   console.log(`\n  mount check ${failures ? 'FAILED - ' + failures + ' problem(s)' : 'passed'}`);

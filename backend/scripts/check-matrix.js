@@ -182,14 +182,18 @@ async function probePublic(port) {
   lines.push('Recorded rather than hidden, so nobody reads a dash as a pass:');
   lines.push('');
   lines.push('- **States, Responsive and a11y are not yet measured per page.** The harness');
-  lines.push('  asserts them across the whole run (1365 controls carry accessible names, and');
-  lines.push('  `check-mobile-layout.js` covers the phone composition), but not per route.');
-  lines.push('  Filling those columns is phase one of the rebuild.');
+  lines.push('  asserts them across the whole run (every control carries an accessible name,');
+  lines.push('  and `check-mobile-layout.js` covers the Desktop module\'s phone arrangement),');
+  lines.push('  but not per route. Filling those columns is phase one of the rebuild.');
+  lines.push('- **This matrix covers the Desktop module.** The Mobile module is a second,');
+  lines.push('  independent entry - its own document, entry module and shell over the same');
+  lines.push('  platform - with its own routes. It is rendered and checked by');
+  lines.push('  `check:mobile-render.js`, whose per-route results are not merged into this');
+  lines.push('  table.');
   lines.push('- **The public site is redesigned for desktop; its phone composition is not.');
   lines.push('  It is on the canonical tokens and its desktop layout is the new one - verified');
-  lines.push('  by `check-public-site.js` - but it has no purpose-built mobile interface,');
-  lines.push('  which is what the mobile brief asks for. A responsive desktop layout is not');
-  lines.push('  a mobile design, and that work is queued behind the rest of the frontend.');
+  lines.push('  by `check-public-site.js` - but it has no purpose-built phone layout of its');
+  lines.push('  own. A responsive desktop layout is not a mobile design.');
   lines.push('');
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
