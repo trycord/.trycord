@@ -28,11 +28,19 @@ class SfuError extends Error {
   }
 }
 
-// Provider credentials, read once and never returned by any route.
-const CREDENTIALS = {
-  appId: String(process.env.VOICE_VIDEO_SFU_APP_ID || ''),
-  appSecret: String(process.env.VOICE_VIDEO_SFU_APP_SECRET || ''),
-};
+// Provider credentials, read at call time and never returned by any route.
+//
+// They used to be a module-level constant read from process.env once, which meant a
+// credential saved in the configuration centre was ignored until the process restarted.
+// Reading them from the feature snapshot - which is rebuilt whenever settings are saved -
+// makes the console authoritative, and keeps the secret out of a long-lived constant.
+function credentials() {
+  const v = features.current.voiceVideo;
+  return {
+    appId: String(v.sfuAppId || ''),
+    appSecret: String(v.sfuAppSecret || ''),
+  };
+}
 
 const iceServers = () => {
   const v = features.current.voiceVideo;
@@ -52,7 +60,7 @@ async function sfu(method, path, body) {
   const res = await fetch(SFU_BASE + path, {
     method,
     headers: {
-      Authorization: 'Bearer ' + CREDENTIALS.appSecret,
+      Authorization: 'Bearer ' + credentials().appSecret,
       'Content-Type': 'application/json',
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -95,7 +103,7 @@ async function available() {
   try {
     // Creating a session is the cheapest authenticated call the provider offers, so it
     // doubles as the credential check.
-    await sfu('POST', `/apps/${CREDENTIALS.appId}/sessions/new`, {});
+    await sfu('POST', `/apps/${credentials().appId}/sessions/new`, {});
     return { available: true, reason: 'ready', detail: '' };
   } catch (e) {
     return {
@@ -206,7 +214,7 @@ async function join(channelId, userId) {
   }
 
   const roomId = await ensureRoom(channelId, verdict.channel.server_id);
-  const created = await sfu('POST', `/apps/${CREDENTIALS.appId}/sessions/new`, {});
+  const created = await sfu('POST', `/apps/${credentials().appId}/sessions/new`, {});
 
   const id = uuid();
   await db.run(
@@ -242,11 +250,11 @@ async function endSession(sessionId) {
   if (!sessionId) return { ok: true };
 
   try {
-    const state = await sfu('GET', `/apps/${CREDENTIALS.appId}/sessions/${sessionId}`);
+    const state = await sfu('GET', `/apps/${credentials().appId}/sessions/${sessionId}`);
     const local = (state.tracks || []).filter((t) => t.location === 'local' && t.mid !== undefined);
     if (!local.length) return { ok: true };
 
-    await sfu('PUT', `/apps/${CREDENTIALS.appId}/sessions/${sessionId}/tracks/close`, {
+    await sfu('PUT', `/apps/${credentials().appId}/sessions/${sessionId}/tracks/close`, {
       tracks: local.map((t) => ({ mid: t.mid, location: 'local' })),
     });
     return { ok: true, closed: local.length };
@@ -265,7 +273,7 @@ async function endSession(sessionId) {
 async function negotiate({ sessionId, tracks, sessionDescription }) {
   if (!sessionId) throw new SfuError(400, 'NO_SESSION', 'a session id is required');
 
-  const out = await sfu('POST', `/apps/${CREDENTIALS.appId}/sessions/${sessionId}/tracks/new`, {
+  const out = await sfu('POST', `/apps/${credentials().appId}/sessions/${sessionId}/tracks/new`, {
     tracks: tracks.map((t) => ({
       location: t.location || 'local',
       sessionId: t.sessionId,
@@ -284,7 +292,7 @@ async function negotiate({ sessionId, tracks, sessionDescription }) {
 
 async function answer({ sessionId, sessionDescription }) {
   if (!sessionId) throw new SfuError(400, 'NO_SESSION', 'a session id is required');
-  await sfu('PUT', `/apps/${CREDENTIALS.appId}/sessions/${sessionId}/renegotiate`, { sessionDescription });
+  await sfu('PUT', `/apps/${credentials().appId}/sessions/${sessionId}/renegotiate`, { sessionDescription });
   return { ok: true };
 }
 
@@ -298,7 +306,7 @@ async function publishScreenShare({ sessionId }) {
 // separately.
 async function sessionState({ sessionId }) {
   if (!sessionId) return { tracks: [], dataChannels: [] };
-  const out = await sfu('GET', `/apps/${CREDENTIALS.appId}/sessions/${sessionId}`);
+  const out = await sfu('GET', `/apps/${credentials().appId}/sessions/${sessionId}`);
   return { tracks: (out && out.tracks) || [], dataChannels: (out && out.dataChannels) || [] };
 }
 
@@ -307,7 +315,7 @@ async function sessionState({ sessionId }) {
 // what a moderation action means.
 async function closeTrack({ sessionId, mid }) {
   if (!sessionId || !mid) throw new SfuError(400, 'BAD_TARGET', 'a session and a track are required');
-  await sfu('PUT', `/apps/${CREDENTIALS.appId}/sessions/${sessionId}/tracks/close`, {
+  await sfu('PUT', `/apps/${credentials().appId}/sessions/${sessionId}/tracks/close`, {
     tracks: [{ mid, location: 'local' }],
   });
   return { ok: true };

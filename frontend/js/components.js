@@ -106,7 +106,7 @@ export function bannerNode(url, className) {
 
 export function channelIcon(channel, size) {
   const type = channel && channel.type;
-  if (type === 'voice') return icon('volume', { size: size || 17 });
+  if (type === 'voice' || type === 'stage') return icon('volume', { size: size || 17 });
   if (type === 'announcement') return icon('bell', { size: size || 17 });
   if (type === 'forum') return icon('list', { size: size || 17 });
   return icon('hash', { size: size || 17 });

@@ -65,6 +65,17 @@ export function path(route) {
   return BASE + clean;
 }
 
+// An address for the public site, which is served at the origin root by the same
+// deployment rather than under the application mount. path() would prefix these
+// with /app and hand the click to the router, which has no public page to draw.
+// Exported so the callers that mean "the public site" say so rather than
+// hand-writing a leading slash that reads like the same thing path() gives.
+export function publicPath(route) {
+  const clean = String(route || '/');
+  if (EXTERNAL.test(clean) || clean.startsWith('//')) return clean;
+  return clean.startsWith('/') ? clean : '/' + clean;
+}
+
 // The current route as the router sees it: always leading-slash, never
 // carrying the mount prefix.
 export function currentRoute() {

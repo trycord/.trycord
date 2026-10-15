@@ -34,10 +34,18 @@ function membersOf(serverId) {
 
 function iconFor(channel) {
   const type = String((channel && channel.type) || '').toLowerCase();
-  if (type === 'voice') return 'volume';
+  if (type === 'voice' || type === 'stage') return 'volume';
   if (type === 'announcement') return 'bell';
   if (type === 'forum') return 'list';
   return 'hash';
+}
+
+// Voice and stage are the same medium: both open a voice room rather than a feed, and
+// services/voice.js authorises them the same way. Kept in one place so the route, the
+// sidebar and the editors cannot disagree about which channels have a feed.
+export function isVoiceType(type) {
+  const clean = String(type || '').toLowerCase();
+  return clean === 'voice' || clean === 'stage';
 }
 
 function button(label, options) {
@@ -168,7 +176,7 @@ export function renderChannel(ctx) {
       onMount() {},
     };
   }
-  if (String(channel.type || '').toLowerCase() === 'voice') return renderVoice(ctx, channel);
+  if (isVoiceType(channel.type)) return renderVoice(ctx, channel);
 
   const scope = {
     kind: 'channel',
@@ -685,17 +693,50 @@ function categoryOptions(serverId, selectedId) {
   return select;
 }
 
-function openChannelEditor(serverId, channel, done) {
+function voiceReason(voice) {
+  if (voice.available) return '';
+  if (voice.reason === 'disabled') return 'Voice and video are off on this instance.';
+  if (voice.reason === 'unreachable') return 'The media server could not be reached.';
+  return voice.detail || 'Voice is unavailable on this instance.';
+}
+
+async function openChannelEditor(serverId, channel, done) {
   const editing = !!channel;
+  const current = String((channel && channel.type) || 'text').toLowerCase();
   const nameInput = editableText(channel ? channel.name : '', 'channel-name', 40);
   const topicInput = editableText(channel ? (channel.topic || '') : '', 'Topic (optional)', 200);
   const category = categoryOptions(serverId, channel ? channel.category_id : null);
-  if (editing && String(channel.type || '').toLowerCase() !== 'text') {
-    nameInput.disabled = true;
-    topicInput.disabled = true;
+
+  // Whether a voice channel can work here is the server's answer, read from the same
+  // capability the media panel reads, so the editor cannot offer a type the instance
+  // cannot carry. Until it is known the voice options stay off, with the reason shown.
+  let voice = { available: false, reason: 'unknown', detail: 'Checking this instance.' };
+  try {
+    const mod = await import('../voice.js');
+    voice = await mod.voiceCapabilities();
+  } catch { /* unreachable backend: the options stay off and the reason says so */ }
+  const voiceOff = !voice.available;
+
+  const typeSelect = el('select', { class: 'input' });
+  for (const [value, label] of [['text', 'Text channel'], ['voice', 'Voice channel'], ['stage', 'Stage channel']]) {
+    typeSelect.appendChild(el('option', {
+      value,
+      selected: value === current,
+      // A channel that is already a voice type keeps that option selectable, or the
+      // editor could not show what the channel is.
+      disabled: isVoiceType(value) && voiceOff && value !== current,
+    }, label));
   }
+  const typeHint = el('div', { class: 'field-hint' },
+    isVoiceType(current) && voiceOff
+      ? 'This channel is a ' + current + ' channel, but voice is not available right now. ' + voiceReason(voice)
+      : voiceOff
+        ? voiceReason(voice)
+        : 'A channel type can be changed later, as long as nobody is connected to it.');
+
   const body = el('div', { class: 'settings-section' },
     el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Name'), nameInput),
+    el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Type'), typeSelect, typeHint),
     el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Topic'), topicInput),
     editing ? null : el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Category'), category));
   const cancel = el('button', { class: 'btn btn--ghost', type: 'button' }, 'Cancel');
@@ -707,8 +748,8 @@ function openChannelEditor(serverId, channel, done) {
     save.disabled = true;
     try {
       const payload = { name: nameInput.value.trim(), topic: topicInput.value };
-      if (!editing) payload.categoryId = category.value || null;
-      if (editing) payload.categoryId = channel.category_id;
+      payload.categoryId = editing ? channel.category_id : (category.value || null);
+      if (!editing || typeSelect.value !== current) payload.type = typeSelect.value;
       if (editing) await Api.updateChannel(serverId, channel.id, payload);
       else await Api.createChannel(serverId, payload);
       dialog.close();

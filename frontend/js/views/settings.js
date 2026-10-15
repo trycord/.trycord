@@ -10,7 +10,7 @@ import { avatar, bannerNode } from '../components.js';
 import { State, loadSession } from '../store.js';
 import Api from '../api.js';
 import { TrycordConfig } from '../config.js';
-import { path } from '../nav.js';
+import { path, publicPath } from '../nav.js';
 import { scopeNav } from '../pages/registry.js';
 import { toast, errorToast, confirmDialog, openDialog } from '../ui.js';
 import { currentTheme, setTheme } from '../theme.js';
@@ -436,7 +436,7 @@ function updatesSection() {
       prow({
         title: 'Help',
         sub: 'Reach the people who run this server.',
-        actions: el('a', { class: 'btn btn--ghost btn--sm', href: path('/support') }, 'Support'),
+        actions: el('a', { class: 'btn btn--ghost btn--sm', href: publicPath('/support') }, 'Support'),
       }),
     ],
   })];

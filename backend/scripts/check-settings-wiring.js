@@ -132,6 +132,20 @@ for (const key of flagKeys) {
     features.capabilities(features.current)[key] !== undefined);
 }
 
+// The voice provider is instance configuration now, not a file on the server. The feature
+// snapshot has to carry it, and the capability response - which every client fetches, signed
+// in or not - must carry the app ID and the TURN URL but never a credential.
+const voice = features.current.voiceVideo;
+ok('the voice app ID reaches the feature layer', typeof voice.sfuAppId === 'string');
+ok('the voice TURN URL reaches the feature layer', typeof voice.turn.url === 'string');
+ok('the voice stage-channel flag is carried by features', typeof voice.stageChannels === 'boolean');
+const capabilityVoice = features.capabilities(features.current).voiceVideo;
+ok('the capability response carries no media secret',
+  capabilityVoice.sfuAppSecret === undefined && voice.sfuAppSecret !== undefined);
+ok('the capability response carries no TURN credential',
+  capabilityVoice.turn === undefined
+    || !JSON.stringify(capabilityVoice).includes('"credential"'));
+
 console.log('\n  ' + declared.length + ' settings, '
   + (declared.length - decorative.length) + ' of them read');
 console.log('  categories offered: ' + populated.join(', '));

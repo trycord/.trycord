@@ -188,7 +188,7 @@ export function communitySidebar(ctx, serverId) {
       href: path(route),
       'aria-current': active ? 'page' : null,
     },
-      icon(channel.type === 'voice' ? 'volume' : channel.type === 'announcement' ? 'bell' : 'hash', { size: 16 }),
+      icon(channel.type === 'voice' || channel.type === 'stage' ? 'volume' : channel.type === 'announcement' ? 'bell' : 'hash', { size: 16 }),
       el('span', { class: 'truncate' }, channel.name),
       isMuted(channel.id) ? el('span', { class: 'nav-muted', title: 'Muted' }, icon('bell', { size: 13 })) : null,
       channel.unread ? el('span', { class: 'nav-dot' }) : null,

@@ -297,6 +297,39 @@ async function waitForHealth(child, attempts) {
     const channel = await call('POST', '/api/servers/' + sid + '/channels', { name: 'flow' }, token);
     ok('a channel can be created', channel.status === 200 && !!channel.json.id);
 
+    // A channel has a type, and the type is the server's fact, not a decoration: the voice
+    // routes refuse anything that is not `voice` or `stage`, so this contract is what
+    // decides whether a voice channel can exist at all. It is exercised here while the
+    // instance's voice feature is off, which is exactly the state an operator stages in:
+    // the structure is real, the media is gated separately.
+    const voiceChannel = await call('POST', '/api/servers/' + sid + '/channels',
+      { name: 'voice-room', type: 'voice' }, token);
+    ok('a voice channel can be created',
+      voiceChannel.status === 200 && voiceChannel.json.type === 'voice',
+      'type ' + (channel.json && channel.json.type) + ' / status ' + voiceChannel.status);
+
+    const stageChannel = await call('POST', '/api/servers/' + sid + '/channels',
+      { name: 'stage-room', type: 'stage' }, token);
+    ok('a stage channel can be created',
+      stageChannel.status === 200 && stageChannel.json.type === 'stage',
+      'type ' + (stageChannel.json && stageChannel.json.type));
+
+    const badType = await call('POST', '/api/servers/' + sid + '/channels',
+      { name: 'hologram-room', type: 'hologram' }, token);
+    ok('an unknown channel type is refused, not stored',
+      badType.status === 400 && code(badType) === 'VALIDATION_ERROR', 'status ' + badType.status);
+
+    const retyped = await call('PATCH', '/api/servers/' + sid + '/channels/' + cid,
+      { type: 'voice' }, token);
+    ok('a channel type can be changed while the room is empty',
+      retyped.status === 200 && retyped.json.type === 'voice',
+      'type ' + (retyped.json && retyped.json.type));
+    const retypedBack = await call('PATCH', '/api/servers/' + sid + '/channels/' + cid,
+      { type: 'text' }, token);
+    ok('and changed back',
+      retypedBack.status === 200 && retypedBack.json.type === 'text',
+      'type ' + (retypedBack.json && retypedBack.json.type));
+
     const sent = await call('POST', '/api/channels/' + cid + '/messages', { content: 'hello from the flow check' }, token);
     const mid = sent.json && sent.json.id;
     ok('a message can be sent', sent.status === 200 && !!mid);

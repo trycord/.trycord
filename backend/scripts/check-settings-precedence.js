@@ -183,6 +183,53 @@ async function main() {
   ok('the newer stored value survives', settings.get('instance.name') === 'Edited elsewhere',
     settings.get('instance.name'));
 
+  // -- G: the voice provider is instance configuration ------------------------------
+  // Voice required editing .env on the server and restarting, which meant an operator who
+  // had installed Trycord but not touched a shell could not turn it on from the console
+  // that exists to configure the instance. These assertions hold the other direction: the
+  // fields are real, the secret stays a secret, and a switch that cannot work is refused
+  // rather than saved and left to fail at the first join.
+  console.log('\n  configuring the voice provider from the instance');
+  const features = require('../src/features');
+  const voiceFields = ['voice.sfuAppId', 'voice.turnUrl', 'voice.turnUsername', 'voice.stageChannels'];
+  ok('every voice provider field is declared',
+    voiceFields.every((k) => settings.SCHEMA.some((s) => s.key === k)),
+    voiceFields.filter((k) => !settings.SCHEMA.some((s) => s.key === k)).join(', '));
+  ok('the provider credential is declared as a secret',
+    settings.SECRETS.has('voice.sfuAppSecret') && settings.SECRETS.has('voice.turnCredential'));
+
+  const premature = await settings.save({ 'voice.enabled': true }, adminId);
+  ok('voice cannot be turned on with no media server', premature.ok === false,
+    (premature.problems || []).join('; '));
+  ok('and the refusal names what is missing',
+    (premature.problems || []).some((p) => /sfuAppId/.test(p)),
+    (premature.problems || []).join('; '));
+
+  const configured = await settings.save({
+    'voice.sfuAppId': 'app-123',
+    'voice.sfuAppSecret': 'media-secret-value',
+    'voice.stunUrls': 'stun:stun.example.com:3478',
+    'voice.enabled': true,
+  }, adminId);
+  ok('a complete voice configuration saves', configured.ok === true,
+    (configured.problems || []).join('; '));
+  ok('the saved app ID is what the feature layer reads',
+    features.current.voiceVideo.sfuAppId === 'app-123',
+    features.current.voiceVideo.sfuAppId);
+  ok('the saved credential reaches the provider without a restart',
+    features.current.voiceVideo.sfuAppSecret === 'media-secret-value');
+  ok('voice reports itself enabled once configured',
+    features.current.voiceVideo.enabled === true);
+  ok('the capability response still carries no credential',
+    !JSON.stringify(features.capabilities(features.current)).includes('media-secret-value'));
+  ok('the catalogue reports the credential as set, never its value',
+    byKey('voice.sfuAppSecret').set === true
+      && !JSON.stringify(settings.catalogue()).includes('media-secret-value'));
+
+  const cannotClear = await settings.save({ 'voice.sfuAppSecret': null }, adminId);
+  ok('the credential cannot be cleared while voice is on', cannotClear.ok === false,
+    (cannotClear.problems || []).join('; '));
+
   await db.close();
   console.log(failed
     ? '\n  settings lifecycle check FAILED - ' + failed + ' of ' + (passed + failed) + ' assertions failed\n'
