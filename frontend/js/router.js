@@ -127,7 +127,12 @@ async function resolveServerId(page, params) {
 
 function firstChannel(serverId) {
   const channels = (State.serverTree.get(serverId) || {}).channels || [];
-  const text = channels.filter((channel) => String(channel.type || 'text') !== 'voice');
+  // Voice and stage channels have no feed to land on, so the default is the first
+  // channel that does. A community of nothing but voice channels still opens one.
+  const text = channels.filter((channel) => {
+    const type = String(channel.type || 'text');
+    return type !== 'voice' && type !== 'stage';
+  });
   const ordered = (text.length ? text : channels).slice()
     .sort((a, b) => (a.position || 0) - (b.position || 0));
   return ordered[0] || null;

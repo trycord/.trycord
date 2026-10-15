@@ -150,6 +150,35 @@ const SCHEMA = [
     description: 'Comma-separated. At least one STUN server or a TURN URL is required when voice is on.',
     live: true,
   },
+  // The media server credential and the TURN relay. These used to be environment-only,
+  // read once at startup, which meant an operator who had already set up the instance
+  // still had to edit a file on the server and restart to turn voice on. They are read
+  // from the store at call time now, so the console is enough. The two credentials
+  // (voice.sfuAppSecret, voice.turnCredential) are declared in SECRETS below.
+  {
+    key: 'voice.sfuAppId', env: 'VOICE_VIDEO_SFU_APP_ID', type: 'string', default: '',
+    category: 'voice', label: 'Media server app ID',
+    description: 'From the media provider dashboard. Required when voice is on.',
+    live: true,
+  },
+  {
+    key: 'voice.turnUrl', env: 'VOICE_VIDEO_TURN_URL', type: 'string', default: '',
+    category: 'voice', label: 'TURN server URL',
+    description: 'Relays media for clients behind a symmetric NAT or a UDP-blocking firewall. A STUN server alone is often not enough.',
+    live: true,
+  },
+  {
+    key: 'voice.turnUsername', env: 'VOICE_VIDEO_TURN_USERNAME', type: 'string', default: '',
+    category: 'voice', label: 'TURN username',
+    description: 'For a static TURN credential. Leave blank if the provider mints short-lived ones.',
+    live: true,
+  },
+  {
+    key: 'voice.stageChannels', env: 'VOICE_VIDEO_STAGE_CHANNELS', type: 'boolean', default: true,
+    category: 'voice', label: 'Allow stage channels',
+    description: 'A stage is a voice channel where an audience listens and a moderator brings speakers up.',
+    live: true,
+  },
 
   // Read at call time by services/mail, so these are live.
   {
@@ -385,6 +414,8 @@ const SECRETS = new Set([
   'mail.smtpPassword',
   'mail.apiKey',
   'storage.s3SecretKey',
+  'voice.sfuAppSecret',
+  'voice.turnCredential',
 ]);
 
 // Settings that cannot be changed from the dashboard at all, with the reason. Listed
@@ -424,10 +455,22 @@ const SECRET_META = {
     description: 'The credential for the mail API. Stored encrypted and never shown again.',
   },
   'storage.s3SecretKey': {
-    env: 'S3_SECRET_KEY',
+    env: 'S3_SECRET_ACCESS_KEY',
     label: 'S3 secret key',
     category: 'storage',
     description: 'The secret half of the S3 credential. Stored encrypted and never shown again.',
+  },
+  'voice.sfuAppSecret': {
+    env: 'VOICE_VIDEO_SFU_APP_SECRET',
+    label: 'Media server app secret',
+    category: 'voice',
+    description: 'Issued with the app ID and used to create media sessions. Stored encrypted and never shown again.',
+  },
+  'voice.turnCredential': {
+    env: 'VOICE_VIDEO_TURN_CREDENTIAL',
+    label: 'TURN credential',
+    category: 'voice',
+    description: 'The password half of a static TURN credential. Stored encrypted and never shown again.',
   },
 };
 
@@ -715,6 +758,13 @@ async function save(entries, adminId) {
         continue;
       }
       if (raw === null || raw === undefined) {
+        // Clearing the credential voice depends on while it is on would leave a live
+        // capability with no way to create a session. Refused here, so the fix is to turn
+        // voice off first rather than to discover it at the next join.
+        if (key === 'voice.sfuAppSecret' && store.values['voice.enabled'] === true) {
+          problems.push(key + ': cannot be cleared while voice and video is on');
+          continue;
+        }
         writes.push({ key, value: null, seen: store.raw[key], clear: true });
         before[key] = secretValues[key] ? '(set)' : '(unset)';
         continue;
@@ -740,6 +790,34 @@ async function save(entries, adminId) {
   }
 
   if (problems.length) return { ok: false, problems };
+
+  // Turning voice on needs the infrastructure it will use. The check runs after the batch
+  // is validated so a single save can set the switch and the credentials together, and it
+  // reads the pending values first, falling back to what is already stored. Without it a
+  // save would report success, the dashboard would show a green tick, and the first join
+  // would be the first sign that nothing worked.
+  const pending = (key) => writes.find((w) => w.key === key);
+  const after = (key) => {
+    const w = pending(key);
+    return w ? w.value : store.values[key];
+  };
+  const secretAfter = (key) => {
+    const w = pending(key);
+    if (w) return !!w.value;
+    if (store.sources[key] === 'environment') return true;
+    return !!secretValues[key];
+  };
+  const voiceOnAfter = after('voice.enabled') === true;
+  if (voiceOnAfter) {
+    const appId = String(after('voice.sfuAppId') || '');
+    const stun = after('voice.stunUrls');
+    const turnUrl = String(after('voice.turnUrl') || '');
+    const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turnUrl;
+    if (!appId) problems.push('voice.sfuAppId: required when voice and video is on');
+    if (!secretAfter('voice.sfuAppSecret')) problems.push('voice.sfuAppSecret: required when voice and video is on');
+    if (!hasIce) problems.push('voice.stunUrls: at least one STUN server or a TURN URL is required when voice is on');
+    if (problems.length) return { ok: false, problems };
+  }
 
   // Turning voice off turns the sub-capabilities off with it. The caller's object is not
   // mutated: it came off the request body, and changing it would make the response and

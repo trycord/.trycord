@@ -86,7 +86,11 @@ const FROM_SETTINGS = {
   VOICE_VIDEO_ENABLED: 'voice.enabled',
   VOICE_VIDEO_MAX_PARTICIPANTS: 'voice.maxParticipants',
   VOICE_VIDEO_SCREEN_SHARING: 'voice.screenSharing',
+  VOICE_VIDEO_STAGE_CHANNELS: 'voice.stageChannels',
   VOICE_VIDEO_STUN_URLS: 'voice.stunUrls',
+  VOICE_VIDEO_SFU_APP_ID: 'voice.sfuAppId',
+  VOICE_VIDEO_TURN_URL: 'voice.turnUrl',
+  VOICE_VIDEO_TURN_USERNAME: 'voice.turnUsername',
   FILE_UPLOADS_ENABLED: 'features.uploads',
   BOTS_ENABLED: 'features.bots',
   WEBHOOKS_ENABLED: 'features.webhooks',
@@ -128,6 +132,24 @@ function providerName() {
   return raw;
 }
 
+// A credential, read through the settings store so one saved in the configuration centre
+// takes effect, falling back to the environment for an install that was configured there.
+//
+// This is the only place outside the mail service that asks the store for a secret, and it
+// exists because voice and video is itself a provider: the value has to reach
+// services/voice.js without passing through the capability response. The snapshot it lands
+// in is internal - `capabilities()` and `healthOf()` both whitelist the fields they expose.
+function secretOf(key, envName) {
+  try {
+    const settings = require('./services/settings');
+    if (settings.isLoaded()) {
+      const stored = settings.secretValue(key);
+      if (stored) return String(stored);
+    }
+  } catch { /* not loaded yet: fall through to the environment */ }
+  return text(envName, '');
+}
+
 function build() {
   const registration = valueOf('REGISTRATION_ENABLED', true);
   const registrationApproval = valueOf('REGISTRATION_APPROVAL', false);
@@ -152,6 +174,7 @@ function build() {
   const voice = valueOf('VOICE_VIDEO_ENABLED', false);
   const screenSharing = valueOf('VOICE_VIDEO_SCREEN_SHARING', true);
   const stageChannels = flag('VOICE_VIDEO_STAGE_CHANNELS', true);
+  const stageChannelsOn = !!valueOf('VOICE_VIDEO_STAGE_CHANNELS', stageChannels.value);
   const stun = valueOf('VOICE_VIDEO_STUN_URLS', []);
   const maxParticipants = valueOf('VOICE_VIDEO_MAX_PARTICIPANTS', 25);
   const maxPayload = valueOf('WS_MAX_PAYLOAD', 204800);
@@ -176,9 +199,9 @@ function build() {
       // The sub-flags are read only so a bad spelling is still a startup error; the
       // effective values are computed below, gated on the master.
       screenSharingRequested: !!screenSharing,
-      stageChannelsRequested: stageChannels.value,
+      stageChannelsRequested: stageChannelsOn,
       screenSharing: !!voice && !!screenSharing,
-      stageChannels: !!voice && stageChannels.value,
+      stageChannels: !!voice && stageChannelsOn,
 
       // Only one provider is implemented. An operator who sets anything else gets a
       // startup error naming what is supported, rather than a runtime failure at the
@@ -186,11 +209,16 @@ function build() {
       provider: providerName(),
       maxParticipants: Math.min(Math.max(Number(maxParticipants) || 25, 1), 200),
 
+      // The provider credential and the ICE servers. `sfuAppSecret` is a secret: it must
+      // never be added to `capabilities()`, and services/voice.js reads it at call time so
+      // a rotation in the console applies without a restart.
+      sfuAppId: String(valueOf('VOICE_VIDEO_SFU_APP_ID', '') || ''),
+      sfuAppSecret: secretOf('voice.sfuAppSecret', 'VOICE_VIDEO_SFU_APP_SECRET'),
       stun: Array.isArray(stun) ? stun : [],
       turn: {
-        url: text('VOICE_VIDEO_TURN_URL', ''),
-        username: text('VOICE_VIDEO_TURN_USERNAME', ''),
-        credential: text('VOICE_VIDEO_TURN_CREDENTIAL', ''),
+        url: String(valueOf('VOICE_VIDEO_TURN_URL', '') || ''),
+        username: String(valueOf('VOICE_VIDEO_TURN_USERNAME', '') || ''),
+        credential: secretOf('voice.turnCredential', 'VOICE_VIDEO_TURN_CREDENTIAL'),
       },
     },
 
@@ -272,8 +300,11 @@ function healthOf(features) {
   if (v.stun.length === 0 && !v.turn.url) {
     problems.push('no STUN or TURN server is configured');
   }
-  if (!text('VOICE_VIDEO_SFU_APP_ID', '')) {
-    problems.push('VOICE_VIDEO_SFU_APP_ID is not set');
+  if (!v.sfuAppId) {
+    problems.push('the media server app ID is not set');
+  }
+  if (!v.sfuAppSecret) {
+    problems.push('the media server app secret is not set');
   }
 
   if (problems.length) {

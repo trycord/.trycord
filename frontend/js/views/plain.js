@@ -8,7 +8,7 @@ import { el } from '../dom.js';
 import { icon } from '../icons.js';
 import { State, refreshServers } from '../store.js';
 import Api from '../api.js';
-import { path, navigate } from '../nav.js';
+import { path, publicPath, navigate } from '../nav.js';
 import { toast, errorToast } from '../ui.js';
 import { page, heading, section } from './util.js';
 
@@ -22,28 +22,46 @@ function pubShell(title, body) {
     el('main', { class: 'pub-body' }, body));
 }
 
+// The public site's documents, by the slug the application addresses them with.
+// These pages are served at the origin root, so a link to one is the one kind of
+// link that must not carry the application mount.
+const PUBLIC_DOCS = {
+  terms: { path: '/terms', label: 'Terms of Service' },
+  privacy: { path: '/privacy', label: 'Privacy Policy' },
+  'instances-terms': { path: '/instances-terms', label: 'Official instance terms' },
+  'trust-and-safety': { path: '/trust-and-safety', label: 'Trust & Safety' },
+  security: { path: '/security', label: 'Security' },
+  support: { path: '/support', label: 'Support' },
+};
+
 export function renderSupport() {
   const instance = State.instance || {};
   const body = el('div', { class: 'pub-doc' },
     el('h1', {}, 'Support'),
     el('p', {}, 'Trycord is self-hosted, so the people who can help are the people who run this instance.'),
     el('div', { class: 'pub-links' },
-      instance.supportUrl ? el('a', { class: 'btn btn--primary', href: instance.supportUrl }, 'Open the support page') : null,
+      el('a', { class: 'btn btn--primary', href: publicPath('/support') }, 'Open the support page'),
+      instance.supportUrl ? el('a', { class: 'btn btn--default', href: instance.supportUrl }, 'Contact the operators') : null,
       el('a', { class: 'btn btn--default', href: path('/login') }, 'Back to sign in')),
   );
   return { raw: true, node: pubShell('Support', body), head: [] };
 }
 
 export function renderLegal(ctx) {
-  const title = ctx.params && ctx.params.doc ? String(ctx.params.doc) : 'Legal';
+  const asked = ctx.params && ctx.params.doc ? String(ctx.params.doc) : '';
+  const known = PUBLIC_DOCS[asked] || null;
+  const extra = known && known.path !== '/terms' && known.path !== '/privacy'
+    ? el('a', { class: 'btn btn--primary', href: publicPath(known.path) }, known.label)
+    : null;
   const body = el('div', { class: 'pub-doc' },
-    el('h1', {}, 'Legal'),
+    el('h1', {}, known ? known.label : 'Legal'),
     el('p', {}, 'The terms and privacy policy for this instance are published on its public site.'),
     el('div', { class: 'pub-links' },
-      el('a', { class: 'btn btn--default', href: path('/terms') }, 'Terms of Service'),
-      el('a', { class: 'btn btn--default', href: path('/privacy') }, 'Privacy Policy')),
-    el('p', { class: 'muted-note' }, 'Requested document: ' + title));
-  return { raw: true, node: pubShell('Legal', body), head: [] };
+      el('a', { class: 'btn btn--default', href: publicPath('/terms') }, 'Terms of Service'),
+      el('a', { class: 'btn btn--default', href: publicPath('/privacy') }, 'Privacy Policy'),
+      extra),
+    known ? null : el('p', { class: 'muted-note' }, 'Requested document: ' + asked));
+  return { raw: true, node: pubShell(known ? known.label : 'Legal', body), head: [] };
 }
 
 // -- invitations -------------------------------------------------------------

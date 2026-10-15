@@ -5,9 +5,9 @@ the code alone does not explain. It is reference, not a plan and not a log.
 
 Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
-client segments are served; `npm run check:flows` boots a server and passes 72
+client segments are served; `npm run check:flows` boots a server and passes 77
 assertions against real flows; `npm run check:render` boots a server and renders all
-40 routable pages in jsdom, passing 125 assertions;
+40 routable pages in jsdom, passing 128 assertions;
 `npm run check:realtime` puts three accounts on three sockets and confirms a
 message crosses between the two that share a community and does not reach the third, who
 never joined the room; `npm run check:contrast` measures every theme against WCAG AA
@@ -20,31 +20,31 @@ The eleven questions worth being able to answer without searching.
 
 | | |
 |---|---|
-| The application tree | `frontend/js/shell/tree.js` - builds it into the one element in `index.html`. The document itself has nothing in it but metadata and a mount point. |
-| What is on screen | `frontend/js/shell/compose.js` - one function, called once before any region draws, returning mode, width, route, state and whether each region exists. The regions read that and nothing else decides on its own. |
-| Routing | `frontend/js/router.js` - parses `location`, calls `mount`. Longest-prefix matching, no hash. |
+| The application tree | `frontend/js/shell.js`, mounted by `frontend/js/main.js` - builds the workspace into the one element in `index.html`. The document itself holds nothing but metadata, `<base>`, the crash screen and the entry module. |
+| What is on screen | `frontend/js/router.js` - resolves the address to a page, asks its renderer for the regions, and fills the shell from that one answer. No region decides for itself. |
+| Routing | `frontend/js/router.js` - parses `location`, matches the longest prefix on segment boundaries, resolves the community by slug or id, and mounts. No hash. |
 | Page definitions | `frontend/js/pages/registry.js` - the one source of truth for every page, route and nav entry. |
-| Navigation | Derived from that registry: `shell.js` for the rail and tab bar, `settings-shell.js` for settings and admin, `community-nav.js` for the community sidebar. Presentation differs; identity does not. |
-| A page | `{id, route, scope, render}`. `handlers.js` attaches the renderer at load via the registry's `bind()`, so a page answers for itself and the registry never imports the twenty modules that draw. |
-| Community settings | `frontend/js/community/settings.js` is the frame; `settings-sections.js` holds the seven sections, each a function that destructures the one context object they share. It was one function containing eight `if (section === ...)` blocks. |
-| Signed-out surfaces | `frontend/js/public/` - `auth.js`, `legal.js`, `backend.js`. The sign-in screens, the legal documents and the instance picker, which had nothing in common but a file. |
-| Privacy settings | `frontend/js/privacy/` - one module per tab, and `sync.js` for the realtime refresh. Three tabs that shared a save helper and nothing else. |
-| The admin console | `frontend/js/admin/` - the frame plus one module per section, and `admin/pages/` for the public-page editor. Eight lists that shared nothing but a paint sequence number. |
-| Renderers | `frontend/js/pages/handlers.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
-| Lifecycle | `frontend/js/pages/lifecycle.js` - mount, teardown, access gate, per-page error isolation. |
-| Authentication state | `frontend/js/state.js`. The token is in `api.js`; everything else reads `State.me`. |
-| Client-side permissions | `state.js#can`, mirrored from `services/permissions.js`. **Display only** - the server decides. |
+| Navigation | Derived from that registry: `frontend/js/shell.js` for the rail and the phone tab bar, `frontend/js/sidebars.js` for the place, settings, admin and community sidebars. Presentation differs; identity does not. |
+| A page | `{id, route, ...}` metadata in the registry, with its renderer bound from `frontend/js/views/index.js` by `main.js` through the registry's `bind()`. The registry never imports the view modules that draw, so reading a label does not pull in the shell. |
+| Community and channel | `frontend/js/views/community.js` - one module for a community: the channel (text or voice), the roster, and the administrative screens (channels, categories, members, roles, invites, settings) underneath it. `frontend/js/sidebars.js` draws the community tree. |
+| Signed-out surfaces | `frontend/js/views/auth.js` (sign-in, registration, two-step) and `frontend/js/views/plain.js` (the public documents, invite and community-creation screens). |
+| Account settings | `frontend/js/views/settings.js` - profile, security, privacy, notifications, appearance, backend and updates, driven by the `settings.*` entries in the registry. |
+| The admin console | `frontend/js/views/admin.js` - the frame plus each section. The configuration centre renders itself from the catalogue the API returns rather than from a hardcoded field list. |
+| Renderers | `frontend/js/views/index.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
+| Lifecycle | `frontend/js/router.js` - teardown of the previous page, access gate, renderer call, then painting the chrome and catching what the renderer throws. |
+| Authentication state | `frontend/js/state.js`, with `frontend/js/store.js` for the loading and refresh. The token is in `api.js`; everything else reads `State.me`. |
+| Client-side permissions | `frontend/js/store.js#can`, mirrored from `services/permissions.js`. **Display only** - the server decides. |
 | Which origins may talk to this instance | `src/origins.js` - the CORS policy, including the desktop app's custom scheme and the `*.` wildcard rules. |
 | Server-side authorization | `middleware/serverAccess.js` - `resolveServer`, `requireMember`, `requirePerm`, `requireOwner`. Routes declare their own level. |
-| Themes | `frontend/js/theme.js` over the `--t-*` tokens in `css/app.css`. Built-in themes are `[data-theme]` blocks; custom ones are verified and kept working. |
+| Themes | `frontend/js/theme.js` over the tokens in `frontend/css/tokens.css` (aggregated by `frontend/css/app.css`). The chosen palette is written to `<html data-theme>`; a reader's custom palette goes on as inline custom properties and is kept only if the shell still measures after it lands. |
 | API calls | `frontend/js/api.js`. One `request()`, no per-feature clients. |
-| Message state | `messages/dm-thread.js` and `community/conversation.js`, each owning its own feed and subscriptions, torn down on the way out. |
-| Community context | `state.js` - `currentServerId`, plus `workspace-shared.js` for the realtime wiring that keeps it fresh. |
+| Message state | `frontend/js/views/messages.js` - one conversation renderer for channels and DMs, owning its feed and subscriptions, torn down on the way out. |
+| Community context | `frontend/js/store.js` - `currentServerId` and the community tree, with `frontend/js/realtime.js` keeping it fresh. |
 | Data model | `db/tables/` - one module per concern: identity, communities, messaging, social, moderation, instance. |
 | Schema migrations | `db/schema.js` - the ALTER and MODIFY lists that bring an existing database up to date, the declared indexes, the backfills. |
 | Database access | `db/index.js`, which is the only module that speaks SQL dialect. |
 | Notification preferences, quiet hours, sessions | `services/prefs.js`, `services/wellbeing.js`, `services/sessions.js` - each its own module, not three more things inside `services/privacy.js`. |
-| Instance configuration | `db/config.js` and the `instanceConfig()` in `server.js`. Every deployment fact is an environment variable, documented in `backend/.env.example`. |
+| Instance configuration | `services/settings.js` - the schema, the stored values and the precedence (stored, then environment, then default) - with `db/config.js` for the deployment facts a running process cannot change. The administrator console edits the stored layer; the environment stays the floor, documented in `backend/.env.example`. |
 | Self-hosting | `docs/selfhosting.md`. No product code requires Trycord's own infrastructure: the client defaults to it but every value is overridable, and a client served by a backend is repointed at that backend. |
 
 ## Architecture

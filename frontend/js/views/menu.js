@@ -103,7 +103,7 @@ export function renderMenu() {
       rows: sorted.length
         ? sorted.map((channel) => prow({
           href: path('/server/' + server.id + '/channel/' + channel.id),
-          lead: icon(channel.type === 'voice' ? 'volume' : channel.type === 'announcement' ? 'bell' : 'hash', { size: 16 }),
+          lead: icon(channel.type === 'voice' || channel.type === 'stage' ? 'volume' : channel.type === 'announcement' ? 'bell' : 'hash', { size: 16 }),
           title: channel.name,
         }))
         : [prow({ sub: tree ? 'No channels yet.' : 'This community could not be read.' })],

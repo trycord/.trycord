@@ -8,6 +8,22 @@ function cleanName(name) {
   return String(name || '').trim().toLowerCase().replace(/[^a-z0-9-_ ]/g, '').slice(0, 32) || 'channel';
 }
 
+// The types the backend can actually honour. `announcement` and `forum` exist in older
+// rows as icons only - a channel of those types behaves exactly like text - so they stay
+// readable but are not offered: letting one be set would promise a behaviour that is not
+// there. `stage` is a voice channel the audience cannot speak in until a moderator grants
+// it; see services/voice.js.
+const CHANNEL_TYPES = ['text', 'voice', 'stage'];
+
+function cleanType(type, fallback = 'text') {
+  if (type === undefined || type === null || String(type).trim() === '') return fallback;
+  const clean = String(type).trim().toLowerCase();
+  if (!CHANNEL_TYPES.includes(clean)) {
+    throw { code: 'VALIDATION_ERROR', message: 'Unknown channel type: ' + clean };
+  }
+  return clean;
+}
+
 async function categories(serverId) {
   return db.all('SELECT * FROM categories WHERE server_id = ? ORDER BY position, name', [serverId]);
 }
@@ -89,24 +105,25 @@ async function list(serverId) {
   return { categories: cats, channels };
 }
 
-async function create(serverId, { name, topic, categoryId }) {
+async function create(serverId, { name, topic, categoryId, type }) {
   let cat = null;
   if (categoryId) {
     cat = await db.get('SELECT * FROM categories WHERE id = ? AND server_id = ?', [categoryId, serverId]);
     if (!cat) throw { code: 'VALIDATION_ERROR', message: 'Category not found in this server' };
   }
+  const kind = cleanType(type);
   const pos = await db.get('SELECT COALESCE(MAX(position), -1) + 1 AS p FROM channels WHERE server_id = ?', [serverId]);
   const id = uuid();
   const clean = cleanName(name);
   await db.run(
     'INSERT INTO channels (id, server_id, category_id, name, topic, type, position, slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, serverId, cat ? cat.id : null, clean, String(topic || '').slice(0, 200), 'text', pos.p,
+    [id, serverId, cat ? cat.id : null, clean, String(topic || '').slice(0, 200), kind, pos.p,
       await slugs.forChannel(clean, serverId)]
   );
   return db.get('SELECT * FROM channels WHERE id = ?', [id]);
 }
 
-async function update(channel, { name, topic, categoryId }) {
+async function update(channel, { name, topic, categoryId, type }) {
   const sets = [];
   const vals = [];
   if (name !== undefined) {
@@ -116,6 +133,26 @@ async function update(channel, { name, topic, categoryId }) {
   if (topic !== undefined) {
     sets.push('topic = ?');
     vals.push(String(topic).slice(0, 200));
+  }
+  if (type !== undefined) {
+    const kind = cleanType(type, channel.type);
+    // A type change is refused while the room is live. Flipping a channel to text with
+    // people still connected would leave their voice_rooms and voice_participants rows
+    // behind, so the change waits until the room is empty rather than orphaning them.
+    if (kind !== channel.type) {
+      const live = await db.get(
+        'SELECT id FROM voice_participants WHERE channel_id = ? AND left_at IS NULL LIMIT 1',
+        [channel.id]
+      );
+      if (live) {
+        throw {
+          code: 'CHANNEL_IN_USE',
+          message: 'Someone is connected to this channel. Ask them to leave before changing its type.',
+        };
+      }
+    }
+    sets.push('type = ?');
+    vals.push(kind);
   }
   if (categoryId !== undefined) {
     if (categoryId) {
@@ -145,4 +182,4 @@ async function remove(serverId, channelId) {
   });
 }
 
-module.exports = { categories, createCategory, renameCategory, reorderCategories, deleteCategory, list, create, update, remove, reorderChannels };
+module.exports = { categories, createCategory, renameCategory, reorderCategories, deleteCategory, list, create, update, remove, reorderChannels, CHANNEL_TYPES };
