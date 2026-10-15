@@ -8,20 +8,24 @@
 
 const EXTERNAL = /^(https?:|mailto:|tel:|#$|blob:|data:)/i;
 
-function mountPoint() {
-  let pathname;
-  try {
-    const url = new URL('.', import.meta.url);
-    // file:// and data: would give a filesystem path as a URL prefix. Desktop
-    // builds served off disk get no mount.
-    if (url.protocol === 'file:' || url.protocol === 'data:') return '';
-    pathname = url.pathname;
-  } catch {
-    return '';
-  }
-  const mount = pathname.replace(/js\/$/, '');
+// The mount is derived from the module's own directory, which sits one level under
+// the client root (`packages/nav.js`, or `js/nav.js` before the platform was split
+// out). Stripping that one directory leaves the mount the server serves from, so the
+// answer follows the file instead of a hard-coded `/app`. Getting this wrong is
+// silent: every in-app link and every navigate() then carries an extra `/packages`.
+export function mountFromModuleUrl(href) {
+  let url;
+  try { url = new URL('.', href); } catch { return ''; }
+  // file:// and data: would give a filesystem path as a URL prefix. Desktop builds
+  // served off disk get no mount.
+  if (url.protocol === 'file:' || url.protocol === 'data:') return '';
+  const mount = url.pathname.replace(/(?:^|\/)(?:js|packages)\/$/, '/');
   if (mount === '/' || !mount.startsWith('/')) return '';
   return mount.replace(/\/$/, '');
+}
+
+function mountPoint() {
+  return mountFromModuleUrl(import.meta.url);
 }
 
 export const BASE = mountPoint();

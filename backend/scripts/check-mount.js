@@ -23,6 +23,7 @@
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const ROOT = path.join(__dirname, '..');
 const REPO = path.join(ROOT, '..');
@@ -118,6 +119,24 @@ async function build(appMount) {
     // Assets under the mount.
     const css = await get(port, '/app/css/app.css');
     ok('GET /app/css/app.css is the stylesheet', css.status === 200 && !/^\s*</.test(css.body.trim()));
+
+    console.log('\n  the mount the client computes for itself');
+    // The client derives its mount from the module's own URL (`packages/nav.js`), so
+    // the answer has to survive the module moving between directories in the source
+    // tree. When the platform was split into packages/, this silently became
+    // /app/packages - every in-app link and every navigate() then carried the extra
+    // segment, and nothing off-disk could see it. This is the check that notices.
+    const { mountFromModuleUrl } = await import(pathToFileURL(
+      path.join(CLIENT, 'packages', 'nav.js')).href);
+    ok('a client served under /app computes BASE /app',
+      mountFromModuleUrl('https://api.trycord.dev/app/packages/nav.js') === '/app',
+      mountFromModuleUrl('https://api.trycord.dev/app/packages/nav.js'));
+    ok('the mount does not depend on the platform module\'s directory',
+      mountFromModuleUrl('https://api.trycord.dev/app/js/nav.js') === '/app');
+    ok('a client served from the origin root computes no mount',
+      mountFromModuleUrl('https://selfhost.example/packages/nav.js') === '');
+    ok('a client served off disk computes no mount',
+      mountFromModuleUrl('file:///opt/trycord/frontend/packages/nav.js') === '');
 
     console.log('\n  the API under the mount');
     // The fault: an API path under the mount must not be answered by the public site's
