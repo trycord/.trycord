@@ -12,8 +12,8 @@ import { loading, failure } from '../components.js';
 import { relativeTime } from '../../../packages/format.js';
 
 // The scrolling body of a screen. Every renderer builds one and returns it.
-export function screen(children) {
-  return el('div', { class: 'm-screen' }, children);
+export function screen(...children) {
+  return el('div', { class: 'm-screen' }, ...children);
 }
 
 // Replace a host's contents with a spinner, run the work, and on failure show a

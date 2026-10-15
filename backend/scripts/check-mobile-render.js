@@ -372,8 +372,20 @@ async function visit(window, document, run, url) {
       const n = document.querySelector('#m-view [data-fault-origin]');
       return n ? n.getAttribute('data-fault-origin') : null;
     })(),
-    signature: (view ? view.innerHTML : '').length + ':'
-      + Array.from(document.querySelectorAll('h1')).map((h) => h.textContent.trim()).join('|'),
+    activeSeg: (() => {
+      const n = document.querySelector('#m-view .m-seg__item.is-active');
+      return n ? (n.textContent || '').trim() : null;
+    })(),
+    signature: (() => {
+      // Content-based, not length-based: two different screens can be the same size,
+      // and the settings sections differ only by which segment is active and what the
+      // host holds. A hash of the view's HTML catches both.
+      const html = view ? view.innerHTML : '';
+      let hash = 0;
+      for (let i = 0; i < html.length; i++) hash = ((hash << 5) - hash + html.charCodeAt(i)) | 0;
+      const headings = Array.from(document.querySelectorAll('h1')).map((h) => h.textContent.trim()).join('|');
+      return html.length + ':' + (hash >>> 0) + ':' + headings;
+    })(),
   };
 }
 
@@ -449,6 +461,17 @@ function accessibilityFaults(document) {
 
   try {
     const token = await signIn();
+
+    // The world is seeded before the entry module boots, and this ordering is the
+    // whole reason the check works. Boot loads the session and then the server list,
+    // and `can()`/`isOwner()` read the servers the list returned. A community created
+    // after boot is not in that list, so every administrative screen would take its
+    // permission guard and render "Not your call" - a green check over a page that
+    // never drew. makeWorld talks to the backend directly, so it does not need the
+    // window's fetch to be wired yet.
+    const world = await makeWorld(token);
+    console.log('  seeded: a community, a channel and a message');
+
     wireFetch(window, token);
     await importClient(window);
 
@@ -504,9 +527,6 @@ function accessibilityFaults(document) {
     REG = registry;
     NAV = nav;
     console.log('  pages in the registry: ' + PAGES.length);
-
-    const world = await makeWorld(token);
-    console.log('  seeded: a community, a channel and a message');
 
     // ---- the shell ----------------------------------------------------------
     const shell = document.getElementById('m-shell');
@@ -595,9 +615,15 @@ function accessibilityFaults(document) {
     }
 
     // ---- the community settings sections, which live behind ?section= --------
-    const SECTION_IDS = ['overview', 'appearance', 'channels', 'categories', 'members',
-      'roles', 'invites', 'moderation', 'integrations', 'analytics', 'ownership'];
+    // The section ids are read from the registry rather than repeated here: the
+    // registry is the one source of truth for the pages, and a section added there
+    // should be swept without editing this check. Mobile folds them into one screen
+    // chosen by the query, so the ids are page suffixes, not addresses.
+    const SECTION_IDS = PAGES
+      .filter((p) => p.id.startsWith('community.settings.'))
+      .map((p) => p.id.slice('community.settings.'.length));
     let sectionsOk = 0;
+    const sectionSignatures = new Set();
     for (const section of SECTION_IDS) {
       const url = `/server/${world.serverId}/settings?section=${section}`;
       const out = await visit(window, document, run, url);
@@ -613,8 +639,12 @@ function accessibilityFaults(document) {
       } else {
         passed++;
         sectionsOk++;
+        sectionSignatures.add(out.signature);
       }
     }
+    ok('choosing a settings section changes the screen',
+      sectionSignatures.size === SECTION_IDS.length,
+      sectionSignatures.size + ' distinct screens for ' + SECTION_IDS.length + ' sections');
     console.log('    ' + (sectionsOk === SECTION_IDS.length ? 'ok  ' : 'note')
       + ' ' + sectionsOk + '/' + SECTION_IDS.length + ' community settings sections rendered');
 
