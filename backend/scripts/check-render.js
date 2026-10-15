@@ -624,11 +624,38 @@ async function settle(window, ms = 400) {
       // <body> as .auth-page rather than into #view-root, which is the correct shape for
       // them and the reason #view-root's emptiness says nothing.
       const auth = document.querySelector('body > .auth-page');
+      // A `required` control the reader cannot see is a form they can never send. The
+      // browser validates it and puts its message over an invisible field, so the
+      // submit button looks dead and nothing explains why. The DOM shape hides this:
+      // the form element, its controls and its text are all still there, so the counts
+      // below say nothing. The visible fields are filled the way a reader would and the
+      // form is asked whether it would actually submit.
+      const unseeable = (node) => {
+        for (let n = node; n && n !== document.body; n = n.parentElement) {
+          if (n.hasAttribute('hidden')) return true;
+        }
+        return false;
+      };
+      const required = auth
+        ? [...auth.querySelectorAll('input[required], select[required], textarea[required]')]
+        : [];
+      const sample = (node) => {
+        if (node.type === 'checkbox' || node.type === 'radio') { node.checked = true; return; }
+        if (node.value) return;
+        if (node.type === 'email') node.value = 'render@example.invalid';
+        else if (node.type === 'url') node.value = 'https://example.invalid/';
+        else if (node.type === 'number') node.value = '1';
+        else node.value = 'x';
+      };
+      for (const node of required) if (!unseeable(node)) sample(node);
+      const authForms = auth ? [...auth.querySelectorAll('form')] : [];
       signedOut.push({
         page, url, outcome,
         text: (auth ? auth.textContent : document.body.textContent) || '',
         controls: document.querySelectorAll('body > .auth-page button, body > .auth-page input').length,
-        forms: document.querySelectorAll('body > .auth-page form').length,
+        forms: authForms.length,
+        hiddenRequired: required.filter(unseeable).map((n) => n.name || n.type),
+        unsendable: authForms.filter((f) => !f.checkValidity()).length,
       });
       if (keep) window.localStorage.setItem('trycord.token', keep);
     }
@@ -656,6 +683,21 @@ async function settle(window, ms = 400) {
     ok('every signed-out screen has fields to fill in',
       guestFieldless.length === 0,
       guestFieldless.map((g) => g.page.id + ' (' + g.controls + ')').join(', '));
+
+    // A required field that is hidden is a form the reader cannot complete: the browser
+    // blocks the submit and shows the message over a field they cannot see. The sign-in
+    // form shipped this way - its two-step field was `required` while hidden - so
+    // "Sign in" did nothing and said nothing.
+    const hiddenRequired = signedOut.filter((g) => g.hiddenRequired.length);
+    ok('no signed-out screen hides a field it requires',
+      hiddenRequired.length === 0,
+      hiddenRequired.map((g) => g.page.id + ': ' + g.hiddenRequired.join(', ')).join(' | '));
+
+    // The other half of the same fault: a form that still fails its own validation after
+    // every visible field is filled is a form nobody can send, whatever it looks like.
+    const unsendable = signedOut.filter((g) => g.unsendable);
+    ok('every signed-out screen can be submitted with the visible fields filled',
+      unsendable.length === 0, unsendable.map((g) => g.page.id).join(', '));
 
     if (!wanted) {
       ok('every registered page is rendered, not only the routable ones',

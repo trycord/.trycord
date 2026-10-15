@@ -70,6 +70,10 @@ function wireSignOut() {
     realtime.disconnect();
     setSession('out');
   });
+  // The attribute is how a document says whether it is signed in - the checks and
+  // the crash screen read it. Signing in in place has to move it too, not only a
+  // reload, or a signed-in document keeps claiming it is signed out.
+  onStore('user', () => { setSession('in'); });
 }
 
 async function boot() {

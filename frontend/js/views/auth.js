@@ -8,7 +8,7 @@ import { el } from '../dom.js';
 import { icon } from '../icons.js';
 import Api from '../api.js';
 import { currentQuery, navigate, path } from '../nav.js';
-import { applyToken, loadSession, refreshServers } from '../store.js';
+import { applyToken, loadSession, logout, refreshServers } from '../store.js';
 import { connect } from '../realtime.js';
 import { toast } from '../ui.js';
 
@@ -65,7 +65,19 @@ function busy(form, isBusy) {
 }
 
 async function afterSignIn(next) {
-  const user = await loadSession();
+  let user;
+  try {
+    user = await loadSession();
+  } catch (error) {
+    // Signed in, but the instance requires a second factor this account does not
+    // have. The token is valid and is exactly what the enrolment screen needs, so
+    // keep it and send the reader there instead of showing a dead error.
+    if (error && error.code === 'MFA_REQUIRED') {
+      navigate('/two-step', { replace: true });
+      return;
+    }
+    throw error;
+  }
   if (!user) return;
   await Promise.all([
     refreshServers().catch(() => {}),
@@ -88,7 +100,13 @@ function nextTarget() {
 function loginForm() {
   const username = input('username');
   const password = Object.assign(input('password'), { type: 'password' });
-  const code = Object.assign(input('code'), { type: 'text', hidden: true });
+  // The two-step field is only for accounts that have two-step sign-in on, so it
+  // must not be `required` while it is hidden: a required control is validated
+  // even when nobody can see it, and the browser then refuses the submit without
+  // putting a message anywhere the reader can find. That is what made "Sign in"
+  // look dead. It is revealed - and only then made required - when the server
+  // answers that a code is needed.
+  const code = Object.assign(input('code', { required: false }), { type: 'text' });
   const mfaField = el('label', { class: 'field', hidden: true }, el('span', {}, 'Two-step code'), code);
 
   const form = el('form', { class: 'auth-form' },
@@ -116,6 +134,8 @@ function loginForm() {
       if (out && out.mfaRequired) {
         challenge = out.challengeToken;
         mfaField.hidden = false;
+        // Required only once it is the field the reader must fill in.
+        code.required = true;
         code.focus();
         return;
       }
@@ -145,7 +165,9 @@ function loginForm() {
 function registerForm() {
   const username = input('username');
   const display = input('displayName');
-  const email = Object.assign(input('email'), { type: 'email' });
+  // The label promises the address is optional, so it must not be `required`:
+  // the server asks for one only when this instance verifies email.
+  const email = Object.assign(input('email', { required: false }), { type: 'email' });
   const password = Object.assign(input('password'), { type: 'password' });
   const form = el('form', { class: 'auth-form' },
     el('label', { class: 'field' }, el('span', {}, 'Username'), username),
@@ -254,6 +276,94 @@ function verifyPanel(token) {
   return [wrap, form, el('p', { class: 'auth-alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
 }
 
+// -- two-step enrolment ------------------------------------------------------
+//
+// Shown when the instance requires a second factor and this account has none.
+// The setting says such an account is signed out "until it enrols", so this is
+// the screen that makes that promise keepable. It takes three steps because the
+// server only hands over the secret once the password is confirmed, and only
+// turns the factor on once a code proves the secret was added to an app.
+
+function twoStepForm() {
+  const host = el('div', { class: 'auth-form' });
+  const saved = { password: '' };
+
+  function swap(node) { host.replaceChildren(node); }
+
+  function passwordStep() {
+    const password = Object.assign(input('password', { autocomplete: 'current-password' }), { type: 'password' });
+    const form = el('form', { class: 'auth-form' },
+      el('label', { class: 'field' }, el('span', {}, 'Password'), password),
+      el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Continue'),
+    );
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      busy(form, true);
+      try {
+        const out = await Api.twoFactorSetup({ password: password.value });
+        saved.password = password.value;
+        swap(codeStep(out && out.secret ? out.secret : ''));
+      } catch (error) {
+        showError(form, error);
+      } finally {
+        busy(form, false);
+      }
+    });
+    return form;
+  }
+
+  function codeStep(secretValue) {
+    const code = Object.assign(input('code', { autocomplete: 'one-time-code' }), { type: 'text', inputmode: 'numeric' });
+    const form = el('form', { class: 'auth-form' },
+      el('label', { class: 'field' }, el('span', {}, 'Secret'), el('code', { class: 'secret-code' }, secretValue)),
+      el('label', { class: 'field' }, el('span', {}, 'Code from the app'), code),
+      el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Turn on two-step sign-in'),
+    );
+    code.focus();
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      busy(form, true);
+      try {
+        const out = await Api.twoFactorEnable({ password: saved.password, code: code.value.trim() });
+        swap(codesStep(out && out.recoveryCodes ? out.recoveryCodes : []));
+      } catch (error) {
+        showError(form, error);
+      } finally {
+        busy(form, false);
+      }
+    });
+    return form;
+  }
+
+  function codesStep(codes) {
+    const done = el('button', { class: 'btn btn--primary btn--block', type: 'button' }, 'Sign in');
+    done.addEventListener('click', async () => {
+      // Turning the factor on invalidated every session, this one included, so
+      // the only honest next step is to sign in again with the new second step.
+      try { await logout(); } catch { /* the local token is dropped either way */ }
+      navigate('/login', { replace: true });
+    });
+    return el('div', { class: 'auth-form' },
+      el('div', { class: 'stack stack--tight' },
+        el('p', { class: 'auth-sub' }, 'Save these now. Each one signs you in once if you lose your authenticator, and this is the only time they are shown.'),
+        el('div', { class: 'recovery-codes' }, codes.map((value) => el('code', { class: 'secret-code' }, value))),
+      ),
+      done,
+    );
+  }
+
+  const signOut = el('button', {
+    class: 'btn btn--ghost', type: 'button',
+    onClick: async () => {
+      try { await logout(); } catch { /* the local token is dropped either way */ }
+      navigate('/login', { replace: true });
+    },
+  }, 'Sign out');
+
+  swap(passwordStep());
+  return [host, el('p', { class: 'auth-alt' }, signOut)];
+}
+
 // -- shared ------------------------------------------------------------------
 
 function errorElHide(form) {
@@ -314,6 +424,16 @@ export function renderAuth(page, params) {
         verification, form, alt,
       ];
       title = 'Verify email';
+      break;
+    }
+    case 'twoStep': {
+      const [form, alt] = twoStepForm();
+      built = [
+        el('h1', { class: 'auth-title' }, 'Two-step sign-in required'),
+        el('p', { class: 'auth-sub' }, 'This instance asks every account for a second factor. Set one up to continue, or sign out.'),
+        form, alt,
+      ];
+      title = 'Two-step sign-in';
       break;
     }
     default: {

@@ -11,14 +11,19 @@ const { requirePassword } = require('./password');
 const { invalidateSessions } = require('./sessions');
 
 // The second factor itself - status, setup, enable, disable, recovery codes.
+//
+// The first three carry auth.allowUnenrolled: an account that the instance
+// requires a second factor of has to be able to reach them, or it can never
+// comply. Disabling and re-issuing stay behind the plain guard - they are not
+// part of enrolling.
 
-router.get('/2fa/status', auth, async (req, res, next) => {
+router.get('/2fa/status', auth.allowUnenrolled, auth, async (req, res, next) => {
   try {
     res.json(await twofactor.status(req.user.id));
   } catch (e) { next(e); }
 });
 
-router.post('/2fa/setup', auth, async (req, res, next) => {
+router.post('/2fa/setup', auth.allowUnenrolled, auth, async (req, res, next) => {
   try {
     if (!(await requirePassword(req, res))) return;
     const out = await twofactor.beginSetup(req.user.id, req.user.username);
@@ -26,7 +31,7 @@ router.post('/2fa/setup', auth, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/2fa/enable', auth, async (req, res, next) => {
+router.post('/2fa/enable', auth.allowUnenrolled, auth, async (req, res, next) => {
   try {
     if (!(await requirePassword(req, res))) return;
     const out = await twofactor.enable(req.user.id, (req.body || {}).code);
