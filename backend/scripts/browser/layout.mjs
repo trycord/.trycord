@@ -354,13 +354,11 @@ async function main() {
           'document.open(); document.write(' + JSON.stringify(stripped.replace('</head>', head + noMotion + '</head>'))
           + '); document.close(); true'
         );
-        // The dumped DOM boots once, at one viewport, so it carries one presentation.
-        // Narrowing that document is not the phone layout - it is the desktop shell in a
-        // small box, and the whole phone layer (mobile.css, the tab bar, the drawer) would
-        // go unmeasured. Put it in the presentation the width calls for, the way the app
-        // itself would, then measure what a phone actually gets.
-        const mode = w.width < 600 ? 'mobile' : 'desktop';
-        await b.eval('document.documentElement.dataset.presentation = ' + JSON.stringify(mode) + '; true');
+        // The dumped DOM is the Desktop module, which has one composition. The narrow
+        // widths below measure how that composition holds up when it is squeezed - the
+        // sidebar and the stage share a smaller box - not a phone arrangement: the phone
+        // is a different module with its own document, its own stylesheet and its own
+        // checks (check-mobile-render.js and check-mobile-layout.js).
         const m = await b.eval(MEASURE);
         rows.push({ w, m });
 

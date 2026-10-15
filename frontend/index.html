@@ -23,20 +23,19 @@
   <link rel="stylesheet" href="./css/app.css">
 
   <script>
-    // Two facts the first paint depends on, decided here so neither can flash:
-    // the stored theme, and whether this is the phone presentation. The phone
-    // layout is keyed to <html data-presentation="mobile"> (see css/mobile.css),
-    // and the same breakpoint presentation.js keeps in sync afterwards.
+    // One fact the first paint depends on, decided here so the theme cannot flash:
+    // the stored theme. Which module this document is - Desktop - is not decided
+    // here; a phone reader gets the Mobile document instead, and this entry hands a
+    // phone over before it builds any chrome (see js/main.js).
     (function () {
       var root = document.documentElement;
-      var read = function (key) { try { return localStorage.getItem(key); } catch (e) { return null; } };
-      var theme = read('trycord.theme');
+      var theme = null;
+      try { theme = localStorage.getItem('trycord.theme'); } catch (e) { theme = null; }
       if (!theme) {
         theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
           ? 'light' : 'trycord';
       }
       root.setAttribute('data-theme', theme);
-      root.setAttribute('data-presentation', window.innerWidth < 600 ? 'mobile' : 'desktop');
     })();
   </script>
 </head>

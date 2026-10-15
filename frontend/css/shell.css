@@ -2,16 +2,16 @@
  *
  * Reading left to right: the rail of your communities, the column that belongs to
  * whichever one is open, the conversation, and the details panel only when you ask
- * for it. Four regions of one tree, plus the phone tab bar. The rail is the one
- * column that is always a column; the rest earn their width back for the
- * conversation.
+ * for it. Four regions of one tree, plus the overlay the details panel uses when it
+ * cannot have a column. The rail is the one column that is always a column; the rest
+ * earn their width back for the conversation.
  *
  * The ember runs through it as a single thread: the pip on the live community, the
  * bar on the current destination, the underline on the open tab. One accent, one
  * meaning - this is where you are.
  *
- * The region ids are the contract: the stylesheet, every renderer and the phone
- * layer all address the same tree.
+ * The region ids are the contract: the stylesheet and every renderer address them,
+ * and the Mobile module builds its own tree with its own ids.
  */
 
 .ws {
@@ -212,8 +212,7 @@
 .stage-head-sub { font-size: var(--fs-micro); color: var(--text-3); }
 .stage-head-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 
-/* The leading control: drawer on a phone root, Back on a phone detail, collapse
-   on a desk. All three are built; the presentation and #shell[data-depth] pick. */
+/* The leading control on a desk: collapse the spine, which is a column. */
 .icon-btn {
   width: 36px; height: 36px; border-radius: var(--radius-sm);
   display: grid; place-items: center; color: var(--text-2); position: relative;
@@ -227,11 +226,7 @@
   position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%;
   background: var(--brand); border: 2px solid var(--panel);
 }
-.icon-btn.nav-toggle { display: none; flex: none; }
-.icon-btn.spine-toggle { display: none; flex: none; }
-.icon-btn.nav-back { display: none; flex: none; }
-html[data-presentation="mobile"] .nav-toggle { display: grid; }
-html[data-presentation="desktop"] .spine-toggle { display: grid; }
+.icon-btn.spine-toggle { display: grid; flex: none; }
 
 .stage-body {
   flex: 1; min-height: 0; overflow-y: auto; position: relative;
@@ -295,38 +290,12 @@ html[data-presentation="desktop"] .spine-toggle { display: grid; }
 .connection .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
 .connection[data-state="offline"] .dot { background: var(--danger); }
 
-/* -- tab bar (phone) ----------------------------------------------------- */
-.tabbar {
-  display: none; grid-column: 1 / -1; grid-row: 2; align-items: stretch;
-  background: color-mix(in srgb, var(--panel) 96%, #000);
-  border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom, 0);
-  z-index: var(--z-nav);
-}
-.tabbar-inner { display: flex; flex: 1; align-items: stretch; }
-.tab-button {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 3px; padding: 8px 0 6px; color: var(--text-3); font-size: 0.68rem; font-weight: var(--weight-strong);
-  position: relative;
-}
-.tab-button__icon { display: grid; place-items: center; }
-.tab-button svg { width: 22px; height: 22px; }
-.tab-button[aria-current="page"] { color: var(--brand); }
-.tab-button[aria-current="page"]::before {
-  content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-  width: 22px; height: 2px; border-radius: 0 0 2px 2px; background: var(--brand);
-}
-.tab-button .count-badge { position: absolute; top: 3px; left: 50%; margin-left: 4px; }
-.tab-button__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* -- the drawer scrim ---------------------------------------------------- */
+/* -- the overlay scrim --------------------------------------------------- */
 .scrim {
   position: fixed; inset: 0; z-index: var(--z-scrim);
   background: color-mix(in srgb, #000 58%, transparent); backdrop-filter: blur(2px);
   opacity: 0; pointer-events: none; transition: opacity var(--dur-2) var(--ease);
 }
-.ws[data-drawer="spine"] .scrim { opacity: 1; pointer-events: auto; }
-html.is-nav-open { overflow: hidden; }
 
 /* -- responsive ---------------------------------------------------------- */
 

@@ -33,7 +33,7 @@ const COLUMNS = [
   ['Heading', 'exactly one h1, or the surface is documented as chrome-less'],
   ['Controls', 'every button and link has an accessible name'],
   ['States', 'loading, empty, error and success states exist'],
-  ['Responsive', 'usable at phone width'],
+  ['Responsive', 'not yet - a phone is the Mobile module, not this one; this column waits on a merged mobile matrix'],
   ['a11y', 'keyboard reachable, named, reduced-motion respected'],
 ];
 
@@ -182,14 +182,13 @@ async function probePublic(port) {
   lines.push('Recorded rather than hidden, so nobody reads a dash as a pass:');
   lines.push('');
   lines.push('- **States, Responsive and a11y are not yet measured per page.** The harness');
-  lines.push('  asserts them across the whole run (every control carries an accessible name,');
-  lines.push('  and `check-mobile-layout.js` covers the Desktop module\'s phone arrangement),');
+  lines.push('  asserts them across the whole run (every control carries an accessible name),');
   lines.push('  but not per route. Filling those columns is phase one of the rebuild.');
-  lines.push('- **This matrix covers the Desktop module.** The Mobile module is a second,');
-  lines.push('  independent entry - its own document, entry module and shell over the same');
-  lines.push('  platform - with its own routes. It is rendered and checked by');
-  lines.push('  `check:mobile-render.js`, whose per-route results are not merged into this');
-  lines.push('  table.');
+  lines.push('- **This matrix covers the Desktop module, which has no phone arrangement.**');
+  lines.push('  A phone is served the Mobile module - a second, independent entry with its own');
+  lines.push('  document, entry module and shell over the same platform. It is rendered and');
+  lines.push('  checked by `check:mobile-render.js` and `check:mobile-layout.js`, whose per-route');
+  lines.push('  results are not merged into this table.');
   lines.push('- **The public site is redesigned for desktop; its phone composition is not.');
   lines.push('  It is on the canonical tokens and its desktop layout is the new one - verified');
   lines.push('  by `check-public-site.js` - but it has no purpose-built phone layout of its');

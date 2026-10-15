@@ -1,9 +1,25 @@
-// The responsive composition, measured from the built stylesheet.
+// The Mobile module's composition, measured from its built stylesheet.
 //
-// The failure this exists for: a `display` rule applied to a region the shell hides
-// with the `hidden` attribute wins against the attribute itself, so a closed panel
-// stays on screen as an undismissable box. Nothing in jsdom can see it - there is no
-// layout engine - and nothing in the render check reads the stylesheet at all.
+// A phone is not a narrowed desk. The desktop module carries no phone layer at all -
+// `frontend/css/app.css` is the desk composition and nothing else - and the Mobile
+// module is a second, independent presentation whose whole style is
+// `frontend/mobile/css/app.css`: the shared token library prepended, then the
+// module's own single layer. Nothing in jsdom can see layout, and nothing that
+// renders a mobile page reads the stylesheet, so the shape the module promises is
+// asserted here, off the file the browser actually loads.
+//
+// Two things this exists for, both of which a render check cannot catch:
+//
+//   1. A `display` rule applied to a region the shell hides with the `hidden`
+//      attribute wins against the attribute itself, so a closed sheet stays on
+//      screen as an undismissable box. The Mobile stylesheet rules this class of
+//      fault out with an `!important` `[hidden]` rule, which this asserts is there.
+//      The failure was found on the desktop sibling, so it is worth naming here
+//      rather than assuming the mobile module is immune.
+//   2. A component losing the measurement that makes it a phone affordance - a
+//      target below the thumb, a composer under the home indicator, a 14px field
+//      the software keyboard zooms into. These are the module's whole reason to
+//      exist and none of them shows up in a render tree.
 //
 //   node scripts/check-mobile-layout.js
 
@@ -11,15 +27,8 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO = path.join(__dirname, '..', '..');
-const CSS = fs.readFileSync(path.join(REPO, 'frontend', 'css', 'app.css'), 'utf8');
-
-// Regions the shell toggles with the `hidden` attribute. The spine is deliberately
-// absent: it is keyed to #shell[data-spine], not to `hidden`, because a collapsed spine
-// and a phone spine are the same element and hide themselves in their own ways.
-const HIDEABLE = [
-  'context-panel',
-  'composer-slot',
-];
+const FILE = path.join(REPO, 'frontend', 'mobile', 'css', 'app.css');
+const CSS = fs.readFileSync(FILE, 'utf8');
 
 let failures = 0;
 const ok = (label, cond, detail) => {
@@ -27,165 +36,125 @@ const ok = (label, cond, detail) => {
   else { failures++; console.log('  FAIL ' + label + (detail ? '  <- ' + detail : '')); }
 };
 
-// The name a selector's last compound part addresses, without its prefix or any
-// attribute/state suffix: ".context-panel:not([hidden])" -> "context-panel".
-function addressed(compound) {
-  return compound.replace(/^[.#]/, '').split(/[^a-zA-Z0-9_-]/)[0];
-}
+// ---- it is the module's own stylesheet -------------------------------------
+//
+// Built by frontend/scripts/build-css.js from the shared token library and
+// frontend/mobile/css/mobile.css alone. If a desktop layer were ever concatenated
+// in, the two modules would stop being separate presentations - the same fault as a
+// cross-module import, one level down.
 
-// Every rule that sets a display property, with its selector.
-const rules = [];
-const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
-let m;
-while ((m = ruleRe.exec(CSS))) {
-  const sel = m[1].trim().replace(/\s+/g, ' ');
-  if (!sel || sel.startsWith('@') || sel.startsWith('/*')) continue;
-  const body = m[2];
-  const disp = body.match(/display\s*:\s*([a-z-]+)/);
-  if (!disp) continue;
-  if (['block', 'flex', 'grid', 'inline-flex', 'inline-grid'].indexOf(disp[1]) === -1) continue;
-  const line = CSS.slice(0, m.index).split('\n').length;
-  rules.push({ sel, display: disp[1], line });
-}
+const markers = CSS.match(/\/\* ---- [A-Za-z0-9._-]+ ---- \*\//g) || [];
+ok('the mobile bundle is exactly one layer, and it is the module\'s own',
+  markers.length === 1 && markers[0] === '/* ---- mobile.css ---- */',
+  'layer markers: ' + (markers.join(', ') || '(none)'));
 
-// A rule that shows a hideable region must be scoped away from the hidden state.
+ok('the shared token library is prepended to it',
+  /--tc-brand\s*:/.test(CSS),
+  'no --tc-brand in the bundle, so the token library was not prepended');
+
+const DESKTOP_SELECTORS = ['.community-rail', '.spine', '.tabbar', '.context-panel',
+  '.place-navigation', 'data-presentation'];
+const leaked = DESKTOP_SELECTORS.filter((s) => CSS.includes(s));
+ok('no desktop composition leaks into the mobile stylesheet',
+  leaked.length === 0,
+  'desktop selectors present: ' + leaked.join(', '));
+
+// ---- a hidden region stays hidden ------------------------------------------
+//
 // `hidden` is a presentational attribute with a UA rule of `display: none`, and an
-// author rule of any other display value beats it.
+// author rule of any other display value beats it. `!important` makes the attribute
+// authoritative no matter what a component rule says, which is the one-line reason
+// the mobile module cannot grow the closed-sheet bug.
+
+const hiddenRule = /\[hidden\]\s*\{([^}]*)\}/.exec(CSS);
+ok('the hidden attribute outranks every component rule',
+  !!hiddenRule && /display\s*:\s*none\s*!important/.test(hiddenRule[1]),
+  hiddenRule ? '[hidden] is "' + hiddenRule[1].trim() + '"' : 'no [hidden] rule in the mobile stylesheet');
+
+// ---- the shell -------------------------------------------------------------
 //
-// Only a selector whose last compound part *is* the region counts, not one that merely
-// names it: the children of a hidden region are hidden along with it, so guarding every
-// descendant would be guarding against a failure that cannot happen.
-const unguarded = rules.filter((r) => {
-  // A grouped selector is several rules in one block, and the guard has to be judged
-  // per branch rather than on the joined text - ".a, .context-panel" is not the
-  // context-panel rule.
-  const branches = r.sel.split(',').map((b) => b.trim()).filter(Boolean);
-  return branches.some((b) => {
-    const lastCompound = b.split(/\s+/).pop();
-    return HIDEABLE.indexOf(addressed(lastCompound)) !== -1 && !b.includes(':not([hidden])');
-  });
-});
+// A fixed app bar and a fixed tab bar around a single scrolling view, on one
+// column, full device height. This is the composition the module's shell builds and
+// the grid it depends on.
 
-ok('every rule that shows a hideable region is scoped away from [hidden]',
-  unguarded.length === 0,
-  unguarded.map((r) => 'line ' + r.line + ': ' + r.sel).join(' | '));
+function ruleBody(selector) {
+  // The first block whose selector list contains the exact selector. Comments
+  // between rules are part of the text a naive scan captures, so they are stripped
+  // before the selector is split.
+  const re = /([^{}]+)\{([^{}]*)\}/g;
+  let m;
+  while ((m = re.exec(CSS))) {
+    const sel = m[1].replace(/\/\*[\s\S]*?\*\//g, ' ');
+    const branches = sel.split(',').map((b) => b.trim());
+    if (branches.includes(selector)) return m[2];
+  }
+  return null;
+}
 
-// ---- the desk composition --------------------------------------------------
+const app = ruleBody('.m-app');
+ok('the mobile shell is a full-height, single-column grid',
+  !!app && /grid-template-rows\s*:/.test(app) && /100dvh/.test(app),
+  app ? '.m-app is "' + app.trim().replace(/\s+/g, ' ') + '"' : 'no .m-app rule');
+
+const tabs = ruleBody('.m-tabs');
+ok('the tab bar is the shell\'s own row and clears the home indicator',
+  !!tabs && /min-height\s*:\s*var\(--m-tabbar-h\)/.test(tabs)
+  && /env\(\s*safe-area-inset-bottom/.test(tabs),
+  tabs ? '.m-tabs is "' + tabs.trim().replace(/\s+/g, ' ') + '"' : 'no .m-tabs rule');
+
+ok('the shell clears the top safe area',
+  !!app && /env\(\s*safe-area-inset-top/.test(app),
+  'the app bar would sit under a notch');
+
+const view = ruleBody('.m-view');
+ok('the view is the one scrolling region',
+  !!view && /overflow-y\s*:\s*auto/.test(view),
+  view ? '.m-view does not scroll' : 'no .m-view rule');
+
+// ---- the composer ----------------------------------------------------------
 //
-// The rail, the column and the stage, three tracks, until the context panel is
-// asked for. The rail is the communities list, the column belongs to the open
-// place, the stage is the conversation. A grid that has lost the rail track is a
-// sidebar and a page again - the dashboard the client is not.
-ok('the resting shell is the rail, the column and the stage',
-  /\.ws\s*\{[^}]*grid-template-columns\s*:\s*var\(--rail-w\)\s+var\(--spine-w\)\s+minmax\(0,\s*1fr\)/.test(CSS),
-  'the base grid is not the rail, column and stage the shell builds');
+// The footer a conversation hands its tab-bar row to, and the field the software
+// keyboard opens into. A 16px field is what stops iOS zooming the whole page on
+// focus, and the bottom inset is what keeps the send button off the home indicator.
 
-ok('the rail is the far-left column, not a second sidebar',
-  /\.community-rail\s*\{[^}]*grid-column\s*:\s*1/.test(CSS)
-  && /\.spine\s*\{[^}]*grid-column\s*:\s*2/.test(CSS)
-  && /\.stage\s*\{[^}]*grid-column\s*:\s*3/.test(CSS),
-  'the rail, the column and the stage do not occupy three tracks, so two regions share one');
+const composer = ruleBody('.m-composer');
+ok('the composer clears the home indicator',
+  !!composer && /env\(\s*safe-area-inset-bottom/.test(composer),
+  composer ? '.m-composer has no bottom safe-area inset' : 'no .m-composer rule');
 
-ok('the context panel takes a column only while it is open',
-  /\.ws\[data-context="open"\]\s*\{[^}]*var\(--context-w\)/.test(CSS),
-  'no rule gives the open context panel a column of its own');
+const field16 = /font-size\s*:\s*16px/.test(ruleBody('.m-input') || '')
+  && /font-size\s*:\s*16px/.test(ruleBody('.m-composer__input') || '');
+ok('the text fields are 16px, so a phone keyboard does not zoom into them',
+  field16,
+  'a field below 16px makes iOS zoom the page rather than the field');
 
-ok('a collapsed spine keeps its track rather than removing it',
-  /\.ws\[data-spine="collapsed"\]\s*\{[^}]*grid-template-columns\s*:\s*var\(--rail-w\)\s+0\s+minmax\(0,\s*1fr\)/.test(CSS),
-  'the stage would move out of its column when the spine collapses');
+// ---- touch targets ---------------------------------------------------------
 
-// The two stage-head controls, each shown at the size where it means something. The
-// drawer control on a desk opens a drawer that is already a column; the collapse
-// control on a phone collapses a drawer. Both are .icon-btn, so the hiding rule has to
-// outrank .icon-btn's own display: grid - a bare .nav-toggle loses that tie and both
-// controls end up on screen at every width.
-ok('the collapse control is a desk affordance',
-  /\.icon-btn\.spine-toggle\s*\{[^}]*display\s*:\s*none/.test(CSS)
-  && /html\[data-presentation="desktop"\]\s+\.spine-toggle\s*\{[^}]*display\s*:\s*grid/.test(CSS),
-  'the collapse control is shown where the spine is not a column, or loses the display tie to .icon-btn');
+ok('the module names a thumb-sized target and uses it',
+  /--m-tap\s*:\s*44px/.test(CSS)
+  && /min-height\s*:\s*var\(--m-tap\)/.test(CSS),
+  'no 44px tap token, or nothing spends it - a list of sub-thumb controls');
 
-ok('the drawer control is a phone affordance',
-  /\.icon-btn\.nav-toggle\s*\{[^}]*display\s*:\s*none/.test(CSS)
-  && /html\[data-presentation="mobile"\]\s+\.nav-toggle\s*\{[^}]*display\s*:\s*grid/.test(CSS),
-  'the drawer control is shown where the spine is a column, or loses the display tie to .icon-btn');
-
-// ---- the phone composition -------------------------------------------------
+// ---- overlays --------------------------------------------------------------
 //
-// The phone is its own layer (css/mobile.css), keyed to
-// <html data-presentation="mobile">, the breakpoint presentation.js owns and the
-// bootstrap in index.html writes before the first paint. The desk layers carry no
-// phone rules, so a phone rule cannot drift away from the drawer it describes.
-// PHONE is the built stylesheet with that prefix removed, so the checks below
-// read as the phone rules themselves.
-const PHONE = CSS.replace(/html\[data-presentation="mobile"\]\s*/g, '');
+// A sheet rises from the bottom with a rounded top edge; it does not float as a
+// card in the middle of the viewport the way the desk's dialog does.
 
-// Drawer on a tab root, Back on a detail; #shell[data-depth] picks one.
-ok('the back control is the phone detail affordance',
-  /\.icon-btn\.nav-back\s*\{[^}]*display\s*:\s*none/.test(CSS)
-  && /\.ws\[data-depth="detail"\]\s+\.nav-back\s*\{[^}]*display\s*:\s*grid/.test(PHONE),
-  'Back is shown on a tab root, or loses the display tie to .icon-btn');
+const sheet = ruleBody('.m-sheet');
+ok('an overlay is a sheet that rises from the bottom',
+  !!sheet && /bottom\s*:\s*0/.test(sheet)
+  && /border-top-left-radius\s*:/.test(sheet) && /border-top-right-radius\s*:/.test(sheet),
+  sheet ? '.m-sheet is not anchored as a bottom sheet' : 'no .m-sheet rule');
 
-// A push and a back must not animate the same way.
-ok('a phone screen slides in the direction it was navigated',
-  /\.screen\.nav-forward\s*\{[^}]*animation/.test(PHONE)
-  && /\.screen\.nav-back\s*\{[^}]*animation/.test(PHONE),
-  'a push and a back would render the same, so the direction is not carried');
+// ---- motion ----------------------------------------------------------------
+//
+// The brand's motion is not optional, so the one preference that must be honoured
+// is the one that turns it off.
 
-ok('the phone presentation is one layer, and it is the last one',
-  /html\[data-presentation="mobile"\]/.test(CSS)
-  && CSS.slice(CSS.lastIndexOf('/* ---- ')).startsWith('/* ---- mobile.css ---- */'),
-  'the phone composition is not a single layer built after every desk layer');
-
-ok('no phone layout is left behind in a width media query',
-  !/@media\s*\(max-width:\s*(?:599\.98|600)px\)/.test(CSS),
-  'a phone rule is still a max-width patch over the desk layers');
-
-// The spine is off-canvas rather than a column, the tab bar is what carries the
-// primary destinations, and the context panel is a sheet over the stage.
-ok('the spine is off-canvas on a phone',
-  /\.spine\s*\{[^}]*transform\s*:\s*translateX\(-104%\)/.test(PHONE),
-  'the spine is still in the flow on a phone, so it and the stage share the width');
-
-ok('the phone grid is one column',
-  /\.ws\[data-spine="collapsed"\]\[data-context="open"\]\s*\{[^}]*grid-template-columns\s*:\s*minmax\(0,\s*1fr\)/.test(PHONE),
-  'a phone still reserves a navigation column');
-
-ok('the tab bar is anchored as the shell\'s last row on a phone',
-  /\.tabbar\s*\{[^}]*grid-row\s*:\s*2/.test(CSS)
-  && /\.tabbar\s*\{[^}]*grid-column\s*:\s*1\s*\/\s*-1/.test(CSS)
-  && /\.tabbar\s*\{[^}]*display\s*:\s*flex/.test(PHONE),
-  'the tab bar is not the full-width last row of the phone shell');
-
-ok('the context panel is a sheet on a phone',
-  /\.context-panel:not\(\[hidden\]\)\s*\{[^}]*inset\s*:\s*0/.test(PHONE),
-  'the context panel still takes part of the width on a phone');
-
-ok('below a wide desk the context panel overlays instead of taking a column',
-  /@media\s*\(max-width:\s*1280px\)/.test(CSS)
-  && /\.context-panel\s*\{[^}]*position\s*:\s*fixed/.test(CSS),
-  'a narrow desk loses conversation width to a panel that could overlay it');
-
-// The content phone composition: the controls a thumb lands on, fields that do
-// not zoom, and a composer that clears the home indicator.
-ok('a field is 16px on a phone, so iOS does not zoom when it takes focus',
-  /\.input,\s*\.textarea,\s*\.select\s*\{[^}]*font-size\s*:\s*16px/.test(PHONE),
-  'a phone field below 16px makes iOS zoom the page on focus');
-
-ok('a dialog rises as a sheet on a phone rather than floating',
-  /\.dialog\s*\{[^}]*border-radius:\s*var\(--radius-xl\)\s+var\(--radius-xl\)\s+0\s+0/.test(PHONE),
-  'the dialog is still a floating card on a phone');
-
-ok('a menu is clamped to the viewport it opens in',
-  /\.menu\s*\{[^}]*max-width:\s*calc\(100vw/.test(PHONE),
-  'an anchored menu can open wider than the phone');
-
-ok('the composer sits above the tab bar and honours the bottom inset',
-  /\.composer-slot\s*\{[^}]*env\(\s*safe-area-inset-bottom/.test(PHONE),
-  'the composer does not clear the home indicator or the tab bar');
-
-ok('the message actions open on a tap where there is no hover',
-  /\.msg--hovered\s+\.msg-actions\s*\{[^}]*opacity\s*:\s*1/.test(CSS),
-  'a phone cannot reach a message action that only opens on hover');
+ok('reduced motion is honoured across the module',
+  /@media\s*\(prefers-reduced-motion:\s*reduce\)/.test(CSS)
+  && /animation-duration\s*:\s*[^;]*!important/.test(CSS),
+  'no reduced-motion rule that actually disables the animation');
 
 console.log(`\n  mobile layout check ${failures ? 'FAILED - ' + failures + ' problem(s)' : 'passed'}`);
 process.exit(failures ? 1 : 0);

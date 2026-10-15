@@ -7,14 +7,14 @@
 // has somewhere to unsubscribe.
 
 import { matchRoute, renderPage } from '../packages/registry.js';
-import { currentRoute, currentQuery, navigate, navigationDirection } from '../packages/nav.js';
+import { currentRoute, currentQuery, navigate } from '../packages/nav.js';
 import {
   State, serverById, channelById, refreshServer, refreshServers, refreshServerTree,
   signedIn,
 } from '../packages/store.js';
 import {
   shellRoot, setStage, setStageHead, setComposer, setContextPanel, setPlaceNav,
-  setTitle, refreshChrome, closeDrawer, beginNavigation,
+  setTitle, refreshChrome,
 } from './shell.js';
 import { buildSidebar } from './sidebars.js';
 import { failure } from './views/util.js';
@@ -143,8 +143,6 @@ function firstChannel(serverId) {
 export async function run() {
   const seq = ++generation;
   const route = currentRoute();
-  // Read now: the awaits below can let another navigation land.
-  const direction = navigationDirection();
   const match = matchRoute(route);
 
   if (activeCleanup) {
@@ -221,8 +219,6 @@ export async function run() {
     }
   }
 
-  closeDrawer();
-
   let sidebar = null;
   try { sidebar = buildSidebar(page.sidebar, ctx, page); }
   catch { sidebar = null; }
@@ -236,9 +232,6 @@ export async function run() {
     return;
   }
   if (seq !== generation) return;
-
-  // Slide before the new screen lands; raw surfaces replace the whole document.
-  if (!(result && result.raw)) beginNavigation(direction);
 
   let mounted;
   try {

@@ -7,13 +7,13 @@
 
 import { mountShell, refreshChrome, setConnection, onSignOut } from './shell.js';
 import { applyTheme } from '../packages/theme.js';
-import { updateFromViewport, wireNav, wireDrawerGestures } from './presentation.js';
+import { preferredEntry, siblingMount } from '../packages/chooser.js';
 import { TrycordConfig } from '../packages/config.js';
 import {
   State, on as onStore, loadInstance, loadLegal, loadSession, logout,
   refreshServers, refreshDms, refreshFriends, refreshNotifications,
 } from '../packages/store.js';
-import { installLinkHandler, installPopStateHandler, navigate } from '../packages/nav.js';
+import { installLinkHandler, installPopStateHandler, navigate, BASE } from '../packages/nav.js';
 import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../packages/realtime.js';
 import { bind } from '../packages/registry.js';
 import { RENDERERS } from './views/index.js';
@@ -24,10 +24,25 @@ function mount() {
   const host = document.getElementById('app');
   if (host) host.appendChild(root);
   else document.body.appendChild(root);
-  updateFromViewport();
-  wireNav();
-  wireDrawerGestures();
   refreshChrome();
+}
+
+// A phone belongs to the Mobile module. The choice is made once, here, from the
+// viewport and the reader's remembered decision, and it is one document load: the
+// desktop tree is never initialized only to be hidden, and no responsive layer
+// reshapes it into a phone. Equal answers stay put, so the two entries cannot
+// bounce a reader between them.
+//
+// Only the front door decides. A deep link is already module-addressed, so
+// following one never bounces the reader into the other module - the same rule the
+// Mobile entry applies to its own deep links.
+function handoffToMobile() {
+  if (preferredEntry('desktop') !== 'mobile') return false;
+  const base = BASE || '';
+  const here = String(window.location.pathname || '').replace(/\/index\.html$/, '/');
+  if (here !== base + '/' && here !== base) return false;
+  window.location.replace(siblingMount('desktop', BASE) + '/');
+  return true;
 }
 
 function setSession(state) {
@@ -77,6 +92,10 @@ function wireSignOut() {
 }
 
 async function boot() {
+  // Before any chrome is built: a reader the chooser sends to Mobile must never see
+  // the desktop shell flash first.
+  if (handoffToMobile()) return;
+
   applyTheme();
 
   // The chrome is mounted before anything is fetched. A slow or unreachable

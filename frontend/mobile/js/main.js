@@ -16,7 +16,7 @@ import {
 import { installLinkHandler, installPopStateHandler, BASE, setBase, mountFromModuleUrl } from '../../packages/nav.js';
 import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../../packages/realtime.js';
 import { bind } from '../../packages/registry.js';
-import { readOverride } from '../../packages/chooser.js';
+import { readOverride, siblingMount } from '../../packages/chooser.js';
 import { RENDERERS } from './views/index.js';
 import { run } from './router.js';
 
@@ -35,8 +35,7 @@ function handoff() {
   const here = String(window.location.pathname || '').replace(/\/index\.html$/, '/');
   if (here !== base + '/' && here !== base) return false;
   if (readOverride() !== 'desktop') return false;
-  // The desktop entry is this module's parent: /app/mobile -> /app, /mobile -> /.
-  window.location.replace((base.replace(/\/mobile$/, '') || '') + '/');
+  window.location.replace(siblingMount('mobile', BASE) + '/');
   return true;
 }
 

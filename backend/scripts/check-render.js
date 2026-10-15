@@ -774,10 +774,8 @@ async function settle(window, ms = 400) {
     console.log('\n  the spine');
 
     const { renderAllChrome: paintChrome } = await import(pathToUrl(path.join(CLIENT, 'js/shell.js')));
-    const { updateFromViewport } = await import(pathToUrl(path.join(CLIENT, 'js/presentation.js')));
-    const { globalPages, mobilePages } = registry;
+    const { globalPages } = registry;
     await setViewport(window, 1440, 900);
-    updateFromViewport();
     await visit(window, document, Router, concrete('/home', world), base);
     paintChrome();
     await settle(window, 200);
@@ -942,9 +940,8 @@ async function settle(window, ms = 400) {
       'the context panel is nested or starts open, so it covers the stage before it is asked for');
 
     const overlay = document.getElementById('desktop-backdrop');
-    const tabbar = document.getElementById('mobile-tab-navigation');
-    ok('the drawer backdrop and the tab bar are not grid items',
-      !!overlay && !!tabbar && shellEl.contains(overlay) && shellEl.contains(tabbar),
+    ok('the overlay backdrop is not a grid item',
+      !!overlay && shellEl.contains(overlay),
       'an overlay that takes a grid cell shifts the workspace out of its column');
 
     // ---- accessibility, over the pages that were just rendered ----
@@ -1104,55 +1101,6 @@ async function settle(window, ms = 400) {
     ok('a page recovers once the endpoint does', recovered.errors === 0,
       'still showing an error after the backend was healthy again');
 
-    // ---- the phone, at the widths people actually use ----
-    //
-    // The desktop sweep above is the wrong shape to judge a phone by, and a phone is
-    // half the product. What is asserted is the composition rather than the pixels,
-    // because jsdom cannot measure: the shell is told it is on a phone, the navigation
-    // is the one the registry defines, and nothing that only makes sense on a wide
-    // screen is the only way into a surface.
-    console.log('\n  the phone composition');
-    for (const [w, h, name] of [[360, 740, 'small phone'], [390, 844, 'phone'], [834, 1112, 'tablet']]) {
-      await setViewport(window, w, h);
-      updateFromViewport();
-      await visit(window, document, Router, concrete('/home', world), base);
-      paintChrome();
-      await settle(window, 200);
-      const tabBar = document.getElementById('mobile-tab-navigation');
-      const tabs = tabBar ? tabBar.querySelectorAll('.tab-button').length : 0;
-      // presentation.js draws its line at 600px. Asserted on both sides of it, because
-      // "is it a phone layout" is a question with one answer and the answer should follow
-      // the breakpoint rather than a guess about which widths feel narrow.
-      //
-      // The first version of this read data-presentation off #shell, where it does not
-      // live - it is on <html> - so the attribute was undefined, undefined is not
-      // 'desktop', and the assertion passed at every width including ones it was
-      // supposed to fail.
-      const mode = document.documentElement.dataset.presentation;
-      const want = w < 600 ? 'mobile' : 'desktop';
-      ok(name + ' (' + w + 'x' + h + '): presentation is ' + want, mode === want,
-        'data-presenta' + 'tion=' + (mode || '(unset)'));
-      if (w < 600) {
-        ok(name + ': the tab bar carries the registry destinations', tabs > 0,
-          'no tab buttons rendered');
-        ok(name + ': the navigation drawer is available from the header',
-          !!document.querySelector('#context-header .nav-toggle'),
-          'no .nav-toggle in the context header');
-        // On a phone the spine is a drawer rather than a column. It is the same region
-        // as desktop - only the presentation differs - so the same ids have to still be
-        // in the tree.
-        ok(name + ': the spine and its navigation are the same regions as desktop',
-          !!document.getElementById('spine')
-          && !!document.getElementById('place-navigation'),
-          'a phone-only navigation tree was built instead of reusing the shell');
-      }
-    }
-
-    // Back to a desktop width before the theme checks, which assert on the shell.
-    await setViewport(window, 1440, 900);
-    updateFromViewport();
-    await settle(window, 100);
-
     // ---- what a page shows while it is waiting ----
     //
     // "Do not make the page appear complete before its data exists" is a rule about the
@@ -1274,28 +1222,6 @@ async function settle(window, ms = 400) {
     }
     ok('no visible control is inert', dead.length === 0, dead.slice(0, 5).join(' | '));
     console.log(`    ${dead.length} inert control(s) across ${targets.length} pages`);
-
-    // ---- the phone composition ----
-    //
-    // The navigation on a phone is derived from the registry, so the thing worth checking
-    // is that it is the same destinations and that they render as tabs with names - not
-    // that there are five of them, which would pass just as well if they were five
-    // arbitrary buttons.
-    const expected = registry.mobilePages().map((pg) => pg.nav.tabLabel || pg.nav.short);
-    const tabBar = document.getElementById('mobile-tab-navigation');
-    const tabLabels = tabBar
-      ? [...tabBar.querySelectorAll('.tab-button__label')].map((n) => n.textContent.trim())
-      : [];
-
-    ok('the phone tab bar carries the destinations the registry defines',
-      expected.length > 0 && tabLabels.length === expected.length
-        && expected.every((label) => tabLabels.includes(label)),
-      'expected ' + expected.join(', ') + ' - got ' + (tabLabels.join(', ') || 'nothing'));
-
-    const navToggle = document.querySelector('#context-header .nav-toggle');
-    ok('the phone header has a navigation control that reports its state',
-      !!navToggle && navToggle.hasAttribute('aria-expanded'),
-      navToggle ? 'no aria-expanded' : 'no nav-toggle in the context header');
 
     // ---- themes ----
     //
