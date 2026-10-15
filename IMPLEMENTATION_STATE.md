@@ -90,6 +90,13 @@ the audit.
   `backend/scripts/check-frontend-modules.js` (the boundary), `backend/scripts/check-mobile-render.js`
   (the second module renders). The old single responsive tree (`js/presentation.js` +
   `css/mobile.css`) is the Desktop module's phone arrangement and is retired in Phase F.
+- **A render check is not optional for a second module.** `check-mobile-render`
+  found that `screen(...)` accepted one child while every mobile renderer passed
+  several, so each screen drew its hero and silently dropped the rest. Parsing,
+  import-resolution and stylesheet checks all stayed green. Evidence:
+  `frontend/mobile/js/views/util.js`, and the "eleven settings sections render eleven
+  distinct screens" assertion that is now its regression test. This is why the mobile
+  module has its own jsdom render check rather than relying on the desktop one.
 - **The client names exactly one backend, in one place.** `check-backend-agnostic.js`
   enforces that only `packages/config.js` mentions a production host, that one module
   stores the chosen address, that one module attaches the `Authorization` header, that
