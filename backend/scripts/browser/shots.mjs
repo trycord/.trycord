@@ -239,112 +239,56 @@ async function main() {
       }
     }
 
-    // The navigation open, at the widths where it is not a docked column. On a
-    // phone the whole spine - the place switcher, the global destinations and the
-    // place's own navigation - lives in this drawer, so a screenshot set that never
-    // opens it cannot tell a working mobile shell from a deleted one - which is
-    // exactly how the sidebar went missing once without the pictures showing it.
+    // The phone surfaces are the Mobile module: a second document at /mobile, not
+    // the desktop shell narrowed. What lived here was a drawer on the desktop
+    // shell - the phone arrangement the Desktop module no longer has - so this
+    // loads the mobile document and photographs its shell at the widths that
+    // matter. A phone's whole navigation is its tab bar, and a screenshot set that
+    // never shows it cannot tell a working mobile module from a deleted one, which
+    // is exactly how the sidebar once went missing unseen.
     for (const [w, h, tag] of SIZES) {
       if (w >= 1000) continue;
       await page.setViewport(w, h);
-      await page.goto(ORIGIN + routes.channel, { waitMs: 2300 });
+      await page.goto(ORIGIN + '/mobile/', { waitMs: 2300 });
       await wait(900);
-      await page.eval(`const b = document.querySelector('.nav-toggle'); if (b) b.click(); return 1;`);
-      await wait(700);
-      const file = OUT + '/' + tag + '-nav-open.png';
+      const file = OUT + '/' + tag + '-mobile.png';
       await page.shot(file);
       written.push(file);
 
-      // What is actually in the drawer, and whether all of it fits above the fold.
-      const nav = await page.eval(`
+      // What the module's navigation actually is, and whether the shell fits the
+      // viewport it was handed.
+      const shell = await page.eval(`
         const NL = String.fromCharCode(10);
-        const spine = document.querySelector('#spine');
-        const r = spine ? spine.getBoundingClientRect() : null;
-        const vis = (sel) => {
-          const e = document.querySelector(sel);
-          if (!e) return sel + ' = MISSING';
-          const cs = getComputedStyle(e);
-          const b = e.getBoundingClientRect();
-          return sel + ' ' + cs.display + ' ' + cs.visibility
-            + ' x=' + Math.round(b.left) + '..' + Math.round(b.right)
-            + ' y=' + Math.round(b.top) + '..' + Math.round(b.bottom)
-            + (b.height > 0 ? '' : ' ZERO-H');
-        };
-        const COMMUNITY = '#place-navigation .nav-item:not(.nav-item--channel):not(.nav-item--dm)';
-        const dests = [...document.querySelectorAll('#global-navigation .nav-item')].map((e) => e.textContent.trim());
-        const comms = [...document.querySelectorAll(COMMUNITY)].map((e) => e.textContent.trim());
-        const chans = [...document.querySelectorAll('.nav-item--channel')].map((e) => e.textContent.trim());
-        const sb = document.querySelector('#place-navigation');
-        const sbb = sb ? sb.getBoundingClientRect() : null;
-        const scrollable = [...document.querySelectorAll('.spine-place, .members-scroll')]
-          .map((e) => e.scrollHeight > e.clientHeight + 1
-            ? e.className.split(' ')[0] + ' scrolls ' + e.scrollHeight + '/' + e.clientHeight : '');
+        const tabs = document.getElementById('m-tabs');
+        const labels = tabs ? [...tabs.querySelectorAll('.m-tab__label')].map((n) => n.textContent.trim()) : [];
+        const current = tabs ? tabs.querySelector('.m-tab[aria-current="page"]') : null;
+        const view = document.querySelector('.m-view');
+        const vb = view ? view.getBoundingClientRect() : null;
         return [
-          'drawer x=' + (r ? Math.round(r.left) + '..' + Math.round(r.right) : '?')
-            + ' y=' + (r ? Math.round(r.top) + '..' + Math.round(r.bottom) : '?'),
-          vis('#spine'), vis('.spine-place'), vis('#place-navigation'),
-          'place navigation box x=' + (sbb ? Math.round(sbb.left) + '..' + Math.round(sbb.right) : '?')
-            + ' y=' + (sbb ? Math.round(sbb.top) + '..' + Math.round(sbb.bottom) : '?'),
-          'destinations(' + dests.length + '): ' + dests.join(' | '),
-          'communities(' + comms.length + '): ' + comms.join(' | '),
-          'channels(' + chans.length + '): ' + chans.join(' | '),
-          scrollable.filter(Boolean).join('; ') || 'everything fits, no inner scroll',
+          'document ' + (document.documentElement.dataset.platform || '(no data-platform)'),
+          'tabs(' + labels.length + '): ' + (labels.join(' | ') || 'MISSING'),
+          'current ' + (current ? current.textContent.trim() : 'none'),
+          'view x=' + (vb ? Math.round(vb.left) + '..' + Math.round(vb.right) : '?')
+            + ' y=' + (vb ? Math.round(vb.top) + '..' + Math.round(vb.bottom) : '?'),
+          'overflow=' + (document.documentElement.scrollWidth > window.innerWidth + 1),
         ].join(NL);
       `);
-      console.log('  ' + tag.padEnd(6) + 'nav-open');
-      console.log(String(nav).split(String.fromCharCode(10)).map((x) => '          ' + x).join(String.fromCharCode(10)));
+      console.log('  ' + tag.padEnd(6) + 'mobile');
+      console.log(String(shell).split(String.fromCharCode(10)).map((x) => '          ' + x).join(String.fromCharCode(10)));
 
-      // Closing has to work as well as opening, or the drawer is a trap. Click the
-      // scrim the way a person does and check the navigation went away and the
-      // conversation underneath is whole again.
-      await page.eval(`const b = document.querySelector('#desktop-backdrop'); if (b) b.click(); return 1;`);
+      // The community tree and the account controls live on the menu page; a phone
+      // reaches it from the tab bar, so it is photographed and read too.
+      await page.goto(ORIGIN + '/mobile/menu', { waitMs: 1800 });
       await wait(700);
-      const closed = await page.eval(`
-        const spine = document.querySelector('#spine');
-        const b = spine ? spine.getBoundingClientRect() : null;
-        const header = document.querySelector('#context-header');
-        const hb = header ? header.getBoundingClientRect() : null;
-        return 'closed: spine x=' + (b ? Math.round(b.left) : '?')
-          + ' width=' + (b ? Math.round(b.width) : '?')
-          + ' | header x=' + (hb ? Math.round(hb.left) : '?')
-          + ' w=' + (hb ? Math.round(hb.width) : '?')
-          + ' | scrim=' + (document.querySelector('#desktop-backdrop') ? 'present' : 'gone')
-          + ' | composer=' + (document.querySelector('.composer') ? 'present' : 'MISSING')
-          + ' | messages=' + document.querySelectorAll('.msg').length
+      const menuFile = OUT + '/' + tag + '-mobile-menu.png';
+      await page.shot(menuFile);
+      written.push(menuFile);
+      const menu = await page.eval(`
+        const rows = [...document.querySelectorAll('.m-row')].map((e) => e.textContent.replace(/\\s+/g, ' ').trim());
+        return 'rows(' + rows.length + '): ' + (rows.slice(0, 12).join(' | ') || 'none')
           + ' | overflow=' + (document.documentElement.scrollWidth > window.innerWidth + 1);
       `);
-      console.log('          ' + closed);
-
-      // Switching community from the drawer: the place navigation under it has to
-      // become the new community's, not the old one's with a new name on it.
-      const before = await page.eval(`
-        const sb = document.querySelector('#place-navigation');
-        return (sb ? sb.textContent.replace(/\\s+/g, ' ').trim().slice(0, 90) : 'MISSING');`);
-      await page.eval(`const b = document.querySelector('.nav-toggle'); if (b) b.click(); return 1;`);
-      await wait(600);
-      const switched = await page.eval(`
-        const comms = [...document.querySelectorAll('#place-navigation .nav-item:not(.nav-item--channel):not(.nav-item--dm)')];
-        const other = comms.find((e) => !e.classList.contains('is-active'));
-        if (!other) return 'only one community seeded, switching not exercised';
-        other.click();
-        return 'clicked ' + other.textContent.trim();`);
-      await wait(1800);
-      const after = await page.eval(`
-        const sb = document.querySelector('#place-navigation');
-        const spine = document.querySelector('#spine');
-        return 'route=' + location.pathname
-          + ' | spine=' + getComputedStyle(spine).display
-          + ' | place-nav=' + (sb ? sb.textContent.replace(/\\s+/g, ' ').trim().slice(0, 90) : 'MISSING');`);
-      console.log('          switch: ' + switched);
-      console.log('            before: ' + before);
-      console.log('            after:  ' + after);
-      // Only meaningful when there was a second community to switch to. With one
-      // seeded there is nothing to click, and warning about it every run trains
-      // you to ignore the warning.
-      if (!/only one community/.test(switched) && after.startsWith('route=/c/')
-          && before && after.includes(before)) {
-        console.log('          WARNING the place navigation did not change with the community');
-      }
+      console.log('          ' + menu);
     }
 
     // Routing is the one thing that has to be right without a screenshot to look

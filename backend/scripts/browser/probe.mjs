@@ -30,7 +30,7 @@ const PROBE = String.raw`(() => {
       + ' disp=' + s.display;
   };
   const root = getComputedStyle(document.documentElement);
-  out.push('presentation=' + document.documentElement.dataset.presentation
+  out.push('platform=' + (document.documentElement.dataset.platform || 'desktop')
     + ' theme=' + (document.documentElement.dataset.theme || '-')
     + ' viewport=' + document.documentElement.clientWidth + 'x' + document.documentElement.clientHeight);
   out.push('vars: --app-bg=' + root.getPropertyValue('--app-bg').trim()
@@ -39,7 +39,7 @@ const PROBE = String.raw`(() => {
     + ' --spine-w=' + root.getPropertyValue('--spine-w').trim()
     + ' --context-w=' + root.getPropertyValue('--context-w').trim());
   out.push(box('body'));
-  for (const sel of ['#app','#shell','#community-rail','#spine','#place-navigation','#global-navigation','#trycord-main','#context-header','#view-root','#context-panel','.tabbar','.ws','.stage','.stage-head']) {
+  for (const sel of ['#app','#shell','#community-rail','#spine','#place-navigation','#global-navigation','#trycord-main','#context-header','#view-root','#context-panel','.ws','.stage','.stage-head']) {
     out.push(box(sel));
   }
   // Colour inventory: distinct computed colours actually painted by text.
@@ -101,7 +101,6 @@ async function main() {
       await new Promise((r) => setTimeout(r, 50));
       await b.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
       await b.eval('document.open(); document.write(' + JSON.stringify(withHead) + '); document.close(); true');
-      await b.eval('document.documentElement.dataset.presentation = ' + JSON.stringify(phone ? 'mobile' : 'desktop') + '; true');
       if (theme) await b.eval('document.documentElement.dataset.theme = ' + JSON.stringify(theme) + '; true');
       await new Promise((r) => setTimeout(r, 100));
       console.log('\n==== ' + id + ' @' + width + ' ====');
