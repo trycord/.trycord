@@ -75,6 +75,15 @@ function wireSignOut() {
 async function boot() {
   applyTheme();
 
+  // The chrome is mounted before anything is fetched. A slow or unreachable
+  // backend must never leave the page blank while a request is outstanding, so
+  // the shell paints first and the data fills in behind it.
+  mount();
+  bind(RENDERERS);
+  wireNavigation();
+  wireChrome();
+  wireSignOut();
+
   try { await TrycordConfig.loadStaticConfig(); } catch { /* the backend resolves from the origin */ }
 
   // A ?api= link is offered, never taken silently: the reader confirms, and the
@@ -88,12 +97,6 @@ async function boot() {
     if (useIt) TrycordConfig.setApiUrl(hintedBackend);
     TrycordConfig.clearQueryBackend();
   }
-
-  mount();
-  bind(RENDERERS);
-  wireNavigation();
-  wireChrome();
-  wireSignOut();
 
   await Promise.allSettled([loadInstance(), loadLegal()]);
 

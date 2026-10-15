@@ -59,8 +59,17 @@ export async function loadStaticConfig() {
   if (staticLoaded) return staticBackend;
   staticLoaded = true;
   if (typeof fetch !== 'function') return null;
+
+  // The build's own hint is bounded: a fetch that never settles would hold the
+  // boot sequence open forever, and the backend resolves from the serving origin
+  // anyway, so giving up on the hint costs nothing.
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), 8000) : null;
   try {
-    const res = await fetch('./backend.json', { cache: 'no-store' });
+    const res = await fetch('./backend.json', {
+      cache: 'no-store',
+      signal: controller ? controller.signal : undefined,
+    });
     if (!res.ok) return null;
     const json = await res.json();
     staticBackend = plausibleUrl(json && json.backendUrl);
@@ -68,6 +77,8 @@ export async function loadStaticConfig() {
     return staticBackend;
   } catch {
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
