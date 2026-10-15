@@ -48,6 +48,10 @@ export const State = {
   typing: new Map(),
   mutedChannels: new Set(),
   hasToken: !!token(),
+  // The instance requires a second factor and this account has none. Set while
+  // loading the session; the router reads it to send the reader to enrolment
+  // rather than to every screen that is going to be refused.
+  mfaRequired: false,
 };
 
 // --- normalisation ----------------------------------------------------------
@@ -117,12 +121,23 @@ export async function loadSession() {
   try {
     State.user = normalizeUser(await Api.me());
     State.hasToken = true;
+    State.mfaRequired = false;
     emit('user', State.user);
     return State.user;
   } catch (error) {
     if (error instanceof ApiError && (error.status === 401 || error.code === 'AUTH_REQUIRED')) {
+      State.mfaRequired = false;
       signOut({ local: true });
       return null;
+    }
+    if (error instanceof ApiError && error.code === 'MFA_REQUIRED') {
+      // The instance requires a second factor and this account has not enrolled
+      // one. The token is kept: it is valid, it is what the enrolment endpoints
+      // accept, and it is what lets the reader fix this without signing in again.
+      State.user = null;
+      State.hasToken = true;
+      State.mfaRequired = true;
+      throw error;
     }
     // A network failure is not a signed-out reader: keep the token and let the
     // caller show a connection problem instead of a login screen.
@@ -149,6 +164,7 @@ export function signOut(options) {
   setToken(null);
   State.hasToken = false;
   State.user = null;
+  State.mfaRequired = false;
   emit('signed-out', opts.reason || null);
 }
 

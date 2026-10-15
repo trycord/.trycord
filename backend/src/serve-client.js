@@ -23,7 +23,7 @@ const path = require('path');
 const APP_ROUTE_PREFIXES = new Set([
   'home', 'dms', 'settings', 'account', 'server', 'servers', 'c', 'admin',
   'friends', 'notifications', 'discover', 'profile', 'users', 'invite',
-  'login', 'register', 'forgot', 'reset-password', 'verify-email',
+  'login', 'register', 'forgot', 'reset-password', 'verify-email', 'two-step',
   'menu', 'legal', 'channel', 'message', 'support',
 ]);
 

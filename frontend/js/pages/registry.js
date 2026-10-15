@@ -202,6 +202,10 @@ export const PAGES = [
   p('forgot', '/forgot', { access: 'guest', guestTo: '/home', layout: 'plain' }),
   p('resetPassword', '/reset-password/:token', { access: 'guest', guestTo: '/home', layout: 'plain' }),
   p('verifyEmail', '/verify-email/:token', { access: 'public', layout: 'plain' }),
+  // Public rather than guest: the reader holds a valid token, they just cannot
+  // use it until a second factor is enrolled, so the guest redirect would fight
+  // the reason they are here.
+  p('twoStep', '/two-step', { access: 'public', layout: 'plain', hidden: true }),
 ];
 
 function groupForCommunitySetting(id) {

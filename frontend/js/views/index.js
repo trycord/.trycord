@@ -52,6 +52,7 @@ export const RENDERERS = {
   forgot: auth,
   resetPassword: auth,
   verifyEmail: auth,
+  twoStep: auth,
 };
 
 // The remaining pages all belong to a scope whose sections share one renderer,

@@ -156,6 +156,21 @@ export async function run() {
   const params = match.params;
   const rest = match.rest;
 
+  // The instance requires a second factor this account has not enrolled. Every
+  // workspace screen would be refused with the same answer, so send the reader
+  // straight to the one screen that can fix it. Public documents (legal, support)
+  // still open, and the enrolment screen itself is public so this cannot loop.
+  if (State.mfaRequired && page.access !== 'public') {
+    navigate('/two-step', { replace: true });
+    return;
+  }
+
+  // The enrolment screen is only meaningful with a token to enrol against.
+  if (page.id === 'twoStep' && !signedIn()) {
+    navigate('/login', { replace: true });
+    return;
+  }
+
   if (page.access === 'guest' && signedIn()) {
     navigate(page.guestTo || '/home', { replace: true });
     return;

@@ -90,7 +90,7 @@ function auth(req, res, next) {
       //
       // Read per request, so a change in the configuration centre applies to the
       // next request rather than the next restart.
-      if (require2fa && !row.totp_enabled_at) {
+      if (require2fa && !row.totp_enabled_at && !req.allowUnenrolled) {
         const isAdmin = await require('../services/enforcement').isPlatformAdmin(user.id);
         if (!isAdmin) {
           return fail(res, 'MFA_REQUIRED',
@@ -106,6 +106,17 @@ function auth(req, res, next) {
       next();
     })
     .catch((e) => next(e));
+}
+
+// The two-factor requirement above has to be satisfiable. The enrolment endpoints
+// must be reachable by the very account that has no second factor yet, or the
+// setting's promise - accounts without a second factor are signed out "until they
+// enrol" - cannot be kept: the endpoints that let them enrol would answer
+// MFA_REQUIRED too, which is a permanent lockout. A route opts in explicitly, so
+// nothing else is opened by accident.
+function allowUnenrolled(req, res, next) {
+  req.allowUnenrolled = true;
+  next();
 }
 
 // Email-verification guard for normal user functionality (messages,
@@ -139,5 +150,6 @@ function requireVerified(req, res, next) {
 module.exports = auth;
 module.exports.tokenStale = tokenStale;
 module.exports.enforced = enforced;
+module.exports.allowUnenrolled = allowUnenrolled;
 module.exports.requireVerified = requireVerified;
 module.exports.verificationEnforceable = verificationEnforceable;
