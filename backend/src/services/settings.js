@@ -362,7 +362,7 @@ const SCHEMA = [
     live: false,
   },
   {
-    key: 'app.mount', env: 'TRYCOD_APP_MOUNT', type: 'string', default: '',
+    key: 'app.mount', env: 'TRYCORD_APP_MOUNT', type: 'string', default: '',
     category: 'deployment', label: 'Mount prefix',
     description: 'Serve the application under a path such as /app. Blank serves it from the site root. Applied when the process next starts.',
     live: false,

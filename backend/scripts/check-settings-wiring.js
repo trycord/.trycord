@@ -71,6 +71,49 @@ ok('every declared setting is read by something',
   decorative.length === 0,
   decorative.map((d) => d.key).join(', '));
 
+// A setting's environment variable has to be the one the deployment actually sets.
+//
+// Reading and writing agreed on their own, which is why nothing caught this: the
+// schema declared `TRYCOD_APP_MOUNT`, one letter from the documented
+// `TRYCORD_APP_MOUNT`, and the server kept reading the store's value. The result
+// was a deployment that set /app in .env and a process that mounted nothing,
+// because the store never saw a variable by that name. A name one edit away from a
+// documented one is a typo, not a second spelling, so it is reported.
+function editDistance(a, b) {
+  const rows = a.length;
+  const cols = b.length;
+  const dp = Array.from({ length: rows + 1 }, (_, i) => [i, ...new Array(cols).fill(0)]);
+  for (let j = 0; j <= cols; j++) dp[0][j] = j;
+  for (let i = 1; i <= rows; i++) {
+    for (let j = 1; j <= cols; j++) {
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+  }
+  return dp[rows][cols];
+}
+
+const examplePath = path.join(ROOT, '.env.example');
+const documented = new Set();
+if (fs.existsSync(examplePath)) {
+  for (const line of fs.readFileSync(examplePath, 'utf8').split('\n')) {
+    const m = line.match(/^([A-Z0-9_]+)=/);
+    if (m) documented.add(m[1]);
+  }
+}
+const nearMisses = [];
+for (const entry of settings.SCHEMA) {
+  if (!entry.env || documented.has(entry.env)) continue;
+  for (const name of documented) {
+    if (editDistance(entry.env, name) === 1) {
+      nearMisses.push(entry.key + ': ' + entry.env + ' looks like ' + name);
+    }
+  }
+}
+ok('no setting reads an environment variable one letter off a documented one',
+  nearMisses.length === 0,
+  nearMisses.join('; '));
+
 // The categories the brief asks for, and the ones this instance actually has.
 // A category with no settings is not offered, because an empty tab is a promise
 // the instance cannot keep.
