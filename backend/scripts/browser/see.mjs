@@ -52,8 +52,6 @@ async function main() {
         width: widthArg, height: heightArg, deviceScaleFactor: 1, mobile: false,
       });
       await b.eval('document.open(); document.write(' + JSON.stringify(withHead) + '); document.close(); true');
-      const mode = widthArg < 600 ? 'mobile' : 'desktop';
-      await b.eval('document.documentElement.dataset.presentation = ' + JSON.stringify(mode) + '; true');
       if (themeArg) await b.eval('document.documentElement.dataset.theme = ' + JSON.stringify(themeArg) + '; true');
       await new Promise((r) => setTimeout(r, 120));
       const shot = await b.send('Page.captureScreenshot', { format: 'png' });

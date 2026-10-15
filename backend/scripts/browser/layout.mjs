@@ -330,7 +330,7 @@ async function main() {
   // changes nothing about the product: this document is not served by anything.
   const head = '<style>' + css + '</style>';
   // Geometry, not motion. A transitioned drawer or a slide-in screen photographed the
-  // instant the presentation flips is photographed mid-flight, and every measurement then
+  // instant a width change is measured is photographed mid-flight, and every measurement then
   // describes a frame nobody sees. Kill transitions and animations so the cascade settles
   // on its final values and the harness measures the layout instead of an animation.
   const noMotion = '<style>*,*::before,*::after{transition:none!important;animation:none!important}</style>';
