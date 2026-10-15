@@ -31,9 +31,11 @@ const ASSET_TOKENS = path.join(__dirname, '..', 'assets', 'trycord-assets', 'tok
 const ASSET_APP = path.join(__dirname, '..', 'assets', 'trycord-assets', 'app');
 
 // Dependency order, not alphabetical: the token library, then the application's
-// semantic tokens, then the layers that consume them. `mobile.css` is last: it
-// is the phone presentation, keyed to the same breakpoint the shell's desk
-// composition is, so it must be free to override every desk layer.
+// semantic tokens, then the layers that consume them.
+//
+// There is no phone layer here. A phone is a different module, not a narrowed
+// desk: it is served its own document under /mobile and loads its own stylesheet
+// built below. This bundle is the desktop composition only.
 const LAYERS = [
   'tokens.css',
   'base.css',
@@ -47,7 +49,6 @@ const LAYERS = [
   'views-auth.css',
   'views-plain.css',
   'voice.css',
-  'mobile.css',
 ];
 
 // The public website is the same product with the same brand. It carries no palette

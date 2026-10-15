@@ -13,8 +13,8 @@ import {
   State, normalizeUser, nameOf, refreshServer, refreshServerTree,
   refreshServerMembers, refreshServerRoles, channelsOf, categoriesOf, can, isOwner, serverById,
 } from '../../../packages/store.js';
-import { path, navigate } from '../../../packages/nav.js';
-import { setOverride } from '../../../packages/chooser.js';
+import { path, navigate, BASE } from '../../../packages/nav.js';
+import { setOverride, siblingMount } from '../../../packages/chooser.js';
 import { menu, sheet, confirm, toast } from '../ui.js';
 import { relativeTime } from '../../../packages/format.js';
 import { mediaUrl } from '../../../packages/media.js';
@@ -162,7 +162,7 @@ export function renderChannel(ctx) {
       el('div', { class: 'm-state__text' }, 'Voice rooms run in the desktop site for now. Opening it there keeps the same permission and the same server.'),
       el('button', {
         class: 'm-btn m-btn--primary', type: 'button',
-        onClick: () => { setOverride('desktop'); window.location.assign(path('/')); },
+        onClick: () => { setOverride('desktop'); window.location.assign(siblingMount('mobile', BASE) + '/'); },
       }, 'Open the desktop site')));
     return {
       head: { lead: 'back', title: channel.name, sub: 'Voice', mark: el('span', { class: 'm-mark' }, icon('volume', { size: 18 })),

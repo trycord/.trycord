@@ -20,10 +20,11 @@ Companion records: `docs/community-channel-audit.md` (community/channel family),
 > **Phases D and E have since executed too.** The Mobile module now exists as a real
 > second module at `frontend/mobile/` — its own entry document, entry module, shell, view
 > tree and stylesheet bundle — importing only `frontend/packages/`, and `serve-client.js`
-> serves both entries from one origin with the base stamped per request. Phase F (retire
-> the Desktop module's phone arrangement, `frontend/js/presentation.js` and
-> `frontend/css/mobile.css`) is not started. See `IMPLEMENTATION_STATE.md` for the
-> current phase.
+> serves both entries from one origin with the base stamped per request. **Phase F is
+> also done**: the Desktop module's phone arrangement (`frontend/js/presentation.js` and
+> `frontend/css/mobile.css`) is deleted, `frontend/css/app.css` is the desk composition
+> only, and each module's front door hands a reader to the other through
+> `frontend/packages/chooser.js`. See `IMPLEMENTATION_STATE.md` for the current phase.
 
 ## 1. What exists today
 
@@ -115,7 +116,10 @@ the place/settings/admin/community sidebars. **One shell serves every viewport.*
 
 ### 1.5.1 The responsive layer the directive forbids
 
-- `index.html` inline script writes `<html data-presentation="mobile|desktop">` from
+*(Recorded as it was at audit time; deleted in Phase F. Kept because it is the fault the
+directive names, and a reader should be able to see it.)*
+
+- `index.html` inline script wrote `<html data-presentation="mobile|desktop">` from
   `innerWidth < 600` **before first paint**.
 - `frontend/js/presentation.js` keeps it in sync, and owns the drawer (open/close/focus
   trap/Escape/edge-swipe) for the narrow case.
@@ -208,7 +212,7 @@ counted.**
 | Component vocabulary | `js/components.js`, `js/ui.js`, `js/user-menu.js` | Desktop presentation |
 | Voice panel | `js/voice.js` | Presentation (currently desktop-shaped) |
 | Every screen | `js/views/*.js` (15) | Desktop presentation |
-| Phone arrangement | `js/presentation.js`, `css/mobile.css` | **To be replaced by a mobile module** |
+| Phone arrangement | `js/presentation.js`, `css/mobile.css` | Replaced by the Mobile module; deleted in Phase F |
 | Renderers binding | `js/views/index.js`, `js/main.js` | Desktop presentation (entry) |
 
 ## 3. Findings register
@@ -276,10 +280,10 @@ routing) or a fixed `/m/` path with no detection (users must type it).
 |---|---|---|
 | **A (this doc)** | Inventory, classification, target, decisions | Audit complete |
 | **B (done)** | Create `packages/`, move shared modules, update every importer + the check scripts + doc counts; add the boundary check. Desktop behaviour unchanged. | `npm run check`, `check:render`, `check:graph` green, same assertion counts |
-| **C** | Move desktop presentation to `desktop/`, split the CSS bundle; desktop pixel/behaviour parity. | Above + `check:desktop-shell`, `check:mobile-layout` adapted |
-| **D** | Build the mobile module (shell, navigation, screens, styles, gestures) importing only `packages/`. | New mobile checks; every capability in §2 reachable |
-| **E** | Serving: mount both entries; Cloudflare build includes both; Electron bundles desktop. | `check:mount`, `check:routes`, Cloudflare build |
-| **F** | Enforce boundaries, retire the responsive layer (`presentation.js`, `mobile.css`), remove dead code. | Boundary check fails when violated |
+| **C** | Move desktop presentation to `desktop/`, split the CSS bundle; desktop pixel/behaviour parity. | Above + `check:desktop-shell`, `check:mobile-layout` adapted — *folded into B/D: the desktop module stayed at `frontend/js/` (D-2), so no move was needed* |
+| **D (done)** | Build the mobile module (shell, navigation, screens, styles, gestures) importing only `packages/`. | New mobile checks; every capability in §2 reachable |
+| **E (done)** | Serving: mount both entries; Cloudflare build includes both; Electron bundles desktop. | `check:mount`, `check:routes`, Cloudflare build |
+| **F (done)** | Enforce boundaries, retire the responsive layer (`presentation.js`, `mobile.css`), remove dead code. | Boundary check fails when violated; `check:render` (no phone composition), `check:mobile-layout`, `check:mobile-render` green |
 
 ## 6. Decisions
 

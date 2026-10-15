@@ -9,8 +9,8 @@ import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { serverMark, loading, failure } from '../components.js';
 import { State, logout } from '../../../packages/store.js';
-import { path, navigate } from '../../../packages/nav.js';
-import { setOverride } from '../../../packages/chooser.js';
+import { path, navigate, BASE } from '../../../packages/nav.js';
+import { setOverride, siblingMount } from '../../../packages/chooser.js';
 import Api from '../../../packages/api.js';
 import { screen, section } from './util.js';
 
@@ -114,7 +114,7 @@ export function renderMenu() {
     }
     list.appendChild(el('button', {
       class: 'm-row', type: 'button',
-      onClick: () => { setOverride('desktop'); window.location.reload(); },
+      onClick: () => { setOverride('desktop'); window.location.assign(siblingMount('mobile', BASE) + '/'); },
     },
       el('span', { class: 'm-row__lead' }, icon('server', { size: 18 })),
       el('span', { class: 'm-row__body' },

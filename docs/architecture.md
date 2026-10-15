@@ -7,7 +7,7 @@ Last verified: `npm run check` applies the schema to a throwaway SQLite database
 and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
 client segments are served; `npm run check:flows` boots a server and passes 77
 assertions against real flows; `npm run check:render` boots a server and renders all
-40 routable pages of the Desktop module in jsdom, passing 128 assertions;
+40 routable pages of the Desktop module in jsdom, passing 117 assertions;
 `npm run check:mobile-render` does the same for the Mobile module - its own document,
 its own entry and its own shell - rendering every routable mobile page and each
 community-settings section and requiring that none throws, none paints an empty view
@@ -19,7 +19,7 @@ and finds 100 ratios that pass; `npm run check:backend-agnostic` checks that no
 component names a backend, that one module stores the chosen address, that one module
 attaches credentials, and that both modules ship the same `backend.json`; and
 `npm run check:client-load`
-evaluates all 59 client modules across the shared platform and the two
+evaluates all 58 client modules across the shared platform and the two
 presentation modules.
 
 ## Where things live
@@ -33,7 +33,7 @@ The eleven questions worth being able to answer without searching.
 | What is on screen | `frontend/js/router.js` - resolves the address to a page, asks its renderer for the regions, and fills the shell from that one answer. No region decides for itself. |
 | Routing | `frontend/js/router.js` - parses `location`, matches the longest prefix on segment boundaries, resolves the community by slug or id, and mounts. No hash. |
 | Page definitions | `frontend/packages/registry.js` - the one source of truth for every page, route and nav entry. |
-| Navigation | Derived from that registry: `frontend/js/shell.js` for the rail and the phone tab bar, `frontend/js/sidebars.js` for the place, settings, admin and community sidebars. Presentation differs; identity does not. |
+| Navigation | Derived from that registry: `frontend/js/shell.js` for the rail, `frontend/mobile/js/shell.js` for the bottom tab bar, `frontend/js/sidebars.js` for the place, settings, admin and community sidebars. Presentation differs; identity does not. |
 | A page | `{id, route, ...}` metadata in the registry, with its renderer bound from `frontend/js/views/index.js` by `main.js` through the registry's `bind()`. The registry never imports the view modules that draw, so reading a label does not pull in the shell. |
 | Community and channel | `frontend/js/views/community.js` - one module for a community: the channel (text or voice), the roster, and the administrative screens (channels, categories, members, roles, invites, settings) underneath it. `frontend/js/sidebars.js` draws the community tree. |
 | Signed-out surfaces | `frontend/js/views/auth.js` (sign-in, registration, two-step) and `frontend/js/views/plain.js` (the public documents, invite and community-creation screens). |
@@ -185,11 +185,12 @@ connection error.
 | `npm run check:client-bindings` | the same, for the client |
 | `npm run check:client-load` | **evaluates** every client module against a stub DOM |
 | `npm run check-backend-agnostic` | the client names one backend: only `packages/config.js` mentions a production host, one module stores the chosen address, one module attaches credentials, the socket follows the resolver, both modules build on `packages/` and neither reaches outside `frontend/` |
+| `npm run check-chooser` | the one decision that picks a module: an explicit choice outranks the viewport, only the two names are honoured, the sibling mount is its own inverse, and both entries hand off through the chooser rather than building the other's path |
 | `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
 | `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
 | `npm run check:contrast` | every theme's contrast ratios against WCAG AA, and no colour written into a component rule |
 | `npm run check:headings` | one `h1` per surface; a page that adds its own beside the context header's fails |
-| `npm run check:render` | **renders every route in jsdom** against a real backend, and checks accessible names, the phone composition and themes |
+| `npm run check:render` | **renders every route in jsdom** against a real backend, and checks accessible names and themes |
 | `npm run check:mobile-render` | **renders every mobile route in jsdom** against a real backend: a second entry document, entry module and shell over the shared platform, with its own stylesheet and its own `backend.json` |
 | `npm run check:realtime` | **two clients, two sockets** - one person's message reaches somebody else's open tab and is still there after a reload |
 | `npm run check:shots` | photographs every surface at eight widths in a real browser; skips where t
@@ -490,12 +491,12 @@ Everything else asks that file rather than deciding for itself:
 - `frontend/mobile/js/router.js` does the same for the Mobile module: it reads the
   same registry, resolves the same addresses, and paints the mobile shell from the
   renderer's answer
-- the rail, the phone tab bar, the settings navigation and the admin navigation all
+- the rail, the bottom tab bar, the settings navigation and the admin navigation all
   read the same definitions
 
 That is the point of it. There used to be six lists each answering part of "where
 can I go and what is this screen called" — the route table, a layout prefix table,
-a sidebar context classifier, the rail's destinations, the phone tab bar's
+a sidebar context classifier, the rail's destinations, the bottom tab bar's
 destinations, and the settings information architecture — and they did not agree.
 The admin navigation came from one list while the admin page's title came from
 another holding the same nine sections in a different order; the sidebar classifier
@@ -527,7 +528,7 @@ the other.
 id — the rail, the place navigation, the workspace and the overlays — once, when the
 application starts, and owns the keyboard shortcuts. The region functions on that
 module (`renderAllChrome()`, `setStage`, `setPlaceNav`, `setContextPanel`,
-`setComposer`, `renderTabbar`), with `frontend/js/sidebars.js`, fill those regions on
+`setComposer`), with `frontend/js/sidebars.js`, fill those regions on
 every route change and every unread badge. The split is deliberate: the shell's
 *structure* is stable and read by id from everywhere; its *content* changes on every
 route. One file doing both was a tree that got torn down and rebuilt to change a
@@ -573,21 +574,28 @@ code with one constant changed. Each module carries its own `backend.json`, beca
 document sits one directory deeper; the server repoints both copies at whoever is serving
 them.
 
-Only the mobile-to-desktop front door is implemented: a reader who has chosen "desktop
-site" is sent to the desktop document before the mobile shell boots. The reverse handoff
-is deferred.
+Both directions of the front-door handoff are implemented, and both are one
+document load driven by the same chooser: a reader arriving at the desktop front door
+whose viewport or remembered choice says mobile is sent to the mobile document before
+any chrome is built, and a reader in the mobile module who chose "desktop site" is sent
+back. Only the front door decides — a deep link is already module-addressed, so
+following one never bounces the reader into the other module.
 
 ### Coupling that is unavoidable, and named
 
-The Desktop module still carries its own phone arrangement: `frontend/js/presentation.js`
-drives a drawer and `frontend/css/mobile.css` is the responsive layer that arranges the
-desktop shell at phone widths. That is **not** the Mobile module. It is the desktop module
-rendering itself responsively, and it stays until Phase F retires it. Two files named
-`mobile.css` in one repository is a trap for a reader: `frontend/css/mobile.css` belongs
-to the desktop bundle (aggregated by `frontend/css/app.css`), and
-`frontend/mobile/css/mobile.css` is the Mobile module's own stylesheet, built separately.
-`check-client-styles.js` reads each class against the stylesheet of the module that emits
-it, so a class moved between modules without its rule is caught.
+The Desktop module carries no phone arrangement. `frontend/css/app.css` is the desk
+composition and nothing else: there is no responsive layer and no `presentation.js`, so
+a narrow viewport never reshapes the desktop shell into a phone. A phone is the Mobile
+module — its own document, its own entry, its own shell and its own stylesheet under
+`frontend/mobile/`. What remains is the handoff between them: `frontend/packages/chooser.js`
+is the one place that decides which module a reader belongs in and computes the sibling
+mount, and each entry consults it at its own front door. That module is the coupling, and
+it is deliberately the only one.
+
+`check-client-styles.js` still reads each class against the stylesheet of the module that
+emits it, so a class moved between modules without its rule is caught, and
+`check-mobile-layout.js` asserts the mobile module's composition from its own built
+stylesheet.
 
 ## Theming
 

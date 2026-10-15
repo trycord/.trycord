@@ -13,9 +13,9 @@
 
 export const PRESENTATION_KEY = 'trycord.presentation';
 
-// The width below which the desktop composition stops being usable (its own
-// presentation layer keys off the same number). Kept as data so a check can
-// assert the two do not disagree.
+// The width below which a viewport is phone-shaped. The Mobile module is a
+// separate document, not a responsive layer over the desktop one, so this is used
+// only to decide which document a reader is sent to.
 export const MOBILE_MAX_WIDTH = 600;
 
 export const ENTRY_DESKTOP = 'desktop';
@@ -87,12 +87,19 @@ export function preferredEntry(current, opts) {
 // The mount of the other module, relative to this origin. Both are server
 // mounts, not routes: handing a reader across is one document load, not a route
 // change inside whichever module is already running.
-export function entryMount(entry) {
-  return entry === ENTRY_MOBILE ? '/m/' : '/app/';
+//
+// `entry` is the module the caller is running in and `base` is that module's own
+// mount (nav.js BASE). The desktop tree is the client root; the mobile tree lives
+// one directory under it, so the two are related by exactly that one segment
+// rather than by a pair of hard-coded paths.
+export function siblingMount(entry, base) {
+  const mount = base === undefined || base === null ? '' : String(base);
+  const clean = mount === '/' ? '' : mount.replace(/\/$/, '');
+  return entry === ENTRY_MOBILE ? clean.replace(/\/mobile$/, '') : clean + '/mobile';
 }
 
 export default {
   PRESENTATION_KEY, MOBILE_MAX_WIDTH, ENTRY_DESKTOP, ENTRY_MOBILE,
   readOverride, setOverride, clearOverride,
-  viewportWantsMobile, resolvePresentation, preferredEntry, entryMount,
+  viewportWantsMobile, resolvePresentation, preferredEntry, siblingMount,
 };

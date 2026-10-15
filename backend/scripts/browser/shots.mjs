@@ -223,8 +223,7 @@ async function main() {
           const NL = String.fromCharCode(10);
           return [
             'shell data-spine=' + (sh && sh.dataset.spine)
-              + ' data-context=' + (sh && sh.dataset.context)
-              + ' data-presentation=' + document.documentElement.dataset.presentation,
+              + ' data-context=' + (sh && sh.dataset.context),
             tracks('#shell', 'gridTemplateColumns'),
             tracks('#trycord-main', 'gridTemplateColumns'),
             tracks('#trycord-main', 'gridTemplateRows'),

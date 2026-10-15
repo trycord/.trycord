@@ -14,14 +14,15 @@ Update this file after every meaningful unit of work, before stopping.
 
 ## Current phase
 
-Frontend modularization directive — **Phase A (audit), Phase B (shared platform
-extraction), Phase D (Mobile module) and Phase E (serving) are complete**. The
-nonvisual platform lives in `frontend/packages/`; the Desktop presentation is the
-desktop module at `frontend/js/`; the Mobile module is a second, independent entry at
-`frontend/mobile/` with its own document, entry module, shell, view tree and stylesheet.
-Both are served by `serve-client.js` from one origin. **Phase F (retire the desktop
-responsive layer — `frontend/js/presentation.js` and `frontend/css/mobile.css`) is not
-started.**
+Frontend modularization directive — **Phases A (audit), B (shared platform
+extraction), D (Mobile module), E (serving) and F (retire the desktop responsive layer)
+are complete**. The nonvisual platform lives in `frontend/packages/`; the Desktop
+presentation is the desktop module at `frontend/js/`; the Mobile module is a second,
+independent entry at `frontend/mobile/` with its own document, entry module, shell, view
+tree and stylesheet. Both are served by `serve-client.js` from one origin. The Desktop
+module's own phone arrangement (`frontend/js/presentation.js` and
+`frontend/css/mobile.css`) is gone; a phone is the Mobile module, and each front door
+hands a reader to the other module through `frontend/packages/chooser.js`.
 
 Delivered in earlier phases: the community/channel route rework and the admin-settings
 expansion.
@@ -32,13 +33,19 @@ expansion.
   check, plus the mobile branches of `check-mount`, `check-client-modules`,
   `check-client-load`, `check-client-bindings`, `check-client-styles` and
   `check-doc-counts`.
-- `check:render` (Desktop) — **green, 128 assertions.**
-- `check:mobile-render` (Mobile) — **green**; boots a throwaway backend, loads
-  `frontend/mobile/index.html` in jsdom, imports the mobile entry, seeds a community
-  and a message, and renders every routable mobile page and every community-settings
-  section.
+- `check:render` (Desktop) — **green, 117 assertions.**
+- `check:mobile-render` (Mobile) — **green, 62 assertions**; boots a throwaway backend,
+  loads `frontend/mobile/index.html` in jsdom, imports the mobile entry, seeds a
+  community and a message, and renders every routable mobile page and every
+  community-settings section.
+- `check:mobile-layout` — **green**; asserts the Mobile module's composition from its own
+  built stylesheet (one layer over the shared tokens, no desktop selector leaking in,
+  `[hidden]` authoritative, thumb-sized targets, safe-area insets, bottom sheets).
+- `check:chooser` — **green**; pins the module-selection decision (override over viewport,
+  invalid values rejected) and the sibling-mount round trip, and that both entries hand off
+  through `frontend/packages/chooser.js` rather than hand-building the other's path.
 - `check:graph` — **green**; every import the server is asked for is one it serves.
-- Client module count **59** (`frontend/js` + `frontend/packages` + `frontend/mobile`).
+- Client module count **58** (`frontend/js` + `frontend/packages` + `frontend/mobile`).
 
 ## What Phases D and E did
 
@@ -56,9 +63,33 @@ expansion.
 - Bound the mobile renderer table through the same `registry.bind()`; mobile pages opt
   into the tab bar with `nav.mobile`, and community routes use `sidebar: 'community'`.
 - Implemented the mobile-to-desktop front door (chosen override `desktop` reloads into
-  the desktop document). Desktop-to-mobile is deferred to Phase F.
+  the desktop document). Desktop-to-mobile followed in Phase F.
 - Added `check-mobile-render`, `check-backend-agnostic` and the mobile branches of the
   existing per-module checks.
+
+## What Phase F did
+
+- Deleted the Desktop module's phone arrangement: `frontend/js/presentation.js` and
+  `frontend/css/mobile.css`, and removed `mobile.css` from the desktop `LAYERS` in
+  `frontend/scripts/build-css.js`. `frontend/css/app.css` is now the desk composition and
+  nothing else.
+- Rewrote `frontend/js/shell.js` for Desktop-only composition: no tab bar, no drawer, no
+  nav toggle/back button, no slide transitions, no `data-presentation`; the leading
+  control is the spine collapse. Removed `data-presentation` from the `frontend/index.html`
+  bootstrap and the desktop phone-layer rules (tab bar, toggle, drawer, scrim) from
+  `frontend/css/shell.css` and the now-dead `--tabbar-h` from `frontend/css/tokens.css`.
+- Added `siblingMount(entry, base)` to `frontend/packages/chooser.js` as the one place
+  that computes the other module's mount, and refactored both entries onto it. The
+  Desktop entry hands a phone to the Mobile document at its front door
+  (`frontend/js/main.js#handoffToMobile`) and the Mobile module hands a reader who chose
+  "desktop site" back (`frontend/mobile/js/main.js#handoff`), both before any chrome is
+  built; deep links are already module-addressed and never bounce.
+- Added `check-mobile-layout.js` and `check-chooser.js` checks. Retargeted
+  `check-mobile-layout.js` from the retired desktop phone layer to the Mobile module's own
+  built stylesheet; `check-chooser.js` pins the module-selection decision and the sibling
+  mount. Made `check:desktop-shell` the desktop-only check. Removed the phone-composition
+  assertions from `check-render.js` and the `data-presentation` faking from the browser
+  tools.
 
 ## What Phase B did
 
@@ -74,12 +105,9 @@ expansion.
 
 ## Active task (next)
 
-Frontend modularization **Phase F** — retire the Desktop module's phone arrangement:
-delete `frontend/js/presentation.js` and `frontend/css/mobile.css` (removing
-`mobile.css` from the desktop `LAYERS` in `frontend/scripts/build-css.js`) and add the
-desktop-to-mobile front door so a narrow viewport on the desktop document can hand off
-to the mobile one. Desktop is not touched except where the boundary needs it. See §5 of
-the audit.
+Frontend modularization **Phase F is complete** (see below). Remaining work is operational:
+commit Phase F, then push once the user supplies credentials. The DB wipe of test /
+keyboard-spam accounts is pending explicit user go-ahead (see "Pending, user-requested").
 
 ## Decisions (with evidence)
 
@@ -89,7 +117,7 @@ the audit.
   module, shell, view tree and stylesheet bundle. Evidence:
   `backend/scripts/check-frontend-modules.js` (the boundary), `backend/scripts/check-mobile-render.js`
   (the second module renders). The old single responsive tree (`js/presentation.js` +
-  `css/mobile.css`) is the Desktop module's phone arrangement and is retired in Phase F.
+  `css/mobile.css`) was the Desktop module's phone arrangement and was retired in Phase F.
 - **A render check is not optional for a second module.** `check-mobile-render`
   found that `screen(...)` accepted one child while every mobile renderer passed
   several, so each screen drew its hero and silently dropped the rest. Parsing,
@@ -108,7 +136,11 @@ the audit.
   audit §1.6, A5.
 - **Module selection = single origin, device-detected with a remembered, explicit
   override.** Rationale: matches the existing single-origin serving; no DNS/host work.
-  Alternative (a `m.` host) is the only open operator decision. Evidence: audit §4.
+  The choice is made once, at a module's front door, by `frontend/packages/chooser.js`
+  (`viewportWantsMobile()` + the stored override), which also computes the sibling mount;
+  a deep link is already module-addressed and never bounces. Alternative (a `m.` host) is
+  the only open operator decision. Evidence: audit §4, `frontend/js/main.js`,
+  `frontend/mobile/js/main.js`.
 - **`server/` is a dead second backend** (not running, older commits). Recorded, not
   touched. Evidence: audit A1.
 - **Desktop stays at `frontend/js/`; `mobile/` is the new tree.** The literal `desktop/`
@@ -150,8 +182,6 @@ the audit.
 
 ## Next action
 
-Begin Phase F: remove the Desktop module's responsive phone arrangement
-(`frontend/js/presentation.js`, `frontend/css/mobile.css` and its `LAYERS` entry in
-`frontend/scripts/build-css.js`), move the phone layout coverage to the Mobile module's
-own checks, and add the desktop-to-mobile handoff. Then commit; push once the user
-supplies credentials.
+Phase F is done and committed locally. Next: `git push` once the user supplies
+credentials (see Blockers). Optionally regenerate `docs/verification-matrix.md` with
+`npm run check:matrix` (not in CI).

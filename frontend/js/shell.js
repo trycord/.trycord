@@ -3,23 +3,22 @@
 // A community client, not a dashboard: a rail of your communities down the far
 // left, the open community's column beside it, the conversation taking the rest,
 // and the member list on demand. The stage holds a single .screen (app bar, body,
-// composer) so a phone has one surface to slide. A page fills regions; it never
-// builds chrome.
+// composer). A page fills regions; it never builds chrome.
 //
-// The leading app-bar control follows the presentation and #shell[data-depth] -
-// drawer on a phone root, back on a phone detail, collapse on a desk. All three
-// are built at every width; CSS picks one.
+// This is the Desktop composition. A phone is a different module, served its own
+// document under /mobile, so there is one leading control here: the spine
+// collapse, because the spine is a column and nowhere to slide.
 
-import { el, clear, prefersReducedMotion } from '../packages/dom.js';
+import { el, clear } from '../packages/dom.js';
 import { icon } from '../packages/icons.js';
 import { avatar, countBadge, serverMark } from './components.js';
 import { State, nameOf } from '../packages/store.js';
-import { path, currentRoute, navigate, canGoBack } from '../packages/nav.js';
-import { globalPages, mobilePages } from '../packages/registry.js';
+import { path, currentRoute, navigate, BASE } from '../packages/nav.js';
+import { globalPages } from '../packages/registry.js';
 import { openMenu, attachContextMenu } from './ui.js';
 import { serverMenuItems } from './sidebars.js';
 import { currentTheme, setTheme } from '../packages/theme.js';
-import { toggleNav, isNavOpen, closeNav, presentationMode } from './presentation.js';
+import { setOverride, viewportWantsMobile, siblingMount } from '../packages/chooser.js';
 
 const refs = {};
 
@@ -42,7 +41,7 @@ export function mountShell() {
   const spine = el('aside', { id: 'spine', class: 'spine', 'aria-label': 'Navigation' },
     spineHead, globalNav, placeNav, spineFoot);
 
-  // Screen rows: app bar, scroll body, composer. A phone slides the whole thing.
+  // Screen rows: app bar, scroll body, composer.
   const stageHead = el('header', { class: 'stage-head', id: 'context-header' });
   const stageBody = el('div', { class: 'stage-body', id: 'view-root', tabindex: '-1' });
   const composerSlot = el('div', { class: 'composer-slot', hidden: true });
@@ -53,29 +52,26 @@ export function mountShell() {
   const contextPanel = el('aside', {
     class: 'context-panel', id: 'context-panel', 'aria-label': 'Context', hidden: true,
   });
-  const tabbar = el('nav', {
-    class: 'tabbar', id: 'mobile-tab-navigation', 'aria-label': 'Primary navigation',
-  });
   const scrim = el('div', { class: 'scrim', id: 'desktop-backdrop', 'aria-hidden': 'true' });
   const connection = el('div', { class: 'connection', id: 'connection-status', role: 'status' });
 
   const root = el('div', {
     class: 'ws', id: 'shell', 'aria-label': 'Trycord',
-    dataset: { spine: 'expanded', context: 'closed', drawer: 'closed', depth: 'root', nav: '' },
+    dataset: { spine: 'expanded', context: 'closed' },
   },
     el('a', { class: 'skip-link', href: '#view-root' }, 'Skip to content'),
-    rail, spine, stage, contextPanel, tabbar, scrim, connection);
+    rail, spine, stage, contextPanel, scrim, connection);
 
-  // One backdrop for the spine drawer and the overlay context panel.
+  // One backdrop, for the context panel when it overlays on a narrower desk. The
+  // spine is a column here and never overlays, so it has no drawer state.
   scrim.addEventListener('click', () => {
-    if (isNavOpen()) closeDrawer();
-    else if (contextPanelOpen()) closeContextPanel();
+    if (contextPanelOpen()) closeContextPanel();
   });
 
-  // Escape closes the context panel only as an overlay (the drawer has its own
-  // handler in presentation.js).
+  // Escape closes the context panel only as an overlay; when it has a column the
+  // place bar's own control is the way it closes.
   document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || isNavOpen()) return;
+    if (event.key !== 'Escape') return;
     if (contextPanelOpen() && !contextPanelHasColumn()) closeContextPanel();
   });
 
@@ -87,14 +83,9 @@ export function mountShell() {
     }
   });
 
-  // Drop the slide class when it ends so the next navigation starts from rest.
-  screen.addEventListener('animationend', () => {
-    screen.classList.remove('nav-forward', 'nav-back');
-  });
-
   Object.assign(refs, {
-    root, screen, rail, spine, spineHead, globalNav, placeNav, spineFoot,
-    stage, stageHead, stageBody, composerSlot, contextPanel, tabbar, scrim, connection,
+    root, rail, spine, spineHead, globalNav, placeNav, spineFoot,
+    stage, stageHead, stageBody, composerSlot, contextPanel, scrim, connection,
   });
   return root;
 }
@@ -103,77 +94,18 @@ export function setTitle(text) {
   document.title = text ? text + ' - Trycord' : 'Trycord';
 }
 
-// ---- navigation transitions -------------------------------------------------
-//
-// nav.js decides where a navigation goes; the shell only slides. A desk has
-// nowhere to slide to, so this is phone-only.
-
-export function beginNavigation(direction) {
-  if (!refs.screen || !refs.root) return;
-  if (direction !== 'forward' && direction !== 'back') return;
-  if (presentationMode() !== 'mobile') return;
-  if (prefersReducedMotion()) return;
-  refs.root.dataset.nav = direction;
-  // Reflow so the same direction replays instead of being ignored as a no-op.
-  refs.screen.classList.remove('nav-forward', 'nav-back');
-  void refs.screen.offsetWidth;
-  refs.screen.classList.add(direction === 'back' ? 'nav-back' : 'nav-forward');
-}
-
-// ---- drawers ---------------------------------------------------------------
-
-// presentation.js owns the drawer; the router just closes it on navigation.
-export function closeDrawer() {
-  closeNav();
-}
-
 // ---- the app bar -----------------------------------------------------------
-
-function isTabRoot(route) {
-  return mobilePages().some((page) => page.route === route);
-}
-
-// A detail with nothing behind it (a first-load deep link) offers the drawer,
-// since there is nothing in the app to go back to.
-function screenDepth() {
-  return (!isTabRoot(currentRoute()) && canGoBack()) ? 'detail' : 'root';
-}
+//
+// One leading control on a desk: the spine collapse, because the spine is a
+// column and nothing here overlays or slides.
 
 export function setStageHead(...children) {
   if (!refs.stageHead) return;
-  if (refs.root) refs.root.dataset.depth = screenDepth();
   clear(refs.stageHead);
-  refs.stageHead.appendChild(navToggle());
-  refs.stageHead.appendChild(backButton());
   refs.stageHead.appendChild(spineToggle());
   const inner = el('div', { class: 'stage-head-inner' });
   for (const child of children) if (child) inner.appendChild(child);
   refs.stageHead.appendChild(inner);
-}
-
-// Drawer control (phone root). presentation.js keeps aria-expanded in step.
-function navToggle() {
-  const button = el('button', {
-    class: 'nav-toggle icon-btn', type: 'button',
-    title: 'Navigation', 'aria-label': 'Toggle navigation',
-    'aria-expanded': 'false',
-  }, icon('menu'));
-  button.addEventListener('click', () => toggleNav());
-  return button;
-}
-
-// Back control (phone detail). Uses history.back so the gesture, the browser
-// button and this control share one history.
-function backButton() {
-  const button = el('button', {
-    class: 'nav-back icon-btn', type: 'button',
-    title: 'Back', 'aria-label': 'Go back',
-  }, icon('chevron-left', { size: 22 }));
-  button.addEventListener('click', () => {
-    if (canGoBack()) window.history.back();
-    else navigate('/home');
-  });
-  return button;
 }
 
 // Collapse control (desk), where the spine is a column.
@@ -190,11 +122,6 @@ function spineToggle() {
     button.setAttribute('aria-pressed', collapsed ? 'false' : 'true');
   });
   return button;
-}
-
-export function setStageHeadControl() {
-  if (!refs.root) return;
-  refs.root.dataset.depth = screenDepth();
 }
 
 export function setStage(node) {
@@ -456,6 +383,17 @@ function openAccountMenu(anchor) {
       me ? { header: nameOf(me) } : null,
       me ? { label: 'View profile', icon: 'user', onSelect: () => navigate('/users/' + me.id) } : null,
       { label: 'Account settings', icon: 'settings', onSelect: () => navigate('/settings') },
+      // A phone-shaped viewport that explicitly chose the desktop composition stays
+      // here (the remembered override outranks the viewport), so this is the visible
+      // way back to the Mobile module. Off a phone it is noise, and it is absent.
+      viewportWantsMobile() ? {
+        label: 'Mobile site',
+        icon: 'phone',
+        onSelect: () => {
+          setOverride('mobile');
+          window.location.assign(siblingMount('desktop', BASE) + '/');
+        },
+      } : null,
       { separator: true },
       { header: 'Theme' },
       { label: 'Match system', icon: theme === 'system' ? 'check' : 'monitor', onSelect: () => setTheme('system') },
@@ -476,38 +414,13 @@ function requestSignOut() {
   if (signOutHandler) signOutHandler();
 }
 
-// ---- tab bar (phone) -------------------------------------------------------
-//
-// Built from the registry's phone destinations, so it cannot drift from them.
-
-export function renderTabbar() {
-  if (!refs.tabbar) return;
-  clear(refs.tabbar);
-  const active = currentRoute();
-  const strip = el('div', { class: 'tabbar-inner' });
-  for (const page of mobilePages()) {
-    const isActive = activeFor(active, page.route);
-    strip.appendChild(el('a', {
-      class: 'tab-button' + (isActive ? ' is-active' : ''),
-      href: path(page.route),
-      'aria-label': page.nav.label,
-      'aria-current': isActive ? 'page' : null,
-    },
-      el('span', { class: 'tab-button__icon' }, icon(page.nav.icon, { size: 22 })),
-      el('span', { class: 'tab-button__label' }, page.nav.tabLabel || page.nav.short || page.nav.label),
-      page.id === 'notifications' ? countBadge(State.notifications.unreadCount) : null,
-    ));
-  }
-  refs.tabbar.appendChild(strip);
-}
-
 // ---- region rebuild on state change ----------------------------------------
 
 export function refreshChrome() {
   renderRail();
   renderSpine();
-  renderTabbar();
 }
+
 
 export function renderAllChrome() {
   refreshChrome();
