@@ -14,12 +14,12 @@
 // live media server, so this is the one part of the client that a self-hoster running
 // voice must confirm on their own instance.
 
-import { el, clear } from './dom.js';
-import { icon } from './icons.js';
+import { el, clear } from '../packages/dom.js';
+import { icon } from '../packages/icons.js';
 import { avatar } from './components.js';
-import { relativeTime } from './format.js';
+import { relativeTime } from '../packages/format.js';
 import { toast, errorToast } from './ui.js';
-import Api from './api.js';
+import Api from '../packages/api.js';
 
 // One live session per channel, so leaving a channel and coming back reuses the
 // connection rather than opening a second one against the media server.

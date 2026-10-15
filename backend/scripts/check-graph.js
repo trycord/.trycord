@@ -49,17 +49,19 @@ const ok = (label, cond, detail) => {
  * It is not in the import graph, so it is excluded from the count.
  */
 function countClientModules() {
-  const jsDir = path.join(ROOT, '..', 'frontend', 'js');
+  const jsDirs = ['js', 'packages'].map((d) => path.join(ROOT, '..', 'frontend', d));
   let total = 0;
-  (function walk(dir) {
-    let entries;
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    for (const e of entries) {
-      const p = path.join(dir, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith('.js') && e.name !== 'crash.js') total++;
-    }
-  })(jsDir);
+  for (const jsDir of jsDirs) {
+    (function walk(dir) {
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.name.endsWith('.js') && e.name !== 'crash.js') total++;
+      }
+    })(jsDir);
+  }
   return total;
 }
 
@@ -153,7 +155,7 @@ async function boot(port) {
   // tag rather than an import. No walk of the module graph can reach crash.js, and it is the
   // one module whose health decides whether a failure is a black screen or a sentence
   // explaining itself - so it is asked about directly rather than assumed present.
-  const roots = [entry, '/js/crash.js'];
+  const roots = [entry, '/packages/crash.js'];
   const seen = new Set(roots);
   const queue = [...roots];
   let rounds = 0;

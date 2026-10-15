@@ -21,6 +21,7 @@ import { stripComments } from './strip-comments.mjs';
 // ES module, so no __dirname. The repo root is two levels up from backend.
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const JS = path.resolve(HERE, '..', '..', 'frontend', 'js');
+const PACKAGES = path.resolve(HERE, '..', '..', 'frontend', 'packages');
 
 // The language and the browser. Without these the check is 79 lines of noise.
 const BUILT_IN = new Set([
@@ -47,6 +48,7 @@ const walk = (dir) => {
   }
 };
 walk(JS);
+walk(PACKAGES);
 
 const problems = [];
 
@@ -111,7 +113,7 @@ for (const file of files) {
     if (bound.has(name) || BUILT_IN.has(name) || reported.has(name)) return;
     reported.add(name);
     const line = code.slice(0, at).split('\n').length;
-    problems.push([path.relative(JS, file), line, name]);
+    problems.push([path.relative(path.resolve(HERE, '..', '..', 'frontend'), file), line, name]);
   };
 
   for (const m of code.matchAll(/(^|[^.\w$'"`])([A-Z][\w$]*)\s*\.\s*[a-z_$]/g)) note(m[2], m.index);

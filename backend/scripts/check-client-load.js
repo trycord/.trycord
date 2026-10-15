@@ -23,7 +23,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const CLIENT_JS = path.join(__dirname, '..', '..', 'frontend', 'js');
+const CLIENT_ROOTS = ['js', 'packages'].map((d) => path.join(__dirname, '..', '..', 'frontend', d));
 
 // Enough DOM for module evaluation. Nothing here is meant to be a working browser:
 // the elements record what was asked of them and return themselves, which is enough
@@ -189,7 +189,7 @@ function walk(dir) {
 
   const { doc, win } = installDom();
 
-  const files = walk(CLIENT_JS).sort();
+  const files = CLIENT_ROOTS.flatMap((r) => walk(r)).sort();
   const failures = [];
   let loaded = 0;
 

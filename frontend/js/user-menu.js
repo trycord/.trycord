@@ -10,11 +10,11 @@
 // report is never offered, and the block entry reads the viewer's own block list
 // before it decides which of the two it is.
 
-import { el } from './dom.js';
+import { el } from '../packages/dom.js';
 import { openMenu, openDialog, attachContextMenu, toast, errorToast, confirmDialog } from './ui.js';
-import { State, nameOf, friendshipWith, normalizeUser } from './store.js';
-import { navigate } from './nav.js';
-import Api from './api.js';
+import { State, nameOf, friendshipWith, normalizeUser } from '../packages/store.js';
+import { navigate } from '../packages/nav.js';
+import Api from '../packages/api.js';
 
 export function isSelf(user) {
   return !!(user && State.user && String(user.id) === String(State.user.id));

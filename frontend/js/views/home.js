@@ -6,13 +6,13 @@
 // is a stack of welcome cards, because a welcome card is a thing you read once
 // and then scroll past forever.
 
-import { el } from '../dom.js';
-import { icon } from '../icons.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { serverMark } from '../components.js';
-import { State, nameOf } from '../store.js';
-import { path } from '../nav.js';
-import Api from '../api.js';
-import { relativeTime } from '../format.js';
+import { State, nameOf } from '../../packages/store.js';
+import { path } from '../../packages/nav.js';
+import Api from '../../packages/api.js';
+import { relativeTime } from '../../packages/format.js';
 import { page, band, panel, prow, notice, loading, failure, empty } from './util.js';
 
 const DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];

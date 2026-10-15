@@ -28,7 +28,8 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 
 const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
-const REGISTRY = path.join(CLIENT, 'pages', 'registry.js');
+const CLIENT_ROOTS = [CLIENT, path.join(__dirname, '..', '..', 'frontend', 'packages')];
+const REGISTRY = path.join(__dirname, '..', '..', 'frontend', 'packages', 'registry.js');
 
 // Fields the contract is allowed to have. Every one is read by something; the comment
 // says by what, because a permitted field nothing reads is what this check exists to
@@ -97,7 +98,7 @@ function ok(label, condition, detail) {
   const unused = Object.keys(ALLOWED).filter((f) => !PAGES.some((p) => f in p));
   const readSomewhere = (field) => {
     const re = new RegExp('\\.' + field + '\\b');
-    return walk(CLIENT).some((file) => file !== REGISTRY
+    return CLIENT_ROOTS.flatMap((r) => walk(r)).some((file) => file !== REGISTRY
       && re.test(fs.readFileSync(file, 'utf8')));
   };
   const trulyDead = unused.filter((f) => !readSomewhere(f));

@@ -84,7 +84,7 @@ const PLAUSIBLE = /^[a-z][a-z0-9_-]*$/;
 
 const emitted = new Map(); // class -> first file that mentions it
 
-for (const file of sourcesIn(path.join(CLIENT, 'js'))) {
+for (const file of [...sourcesIn(path.join(CLIENT, 'js')), ...sourcesIn(path.join(CLIENT, 'packages'))]) {
   const src = fs.readFileSync(file, 'utf8');
   for (const re of PATTERNS) {
     re.lastIndex = 0;

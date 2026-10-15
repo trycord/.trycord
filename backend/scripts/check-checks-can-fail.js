@@ -90,7 +90,7 @@ const CASES = [
       "if (pattern === '*') return true;"),
     word: 'bare star' },
 
-  { script: 'check-client-registry', file: 'frontend/js/pages/registry.js',
+  { script: 'check-client-registry', file: 'frontend/packages/registry.js',
     guards: 'a page registered without a route',
     // PAGES is what the check imports, so the probe has to join that array - an exported
     // constant nothing reads would not be seen by anything.
@@ -121,7 +121,7 @@ const CASES = [
     break: (f) => append(f, "\nrouter.get('/', requireVerified, async (req, res) => res.json([]));\n"),
     word: 'duplicate' },
 
-  { script: 'check-routes', file: 'frontend/js/pages/registry.js',
+  { script: 'check-routes', file: 'frontend/packages/registry.js',
     guards: 'a client route the server would not treat as an application route',
     break: (f) => append(f,
       "\nPAGES.push({ id: '__probe', route: '/app/__probe', scope: 'me', render: () => {} });\n"),
@@ -162,7 +162,7 @@ const CASES = [
       'return res.json(Object.assign({\n    token: undefined,'),
     word: 'token' },
 
-  { script: 'check-crash-screen', file: 'frontend/js/crash.js',
+  { script: 'check-crash-screen', file: 'frontend/packages/crash.js',
     guards: 'a report that scrolls the page instead of covering it',
     // The mobile bug this check guards: the report was laid out inside the full-height
     // mount, so on a phone it sat below the fold and the reader had to scroll to find it.

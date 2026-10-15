@@ -4,7 +4,7 @@
 // read by the shell without importing every view. The router binds this before
 // it dispatches, and a page with no entry here is a page that cannot be opened.
 
-import { PAGES } from '../pages/registry.js';
+import { PAGES } from '../../packages/registry.js';
 import { renderHome } from './home.js';
 import { renderDms, renderDm } from './dms.js';
 import { renderNotifications } from './notifications.js';

@@ -5,18 +5,18 @@
 // permission list the API already returned with the community, so a control
 // that would be refused is never drawn.
 
-import { el, clear, fragment } from '../dom.js';
-import { icon } from '../icons.js';
+import { el, clear, fragment } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { avatar, iconButton, serverMark, fieldRow } from '../components.js';
 import {
   State, normalizeUser, nameOf, refreshServer, refreshServerTree,
   refreshServerMembers, refreshServerRoles, channelsOf, categoriesOf, can, isOwner, serverById,
-} from '../store.js';
-import { path, navigate } from '../nav.js';
+} from '../../packages/store.js';
+import { path, navigate } from '../../packages/nav.js';
 import { openDialog, confirmDialog, toast, errorToast, attachContextMenu } from '../ui.js';
 import { openUserMenu, userMenuItems } from '../user-menu.js';
-import { relativeTime } from '../format.js';
-import Api from '../api.js';
+import { relativeTime } from '../../packages/format.js';
+import Api from '../../packages/api.js';
 import { page, heading, loading, failure, nothing, stat } from './util.js';
 import { renderConversation } from './messages.js';
 
@@ -105,7 +105,7 @@ function membersPanel(serverId) {
       paint();
       const ids = membersOf(serverId).map((m) => m.id).filter(Boolean);
       if (ids.length) {
-        const { refreshPresence } = await import('../store.js');
+        const { refreshPresence } = await import('../../packages/store.js');
         refreshPresence(ids).catch(() => {});
       }
     } catch {
@@ -318,7 +318,7 @@ function membersSection(serverId) {
       const items = membersOf(serverId);
       const ids = items.map((m) => m.id).filter(Boolean);
       if (ids.length) {
-        const { refreshPresence } = await import('../store.js');
+        const { refreshPresence } = await import('../../packages/store.js');
         refreshPresence(ids).catch(() => {});
       }
       rows.replaceChildren();
@@ -1066,7 +1066,7 @@ async function deleteCommunity(serverId) {
 }
 
 async function signOutToHome() {
-  const { refreshServers } = await import('../store.js');
+  const { refreshServers } = await import('../../packages/store.js');
   await refreshServers().catch(() => {});
   navigate('/home');
 }

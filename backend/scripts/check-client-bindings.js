@@ -30,7 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
+const CLIENT_ROOTS = ['js', 'packages'].map((d) => path.join(__dirname, '..', '..', 'frontend', d));
 
 (async () => {
   const { stripComments } = await import('./strip-comments.mjs');
@@ -45,7 +45,7 @@ const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
     return out;
   }
 
-  const files = walk(CLIENT);
+  const files = CLIENT_ROOTS.flatMap((r) => walk(r));
   const src = new Map();
   for (const f of files) src.set(f, fs.readFileSync(f, 'utf8'));
 

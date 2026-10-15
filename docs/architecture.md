@@ -23,7 +23,7 @@ The eleven questions worth being able to answer without searching.
 | The application tree | `frontend/js/shell.js`, mounted by `frontend/js/main.js` - builds the workspace into the one element in `index.html`. The document itself holds nothing but metadata, `<base>`, the crash screen and the entry module. |
 | What is on screen | `frontend/js/router.js` - resolves the address to a page, asks its renderer for the regions, and fills the shell from that one answer. No region decides for itself. |
 | Routing | `frontend/js/router.js` - parses `location`, matches the longest prefix on segment boundaries, resolves the community by slug or id, and mounts. No hash. |
-| Page definitions | `frontend/js/pages/registry.js` - the one source of truth for every page, route and nav entry. |
+| Page definitions | `frontend/packages/registry.js` - the one source of truth for every page, route and nav entry. |
 | Navigation | Derived from that registry: `frontend/js/shell.js` for the rail and the phone tab bar, `frontend/js/sidebars.js` for the place, settings, admin and community sidebars. Presentation differs; identity does not. |
 | A page | `{id, route, ...}` metadata in the registry, with its renderer bound from `frontend/js/views/index.js` by `main.js` through the registry's `bind()`. The registry never imports the view modules that draw, so reading a label does not pull in the shell. |
 | Community and channel | `frontend/js/views/community.js` - one module for a community: the channel (text or voice), the roster, and the administrative screens (channels, categories, members, roles, invites, settings) underneath it. `frontend/js/sidebars.js` draws the community tree. |
@@ -32,14 +32,14 @@ The eleven questions worth being able to answer without searching.
 | The admin console | `frontend/js/views/admin.js` - the frame plus each section. The configuration centre renders itself from the catalogue the API returns rather than from a hardcoded field list. |
 | Renderers | `frontend/js/views/index.js` - id to renderer, and nothing else. Metadata stays in the registry so the registry is not a cycle. |
 | Lifecycle | `frontend/js/router.js` - teardown of the previous page, access gate, renderer call, then painting the chrome and catching what the renderer throws. |
-| Authentication state | `frontend/js/state.js`, with `frontend/js/store.js` for the loading and refresh. The token is in `api.js`; everything else reads `State.me`. |
-| Client-side permissions | `frontend/js/store.js#can`, mirrored from `services/permissions.js`. **Display only** - the server decides. |
+| Authentication state | `frontend/packages/state.js`, with `frontend/packages/store.js` for the loading and refresh. The token is in `api.js`; everything else reads `State.me`. |
+| Client-side permissions | `frontend/packages/store.js#can`, mirrored from `services/permissions.js`. **Display only** - the server decides. |
 | Which origins may talk to this instance | `src/origins.js` - the CORS policy, including the desktop app's custom scheme and the `*.` wildcard rules. |
 | Server-side authorization | `middleware/serverAccess.js` - `resolveServer`, `requireMember`, `requirePerm`, `requireOwner`. Routes declare their own level. |
-| Themes | `frontend/js/theme.js` over the tokens in `frontend/css/tokens.css` (aggregated by `frontend/css/app.css`). The chosen palette is written to `<html data-theme>`; a reader's custom palette goes on as inline custom properties and is kept only if the shell still measures after it lands. |
-| API calls | `frontend/js/api.js`. One `request()`, no per-feature clients. |
+| Themes | `frontend/packages/theme.js` over the tokens in `frontend/css/tokens.css` (aggregated by `frontend/css/app.css`). The chosen palette is written to `<html data-theme>`; a reader's custom palette goes on as inline custom properties and is kept only if the shell still measures after it lands. |
+| API calls | `frontend/packages/api.js`. One `request()`, no per-feature clients. |
 | Message state | `frontend/js/views/messages.js` - one conversation renderer for channels and DMs, owning its feed and subscriptions, torn down on the way out. |
-| Community context | `frontend/js/store.js` - `currentServerId` and the community tree, with `frontend/js/realtime.js` keeping it fresh. |
+| Community context | `frontend/packages/store.js` - `currentServerId` and the community tree, with `frontend/packages/realtime.js` keeping it fresh. |
 | Data model | `db/tables/` - one module per concern: identity, communities, messaging, social, moderation, instance. |
 | Schema migrations | `db/schema.js` - the ALTER and MODIFY lists that bring an existing database up to date, the declared indexes, the backfills. |
 | Database access | `db/index.js`, which is the only module that speaks SQL dialect. |
@@ -466,7 +466,7 @@ the signer now.
 
 ## The client: pages and navigation
 
-One file says what a page *is*: `frontend/js/pages/registry.js`. A page
+One file says what a page *is*: `frontend/packages/registry.js`. A page
 declares its identity, its address, who may be there, which shell layout it wants,
 whether it has a contextual sidebar, and — for the scoped navigations — its scope,
 group, label, icon, order and blurbs.
@@ -474,7 +474,7 @@ group, label, icon, order and blurbs.
 Everything else asks that file rather than deciding for itself:
 
 - the router resolves an address to a page
-- `pages/lifecycle.js` runs the previous page's teardown, gates access, calls the
+- `frontend/js/router.js` runs the previous page's teardown, gates access, calls the
   renderer, paints the chrome afterwards and catches what the renderer throws
 - the rail, the phone tab bar, the settings navigation and the admin navigation all
   read the same definitions
@@ -494,31 +494,31 @@ an entry cannot change what a URL means. Legacy spellings are rewritten before
 matching rather than kept as parallel entries, so `/account/*` and `/admin/servers`
 reach the page that answers to them and cannot drift from it.
 
-A renderer lives next to its own domain — `community/`, `account/`, `admin/`,
-`messages/`, `global/`, `profile/`, `discovery/`, `support/`, `public/` — and binds
-to a page id in `pages/handlers.js`. Renderers are kept out of the registry because
-the the rail, the sidebar and the settings navigation would otherwise have to import
-every page module to read a label, and those modules import the shell, which reads
-the registry.
+A renderer is a module in `frontend/js/views/` — `community.js`, `messages.js`,
+`settings.js`, `admin.js`, `auth.js` and the rest — and `frontend/js/views/index.js`
+holds the one table that maps a page id to the renderer that draws it, which
+`frontend/packages/registry.js` binds at startup. The table is kept out of the registry
+because the rail, the sidebar and the settings navigation read page definitions to
+draw a label, and a renderer imports the shell, which in turn reads the registry.
 
 ## The shell
 
-`frontend/js/app-shell.js` draws the tree the rest of the application addresses by
+`frontend/js/shell.js` draws the tree the rest of the application addresses by
 id — the rail, the place navigation, the workspace and the overlays — once, when the
-application starts. It also owns the keyboard shortcuts. Everything else about the
-chrome belongs to the region renderers in `shell/`: `renderAllChrome()` fills those
-regions on every route change, and each one is a module named for what it draws.
-This split is deliberate. The shell's *structure* is stable and read by id from
-everywhere; its *content* changes on every route and on every unread badge. One file
-doing both was a tree that got torn down and rebuilt to change a number.
+application starts, and owns the keyboard shortcuts. The region functions on that
+module (`renderAllChrome()`, `setStage`, `setPlaceNav`, `setContextPanel`,
+`setComposer`, `renderTabbar`), with `frontend/js/sidebars.js`, fill those regions on
+every route change and every unread badge. The split is deliberate: the shell's
+*structure* is stable and read by id from everywhere; its *content* changes on every
+route. One file doing both was a tree that got torn down and rebuilt to change a
+number.
 
-`components/base.js` is the component base: `render()`, `mount()`, `unmount()`
-and `on()`, which registers a listener that `unmount()` removes. It exists because
-a listener registered without a matching removal outlives the surface it draws for,
-and the symptom is a handler that responds to a page the reader has left. It is not
-a framework — there is no reactivity, no diffing, no virtual DOM, and no component
-library on top of it. The two things that needed it have it; everything else creates
-its own DOM the way the renderers always have.
+There is no component framework. A screen builds DOM with `el()` from
+`frontend/js/packages/dom.js`; the shared pieces are plain functions in
+`frontend/js/components.js`, and overlays, dialogs and toasts live in
+`frontend/js/ui.js`. A surface that registers a document listener removes it when it
+is torn down — the lifecycle the router runs — because a listener left behind answers
+for a page the reader has left.
 
 ## Theming
 

@@ -10,15 +10,15 @@
 // drawer on a phone root, back on a phone detail, collapse on a desk. All three
 // are built at every width; CSS picks one.
 
-import { el, clear, prefersReducedMotion } from './dom.js';
-import { icon } from './icons.js';
+import { el, clear, prefersReducedMotion } from '../packages/dom.js';
+import { icon } from '../packages/icons.js';
 import { avatar, countBadge, serverMark } from './components.js';
-import { State, nameOf } from './store.js';
-import { path, currentRoute, navigate, canGoBack } from './nav.js';
-import { globalPages, mobilePages } from './pages/registry.js';
+import { State, nameOf } from '../packages/store.js';
+import { path, currentRoute, navigate, canGoBack } from '../packages/nav.js';
+import { globalPages, mobilePages } from '../packages/registry.js';
 import { openMenu, attachContextMenu } from './ui.js';
 import { serverMenuItems } from './sidebars.js';
-import { currentTheme, setTheme } from './theme.js';
+import { currentTheme, setTheme } from '../packages/theme.js';
 import { toggleNav, isNavOpen, closeNav, presentationMode } from './presentation.js';
 
 const refs = {};

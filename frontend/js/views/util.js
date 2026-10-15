@@ -4,10 +4,10 @@
 // sections, so the shape is defined once here rather than re-derived - slightly
 // differently - on each screen.
 
-import { el } from '../dom.js';
-import { icon } from '../icons.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { spinner } from '../components.js';
-import { relativeTime } from '../format.js';
+import { relativeTime } from '../../packages/format.js';
 
 export function page(children, options) {
   // Two call styles grew up side by side: page({ wide }, ...children) and

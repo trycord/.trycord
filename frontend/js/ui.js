@@ -5,8 +5,8 @@
 // mechanism, which is how every screen ended up with its own slightly different
 // idea of whether Escape cancels or closes.
 
-import { el, qs, trapFocus } from './dom.js';
-import { icon } from './icons.js';
+import { el, qs, trapFocus } from '../packages/dom.js';
+import { icon } from '../packages/icons.js';
 
 // -- toasts ------------------------------------------------------------------
 

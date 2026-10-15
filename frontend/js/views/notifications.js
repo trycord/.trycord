@@ -4,13 +4,13 @@
 // then follows it, because a notification is a pointer and opening it is the same
 // gesture as going there.
 
-import { el } from '../dom.js';
-import { icon } from '../icons.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { avatar } from '../components.js';
-import { State, refreshNotifications } from '../store.js';
-import { navigate } from '../nav.js';
-import { relativeTime } from '../format.js';
-import Api from '../api.js';
+import { State, refreshNotifications } from '../../packages/store.js';
+import { navigate } from '../../packages/nav.js';
+import { relativeTime } from '../../packages/format.js';
+import Api from '../../packages/api.js';
 import { page, band, panel, prow, loading, failure, empty } from './util.js';
 
 const PHRASE = {

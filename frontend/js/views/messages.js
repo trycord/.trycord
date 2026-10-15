@@ -5,17 +5,17 @@
 // carries, and a composer. What differs is the routes that read and write the
 // scroll, so those are the only thing passed in.
 
-import { el, clear } from '../dom.js';
-import { icon } from '../icons.js';
+import { el, clear } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { avatar } from '../components.js';
-import { State } from '../store.js';
+import { State } from '../../packages/store.js';
 import { openMenu, openDialog, confirmDialog, errorToast, attachContextMenu } from '../ui.js';
 import { attachUserMenu } from '../user-menu.js';
-import { mediaUrl, isServerPath } from '../media.js';
-import { dayLabel, toDate, timeOfDay, fullTimestamp, fileSize } from '../format.js';
-import realtime, { EVENTS } from '../realtime.js';
-import { navigate, path } from '../nav.js';
-import Api from '../api.js';
+import { mediaUrl, isServerPath } from '../../packages/media.js';
+import { dayLabel, toDate, timeOfDay, fullTimestamp, fileSize } from '../../packages/format.js';
+import realtime, { EVENTS } from '../../packages/realtime.js';
+import { navigate, path } from '../../packages/nav.js';
+import Api from '../../packages/api.js';
 
 const QUICK = ['\u{1F44D}', '\u{1F525}', '\u{1F389}', '\u{1F602}', '\u{1F440}', '\u{2705}'];
 

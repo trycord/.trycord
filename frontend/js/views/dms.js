@@ -4,12 +4,12 @@
 // conversation renderer is shared and this file only supplies its scope and the
 // header around it.
 
-import { el } from '../dom.js';
+import { el } from '../../packages/dom.js';
 import { avatar, countBadge, iconButton } from '../components.js';
-import { State, dmPeer, nameOf, refreshDms } from '../store.js';
-import { path, navigate } from '../nav.js';
-import { relativeTime } from '../format.js';
-import Api from '../api.js';
+import { State, dmPeer, nameOf, refreshDms } from '../../packages/store.js';
+import { path, navigate } from '../../packages/nav.js';
+import { relativeTime } from '../../packages/format.js';
+import Api from '../../packages/api.js';
 import { page, band, panel, prow, loading, failure, empty } from './util.js';
 import { renderConversation } from './messages.js';
 

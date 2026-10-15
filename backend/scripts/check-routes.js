@@ -19,7 +19,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const ROOT = path.join(__dirname, '..');
-const CLIENT_PAGES = path.join(ROOT, '..', 'frontend', 'js', 'pages', 'registry.js');
+const CLIENT_PAGES = path.join(ROOT, '..', 'frontend', 'packages', 'registry.js');
 const SERVE_CLIENT = path.join(ROOT, 'src', 'serve-client.js');
 
 // Prefixes the server answers with the shell even though no client route uses

@@ -6,12 +6,12 @@
 // lifecycle. It owns exactly one cleanup, so a page that subscribes to anything
 // has somewhere to unsubscribe.
 
-import { matchRoute, renderPage } from './pages/registry.js';
-import { currentRoute, currentQuery, navigate, navigationDirection } from './nav.js';
+import { matchRoute, renderPage } from '../packages/registry.js';
+import { currentRoute, currentQuery, navigate, navigationDirection } from '../packages/nav.js';
 import {
   State, serverById, channelById, refreshServer, refreshServers, refreshServerTree,
   signedIn,
-} from './store.js';
+} from '../packages/store.js';
 import {
   shellRoot, setStage, setStageHead, setComposer, setContextPanel, setPlaceNav,
   setTitle, refreshChrome, closeDrawer, beginNavigation,

@@ -11,7 +11,7 @@ stale document. Numbers that a check can read are not repeated here.
 ## 1. The route, as it actually is
 
 The community tree is a client-side route family rendered by one module,
-`frontend/js/views/community.js`, and registered in `frontend/js/pages/registry.js` and
+`frontend/js/views/community.js`, and registered in `frontend/packages/registry.js` and
 `frontend/js/views/index.js`. `/c/:slug` is the current spelling; `/server/:id` is the
 legacy spelling and is an `aliasOf` the canonical page, so the shell only ever sees an id.
 

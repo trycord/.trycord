@@ -4,12 +4,12 @@
 // so they share one module. They render outside the workspace, because a person
 // who is not signed in has no workspace to be inside.
 
-import { el } from '../dom.js';
-import { icon } from '../icons.js';
-import Api from '../api.js';
-import { currentQuery, navigate, path } from '../nav.js';
-import { applyToken, loadSession, logout, refreshServers } from '../store.js';
-import { connect } from '../realtime.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
+import Api from '../../packages/api.js';
+import { currentQuery, navigate, path } from '../../packages/nav.js';
+import { applyToken, loadSession, logout, refreshServers } from '../../packages/store.js';
+import { connect } from '../../packages/realtime.js';
 import { toast } from '../ui.js';
 
 function lockup() {

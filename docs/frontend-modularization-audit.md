@@ -8,6 +8,15 @@ names the decisions that must be settled before any file moves. It changes no co
 Companion records: `docs/community-channel-audit.md` (community/channel family),
 `docs/architecture.md` (system), `IMPLEMENTATION_STATE.md` (phase + decisions).
 
+> **Phase B has since executed.** The nonvisual platform now lives in
+> `frontend/packages/` (`api`, `config`, `store`, `state`, `realtime`, `format`,
+> `media`, `dom`, `icons`, `nav`, `theme`, `crash`, `registry`); the desktop
+> presentation stays in `frontend/js/`, and the desktop entry is still
+> `frontend/index.html` at the same mount. Every importer was rewritten by resolving
+> each specifier, and the check harness now reads both roots. The `frontend/js/...`
+> paths in §1 below describe the tree **at audit time**; §4 and `IMPLEMENTATION_STATE.md`
+> give the current layout.
+
 ## 1. What exists today
 
 ### 1.1 Repository layout (git-tracked)
@@ -54,7 +63,7 @@ the browser never loads.
 
 ### 1.3 Routing and pages
 
-- `frontend/js/pages/registry.js` — the single source of truth: `{id, route, scope,
+- `frontend/packages/registry.js` — the single source of truth: `{id, route, scope,
   sidebar, nav}` for every page, plus `matchPath/matchRoute/scopeNav/globalPages/
   mobilePages/scopeHasTab` and the renderer `bind()` table.
 - `frontend/js/router.js` — longest-prefix match on segment boundaries, resolves the
@@ -90,7 +99,7 @@ the place/settings/admin/community sidebars. **One shell serves every viewport.*
 | `dom.js` | `el`, `qs`, `clear`, `trapFocus`, `svgEl`. | Platform (nonvisual primitives). |
 | `icons.js` | Inline 24×24 icon set. | Platform (icon vocabulary). |
 | `crash.js` | Crash screen; plain script, not a module. | Platform. |
-| `pages/registry.js` | Route/page table. | Platform (route contract). |
+| `packages/registry.js` | Route/page table. | Platform (route contract). |
 
 **Presentation (desktop, today):** `shell.js`, `sidebars.js`, `components.js`, `ui.js`,
 `user-menu.js`, `voice.js`, `presentation.js`, `views/*` (15 modules), `main.js`,
@@ -176,16 +185,16 @@ counted.**
 
 | Capability | Today | Classification |
 |---|---|---|
-| API client, request envelope | `js/api.js` | Platform |
-| Session load/refresh, logout | `js/store.js`, `js/state.js` | Platform |
-| Permission mirror (`can`) | `js/store.js` | Platform |
-| Realtime gateway + events | `js/realtime.js` | Platform |
-| Route table + matcher | `js/pages/registry.js` | Platform (contract) |
-| URL/`<base>`/public-link helpers | `js/nav.js` | Platform |
-| Theme application | `js/theme.js` | Platform |
-| Formatting / media URLs | `js/format.js`, `js/media.js` | Platform |
-| DOM + icon primitives | `js/dom.js`, `js/icons.js` | Platform |
-| Crash screen | `js/crash.js` | Platform |
+| API client, request envelope | `packages/api.js` | Platform |
+| Session load/refresh, logout | `packages/store.js`, `packages/state.js` | Platform |
+| Permission mirror (`can`) | `packages/store.js` | Platform |
+| Realtime gateway + events | `packages/realtime.js` | Platform |
+| Route table + matcher | `packages/registry.js` | Platform (contract) |
+| URL/`<base>`/public-link helpers | `packages/nav.js` | Platform |
+| Theme application | `packages/theme.js` | Platform |
+| Formatting / media URLs | `packages/format.js`, `packages/media.js` | Platform |
+| DOM + icon primitives | `packages/dom.js`, `packages/icons.js` | Platform |
+| Crash screen | `packages/crash.js` | Platform |
 | App shell, regions, chrome | `js/shell.js` | Desktop presentation |
 | Sidebars (place/settings/admin/community) | `js/sidebars.js` | Desktop presentation |
 | Component vocabulary | `js/components.js`, `js/ui.js`, `js/user-menu.js` | Desktop presentation |
@@ -216,29 +225,30 @@ tree.
 ```
 frontend/
   index.html                 # desktop entry (keeps the current served URL)
-  mobile.html                # mobile entry (new; served at the mobile mount)
+  mobile.html                # mobile entry (new; Phase D)
+  js/                        # the DESKTOP module (presentation)
+    main.js app.js shell.js sidebars.js components.js ui.js user-menu.js voice.js
+    router.js presentation.js
+    views/*                  # views/index.js is the page-id -> renderer table
   packages/                  # shared, nonvisual — imports nothing visual
     api.js config.js store.js state.js realtime.js format.js media.js
-    dom.js icons.js nav.js theme.js crash.js
-    routes/registry.js
-  desktop/                   # desktop presentation
-    main.js shell.js sidebars.js components.js ui.js user-menu.js voice.js
-    presentation.js views/*  index.js
-    css/                     # desktop layers (tokens/base/components/shell/…)
-  mobile/                    # mobile presentation (new, independent)
+    dom.js icons.js nav.js theme.js crash.js registry.js
+  mobile/                    # the MOBILE module (new, independent; Phase D)
     main.js shell.js navigation.js sheets.js views/* index.js
-    css/                     # mobile layers only
+  css/                       # style layers (desktop arrangement today; Phase C splits)
   assets/                    # unchanged; trycord-assets staged here
 ```
 
-Boundary rules, enforced by a new `backend/scripts/check-frontend-modules.js`:
+Boundary rules, enforced by `backend/scripts/check-frontend-modules.js` (written and
+wired into `npm run check` in Phase B):
 
-1. `desktop/**` may import `packages/**`; never `mobile/**`.
-2. `mobile/**` may import `packages/**`; never `desktop/**`.
-3. `packages/**` imports neither `desktop/**` nor `mobile/**`.
-4. `packages/**` contains no DOM/shell module that reads presentation state.
+1. `js/**` (the desktop module) may import `packages/**`; never `mobile/**`.
+2. `mobile/**` may import `packages/**`; never `js/**`.
+3. `packages/**` imports neither `js/**` nor `mobile/**`.
+4. `packages/**` holds no shell or visual component; the check reads files, so this
+   stays a review rule.
 
-Route/page identity stays in `packages/routes/registry.js`; each module registers its
+Route/page identity stays in `packages/registry.js`; each module registers its
 own renderers (the current `bind()` seam already supports this).
 
 ### Module selection
@@ -257,7 +267,7 @@ routing) or a fixed `/m/` path with no detection (users must type it).
 | Phase | Work | Gate |
 |---|---|---|
 | **A (this doc)** | Inventory, classification, target, decisions | Audit complete |
-| **B** | Create `packages/`, move shared modules, update every importer + the 8 check scripts + doc counts; add the boundary check. Desktop behaviour unchanged. | `npm run check` + `check:render` green, same assertions |
+| **B (done)** | Create `packages/`, move shared modules, update every importer + the check scripts + doc counts; add the boundary check. Desktop behaviour unchanged. | `npm run check`, `check:render`, `check:graph` green, same assertion counts |
 | **C** | Move desktop presentation to `desktop/`, split the CSS bundle; desktop pixel/behaviour parity. | Above + `check:desktop-shell`, `check:mobile-layout` adapted |
 | **D** | Build the mobile module (shell, navigation, screens, styles, gestures) importing only `packages/`. | New mobile checks; every capability in §2 reachable |
 | **E** | Serving: mount both entries; Cloudflare build includes both; Electron bundles desktop. | `check:mount`, `check:routes`, Cloudflare build |

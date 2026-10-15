@@ -4,12 +4,12 @@
 // plus a way to start one. They belong on one page because they are the same
 // question asked of a different set of rows.
 
-import { el } from '../dom.js';
+import { el } from '../../packages/dom.js';
 import { avatar, iconButton } from '../components.js';
-import { State, nameOf, normalizeUser, refreshFriends } from '../store.js';
-import { path, navigate } from '../nav.js';
+import { State, nameOf, normalizeUser, refreshFriends } from '../../packages/store.js';
+import { path, navigate } from '../../packages/nav.js';
 import { openMenu, toast, errorToast, confirmDialog } from '../ui.js';
-import Api from '../api.js';
+import Api from '../../packages/api.js';
 import { page, band, panel, prow, loading, failure, empty } from './util.js';
 
 const TABS = [

@@ -42,7 +42,8 @@ function walk(dir, out = []) {
   return out;
 }
 
-const clientModules = walk(path.join(ROOT, 'frontend', 'js')).length;
+const clientModules = walk(path.join(ROOT, 'frontend', 'js')).length
+  + walk(path.join(ROOT, 'frontend', 'packages')).length;
 ok('the client module count in the summary', doc.includes(`all ${clientModules} client modules`),
   clientModules + ' modules, and the docs do not say that');
 

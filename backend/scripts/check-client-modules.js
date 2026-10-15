@@ -23,7 +23,7 @@ const { spawnSync } = require('child_process');
 const { stripCommentsOnly } = require('./strip-comments.mjs');
 
 const REPO = path.join(__dirname, '..', '..');
-const DIRS = process.argv.length > 2 ? process.argv.slice(2) : ['frontend/js'];
+const DIRS = process.argv.length > 2 ? process.argv.slice(2) : ['frontend/js', 'frontend/packages'];
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-modules-'));
 const probe = path.join(tmp, 'probe.mjs');

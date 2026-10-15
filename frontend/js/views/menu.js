@@ -4,12 +4,12 @@
 // community with its channels. A map is scanned, not read, so this is rows in
 // panels and nothing else - no cards to scroll past.
 
-import { el } from '../dom.js';
-import { icon } from '../icons.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { serverMark } from '../components.js';
-import { State } from '../store.js';
-import { path } from '../nav.js';
-import Api from '../api.js';
+import { State } from '../../packages/store.js';
+import { path } from '../../packages/nav.js';
+import Api from '../../packages/api.js';
 import { page, band, panel, prow, loading, failure } from './util.js';
 
 const GLOBAL = [

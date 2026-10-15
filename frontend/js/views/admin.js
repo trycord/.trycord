@@ -5,13 +5,13 @@
 // happening here - and every page is gated by the server, not by a flag in the
 // client.
 
-import { el, clear } from '../dom.js';
-import { icon } from '../icons.js';
+import { el, clear } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import { avatar, serverMark } from '../components.js';
-import { nameOf } from '../store.js';
-import Api from '../api.js';
-import { path, navigate } from '../nav.js';
-import { scopeNav } from '../pages/registry.js';
+import { nameOf } from '../../packages/store.js';
+import Api from '../../packages/api.js';
+import { path, navigate } from '../../packages/nav.js';
+import { scopeNav } from '../../packages/registry.js';
 import { toast, errorToast, confirmDialog, openDialog, openMenu } from '../ui.js';
 import { page, band, panel, prow, notice, section, loading, failure, nothing, empty, relative, stat } from './util.js';
 

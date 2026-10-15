@@ -5,11 +5,11 @@
 // from the id, so the same person is the same colour everywhere without the
 // server storing one.
 
-import { el } from './dom.js';
-import { icon } from './icons.js';
-import { initials, hueOf } from './format.js';
-import { mediaUrl, isServerPath } from './media.js';
-import { State } from './store.js';
+import { el } from '../packages/dom.js';
+import { icon } from '../packages/icons.js';
+import { initials, hueOf } from '../packages/format.js';
+import { mediaUrl, isServerPath } from '../packages/media.js';
+import { State } from '../packages/store.js';
 
 export function avatar(user, options) {
   const opts = options || {};

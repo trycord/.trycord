@@ -5,14 +5,14 @@
 // not here any more - the shell's spine carries it at the foot of the column, so
 // every place has it and no page has to remember to add it.
 
-import { el } from './dom.js';
-import { icon } from './icons.js';
+import { el } from '../packages/dom.js';
+import { icon } from '../packages/icons.js';
 import { avatar, iconButton, serverMark } from './components.js';
-import { State, nameOf, isMuted, refreshMutes, refreshServers } from './store.js';
-import { path, currentRoute, navigate } from './nav.js';
+import { State, nameOf, isMuted, refreshMutes, refreshServers } from '../packages/store.js';
+import { path, currentRoute, navigate } from '../packages/nav.js';
 import { openMenu, attachContextMenu, confirmDialog, toast, errorToast } from './ui.js';
 import { attachUserMenu } from './user-menu.js';
-import Api from './api.js';
+import Api from '../packages/api.js';
 
 function head(title, actions) {
   const list = Array.isArray(actions) ? actions.filter(Boolean) : (actions ? [actions] : []);

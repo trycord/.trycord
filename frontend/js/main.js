@@ -6,16 +6,16 @@
 // router. Everything a reader sees is built from here.
 
 import { mountShell, refreshChrome, setConnection, onSignOut } from './shell.js';
-import { applyTheme } from './theme.js';
+import { applyTheme } from '../packages/theme.js';
 import { updateFromViewport, wireNav, wireDrawerGestures } from './presentation.js';
-import { TrycordConfig } from './config.js';
+import { TrycordConfig } from '../packages/config.js';
 import {
   State, on as onStore, loadInstance, loadLegal, loadSession, logout,
   refreshServers, refreshDms, refreshFriends, refreshNotifications,
-} from './store.js';
-import { installLinkHandler, installPopStateHandler, navigate } from './nav.js';
-import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from './realtime.js';
-import { bind } from './pages/registry.js';
+} from '../packages/store.js';
+import { installLinkHandler, installPopStateHandler, navigate } from '../packages/nav.js';
+import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../packages/realtime.js';
+import { bind } from '../packages/registry.js';
 import { RENDERERS } from './views/index.js';
 import { run } from './router.js';
 
