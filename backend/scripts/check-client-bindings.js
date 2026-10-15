@@ -30,7 +30,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const CLIENT_ROOTS = ['js', 'packages'].map((d) => path.join(__dirname, '..', '..', 'frontend', d));
+const CLIENT_ROOTS = ['js', 'packages', 'mobile'].map((d) => path.join(__dirname, '..', '..', 'frontend', d));
 
 (async () => {
   const { stripComments } = await import('./strip-comments.mjs');

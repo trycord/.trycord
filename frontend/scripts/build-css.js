@@ -15,6 +15,10 @@ const fs = require('fs');
 const path = require('path');
 
 const CSS = path.join(__dirname, '..', 'css');
+// The Mobile module owns its presentation entirely, so its stylesheet is built
+// separately and is never a layer of the desktop one. It shares only the token
+// library, prepended here exactly as it is for the desktop build.
+const MOBILE_CSS = path.join(__dirname, '..', 'mobile', 'css');
 const PUBLIC_CSS = path.join(__dirname, '..', '..', 'public', 'css');
 const PUBLIC_ASSETS = path.join(__dirname, '..', '..', 'public', 'assets');
 // The canonical design-token library. It is the first layer rather than a copy,
@@ -117,7 +121,30 @@ function buildPublicIcons() {
   }
 }
 
+// The Mobile presentation: the shared token library, then the module's own
+// single layer. No desktop layer is included: cross-module CSS leakage is the
+// same fault as a cross-module import.
+function buildMobile(library) {
+  const source = path.join(MOBILE_CSS, 'mobile.css');
+  if (!fs.existsSync(source)) {
+    console.log('no mobile stylesheet to build');
+    return;
+  }
+  const header = '/* The Mobile module stylesheet. Built from frontend/mobile/css/mobile.css by '
+    + 'frontend/scripts/build-css.js - edit the layer, not this file. */\n';
+  const parts = [header, library, '\n/* ---- mobile.css ---- */\n', fs.readFileSync(source, 'utf8')];
+  const out = path.join(MOBILE_CSS, 'app.css');
+  const built = parts.join('');
+  if (fs.existsSync(out) && fs.readFileSync(out, 'utf8') === built) {
+    console.log('mobile stylesheet is up to date');
+    return;
+  }
+  fs.writeFileSync(out, built);
+  console.log('wrote ' + path.relative(process.cwd(), out));
+}
+
 const library = fs.readFileSync(ASSET_TOKENS, 'utf8').trim();
 buildApplication(library);
+buildMobile(library);
 buildPublicTokens(library);
 buildPublicIcons();

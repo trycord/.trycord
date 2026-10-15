@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" data-theme="trycord" data-platform="mobile">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#13100C">
+  <title>Trycord</title>
+  <meta name="description" content="Trycord on your phone.">
+
+  <!-- The Mobile module's own entry document. Its base is the module root, which the
+       server rewrites per request like the desktop entry's; every asset below is
+       relative to it. It shares the token library and the packages tree with the
+       desktop module and nothing else - no desktop stylesheet is loaded here. -->
+  <base href="/app/mobile/">
+
+  <link rel="stylesheet" href="./css/app.css">
+  <link rel="icon" href="../assets/trycord-logo.svg">
+
+  <script>
+    // The theme, applied before the first paint so the page never flashes the wrong
+    // one. Same key and same fallback as the desktop entry: a reader who chose a
+    // theme in either module keeps it in both.
+    (function () {
+      var key = 'trycord.theme';
+      var stored = null;
+      try { stored = window.localStorage.getItem(key); } catch (e) { /* storage off */ }
+      var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+        ? 'light' : 'trycord');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+</head>
+<body>
+  <!-- One mount point. The whole interface is built by js/main.js. -->
+  <div id="app" class="m-root"></div>
+
+  <!-- Loaded first, as a plain script: it has to be able to report a module graph
+       that failed to load, so it cannot depend on that graph. -->
+  <script src="../packages/crash.js"></script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

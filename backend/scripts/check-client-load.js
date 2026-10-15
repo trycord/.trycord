@@ -23,7 +23,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const CLIENT_ROOTS = ['js', 'packages'].map((d) => path.join(__dirname, '..', '..', 'frontend', d));
+const CLIENT_ROOTS = ['js', 'packages', 'mobile'].map((d) => path.join(__dirname, '..', '..', 'frontend', d));
 
 // Enough DOM for module evaluation. Nothing here is meant to be a working browser:
 // the elements record what was asked of them and return themselves, which is enough
