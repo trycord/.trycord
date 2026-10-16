@@ -123,8 +123,14 @@ function mountClient(app, opts) {
     // express.static because the static handler is configured with index:false, so a
     // request for the directory itself is answered by hand and the embedded base can
     // be corrected.
+    //
+    // The base is this route's own mount, not appMount: an origin-root /mobile/ on an
+    // instance that also serves under /app is still /mobile/, and stamping /app/mobile/
+    // there made the module read the wrong prefix - the document loaded, the router
+    // looked for /mobile/ in a tree rooted at /app/mobile, and every phone that reached
+    // the alias got the not-found screen.
     app.get(['/mobile', '/mobile/', '/mobile/index.html'], (req, res, next) =>
-      sendMobileDocument(candidate, appMount, res, next));
+      sendMobileDocument(candidate, '', res, next));
     if (appMount) {
       app.get([appMount + '/mobile', appMount + '/mobile/', appMount + '/mobile/index.html'],
         (req, res, next) => sendMobileDocument(candidate, appMount, res, next));
@@ -439,7 +445,10 @@ function mountSpaFallback(app, opts) {
       // reader back into the desktop composition. Tested on the mount-relative path, so
       // both /app/mobile/... and /mobile/... resolve to the same base.
       if (rest === '/mobile' || rest.startsWith('/mobile/')) {
-        return sendMobileDocument(clientDir, appMount || '', res, next);
+        // The request's own mount ('' at the origin root, /app under the mount), not
+        // the configured one: a deep link on a root /mobile/... resolves its base
+        // against /mobile/, and one under /app/mobile/... against /app/mobile/.
+        return sendMobileDocument(clientDir, mount || '', res, next);
       }
       // An instance can also serve a marketing site from the same origin. Those clean
       // URLs belong to it, so the app only claims its own prefixes and anything else
