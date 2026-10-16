@@ -1047,6 +1047,7 @@ function catalogue(secretState) {
         restartRequired: !s.live,
         pendingRestart: store.pendingRestart.has(s.key),
         consequential: !!s.consequential,
+        showIf: s.showIf || null,
         // A deployment variable that seeds a setting an administrator has since saved.
         // The saved value is in force; this names the seed so the field can say one
         // exists without implying it still decides anything.
