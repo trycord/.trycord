@@ -140,9 +140,9 @@ const SCHEMA = [
     live: true, consequential: true,
   },
   {
-    key: 'voice.provider', env: 'VOICE_VIDEO_PROVIDER', type: 'string', default: 'in-house',
+    key: 'voice.provider', env: 'VOICE_VIDEO_PROVIDER', type: 'string', default: 'cloudflare',
     category: 'voice', label: 'Media server provider',
-    description: 'In-house runs the media stack on this instance. Cloudflare Realtime SFU routes media and DataChannels but Trycord still owns signalling and room management.',
+    description: 'In-house runs the media stack on this instance using WebRTC directly. Cloudflare Realtime SFU routes media and DataChannels but Trycord still owns signalling and room management.',
     allowed: ['in-house', 'cloudflare'], live: true, consequential: true,
   },
   {
@@ -174,6 +174,7 @@ const SCHEMA = [
     category: 'voice', label: 'STUN servers',
     description: 'Comma-separated. At least one STUN server or a TURN URL is required when voice is on.',
     live: true,
+    showIf: { key: 'voice.provider', value: 'cloudflare' },
   },
   // The media server credential and the TURN relay. These used to be environment-only,
   // read once at startup, which meant an operator who had already set up the instance
@@ -183,20 +184,23 @@ const SCHEMA = [
   {
     key: 'voice.sfuAppId', env: 'VOICE_VIDEO_SFU_APP_ID', type: 'string', default: '',
     category: 'voice', label: 'Media server app ID',
-    description: 'From the media provider dashboard. Required when voice is on.',
+    description: 'From the Cloudflare Realtime SFU dashboard. Required when voice is on and provider is Cloudflare.',
     live: true,
+    showIf: { key: 'voice.provider', value: 'cloudflare' },
   },
   {
     key: 'voice.turnUrl', env: 'VOICE_VIDEO_TURN_URL', type: 'string', default: '',
     category: 'voice', label: 'TURN server URL',
     description: 'Relays media for clients behind a symmetric NAT or a UDP-blocking firewall. A STUN server alone is often not enough.',
     live: true,
+    showIf: { key: 'voice.provider', value: 'cloudflare' },
   },
   {
     key: 'voice.turnUsername', env: 'VOICE_VIDEO_TURN_USERNAME', type: 'string', default: '',
     category: 'voice', label: 'TURN username',
     description: 'For a static TURN credential. Leave blank if the provider mints short-lived ones.',
     live: true,
+    showIf: { key: 'voice.provider', value: 'cloudflare' },
   },
   {
     key: 'voice.stageChannels', env: 'VOICE_VIDEO_STAGE_CHANNELS', type: 'boolean', default: true,
@@ -845,14 +849,26 @@ async function save(entries, adminId) {
     return !!secretValues[key];
   };
   const voiceOnAfter = after('voice.enabled') === true;
+  const voiceProviderAfter = String(after('voice.provider') || 'cloudflare');
   if (voiceOnAfter) {
-    const appId = String(after('voice.sfuAppId') || '');
-    const stun = after('voice.stunUrls');
-    const turnUrl = String(after('voice.turnUrl') || '');
-    const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turnUrl;
-    if (!appId) problems.push('voice.sfuAppId: required when voice and video is on');
-    if (!secretAfter('voice.sfuAppSecret')) problems.push('voice.sfuAppSecret: required when voice and video is on');
-    if (!hasIce) problems.push('voice.stunUrls: at least one STUN server or a TURN URL is required when voice is on');
+    if (voiceProviderAfter === 'cloudflare') {
+      const appId = String(after('voice.sfuAppId') || '');
+      const stun = after('voice.stunUrls');
+      const turnUrl = String(after('voice.turnUrl') || '');
+      const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turnUrl;
+      if (!appId) problems.push('voice.sfuAppId: required when voice and video is on with Cloudflare provider');
+      if (!secretAfter('voice.sfuAppSecret')) problems.push('voice.sfuAppSecret: required when voice and video is on with Cloudflare provider');
+      if (!hasIce) problems.push('voice.stunUrls: at least one STUN server or a TURN URL is required when voice is on with Cloudflare provider');
+    } else if (voiceProviderAfter === 'in-house') {
+      // In-house WebRTC still needs at least one ICE (STUN/TURN) server for NAT
+      // traversal. These are network peers, not provider-specific credentials, so
+      // they apply to both providers.
+      const stun = after('voice.stunUrls');
+      const turnUrl = String(after('voice.turnUrl') || '');
+      const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turnUrl;
+      if (!hasIce) problems.push('voice.stunUrls: at least one STUN server or a TURN URL is required when voice is on (in-house WebRTC still needs ICE candidates)');
+    }
+    // In-house provider: no third-party credentials required, but ICE is mandatory.
     if (problems.length) return { ok: false, problems };
   }
 
