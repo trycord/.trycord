@@ -16,7 +16,7 @@ import { textInput, field } from './util.js';
 
 function lockup() {
   return el('div', { class: 'm-auth__lockup' },
-    el('img', { src: path('/assets/trycord-logo.svg'), alt: '', width: 34, height: 34 }),
+    el('img', { src: '../assets/trycord-assets/brand/trycord-symbol.svg', alt: '', width: 34, height: 34 }),
     el('span', { class: 'm-auth__brand' }, 'Trycord'));
 }
 
