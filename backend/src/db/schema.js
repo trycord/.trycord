@@ -406,6 +406,10 @@ const INDEXES = [
   'CREATE INDEX idx_continuum_deliveries_event ON continuum_deliveries(event_id, attempted_at)',
   'CREATE INDEX idx_continuum_deliveries_instance ON continuum_deliveries(instance_id, status)',
   'CREATE INDEX idx_continuum_inbox_instance ON continuum_inbox(instance_id, processed)',
+  // Community Memory: listing by server, looking up by author/source message.
+  'CREATE INDEX idx_community_memory_server ON community_memory_entries(server_id, created_at)',
+  'CREATE INDEX idx_community_memory_author ON community_memory_entries(author_id)',
+  'CREATE INDEX idx_community_memory_source ON community_memory_entries(source_message_id)',
 ];
 
 const MYSQL_COLUMN_SQL =

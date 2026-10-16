@@ -283,6 +283,12 @@ const Api = {
   leaveServer: (id) => request('POST', '/api/servers/' + encodeURIComponent(id) + '/leave'),
   transferServer: (id, userId) =>
     request('POST', '/api/servers/' + encodeURIComponent(id) + '/transfer', { body: { userId } }),
+  communityMemory: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory'),
+  createCommunityMemory: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory', { body }),
+  getCommunityMemory: (serverId, id) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory/' + encodeURIComponent(id)),
+  updateCommunityMemory: (serverId, id, body) => request('PUT', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory/' + encodeURIComponent(id), { body }),
+  deleteCommunityMemory: (serverId, id) => request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory/' + encodeURIComponent(id)),
+  communityMemoryRevisions: (serverId, id) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory/' + encodeURIComponent(id) + '/revisions'),
   kickMember: (id, userId) =>
     request('POST', '/api/servers/' + encodeURIComponent(id) + '/kick', { body: { userId } }),
   banMember: (id, userId, reason) =>

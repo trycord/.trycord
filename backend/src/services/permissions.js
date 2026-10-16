@@ -11,6 +11,7 @@ const PERMISSIONS = {
   BAN_MEMBERS: 'Ban or unban members and manage timeouts. Unbanning is not limited by rank.',
   MANAGE_MESSAGES: 'Delete any message in the server.',
   SEND_MESSAGES: 'Post messages in channels.',
+  MEMORIZE: 'Create and edit community memory entries.',
   // Voice and video. CONNECT and VIDEO belong to @everyone because a community that turns
   // voice on should not have to re-grant "may join" to every member it already has; the
   // instance-level master switch is what decides whether any of this is reachable at all.
