@@ -11,6 +11,7 @@
 
 import { el, clear } from '../packages/dom.js';
 import { icon } from '../packages/icons.js';
+import { brandSymbolUrl } from '../packages/brand.js';
 import { avatar, countBadge, serverMark } from './components.js';
 import { State, nameOf } from '../packages/store.js';
 import { path, currentRoute, navigate, BASE } from '../packages/nav.js';
@@ -232,7 +233,7 @@ function renderSpineHead() {
     class: 'spine-mark', href: path('/home'), title: 'Trycord home', 'aria-label': 'Trycord home',
   });
   const img = el('img', {
-    class: 'spine-mark-img', src: 'assets/trycord-assets/brand/trycord-symbol.svg',
+    class: 'spine-mark-img', src: brandSymbolUrl,
     alt: '', loading: 'lazy',
   });
   img.addEventListener('error', () => {
@@ -344,7 +345,7 @@ function renderRail() {
     'aria-current': server ? null : 'page',
   });
   const img = el('img', {
-    src: 'assets/trycord-assets/brand/trycord-symbol.svg', alt: '', loading: 'lazy',
+    src: brandSymbolUrl, alt: '', loading: 'lazy',
   });
   img.addEventListener('error', () => {
     home.replaceChildren(el('span', { class: 'rail-fallback', 'aria-hidden': 'true' }, 'T'));

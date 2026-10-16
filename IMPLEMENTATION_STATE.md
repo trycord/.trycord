@@ -182,6 +182,30 @@ keyboard-spam accounts is pending explicit user go-ahead (see "Pending, user-req
 
 ## Next action
 
-Phase F is done and committed locally. Next: `git push` once the user supplies
-credentials (see Blockers). Optionally regenerate `docs/verification-matrix.md` with
-`npm run check:matrix` (not in CI).
+Phase F is done and committed locally. Mobile viewport, safe-area insets and
+bottom-navigation stacking fixed; both modules render cleanly and checks pass.
+
+## Master directive additions (recorded)
+
+- Audit and keep routing in lockstep between origin (`backend/src/serve-client.js`)
+  and Cloudflare static (`cloudflare/worker.js`): serve origin-root mobile aliases,
+  draw a hard asset/route boundary under `/app/` (return 404 for non-existent
+  files), and never let the SPA fallback swallow missing assets.
+- Redo mobile layout with explicit containers: use `dvh`/`svh`, `viewport-fit=cover`,
+  horizontal/vertical safe-area insets with sensible fallbacks, make the bottom
+  tab bar sticky at bottom with its own safe-area padding, and give the composer
+  and scrolling view left/right insets so content never goes under device notches
+  or rounded corners.
+- Ensure the frontend remains backend-agnostic: backend resolution lives in one
+  place (`frontend/packages/config.js`) — stored choice → `backend.json` → serving
+  origin → default — with `backend.json` rewritten at serve-time to point to the
+  serving instance; both Desktop and Mobile import the same platform packages and
+  ship their own `backend.json` beside their entry document. No presentation code
+  hardcodes a host.
+- Brand assets are one source too: the monogram's address is derived once in
+  `frontend/packages/brand.js` from that file's own URL (client root = its parent
+  in both entries), not spelled per module as `assets/...` vs `../assets/...`. A
+  wrapper that shows the mark names the box it sits in; a wrapper with no box
+  hands back the symbol's intrinsic 512px, which is how the logo filled the app
+  bar and half the phone screen. `m-auth__brand` (a stray rule on the sign-in
+  wordmark) is gone; the wordmark uses `m-auth__name`.

@@ -6,6 +6,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
+import { brandSymbolUrl } from '../../packages/brand.js';
 import Api from '../../packages/api.js';
 import { currentQuery, navigate, path } from '../../packages/nav.js';
 import { applyToken, loadSession, logout, refreshServers } from '../../packages/store.js';
@@ -16,7 +17,7 @@ function lockup() {
   return el('div', { class: 'auth-lockup' },
     el('img', {
       class: 'auth-lockup-mark', alt: '',
-      src: 'assets/trycord-assets/brand/trycord-symbol.svg',
+      src: brandSymbolUrl,
       width: '38', height: '38',
     }),
     el('span', { class: 'auth-lockup-name' }, 'Trycord'),

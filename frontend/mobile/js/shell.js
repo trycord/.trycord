@@ -7,6 +7,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
+import { brandMark } from '../../packages/brand.js';
 import { path, currentRoute } from '../../packages/nav.js';
 import { mobilePages } from '../../packages/registry.js';
 import { State } from '../../packages/store.js';
@@ -41,8 +42,10 @@ export function setAppBar(head) {
   const h = head || {};
   refs.lead.replaceChildren();
   if (h.lead === undefined || h.lead === 'brand') {
+    // The monogram's address and box are packages/brand.js's business; the link
+    // is this shell's, because the app bar is the Mobile module's control.
     refs.lead.appendChild(el('a', { class: 'm-brandmark', href: path('/home'), 'aria-label': 'Home' },
-      el('img', { src: '../assets/trycord-assets/brand/trycord-symbol.svg', alt: '', width: 28, height: 28 })));
+      brandMark({ size: 28 })));
   } else if (h.lead === 'back') {
     refs.lead.appendChild(el('button', {
       class: 'm-iconbtn', type: 'button', 'aria-label': 'Back',
