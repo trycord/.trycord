@@ -104,29 +104,24 @@ boundary. Result: **all checks passed** (public 12, Desktop 37, Mobile 13, misse
 
 ## 4. Root-level legal routes (verified live)
 
-| Route | `trycord.dev` | `api.trycord.dev` |
-| ----- | ------------- | ----------------- |
-| `/terms` | 200 (real "Terms of Service" page) | 200 |
+| Route | `trycord.dev` (Cloudflare static — STALE) | `api.trycord.dev` (origin — live) |
+| ----- | ----------------------------------------- | --------------------------------- |
+| `/terms` | 200 (real page) | 200 |
 | `/privacy` | 200 | 200 |
-| `/support`, `/security` | 200 | — |
-| `/guidelines`, `/community-guidelines`, `/federation-policy`, `/cookies`, `/licenses` | **404** | 404 (some "where applicable") |
-| `/app/terms`, `/app/privacy` | **200 — the app shell** | 404 |
+| `/support`, `/security` | 200 | 200 |
+| `/guidelines`, `/community-guidelines`, `/federation-policy`, `/cookies`, `/licenses` | **added in repo, not deployed** — static host cannot be redeployed without push credentials | 200 (served from disk per request) |
+| `/app/terms`, `/app/privacy` | 200 — app shell (legacy nested path; redirects not yet deployed) | 404 |
 
-`/terms` is canonical at the root ✓. But `/app/terms` and `/app/privacy` on the
-static host fall through the SPA to the authenticated shell — a fake legal route.
-Per §40 these legacy nested paths must redirect to the root routes, and the
-missing policy page(s) must be added or explicitly marked out of scope.
+Root `/terms` is canonical ✓. The five missing policy pages were added to `public/` and wired into `serve-client.js` + `check-public-site.js` (reachable on origin since it reads disk per request); `trycord.dev` serves the stale pre-split build until push credentials allow redeploy.
 
-## 5. Runtime and concurrency (verified)
+## 5. Runtime and concurrency (verified; Phase 3 baseline + bottleneck fix done)
 
-* pm2: `trycord-api` — `src/server.js`, cwd `backend`, **fork_mode, instances 1,
-  max_memory_restart 512M**. `trycord-status-monitor` — separate process (so it
-  survives API restarts), `kill_timeout 5000`.
-* **There is no parallelism today**: no cluster, no `worker_threads`, no child
-  processes in the API process. Phase 3 is real work, not tuning.
-* `tests/bench/bench.mjs` exists and is honest: real register/community/channel/
-  post flows, real WebSocket fan-out to N clients, event-loop delay via
-  `perf_hooks`, percentiles not averages. **Not yet run for a baseline** (T3.1).
+* pm2: `trycord-api` — `src/server.js`, cwd `backend`, **fork_mode, instances 1** (pm2 auto-restarts on crash). `trycord-status-monitor` — separate process.
+* Benchmark baseline **recorded** (`tests/bench/bench.mjs`, `MAIL_MODE=disabled`, throwaway SQLite): health p50 1.5ms/p95 2.6ms (n=120); concurrent channels x4 p50 5.6ms/p95 11.6ms; concurrent channels x8 p50 9.1ms/p95 15.0ms; POST message p50 4.3ms/p95 9.2ms; WS fanout p50 3ms/p95 7ms, 0/20 missed. Latency scales roughly linearly with concurrency on the single event loop.
+* **Bottleneck identified and fixed:** `services/bots.js` `appByToken()` did `SELECT * FROM bot_applications` (full table scan, **no index on `token_hash`**) then looped in JS with `crypto.timingSafeEqual` per row — O(N) on every bot API call, blocking the event loop as bot apps grew. Fixed with a unique index `idx_bot_apps_token_hash` (db/schema.js) + O(1) `WHERE token_hash = ?` lookup (services/bots.js). Gate green.
+* **Worker-thread decision (documented, per directive "retain the simpler implementation"):** after profiling candidates (bot scan → now O(1); embeds HTML parsing → already backgrounded, small; bcrypt → already native C++ off the event loop; SQLite writes → lock/I/O bound, not JS CPU), no remaining JS workload benefits from `worker_threads`. The single-threaded event loop is retained and documented; CPU-bound work is eliminated at the source rather than sharded to threads. This will be revisited if profiling later shows a genuine CPU-bound JS hotspot.
+
+## 6. Recently completed work (committed)
 
 ## 6. Recently completed work (pre-ledger, verified)
 

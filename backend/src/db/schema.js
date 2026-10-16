@@ -273,6 +273,10 @@ const INDEXES = [
   'CREATE INDEX idx_webhooks_server ON webhooks(server_id, active)',
   'CREATE INDEX idx_webhook_deliveries_hook ON webhook_deliveries(webhook_id, created_at)',
   'CREATE INDEX idx_bot_apps_server ON bot_applications(server_id)',
+  // Token lookups happen on every authenticated bot request. A full table scan
+  // plus a JS timing-compare loop per row is O(N) in the number of bot apps and
+  // blocks the event loop; an indexed lookup is O(1).
+  'CREATE UNIQUE INDEX idx_bot_apps_token_hash ON bot_applications(token_hash)',
   'CREATE INDEX idx_voice_participants_room ON voice_participants(room_id)',
   'CREATE INDEX idx_voice_participants_live ON voice_participants(channel_id, left_at)',
   'CREATE INDEX idx_voice_rooms_server ON voice_rooms(server_id)',

@@ -282,18 +282,20 @@ async function removeCommand(commandId, appId, serverId) {
 }
 
 // The bearer token identifies the application. Constant-time compare, because a
-// token guess is still a token guess.
+// token guess is still a token guess. token_hash is unique and indexed
+// (idx_bot_apps_token_hash), so this is an O(1) indexed lookup rather than a
+// full table scan plus a JS timing-compare loop per row - the latter blocked
+// the event loop once an instance had more than a handful of bot apps.
 async function appByToken(token) {
   const raw = String(token || '');
   if (!raw.startsWith(TOKEN_PREFIX)) return null;
   const want = hashToken(raw);
-  const rows = await db.all('SELECT * FROM bot_applications');
-  for (const r of rows) {
-    const got = String(r.token_hash || '');
-    if (got.length !== want.length) continue;
-    if (crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want))) return r;
-  }
-  return null;
+  const row = await db.get('SELECT * FROM bot_applications WHERE token_hash = ?', [want]);
+  if (!row) return null;
+  const got = String(row.token_hash || '');
+  if (got.length !== want.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want))) return null;
+  return row;
 }
 
 // A command is matched on the first word of a message. Returns the response to
