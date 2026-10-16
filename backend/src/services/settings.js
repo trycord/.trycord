@@ -325,32 +325,37 @@ const SCHEMA = [
   {
     key: 'storage.s3Bucket', env: 'S3_BUCKET', type: 'string', default: '',
     category: 'storage', label: 'S3 bucket',
-    description: 'The bucket that holds uploaded files.',
+    description: 'The bucket that holds uploaded files. Shown only when storage provider is S3.',
     live: true,
+    showIf: { key: 'storage.driver', value: 's3' },
   },
   {
     key: 'storage.s3AccessKeyId', env: 'S3_ACCESS_KEY_ID', type: 'string', default: '',
     category: 'storage', label: 'S3 access key ID',
-    description: 'The public half of the S3 credential.',
+    description: 'The public half of the S3 credential. Shown only when storage provider is S3.',
     live: true,
+    showIf: { key: 'storage.driver', value: 's3' },
   },
   {
     key: 'storage.s3Endpoint', env: 'S3_ENDPOINT', type: 'url', default: '',
     category: 'storage', label: 'S3 endpoint',
-    description: 'The service endpoint. Leave blank for AWS S3; set for R2, MinIO or others.',
+    description: 'The service endpoint. Leave blank for AWS S3; set for R2, MinIO or others. Shown only when storage provider is S3.',
     live: true,
+    showIf: { key: 'storage.driver', value: 's3' },
   },
   {
     key: 'storage.s3Region', env: 'S3_REGION', type: 'string', default: 'us-east-1',
     category: 'storage', label: 'S3 region',
-    description: 'The bucket region. us-east-1 for AWS S3; other services use different values.',
+    description: 'The bucket region. us-east-1 for AWS S3; other services use different values. Shown only when storage provider is S3.',
     live: true,
+    showIf: { key: 'storage.driver', value: 's3' },
   },
   {
     key: 'storage.s3ForcePathStyle', env: 'S3_FORCE_PATH_STYLE', type: 'boolean', default: true,
     category: 'storage', label: 'Force path-style addressing',
-    description: 'On for R2 and MinIO. Off for AWS S3 with DNS-safe bucket names.',
+    description: 'On for R2 and MinIO. Off for AWS S3 with DNS-safe bucket names. Shown only when storage provider is S3.',
     live: true,
+    showIf: { key: 'storage.driver', value: 's3' },
   },
 
   {
