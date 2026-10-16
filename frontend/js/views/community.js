@@ -944,51 +944,6 @@ function appearanceSection(serverId) {
   return { node: host, load };
 }
 
-
-function pickServerImage(serverId, kind, done) {
-  const input = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
-  document.body.appendChild(input);
-  input.addEventListener('change', async () => {
-    const file = input.files && input.files[0];
-    input.remove();
-    if (!file) return;
-    try {
-      await Api.setServerImage(serverId, kind, file);
-      toast('Image updated.', { type: 'success' });
-      if (done) done();
-    } catch (error) { errorToast(error); }
-  });
-  input.click();
-}
-
-async function removeServerImage(serverId, kind, done) {
-  try {
-    await Api.removeServerImage(serverId, kind);
-    toast('Image removed.', { type: 'success' });
-    if (done) done();
-  } catch (error) { errorToast(error); }
-}
-
-function moderationSection(serverId) {
-  const host = sectionShell();
-  const rows = el('div', { class: 'rows' });
-  host.appendChild(el('div', { class: 'panel', }, el('div', { class: 'panel-title' }, 'Banned accounts')));
-  host.appendChild(rows);
-
-  async function load() {
-    rows.replaceChildren(loading('Loading bans'));
-    try {
-      const out = await Api.bans(serverId);
-      const bans = Array.isArray(out) ? out : (out.bans || out.items || []);
-      rows.replaceChildren();
-      if (!bans.length) {
-        rows.appendChild(nothing('No bans', 'Accounts you ban appear here.'));
-        return;
-      }
-      for (const ban of bans) {
-        const id = ban.user_id || ban.userId || ban.id;
-        const name = ban.display_name || ban.displayName || ban.username || id;
-        rows.appendChild(el('div', { class: 'row-item' },
           el('div', { class: 'row-item-main' },
             el('div', { class: 'row-item-title' }, name),
             ban.reason ? el('div', { class: 'row-item-sub' }, ban.reason) : null),
@@ -1209,6 +1164,42 @@ function bannerOrBlank(server) {
   return el('div', { class: 'media-blank' }, icon('image', { size: 22 }));
 }
 
+  return host;
+}
+
+function communitySettings(serverId) {
+  const host = el('div', { class: 'settings-stack' });
+
+  const welcomeContent = el('textarea', { class: 'input', rows: '4', placeholder: 'Welcome message shown to new members...' });
+  welcomeContent.value = serverById(serverId)?.welcome_content || '';
+  const welcomeEnabled = el('input', { type: 'checkbox', role: 'switch', 'aria-checked': String(!!serverById(serverId)?.welcome_enabled) });
+  welcomeEnabled.checked = !!serverById(serverId)?.welcome_enabled;
+  const guidelines = el('textarea', { class: 'input', rows: '6', placeholder: 'Community guidelines...' });
+  guidelines.value = serverById(serverId)?.guidelines || '';
+  const notificationDefaults = el('textarea', { class: 'input', rows: '4', placeholder: 'Notification defaults (JSON)...' });
+  notificationDefaults.value = serverById(serverId)?.notification_defaults || '';
+  const interactionSettings = el('textarea', { class: 'input', rows: '4', placeholder: 'Interaction settings (JSON)...' });
+  interactionSettings.value = serverById(serverId)?.interaction_settings || '';
+
+  const save = el('button', { class: 'btn btn--primary', type: 'button' }, 'Save settings');
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    try {
+      await Api.updateServerSettings(serverId, {
+        welcome_content: welcomeContent.value,
+        welcome_enabled: welcomeEnabled.checked,
+        guidelines: guidelines.value,
+        notification_defaults: notificationDefaults.value,
+        interaction_settings: interactionSettings.value,
+      });
+      toast('Community settings saved.', { type: 'success' });
+      await refreshServer(serverId);
+    } catch (error) { errorToast(error); } finally { save.disabled = false; }
+  });
+
+  return host;
+}
+
 function communityAllowed(serverId) {
   const host = el('div', { class: 'settings-stack' });
 
@@ -1346,7 +1337,7 @@ export function renderCommunitySettings(ctx) {
     integrations: () => integrationsSection(serverId),
     analytics: () => analyticsSection(serverId),
     ownership: () => ownershipSection(serverId),
-    settings: () => renderCommunitySettings(server),
+    settings: () => renderCommunitySettings({ serverId }),
   };
 
   const requested = (ctx.query && ctx.query.get('section')) || 'overview';

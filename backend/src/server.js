@@ -433,6 +433,7 @@ async function boot() {
   app.use('/api/servers/:serverId/categories', require('./routes/categories'));
   app.use('/api/servers/:serverId/roles', require('./routes/roles'));
   app.use('/api/servers/:serverId/invites', inviteRoutes.managed);
+  app.use('/api/servers/:serverId/communityMemory', require('./routes/communityMemory'));
   app.use('/api/channels/:channelId/messages', require('./routes/messages'));
   app.use('/api', require('./routes/attachments'));
   app.use('/api/servers', require('./routes/servers'));
