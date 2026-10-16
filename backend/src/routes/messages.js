@@ -31,6 +31,7 @@ const webhooks = require('../services/webhooks');
 const bots = require('../services/bots');
 const mentions = require('../services/mentions');
 const { EVENTS } = require('../ws/events.js');
+const continuum = require('../services/continuum');
 
 let broadcast = () => {};
 let sendToUser = () => {};
@@ -283,6 +284,16 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       : [];
     await attachEngagement([msg], req.user.id);
     broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE, ...msg });
+
+    // Fan out to federated instances: a message posted to a community becomes a
+    // durable outbox event that the job system delivers to trusted remote
+    // instances. Never fails the post.
+    try {
+      await continuum.enqueueEvent('message.posted', {
+        serverId: ch.server_id, channelId: ch.id, messageId: msg.id,
+        authorId: msg.author_id, content,
+      }, { actorId: req.user.id, targetId: msg.id });
+    } catch { /* continuum disabled or misconfigured: post still succeeded */ }
 
     // Everything below is extra information about a message that has already
     // been accepted. None of it is allowed to fail the post: a slow link, a dead
