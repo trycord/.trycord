@@ -606,3 +606,90 @@ reload means the WebSocket is not connecting — check the proxy
 | Desktop app cannot connect | `trycord://app` is missing from `CLIENT_ORIGIN`; add it and restart |
 | A subdomain is rejected but the apex works | `*.` covers one label only, never the apex — list both |
 | `Unknown column 'seq' in 'where clause'` at startup | The database predates the canonical-ordering migration; it is applied automatically on the next start. Do not add the column by hand. |
+
+## Voice and media
+
+### Two supported providers
+
+Trycord provides two mutually exclusive voice paths:
+
+1. **Cloudflare Realtime SFU** (`VOICE_VIDEO_PROVIDER=cloudflare`) — full voice,
+   video, and screen sharing, large rooms, adaptive quality. Requires a
+   Cloudflare account with Realtime enabled **and** a self-hosted (or known
+   trusted) STUN/TURN endpoint.
+
+2. **Self-hosted mesh** (`VOICE_VIDEO_PROVIDER=mesh`) — peer-to-peer WebRTC
+   between clients. The server only relays signaling, ICE candidates, and room
+   state. No external media service is required; media flows browser-to-browser.
+   Practical up to ~6 participants per room (O(N^2) packets). Stage channels
+   with many listeners and a few speakers do NOT work with mesh — use the SFU
+   provider for those.
+
+Both providers require a self-hosted STUN endpoint, and (for restrictive-network
+clients) a self-hosted TURN endpoint. There is NO default third-party Google STUN
+fallback; `VOICE_VIDEO_STUN_URLS` defaults to `[]` and voice will refuse to
+enable until it is set.
+
+### Self-hosted STUN/TURN (Coturn)
+
+```bash
+apt install coturn
+
+# /etc/turnserver.conf
+listening-port=3478
+tls-listening-port=5349
+lt-cred-mech
+user=trycord:STRONG_PASSWORD
+realm=trycord.yourdomain
+fingerprint
+no-multicast-peers
+no-cli
+max-allocate-lifetime=3600
+channel-lifetime=60
+cert=/etc/letsencrypt/live/yourdomain/fullchain.pem
+pkey=/etc/letsencrypt/live/yourdomain/privkey.pem
+
+# Run:
+turnserver -c /etc/turnserver.conf
+```
+
+```env
+VOICE_VIDEO_STUN_URLS=stun:your-stun-host:3478
+VOICE_VIDEO_TURN_URL=turn:your-stun-host:3478
+VOICE_VIDEO_TURN_USERNAME=trycord
+VOICE_VIDEO_TURN_CREDENTIAL=STRONG_PASSWORD
+```
+
+### Connection quality and network requirements
+
+- **UDP outbound** from clients (random high ports) required for direct media.
+- **UDP inbound to ports 3478 (STUN/TURN) and 5349 (TLS)**.
+- **Public IP** recommended for the STUN/TURN host; symmetric-NAT clients will
+  use relay (TURN) mode.
+- **Bandwidth**: ~64 kbps up/down per audio stream; video demands 1-3 Mbps per
+  stream.
+- **CPU**: media encryption is handled by WebRTC in the browser for mesh; for
+  the SFU path, Cloudflare owns the SFU CPU cost.
+- **Relay bandwidth**: TURN-relayed streams consume 2× bandwidth at the host.
+
+Verify before enabling voice in production:
+```sh
+grep -rn "google.com\|stun.l" backend/ frontend/ public/ docs/
+```
+Must return no hits except legitimate upstream documentation. Then confirm a
+two-browser peer actually establishes media by recording a startup log: the
+server emits `[voice.mesh] ... joined channel ...` for each participant.
+
+### No mandatory external dependencies
+
+- `VOICE_VIDEO_STUN_URLS` default: `[]` — must be set explicitly.
+- `VOICE_VIDEO_TURN_URL` default: '' — no relay fallback unless configured.
+- `VOICE_VIDEO_PROVIDER` default: `cloudflare` (requires CF credentials). Switch to
+  `mesh` for self-hosted STUN+TURN-only operation.
+- Signaling via Trycord's WebSocket gateway (first-party, server-owned).
+- All media routes (signaling, join, leave, state, credentials) defined in
+  `backend/src/routes/voice.js` — none delegate to a third-party control plane.
+
+License
+-------
+MIT.

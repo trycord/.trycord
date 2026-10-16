@@ -10,7 +10,6 @@
 // a future, honest implementation. The default cap of 6 keeps CPU and bandwidth
 // predictable on a Raspberry Pi-class host.
 const MESH_MAX = 6;
-const ch = require('crypto').randomUUID ? {} : {};
 const { now } = require('../util');
 const channels = require('./channels');
 const permissions = require('./permissions');
@@ -86,10 +85,19 @@ function cleanupUser(userId) {
   }
 }
 
+// Operator must supply at least one STUN (and, for restrictive/relay-only scenarios,
+// a TURN) endpoint via VOICE_VIDEO_STUN_URLS / VOICE_VIDEO_TURN_URL. An empty
+// list disables mesh connectivity — the in-house STUN server is expected on a
+// known address (TURN/STUN daemon running locally or on a controlled host).
 function iceServers() {
-  // Default to a public STUN (operator can override via env or settings later).
-  const stun = String(process.env.VOICE_VIDEO_STUN_URLS || 'stun:stun.l.google.com:19302').split(',').map((s) => s.trim()).filter(Boolean);
-  return stun.map((u) => ({ urls: u }));
+  const stun = String(process.env.VOICE_VIDEO_STUN_URLS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const turnUrl = String(process.env.VOICE_VIDEO_TURN_URL || '').trim();
+  const turnUser = String(process.env.VOICE_VIDEO_TURN_USERNAME || '').trim();
+  const out = stun.map((u) => ({ urls: u }));
+  if (turnUrl) {
+    out.push({ urls: turnUrl, username: (turnUser || undefined), credential: undefined });
+  }
+  return out;
 }
 
 module.exports = {
