@@ -1,8 +1,12 @@
 // /api/notifications — my own notifications only. The realtime gateway
 // pushes new ones to connected sockets; this API is the durable source
 // when offline. Authorization: every query is scoped to req.user.id.
+//
+// Notifications are delivered in-house ('notifications.provider' in the
+// settings catalogue). External push is an optional add-on.
 const express = require('express');
 const auth = require('../middleware/auth');
+const settings = require('../services/settings');
 const { serviceError } = require('../errors');
 const notifications = require('../services/notifications');
 
@@ -17,6 +21,7 @@ router.use(auth);
 // not shrink as the caller pages.
 router.get('/', async (req, res, next) => {
   try {
+    settings.get('notifications.provider');
     res.json(await notifications.list(req.user.id, req.query.limit, req.query.before));
   } catch (e) { next(e); }
 });

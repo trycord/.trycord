@@ -140,6 +140,24 @@ const SCHEMA = [
     live: true, consequential: true,
   },
   {
+    key: 'voice.provider', env: 'VOICE_VIDEO_PROVIDER', type: 'string', default: 'in-house',
+    category: 'voice', label: 'Media server provider',
+    description: 'In-house runs the media stack on this instance. Cloudflare Realtime SFU routes media and DataChannels but Trycord still owns signalling and room management.',
+    allowed: ['in-house', 'cloudflare'], live: true, consequential: true,
+  },
+  {
+    key: 'search.provider', env: 'SEARCH_PROVIDER', type: 'string', default: 'in-house',
+    category: 'search', label: 'Search provider',
+    description: 'In-house indexes messages and community content in the instance database with permission-scoped results. No external search service is required.',
+    allowed: ['in-house'], live: false,
+  },
+  {
+    key: 'notifications.provider', env: 'NOTIFICATIONS_PROVIDER', type: 'string', default: 'in-house',
+    category: 'notifications', label: 'Notification provider',
+    description: 'In-house delivers in-app notifications through the instance itself. External push providers are optional add-ons; core notification delivery does not depend on them.',
+    allowed: ['in-house'], live: false,
+  },
+  {
     key: 'voice.maxParticipants', env: 'VOICE_VIDEO_MAX_PARTICIPANTS', type: 'integer', default: 25,
     category: 'voice', label: 'Participants per channel',
     description: 'Enforced before a session is created, so a full channel refuses rather than dropping someone.',
@@ -287,9 +305,9 @@ const SCHEMA = [
   // restart. The quota is read per upload and is live.
   {
     key: 'storage.driver', env: 'STORAGE_DRIVER', type: 'string', default: 'local',
-    category: 'storage', label: 'Storage driver',
-    description: 'local writes under the upload directory. s3 needs a bucket, a region and credentials.',
-    live: false,
+    category: 'storage', label: 'Storage provider',
+    description: 'Local writes uploads to this instance\'s filesystem - no external account needed. S3-compatible (Amazon S3, Cloudflare R2, MinIO, Backblaze) needs a bucket, region and credentials. Both are served through authenticated routes; switching preserves existing files - run the storage migration after changing.',
+    allowed: ['local', 's3'], live: false,
   },
   {
     key: 'storage.quotaMb', env: 'STORAGE_QUOTA_MB', type: 'integer', default: 512,

@@ -9,12 +9,14 @@ const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail } = require('../errors');
 const { escapeLike } = require('../util');
+const settings = require('../services/settings');
 
 const router = express.Router();
 router.use(auth);
 
 router.get('/', rateLimit(30), async (req, res, next) => {
   try {
+    settings.get('search.provider');
     const q = String(req.query.q || '').trim().slice(0, 200);
     if (q.length < 2) return fail(res, 'VALIDATION_ERROR', 'type at least 2 characters to search');
     const limit = Math.min(Math.max(parseInt(req.query.limit || '25', 10) || 25, 1), 50);
