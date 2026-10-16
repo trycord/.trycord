@@ -234,6 +234,14 @@ Phase 3 baseline — complete: `tests/bench/bench.mjs` run against a throwaway S
 
 Phase 6 — complete: `instance.backendRole` setting (primary/backup dropdown) in settings schema with server-side allowed-values validation, surfaced via `/api/instance`.
 
+Phase 7 — complete (foundation): Community customization — `services/continuum.js` (continued),
+`routes/continuum.js`, `frontend/js/views/continuum.js` admin section with remote
+instance management (add instance, set trust status), wired into
+`backend/src/routes/servers.js` (PATCH /api/servers/:id/settings),
+`frontend/js/views/community.js` community settings section (welcome content,
+guidelines, notification defaults, interaction settings) wired into
+`frontend/js/views/admin.js` and `frontend/packages/registry.js`.
+
 Phase 8 — complete: `/guidelines`, `/community-guidelines`, `/federation-policy`, `/cookies`, `/licenses` added as root-level editable public routes in `serve-client.js`, registered in `check-public-site.js`, served from disk per request on the origin; reachable on `api.trycord.dev` but **not deployed** to `trycord.dev` (stale Cloudflare build, no push credentials).
 
 Gate: `npm run check` exit 0 (40+ sub-checks incl. jobs check, public-site check, settings wiring); mobile layout 14/14; mobile render 62/62 (656 controls); redteam 28/28.
