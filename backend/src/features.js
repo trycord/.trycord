@@ -97,6 +97,7 @@ const FROM_SETTINGS = {
   PUSH_NOTIFICATIONS_ENABLED: 'features.push',
   STORAGE_QUOTA_MB: 'storage.quotaMb',
   RATE_LIMIT_MAX: 'limits.rateMax',
+  CONTINUUM_ENABLED: 'continuum.enabled',
 };
 
 // The value for a flag, from wherever it actually comes from.
@@ -167,6 +168,7 @@ function build() {
   const bots = !!valueOf('BOTS_ENABLED', true);
   const webhooks = !!valueOf('WEBHOOKS_ENABLED', true);
   const push = !!valueOf('PUSH_NOTIFICATIONS_ENABLED', false);
+  const continuum = !!valueOf('CONTINUUM_ENABLED', false);
 
   // Voice and video carries the master switch plus the two sub-capabilities beneath it.
   // A sub-capability can be off while the master is on, but never on while the master is
@@ -190,6 +192,7 @@ function build() {
     bots: !!bots,
     webhooks: !!webhooks,
     pushNotifications: !!push,
+    continuum: !!continuum,
     maxUploadBytes: Number(maxUploadBytes),
     quotaBytes: Number(valueOf('STORAGE_QUOTA_MB', 512)) * 1024 * 1024,
     rateLimitMax: Number(valueOf('RATE_LIMIT_MAX', 0)) || 0,

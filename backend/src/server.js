@@ -20,6 +20,7 @@ const pages = require('./services/pages');
 const features = require('./features');
 const settings = require('./services/settings');
 const jobs = require('./services/jobs');
+const continuum = require('./services/continuum');
 
 /**
  * Reduce a configured API location to the origin the client should talk to.
@@ -203,6 +204,10 @@ async function boot() {
   // saved dashboard value be ignored.
   await settings.load();
   features.load();
+  if (continuum.enabled()) {
+    continuum.setInstanceId(inst.instanceId);
+    continuum.generateKeyPair();
+  }
   // Resolved after the store, because the listener and the mount are settings: an
   // administrator changes them in the dashboard and the change takes effect at the
   // next start. This is where a saved value replaces the environment's seed.
@@ -452,6 +457,7 @@ async function boot() {
   app.use('/api/admin/settings', require('./routes/settings'));
   app.use('/api/admin/database', require('./routes/database'));
   app.use('/api/admin/mail', require('./routes/mail'));
+  app.use(require('./routes/continuum'));
   // Test hooks for automated suites (email verification without an inbox).
   // Strictly opt-in: unmounted in every other boot, where the paths 404.
   if (process.env.ALLOW_TEST_HOOKS === 'true') {
@@ -633,6 +639,11 @@ async function boot() {
 
   // Durable background jobs: bounded workers claim due jobs from the database,
   // retry with backoff, and never lose work on restart or crash.
+  jobs.register('continuum_deliver', continuum.deliverEvent, {
+    concurrency: 4,
+    maxAttempts: 5,
+    backoffMs: 1000,
+  });
   await jobs.start();
 
   // The WebSocket gateway shares this HTTP server: same bind address, no second port.
