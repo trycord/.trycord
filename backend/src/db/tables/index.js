@@ -22,7 +22,8 @@ const messaging = require('./messaging');
 const social = require('./social');
 const moderation = require('./moderation');
 const instance = require('./instance');
+const continuum = require('./continuum');
 
-const GROUPS = [identity, communities, messaging, social, moderation, instance];
+const GROUPS = [identity, communities, messaging, social, moderation, instance, continuum];
 
 module.exports = (engine) => GROUPS.flatMap((group) => group(engine));

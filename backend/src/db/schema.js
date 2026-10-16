@@ -386,6 +386,14 @@ const INDEXES = [
   // exactly the behaviour we want for callers that send no nonce.
   'CREATE UNIQUE INDEX idx_messages_nonce ON messages(channel_id, client_nonce)',
   'CREATE UNIQUE INDEX idx_dm_messages_nonce ON dm_messages(conversation_id, client_nonce)',
+  // Continuum federation access patterns: outbox polling, delivery retry
+  // history, and inbox deduplication. All are read on every delivery sweep
+  // and on every inbound event, so they must be indexed.
+  'CREATE INDEX idx_continuum_events_due ON continuum_events(status, run_after)',
+  'CREATE INDEX idx_continuum_events_kind ON continuum_events(kind)',
+  'CREATE INDEX idx_continuum_deliveries_event ON continuum_deliveries(event_id, attempted_at)',
+  'CREATE INDEX idx_continuum_deliveries_instance ON continuum_deliveries(instance_id, status)',
+  'CREATE INDEX idx_continuum_inbox_instance ON continuum_inbox(instance_id, processed)',
 ];
 
 const MYSQL_COLUMN_SQL =
