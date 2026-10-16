@@ -1213,7 +1213,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   border: 1px solid var(--line);
   border-radius: var(--tc-radius-md);
   background: var(--panel-2);
-  font-family: var(--font-mono);
+  font-family: var(--mono);
   font-size: var(--fs-meta);
   color: var(--text-1);
   user-select: all;
@@ -1371,7 +1371,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-profile-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .m-profile-name { font-size: var(--fs-h2); font-weight: var(--weight-strong); color: var(--text-1); }
 .m-profile-handle { font-size: var(--fs-sm); color: var(--text-2); }
-.m-profile-id { font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-3); }
+.m-profile-id { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }
 
 .m-role-dot {
   width: 10px; height: 10px;

@@ -122,18 +122,26 @@ function buildPublicIcons() {
   }
 }
 
-// The Mobile presentation: the shared token library, then the module's own
-// single layer. No desktop layer is included: cross-module CSS leakage is the
-// same fault as a cross-module import.
+// The Mobile presentation: the shared token library, the shared semantic layer,
+// then the module's own single layer. The semantic layer is not a desktop
+// composition - it is the one place the names both modules spend (a panel, a type
+// step, the ember fill, the font) are defined, so the module loads it exactly as
+// the desk does. A module that named them without loading them renders with the
+// token stripped, which is what a bundle missing this layer looks like.
+// No desktop composition is included: cross-module CSS leakage is the same fault
+// as a cross-module import.
 function buildMobile(library) {
   const source = path.join(MOBILE_CSS, 'mobile.css');
   if (!fs.existsSync(source)) {
     console.log('no mobile stylesheet to build');
     return;
   }
+  const semantic = fs.readFileSync(path.join(CSS, 'tokens.css'), 'utf8');
   const header = '/* The Mobile module stylesheet. Built from frontend/mobile/css/mobile.css by '
     + 'frontend/scripts/build-css.js - edit the layer, not this file. */\n';
-  const parts = [header, library, '\n/* ---- mobile.css ---- */\n', fs.readFileSync(source, 'utf8')];
+  const parts = [header, library,
+    '\n/* ---- tokens.css ---- */\n', semantic,
+    '\n/* ---- mobile.css ---- */\n', fs.readFileSync(source, 'utf8')];
   const out = path.join(MOBILE_CSS, 'app.css');
   const built = parts.join('');
   if (fs.existsSync(out) && fs.readFileSync(out, 'utf8') === built) {
