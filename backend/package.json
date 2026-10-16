@@ -22,6 +22,7 @@
   "scripts": {
     "start": "node src/server.js",
     "status-monitor": "node src/status-monitor/index.js",
+    "turn": "node src/services/turn.js",
     "db:backup": "node scripts/db-backup.js",
     "seed": "node scripts/seed.js",
     "migrate": "node scripts/migrate.js",
