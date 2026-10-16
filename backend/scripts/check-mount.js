@@ -147,6 +147,19 @@ async function build(appMount) {
         !String(mobileCfg.backendUrl || '').includes(OFFICIAL), 'backendUrl=' + mobileCfg.backendUrl);
     }
 
+    // The alias at the origin root, on an instance that also serves under the mount.
+    // This is the combination that broke: the handler stamped the configured mount
+    // (/app/mobile/) onto a request that arrived at /mobile/, so the document loaded
+    // but its router looked for /mobile/ inside a tree rooted at /app/mobile and every
+    // phone that reached the root alias got the not-found screen. The origin-root block
+    // below builds appMount '' and never saw it; a mounted build has to assert it too.
+    console.log('\n  the root /mobile alias, on a mounted instance');
+    for (const p of ['/mobile/', '/mobile/home', '/mobile/settings']) {
+      const r = await get(port, p);
+      ok('GET ' + p + ' is the root mobile shell',
+        r.status === 200 && /<base href="\/mobile\/">/.test(r.body), 'status ' + r.status);
+    }
+
     console.log('\n  the mount the client computes for itself');
     // The client derives its mount from the module's own URL (`packages/nav.js`), so
     // the answer has to survive the module moving between directories in the source
