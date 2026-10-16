@@ -17,7 +17,7 @@ import { openDialog, confirmDialog, toast, errorToast, attachContextMenu } from 
 import { openUserMenu, userMenuItems } from '../user-menu.js';
 import { relativeTime } from '../../packages/format.js';
 import Api from '../../packages/api.js';
-import { page, heading, loading, failure, nothing, stat, panel, empty } from './util.js';
+import { page, heading, loading, failure, nothing, stat, panel, empty, relative } from './util.js';
 import { renderConversation } from './messages.js';
 
 // -- small shared pieces -----------------------------------------------------
@@ -1205,7 +1205,7 @@ function communityAllowed(serverId) {
     instances.replaceChildren(el('div', { class: 'stack' }, loading('Loading remote instances…')));
     let rows;
     try {
-      rows = await Api.get('/api/continuum/instances');
+      rows = await Api.request('GET', '/api/continuum/instances');
     } catch (error) {
       instances.replaceChildren(failure(error, loadInstances));
       return;
@@ -1225,7 +1225,7 @@ function communityAllowed(serverId) {
 
   async function setTrust(id, status) {
     try {
-      await Api.patch('/api/continuum/instances/' + encodeURIComponent(id) + '/trust', { trust_status: status });
+      await Api.request('PATCH', '/api/continuum/instances/' + encodeURIComponent(id) + '/trust', { body: { trust_status: status } });
       toast('Trust updated.', { type: 'success' });
       loadInstances();
     } catch (error) { errorToast(error); }
@@ -1251,12 +1251,12 @@ function communityAllowed(serverId) {
     if (!keyInput.value.trim()) { addError.textContent = 'Paste its public key.'; return; }
     addBtn.disabled = true;
     try {
-      await Api.post('/api/continuum/instances', {
+      await Api.request('POST', '/api/continuum/instances', { body: {
         id: nameInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         name: nameInput.value.trim(),
         origin: originInput.value.trim(),
         public_key: keyInput.value.trim(),
-      });
+      }});
       nameInput.value = ''; originInput.value = ''; keyInput.value = '';
       toast('Remote instance added. It starts untrusted; set it to Trust to exchange events.', { type: 'success' });
       loadInstances();
@@ -1456,10 +1456,14 @@ function moderationSection(serverId) {
 }
 
 // -- Community Memory ------------------------------------------------------
+//
+// Curated knowledge that outlives chat history. Any member may read; writing
+// needs the MEMORIZE permission. Revisions are append-only: editing creates a
+// new revision row, so nothing is ever silently overwritten.
+
 function memorySection(serverId) {
   const host = el('div', { class: 'stack' });
   const entries = el('div', { class: 'stack' });
-  const form = el('form', { class: 'stack' });
 
   async function load() {
     host.replaceChildren(loading('Loading knowledge entries'));
@@ -1476,25 +1480,36 @@ function memorySection(serverId) {
         return;
       }
       for (const entry of list) {
-        host.appendChild(el('div', { class: 'row-item' },
-          el('div', { class: 'row-item-main' },
-            el('div', { class: 'row-item-title' }, entry.title),
-            el('div', { class: 'row-item-sub' }, entry.body)),
-          el('div', { class: 'row-item-actions' },
-            el('button', { kind: 'default', onClick: () => openEditor(entry) }, 'Edit'),
-            el('button', { kind: 'default', onClick: () => del(entry.id) }, 'Delete'))));
+        host.appendChild(entryRow(entry));
       }
     } catch (error) {
       host.replaceChildren(failure(error, load));
     }
   }
 
+  function entryRow(entry) {
+    const revBadge = el('span', { class: 'badge' }, 'r' + (entry.revisionCount || 1));
+    const byline = el('div', { class: 'stack stack--tight' },
+      el('div', { class: 'row-item-sub truncate' }, entry.body),
+      el('div', { class: 'row-item-actions' },
+        el('span', { class: 'prow-sub' }, entry.updatedAt ? relative(entry.updatedAt) : null),
+        revBadge));
+    return el('div', { class: 'row-item' },
+      el('div', { class: 'row-item-main' },
+        el('div', { class: 'row-item-title truncate' }, entry.title),
+        byline),
+      el('div', { class: 'row-item-actions' },
+        el('button', { kind: 'default', onClick: () => openEditor(entry) }, 'Edit'),
+        el('button', { kind: 'default', onClick: () => openRevisions(entry) }, 'History'),
+        el('button', { kind: 'default', onClick: () => del(entry.id) }, 'Delete')));
+  }
+
   function openEditor(entry) {
     const title = el('input', { class: 'input', value: entry ? entry.title : '' });
     const body = el('textarea', { class: 'input', rows: 6, value: entry ? entry.body : '' });
     const form = el('form', { class: 'stack' },
-      el('label', { class: 'field' }, el('span', {}, 'Title'), title),
-      el('label', { class: 'field' }, el('span', {}, 'Body'), body),
+      fieldBlock('Title', 'What this entry is called.', title),
+      fieldBlock('Body', 'The knowledge itself.', body),
       el('div', { class: 'stack actions' },
         el('button', { kind: 'primary', type: 'button' }, entry ? 'Save' : 'Create'),
         el('button', { kind: 'ghost', type: 'button', onClick: () => dialog.close() }, 'Cancel')));
@@ -1505,30 +1520,63 @@ function memorySection(serverId) {
     });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      const next = form.querySelector('button[type="button"]:not([kind="ghost"])');
+      if (!next) return;
       next.disabled = true;
       try {
         if (entry) {
-          await Api.communityMemoryUpdate(serverId, entry.id, { title: title.value.trim(), body: body.value.trim() });
+          await Api.updateCommunityMemory(serverId, entry.id, { title: title.value.trim(), body: body.value.trim() });
         } else {
-          await Api.communityMemoryCreate(serverId, { title: title.value.trim(), body: body.value.trim() });
+          await Api.createCommunityMemory(serverId, { title: title.value.trim(), body: body.value.trim() });
         }
         dialog.close();
         load();
       } catch (error) { errorToast(error); } finally { next.disabled = false; }
     });
-    const next = form.querySelector('button[type="submit"]');
+  }
+
+  function openRevisions(entry) {
+    const list = el('div', { class: 'stack' });
+    async function loadRevs() {
+      list.replaceChildren(loading('Loading revision history'));
+      try {
+        const revs = await Api.communityMemoryRevisions(serverId, entry.id);
+        list.replaceChildren();
+        if (!revs.length) {
+          list.appendChild(empty({ icon: 'book', title: 'No revisions yet' }));
+          return;
+        }
+        for (const rev of revs) {
+          list.appendChild(el('div', { class: 'row-item' },
+            el('div', { class: 'row-item-main' },
+              el('div', { class: 'row-item-title truncate' }, 'Revision ' + rev.revision),
+              el('div', { class: 'row-item-sub truncate' }, rev.body)),
+            el('div', { class: 'row-item-actions' },
+              el('span', { class: 'prow-sub' }, rev.createdAt ? relative(rev.createdAt) : null))));
+        }
+      } catch (error) {
+        list.replaceChildren(failure(error, loadRevs));
+      }
+    }
+    openDialog({
+      title: 'Revision history',
+      sub: entry.title,
+      body: list,
+      onClose: () => { },
+    });
+    loadRevs();
   }
 
   function del(id) {
     confirmDialog({
       title: 'Delete entry?',
-      body: 'This cannot be undone.',
+      body: 'This removes the entry and its revision history. It cannot be undone.',
       confirmLabel: 'Delete',
       danger: true,
     }).then(async (yes) => {
       if (!yes) return;
       try {
-        await Api.communityMemoryDelete(serverId, id);
+        await Api.deleteCommunityMemory(serverId, id);
         load();
       } catch (error) { errorToast(error); }
     });

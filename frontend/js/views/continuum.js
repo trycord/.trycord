@@ -64,7 +64,7 @@ export function continuumSection() {
     instances.replaceChildren(el('div', { class: 'stack' }, loading('Loading remote instances…')));
     let rows;
     try {
-      rows = await Api.get('/api/continuum/instances');
+      rows = await Api.request('GET', '/api/continuum/instances');
     } catch (error) {
       instances.replaceChildren(failure(error, load));
       return;
@@ -78,7 +78,7 @@ export function continuumSection() {
 
   async function setTrust(id, status) {
     try {
-      await Api.patch('/api/continuum/instances/' + encodeURIComponent(id) + '/trust', { trust_status: status });
+      await Api.request('PATCH', '/api/continuum/instances/' + encodeURIComponent(id) + '/trust', { body: { trust_status: status } });
       toast('Trust updated.', { type: 'success' });
       loadInstances();
     } catch (error) { errorToast(error); }
@@ -99,12 +99,12 @@ export function continuumSection() {
     if (!keyInput.value.trim()) { addError.textContent = 'Paste its public key.'; return; }
     addBtn.disabled = true;
     try {
-      await Api.post('/api/continuum/instances', {
+      await Api.request('POST', '/api/continuum/instances', { body: {
         id: nameInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         name: nameInput.value.trim(),
         origin: originInput.value.trim(),
         public_key: keyInput.value.trim(),
-      });
+      }});
       nameInput.value = ''; originInput.value = ''; keyInput.value = '';
       toast('Remote instance added. It starts untrusted; set it to Trust to exchange events.', { type: 'success' });
       loadInstances();
