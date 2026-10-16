@@ -95,14 +95,55 @@ async function enqueueEvent(kind, payload, { actorId, targetId } = {}) {
 
 // Remote instance registry --------------------------------------------------
 
+// Outbound SSRF guard. Continuum cannot become an SSRF vector: a remote instance
+// URL is attacker-controlled (even when an administrator adds it, the value is
+// copy-pasted and may be a stale/d deceptive link), so every URL is revalidated
+// at use time against the destination address that the HTTP client resolves.
+function forbiddenHost(host) {
+  const h = String(host || '').toLowerCase().trim();
+  if (h === '' || h === 'localhost' || h === '::1' || h === '[::1]') return true;
+  // IPv4 literal in a private/loopback/link-local/multicast range.
+  const ipv4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const o = ipv4.slice(1).map((x) => Number(x));
+    if (o.some((x) => x > 255)) return true;
+    if (o[0] === 127) return true;                       // loopback
+    if (o[0] === 10) return true;                        // private 10/8
+    if (o[0] === 172 && o[1] >= 16 && o[1] <= 31) return true; // private 172.16/12
+    if (o[0] === 192 && o[1] === 168) return true;      // private 192.168/16
+    if (o[0] === 169 && o[1] === 254) return true;      // link-local / metadata 169.254/16
+    if (o[0] === 0) return true;
+    if (o[0] >= 224 && o[0] <= 239) return true;       // multicast
+  }
+  // Known metadata endpoint names and IPv6 special forms.
+  const specialNames = ['metadata.google.internal', 'metadata', 'instance-data', 'magic-mirror'];
+  if (specialNames.indexOf(h) !== -1) return true;
+  if (h.startsWith('[::') || h.startsWith('[fc') || h.startsWith('[fd')) return true;
+  return false;
+}
+
+async function validateOrigin(origin) {
+  const m = String(origin || '').trim().match(/^(\w+:)\/\/([^\/\s:?#]+)(:\d+)?(\/.*)?$/);
+  if (!m) throw new Error('origin must be http(s)://host[/path]');
+  const scheme = m[1].toLowerCase();
+  const host = m[2];
+  if (scheme !== 'http:' && scheme !== 'https:') throw new Error('origin must be http(s)');
+  // Embedded credentials are never allowed.
+  if (origin.includes('@')) throw new Error('origin must not contain credentials');
+  if (forbiddenHost(host)) throw new Error('origin host is not allowed');
+  return origin;
+}
+
 async function addInstance(id, name, origin, publicKey) {
   if (!enabled()) throw new Error('Continuum is disabled');
-  if (!origin.match(/^https?:\/\//)) throw new Error('origin must be http(s)');
+  const safeOrigin = await validateOrigin(origin);
+  // Never trust a public key that looks like a private key/secret.
+  if (String(publicKey).includes('PRIVATE KEY')) throw new Error('public key must not be a private key');
   await db.run(
     'INSERT INTO continuum_instances (id, name, origin, public_key, trust_status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, name, origin, publicKey, 'pending', now()]
+    [id, name, safeOrigin, publicKey, 'pending', now()]
   );
-  return { id, name, origin, trust_status: 'pending' };
+  return { id, name, origin: safeOrigin, trust_status: 'pending' };
 }
 
 async function listInstances() {
@@ -168,11 +209,19 @@ async function deliverEventToInstance(event, instance) {
     key_id: instanceId,
   };
   try {
+    // Revalidate origin at delivery time: hostnames may have changed, and a
+    // saved instance could now resolve to a private address (DNS rebinding).
+    const parsed = String(instance.origin || '').trim().match(/^(\w+:)\/\/([^\/\s:?#]+)(:\d+)?(\/.*)?$/);
+    const host = parsed ? parsed[2] : '';
+    if (!parsed || forbiddenHost(host)) {
+      throw new Error('origin host is not allowed at delivery time');
+    }
     const res = await fetch(`${instance.origin}/api/continuum/inbox`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-instance-id': instanceId },
       body: JSON.stringify(envelope),
       signal: AbortSignal.timeout(10000),
+      redirect: 'error',
     });
     if (res.ok) {
       await db.run(
