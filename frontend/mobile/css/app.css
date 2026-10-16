@@ -457,6 +457,18 @@ a:hover { text-decoration: underline; }
   background: var(--app-bg);
 }
 
+/* When installed as a webapp (display-mode: standalone) there is no browser
+   chrome: no address bar, no back button, no tabs. The shell is self-contained -
+   its own app bar, tab bar and composer - and safe-area insets cover the status
+   bar and home indicator. Keeping the shell a single full-height grid prevents
+   the address-bar height from being mistaken for layout space. */
+@media (display-mode: standalone) {
+  .m-app {
+    height: 100dvh;
+    min-height: 100svh;
+  }
+}
+
 /* Skip link: off-screen until focused, so keyboard and screen-reader users can
    jump straight to the view instead of tabbing through the app bar and tab bar
    on every screen. */
