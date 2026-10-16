@@ -438,7 +438,6 @@ function mountSpaFallback(app, opts) {
       // answering it with HTML would turn a broken script tag into a syntax error
       // far from the cause.
       if (/\.[a-z0-9]+$/i.test(rest)) return next();
-      if (/\.[a-z0-9]+$/i.test(rest)) return next();
       // The Mobile module is a subdirectory of the same client tree with its own entry
       // document, so a deep link inside it has to be answered with that document rather
       // than the desktop one - otherwise a refresh inside /mobile/settings dropped the

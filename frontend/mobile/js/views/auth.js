@@ -7,6 +7,7 @@
 
 import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
+import { brandMark } from '../../../packages/brand.js';
 import Api from '../../../packages/api.js';
 import { currentQuery, navigate, path } from '../../../packages/nav.js';
 import { applyToken, loadSession, logout, refreshServers } from '../../../packages/store.js';
@@ -16,8 +17,8 @@ import { textInput, field } from './util.js';
 
 function lockup() {
   return el('div', { class: 'm-auth__lockup' },
-    el('img', { src: '../assets/trycord-assets/brand/trycord-symbol.svg', alt: '', width: 34, height: 34 }),
-    el('span', { class: 'm-auth__brand' }, 'Trycord'));
+    brandMark({ size: 36 }),
+    el('span', { class: 'm-auth__name' }, 'Trycord'));
 }
 
 function busy(form, isBusy) {

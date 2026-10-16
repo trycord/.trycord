@@ -903,7 +903,9 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   width: 100%;
 }
 .m-auth__lockup { display: flex; align-items: center; gap: 10px; }
-.m-auth__lockup img { width: 36px; height: 36px; }
+/* The mark keeps its box against the flex row's stretch, exactly as the app bar
+   does, so both sign-in and shell draw the monogram at the same weight. */
+.m-auth__lockup img { display: block; flex: none; width: 36px; height: 36px; }
 .m-auth__name { font-weight: var(--weight-bold); font-size: var(--fs-h2); }
 .m-auth__title { font-size: var(--fs-display); font-weight: var(--weight-bold); letter-spacing: var(--tracking-tight); margin: 0; }
 .m-auth__sub { color: var(--text-2); font-size: var(--fs-sm); margin: -8px 0 0; }
@@ -1355,7 +1357,6 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 
 /* ---- the sign-in surfaces ------------------------------------------------- */
 
-.m-auth__brand { display: grid; place-items: center; gap: 10px; padding: 24px 0 8px; }
 .m-auth__card {
   display: flex;
   flex-direction: column;
@@ -1367,8 +1368,18 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 }
 .m-auth__form { display: flex; flex-direction: column; gap: 14px; }
 
-/* The monogram, at the size the phone header uses. */
-.m-brandmark { display: block; border-radius: var(--tc-radius-sm); }
+/* The monogram, at the size the phone header uses.
+   The box is named here, on the wrapper, and nowhere else. The symbol ships with
+   width and height attributes of 512 of its own, and the image inside this
+   wrapper is sized to 100% of it - so a wrapper with no box of its own hands the
+   intrinsic 512 back, which is the app bar grown to fill half the screen. */
+.m-brandmark {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--tc-radius-sm);
+}
 .m-brandmark img { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 /* ---- profile -------------------------------------------------------------- */

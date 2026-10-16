@@ -6,6 +6,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
+import { brandMark } from '../../packages/brand.js';
 import { path } from '../../packages/nav.js';
 import { mediaUrl } from '../../packages/media.js';
 import { initials, hueOf } from '../../packages/format.js';
@@ -25,13 +26,12 @@ export function iconButton(name, label, onClick, options) {
 }
 
 export function brandLink() {
-  // The brand symbol lives once, at the client root, and the Mobile document
-  // reaches it one directory up. Relative rather than path(): path() prefixes the
-  // module's own mount (/app/mobile), but the assets are shared with the Desktop
-  // module at /app/assets, so a mounted deploy needs ../assets and an origin-root
-  // one /assets. The Desktop module points at the same file the same way.
+  // Where the monogram lives is packages/brand.js's business: the two entries sit
+  // at different depths of the one tree, so the way up to the shared asset
+  // library is derived there from its own file rather than guessed per entry.
+  // What is drawn around it stays here, because this is a Mobile control.
   return el('a', { class: 'm-brandmark', href: path('/home'), 'aria-label': 'Trycord home' },
-    el('img', { src: '../assets/trycord-assets/brand/trycord-symbol.svg', alt: '', width: 28, height: 28 }));
+    brandMark({ size: 28 }));
 }
 
 // An identity face. The image is fetched with the session and shown from an object
