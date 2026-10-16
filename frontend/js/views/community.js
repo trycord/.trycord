@@ -17,7 +17,7 @@ import { openDialog, confirmDialog, toast, errorToast, attachContextMenu } from 
 import { openUserMenu, userMenuItems } from '../user-menu.js';
 import { relativeTime } from '../../packages/format.js';
 import Api from '../../packages/api.js';
-import { page, heading, loading, failure, nothing, stat, panel } from './util.js';
+import { page, heading, loading, failure, nothing, stat, panel, empty } from './util.js';
 import { renderConversation } from './messages.js';
 
 // -- small shared pieces -----------------------------------------------------
@@ -944,19 +944,6 @@ function appearanceSection(serverId) {
   return { node: host, load };
 }
 
-          el('div', { class: 'row-item-main' },
-            el('div', { class: 'row-item-title' }, name),
-            ban.reason ? el('div', { class: 'row-item-sub' }, ban.reason) : null),
-          el('div', { class: 'row-item-actions' },
-            button('Unban', { kind: 'default', onClick: () => unbanPerson(serverId, id, load) }))));
-      }
-    } catch (error) {
-      rows.replaceChildren(failure(error, load));
-    }
-  }
-
-  return { node: host, load };
-}
 
 async function unbanPerson(serverId, userId, done) {
   try {
@@ -1162,9 +1149,6 @@ function bannerOrBlank(server) {
     return el('img', { class: 'media-img', src: server.banner_url, alt: '' });
   }
   return el('div', { class: 'media-blank' }, icon('image', { size: 22 }));
-}
-
-  return host;
 }
 
 function communitySettings(serverId) {
@@ -1409,6 +1393,64 @@ export function renderCommunityHome(ctx) {
           channel.topic ? el('div', { class: 'row-item-sub truncate' }, channel.topic) : null)));
     }
   }
+}
+
+function pickServerImage(serverId, kind, done) {
+  const input = el('input', { type: 'file', accept: 'image/*', class: 'visually-hidden' });
+  document.body.appendChild(input);
+  input.addEventListener('change', async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    try {
+      await Api.setServerImage(serverId, kind, file);
+      toast('Image updated.', { type: 'success' });
+      if (done) done();
+    } catch (error) {
+      toast(error.message, { type: 'danger' });
+    }
+  });
+  input.click();
+}
+
+async function removeServerImage(serverId, kind, done) {
+  try {
+    await Api.removeServerImage(serverId, kind);
+    toast('Image removed.', { type: 'success' });
+    if (done) done();
+  } catch (error) {
+    toast(error.message, { type: 'danger' });
+  }
+}
+
+function moderationSection(serverId) {
+  const host = el('div', { class: 'stack' });
+  async function load() {
+    host.replaceChildren(loading('Loading bans'));
+    try {
+      const out = await Api.bans(serverId);
+      const bans = Array.isArray(out) ? out : (out.bans || out.items || []);
+      host.replaceChildren();
+      if (!bans.length) {
+        host.appendChild(empty({ icon: 'ban', title: 'Nobody is banned', text: 'People you ban appear here, and can be unbanned.' }));
+        return;
+      }
+      for (const ban of bans) {
+        const id = ban.user_id || ban.userId || ban.id;
+        const name = ban.display_name || ban.displayName || ban.username || id;
+        host.appendChild(el('div', { class: 'row-item' },
+          el('div', { class: 'row-item-main' },
+            el('div', { class: 'row-item-title' }, name),
+            ban.reason ? el('div', { class: 'row-item-sub' }, ban.reason) : null),
+          el('div', { class: 'row-item-actions' },
+            button('Unban', { kind: 'default', onClick: () => unbanPerson(serverId, id, load) }))));
+      }
+    } catch (error) {
+      host.replaceChildren(failure(error, load));
+    }
+  }
+  load();
+  return { node: host, load };
 }
 
 export default {
