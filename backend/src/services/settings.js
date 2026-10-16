@@ -403,6 +403,18 @@ const SCHEMA = [
     description: 'Serve the application under a path such as /app. Blank serves it from the site root. Applied when the process next starts.',
     live: false,
   },
+  {
+    key: 'cpu.worker_count', env: 'JOBS_WORKERS', type: 'integer', default: 0,
+    category: 'limits', label: 'CPU worker count',
+    description: 'Number of background job workers the job system runs. 0 means auto: half the logical CPUs, at least one, capped at eight. Applied when the process next starts.',
+    min: 0, max: 64, live: false,
+  },
+  {
+    key: 'cpu.concurrent_jobs', env: 'TRYCORD_CONCURRENT_JOBS', type: 'integer', default: 4,
+    category: 'limits', label: 'Concurrent jobs per type',
+    description: 'Maximum jobs of the same type running at once, so one expensive job type cannot starve the rest. Applied when the process next starts.',
+    min: 1, max: 100, live: false,
+  },
 ];
 
 // Secret-bearing settings. Named explicitly rather than inferred, because a type of

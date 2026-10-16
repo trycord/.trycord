@@ -41,19 +41,42 @@ let stopping = false;
 let started = false;
 
 // CPU-aware default: half the logical CPUs, at least one, at most eight.
-// Container limits are not visible to Node here, so the operator can pin the
-// pool with JOBS_WORKERS when the box is shared or tiny.
+// Container limits are not visible to Node here. The operator can pin the pool
+// with JOBS_WORKERS, or save cpu.worker_count in the configuration centre; the
+// saved value wins, the environment seeds it, and the CPU-aware default is the
+// floor. Applied when the process next starts.
 function defaultWorkerCount() {
+  try {
+    const settings = require('./services/settings');
+    if (settings.isLoaded()) {
+      const saved = settings.get('cpu.worker_count');
+      if (Number.isFinite(saved) && saved > 0) return Math.floor(saved);
+    }
+  } catch { /* store not loaded yet */ }
   const fromEnv = Number(process.env.JOBS_WORKERS);
   if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv);
-  const cpus = (typeof osCpus === 'function' ? osCpus() : require('os').cpus().length) || 1;
+  const cpus = require('os').cpus().length || 1;
   return Math.min(8, Math.max(1, Math.floor(cpus / 2)));
 }
 
-function osCpus() { return require('os').cpus().length; }
-
 function isoPlusMs(ms) {
   return new Date(Date.now() + ms).toISOString();
+}
+
+// Default concurrency per job kind: how many jobs of the same type run at once.
+// Read from the configuration centre (cpu.concurrent_jobs), falling back to 4.
+// Applied when the process next starts.
+function defaultConcurrency() {
+  try {
+    const settings = require('./services/settings');
+    if (settings.isLoaded()) {
+      const saved = settings.get('cpu.concurrent_jobs');
+      if (Number.isFinite(saved) && saved > 0) return Math.floor(saved);
+    }
+  } catch { /* store not loaded yet */ }
+  const fromEnv = Number(process.env.TRYCORD_CONCURRENT_JOBS);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv);
+  return 4;
 }
 
 // Claim the next due job, atomically. Returns null when nothing is due.
@@ -120,9 +143,32 @@ async function worker(slot) {
     const handler = handlers.get(job.kind);
     try {
       if (!handler) throw new Error('no handler registered for job kind "' + job.kind + '"');
-      await handler(JSON.parse(job.payload || '{}'));
-      await markDone(job.id, job);
+
+      // Kind concurrency limit: one expensive job type cannot starve the rest.
+      // If this kind is at its cap, put the job back and wait for a slot.
+      const limit = kindLimits.get(job.kind) || 1;
+      const running = kindRunning.get(job.kind) || 0;
+      if (running >= limit) {
+        await db.run(
+          'UPDATE jobs SET status = ?, updated_at = ? WHERE id = ? AND status = ?',
+          ['pending', now(), job.id, 'running']
+        );
+        await sleep(POLL_MS);
+        continue;
+      }
+      kindRunning.set(job.kind, running + 1);
+      try {
+        await handler(JSON.parse(job.payload || '{}'));
+        await markDone(job.id, job);
+      } catch (e) {
+        await markFailed(job.id, job, e && e.message);
+      } finally {
+        kindRunning.set(job.kind, Math.max(0, (kindRunning.get(job.kind) || 1) - 1));
+      }
     } catch (e) {
+      // A handler that throws after the kind slot was taken still needs the
+      // slot released; the finally above already did that, so mark failed and
+      // continue rather than crashing the worker.
       await markFailed(job.id, job, e && e.message);
     }
   }
@@ -135,7 +181,7 @@ function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 function register(kind, handler, opts = {}) {
   if (handlers.has(kind)) throw new Error('job kind already registered: ' + kind);
   handlers.set(kind, handler);
-  kindLimits.set(kind, Math.max(1, Number(opts.concurrency || 1)));
+  kindLimits.set(kind, Math.max(1, Number(opts.concurrency || defaultConcurrency())));
   kindRunning.set(kind, 0);
 }
 
