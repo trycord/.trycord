@@ -14,6 +14,7 @@ import { path, navigate } from '../../packages/nav.js';
 import { scopeNav } from '../../packages/registry.js';
 import { toast, errorToast, confirmDialog, openDialog, openMenu } from '../ui.js';
 import { page, band, panel, prow, notice, section, loading, failure, nothing, empty, relative, stat } from './util.js';
+import { continuumSection } from './continuum.js';
 
 // -- shared furniture --------------------------------------------------------
 
@@ -943,6 +944,7 @@ const SECTIONS = {
   pages: pagesSection,
   settings: settingsSection,
   database: databaseSection,
+  continuum: continuumSection,
 };
 
 // -- the database ------------------------------------------------------------

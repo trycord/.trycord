@@ -23,7 +23,7 @@ Run from `backend/`, on 2026-10-16, against the working tree at `dd4b6ac`.
 | Redteam regression | `tests/redteam/regression.mjs` on isolated SQLite, `ALLOW_TEST_HOOKS=true` | **14 passed, 0 failed** (RT-01…RT-14; launch header patched to include `ALLOW_TEST_HOOKS=true`) |
 | Redteam manual | `tests/redteam/findings-manual.mjs` on isolated SQLite | **14 passed, 0 failed** (§4 CSP, §13 2FA lockout, §15 unban audit rows, §16 upload/voice limits) |
 | Backend modules | `check-server-routes.js` / `check-server-bindings.js` | 141 modules |
-| Client modules | `check-client-modules.js` / `check-frontend-modules.js` | 60 modules; boundary holds |
+| Client modules | `check-client-modules.js` / `check-frontend-modules.js` | 61 modules; boundary holds |
 | Status monitor | `check-status-monitor.js` | 83 assertions |
 
 CI reality (`.github/workflows/check.yml`): CI runs **only** `npm run check`
@@ -238,4 +238,6 @@ Phase 8 — complete: `/guidelines`, `/community-guidelines`, `/federation-polic
 
 Gate: `npm run check` exit 0 (40+ sub-checks incl. jobs check, public-site check, settings wiring); mobile layout 14/14; mobile render 62/62 (656 controls); redteam 28/28.
 
-Remaining phases not yet started: Phase 3 CPU parallelism implementation beyond baseline; Phase 4 Community Continuum federation; Phase 7 Community customization & Community Memory; Phase 9 integration & release verification. Next action: Phase 3 profiling (bot O(N) token scan at `services/bots.js:290`, SQLite serialized writes, `LIKE '%q%'` search) before implementing any bounded concurrency.
+Phase 4 foundation — complete: `services/continuum.js` (Ed25519-signed event envelopes via node:crypto, capability discovery at `/.well-known/trycord`, inbound verification with replay protection, outbox delivery with backoff+jitter retries and dead-lettering), `routes/continuum.js` (public discovery, admin instance management, admin inbox), `db/tables/continuum.js` + `db/schema.js` (continuum_instances, continuum_events, continuum_deliveries, continuum_inbox), `features.js` continuum.enabled flag (default off), `.env.example` CONTINUUM_ENABLED=off. Wired into server.js boot/key generation/job registration. End-to-end verified between two local instances: valid signed events 202, replays rejected, tampered signatures rejected, unknown keys rejected.
+
+Phase 4 remaining: wire message posts → outbox events (routes/messages.js), Continuum admin UI page, continuum check script.

@@ -169,6 +169,11 @@ export const PAGES = [
     label: 'Database', icon: 'database', tabs: ['database'],
     blurb: 'Where this instance keeps its data, and how to move it',
   }),
+  p('admin.continuum', '/admin/continuum', {
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 6,
+    label: 'Continuum', icon: 'share', tabs: ['continuum'],
+    blurb: 'Federation with compatible Trycord instances',
+  }),
 
   // ---- community settings sections. No path: each is addressed relative to
   // whichever community is open, and the shell owns that resolver.
