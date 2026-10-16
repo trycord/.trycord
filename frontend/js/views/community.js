@@ -17,7 +17,7 @@ import { openDialog, confirmDialog, toast, errorToast, attachContextMenu } from 
 import { openUserMenu, userMenuItems } from '../user-menu.js';
 import { relativeTime } from '../../packages/format.js';
 import Api from '../../packages/api.js';
-import { page, heading, loading, failure, nothing, stat } from './util.js';
+import { page, heading, loading, failure, nothing, stat, panel } from './util.js';
 import { renderConversation } from './messages.js';
 
 // -- small shared pieces -----------------------------------------------------
@@ -55,6 +55,13 @@ function button(label, options) {
     type: 'button',
     onClick: opts.onClick || null,
   }, opts.icon ? icon(opts.icon, { size: 15 }) : null, el('span', {}, label));
+}
+
+function fieldBlock(label, hint, control) {
+  return el('label', { class: 'field' },
+    el('span', { class: 'field-label' }, label),
+    control,
+    hint ? el('span', { class: 'field-hint' }, hint) : null);
 }
 
 function sectionShell() {
@@ -937,12 +944,6 @@ function appearanceSection(serverId) {
   return { node: host, load };
 }
 
-function bannerOrBlank(server) {
-  if (server.banner_url) {
-    return el('img', { class: 'media-img', src: server.banner_url, alt: '' });
-  }
-  return el('div', { class: 'media-blank' }, icon('image', { size: 22 }));
-}
 
 function pickServerImage(serverId, kind, done) {
   const input = el('input', { type: 'file', accept: 'image/*', style: { display: 'none' } });
@@ -1201,9 +1202,103 @@ function analyticsSection(serverId) {
 
 // -- the settings page -------------------------------------------------------
 
-function communityAllowed(serverId) {
-  return can(serverId, 'MANAGE_SERVER') || isOwner(serverId);
+function bannerOrBlank(server) {
+  if (server.banner_url) {
+    return el('img', { class: 'media-img', src: server.banner_url, alt: '' });
+  }
+  return el('div', { class: 'media-blank' }, icon('image', { size: 22 }));
 }
+
+function communityAllowed(serverId) {
+  const host = el('div', { class: 'settings-stack' });
+
+  const instances = el('div', { class: 'stack' });
+  const formHost = el('div', { class: 'stack' });
+
+  function render() {
+    host.replaceChildren(el('table', { class: 'table' },
+      el('thead', el('tr',
+        el('th', 'Instance'),
+        el('th', 'Origin'),
+        el('th', 'Trust'),
+        el('th', 'Actions'))),
+      el('tbody')));
+    loadInstances();
+  }
+
+  async function loadInstances() {
+    instances.replaceChildren(el('div', { class: 'stack' }, loading('Loading remote instances…')));
+    let rows;
+    try {
+      rows = await Api.get('/api/continuum/instances');
+    } catch (error) {
+      instances.replaceChildren(failure(error, loadInstances));
+      return;
+    }
+    if (!rows || !rows.length) {
+      instances.replaceChildren(nothing('No remote instances yet. Add one below to begin federating.'));
+    } else {
+      instances.replaceChildren(el('table', { class: 'table' },
+        el('thead', el('tr',
+          el('th', 'Instance'),
+          el('th', 'Origin'),
+          el('th', 'Trust'),
+          el('th', 'Actions'))),
+        el('tbody', ...rows.map(instanceRow))));
+    }
+  }
+
+  async function setTrust(id, status) {
+    try {
+      await Api.patch('/api/continuum/instances/' + encodeURIComponent(id) + '/trust', { trust_status: status });
+      toast('Trust updated.', { type: 'success' });
+      loadInstances();
+    } catch (error) { errorToast(error); }
+  }
+
+  const nameInput = el('input', { class: 'input', placeholder: 'Remote instance name', maxLength: '128' });
+  const originInput = el('input', { class: 'input', placeholder: 'https://remote.example.com', maxLength: '512' });
+  const keyInput = el('textarea', { class: 'input', rows: '4', placeholder: '-----BEGIN PUBLIC KEY-----...', maxLength: '512' });
+  const addError = el('div', { class: 'form-error' });
+  const addBtn = el('button', { class: 'btn btn--primary', type: 'button' }, 'Add instance');
+
+  const addForm = el('div', { class: 'stack' },
+    fieldBlock('Name', 'Shown in lists.', nameInput),
+    fieldBlock('Origin', 'The instance\'s origin URL, https:// or http://.', originInput),
+    fieldBlock('Public key', 'Paste the remote instance\'s public key so its events can be verified.', keyInput),
+    el('div', { class: 'stack' }, addError, addBtn)
+  );
+
+  addBtn.addEventListener('click', async () => {
+    addError.textContent = '';
+    if (!nameInput.value.trim()) { addError.textContent = 'Give the instance a name.'; return; }
+    if (!originInput.value.trim()) { addError.textContent = 'Enter its origin URL.'; return; }
+    if (!keyInput.value.trim()) { addError.textContent = 'Paste its public key.'; return; }
+    addBtn.disabled = true;
+    try {
+      await Api.post('/api/continuum/instances', {
+        id: nameInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        name: nameInput.value.trim(),
+        origin: originInput.value.trim(),
+        public_key: keyInput.value.trim(),
+      });
+      nameInput.value = ''; originInput.value = ''; keyInput.value = '';
+      toast('Remote instance added. It starts untrusted; set it to Trust to exchange events.', { type: 'success' });
+      loadInstances();
+    } catch (error) { addError.textContent = error.message || 'That did not work.'; }
+    finally { addBtn.disabled = false; }
+  });
+
+  host.replaceChildren(
+    panel({ title: 'Remote instances', body: instances }),
+    panel({ title: 'Add a remote instance', body: addForm })
+  );
+
+  loadInstances();
+
+  return host;
+}
+
 
 export function renderCommunitySettings(ctx) {
   const serverId = ctx.serverId;
@@ -1237,6 +1332,7 @@ export function renderCommunitySettings(ctx) {
     ['automation', 'Integrations', 'rocket'],
     ['analytics', 'Analytics', 'chart'],
     ['ownership', 'Ownership', 'crown'],
+    ['settings', 'Settings', 'sliders'],
   ];
   const builders = {
     overview: () => overviewSection(serverId),
@@ -1250,6 +1346,7 @@ export function renderCommunitySettings(ctx) {
     integrations: () => integrationsSection(serverId),
     analytics: () => analyticsSection(serverId),
     ownership: () => ownershipSection(serverId),
+    settings: () => renderCommunitySettings(server),
   };
 
   const requested = (ctx.query && ctx.query.get('section')) || 'overview';

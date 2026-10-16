@@ -23,6 +23,12 @@ module.exports = (engine) => [
       enforcement_state VARCHAR(16),
       enforcement_reason TEXT,
       enforcement_updated_at VARCHAR(64),
+      -- Community customization: welcome content, guidelines, and defaults
+      welcome_content TEXT,
+      welcome_enabled INTEGER NOT NULL DEFAULT 0,
+      guidelines TEXT,
+      notification_defaults TEXT,
+      interaction_settings TEXT,
       -- Human-readable URL segment. Backfilled from name at boot and unique, so
       -- a community can be linked as /c/my-community rather than by UUID.
       -- Users deliberately have no slug: the username already serves that role.

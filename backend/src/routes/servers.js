@@ -73,6 +73,47 @@ router.patch('/:id', resolveServer, auth.requireVerified, requirePerm('MANAGE_SE
   } catch (e) { serviceError(res, e); }
 });
 
+// Community settings: welcome content, guidelines, notification defaults,
+// interaction settings. All server-side enforced with MANAGE_SERVER permission.
+router.patch('/:id/settings', resolveServer, auth.requireVerified, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
+  try {
+    const { welcome_content, welcome_enabled, guidelines, notification_defaults, interaction_settings } = req.body || {};
+    const sets = [];
+    const vals = [];
+    if (welcome_content !== undefined) {
+      if (typeof welcome_content !== 'string') throw { code: 'VALIDATION_ERROR', message: 'welcome_content must be a string' };
+      sets.push('welcome_content = ?');
+      vals.push(String(welcome_content).slice(0, 5000));
+    }
+    if (welcome_enabled !== undefined) {
+      if (typeof welcome_enabled !== 'boolean') throw { code: 'VALIDATION_ERROR', message: 'welcome_enabled must be a boolean' };
+      sets.push('welcome_enabled = ?');
+      vals.push(welcome_enabled ? 1 : 0);
+    }
+    if (guidelines !== undefined) {
+      if (typeof guidelines !== 'string') throw { code: 'VALIDATION_ERROR', message: 'guidelines must be a string' };
+      sets.push('guidelines = ?');
+      vals.push(String(guidelines).slice(0, 5000));
+    }
+    if (notification_defaults !== undefined) {
+      if (typeof notification_defaults !== 'string') throw { code: 'VALIDATION_ERROR', message: 'notification_defaults must be a string' };
+      sets.push('notification_defaults = ?');
+      vals.push(notification_defaults);
+    }
+    if (interaction_settings !== undefined) {
+      if (typeof interaction_settings !== 'string') throw { code: 'VALIDATION_ERROR', message: 'interaction_settings must be a string' };
+      sets.push('interaction_settings = ?');
+      vals.push(interaction_settings);
+    }
+    if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'Nothing to update' };
+    vals.push(req.server.id);
+    await db.run(`UPDATE servers SET ${sets.join(', ')} WHERE id = ?`, vals);
+    const detail = await servers.detail(req.server.id, req.user.id, req.access && req.access.permissions);
+    events.emit(req.server.id, 'community_settings_updated', { server: detail.id });
+    res.json(detail);
+  } catch (e) { serviceError(res, e); }
+});
+
 router.delete('/:id', resolveServer, auth.requireVerified, requireOwner, async (req, res, next) => {
   try {
     res.json(await servers.remove(req.server.id));

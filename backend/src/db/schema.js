@@ -155,6 +155,13 @@ const LEGACY_ALTERS = [
   ['messages', 'thread_root_id', 'ALTER TABLE messages ADD COLUMN thread_root_id VARCHAR(64)'],
   ['dm_messages', 'thread_root_id', 'ALTER TABLE dm_messages ADD COLUMN thread_root_id VARCHAR(64)'],
   ['audit_logs', 'server_id', 'ALTER TABLE audit_logs ADD COLUMN server_id VARCHAR(64)'],
+  // Community customization: welcome content, guidelines, notification defaults,
+  // interaction settings.
+  ['servers', 'welcome_content', 'ALTER TABLE servers ADD COLUMN welcome_content TEXT'],
+  ['servers', 'welcome_enabled', 'ALTER TABLE servers ADD COLUMN welcome_enabled INTEGER NOT NULL DEFAULT 0'],
+  ['servers', 'guidelines', 'ALTER TABLE servers ADD COLUMN guidelines TEXT'],
+  ['servers', 'notification_defaults', 'ALTER TABLE servers ADD COLUMN notification_defaults TEXT'],
+  ['servers', 'interaction_settings', 'ALTER TABLE servers ADD COLUMN interaction_settings TEXT'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -198,6 +205,11 @@ const MYSQL_ADD = [
   ['servers', 'enforcement_state', 'ALTER TABLE servers ADD COLUMN enforcement_state VARCHAR(16)'],
   ['servers', 'enforcement_reason', 'ALTER TABLE servers ADD COLUMN enforcement_reason TEXT'],
   ['servers', 'enforcement_updated_at', 'ALTER TABLE servers ADD COLUMN enforcement_updated_at VARCHAR(64)'],
+  ['servers', 'welcome_content', 'ALTER TABLE servers ADD COLUMN welcome_content TEXT'],
+  ['servers', 'welcome_enabled', 'ALTER TABLE servers ADD COLUMN welcome_enabled INTEGER NOT NULL DEFAULT 0'],
+  ['servers', 'guidelines', 'ALTER TABLE servers ADD COLUMN guidelines TEXT'],
+  ['servers', 'notification_defaults', 'ALTER TABLE servers ADD COLUMN notification_defaults TEXT'],
+  ['servers', 'interaction_settings', 'ALTER TABLE servers ADD COLUMN interaction_settings TEXT'],
   ['users', 'bio', 'ALTER TABLE users ADD COLUMN bio TEXT'],
   ['users', 'avatar_url', 'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(512)'],
   ['users', 'banner_url', 'ALTER TABLE users ADD COLUMN banner_url VARCHAR(512)'],
