@@ -240,7 +240,10 @@ async function main() {
       await new Promise((r) => setTimeout(r, 2));
     }
     const at = received.get(content);
-    fanout.push(at ? sentAt - at : -1);
+    // at is when the subscriber got the frame, so the delivery latency is at -
+    // sentAt, never the other way around. The old sign made every measured
+    // round negative and therefore invisible to the percentile summariser.
+    fanout.push(at ? at - sentAt : -1);
   }
   // Did the message exist at all? A post that was never stored and a post that was
   // stored but never broadcast are different faults, and only one of them is the

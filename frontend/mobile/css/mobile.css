@@ -187,6 +187,31 @@ a:hover { text-decoration: underline; }
   padding-right: env(safe-area-inset-right, 0);
   background: var(--app-bg);
 }
+
+/* Skip link: off-screen until focused, so keyboard and screen-reader users can
+   jump straight to the view instead of tabbing through the app bar and tab bar
+   on every screen. */
+.m-skip {
+  position: fixed;
+  left: env(safe-area-inset-left, 0);
+  top: env(safe-area-inset-top, 0);
+  z-index: var(--z-scrim, 55);
+  padding: 6px 12px;
+  margin: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--tc-radius-md);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  transform: translateY(-100%);
+  transition: transform var(--tc-motion-fast);
+}
+.m-skip:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--m-brand-line);
+  outline-offset: 2px;
+}
 /* A conversation hands its footer to the composer: the tab bar would sit under a
    keyboard and is the wrong destination to keep visible while typing. */
 .m-app[data-layout="conversation"] .m-tabs { display: none; }
@@ -231,8 +256,8 @@ a:hover { text-decoration: underline; }
 .m-iconbtn {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: 0;
   border-radius: var(--tc-radius-md);
   background: transparent;
@@ -247,9 +272,9 @@ a:hover { text-decoration: underline; }
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   scroll-padding-top: 8px;
-  padding: 10px 12px calc(18px + env(safe-area-inset-bottom, 0));
-  padding-left: calc(12px + env(safe-area-inset-left, 0));
-  padding-right: calc(12px + env(safe-area-inset-right, 0));
+  /* One gutter only: .m-app already pads the safe area, and .m-tabs owns the
+     bottom home-indicator inset, so neither safe-area value is repeated here. */
+  padding: 10px 12px 18px;
 }
 
 /* A view that owns a fixed footer (a conversation) drops its own padding and
@@ -506,7 +531,7 @@ a:hover { text-decoration: underline; }
 .m-btn--ghost { background: transparent; border-color: transparent; }
 .m-btn--danger { color: var(--m-danger); border-color: var(--m-brand-line); background: transparent; }
 .m-btn--block { display: flex; width: 100%; }
-.m-btn--sm { min-height: 34px; padding: 0 12px; }
+.m-btn--sm { min-height: var(--m-tap); padding: 0 12px; }
 
 .m-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 2px 2px; }
 
@@ -772,7 +797,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-composer__send {
   display: grid;
   place-items: center;
-  width: 42px; height: 42px;
+  width: 44px; height: 44px;
   border-radius: var(--tc-radius-md);
   border: 0;
   background: var(--brand-fill);
@@ -887,6 +912,12 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   box-shadow: var(--shadow-2);
 }
 .m-toast--error { border-color: var(--m-brand-line); background: var(--m-brand-soft); }
+
+/* In a conversation the tab bar is hidden, so the toast must not leave a tab-bar
+   shaped gap above the home indicator. */
+.m-app[data-layout="conversation"] .m-toast-root {
+  bottom: calc(12px + env(safe-area-inset-bottom, 0));
+}
 .m-toast--success { border-color: var(--m-success); }
 
 /* ---- auth ----------------------------------------------------------------- */
@@ -952,6 +983,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 }
 .m-chipbtn {
   flex: 0 0 auto;
+  min-height: var(--m-tap);
   padding: 7px 14px;
   border-radius: var(--tc-radius-pill);
   border: 1px solid var(--line-2);
@@ -969,16 +1001,16 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 
 /* ---- layout primitives ---------------------------------------------------- */
 
-/* The scrolling body of a screen. Fixed chrome above and below it, so the page
-   itself is what moves. */
+/* The scrolling body of a screen. Fixed chrome sits above and below it, so the
+   page itself is what moves. .m-view is the one scrolling region (see the rule
+   above); .m-screen fills it and stacks sections, so nothing here scrolls on its
+   own. Removing the overflow/padding here stops the nested scroll and the double
+   gutter the view and the screen used to stack. */
 .m-screen {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 10px var(--m-gutter) 18px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  flex: 1 1 auto;
+  height: 100%;
   min-height: 0;
 }
 
@@ -1034,7 +1066,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  min-height: var(--m-tap);
   padding: 0 14px;
   border: 0;
   border-radius: var(--tc-radius-pill);
@@ -1141,8 +1173,8 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-switch {
   position: relative;
   flex: 0 0 auto;
-  width: 46px;
-  height: 28px;
+  width: 48px;
+  height: var(--m-tap);
   padding: 0;
   border: 1px solid var(--line-2);
   border-radius: var(--tc-radius-pill);
@@ -1153,8 +1185,8 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-switch::after {
   content: "";
   position: absolute;
-  top: 2px; left: 2px;
-  width: 22px; height: 22px;
+  top: 10px; left: 10px;
+  width: 24px; height: 24px;
   border-radius: 50%;
   background: var(--text-2);
   transition: transform .16s ease, background .16s ease;

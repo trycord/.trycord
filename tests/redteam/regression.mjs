@@ -4,7 +4,7 @@
 // test instance only (fresh sqlite file), never production:
 //
 //   JWT_SECRET=test-secret DB_CLIENT=sqlite DB_FILE=/tmp/rt-reg.db \
-//     PORT=18999 HOST=127.0.0.1 SERVER_HOST_TYPE=express node src/server.js &
+//     PORT=18999 HOST=127.0.0.1 SERVER_HOST_TYPE=express ALLOW_TEST_HOOKS=true node src/server.js &
 //   BASE=http://127.0.0.1:18999 BACKEND=/home/ultim/trycord/.trycord/backend \
 //     node tests/redteam/regression.mjs
 //
