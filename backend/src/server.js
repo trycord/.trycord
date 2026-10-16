@@ -19,6 +19,7 @@ const enforcement = require('./services/enforcement');
 const pages = require('./services/pages');
 const features = require('./features');
 const settings = require('./services/settings');
+const jobs = require('./services/jobs');
 
 /**
  * Reduce a configured API location to the origin the client should talk to.
@@ -375,6 +376,7 @@ async function boot() {
       name: s.isLoaded() ? s.get('instance.name') : inst.name,
       description: s.isLoaded() ? s.get('instance.description') : '',
       supportUrl: s.isLoaded() ? s.get('instance.supportUrl') : '',
+      backendRole: s.isLoaded() ? s.get('instance.backendRole') : 'primary',
       globalSync: inst.globalUrl !== '',
       features: {
         publicDiscovery: features.current.communityDiscovery,
@@ -629,6 +631,10 @@ async function boot() {
   await purge();
   setInterval(purge, 60 * 60 * 1000).unref();
 
+  // Durable background jobs: bounded workers claim due jobs from the database,
+  // retry with backoff, and never lose work on restart or crash.
+  await jobs.start();
+
   // The WebSocket gateway shares this HTTP server: same bind address, no second port.
   await new Promise((resolve, reject) => {
     server.on('error', reject);
@@ -656,8 +662,9 @@ if (require.main === module) {
       shuttingDown = true;
       console.log(`[info] ${signal}: draining connections…`);
       server.close(() => {
-        db.close()
-          .catch(() => {})
+        jobs.stop()
+          .then(() => db.close())
+          .catch(() => db.close())
           .finally(() => {
             console.log('[info] shutdown complete');
             process.exit(0);

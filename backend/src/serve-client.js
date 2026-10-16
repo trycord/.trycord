@@ -48,6 +48,11 @@ const CLEAN_PAGES = [
   { route: '/trust-and-safety', file: 'trust-and-safety.html', editable: true },
   { route: '/support', file: 'support.html', editable: true },
   { route: '/security', file: 'security.html', editable: true },
+  { route: '/guidelines', file: 'guidelines.html', editable: true },
+  { route: '/community-guidelines', file: 'community-guidelines.html', editable: true },
+  { route: '/federation-policy', file: 'federation-policy.html', editable: true },
+  { route: '/cookies', file: 'cookies.html', editable: true },
+  { route: '/licenses', file: 'licenses.html', editable: true },
 ];
 
 // Where the built client might be, in the order it is tried.
