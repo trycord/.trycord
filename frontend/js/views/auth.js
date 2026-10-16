@@ -59,6 +59,12 @@ function input(name, options) {
   });
 }
 
+function fieldBlock(label, control) {
+  return el('label', { class: 'field' },
+    el('span', { class: 'field-label' }, label),
+    control);
+}
+
 function busy(form, isBusy) {
   const button = form.querySelector('button[type="submit"]');
   if (button) button.disabled = isBusy;
@@ -111,8 +117,8 @@ function loginForm() {
   const mfaField = el('label', { class: 'field', hidden: true }, el('span', {}, 'Two-step code'), code);
 
   const form = el('form', { class: 'auth-form' },
-    el('label', { class: 'field' }, el('span', {}, 'Username or email'), username),
-    el('label', { class: 'field' }, el('span', {}, 'Password'), password),
+    fieldBlock('Username or email', username),
+    fieldBlock('Password', password),
     mfaField,
     el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Sign in'),
   );
@@ -171,10 +177,10 @@ function registerForm() {
   const email = Object.assign(input('email', { required: false }), { type: 'email' });
   const password = Object.assign(input('password'), { type: 'password' });
   const form = el('form', { class: 'auth-form' },
-    el('label', { class: 'field' }, el('span', {}, 'Username'), username),
-    el('label', { class: 'field' }, el('span', {}, 'Display name'), display),
-    el('label', { class: 'field' }, el('span', {}, 'Email (optional)'), email),
-    el('label', { class: 'field' }, el('span', {}, 'Password'), password),
+    fieldBlock('Username', username),
+    fieldBlock('Display name', display),
+    fieldBlock('Email (optional)', email),
+    fieldBlock('Password', password),
     el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Create account'),
   );
 
@@ -213,7 +219,7 @@ function registerForm() {
 function forgotForm() {
   const email = Object.assign(input('email'), { type: 'email' });
   const form = el('form', { class: 'auth-form' },
-    el('label', { class: 'field' }, el('span', {}, 'Email address'), email),
+    fieldBlock('Email address', email),
     el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Send reset link'),
   );
 
@@ -238,8 +244,8 @@ function resetForm(token) {
   const next = Object.assign(input('newPassword'), { type: 'password' });
   const confirm = Object.assign(input('confirmPassword'), { type: 'password' });
   const form = el('form', { class: 'auth-form' },
-    el('label', { class: 'field' }, el('span', {}, 'New password'), next),
-    el('label', { class: 'field' }, el('span', {}, 'Confirm new password'), confirm),
+    fieldBlock('New password', next),
+    fieldBlock('Confirm new password', confirm),
     el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Set new password'),
   );
 
@@ -294,7 +300,7 @@ function twoStepForm() {
   function passwordStep() {
     const password = Object.assign(input('password', { autocomplete: 'current-password' }), { type: 'password' });
     const form = el('form', { class: 'auth-form' },
-      el('label', { class: 'field' }, el('span', {}, 'Password'), password),
+      fieldBlock('Password', password),
       el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Continue'),
     );
     form.addEventListener('submit', async (event) => {
@@ -316,8 +322,8 @@ function twoStepForm() {
   function codeStep(secretValue) {
     const code = Object.assign(input('code', { autocomplete: 'one-time-code' }), { type: 'text', inputmode: 'numeric' });
     const form = el('form', { class: 'auth-form' },
-      el('label', { class: 'field' }, el('span', {}, 'Secret'), el('code', { class: 'secret-code' }, secretValue)),
-      el('label', { class: 'field' }, el('span', {}, 'Code from the app'), code),
+      fieldBlock('Secret', el('code', { class: 'secret-code' }, secretValue)),
+      fieldBlock('Code from the app', code),
       el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Turn on two-step sign-in'),
     );
     code.focus();

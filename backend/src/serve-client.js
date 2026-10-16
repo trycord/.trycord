@@ -454,10 +454,24 @@ function mountSpaFallback(app, opts) {
         // against /mobile/, and one under /app/mobile/... against /app/mobile/.
         return sendMobileDocument(clientDir, mount || '', res, next);
       }
+      const seg = rest.split('/').filter(Boolean)[0] || '';
+
+      // Auth pages live at root-level URLs: /login, /register, /forgot, /reset-password,
+      // /verify-email, /two-step. When the client is mounted under /app those same
+      // paths exist there too, but they redirect to the canonical root-level path so
+      // there is one address for signing in and one place password-reset emails point.
+      if (mount === '/app') {
+        const target = '/' + seg + rest.slice(seg.length + 1);
+        if (seg === 'login' || seg === 'register' || seg === 'forgot'
+          || seg === 'reset-password' || seg === 'verify-email' || seg === 'two-step') {
+          res.redirect(301, target);
+          return;
+        }
+      }
+
       // An instance can also serve a marketing site from the same origin. Those clean
       // URLs belong to it, so the app only claims its own prefixes and anything else
       // falls through to the public site's own 404.
-      const seg = rest.split('/').filter(Boolean)[0] || '';
       if (!APP_ROUTE_PREFIXES.has(seg)) return next();
       // The base is stamped per request because the mount point is a deployment fact,
       // not a build-time constant: the same file is served from the origin root by a
