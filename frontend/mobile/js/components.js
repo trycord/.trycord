@@ -25,8 +25,13 @@ export function iconButton(name, label, onClick, options) {
 }
 
 export function brandLink() {
+  // The brand symbol lives once, at the client root, and the Mobile document
+  // reaches it one directory up. Relative rather than path(): path() prefixes the
+  // module's own mount (/app/mobile), but the assets are shared with the Desktop
+  // module at /app/assets, so a mounted deploy needs ../assets and an origin-root
+  // one /assets. The Desktop module points at the same file the same way.
   return el('a', { class: 'm-brandmark', href: path('/home'), 'aria-label': 'Trycord home' },
-    el('img', { src: path('/assets/trycord-logo.svg'), alt: '', width: 28, height: 28 }));
+    el('img', { src: '../assets/trycord-assets/brand/trycord-symbol.svg', alt: '', width: 28, height: 28 }));
 }
 
 // An identity face. The image is fetched with the session and shown from an object

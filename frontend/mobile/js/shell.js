@@ -42,7 +42,7 @@ export function setAppBar(head) {
   refs.lead.replaceChildren();
   if (h.lead === undefined || h.lead === 'brand') {
     refs.lead.appendChild(el('a', { class: 'm-brandmark', href: path('/home'), 'aria-label': 'Home' },
-      el('img', { src: path('/assets/trycord-logo.svg'), alt: '', width: 28, height: 28 })));
+      el('img', { src: '../assets/trycord-assets/brand/trycord-symbol.svg', alt: '', width: 28, height: 28 })));
   } else if (h.lead === 'back') {
     refs.lead.appendChild(el('button', {
       class: 'm-iconbtn', type: 'button', 'aria-label': 'Back',
