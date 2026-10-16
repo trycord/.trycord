@@ -769,6 +769,30 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 
 /* ---- shell.css ---- */
 
+.settings-centre {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 16px;
+}
+
+.settings-centre-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  background: var(--tc-surface);
+}
+
 /* The Continuum workspace.
  *
  * Reading left to right: the rail of your communities, the column that belongs to

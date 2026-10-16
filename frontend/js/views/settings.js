@@ -718,6 +718,8 @@ function settingsNav(activeId) {
 
 export function renderSettings(ctx) {
   const content = el('div', { class: 'settings-centre' });
+  const body = el('div', { class: 'settings-centre-body' });
+  content.appendChild(body);
   const node = page({ wide: true },
     band({
       eyebrow: 'Settings',
@@ -731,9 +733,9 @@ export function renderSettings(ctx) {
     const build = SECTIONS[tab];
     if (!build) continue;
     try {
-      for (const part of [].concat(build())) if (part) content.appendChild(part);
+      for (const part of [].concat(build())) if (part) body.appendChild(part);
     } catch (error) {
-      content.appendChild(notice({
+      body.appendChild(notice({
         tone: 'danger',
         title: 'This section did not build',
         text: String((error && error.message) || error),
