@@ -10,6 +10,7 @@ const limit = require('../middleware/ratelimit');
 const auth = require('../middleware/auth');
 const requireVerified = auth.requireVerified;
 const voice = require('../services/voice');
+const voiceMesh = require('../services/voice-mesh');
 const permissions = require('../services/permissions');
 const db = require('../db');
 
@@ -175,5 +176,34 @@ async function sessionOf(channelId, userId) {
   );
   return row ? row.session_id : null;
 }
+
+// In-house WebRTC mesh (self-hosted peer-to-peer) signaling. Room cleanup happens on
+// leave and on disconnect (handled by services/voice-mesh.cleanupUser on WS close).
+router.post('/channels/:channelId/mesh-join', requireVerified, wrap(async (req, res) => {
+  const verdict = await voice.authorizeVoice(req.params.channelId, req.user.id, {});
+  if (!verdict.ok && verdict.code === 'FORBIDDEN') return fail(res, verdict.code, verdict.message, verdict.status);
+  const result = await voiceMesh.join(req.params.channelId, req.user.id);
+  if (!result.ok) return fail(res, result.code, result.message, result.status);
+  res.status(201).json(result);
+}));
+
+router.post('/channels/:channelId/mesh-leave', requireVerified, wrap(async (req, res) => {
+  res.json(await voiceMesh.leave(req.params.channelId, req.user.id));
+}));
+
+router.get('/channels/:channelId/mesh-peers', requireVerified, wrap(async (req, res) => {
+  const r = await voiceMesh.participants(req.params.channelId);
+  res.json(r);
+}));
+
+router.post('/channels/:channelId/mesh-signal', requireVerified, limit({ windowMs: 60000, max: 600 }), wrap(async (req, res) => {
+  const { to, kind, payload } = req.body || {};
+  if (!to || typeof to !== 'string' && typeof to !== 'number') return fail(res, 'VALIDATION_ERROR', 'target peer id required', 400);
+  if (!['offer', 'answer', 'ice', 'mute', 'leave'].includes(kind)) return fail(res, 'VALIDATION_ERROR', 'unknown signal kind', 400);
+  if (!voiceMesh.relay(req.params.channelId, req.user.id, to, kind, payload)) {
+    return fail(res, 'NOT_FOUND', 'target peer not in room', 404);
+  }
+  res.json({ ok: true });
+}));
 
 module.exports = router;

@@ -503,6 +503,9 @@ async function boot() {
   const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer } = createGateway(server);
   require('./routes/auth').setTicketIssuer(issueTicket);
   require('./routes/auth').setGateway({ disconnectUser });
+  // Voice mesh (in-house, peer-to-peer real-time) uses the realtime gateway to
+  // relay SDP offers/answers and ICE candidates directly between peers.
+  global.voiceRelayBridge = { sendToUser };
   require('./routes/messages').setGateway({ broadcast, sendToUser });
   require('./routes/channels').setGateway({ broadcast });
   // Account-scoped settings that did not previously have a home: privacy

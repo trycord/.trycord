@@ -63,7 +63,7 @@ function url(name) {
 }
 
 // The declared flags. Order here is documentation order, not precedence.
-const PROVIDERS = ['cloudflare'];
+const PROVIDERS = ['cloudflare', 'mesh'];
 
 // Settings the configuration centre owns. Each of these has a row in
 // services/settings.js, and that module already implements the precedence this
@@ -303,11 +303,13 @@ function healthOf(features) {
   if (v.stun.length === 0 && !v.turn.url) {
     problems.push('no STUN or TURN server is configured');
   }
-  if (!v.sfuAppId) {
-    problems.push('the media server app ID is not set');
-  }
-  if (!v.sfuAppSecret) {
-    problems.push('the media server app secret is not set');
+  if (v.provider !== 'mesh') {
+    if (!v.sfuAppId) {
+      problems.push('the media server app ID is not set');
+    }
+    if (!v.sfuAppSecret) {
+      problems.push('the media server app secret is not set');
+    }
   }
 
   if (problems.length) {

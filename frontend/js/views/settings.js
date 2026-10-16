@@ -446,7 +446,8 @@ function updatesSection() {
 
 function voiceProviderSection() {
   const select = el('select', { class: 'input input--compact', 'aria-label': 'Media server provider' });
-  select.appendChild(el('option', { value: 'cloudflare' }, 'Cloudflare Realtime SFU (only supported provider)'));
+  select.appendChild(el('option', { value: 'cloudflare' }, 'Cloudflare Realtime SFU (large rooms, screen sharing)'));
+  select.appendChild(el('option', { value: 'mesh' }, 'Self-hosted mesh (peer-to-peer, up to 6 participants)'));
   const info = el('div', { class: 'prow-sub' }, 'In-house runs the media stack here. Cloudflare routes media; Trycord owns signalling and room management.');
   select.addEventListener('change', async () => {
     try {

@@ -97,6 +97,16 @@ async function available() {
   if (!f.voiceVideo.enabled) {
     return { available: false, reason: 'disabled', detail: 'Voice and video are off on this instance.' };
   }
+  // In-house mesh needs no upstream subscription. It is always "available" whenever
+  // voice is enabled and at least one ICE server is configured (a network requirement,
+  // not a third-party one - a free STUN server is the default).
+  if (f.voiceVideo.provider === 'mesh') {
+    const stun = Array.isArray(f.voiceVideo.stun) ? f.voiceVideo.stun : [];
+    if (!stun.length && !f.voiceVideo.turn.url) {
+      return { available: false, reason: 'unreachable', detail: 'No STUN/TURN configured for mesh.', problems: ['voice.stunUrls'] };
+    }
+    return { available: true, reason: 'ready', detail: '', provider: 'mesh' };
+  }
   const health = features.healthOf(f);
   if (!health.available) return health;
 
