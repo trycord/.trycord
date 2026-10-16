@@ -1308,6 +1308,7 @@ export function renderCommunitySettings(ctx) {
     ['analytics', 'Analytics', 'chart'],
     ['ownership', 'Ownership', 'crown'],
     ['settings', 'Settings', 'sliders'],
+    ['memory', 'Memory', 'book'],
   ];
   const builders = {
     overview: () => overviewSection(serverId),
@@ -1322,6 +1323,7 @@ export function renderCommunitySettings(ctx) {
     analytics: () => analyticsSection(serverId),
     ownership: () => ownershipSection(serverId),
     settings: () => renderCommunitySettings({ serverId }),
+    memory: () => memorySection(serverId),
   };
 
   const requested = (ctx.query && ctx.query.get('section')) || 'overview';
@@ -1453,6 +1455,89 @@ function moderationSection(serverId) {
   return { node: host, load };
 }
 
+// -- Community Memory ------------------------------------------------------
+function memorySection(serverId) {
+  const host = el('div', { class: 'stack' });
+  const entries = el('div', { class: 'stack' });
+  const form = el('form', { class: 'stack' });
+
+  async function load() {
+    host.replaceChildren(loading('Loading knowledge entries'));
+    try {
+      const list = await Api.communityMemory(serverId);
+      host.replaceChildren(entries);
+      if (!list.length) {
+        host.appendChild(empty({
+          icon: 'book',
+          title: 'No knowledge entries yet',
+          text: 'Curate community knowledge here. Entries persist beyond chat history.',
+          action: el('button', { kind: 'primary', onClick: () => openEditor() }, 'Create entry'),
+        }));
+        return;
+      }
+      for (const entry of list) {
+        host.appendChild(el('div', { class: 'row-item' },
+          el('div', { class: 'row-item-main' },
+            el('div', { class: 'row-item-title' }, entry.title),
+            el('div', { class: 'row-item-sub' }, entry.body)),
+          el('div', { class: 'row-item-actions' },
+            el('button', { kind: 'default', onClick: () => openEditor(entry) }, 'Edit'),
+            el('button', { kind: 'default', onClick: () => del(entry.id) }, 'Delete'))));
+      }
+    } catch (error) {
+      host.replaceChildren(failure(error, load));
+    }
+  }
+
+  function openEditor(entry) {
+    const title = el('input', { class: 'input', value: entry ? entry.title : '' });
+    const body = el('textarea', { class: 'input', rows: 6, value: entry ? entry.body : '' });
+    const form = el('form', { class: 'stack' },
+      el('label', { class: 'field' }, el('span', {}, 'Title'), title),
+      el('label', { class: 'field' }, el('span', {}, 'Body'), body),
+      el('div', { class: 'stack actions' },
+        el('button', { kind: 'primary', type: 'button' }, entry ? 'Save' : 'Create'),
+        el('button', { kind: 'ghost', type: 'button', onClick: () => dialog.close() }, 'Cancel')));
+    const dialog = openDialog({
+      title: entry ? 'Edit knowledge entry' : 'Create knowledge entry',
+      body: form,
+      onClose: () => { },
+    });
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      next.disabled = true;
+      try {
+        if (entry) {
+          await Api.communityMemoryUpdate(serverId, entry.id, title.value.trim(), body.value.trim());
+        } else {
+          await Api.communityMemoryCreate(serverId, title.value.trim(), body.value.trim(), entry ? entry.channelId : null);
+        }
+        dialog.close();
+        load();
+      } catch (error) { errorToast(error); } finally { next.disabled = false; }
+    });
+    const next = form.querySelector('button[type="submit"]');
+  }
+
+  function del(id) {
+    confirmDialog({
+      title: 'Delete entry?',
+      body: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    }).then(async (yes) => {
+      if (!yes) return;
+      try {
+        await Api.communityMemoryDelete(serverId, id);
+        load();
+      } catch (error) { errorToast(error); }
+    });
+  }
+
+  load();
+  return { node: host, load };
+}
+
 export default {
   renderChannel,
   renderChannelPins,
@@ -1473,4 +1558,5 @@ export default {
   ownershipSection,
   integrationsSection,
   analyticsSection,
+  memorySection,
 };

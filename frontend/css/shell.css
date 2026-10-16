@@ -14,6 +14,27 @@
  * and the Mobile module builds its own tree with its own ids.
  */
 
+:root {
+  --tc-bg-deep: var(--tc-bg-deep);
+  --tc-bg: var(--tc-bg);
+  --tc-surface: var(--tc-surface);
+  --tc-border: var(--tc-border);
+  --tc-text: var(--tc-text);
+  --tc-text-muted: var(--tc-text-muted);
+  --tc-brand: var(--tc-brand);
+  --tc-brand-hover: var(--tc-brand-hover);
+
+  --bg: var(--tc-bg-deep);
+  --bg-2: var(--tc-bg);
+  --surface: var(--tc-surface);
+  --line: var(--tc-border);
+  --text: var(--tc-text);
+  --muted: var(--tc-text-muted);
+  --ember: var(--tc-brand);
+  --ember-2: var(--tc-brand-hover);
+  --sans: var(--tc-font-sans);
+}
+
 .ws {
   height: 100dvh;
   display: grid;
@@ -38,8 +59,8 @@
 .community-rail {
   grid-column: 1;
   grid-row: 1 / -1;
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 10px 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 14px 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   background: var(--tc-bg-deep);
   border-right: 1px solid var(--tc-border);
   z-index: var(--z-nav);
@@ -49,7 +70,7 @@
 .rail-list { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
 .rail-item {
   position: relative; width: 56px; height: 56px; flex: none;
-  display: grid; place-items: center; border-radius: var(--radius-lg);
+  display: grid; place-items: center; border-radius: var(--radius-md);
   color: var(--tc-text-muted); background: transparent;
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
               border-radius var(--dur-1) var(--ease);
@@ -58,19 +79,19 @@
 /* The live tile: a full-height ember bar set flush into the seam between the rail
    and the column, so the thread runs the whole of the active community rather than
    a pip beside it. */
-.rail-item.is-active, .rail-item[aria-current="page"] { color: var(--tc-brand) background: var(--tc-brand-hover); }
+.rail-item.is-active, .rail-item[aria-current="page"] { color: var(--tc-brand); background: var(--tc-brand-hover); }
 .rail-item.is-active::before, .rail-item[aria-current="page"]::before {
   content: ""; position: absolute; left: -14px; top: 4px; bottom: 4px;
-  width: 4px; border-radius: 0 4px 4px 0; background: var(--tc-brand)
+  width: 4px; border-radius: 0 4px 4px 0; background: var(--tc-brand);
 }
-.rail-home { background: var(--tc-surface); border: 1px solid var(--tc-border); }
+.rail-home { background: var(--tc-surface); border: 1px solid var(--tc-border); border-radius: var(--radius-md); }
 .rail-home:hover { border-color: var(--tc-border); }
 .rail-home img, .rail-home svg { width: 26px; height: 26px; object-fit: contain; }
-.rail-home .rail-fallback { font-weight: var(--weight-black); font-size: 1.05rem; color: var(--tc-brand) }
-.rail-community .avatar { width: 56px; height: 56px; --avatar-size: 56px; font-size: 1rem; }
-.rail-divider { width: 24px; height: 1px; flex: none; background: var(--tc-border); margin: 3px 0; }
-.rail-add { border: 1px dashed var(--tc-border); color: var(--tc-text-muted); }
-.rail-add:hover { border-color: var(--tc-border); color: var(--tc-brand) background: var(--tc-brand-hover); }
+.rail-home .rail-fallback { font-weight: var(--weight-black); font-size: 1.05rem; color: var(--tc-brand); }
+.rail-community .avatar { width: 40px; height: 40px; --avatar-size: 40px; font-size: 0.9rem; }
+.rail-divider { width: 24px; height: 1px; flex: none; background: var(--tc-border); margin: 8px 0; }
+.rail-add { border: 1px dashed var(--tc-border); color: var(--tc-text-muted); border-radius: var(--radius-md); width: 56px; height: 56px; display: grid; place-items: center; }
+.rail-add:hover { border-color: var(--tc-brand); color: var(--tc-brand); background: var(--tc-brand-hover); }
 
 /* -- the column ---------------------------------------------------------- */
 /* The open place: its identity at the top, the destinations it holds, and the
@@ -85,47 +106,47 @@
 .ws[data-spine="collapsed"] .spine { display: none; }
 
 .spine-head {
-  flex: none; display: flex; align-items: center; gap: 8px;
-  min-height: var(--head-h); padding: 8px 10px; border-bottom: 1px solid var(--tc-border);
+  flex: none; display: flex; align-items: center; gap: 10px;
+  min-height: var(--head-h); padding: 10px 12px; border-bottom: 1px solid var(--tc-border);
 }
 .spine-mark {
-  width: 34px; height: 34px; flex: none; border-radius: var(--radius-sm);
-  display: grid; place-items: center; color: var(--tc-brand)
+  width: 36px; height: 36px; flex: none; border-radius: var(--radius-md);
+  display: grid; place-items: center; color: var(--tc-brand);
   background: var(--tc-brand-hover); border: 1px solid var(--tc-border);
 }
 .spine-mark-img { width: 20px; height: 20px; object-fit: contain; }
 .spine-mark-fallback { font-weight: var(--weight-black); font-size: 0.92rem; color: var(--tc-brand) }
 
 .place-switcher {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px;
-  height: 36px; padding: 0 8px; border-radius: var(--radius-sm);
-  background: transparent; border: 1px solid transparent;
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  height: 40px; padding: 0 10px; border-radius: var(--radius-md);
+  background: var(--panel); border: 1px solid var(--tc-border);
   color: var(--tc-text); font-weight: var(--weight-strong); font-size: 0.92rem; text-align: left;
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.place-switcher:hover { background: var(--hover); border-color: var(--tc-border); }
+.place-switcher:hover { background: var(--panel-2); border-color: var(--tc-brand); }
 .place-switcher-title { flex: 1; min-width: 0; }
 .place-switcher-icon { flex: none; display: grid; place-items: center; color: var(--tc-text-muted); }
 .place-switcher-chevron { flex: none; display: grid; place-items: center; color: var(--tc-text-muted); }
 .place-switcher .avatar { flex: none; }
 
 .spine-global {
-  flex: none; display: flex; flex-direction: column; gap: 2px;
-  padding: 8px; border-bottom: 1px solid var(--tc-border);
+  flex: none; display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 10px; border-bottom: 1px solid var(--tc-border);
 }
 .spine-place { flex: 1; min-height: 0; display: flex; flex-direction: column; min-width: 0; }
-.spine-foot { flex: none; padding: 8px; border-top: 1px solid var(--tc-border); }
+.spine-foot { flex: none; padding: 10px 12px; border-top: 1px solid var(--tc-border); }
 
 .spine-account {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px;
-  padding: 8px; border-radius: var(--radius-sm); background: var(--tc-surface);
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px;
+  padding: 10px 12px; border-radius: var(--radius-md); background: var(--tc-surface);
   border: 1px solid var(--tc-border); text-align: left;
   transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
 }
-.spine-account:hover { background: var(--tc-surface); border-color: var(--tc-border); }
+.spine-account:hover { background: var(--panel-2); border-color: var(--tc-border); }
 .spine-account-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.spine-account-name { font-weight: var(--weight-strong); font-size: 0.88rem; }
-.spine-account-sub { font-family: var(--mono); font-size: 0.72rem; color: var(--tc-text-muted); }
+.spine-account-name { font-weight: var(--weight-strong); font-size: 0.9rem; }
+.spine-account-sub { font-family: var(--mono); font-size: 0.74rem; color: var(--tc-text-muted); }
 
 /* -- the destination list ------------------------------------------------ */
 .sidebar-head {
@@ -298,6 +319,132 @@
   opacity: 0; pointer-events: none; transition: opacity var(--dur-2) var(--ease);
 }
 
+.settings-centre {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 16px;
+}
+
+.settings-centre-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--tc-border);
+  background: var(--tc-surface);
+}
+
+.settings-centre-title {
+  font-size: var(--fs-h2);
+  font-weight: var(--weight-bold);
+  color: var(--tc-text);
+}
+
+.settings-centre-subtitle {
+  font-size: var(--fs-sm);
+  color: var(--tc-text-muted);
+}
+
+.settings-centre-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+.settings-centre-section {
+  background: var(--tc-surface);
+  border: 1px solid var(--tc-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.settings-centre-section-title {
+  font-size: var(--fs-h3);
+  font-weight: var(--weight-strong);
+  color: var(--tc-text);
+  margin-bottom: 16px;
+}
+
+.settings-centre-section-subtitle {
+  font-size: var(--fs-sm);
+  color: var(--tc-text-muted);
+  margin-bottom: 16px;
+}
+
+.settings-centre-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.settings-centre-row:hover {
+  background: var(--hover);
+}
+
+.settings-centre-row.is-active {
+  background: var(--tc-brand-hover);
+  color: var(--tc-brand);
+}
+
+.settings-centre-row-title {
+  font-size: var(--fs-body);
+  font-weight: var(--weight-medium);
+}
+
+.settings-centre-row-subtitle {
+  font-size: var(--fs-sm);
+  color: var(--tc-text-muted);
+}
+
+.settings-centre-row-toggle {
+  width: 44px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--tc-border);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.settings-centre-row-toggle.is-active {
+  background: var(--tc-brand);
+}
+
+.settings-centre-row-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--tc-text);
+  transition: transform var(--dur-1) var(--ease);
+}
+
+.settings-centre-row-toggle.is-active::after {
+  transform: translateX(20px);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 /* -- responsive ---------------------------------------------------------- */
 
 /* Below a wide desk the details panel overlays the conversation instead of taking
@@ -314,3 +461,4 @@
   }
   .ws[data-context="open"] .scrim { opacity: 1; pointer-events: auto; }
 }
+.settings-centre { display: block; }
