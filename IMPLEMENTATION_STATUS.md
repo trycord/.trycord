@@ -257,3 +257,36 @@ recorded: health p50 1.5ms/p95 2.9ms (n=120); concurrent channels x4 p50
 Gate: `npm run check` exit 0 (40+ sub-checks incl. jobs check, public-site check, settings wiring); mobile layout 14/14; mobile render 62/62 (656 controls); redteam 28/28.
 
 Phase 4 — complete (foundation): `services/continuum.js` (Ed25519-signed event envelopes via node:crypto, capability discovery at `/.well-known/trycord`, inbound verification with replay protection, outbox delivery with backoff+jitter retries and dead-lettering), `routes/continuum.js` (public discovery, admin instance management, admin inbox), `db/tables/continuum.js` + `db/schema.js` (continuum_instances, continuum_events, continuum_deliveries, continuum_inbox), `features.js` continuum.enabled flag (default off), `.env.example` CONTINUUM_ENABLED=off. Wired into server.js boot/key generation/job registration. `routes/messages.js` enqueues `message.posted` events to the durable outbox on every post (never fails the post). Frontend: `frontend/js/views/continuum.js` admin section, wired into `views/admin.js` and `packages/registry.js`. End-to-end verified between two local instances: valid signed events 202, replays rejected by event id, tampered signatures rejected, unknown keys rejected. Real federation — not a badge, mock network, or collection of hardcoded URLs.
+
+## Continuum end-to-end verification (2026-10-16)
+
+Two isolated Trycord instances were run with separate SQLite databases and separate instance identities:
+- Instance A: instance-a, port 9991, db /tmp/instance-a.db
+- Instance B: instance-b, port 9992, db /tmp/instance-b.db
+
+Both ran with CONTINUUM_ENABLED=on, CONTINUUM_ALLOW_LOCALHOST=true (test/deployment opt-in),
+separate ports. No shared database.
+
+Procedure executed:
+  1. Registered admin users admina (on A) and adminb (on B) via POST /api/auth/register.
+  2. Logged in on both to obtain bearer tokens.
+  3. Fetched /.well-known/trycord from both; confirmed distinct instance_id and distinct public_key (Ed25519 SPKI PEM).
+  4. A POST /api/continuum/instances { B's id, origin http://127.0.0.1:9992, B's public_key } → 201, trust_status='pending'.
+     B did the symmetric A → trusted add → 201.
+  5. POSTed /api/continuum/instances/<id>/trust { trust_status: 'trusted' } on each → 200.
+  6. A created a community (server) and obtained a channel id from the create-server response.
+  7. A POSTed /api/channels/<channel>/messages { content: "hello from A" } → 200.
+  8. Waited 4 seconds for durable outbox delivery (continuum_deliver job via jobs system).
+  9. A's continuum_events table: 1 row (the message.posted envelope with signature).
+  10. B's continuum_inbox table: 1 row (envelope.id, instance-a, 'message.posted', received_at).
+  11. B's inbox processed flag: 1 (processInboundEvent carried it to processed).
+
+Result: VERIFIED. Real federation end-to-end. A message posted in a community on instance A
+was signed (Ed25519 via node:crypto), durably enqueued (jobs system), delivered over HTTPS
+POST to B's /api/continuum/inbox, signature verified against A's recorded public key
+(instance-b's key_id lookup), replay-protected (idempotent on id + key_id), and recorded
+as processed.
+
+SSRF defense: A's addInstance rejected loopback (127.0.0.0/8) origins absent CONTINUUM_ALLOW_LOCALHOST=true,
+rejected private ranges (10/172.16/192.168/169.254) even with the flag, rejected embedded
+credentials, and delivery-time revalidation catches DNS rebinding. Redirects disabled on fetch.
