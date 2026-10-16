@@ -142,8 +142,8 @@ const SCHEMA = [
   {
     key: 'voice.provider', env: 'VOICE_VIDEO_PROVIDER', type: 'string', default: 'cloudflare',
     category: 'voice', label: 'Media server provider',
-    description: 'In-house runs the media stack on this instance using WebRTC directly. Cloudflare Realtime SFU routes media and DataChannels but Trycord still owns signalling and room management.',
-    allowed: ['in-house', 'cloudflare'], live: true, consequential: true,
+    description: 'cloudflare routes media through Cloudflare Realtime SFU (provider supports all voice, video, and screen sharing). Trycord owns signalling, room management, and permissions. An in-house self-hosted SFU option (Mediasoup/Janus-based) is not yet implemented — setting this to in-house disables media until the adapter exists.',
+    allowed: ['cloudflare'], live: true, consequential: true,
   },
   {
     key: 'search.provider', env: 'SEARCH_PROVIDER', type: 'string', default: 'in-house',
@@ -1072,6 +1072,7 @@ function catalogue(secretState) {
         restartRequired: !s.live,
         pendingRestart: store.pendingRestart.has(s.key),
         consequential: !!s.consequential,
+        showIf: s.showIf || null,
         locked: store.sources[s.key] === 'environment',
         lockedReason: store.sources[s.key] === 'environment'
           ? 'Set by the deployment environment (' + s.env + '). Rotate it there.'
