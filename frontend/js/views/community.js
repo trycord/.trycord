@@ -17,8 +17,9 @@ import { openDialog, confirmDialog, toast, errorToast, attachContextMenu } from 
 import { openUserMenu, userMenuItems } from '../user-menu.js';
 import { relativeTime } from '../../packages/format.js';
 import Api from '../../packages/api.js';
-import { page, heading, loading, failure, nothing, stat, panel, empty, relative } from './util.js';
+import { page, heading, loading, failure, nothing, stat, panel, empty, relative, prow } from './util.js';
 import { renderConversation } from './messages.js';
+import { continuumSection } from './continuum.js';
 
 // -- small shared pieces -----------------------------------------------------
 
@@ -1154,19 +1155,35 @@ function bannerOrBlank(server) {
 function communitySettings(serverId) {
   const host = el('div', { class: 'settings-stack' });
 
+  const server = serverById(serverId) || {};
+
+  // -- overview panel ---------------------------------------------------------
+
   const welcomeContent = el('textarea', { class: 'input', rows: '4', placeholder: 'Welcome message shown to new members...' });
-  welcomeContent.value = serverById(serverId)?.welcome_content || '';
-  const welcomeEnabled = el('input', { type: 'checkbox', role: 'switch', 'aria-checked': String(!!serverById(serverId)?.welcome_enabled) });
-  welcomeEnabled.checked = !!serverById(serverId)?.welcome_enabled;
-  const guidelines = el('textarea', { class: 'input', rows: '6', placeholder: 'Community guidelines...' });
-  guidelines.value = serverById(serverId)?.guidelines || '';
-  const notificationDefaults = el('textarea', { class: 'input', rows: '4', placeholder: 'Notification defaults (JSON)...' });
-  notificationDefaults.value = serverById(serverId)?.notification_defaults || '';
-  const interactionSettings = el('textarea', { class: 'input', rows: '4', placeholder: 'Interaction settings (JSON)...' });
-  interactionSettings.value = serverById(serverId)?.interaction_settings || '';
+  welcomeContent.value = server.welcome_content || '';
+  const welcomeEnabled = el('input', { type: 'checkbox', role: 'switch', 'aria-checked': String(!!server.welcome_enabled) });
+  welcomeEnabled.checked = !!server.welcome_enabled;
+
+  // -- guidelines panel -------------------------------------------------------
+
+  const guidelines = el('textarea', { class: 'input', rows: '6', placeholder: 'Community guidelines…' });
+  guidelines.value = server.guidelines || '';
+
+  // -- notification defaults --------------------------------------------------
+
+  const notificationDefaults = el('textarea', { class: 'input', rows: '4', placeholder: 'Notification defaults (JSON)…' });
+  notificationDefaults.value = server.notification_defaults || '';
+
+  // -- interaction settings ---------------------------------------------------
+
+  const interactionSettings = el('textarea', { class: 'input', rows: '4', placeholder: 'Interaction settings (JSON)…' });
+  interactionSettings.value = server.interaction_settings || '';
 
   const save = el('button', { class: 'btn btn--primary', type: 'button' }, 'Save settings');
+  let saving = false;
   save.addEventListener('click', async () => {
+    if (saving) return;
+    saving = true;
     save.disabled = true;
     try {
       await Api.updateServerSettings(serverId, {
@@ -1176,102 +1193,55 @@ function communitySettings(serverId) {
         notification_defaults: notificationDefaults.value,
         interaction_settings: interactionSettings.value,
       });
-      toast('Community settings saved.', { type: 'success' });
       await refreshServer(serverId);
-    } catch (error) { errorToast(error); } finally { save.disabled = false; }
+      toast('Community settings saved.', { type: 'success' });
+    } catch (error) { errorToast(error); } finally { saving = false; save.disabled = false; }
   });
+
+  host.replaceChildren(
+    panel({
+      title: 'Welcome & onboarding',
+      note: 'What new members see when they join',
+      rows: [
+        fieldBlock('Welcome message', 'Shown to new members on their first visit.', welcomeContent),
+        prow({
+          top: true,
+          title: 'Show welcome message',
+          sub: 'Toggle whether new members see the welcome message.',
+          actions: welcomeEnabled,
+        }),
+      ],
+      foot: save,
+      footEnd: true,
+    }),
+    panel({
+      title: 'Community guidelines',
+      note: 'The rules and expectations for everyone here.',
+      rows: [
+        fieldBlock('Guidelines', 'Markdown is supported.', guidelines),
+      ],
+    }),
+    panel({
+      title: 'Notification defaults',
+      note: 'Default notification preferences for new members (JSON).',
+      rows: [
+        fieldBlock('Defaults', 'A JSON object applied to new members.', notificationDefaults),
+      ],
+    }),
+    panel({
+      title: 'Interaction settings',
+      note: 'How members can interact with the community (JSON).',
+      rows: [
+        fieldBlock('Settings', 'A JSON object controlling replies, reactions, mentions.', interactionSettings),
+      ],
+    }),
+  );
 
   return host;
 }
 
 function communityAllowed(serverId) {
-  const host = el('div', { class: 'settings-stack' });
-
-  const instances = el('div', { class: 'stack' });
-  const formHost = el('div', { class: 'stack' });
-
-  function render() {
-    host.replaceChildren(el('table', { class: 'table' },
-      el('thead', el('tr',
-        el('th', 'Instance'),
-        el('th', 'Origin'),
-        el('th', 'Trust'),
-        el('th', 'Actions'))),
-      el('tbody')));
-    loadInstances();
-  }
-
-  async function loadInstances() {
-    instances.replaceChildren(el('div', { class: 'stack' }, loading('Loading remote instances…')));
-    let rows;
-    try {
-      rows = await Api.request('GET', '/api/continuum/instances');
-    } catch (error) {
-      instances.replaceChildren(failure(error, loadInstances));
-      return;
-    }
-    if (!rows || !rows.length) {
-      instances.replaceChildren(nothing('No remote instances yet. Add one below to begin federating.'));
-    } else {
-      instances.replaceChildren(el('table', { class: 'table' },
-        el('thead', el('tr',
-          el('th', 'Instance'),
-          el('th', 'Origin'),
-          el('th', 'Trust'),
-          el('th', 'Actions'))),
-        el('tbody', ...rows.map(instanceRow))));
-    }
-  }
-
-  async function setTrust(id, status) {
-    try {
-      await Api.request('PATCH', '/api/continuum/instances/' + encodeURIComponent(id) + '/trust', { body: { trust_status: status } });
-      toast('Trust updated.', { type: 'success' });
-      loadInstances();
-    } catch (error) { errorToast(error); }
-  }
-
-  const nameInput = el('input', { class: 'input', placeholder: 'Remote instance name', maxLength: '128' });
-  const originInput = el('input', { class: 'input', placeholder: 'https://remote.example.com', maxLength: '512' });
-  const keyInput = el('textarea', { class: 'input', rows: '4', placeholder: '-----BEGIN PUBLIC KEY-----...', maxLength: '512' });
-  const addError = el('div', { class: 'form-error' });
-  const addBtn = el('button', { class: 'btn btn--primary', type: 'button' }, 'Add instance');
-
-  const addForm = el('div', { class: 'stack' },
-    fieldBlock('Name', 'Shown in lists.', nameInput),
-    fieldBlock('Origin', 'The instance\'s origin URL, https:// or http://.', originInput),
-    fieldBlock('Public key', 'Paste the remote instance\'s public key so its events can be verified.', keyInput),
-    el('div', { class: 'stack' }, addError, addBtn)
-  );
-
-  addBtn.addEventListener('click', async () => {
-    addError.textContent = '';
-    if (!nameInput.value.trim()) { addError.textContent = 'Give the instance a name.'; return; }
-    if (!originInput.value.trim()) { addError.textContent = 'Enter its origin URL.'; return; }
-    if (!keyInput.value.trim()) { addError.textContent = 'Paste its public key.'; return; }
-    addBtn.disabled = true;
-    try {
-      await Api.request('POST', '/api/continuum/instances', { body: {
-        id: nameInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-        name: nameInput.value.trim(),
-        origin: originInput.value.trim(),
-        public_key: keyInput.value.trim(),
-      }});
-      nameInput.value = ''; originInput.value = ''; keyInput.value = '';
-      toast('Remote instance added. It starts untrusted; set it to Trust to exchange events.', { type: 'success' });
-      loadInstances();
-    } catch (error) { addError.textContent = error.message || 'That did not work.'; }
-    finally { addBtn.disabled = false; }
-  });
-
-  host.replaceChildren(
-    panel({ title: 'Remote instances', body: instances }),
-    panel({ title: 'Add a remote instance', body: addForm })
-  );
-
-  loadInstances();
-
-  return host;
+  return can(serverId, 'MANAGE_SERVER') || isOwner(serverId);
 }
 
 
@@ -1310,6 +1280,7 @@ export function renderCommunitySettings(ctx) {
     ['settings', 'Settings', 'sliders'],
     ['memory', 'Memory', 'book'],
   ];
+  if (communityAllowed(serverId)) order.push(['continuum', 'Continuum', 'share']);
   const builders = {
     overview: () => overviewSection(serverId),
     appearance: () => appearanceSection(serverId),
@@ -1322,8 +1293,9 @@ export function renderCommunitySettings(ctx) {
     integrations: () => integrationsSection(serverId),
     analytics: () => analyticsSection(serverId),
     ownership: () => ownershipSection(serverId),
-    settings: () => renderCommunitySettings({ serverId }),
+    settings: () => communitySettings(serverId),
     memory: () => memorySection(serverId),
+    continuum: () => ({ node: continuumSection(), load: null }),
   };
 
   const requested = (ctx.query && ctx.query.get('section')) || 'overview';

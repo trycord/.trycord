@@ -76,9 +76,6 @@ async function afterSignIn(next) {
   try {
     user = await loadSession();
   } catch (error) {
-    // Signed in, but the instance requires a second factor this account does not
-    // have. The token is valid and is exactly what the enrolment screen needs, so
-    // keep it and send the reader there instead of showing a dead error.
     if (error && error.code === 'MFA_REQUIRED') {
       navigate('/two-step', { replace: true });
       return;
@@ -97,7 +94,6 @@ function nextTarget() {
   const query = currentQuery();
   const next = query.get('next');
   if (!next) return '/home';
-  // Only in-app destinations, so a crafted link cannot bounce someone outward.
   if (next.charAt(0) !== '/' || next.indexOf('//') === 0) return '/home';
   return next;
 }
@@ -105,14 +101,8 @@ function nextTarget() {
 // -- login -------------------------------------------------------------------
 
 function loginForm() {
-  const username = input('username');
+  const username = input('username', { autofocus: true });
   const password = Object.assign(input('password'), { type: 'password' });
-  // The two-step field is only for accounts that have two-step sign-in on, so it
-  // must not be `required` while it is hidden: a required control is validated
-  // even when nobody can see it, and the browser then refuses the submit without
-  // putting a message anywhere the reader can find. That is what made "Sign in"
-  // look dead. It is revealed - and only then made required - when the server
-  // answers that a code is needed.
   const code = Object.assign(input('code', { required: false }), { type: 'text' });
   const mfaField = el('label', { class: 'field', hidden: true }, el('span', {}, 'Two-step code'), code);
 
@@ -141,7 +131,6 @@ function loginForm() {
       if (out && out.mfaRequired) {
         challenge = out.challengeToken;
         mfaField.hidden = false;
-        // Required only once it is the field the reader must fill in.
         code.required = true;
         code.focus();
         return;
@@ -157,7 +146,10 @@ function loginForm() {
   });
 
   return [
-    form,
+    el('div', { class: 'auth-card' },
+      el('h1', { class: 'auth-title' }, 'Welcome back'),
+      el('p', { class: 'auth-sub' }, 'Sign in to your communities.'),
+      form),
     el('p', { class: 'auth-alt' },
       'New here? ',
       el('a', { href: path('/register') }, 'Create an account'),
@@ -170,10 +162,8 @@ function loginForm() {
 // -- register ----------------------------------------------------------------
 
 function registerForm() {
-  const username = input('username');
+  const username = input('username', { autofocus: true });
   const display = input('displayName');
-  // The label promises the address is optional, so it must not be `required`:
-  // the server asks for one only when this instance verifies email.
   const email = Object.assign(input('email', { required: false }), { type: 'email' });
   const password = Object.assign(input('password'), { type: 'password' });
   const form = el('form', { class: 'auth-form' },
@@ -211,13 +201,18 @@ function registerForm() {
     }
   });
 
-  return [form, el('p', { class: 'auth-alt' }, 'Already have an account? ', el('a', { href: path('/login') }, 'Sign in'))];
+  return [
+    el('div', { class: 'auth-card' },
+      el('h1', { class: 'auth-title' }, 'Create your account'),
+      el('p', { class: 'auth-sub' }, 'It takes a moment. You can change everything afterwards.'),
+      form),
+    el('p', { class: 'auth-alt' }, 'Already have an account? ', el('a', { href: path('/login') }, 'Sign in'))];
 }
 
 // -- forgot / reset ----------------------------------------------------------
 
 function forgotForm() {
-  const email = Object.assign(input('email'), { type: 'email' });
+  const email = Object.assign(input('email', { autofocus: true }), { type: 'email' });
   const form = el('form', { class: 'auth-form' },
     fieldBlock('Email address', email),
     el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Send reset link'),
@@ -237,11 +232,16 @@ function forgotForm() {
     }
   });
 
-  return [form, el('p', { class: 'auth-alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
+  return [
+    el('div', { class: 'auth-card' },
+      el('h1', { class: 'auth-title' }, 'Reset your password'),
+      el('p', { class: 'auth-sub' }, 'We will email you a link that expires shortly.'),
+      form),
+    el('p', { class: 'auth-alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
 }
 
 function resetForm(token) {
-  const next = Object.assign(input('newPassword'), { type: 'password' });
+  const next = Object.assign(input('newPassword', { autofocus: true }), { type: 'password' });
   const confirm = Object.assign(input('confirmPassword'), { type: 'password' });
   const form = el('form', { class: 'auth-form' },
     fieldBlock('New password', next),
@@ -263,7 +263,12 @@ function resetForm(token) {
     }
   });
 
-  return [form, el('p', { class: 'auth-alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
+  return [
+    el('div', { class: 'auth-card' },
+      el('h1', { class: 'auth-title' }, 'Choose a new password'),
+      el('p', { class: 'auth-sub' }, 'At least eight characters.'),
+      form),
+    el('p', { class: 'auth-alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
 }
 
 function verifyPanel(token) {
@@ -284,12 +289,6 @@ function verifyPanel(token) {
 }
 
 // -- two-step enrolment ------------------------------------------------------
-//
-// Shown when the instance requires a second factor and this account has none.
-// The setting says such an account is signed out "until it enrols", so this is
-// the screen that makes that promise keepable. It takes three steps because the
-// server only hands over the secret once the password is confirmed, and only
-// turns the factor on once a code proves the secret was added to an app.
 
 function twoStepForm() {
   const host = el('div', { class: 'auth-form' });
@@ -345,8 +344,6 @@ function twoStepForm() {
   function codesStep(codes) {
     const done = el('button', { class: 'btn btn--primary btn--block', type: 'button' }, 'Sign in');
     done.addEventListener('click', async () => {
-      // Turning the factor on invalidated every session, this one included, so
-      // the only honest next step is to sign in again with the new second step.
       try { await logout(); } catch { /* the local token is dropped either way */ }
       navigate('/login', { replace: true });
     });
@@ -368,7 +365,12 @@ function twoStepForm() {
   }, 'Sign out');
 
   swap(passwordStep());
-  return [host, el('p', { class: 'auth-alt' }, signOut)];
+  return [
+    el('div', { class: 'auth-card' },
+      el('h1', { class: 'auth-title' }, 'Two-step sign-in required'),
+      el('p', { class: 'auth-sub' }, 'This instance asks every account for a second factor. Set one up to continue, or sign out.'),
+      host),
+    el('p', { class: 'auth-alt' }, signOut)];
 }
 
 // -- shared ------------------------------------------------------------------
@@ -396,60 +398,37 @@ export function renderAuth(page, params) {
   switch (page.id) {
     case 'register': {
       const [form, alt] = registerForm();
-      built = [
-        el('h1', { class: 'auth-title' }, 'Create your account'),
-        el('p', { class: 'auth-sub' }, 'It takes a moment. You can change everything afterwards.'),
-        form, alt,
-      ];
+      built = [form, alt];
       title = 'Create account';
       break;
     }
     case 'forgot': {
       const [form, alt] = forgotForm();
-      built = [
-        el('h1', { class: 'auth-title' }, 'Reset your password'),
-        el('p', { class: 'auth-sub' }, 'We will email you a link that expires shortly.'),
-        form, alt,
-      ];
+      built = [form, alt];
       title = 'Reset password';
       break;
     }
     case 'resetPassword': {
       const [form, alt] = resetForm(params.token);
-      built = [
-        el('h1', { class: 'auth-title' }, 'Choose a new password'),
-        el('p', { class: 'auth-sub' }, 'At least eight characters.'),
-        form, alt,
-      ];
+      built = [form, alt];
       title = 'New password';
       break;
     }
     case 'verifyEmail': {
       const [verification, form, alt] = verifyPanel(params.token);
-      built = [
-        el('h1', { class: 'auth-title' }, 'Verify your email'),
-        verification, form, alt,
-      ];
+      built = [verification, form, alt];
       title = 'Verify email';
       break;
     }
     case 'twoStep': {
       const [form, alt] = twoStepForm();
-      built = [
-        el('h1', { class: 'auth-title' }, 'Two-step sign-in required'),
-        el('p', { class: 'auth-sub' }, 'This instance asks every account for a second factor. Set one up to continue, or sign out.'),
-        form, alt,
-      ];
+      built = [form, alt];
       title = 'Two-step sign-in';
       break;
     }
     default: {
       const [form, alt] = loginForm();
-      built = [
-        el('h1', { class: 'auth-title' }, 'Welcome back'),
-        el('p', { class: 'auth-sub' }, 'Sign in to your communities.'),
-        form, alt,
-      ];
+      built = [form, alt];
       title = 'Sign in';
     }
   }
