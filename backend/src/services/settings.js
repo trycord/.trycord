@@ -142,8 +142,8 @@ const SCHEMA = [
   {
     key: 'voice.provider', env: 'VOICE_VIDEO_PROVIDER', type: 'string', default: 'cloudflare',
     category: 'voice', label: 'Media server provider',
-    description: 'cloudflare routes media through Cloudflare Realtime SFU (provider supports all voice, video, and screen sharing). Trycord owns signalling, room management, and permissions. An in-house self-hosted SFU option (Mediasoup/Janus-based) is not yet implemented — setting this to in-house disables media until the adapter exists.',
-    allowed: ['cloudflare'], live: true, consequential: true,
+    description: 'cloudflare routes media through Cloudflare Realtime SFU (supports large rooms and screen sharing). mesh is a self-hosted peer-to-peer WebRTC fallback for small rooms (up to 6 participants) — no SFU needed, but media flows browser-to-browser and scales as O(N^2); not suited to stage channels or large rooms. Set STUN/TURN URLs for either, plus Cloudflare credentials for sfu.',
+    allowed: ['cloudflare', 'mesh'], live: true, consequential: true,
   },
   {
     key: 'search.provider', env: 'SEARCH_PROVIDER', type: 'string', default: 'in-house',
