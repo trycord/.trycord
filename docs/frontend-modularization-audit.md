@@ -34,7 +34,7 @@ Companion records: `docs/community-channel-audit.md` (community/channel family),
 |---|---|---|
 | `frontend/` | **The web client.** One ES-module application, one `index.html`. | Live. Served by the backend. |
 | `frontend/assets/trycord-assets/` | Staged copy of the canonical brand/token/icon library. | Live. `check-brand.js` pins it. |
-| `trycord-assets/` | **Canonical** brand, tokens, icons, motion. The exclusive asset source. | Live. |
+| `frontend/assets/trycord-assets/` | **Canonical** brand, tokens, icons, motion. The exclusive asset source. | Live. |
 | `public/` | The public marketing site (plain HTML + its own `js/`). Separate tree. | Live, separate. |
 | `backend/` | The authoritative backend (141 modules): API, WS, auth, storage, static server. | **Running** (PM2 `trycord-api`). |
 | `server/` | A **second, older backend** (63 modules, `src/index.js`, `bus.js`, `admin.js`). | Not running. Legacy/duplicate. |
@@ -143,11 +143,11 @@ CSS and a bit of drawer logic. **Finding M1.** It is the thing to replace, not t
 
 ### 1.7 Assets
 
-- Brand/monogram/token/icon files come from `trycord-assets/`, staged to
+- Brand/monogram/token/icon files come from `frontend/assets/trycord-assets/`, staged to
   `frontend/assets/trycord-assets/`. Only 4 asset paths are referenced from the client
   (`favicon.svg`, `trycord-app-icon.svg`, `site.webmanifest`, `trycord-symbol.svg`).
 - **Finding M2 — `icons.js` is a hand-authored inline SVG set**, not drawn from
-  `trycord-assets/icons/`. The directive says Trycord-assets is the exclusive asset
+  `frontend/assets/trycord-assets/icons/`. The directive says Trycord-assets is the exclusive asset
   source; the UI icon set is currently maintained by hand. (The asset library *has*
   `icons/ui`, `icons/communities`, `icons/status`.) Reconcile in the mobile rebuild and
   decide whether desktop switches too.
@@ -220,7 +220,7 @@ counted.**
 | # | Finding | Severity |
 |---|---|---|
 | M1 | One shell + one component tree switched by `data-presentation`; no independent mobile module. | Blocks the directive |
-| M2 | `icons.js` hand-authored, not sourced from `trycord-assets/icons`. | Medium |
+| M2 | `icons.js` hand-authored, not sourced from `frontend/assets/trycord-assets/icons`. | Medium |
 | A1 | Two backends tracked (`backend/` live, `server/` dead). | Medium (not in scope) |
 | A2 | Served entry (`main.js`) ≠ checked entry (`app.js`). | Low |
 | A3 | `trycord-desktop/client/` is a stale, drifted copy of `frontend/`. | Medium |
@@ -292,7 +292,7 @@ routing) or a fixed `/m/` path with no detection (users must type it).
 - **D-2 (layout):** `frontend/{packages,desktop,mobile}` as above, with the desktop entry
   kept as `frontend/index.html` so the served URL does not change. The literal
   `frontend/apps/…` spelling is optional; behaviour is identical.
-- **D-3 (icons):** whether the UI icon set moves to `trycord-assets/icons` in this work
+- **D-3 (icons):** whether the UI icon set moves to `frontend/assets/trycord-assets/icons` in this work
   or is left and recorded as M2.
 - **D-4 (`server/`):** out of scope; recorded as A1.
 

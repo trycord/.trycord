@@ -35,7 +35,7 @@ second copy that then drifts.
 | `DESIGN_SYSTEM.md`    | `docs/theming.md` + `docs/desktop.md` | Design tokens/theme are documented there; the shared token library is `frontend/css/tokens.css`. A single `DESIGN_SYSTEM.md` is a candidate if those two drift. |
 | `SECURITY_REVIEW.md`  | `SECURITY.md` + `REDTEAM-FINDINGS.md` + `tests/redteam/` | Existing separate homes; `SECURITY_REVIEW.md` would duplicate them. |
 | `MIGRATIONS.md`       | `docs/architecture.md` (schema section) + `backend/src/db/` | Create a dedicated file only if migrations exist that warrant it (see T0.4). |
-| Continuum/concurrency/deployment docs | `docs/community-channel-audit.md`, `docs/production-readiness.md`, `docs/self-hosting.md` | Existing. |
+| Continuum/concurrency/deployment docs | `docs/community-channel-audit.md`, `docs/production-readiness.md`, `docs/selfhosting.md` | Existing. |
 
 `IMPLEMENTATION_STATE.md` predates this ledger. It is **not deleted** (it is
 prior work); its live content is folded into `IMPLEMENTATION_STATUS.md`, and the
@@ -106,7 +106,7 @@ behaviour, constrained admin dropdowns (backend role), deployment verification.
 ## Phase 8 — Public routes, legal pages, documentation, onboarding
 
 Root-level legal routes (`/terms` canonical, not `/app/terms`), missing pages,
-self-hosting/CPU/federation docs, onboarding.
+selfhosting/CPU/federation docs, onboarding.
 
 ## Phase 9 — Integration and release verification
 
