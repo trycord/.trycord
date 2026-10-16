@@ -1,7 +1,6 @@
 {
   "name": "Trycord",
   "short_name": "Trycord",
-  "start_url": "/",
   "display": "standalone",
   "background_color": "#18191D",
   "theme_color": "#FF4D24",
