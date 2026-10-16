@@ -34,6 +34,238 @@
   --tc-text-muted: #666A75; --tc-text-on-brand: #FFFFFF;
   --tc-brand-focus: #C93618;
 }
+/* ---- tokens.css ---- */
+/* The application's semantic layer over the token library.
+ *
+ * The library (inlined above) owns the palette, the type scale and the timing.
+ * This file names the surfaces, the states and the measurements the interface
+ * actually uses, so a component never reaches for a raw hex or a magic pixel.
+ *
+ * Trycord is a workspace: navigation is quiet and structural, the conversation
+ * is the most legible thing on screen, and the ember accent marks only what is
+ * live, selected or primary. */
+
+:root {
+  /* -- measurement ------------------------------------------------------- */
+  /* The adaptive workspace: a rail of communities, the open place's column, the
+     conversation, and details on demand. The rail never moves; the column and the
+     context panel come and go with the width, so the conversation always keeps the
+     most room. The numbers match CONTEXT_COLUMN_MIN in shell.js. */
+  --rail-w: 84px;
+  --spine-w: 300px;
+  --context-w: 312px;
+  --head-h: 58px;
+  --composer-max: 260px;
+  --content-max: 940px;
+
+  /* The readable floor. Nothing renders smaller than this: a monogram that scales
+     with its circle floors here instead of shrinking into illegibility. */
+  --text-xs: 0.75rem;
+
+  /* -- type ---------------------------------------------------------------- */
+  /* One scale, six steps, named for the job each does rather than its size. A
+     page title is --fs-h1 wherever it appears; a timestamp is --fs-micro. The
+     display step is fluid so a first-run screen breathes on a desk and a phone
+     does not inherit a billboard. */
+  --fs-display: clamp(1.7rem, 1.25rem + 1.7vw, 2.4rem);
+  --fs-h1: 1.4rem;
+  --fs-h2: 1.12rem;
+  --fs-h3: 0.98rem;
+  --fs-body: 0.95rem;
+  --fs-sm: 0.86rem;
+  --fs-meta: 0.79rem;
+  --fs-micro: 0.72rem;
+  --weight-body: 450;
+  --weight-medium: 550;
+  --weight-strong: 650;
+  --weight-bold: 750;
+  --weight-black: 800;
+  --tracking-tight: -0.02em;
+  --tracking-label: 0.1em;
+
+  /* -- space --------------------------------------------------------------- */
+  /* A four-pixel rhythm. Components step by these; nothing reaches for a
+     magic number, so two surfaces built months apart still line up. */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-7: 28px;
+  --space-8: 40px;
+
+  /* -- radii and motion --------------------------------------------------- */
+  /* Compact and squared, per the brand's shape language: panels and controls are
+     cut close to square, and only the pill stays round. The rounding is the
+     fastest way to tell this client from a dashboard - nothing floats. */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-pill: var(--tc-radius-pill);
+  --dur-1: var(--tc-motion-fast);
+  --dur-2: var(--tc-motion-normal);
+  --dur-3: 280ms;
+  --ease: var(--tc-ease);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+
+  /* The ground under a filled control that carries a label. The bright ember is an
+     accent - a pip, a dot, a glyph, a switch - and white on it is 3.3:1, which a
+     label cannot live on. Anything with text rides this darker one instead, so a
+     button, a badge and the new-messages chip all clear the 4.5:1 a label needs. */
+  --brand-fill: var(--tc-brand-strong);
+  --brand-fill-hover: color-mix(in srgb, var(--tc-brand-strong) 86%, #000);
+  --brand-fill-active: color-mix(in srgb, var(--tc-brand-strong) 72%, #000);
+
+  /* -- layering ----------------------------------------------------------- */
+  --z-nav: 30;
+  --z-drawer: 60;
+  --z-scrim: 55;
+  --z-menu: 75;
+  --z-overlay: 80;
+  --z-toast: 90;
+
+  --font: var(--tc-font-sans);
+  --mono: var(--tc-font-mono);
+}
+
+/* Dark is the default product. Charcoal, not slate: the ground is a warm near-black
+ * with a little red in it and the panels step up through warmer browns, so the whole
+ * workspace sits in the same family as the ember instead of beside it. Nothing here
+ * is blue-grey; the cool greys belonged to the previous shell and are what made a
+ * recolour read as no change at all. The rail is the deepest plane - the hearth the
+ * rest of the client is arranged around. */
+:root,
+[data-theme="trycord"],
+[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #13100C;
+  --panel: #1B1712;
+  --panel-2: #231E17;
+  --panel-3: #2C2620;
+  --raised: #383026;
+  --rail-bg: #0D0B08;
+
+  --line: rgba(255, 236, 214, .07);
+  --line-2: rgba(255, 236, 214, .14);
+
+  --text-1: #F6F0E8;
+  --text-2: #B6A99A;
+  --text-3: #A69A8B;
+
+  --hover: rgba(255, 236, 214, .055);
+  --active: rgba(255, 236, 214, .10);
+  --selected: color-mix(in srgb, var(--tc-brand) 16%, transparent);
+
+  --brand: var(--tc-brand);
+  --brand-ink: #FFFFFF;
+  --brand-soft: rgba(255, 77, 36, .14);
+  --brand-line: rgba(255, 77, 36, .40);
+  --focus: var(--tc-brand-focus);
+
+  --danger: #F87171;
+  --success: #4ADE9B;
+  --warning: #FBBF67;
+  --info: #7CB2FF;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .34);
+  --shadow-2: 0 8px 24px -8px rgba(0, 0, 0, .55);
+  --shadow-3: 0 24px 60px -16px rgba(0, 0, 0, .7);
+
+  /* A single soft ember wash used behind the rail mark and primary banners. */
+  --ember-wash: radial-gradient(120% 80% at 50% 0%, rgba(255, 77, 36, .22), transparent 70%);
+
+  --scrollbar: rgba(255, 255, 255, .13);
+  --scrollbar-hover: rgba(255, 255, 255, .22);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #F4EEE6;
+  --panel: #FFFCF8;
+  --panel-2: #F6F0E7;
+  --panel-3: #EDE4D8;
+  --raised: #FFFFFF;
+  --rail-bg: #E9E0D3;
+
+  --text-1: #201C17;
+  --text-2: #574F45;
+  --text-3: #6E6355;
+  --line: rgba(58, 44, 28, .10);
+  --line-2: rgba(58, 44, 28, .18);
+
+  --hover: rgba(58, 44, 28, .05);
+  --active: rgba(58, 44, 28, .09);
+  --selected: rgba(226, 63, 23, .12);
+
+  --brand: #E23F17;
+  --brand-hover: #C93618;
+  --brand-soft: rgba(226, 63, 23, .10);
+  --brand-line: rgba(226, 63, 23, .35);
+  --focus: #C93618;
+
+  --danger: #C0392B;
+  --success: #1E8E5A;
+  --warning: #A96A12;
+  --info: #1F5FBF;
+
+  --shadow-1: 0 1px 2px rgba(20, 22, 28, .06);
+  --shadow-2: 0 10px 30px -12px rgba(20, 22, 28, .22);
+  --shadow-3: 0 28px 60px -20px rgba(20, 22, 28, .28);
+
+  --ember-wash: radial-gradient(120% 80% at 50% 0%, rgba(226, 63, 23, .12), transparent 70%);
+
+  --scrollbar: rgba(20, 22, 28, .16);
+  --scrollbar-hover: rgba(20, 22, 28, .26);
+}
+
+/* Midnight: the same charcoal family, pushed blue and cooler, for a reader who
+ * wants the ember accent against a colder room. */
+:root[data-theme="midnight"],
+[data-theme="midnight"] {
+  color-scheme: dark;
+  --app-bg: #0B0E17;
+  --panel: #121623;
+  --panel-2: #171C2C;
+  --panel-3: #1E2436;
+  --raised: #262D42;
+  --rail-bg: #080B13;
+
+  --line: rgba(190, 210, 255, .085);
+  --line-2: rgba(190, 210, 255, .15);
+
+  --text-1: #EAEFFB;
+  --text-2: #9AA6C4;
+  --text-3: #9199AF;
+
+  --hover: rgba(190, 210, 255, .06);
+  --active: rgba(190, 210, 255, .1);
+  --selected: color-mix(in srgb, var(--tc-brand) 18%, transparent);
+
+  --brand: var(--tc-brand);
+  --brand-ink: #FFFFFF;
+  --brand-soft: rgba(255, 77, 36, .16);
+  --brand-line: rgba(255, 77, 36, .42);
+  --focus: var(--tc-brand-focus);
+
+  --danger: #F87171;
+  --success: #4ADE9B;
+  --warning: #FBBF67;
+  --info: #8FB4FF;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .42);
+  --shadow-2: 0 10px 28px -8px rgba(0, 0, 0, .62);
+  --shadow-3: 0 26px 64px -18px rgba(0, 0, 0, .76);
+
+  --ember-wash: radial-gradient(120% 80% at 50% 0%, rgba(255, 77, 36, .24), transparent 70%);
+
+  --scrollbar: rgba(190, 210, 255, .15);
+  --scrollbar-hover: rgba(190, 210, 255, .24);
+}
+
+
 /* ---- mobile.css ---- */
 /* The Mobile presentation stylesheet.
  *
@@ -1250,7 +1482,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   border: 1px solid var(--line);
   border-radius: var(--tc-radius-md);
   background: var(--panel-2);
-  font-family: var(--font-mono);
+  font-family: var(--mono);
   font-size: var(--fs-meta);
   color: var(--text-1);
   user-select: all;
@@ -1408,7 +1640,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-profile-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .m-profile-name { font-size: var(--fs-h2); font-weight: var(--weight-strong); color: var(--text-1); }
 .m-profile-handle { font-size: var(--fs-sm); color: var(--text-2); }
-.m-profile-id { font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--text-3); }
+.m-profile-id { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }
 
 .m-role-dot {
   width: 10px; height: 10px;

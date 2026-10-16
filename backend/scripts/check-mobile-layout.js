@@ -38,14 +38,18 @@ const ok = (label, cond, detail) => {
 
 // ---- it is the module's own stylesheet -------------------------------------
 //
-// Built by frontend/scripts/build-css.js from the shared token library and
-// frontend/mobile/css/mobile.css alone. If a desktop layer were ever concatenated
-// in, the two modules would stop being separate presentations - the same fault as a
-// cross-module import, one level down.
+// Built by frontend/scripts/build-css.js from the shared token library, the
+// shared semantic layer, and frontend/mobile/css/mobile.css alone. If a desktop
+// composition were ever concatenated in, the two modules would stop being
+// separate presentations - the same fault as a cross-module import, one level
+// down. The semantic layer is the exception: it defines the names both modules
+// spend, so the module has to load it or it renders tokenless.
 
 const markers = CSS.match(/\/\* ---- [A-Za-z0-9._-]+ ---- \*\//g) || [];
-ok('the mobile bundle is exactly one layer, and it is the module\'s own',
-  markers.length === 1 && markers[0] === '/* ---- mobile.css ---- */',
+ok('the mobile bundle is the shared foundation plus the module\'s own single layer',
+  markers.length === 2
+  && markers[0] === '/* ---- tokens.css ---- */'
+  && markers[1] === '/* ---- mobile.css ---- */',
   'layer markers: ' + (markers.join(', ') || '(none)'));
 
 ok('the shared token library is prepended to it',
