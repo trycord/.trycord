@@ -1508,9 +1508,9 @@ function memorySection(serverId) {
       next.disabled = true;
       try {
         if (entry) {
-          await Api.communityMemoryUpdate(serverId, entry.id, title.value.trim(), body.value.trim());
+          await Api.communityMemoryUpdate(serverId, entry.id, { title: title.value.trim(), body: body.value.trim() });
         } else {
-          await Api.communityMemoryCreate(serverId, title.value.trim(), body.value.trim(), entry ? entry.channelId : null);
+          await Api.communityMemoryCreate(serverId, { title: title.value.trim(), body: body.value.trim() });
         }
         dialog.close();
         load();
