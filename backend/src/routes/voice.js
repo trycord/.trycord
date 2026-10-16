@@ -11,6 +11,7 @@ const auth = require('../middleware/auth');
 const requireVerified = auth.requireVerified;
 const voice = require('../services/voice');
 const voiceMesh = require('../services/voice-mesh');
+const turnCredential = require('../services/turn').issueCredentials;
 const permissions = require('../services/permissions');
 const db = require('../db');
 
@@ -132,6 +133,11 @@ router.post('/channels/:channelId/moderate/:userId', requireVerified, limit({ wi
 // Stage channels: an audience member asks to speak, and a moderator grants it.
 router.post('/channels/:channelId/request-speak', requireVerified, limit({ windowMs: 60000, max: 30, key: 'voice-request-speak' }), wrap(async (req, res) => {
   res.json(await voice.requestSpeak(req.params.channelId, req.user.id));
+}));
+
+router.get('/turn/credentials', requireVerified, wrap(async (req, res) => {
+  const turn = require('../services/turn');
+  res.json(turn.issueCredentials(req.user.id));
 }));
 
 router.get('/channels/:channelId/speak-requests', requireVerified, wrap(async (req, res) => {
