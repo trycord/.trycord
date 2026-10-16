@@ -10,11 +10,9 @@ web app (WAC) or the desktop shell (DAC).
 
 - `backend/` — REST API, WebSocket gateway, accounts, permissions,
   moderation, uploads, database access
-- `frontend/` — the web client (also shipped inside the desktop app)
-- `trycord-desktop/` — Electron shell around the same client
+- `frontend/` — the web client (desktop and mobile modules)
 - `public/` — the public website and legal pages
-- `docs/` — self-hosting, theming, the desktop app and its launcher, and the
-  architecture reference
+- `docs/` — self-hosting, theming, and the architecture reference
 
 ## Quick start
 
@@ -70,29 +68,15 @@ relative imports. Use it instead of `node --check` on a `.js` client file: that
 reports success for a file containing `import` statements even when the body has
 a duplicate declaration, so it is not a check.
 
-## Desktop app
+## Clients
 
-```
-cd trycord-desktop
-npm install
-npm run build:linux      # AppImage
-npm run build:win        # NSIS installer and portable exe
-npm run build:mac        # dmg
-```
+Trycord ships one web client under `frontend/`, with desktop browser support
+and a purpose-built mobile module. There is no separate desktop wrapper; point
+a self-hosted deployment or a browser at the instance and it serves both the
+desktop and mobile surfaces from the same client.
 
-Each target builds on its own platform; cross-building from Linux is not
-reliable for Windows or macOS. `npm run build` produces whatever the current
-platform supports. See `docs/desktop.md` for how it is put together and
-`docs/launcher.md` for the startup and update behaviour.
-
-The packaged app picks its backend at launch, in this order:
-
-1. `--api-url=<url>` — how a self-hoster points it at their own instance
-2. the bundled `client/backend.json`
-
-So `Trycord --api-url=https://chat.example.org` runs against that instance and
-nothing else. The shipped build reaches the official instance by default, which
-is a default rather than a requirement.
+See `docs/desktop.md` for desktop usage and `docs/launcher.md` if a launcher
+workflow is still required by your deployment.
 
 ## Configuration
 
