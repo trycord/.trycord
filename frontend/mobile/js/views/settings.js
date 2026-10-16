@@ -547,31 +547,6 @@ function updatesBody() {
         el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))))));
 }
 
-function infrastructureBody() {
-  return el('div', { class: 'm-stack' },
-    group('Infrastructure providers', el('div', { class: 'm-list' },
-      el('div', { class: 'm-row' },
-        el('span', { class: 'm-row__body' },
-          el('span', { class: 'm-row__title' }, 'Voice & video'),
-          el('span', { class: 'm-row__sub' }, 'Media server provider')),
-        el('span', { class: 'm-row__actions' }, el('span', { class: 'm-badge' }, 'In-house'))),
-      el('div', { class: 'm-row' },
-        el('span', { class: 'm-row__body' },
-          el('span', { class: 'm-row__title' }, 'Storage'),
-          el('span', { class: 'm-row__sub' }, 'Local filesystem')),
-        el('span', { class: 'm-row__actions' }, el('span', { class: 'm-badge' }, 'Local'))),
-      el('div', { class: 'm-row' },
-        el('span', { class: 'm-row__body' },
-          el('span', { class: 'm-row__title' }, 'Search'),
-          el('span', { class: 'm-row__sub' }, 'Message and community search')),
-        el('span', { class: 'm-row__actions' }, el('span', { class: 'm-badge' }, 'In-house'))),
-      el('div', { class: 'm-row' },
-        el('span', { class: 'm-row__body' },
-          el('span', { class: 'm-row__title' }, 'Notifications'),
-          el('span', { class: 'm-row__sub' }, 'In-app delivery')),
-        el('span', { class: 'm-row__actions' }, el('span', { class: 'm-badge' }, 'In-house'))))));
-}
-
 export function renderSettings(ctx) {
   const page = ctx.page || {};
   const strip = el('div', { class: 'm-seg m-seg--scroll', role: 'tablist', 'aria-label': 'Settings' });
@@ -600,7 +575,6 @@ export function renderSettings(ctx) {
     'settings.appearance': appearanceBody,
     'settings.backend': backendBody,
     'settings.updates': updatesBody,
-    'settings.infrastructure': infrastructureBody,
   };
 
   return {

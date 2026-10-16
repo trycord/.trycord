@@ -533,10 +533,6 @@ function notificationsProviderSection() {
   })];
 }
 
-function infrastructureSection() {
-  return [voiceProviderSection(), storageProviderSection(), searchProviderSection(), notificationsProviderSection()].flat();
-}
-
 // -- security ----------------------------------------------------------------
 
 function securitySection() {
@@ -796,7 +792,6 @@ const SECTIONS = {
   storage: storageProviderSection,
   search: searchProviderSection,
   notifications: notificationsSection,
-  infrastructure: infrastructureSection,
 };
 
 function settingsNav(activeId) {
