@@ -717,7 +717,7 @@ function settingsNav(activeId) {
 }
 
 export function renderSettings(ctx) {
-  const content = el('div', { class: 'stack' });
+  const content = el('div', { class: 'settings-centre' });
   const node = page({ wide: true },
     band({
       eyebrow: 'Settings',
