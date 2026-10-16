@@ -99,15 +99,22 @@ async function enqueueEvent(kind, payload, { actorId, targetId } = {}) {
 // URL is attacker-controlled (even when an administrator adds it, the value is
 // copy-pasted and may be a stale/d deceptive link), so every URL is revalidated
 // at use time against the destination address that the HTTP client resolves.
+function allowLocalhost() {
+  const v = String(process.env.CONTINUUM_ALLOW_LOCALHOST || '').trim().toLowerCase();
+  return v === 'true' || v === '1' || v === 'yes' || v === 'on';
+}
+
 function forbiddenHost(host) {
   const h = String(host || '').toLowerCase().trim();
-  if (h === '' || h === 'localhost' || h === '::1' || h === '[::1]') return true;
+  if (h === '' || h === 'localhost' || h === '::1' || h === '[::1]') {
+    return !allowLocalhost();
+  }
   // IPv4 literal in a private/loopback/link-local/multicast range.
   const ipv4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (ipv4) {
     const o = ipv4.slice(1).map((x) => Number(x));
     if (o.some((x) => x > 255)) return true;
-    if (o[0] === 127) return true;                       // loopback
+    if (o[0] === 127) return !allowLocalhost();         // loopback (allowed only with explicit opt-in)
     if (o[0] === 10) return true;                        // private 10/8
     if (o[0] === 172 && o[1] >= 16 && o[1] <= 31) return true; // private 172.16/12
     if (o[0] === 192 && o[1] === 168) return true;      // private 192.168/16

@@ -539,6 +539,18 @@ async function applySchema(conn) {
     await conn.exec(ddl);
   }
 
+  // SQLite-native in-house search index: an FTS5 virtual table over messages.content,
+  // kept in sync via triggers. On MySQL this is skipped because a comparable fast
+  // full-text path already exists via the engine's own LIKE/FTS (and the search
+  // route falls back to its default LIKE query there). Run on every boot, idempotent.
+  if (dialect === 'sqlite') {
+    await conn.exec('CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content, content_rowid=rowid)');
+    await conn.exec('CREATE TRIGGER IF NOT EXISTS messages_fts_ai AFTER INSERT ON messages BEGIN INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content); END;');
+    await conn.exec("CREATE TRIGGER IF NOT EXISTS messages_fts_ad AFTER DELETE ON messages BEGIN INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.rowid, old.content); END;");
+    await conn.exec("CREATE TRIGGER IF NOT EXISTS messages_fts_au AFTER UPDATE OF content ON messages BEGIN INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.rowid, old.content); INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content); END;");
+    await conn.exec('INSERT OR IGNORE INTO messages_fts(rowid, content) SELECT rowid, content FROM messages WHERE rowid NOT IN (SELECT rowid FROM messages_fts)');
+  }
+
   // Retire columns that belong to removed features. After the base DDL, so the
   // table is guaranteed to exist: on a fresh database there is nothing to drop,
   // and on an existing one the column goes. Best effort, because a column that
