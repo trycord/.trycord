@@ -645,6 +645,11 @@ async function boot() {
     maxAttempts: 5,
     backoffMs: 1000,
   });
+  jobs.register('continuum_inbound_process', continuum.processInboundEvent, {
+    concurrency: 2,
+    maxAttempts: 3,
+    backoffMs: 1000,
+  });
   await jobs.start();
 
   // The WebSocket gateway shares this HTTP server: same bind address, no second port.

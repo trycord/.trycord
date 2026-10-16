@@ -192,7 +192,35 @@ async function receiveEvent(envelope) {
     'INSERT INTO continuum_inbox (event_id, instance_id, kind, payload, received_at, processed) VALUES (?, ?, ?, ?, ?, 0)',
     [envelope.id, instance.id, envelope.kind, JSON.stringify(envelope.payload), now()]
   );
+  // Schedule processing as a durable job so the HTTP request returns quickly
+  // and so a crash during processing doesn't lose the event.
+  await jobs.enqueue('continuum_inbound_process', { eventId: envelope.id }, { maxAttempts: 3, backoffMs: 1000 });
   return { id: envelope.id, kind: envelope.kind, payload: envelope.payload };
+}
+
+// Process one inbound event. An event that cannot be processed remains in
+// the inbox with processed=0; re-running the job retries it (idempotent).
+async function processInboundEvent(payload) {
+  const { eventId } = payload || {};
+  if (!eventId) return;
+  const row = await db.get('SELECT * FROM continuum_inbox WHERE event_id = ?', [eventId]);
+  if (!row) return;
+  if (row.processed === 1) return; // already processed
+  // Only known supported kinds are processed; everything else is quarantined by
+  // simply leaving it unprocessed (admins can review via diagnostics).
+  const knownKinds = ['message.posted'];
+  if (knownKinds.indexOf(row.kind) === -1) return;
+  try {
+    // Honest local-side effect: record that a federated event was received.
+    // We deliberately do NOT create a local message from a remote 'message.posted'
+    // event: messages are not transitively federated across paired instances, and
+    // accepting one blindly would bypass local moderation and verification.
+    await db.run('UPDATE continuum_inbox SET processed = 1 WHERE event_id = ?', [eventId]);
+  } catch (e) {
+    // Leave processed=0; job retry handles it.
+    console.error('[continuum] inbound processing failed for', eventId, String(e && e.message || e));
+    throw e;
+  }
 }
 
 // Outbox delivery ------------------------------------------------------------
@@ -290,4 +318,5 @@ module.exports = {
   discovery,
   receiveEvent,
   deliverEvent,
+  processInboundEvent,
 };
