@@ -113,6 +113,13 @@ export const PAGES = [
     tabs: ['updates'],
   }),
 
+  p('settings.infrastructure', '/settings/infrastructure', {
+    layout: 'settings', scope: 'account', group: 'Preferences', order: 4,
+    label: 'Infrastructure', icon: 'server',
+    blurb: 'How this instance handles media, storage, search and notifications',
+    tabs: ['infrastructure'],
+  }),
+
   // ---- admin.
   p('admin', '/admin', {
     layout: 'admin', scope: 'admin', group: 'Instance', order: 1,

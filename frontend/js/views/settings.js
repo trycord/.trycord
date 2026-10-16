@@ -448,7 +448,7 @@ function voiceProviderSection() {
   const select = el('select', { class: 'input input--compact', 'aria-label': 'Media server provider' });
   select.appendChild(el('option', { value: 'in-house' }, 'In-house (WebRTC on this instance)'));
   select.appendChild(el('option', { value: 'cloudflare' }, 'Cloudflare Realtime SFU'));
-  const info = el('div', { class: 'form-note' }, 'In-house runs the media stack here. Cloudflare routes media; Trycord owns signalling and room management.');
+  const info = el('div', { class: 'prow-sub' }, 'In-house runs the media stack here. Cloudflare routes media; Trycord owns signalling and room management.');
   select.addEventListener('change', async () => {
     try {
       await Api.updateInstanceSettings({ 'voice.provider': select.value });
@@ -531,6 +531,10 @@ function notificationsProviderSection() {
       }),
     ],
   })];
+}
+
+function infrastructureSection() {
+  return [voiceProviderSection(), storageProviderSection(), searchProviderSection(), notificationsProviderSection()].flat();
 }
 
 // -- security ----------------------------------------------------------------
@@ -792,6 +796,7 @@ const SECTIONS = {
   storage: storageProviderSection,
   search: searchProviderSection,
   notifications: notificationsSection,
+  infrastructure: infrastructureSection,
 };
 
 function settingsNav(activeId) {
