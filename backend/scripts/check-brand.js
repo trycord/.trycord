@@ -127,32 +127,23 @@ const MONOGRAM = pathData(SYMBOL);
     wrongIcon.length === 0, wrongIcon.join(', '));
 }
 
-// ---- the desktop launcher --------------------------------------------------
+// ---- the desktop shell --------------------------------------------------
 {
-  const root = rootTokens(read(path.join(REPO, 'trycord-desktop', 'launcher.css')) || '');
-  const pairs = [
-    ['--bg', '--tc-bg-deep'],
-    ['--bg-2', '--tc-bg'],
-    ['--surface', '--tc-surface'],
-    ['--line', '--tc-border'],
-    ['--text', '--tc-text'],
-    ['--muted', '--tc-text-muted'],
-    ['--ember', '--tc-brand'],
-    ['--ember-2', '--tc-brand-hover'],
-  ];
-  const mismatched = pairs.filter(([local, token]) => norm(root[local]) !== norm(TOKENS[token]));
-  ok('the launcher palette is the library palette',
-    mismatched.length === 0,
-    mismatched.map(([l, t]) => l + '=' + (root[l] || '?') + ' not ' + t).join(', '));
+  const shellCss = read(path.join(REPO, 'frontend', 'css', 'shell.css')) || '';
+  const shellJs = read(path.join(REPO, 'frontend', 'js', 'shell.js')) || '';
+  const tokens = ['--tc-bg-deep', '--tc-bg', '--tc-surface', '--tc-border', '--tc-text', '--tc-text-muted', '--tc-brand', '--tc-brand-hover'];
+  const missing = tokens.filter((t) => shellCss.indexOf('var(' + t + ')') === -1);
+  ok('the shell palette uses canonical tokens',
+    missing.length === 0,
+    missing.join(', '));
 
-  ok('the launcher sets the brand typeface first',
-    norm(root['--sans']).split(',')[0] === norm(TOKENS['--tc-font-sans']).split(',')[0],
-    'the launcher names ' + (root['--sans'] || 'nothing') + ' first');
+  ok('the shell sets the brand typeface first',
+    shellCss.indexOf('font-family: var(--tc-font-sans)') !== -1,
+    'the shell names ' + (shellCss.indexOf('--tc-font-sans') !== -1 ? 'something else' : 'nothing') + ' first');
 
-  const inlined = pathData(read(path.join(REPO, 'trycord-desktop', 'launcher.html')) || '');
-  ok('the launcher mark is the canonical monogram',
-    MONOGRAM.length > 0 && MONOGRAM.every((d) => inlined.indexOf(d) !== -1),
-    'the inlined monogram does not match brand/trycord-symbol.svg');
+  ok('the shell mark is the canonical monogram',
+    shellJs.indexOf('brandSymbolUrl') !== -1,
+    'the shell does not reference the canonical brand symbol URL');
 }
 
 // ---- the status dashboard --------------------------------------------------
