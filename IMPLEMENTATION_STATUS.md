@@ -219,3 +219,28 @@ Recommended next actions, in order:
 Blockers (§7) remain: no push credentials (`trycord.dev` stays on the stale pre-split
 build; origin is live), no production DB writes without authorization, and the
 `api.trycord.dev` dual-client-surface decision pending authorization.
+
+⸻
+
+## Final state (2026-10-16 — all phases executable locally are complete)
+
+Phase 0 — complete: repository map, test baseline, durable ledger (`IMPLEMENTATION_PLAN.md`, `IMPLEMENTATION_STATUS.md`, `MASTER_DIRECTIVE.md` committed; `IMPLEMENTATION_STATE.md` retired).
+
+Phase 1 — complete:
+- T1.1 redteam regression 14/14 + manual 14/14 green on isolated SQLite (suite header patched to include `ALLOW_TEST_HOOKS=true`).
+- T1.2 authz audit: every mutating route in `backend/src/routes/` carries server-side authorization; admin routes behind `adminGuard`, server-scoped routes use `resolveServer`+`requirePerm`, user-scoped routes scope to `req.user.id`.
+- T1.3 uploads audit: magic-byte detection, multer per-request size limit, per-user quota, nosniff, hourly `purgePending`, membership-based authz — all verified in code review.
+- T1.4 secret handling: `settings.SECRETS` excluded from catalogue responses, env secrets immutable via dashboard, mail secret endpoints return presence-only.
+- T1.5 startup validation: `db/config.js` throws on invalid config at boot; `features.js` resolves flags from the store with env seeding.
+
+Phase 2 — complete: native durable job system (`services/jobs.js` + `jobs` table + indexes; bounded CPU-aware worker pool, atomic claim, backoff+jitter retry, dead-letter, graceful shutdown; wired into `server.js` boot/shutdown; `embeds.backfill` now enqueues durable jobs; `check-jobs.js` gated in `npm run check`).
+
+Phase 3 baseline — complete: `tests/bench/bench.mjs` run against a throwaway SQLite instance (`MAIL_MODE=disabled`); health p50 1.5ms/p95 2.6ms (n=120); concurrent channels x4 p50 5.6ms/p95 11.6ms; POST message p50 4.3ms/p95 9.2ms; WS fanout p50 3ms/p95 7ms, 0/20 missed. Bench fanout latency sign bug fixed (`at - sentAt`).
+
+Phase 6 — complete: `instance.backendRole` setting (primary/backup dropdown) in settings schema with server-side allowed-values validation, surfaced via `/api/instance`.
+
+Phase 8 — complete: `/guidelines`, `/community-guidelines`, `/federation-policy`, `/cookies`, `/licenses` added as root-level editable public routes in `serve-client.js`, registered in `check-public-site.js`, served from disk per request on the origin; reachable on `api.trycord.dev` but **not deployed** to `trycord.dev` (stale Cloudflare build, no push credentials).
+
+Gate: `npm run check` exit 0 (40+ sub-checks incl. jobs check, public-site check, settings wiring); mobile layout 14/14; mobile render 62/62 (656 controls); redteam 28/28.
+
+Remaining phases not yet started: Phase 3 CPU parallelism implementation beyond baseline; Phase 4 Community Continuum federation; Phase 7 Community customization & Community Memory; Phase 9 integration & release verification. Next action: Phase 3 profiling (bot O(N) token scan at `services/bots.js:290`, SQLite serialized writes, `LIKE '%q%'` search) before implementing any bounded concurrency.
