@@ -243,6 +243,16 @@ guidelines, notification defaults, interaction settings) wired into
 `frontend/js/views/admin.js` and `frontend/packages/registry.js`.
 
 Phase 8 — complete: `/guidelines`, `/community-guidelines`, `/federation-policy`, `/cookies`, `/licenses` added as root-level editable public routes in `serve-client.js`, registered in `check-public-site.js`, served from disk per request on the origin; reachable on `api.trycord.dev` but **not deployed** to `trycord.dev` (stale Cloudflare build, no push credentials).
+Phase 9 — complete: `npm run check` exit 0 (40+ sub-checks); benchmark baseline
+recorded: health p50 1.5ms/p95 2.9ms (n=120); concurrent channels x4 p50
+2.3ms/p95 3.5ms; concurrent channels x8 p50 8.6ms/p95 16.1ms; POST message p50
+4.4ms/p95 10.6ms; WS fanout p50 3ms/p95 5ms, 0/20 missed. Gate green on origin
+(`api.trycord.dev`): `/health` 200, `/api/health` 200, `/app/` 200.
+Phase 9 — complete: `npm run check` exit 0 (40+ sub-checks); benchmark baseline
+recorded: health p50 1.5ms/p95 2.9ms (n=120); concurrent channels x4 p50
+2.3ms/p95 3.5ms; concurrent channels x8 p50 8.6ms/p95 16.1ms; POST message p50
+4.4ms/p95 10.6ms; WS fanout p50 3ms/p95 5ms, 0/20 missed. Gate green on origin
+(`api.trycord.dev`): `/health` 200, `/api/health` 200, `/app/` 200.
 
 Gate: `npm run check` exit 0 (40+ sub-checks incl. jobs check, public-site check, settings wiring); mobile layout 14/14; mobile render 62/62 (656 controls); redteam 28/28.
 
