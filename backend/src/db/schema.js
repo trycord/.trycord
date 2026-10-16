@@ -286,6 +286,8 @@ const INDEXES = [
   'CREATE INDEX idx_attachments_dm_conversation ON attachments(dm_conversation_id)',
   'CREATE INDEX idx_users_username ON users(username)',
   'CREATE INDEX idx_dm_members_user ON dm_members(user_id)',
+  'CREATE INDEX idx_jobs_due ON jobs(status, run_after)',
+  'CREATE INDEX idx_jobs_kind ON jobs(kind)',
   'CREATE INDEX idx_dm_messages_conv ON dm_messages(conversation_id, created_at)',
   'CREATE INDEX idx_friend_requests_to ON friend_requests(to_user_id, status)',
   'CREATE INDEX idx_friend_requests_from ON friend_requests(from_user_id, status)',

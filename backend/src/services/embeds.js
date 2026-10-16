@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { now, uuid } = require('../util');
 const { isPrivateAddress, assertPublicHost } = require('./netguard');
+const jobs = require('./jobs');
 
 const FETCH_TIMEOUT_MS = 4000;
 const MAX_BYTES = 512 * 1024;
@@ -234,6 +235,54 @@ function videoCandidate(raw, base) {
   return u.toString();
 }
 
+// Store one link preview row: insert pending, then describe the URL and fill it in.
+// Returns the shaped card, or null if the row already existed.
+async function previewAndStore(keyCol, keyVal, url) {
+  const id = uuid();
+  const channelId = keyCol === 'message_id' ? keyVal : null;
+  const dmConversationId = keyCol === 'dm_message_id' ? null : keyVal;
+  const dmMessageId = keyCol === 'dm_message_id' ? keyVal : null;
+  try {
+    await db.run(
+      'INSERT INTO message_embeds'
+      + ' (id, message_id, dm_conversation_id, dm_message_id, url, status, created_at)'
+      + ' VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, channelId, dmConversationId, dmMessageId, url, 'pending', now()]
+    );
+  } catch { return null; }
+  const info = await describe(url);
+  await db.run(
+    'UPDATE message_embeds SET site_name = ?, title = ?, description = ?, image_url = ?, video_url = ?, kind = ?, status = ? WHERE id = ?',
+    [info.siteName || null, info.title || null, info.description || null,
+      info.imageUrl || null, info.videoUrl || null, info.kind || 'link', info.status, id]
+  );
+  return shape({ id, url, ...info });
+}
+
+// Processes one durable backfill job: describe every URL in a message that
+// does not already have an embed row. Retried with backoff by the job system,
+// so a transient outage self-heals and a crashed worker never loses the work.
+async function handleEmbedBackfill(payload) {
+  const { keyCol, keyVal, urls } = payload || {};
+  if (!keyCol || !keyVal || !Array.isArray(urls)) return;
+  for (const url of urls) {
+    const existing = await db.get(
+      'SELECT id FROM message_embeds WHERE ' + keyCol + ' IS ? AND url = ?',
+      [keyVal, url]
+    );
+    if (existing) continue;
+    await previewAndStore(keyCol, keyVal, url);
+  }
+}
+
+// Register the durable job type once the job system exists. Workers start only
+// after boot, so no job can be claimed before its handler is registered.
+jobs.register('embed_backfill', handleEmbedBackfill, {
+  concurrency: 4,
+  maxAttempts: 5,
+  backoffMs: 1000,
+});
+
 // Queued rather than awaited by the caller: a slow or hostile URL must not
 // delay a send. Sequential on purpose, so a message with three links makes three
 // requests rather than three at once.
@@ -256,22 +305,7 @@ async function queue(scope, content) {
       [keyVal, url]
     );
     if (existing) continue;
-    const id = uuid();
-    try {
-      await db.run(
-        'INSERT INTO message_embeds'
-        + ' (id, message_id, dm_conversation_id, dm_message_id, url, status, created_at)'
-        + ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [id, target.messageId || null, target.conversationId || null,
-          target.dmMessageId || null, url, 'pending', now()]
-      );
-    } catch { continue; }
-    const info = await describe(url);
-    await db.run(
-      'UPDATE message_embeds SET site_name = ?, title = ?, description = ?, image_url = ?, video_url = ?, kind = ?, status = ? WHERE id = ?',
-      [info.siteName || null, info.title || null, info.description || null,
-        info.imageUrl || null, info.videoUrl || null, info.kind || 'link', info.status, id]
-    );
+    await previewAndStore(keyCol, keyVal, url);
   }
   // The cards for this one message, as a list. listForMessages() returns a map
   // keyed by id because a history read asks for many at once; queue() resolves
@@ -325,7 +359,9 @@ async function backfill(limit = 25) {
      WHERE e.id IS NULL AND m.content LIKE '%http%'
      ORDER BY m.created_at DESC LIMIT ?`, [limit]
   );
-  for (const m of rows) await queue({ kind: 'channel', messageId: m.id }, m.content);
+  for (const m of rows) await jobs.enqueue('embed_backfill', {
+    keyCol: 'message_id', keyVal: m.id, urls: extractUrls(m.content)
+  });
   return rows.length;
 }
 

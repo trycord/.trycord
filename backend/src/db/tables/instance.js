@@ -51,4 +51,22 @@ module.exports = (engine) => [
       expires_at  VARCHAR(64),
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
+
+  // Durable background jobs. A job is claimed by exactly one worker, runs to
+  // completion or failure, and is retried with backoff until it succeeds or
+  // exhausts its attempts - so a restart or a crashed worker never silently
+  // loses durable work, and two workers never process the same job.
+  `CREATE TABLE IF NOT EXISTS jobs (
+      id          VARCHAR(64) PRIMARY KEY,
+      kind        VARCHAR(64) NOT NULL,
+      payload     TEXT NOT NULL,
+      status      VARCHAR(16) NOT NULL DEFAULT 'pending',
+      attempts    INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 5,
+      backoff_ms  INTEGER NOT NULL DEFAULT 1000,
+      run_after   VARCHAR(64) NOT NULL,
+      error       TEXT,
+      created_at  VARCHAR(64) NOT NULL,
+      updated_at  VARCHAR(64) NOT NULL
+    )${engine}`,
 ];

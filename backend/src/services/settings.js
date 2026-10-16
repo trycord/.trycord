@@ -62,6 +62,13 @@ const SCHEMA = [
     description: 'Where people go for help. Shown on the public site and in support emails.',
     live: true,
   },
+  {
+    key: 'instance.backendRole', env: 'TRYCORD_BACKEND_ROLE', type: 'string', default: 'primary',
+    category: 'general', label: 'Backend role',
+    description: 'This server\'s role within the logical instance: PRIMARY API (serves traffic) or BACKUP API (standby). Actual failover routing is handled separately.',
+    allowed: ['primary', 'backup'],
+    live: false,
+  },
 
   {
     key: 'registration.enabled', env: 'REGISTRATION_ENABLED', type: 'boolean', default: true,
