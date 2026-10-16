@@ -178,6 +178,111 @@ desktop app too:
 CLIENT_ORIGIN=https://trycord.example,http://*.trycord.example,trycord://app
 ```
 
+### Feature flags
+
+One switch per meaningful platform capability. Every value is `on`/`off`
+(`true`/`false` and `1`/`0` also parse), blank falls back to the default, and
+**anything else is a startup error** — a typo must not silently enable or
+disable something.
+
+| Flag | Default | What it does |
+| --- | --- | --- |
+| `REGISTRATION_ENABLED` | on | New accounts. Off makes the instance invite-only. |
+| `EMAIL_VERIFICATION_REQUIRED` | off | Whether an account must confirm an address to post. Only enforceable with `MAIL_MODE=smtp`. |
+| `FILE_UPLOADS_ENABLED` | on | Uploads, including avatars and community icons. |
+| `COMMUNITY_DISCOVERY_ENABLED` | on | The public discovery feed. |
+| `BOTS_ENABLED` | on | Bot accounts and tokens. |
+| `WEBHOOKS_ENABLED` | on | Incoming webhooks. |
+| `PUSH_NOTIFICATIONS_ENABLED` | off | Browser push. Needs a push service and a public key. |
+
+The flags are read once, at startup, by `server/src/features.js`. Nothing
+else in the server reads the environment for a feature decision, so the API
+routes, the realtime gateway and the client's capability discovery cannot
+disagree about what is available. Restarting with a different value takes
+effect immediately — there is no cache to clear.
+
+`GET /api/voice/capabilities` is what a client reads to discover what this
+instance can do. It carries no credentials and no internal hostnames: the TURN
+*URL* is public by design, and its credential is minted per session by the
+backend and never appears in that response.
+
+### Voice and video
+
+Off by default, because the default is an instance with no media server.
+
+```
+VOICE_VIDEO_ENABLED=off
+```
+
+With the flag **off**: every voice route refuses with `FEATURE_DISABLED`, the
+capability response reports voice as unavailable with the reason `disabled`,
+the ICE server list is empty, and text chat is entirely unaffected.
+
+With the flag **on** but the infrastructure missing, the server **refuses to
+start**. The error names exactly what is absent — for example:
+
+```
+VOICE_VIDEO_ENABLED is on, but voice cannot work:
+no STUN or TURN server is configured; VOICE_VIDEO_SFU_APP_ID is not set
+```
+
+That is deliberate. A configuration that cannot work is a startup error, not a
+runtime surprise discovered at the first join.
+
+### Provider
+
+There is exactly one provider: **Cloudflare Realtime SFU**. Set it explicitly
+or leave it unset — the value defaults to it.
+
+```
+VOICE_VIDEO_PROVIDER=cloudflare
+```
+
+Its own documentation is explicit that it does not provide signalling or room
+management: *"The backend holds the SFU App Secret and manages application
+state and permissions"*. So Trycord's backend remains the authority on who is
+a user, which community they belong to, and whether they may speak. The
+provider only creates sessions and moves SDP; it never decides who may join.
+
+```
+VOICE_VIDEO_SFU_APP_ID=...
+VOICE_VIDEO_SFU_APP_SECRET=...
+```
+
+Both are read from the environment and never returned by any route. The App
+Secret stays on the server; a browser never sees it.
+
+A peer-to-peer mode with no server-side routing does not exist. An earlier
+version of this document described one, and it was never implemented.
+
+### Network
+
+```
+VOICE_VIDEO_STUN_URLS=stun:stun.example.com:3478
+VOICE_VIDEO_TURN_URL=turn:turn.example.com:3478
+VOICE_VIDEO_TURN_USERNAME=...
+VOICE_VIDEO_TURN_CREDENTIAL=...
+```
+
+At least one STUN server or a TURN URL is required when voice is on. STUN is
+enough for most home networks; TURN is what gets a call through a symmetric NAT
+or a firewall that blocks UDP.
+
+The TURN URL and username are handed to clients, because a client needs them
+to open a connection. The credential is minted per session by the backend —
+ask `POST /api/voice/credentials` — so a client that walks away with one does
+not carry standing TURN access, and it never appears in the capability response.
+
+### Limits and sub-capabilities
+
+`VOICE_VIDEO_MAX_PARTICIPANTS` (default 25, range 1–200) is enforced
+**server-side, before a session is created**: a channel that is full answers
+`ROOM_FULL` rather than letting another person connect and then dropping them.
+
+`VOICE_VIDEO_SCREEN_SHARING` and `VOICE_VIDEO_STAGE_CHANNELS` are separately
+switchable. Neither can be on while the master switch is off — a sub-flag does
+not conjure infrastructure the master says does not exist.
+
 ### Optional: the status monitor
 
 A second, independent container that checks the instance on a schedule and
