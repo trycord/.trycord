@@ -262,6 +262,7 @@ const Api = {
   createServer: (body) => request('POST', '/api/servers', { body }),
   server: (id) => request('GET', '/api/servers/' + encodeURIComponent(id)),
   updateServer: (id, body) => request('PATCH', '/api/servers/' + encodeURIComponent(id), { body }),
+  updateServerSettings: (id, body) => request('PATCH', '/api/servers/' + encodeURIComponent(id) + '/settings', { body }),
   deleteServer: (id) => request('DELETE', '/api/servers/' + encodeURIComponent(id)),
   serverMembers: (id, opts) => {
     const o = opts || {};
