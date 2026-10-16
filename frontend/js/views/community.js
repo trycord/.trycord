@@ -1461,9 +1461,11 @@ function memorySection(serverId) {
 
   function entryRow(entry) {
     const revBadge = el('span', { class: 'badge' }, 'r' + (entry.revisionCount || 1));
+    const author = entry.authorName ? el('span', { class: 'prow-sub' }, 'by ' + entry.authorName) : null;
     const byline = el('div', { class: 'stack stack--tight' },
       el('div', { class: 'row-item-sub truncate' }, entry.body),
       el('div', { class: 'row-item-actions' },
+        author,
         el('span', { class: 'prow-sub' }, entry.updatedAt ? relative(entry.updatedAt) : null),
         revBadge));
     return el('div', { class: 'row-item' },

@@ -43,6 +43,7 @@ function toPublic(row) {
     title: row.title,
     body: row.body,
     authorId: row.author_id,
+    authorName: row.author_display_name || row.author_username || null,
     sourceMessageId: row.source_message_id,
     revisionCount: row.revision_count,
     status: row.status,
@@ -59,7 +60,7 @@ async function ensureRow(serverId, id) {
 
 async function list(serverId) {
   const rows = await db.all(
-    'SELECT * FROM community_memory_entries WHERE server_id = ? ORDER BY updated_at DESC',
+    'SELECT e.*, u.username AS author_username, u.display_name AS author_display_name FROM community_memory_entries e LEFT JOIN users u ON u.id = e.author_id WHERE e.server_id = ? ORDER BY e.updated_at DESC',
     [serverId]
   );
   return rows.map(toPublic);
