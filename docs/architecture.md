@@ -19,7 +19,7 @@ and finds 100 ratios that pass; `npm run check:backend-agnostic` checks that no
 component names a backend, that one module stores the chosen address, that one module
 attaches credentials, and that both modules ship the same `backend.json`; and
 `npm run check:client-load`
-evaluates all 59 client modules across the shared platform and the two
+evaluates all 60 client modules across the shared platform and the two
 presentation modules.
 
 ## Where things live

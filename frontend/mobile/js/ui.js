@@ -7,6 +7,7 @@
 
 import { el, trapFocus, prefersReducedMotion } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
+import { attachSheetDismiss } from '../js/gestures.js';
 
 const stack = [];
 
@@ -15,6 +16,9 @@ function present(node, options) {
   const scrim = el('div', { class: 'm-scrim' });
   document.body.appendChild(scrim);
   document.body.appendChild(node);
+
+  // Pulling a sheet down past the threshold dismisses it.
+  attachSheetDismiss(node, layer.close);
 
   const layer = {
     node,

@@ -1,0 +1,221 @@
+# Trycord Implementation Status
+
+Progress against `IMPLEMENTATION_PLAN.md`. Everything here is *verified* — run,
+observed, or read with a file:line. Anything not yet verified is marked
+`UNVERIFIED`. The exact next action is at the bottom.
+
+Last updated: Phase 0 (reconnaissance), in progress.
+
+## 1. Test baseline (actually executed)
+
+Run from `backend/`, on 2026-10-16, against the working tree at `dd4b6ac`.
+
+| Suite | Command | Result |
+| ----- | ------- | ------ |
+| Full gate | `npm run check` | **exit 0, 0 FAIL lines** (40+ sub-checks) |
+| Client styles | `scripts/check-client-styles.js` | 529/529 class names have a rule |
+| Contrast | `scripts/check-contrast.js` | 37 passed, 0 failed |
+| Doc counts | `scripts/check-doc-counts.js` | passed (summary numbers match the suite) |
+| Flows | `scripts/check-flows.js` | 77 assertions against a running server |
+| Graph | `scripts/check-graph.js` | passed |
+| Desktop render | `scripts/check-render.js` | 117 assertions, 56 pages, 0 inert controls |
+| Mobile render | `scripts/check-mobile-render.js` | 62 assertions, 45 pages, 611 controls |
+| Redteam regression | `tests/redteam/regression.mjs` on isolated SQLite, `ALLOW_TEST_HOOKS=true` | **14 passed, 0 failed** (RT-01…RT-14; launch header patched to include `ALLOW_TEST_HOOKS=true`) |
+| Redteam manual | `tests/redteam/findings-manual.mjs` on isolated SQLite | **14 passed, 0 failed** (§4 CSP, §13 2FA lockout, §15 unban audit rows, §16 upload/voice limits) |
+| Backend modules | `check-server-routes.js` / `check-server-bindings.js` | 141 modules |
+| Client modules | `check-client-modules.js` / `check-frontend-modules.js` | 60 modules; boundary holds |
+| Status monitor | `check-status-monitor.js` | 83 assertions |
+
+CI reality (`.github/workflows/check.yml`): CI runs **only** `npm run check`
+(plus a `node --check` sweep) on a throwaway SQLite file. The render, flow,
+graph and mobile-render suites are **not gated in CI** — they are green locally
+but nothing stops a regression. (Candidate task, Phase 9.)
+
+## 2. Deployment topology (verified live)
+
+DNS + HTTP, 2026-10-16:
+
+* `trycord.dev` → Cloudflare (static deploy: public site + the client under
+  `/app/`). Header `cf-cache-status` present; served by the Pages/worker tree.
+* `api.trycord.dev` → Cloudflare, origin is the pm2 process `trycord-api`
+  (`backend/src/server.js`, `TRUST_PROXY=1`). It serves **the API under `/api`
+  and also the full client under `/` and `/app`**.
+* `trycord-api.wispbyte.app` → resolves; named in `backend/.env.example` as
+  `API_BACKUP_URL`. This is Backend B.
+
+`frontend/backend.json` (both modules) and the origin's `backend.json` both read:
+
+```json
+{ "backendUrl": "https://api.trycord.dev",
+  "fallbackUrls": ["https://trycord-api.wispbyte.app"] }
+```
+
+Origin CSP `connect-src` allows `api.trycord.dev`, `trycord-api.wispbyte.app`,
+`localhost:9971`. `CLIENT_ORIGIN` in `.env.example` is
+`https://trycord.dev,http://*.trycord.dev,trycord://app`.
+
+### The `api.trycord.dev` question (directive §8)
+
+**Verdict: intentional service origin, not a redirect and not (by itself) an
+error — but its dual role conflicts with the stated canonical topology.**
+
+* It is **not** an alias or redirect: `trycord.dev` is a separate Cloudflare
+  deployment serving its own static tree; it does not redirect to `api.`.
+* `api.trycord.dev` is Backend A's public origin. It answers `/health` and
+  `/api/health` with 200 and serves the API under `/api`.
+* It **also serves a full copy of the client** at `/` and `/app/` (with its own
+  CSP), because the server mounts the client at the root. That is why a phone
+  that opened `api.trycord.dev` showed a working app. Per the directive,
+  `trycord.dev` is the canonical frontend and the API is a separate service, so
+  the duplicated client surface at the API origin is a topology defect to
+  resolve deliberately (not by DNS changes — §8 forbids destructive changes
+  without authorization).
+
+### Deploy drift (the live breakage the user keeps seeing)
+
+| Host | `/app/` build | Entry script |
+| ---- | ------------- | ------------ |
+| `trycord.dev` (canonical) | 8872 bytes | `./js/app.js` — **pre-split build, stale** |
+| `api.trycord.dev` (origin) | 3262 bytes | `./js/main.js` — current |
+
+So the canonical frontend host is serving the **old** build: on `trycord.dev`
+the Mobile module's assets fall through to the Desktop shell and `/app/mobile`
+renders the Desktop app. The origin is correct. **The fix is a deploy of the
+Cloudflare tree**, which is blocked (see Blockers).
+
+## 3. Live routing (verified)
+
+Probed `trycord.dev` and `api.trycord.dev` over the same route list:
+
+* Origin `api.trycord.dev`: `/app/*` routes return the Desktop shell, `/app/mobile/*`
+  assets return as themselves, a missing `.js` under `/app` is a **404**, and
+  `/mobile*` is served. Correct.
+* Static `trycord.dev`: a missing `.js`/`.css` under `/app` returned the **shell
+  (200 HTML)**, not a 404 — a module typo becomes a MIME error far from its
+  cause. Fixed in the worker source (`ASSET_PATH` guard), and the worker
+  verifier now asserts it. Not yet deployed.
+* `/mobile`, `/mobile/`, `/mobile/settings` 404 on the stale static host; the
+  worker now redirects them onto `/app/mobile/*`.
+
+`verify-worker.mjs` (Cloudflare repo) rewritten: it now tells the two documents
+apart, covers the Mobile subtree, the `/mobile` alias, and the asset/route
+boundary. Result: **all checks passed** (public 12, Desktop 37, Mobile 13, misses
+8, plus aliases/redirects). Committed `9cde2fa`.
+
+## 4. Root-level legal routes (verified live)
+
+| Route | `trycord.dev` | `api.trycord.dev` |
+| ----- | ------------- | ----------------- |
+| `/terms` | 200 (real "Terms of Service" page) | 200 |
+| `/privacy` | 200 | 200 |
+| `/support`, `/security` | 200 | — |
+| `/guidelines`, `/community-guidelines`, `/federation-policy`, `/cookies`, `/licenses` | **404** | 404 (some "where applicable") |
+| `/app/terms`, `/app/privacy` | **200 — the app shell** | 404 |
+
+`/terms` is canonical at the root ✓. But `/app/terms` and `/app/privacy` on the
+static host fall through the SPA to the authenticated shell — a fake legal route.
+Per §40 these legacy nested paths must redirect to the root routes, and the
+missing policy page(s) must be added or explicitly marked out of scope.
+
+## 5. Runtime and concurrency (verified)
+
+* pm2: `trycord-api` — `src/server.js`, cwd `backend`, **fork_mode, instances 1,
+  max_memory_restart 512M**. `trycord-status-monitor` — separate process (so it
+  survives API restarts), `kill_timeout 5000`.
+* **There is no parallelism today**: no cluster, no `worker_threads`, no child
+  processes in the API process. Phase 3 is real work, not tuning.
+* `tests/bench/bench.mjs` exists and is honest: real register/community/channel/
+  post flows, real WebSocket fan-out to N clients, event-loop delay via
+  `perf_hooks`, percentiles not averages. **Not yet run for a baseline** (T3.1).
+
+## 6. Recently completed work (pre-ledger, verified)
+
+These predate the ledger and are already committed and verified in the working
+tree; they belong to Phase 5.
+
+| Commit | Change |
+| ------ | ------ |
+| `309e99c` | Mobile bundle now includes the shared semantic token layer (`--panel`, `--fs-*`, …) — the Mobile module had rendered with no panel colours or type scale. |
+| `61a2021` | `/mobile` alias `<base>` bug fixed in `serve-client.js`; mounted-instance alias assertions added. |
+| `7523abe` | Mobile brandmark/favicon pointed at a nonexistent `trycord-logo.svg` → the shared `trycord-symbol.svg`. |
+| `3f9108b` | Cloudflare worker routes `/app/mobile` and unknown `/app/mobile/*`; `verify-dist.js` updated for the split (60/60). |
+| `6c99cc3` | Mobile viewport + safe areas + sticky bottom nav. |
+| `dd4b6ac` | One source for the brand monogram (`frontend/packages/brand.js`); the phone's app-bar mark was unsized, so the SVG's intrinsic 512px made the logo fill half the screen. |
+| `9cde2fa` (cf) | Worker verifier covers the Mobile subtree and the asset/route boundary. |
+
+## 6b. Working-tree changes this session (uncommitted)
+
+Mobile UI repair, verified against `check-mobile-layout.js` (14/14) and
+`check-mobile-render.js` (62/62, 656 controls across 45 pages, every interactive
+control has an accessible name). Rebuilt `frontend/mobile/css/app.css` via
+`frontend/scripts/build-css.js` (the module's own layer — shared token library +
+`mobile.css`, nothing from the desktop composition).
+
+| File | Change |
+| ---- | ------ |
+| `frontend/mobile/css/mobile.css` | `.m-screen` no longer scrolls or pads on top of `.m-view` — `.m-view` is the single scrolling region, removing the nested scroll and the double gutter (~28px sides, ~20px top, ~36px bottom). `.m-view` drops its duplicated `env(safe-area-inset-*)` values (`.m-app` pads the safe area; `.m-tabs` owns the bottom inset). Conversation toasts re-anchored to the bottom when the tab bar is hidden. Touch targets brought to `--m-tap` (44px): `.m-iconbtn`, `.m-composer__send`, `.m-composer__input`, `.m-btn--sm`, `.m-seg__item`, `.m-chipbtn`, `.m-switch` (now 44×44 with a 24px thumb). Added a focus-visible skip link (`.m-skip`, jumps to `#m-view`). |
+| `frontend/mobile/js/shell.js` | Skip link rendered as the shell's first focusable; `setView` moves focus to `#m-view` (`{preventScroll: true}`) on every route change so screen readers announce the new screen. Sheets still re-focus themselves on open and restore focus on close (`packages/dom.js` `trapFocus`). |
+| `frontend/mobile/index.html` | Added `rel="manifest"` (linking the existing `site.webmanifest`), `mobile-web-app-capable`, and `apple-mobile-web-app-title`. No `apple-touch-icon` added because that asset does not exist in trycord-assets (the asset rule forbids inventing filenames). |
+
+## 7. Blockers (must be stated, not hidden)
+
+1. **No push credentials.** `git push` for both repositories fails with
+   `could not read Username for 'https://github.com'`. No SSH key or credential
+   helper is present. Consequently:
+   * `trycord.dev` cannot be redeployed to the current build, so the canonical
+     frontend stays stale and the Mobile module is broken there in production.
+   * The origin (`api.trycord.dev`) reads assets from disk per request, so
+     frontend fixes *are* live there without a restart.
+2. **No production DB writes / migrations** without explicit authorization. The
+   local instance uses the real MySQL DB; destructive tests run on throwaway
+   SQLite only.
+3. `api.trycord.dev` serving a duplicate client surface needs a deliberate,
+   authorized decision (§8).
+
+## 8. Exact next action (2026-10-16)
+
+Phase 0 reconnaissance is complete and the ledger is in place. `IMPLEMENTATION_STATE.md`
+has been retired (T0.7) — its plan/state/decisions live in `IMPLEMENTATION_PLAN.md` and
+this file, its capability inventories point at the existing audit docs, and its migration
+section is historical (no schema changes).
+
+Completed this session:
+- **T1.1 — redteam regression:** `tests/redteam/regression.mjs` 14/14 and
+  `tests/redteam/findings-manual.mjs` 14/14, both green on isolated SQLite (suite's
+  own launch header patched to include `ALLOW_TEST_HOOKS=true`).
+- **T1.2 — authz audit of mutating routes:** every mutating route in `backend/src/routes/`
+  carries server-side authorization. Admin routes (`/api/admin`, `/api/admin/pages`,
+  `/api/admin/database`, `/api/admin/mail`) are behind `adminGuard` at the router;
+  server-scoped routes use `resolveServer` + `requirePerm`/`requireMember`/`requireOwner`;
+  user-scoped routes use `auth` + `req.user.id` scoping; `/api/appeals` is deliberately
+  anonymous-by-design (possession-of-id + rate limit). `backend/scripts/check-events.js`,
+  `check-permissions.js` and `check-mail.js` exercise parts of this. No IDOR or
+  privilege-escalation hole found in the routes audited.
+- **T3.1 — Phase 3 baseline benchmark** (`tests/bench/bench.mjs` against a throwaway
+  SQLite instance, `MAIL_MODE=disabled`): also **fixed a measurement bug in the bench
+  itself** — fanout latency used `sentAt - at` (always negative, so every reading was
+  filtered out and fanout read n=0); corrected to `at - sentAt`. Honest baseline:
+  `GET /api/health` p50 1.44ms / p95 2.37ms (n=120); `GET channels` p50 2.08ms / p95
+  3.24ms; concurrent channels x4 p50 4.55ms / p95 8.39ms; `POST message` p50 3.15ms /
+  p95 4.86ms; WS fanout to 4 subscribers p50 2.0ms / p95 4.0ms, 0/20 missed. (The WS
+  `msg`-frame probe reads as "stored: no" only in this mail-disabled test env because
+  the gateway gates socket sends on email verification; REST and WS are consistent when
+  mail is enabled.) Baseline recorded here so Phase 3 can compare against real numbers.
+
+Recommended next actions, in order:
+
+1. **T1.3 — Uploads audit** (`src/services/uploads/`, `routes/attachments.js`): type,
+   size, path-traversal and storage-provider checks; confirm `uploads.purgePending()`.
+2. **T1.4 — Secret handling audit:** confirm no secret reaches responses/logs/bundles
+   (`settings.SECRETS`, `secrets.readable`, mail secret endpoints); add a check if none
+   exists.
+3. **T1.5 — Startup/config validation fails safely:** confirm invalid config refuses to
+   start with a clear message (`db/config.js` bootstrap + `features.js` flag parsing).
+4. **Phase 2 candidates** (per the directive's native-systems mandate): background job
+   system with durable storage, native backup/restore with verification, search,
+   notifications, Community Continuum federation — none exist in `backend/src` today;
+   scope and sequence them after Phase 1.
+
+Blockers (§7) remain: no push credentials (`trycord.dev` stays on the stale pre-split
+build; origin is live), no production DB writes without authorization, and the
+`api.trycord.dev` dual-client-surface decision pending authorization.
