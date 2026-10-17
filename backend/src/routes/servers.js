@@ -283,4 +283,13 @@ router.patch('/:id/members/:userId/nickname', resolveServer, auth.requireVerifie
   } catch (e) { serviceError(res, e); }
 });
 
+// GET /api/servers/:id/export - community portability manifest (admin only)
+router.get('/:id/export', resolveServer, auth.requireVerified, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
+  try {
+    const exporter = require('../services/export');
+    const payload = await exporter.exportCommunity(req.server.id, req.user.id);
+    res.status(200).set('Cache-Control', 'no-store').json(payload);
+  } catch (e) { serviceError(res, e); }
+});
+
 module.exports = router;
