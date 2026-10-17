@@ -645,15 +645,7 @@ function settingsSection() {
   function edit(entry, value) {
     if (isChanged(entry, value)) edits.set(entry.key, value);
     else edits.delete(entry.key);
-    // Re-paint when a setting that controls field visibility changes.
-    if (entry.showIf || allEntries().some((e) => e.showIf && e.showIf.key === entry.key)) {
-      // Preserve activeId across re-paint.
-      const current = activeId;
-      activeId = current;
-      paint();
-    } else {
-      refresh();
-    }
+    refresh();
   }
 
   function readControl(control) {
@@ -723,12 +715,6 @@ function settingsSection() {
   }
 
   function entryRow(entry) {
-    // Conditional fields: hide settings whose showIf dependency isn't met.
-    if (entry.showIf) {
-      const dep = entryOf(entry.showIf.key);
-      const depValue = dep && edits.has(dep.key) ? edits.get(dep.key) : dep && dep.value;
-      if (String(depValue) !== String(entry.showIf.value)) return null;
-    }
     return prow({
       top: true,
       class: 'cfg-entry' + (entry.locked ? ' cfg-entry--locked' : ''),
@@ -851,13 +837,7 @@ function settingsSection() {
   }
 
   function categoryPanel(category) {
-    const entries = entriesIn(category).filter((entry) => {
-      if (!entry.showIf) return true;
-      const dep = entryOf(entry.showIf.key);
-      const depValue = dep && edits.has(dep.key) ? edits.get(dep.key) : dep && dep.value;
-      return String(depValue) === String(entry.showIf.value);
-    });
-    if (!entries.length) return null;
+    const entries = entriesIn(category);
 
     saveCount = el('span', { class: 'cfg-count' }, 'No changes yet');
     saveButton = el('button', {
@@ -867,7 +847,7 @@ function settingsSection() {
     return panel({
       title: category.label,
       note: entries.length + (entries.length === 1 ? ' setting' : ' settings'),
-      rows: entries.map(entryRow).filter(Boolean),
+      rows: entries.map(entryRow),
       foot: [saveCount, saveButton],
     });
   }
