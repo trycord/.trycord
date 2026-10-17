@@ -15,14 +15,14 @@
  */
 
 :root {
-  --tc-bg-deep: var(--tc-bg-deep);
-  --tc-bg: var(--tc-bg);
-  --tc-surface: var(--tc-surface);
-  --tc-border: var(--tc-border);
-  --tc-text: var(--tc-text);
-  --tc-text-muted: var(--tc-text-muted);
-  --tc-brand: var(--tc-brand);
-  --tc-brand-hover: var(--tc-brand-hover);
+  --tc-bg-deep: #12100B;
+  --tc-bg: #18191D;
+  --tc-surface: #22242A;
+  --tc-border: #30323A;
+  --tc-text: #F4F5F7;
+  --tc-text-muted: #A4A7B0;
+  --tc-brand: #FF4D24;
+  --tc-brand-hover: #E9431D;
 
   --bg: var(--tc-bg-deep);
   --bg-2: var(--tc-bg);
