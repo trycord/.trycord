@@ -5,10 +5,10 @@
 // question asked of a different set of rows.
 
 import { el } from '../../packages/dom.js';
-import { avatar, iconButton } from '../components.js';
+import { avatar, iconButton } from '../ui/primitives.js';
 import { State, nameOf, normalizeUser, refreshFriends } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
-import { openMenu, toast, errorToast, confirmDialog } from '../ui.js';
+import { openMenu, toast, errorToast, confirmDialog } from '../ui/overlays.js';
 import Api from '../../packages/api.js';
 import { page, band, panel, prow, loading, failure, empty } from './util.js';
 

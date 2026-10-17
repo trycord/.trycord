@@ -8,7 +8,7 @@
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
-import { toast, errorToast } from '../ui.js';
+import { toast, errorToast } from '../ui/overlays.js';
 import { panel, loading, failure, nothing } from './util.js';
 
 // -- shared furniture --------------------------------------------------------

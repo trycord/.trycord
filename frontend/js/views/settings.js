@@ -6,13 +6,13 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { avatar, bannerNode } from '../components.js';
+import { avatar, bannerNode } from '../ui/primitives.js';
 import { State, loadSession } from '../../packages/store.js';
 import Api from '../../packages/api.js';
 import { TrycordConfig } from '../../packages/config.js';
 import { path, publicPath } from '../../packages/nav.js';
 import { scopeNav } from '../../packages/registry.js';
-import { toast, errorToast, confirmDialog, openDialog } from '../ui.js';
+import { toast, errorToast, confirmDialog, openDialog } from '../ui/overlays.js';
 import { currentTheme, setTheme } from '../../packages/theme.js';
 import { page, band, panel, prow, notice, loading, failure, empty, relative } from './util.js';
 

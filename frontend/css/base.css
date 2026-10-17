@@ -39,20 +39,7 @@ html {
 
 body {
   font-family: var(--font);
-  font-size: 15px;
-  line-height: 1.5;
-  font-weight: 450;
-  color: var(--text-1);
-  background: var(--app-bg);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  overscroll-behavior: none;
-}
-
-body {
-  font-family: var(--font);
-  font-size: 15px;
+  font-size: var(--fs-body);
   line-height: 1.5;
   font-weight: var(--weight-body);
   color: var(--text-1);
@@ -175,4 +162,14 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* The same floor when the reader asked for it in Appearance rather than through
+   the OS - one of the two is always the last word, and they say the same thing. */
+[data-motion="reduced"], [data-motion="reduced"] *,
+[data-motion="reduced"] *::before, [data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

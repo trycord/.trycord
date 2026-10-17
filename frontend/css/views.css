@@ -624,3 +624,68 @@
 .row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .role-dot { display: block; width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); }
+
+/* -- the channel roster ---------------------------------------------------
+ * The members list a channel shows in the inspector. It was written for the
+ * old details panel and keeps its class names until the conversation feature
+ * owns this surface outright. */
+.member-group { margin-bottom: 16px; }
+.member-group-head {
+  padding: 6px 10px; font-family: var(--mono); font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-3);
+}
+.member-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px;
+  padding: 6px 10px; border-radius: var(--radius-sm); text-align: left;
+  transition: background var(--dur-1) var(--ease);
+}
+.member-row:hover { background: var(--hover); }
+.member-name { font-size: 0.88rem; font-weight: var(--weight-strong); min-width: 0; }
+.member-role { color: var(--text-3); }
+
+/* -- the settings centre --------------------------------------------------
+ * The full-page settings surface the account screens still build for
+ * themselves, one section at a time; the studio pattern replaces it. */
+.settings-centre { display: block; height: 100%; }
+.settings-centre-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; border-bottom: 1px solid var(--line); background: var(--raised);
+}
+.settings-centre-title { font-size: var(--fs-h2); font-weight: var(--weight-bold); color: var(--text-1); }
+.settings-centre-subtitle { font-size: var(--fs-sm); color: var(--text-3); }
+.settings-centre-body {
+  flex: 1; overflow-y: auto; padding: 24px;
+  display: grid; grid-template-columns: 1fr; gap: 24px;
+}
+.settings-centre-section {
+  background: var(--raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 24px;
+}
+.settings-centre-section-title {
+  font-size: var(--fs-h3); font-weight: var(--weight-strong); color: var(--text-1);
+  margin-bottom: 16px;
+}
+.settings-centre-section-subtitle { font-size: var(--fs-sm); color: var(--text-3); margin-bottom: 16px; }
+.settings-centre-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px; border-radius: var(--radius-md); cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+.settings-centre-row:hover { background: var(--hover); }
+.settings-centre-row.is-active { background: var(--brand-soft); color: var(--brand); }
+.settings-centre-row-title { font-size: var(--fs-body); font-weight: var(--weight-medium); }
+.settings-centre-row-subtitle { font-size: var(--fs-sm); color: var(--text-3); }
+.settings-centre-row-toggle {
+  width: 44px; height: 24px; border-radius: var(--radius-pill);
+  background: var(--panel-3); border: none; cursor: pointer; position: relative;
+  transition: background var(--dur-1) var(--ease);
+}
+.settings-centre-row-toggle.is-active { background: var(--brand-fill); }
+.settings-centre-row-toggle::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+  border-radius: 50%; background: var(--text-2);
+  transition: transform var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.settings-centre-row-toggle.is-active::after { transform: translateX(20px); background: #fff; }
+
+.members-scroll { flex: 1; overflow-y: auto; padding: 8px; }

@@ -27,11 +27,24 @@ const CLIENT_ROOTS = ['js', 'packages', 'mobile'].map((d) => path.join(__dirname
 
 // Enough DOM for module evaluation. Nothing here is meant to be a working browser:
 // the elements record what was asked of them and return themselves, which is enough
-// for a module that builds a node at import time and nothing more.
+// for a module that builds a node at import time and nothing more. The style object
+// still speaks the CSSOM, because the shell writes layout properties through
+// setProperty and a plain {} would only teach the code to avoid its own API.
+function makeStyle() {
+  return {
+    _props: {},
+    setProperty(name, value) { this._props[name] = String(value); },
+    getPropertyValue(name) {
+      return Object.prototype.hasOwnProperty.call(this._props, name) ? this._props[name] : '';
+    },
+    removeProperty(name) { delete this._props[name]; },
+  };
+}
+
 function makeElement(tag) {
   const node = {
     tagName: String(tag || 'div').toUpperCase(),
-    style: {},
+    style: makeStyle(),
     dataset: {},
     children: [],
     attributes: {},
@@ -81,6 +94,7 @@ function makeElement(tag) {
 }
 
 function installDom() {
+  const appRoot = makeElement('div');
   const doc = {
     documentElement: makeElement('html'),
     body: makeElement('body'),
@@ -92,7 +106,7 @@ function installDom() {
     createDocumentFragment: () => ({ children: [], appendChild(c) { this.children.push(c); return c; }, append(...c) { c.forEach((x) => this.children.push(x)); } }),
     querySelector: () => null,
     querySelectorAll: () => [],
-    getElementById: () => null,
+    getElementById: (id) => (id === 'app' ? appRoot : null),
     addEventListener() {},
     removeEventListener() {},
     dispatchEvent() { return true; },

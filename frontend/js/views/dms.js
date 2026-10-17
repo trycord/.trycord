@@ -5,7 +5,7 @@
 // header around it.
 
 import { el } from '../../packages/dom.js';
-import { avatar, countBadge, iconButton } from '../components.js';
+import { avatar, countBadge, iconButton } from '../ui/primitives.js';
 import { State, dmPeer, nameOf, refreshDms } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
 import { relativeTime } from '../../packages/format.js';

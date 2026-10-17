@@ -6,7 +6,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { serverMark } from '../components.js';
+import { serverMark } from '../ui/primitives.js';
 import { State } from '../../packages/store.js';
 import { path } from '../../packages/nav.js';
 import Api from '../../packages/api.js';

@@ -6,7 +6,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { spinner } from '../components.js';
+import { spinner } from '../ui/primitives.js';
 import { relativeTime } from '../../packages/format.js';
 
 export function page(children, options) {

@@ -7,12 +7,12 @@
 
 import { el, clear } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { avatar, serverMark } from '../components.js';
+import { avatar, serverMark } from '../ui/primitives.js';
 import { nameOf } from '../../packages/store.js';
 import Api from '../../packages/api.js';
 import { path, navigate } from '../../packages/nav.js';
 import { scopeNav } from '../../packages/registry.js';
-import { toast, errorToast, confirmDialog, openDialog, openMenu } from '../ui.js';
+import { toast, errorToast, confirmDialog, openDialog, openMenu } from '../ui/overlays.js';
 import { page, band, panel, prow, notice, section, loading, failure, nothing, empty, relative, stat } from './util.js';
 import { continuumSection } from './continuum.js';
 

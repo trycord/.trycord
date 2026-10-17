@@ -38,6 +38,8 @@ const CLEAN_PAGES = [
   { route: '/features', file: 'features.html' },
   { route: '/docs', file: 'documentation.html' },
   { route: '/download', file: 'download.html' },
+  { route: '/faq', file: 'faq.html' },
+  { route: '/install', file: 'install.html' },
   { route: '/about', file: 'about.html' },
   { route: '/changelog', file: 'changelog.html' },
   { route: '/roadmap', file: 'roadmap.html' },

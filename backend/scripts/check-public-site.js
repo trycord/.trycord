@@ -20,6 +20,8 @@ const PAGES = [
   ['/features', 'features.html', 'Features'],
   ['/docs', 'documentation.html', 'Documentation'],
   ['/download', 'download.html', 'Download'],
+  ['/faq', 'faq.html', 'FAQ'],
+  ['/install', 'install.html', 'Install'],
   ['/about', 'about.html', 'About'],
   ['/changelog', 'changelog.html', 'Changelog'],
   ['/roadmap', 'roadmap.html', 'Roadmap'],

@@ -1,368 +1,259 @@
 // The workspace shell.
 //
-// A community client, not a dashboard: a rail of your communities down the far
-// left, the open community's column beside it, the conversation taking the rest,
-// and the member list on demand. The stage holds a single .screen (app bar, body,
-// composer). A page fills regions; it never builds chrome.
+// A command-first workbench: one persistent command bar across the top, then a
+// rail of communities, the open place's column, and the stage - and nothing
+// else competing for attention. The inspector and the dock float; the column is
+// the only navigation beside the rail, and it only ever speaks for one scope.
 //
-// This is the Desktop composition. A phone is a different module, served its own
-// document under /mobile, so there is one leading control here: the spine
-// collapse, because the spine is a column and nowhere to slide.
+// A page fills regions; it never builds chrome. The region API is this module's
+// public surface, and it is the same one it has always been, minus the parts
+// that were about the old spine: setStage, setStageHead, setComposer,
+// setContextPage, setInspector, setDock, setConnection, setTitle.
+//
+// This is the Desktop composition. A phone is a different module, served its
+// own document under /mobile.
 
 import { el, clear } from '../packages/dom.js';
 import { icon } from '../packages/icons.js';
-import { brandSymbolUrl } from '../packages/brand.js';
-import { avatar, countBadge, serverMark } from './components.js';
+import { avatar, countBadge, serverMark } from './ui/primitives.js';
 import { State, nameOf } from '../packages/store.js';
 import { path, currentRoute, navigate, BASE } from '../packages/nav.js';
-import { globalPages } from '../packages/registry.js';
-import { openMenu, attachContextMenu } from './ui.js';
-import { serverMenuItems } from './sidebars.js';
-import { currentTheme, setTheme } from '../packages/theme.js';
+import { openMenu, attachContextMenu, isOverlayOpen, isMenuOpen, closeTopOverlay } from './ui/overlays.js';
+import { buildContext, serverMenuItems } from './shell/context.js';
+import { buildFrame, attachColumnResize, brandMark } from './shell/frame.js';
+import { createInspector } from './shell/inspector.js';
+import { openPalette, shortcutLabel } from './shell/palette.js';
+import {
+  applyDensity, applyLayoutWidths, rememberContextWidth,
+  CONTEXT_MIN, CONTEXT_MAX,
+} from './prefs.js';
 import { setOverride, viewportWantsMobile, siblingMount } from '../packages/chooser.js';
 
-const refs = {};
+const refs = { frame: null, inspector: null };
+let contextSource = null;
+let signOutHandler = null;
 
 export function shellRoot() {
-  return refs.root || null;
+  return refs.frame ? refs.frame.root : null;
 }
 
+// ---- mount -----------------------------------------------------------------
+
 export function mountShell() {
-  const rail = el('nav', {
-    class: 'community-rail', id: 'community-rail', 'aria-label': 'Communities',
-  });
-  const spineHead = el('header', { class: 'spine-head', id: 'spine-head' });
-  const globalNav = el('nav', {
-    id: 'global-navigation', class: 'spine-global', 'aria-label': 'Global navigation',
-  });
-  const placeNav = el('div', {
-    id: 'place-navigation', class: 'spine-place', 'aria-label': 'Current place navigation',
-  });
-  const spineFoot = el('footer', { id: 'spine-foot', class: 'spine-foot', 'aria-label': 'Account' });
-  const spine = el('aside', { id: 'spine', class: 'spine', 'aria-label': 'Navigation' },
-    spineHead, globalNav, placeNav, spineFoot);
+  const frame = buildFrame();
+  refs.frame = frame;
+  refs.inspector = createInspector(frame);
 
-  // Screen rows: app bar, scroll body, composer.
-  const stageHead = el('header', { class: 'stage-head', id: 'context-header' });
-  const stageBody = el('div', { class: 'stage-body', id: 'view-root', tabindex: '-1' });
-  const composerSlot = el('div', { class: 'composer-slot', hidden: true });
-  const screen = el('div', { class: 'screen', id: 'screen' },
-    stageHead, stageBody, composerSlot);
-  const stage = el('main', { class: 'stage', id: 'trycord-main' }, screen);
+  applyDensity();
+  applyLayoutWidths(frame.root);
 
-  const contextPanel = el('aside', {
-    class: 'context-panel', id: 'context-panel', 'aria-label': 'Context', hidden: true,
-  });
-  const scrim = el('div', { class: 'scrim', id: 'desktop-backdrop', 'aria-hidden': 'true' });
-  const connection = el('div', { class: 'connection', id: 'connection-status', role: 'status' });
+  refs.frame.kbd.textContent = shortcutLabel();
+  refs.frame.omnibox.addEventListener('click', () => openPalette());
 
-  const root = el('div', {
-    class: 'ws', id: 'shell', 'aria-label': 'Trycord',
-    dataset: { spine: 'expanded', context: 'closed' },
-  },
-    el('a', { class: 'skip-link', href: '#view-root' }, 'Skip to content'),
-    rail, spine, stage, contextPanel, scrim, connection);
-
-  // One backdrop, for the context panel when it overlays on a narrower desk. The
-  // spine is a column here and never overlays, so it has no drawer state.
-  scrim.addEventListener('click', () => {
-    if (contextPanelOpen()) closeContextPanel();
+  attachColumnResize(frame.columnGrip, {
+    root: frame.root,
+    variable: '--context-w',
+    min: CONTEXT_MIN,
+    max: CONTEXT_MAX,
+    sign: 1,
+    remember: rememberContextWidth,
+    fallback: 276,
   });
 
-  // Escape closes the context panel only as an overlay; when it has a column the
-  // place bar's own control is the way it closes.
+  frame.scrim.addEventListener('click', () => {
+    if (frame.root.dataset.nav === 'overlay') collapseNav();
+    else refs.inspector.close();
+  });
+
+  // Escape unwinds one layer at a time: overlays first (they own it while they
+  // are up), then the inspector, then an overlaid column.
   document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    if (contextPanelOpen() && !contextPanelHasColumn()) closeContextPanel();
-  });
-
-  // A column that becomes an overlay on resize would jump in front of the stage,
-  // so close it; the place bar reopens it.
-  window.addEventListener('resize', () => {
-    if (refs.root && refs.root.dataset.context === 'open' && !contextPanelHasColumn()) {
-      closeContextPanel();
+    if (event.key === 'Escape') {
+      if (isOverlayOpen() || isMenuOpen()) return;
+      if (refs.inspector && refs.inspector.isOpen()) { refs.inspector.close(); return; }
+      if (frame.root.dataset.nav === 'overlay') collapseNav();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && (event.key === 'k' || event.key === 'K')) {
+      event.preventDefault();
+      if (document.querySelector('.dialog--palette')) closeTopOverlay();
+      else openPalette();
     }
   });
 
-  Object.assign(refs, {
-    root, rail, spine, spineHead, globalNav, placeNav, spineFoot,
-    stage, stageHead, stageBody, composerSlot, contextPanel, scrim, connection,
-  });
-  return root;
+  syncNavMode();
+  window.addEventListener('resize', syncNavMode);
+  return frame.root;
 }
+
+// The column is a column on a desk and an overlay on a narrow window. The mode
+// is a viewport fact, and the expanded/collapsed choice survives it.
+function narrow() {
+  try { return window.matchMedia('(max-width: 1080px)').matches; } catch { return false; }
+}
+
+function syncNavMode() {
+  const frame = refs.frame;
+  if (!frame) return;
+  const wasOverlay = frame.root.dataset.nav === 'overlay';
+  if (narrow()) {
+    if (wasOverlay) return;
+    frame.root.dataset.nav = frame.root.dataset.nav === 'hidden' ? 'hidden' : 'expanded';
+    // On a narrow window the expanded column draws over the stage, so it needs
+    // the backdrop and the toggle has to say so.
+    if (frame.root.dataset.nav === 'expanded') frame.root.dataset.nav = 'overlay';
+  } else {
+    frame.root.dataset.nav = wasOverlay ? 'expanded' : frame.root.dataset.nav;
+  }
+  frame.navToggle.setAttribute('aria-expanded', String(frame.root.dataset.nav !== 'hidden'));
+}
+
+function collapseNav() {
+  const frame = refs.frame;
+  if (!frame) return;
+  frame.root.dataset.nav = 'hidden';
+  frame.navToggle.setAttribute('aria-expanded', 'false');
+}
+
+// ---- the document title ----------------------------------------------------
 
 export function setTitle(text) {
   document.title = text ? text + ' - Trycord' : 'Trycord';
 }
 
-// ---- the app bar -----------------------------------------------------------
-//
-// One leading control on a desk: the spine collapse, because the spine is a
-// column and nothing here overlays or slides.
+// ---- the stage -------------------------------------------------------------
 
 export function setStageHead(...children) {
-  if (!refs.stageHead) return;
-  clear(refs.stageHead);
-  refs.stageHead.appendChild(spineToggle());
+  const frame = refs.frame;
+  if (!frame) return;
+  clear(frame.stageHead);
   const inner = el('div', { class: 'stage-head-inner' });
   for (const child of children) if (child) inner.appendChild(child);
-  refs.stageHead.appendChild(inner);
-}
-
-// Collapse control (desk), where the spine is a column.
-function spineToggle() {
-  const button = el('button', {
-    class: 'spine-toggle icon-btn', type: 'button',
-    title: 'Collapse navigation', 'aria-label': 'Collapse navigation',
-    'aria-pressed': refs.root && refs.root.dataset.spine === 'collapsed' ? 'true' : 'false',
-  }, icon('sidebar', { size: 17 }));
-  button.addEventListener('click', () => {
-    if (!refs.root) return;
-    const collapsed = refs.root.dataset.spine === 'collapsed';
-    refs.root.dataset.spine = collapsed ? 'expanded' : 'collapsed';
-    button.setAttribute('aria-pressed', collapsed ? 'false' : 'true');
-  });
-  return button;
+  frame.stageHead.appendChild(inner);
 }
 
 export function setStage(node) {
-  if (!refs.stageBody) return;
-  clear(refs.stageBody);
-  if (node) refs.stageBody.appendChild(node);
-  refs.stageBody.scrollTop = 0;
-}
-
-// The part of the spine a page supplies; the rest of the spine is always there.
-export function setPlaceNav(node) {
-  if (!refs.placeNav) return;
-  clear(refs.placeNav);
-  const parts = node === null || node === undefined
-    ? []
-    : (Array.isArray(node) ? node : [node]);
-  for (const part of parts) if (part) refs.placeNav.appendChild(part);
-}
-
-// ---- the context panel -----------------------------------------------------
-//
-// A column above 1280px (see shell.css), an overlay below; starts closed.
-
-const CONTEXT_COLUMN_MIN = 1280;
-
-function contextPanelHasColumn() {
-  return typeof window !== 'undefined' && window.innerWidth > CONTEXT_COLUMN_MIN;
-}
-
-function setContextOpen(open) {
-  if (!refs.root) return;
-  refs.root.dataset.context = open ? 'open' : 'closed';
-  if (refs.contextPanel) refs.contextPanel.hidden = !open;
-  syncContextChrome();
-}
-
-function syncContextChrome() {
-  if (!refs.root) return;
-  const open = refs.root.dataset.context === 'open';
-  for (const node of document.querySelectorAll('.context-toggle')) {
-    node.setAttribute('aria-expanded', open ? 'true' : 'false');
-  }
-}
-
-function contextPanelOpen() {
-  return !!refs.root && refs.root.dataset.context === 'open';
-}
-
-export function setContextPanel(node) {
-  if (!refs.contextPanel || !refs.root) return;
-  clear(refs.contextPanel);
-  if (node) refs.contextPanel.appendChild(node);
-  setContextOpen(false);
-}
-
-export function toggleContextPanel() {
-  if (!refs.root) return;
-  setContextOpen(!contextPanelOpen());
-}
-
-export function closeContextPanel() {
-  if (refs.root) setContextOpen(false);
+  const frame = refs.frame;
+  if (!frame) return;
+  clear(frame.stageBody);
+  if (node) frame.stageBody.appendChild(node);
+  frame.stageBody.scrollTop = 0;
 }
 
 export function setComposer(node) {
-  if (!refs.composerSlot) return;
-  clear(refs.composerSlot);
+  const frame = refs.frame;
+  if (!frame) return;
+  clear(frame.composerSlot);
   if (node) {
-    refs.composerSlot.appendChild(node);
-    refs.composerSlot.hidden = false;
+    frame.composerSlot.appendChild(node);
+    frame.composerSlot.hidden = false;
   } else {
-    refs.composerSlot.hidden = true;
+    frame.composerSlot.hidden = true;
   }
 }
+
+// ---- the place column ------------------------------------------------------
+
+// The router hands over what the page says its column is (the registry's
+// `sidebar` kind), and the shell paints it - now and again on every chrome
+// refresh, so a mute, a new channel or a nickname lands without a re-route.
+export function setContextPage(kind, ctx, page) {
+  contextSource = kind ? { kind, ctx, page } : null;
+  paintContext();
+}
+
+function paintContext() {
+  const frame = refs.frame;
+  if (!frame) return;
+
+  let parts = null;
+  if (contextSource) {
+    try { parts = buildContext(contextSource.kind, contextSource.ctx, contextSource.page); }
+    catch { parts = null; }
+  }
+
+  if (!parts) {
+    frame.root.dataset.column = 'off';
+    clear(frame.columnHead);
+    clear(frame.columnBody);
+    return;
+  }
+  frame.root.dataset.column = 'on';
+  clear(frame.columnHead);
+  clear(frame.columnBody);
+  append(frame.columnHead, parts.head);
+  append(frame.columnBody, parts.body);
+}
+
+function append(host, content) {
+  if (content === null || content === undefined) return;
+  const parts = Array.isArray(content) ? content : [content];
+  for (const part of parts) if (part) host.appendChild(part);
+}
+
+// ---- the inspector ---------------------------------------------------------
+
+export function setInspector(spec) {
+  if (refs.inspector) refs.inspector.setSpec(spec || null);
+}
+
+export function toggleInspector() {
+  if (refs.inspector) refs.inspector.toggle();
+}
+
+export function closeInspector() {
+  if (refs.inspector) refs.inspector.close();
+}
+
+// ---- the dock --------------------------------------------------------------
+
+export function setDock(node) {
+  const frame = refs.frame;
+  if (!frame) return;
+  clear(frame.dock);
+  if (node) {
+    frame.dock.appendChild(node);
+    frame.dock.hidden = false;
+  } else {
+    frame.dock.hidden = true;
+  }
+}
+
+// ---- the connection chip ---------------------------------------------------
 
 export function setConnection(state, label) {
-  if (!refs.connection) return;
-  refs.connection.dataset.state = state || '';
-  clear(refs.connection);
+  const frame = refs.frame;
+  if (!frame) return;
+  frame.connection.dataset.state = state || '';
+  clear(frame.connection);
   if (!state) return;
-  refs.connection.appendChild(el('span', { class: 'dot' }));
-  refs.connection.appendChild(el('span', {}, label || (state === 'offline' ? 'Offline - reconnecting' : 'Reconnecting')));
+  frame.connection.appendChild(el('span', { class: 'dot' }));
+  frame.connection.appendChild(el('span', {}, label || (state === 'offline' ? 'Offline - reconnecting' : 'Reconnecting')));
 }
 
-// ---- the spine -------------------------------------------------------------
+// ---- the rail --------------------------------------------------------------
 
-function activeFor(here, route) {
-  return !!here && !!route && (here === route || here.startsWith(route + '/'));
-}
-
-// The community the address is inside, if it is inside one. The switcher names
-// it, and the same lookup marks it in the menu.
-function currentServer() {
-  const here = currentRoute();
-  const byId = /^\/server\/([^/]+)/.exec(here);
-  if (byId) {
-    return State.servers.find((s) => s.id === byId[1])
-      || State.serverDetail.get(byId[1])
-      || null;
-  }
-  const bySlug = /^\/c\/([^/]+)/.exec(here);
-  if (bySlug) return State.servers.find((s) => (s.slug || s.id) === bySlug[1]) || null;
-  return null;
-}
-
-function renderSpineHead() {
-  const home = el('a', {
-    class: 'spine-mark', href: path('/home'), title: 'Trycord home', 'aria-label': 'Trycord home',
-  });
-  const img = el('img', {
-    class: 'spine-mark-img', src: brandSymbolUrl,
-    alt: '', loading: 'lazy',
-  });
-  img.addEventListener('error', () => {
-    home.replaceChildren(el('span', { class: 'spine-mark-fallback', 'aria-hidden': 'true' }, 'T'));
-  });
-  home.appendChild(img);
-
-  const server = currentServer();
-  const switcher = el('button', {
-    class: 'place-switcher', type: 'button', 'aria-haspopup': 'menu',
-    'aria-label': server ? 'Switch community, currently ' + server.name : 'Choose a community',
-  },
-    server
-      ? serverMark(server, { size: 'sm' })
-      : el('span', { class: 'place-switcher-icon' }, icon('grid', { size: 16 })),
-    el('span', { class: 'place-switcher-title truncate' }, server ? server.name : 'Communities'),
-    el('span', { class: 'place-switcher-chevron' }, icon('chevron-down', { size: 15 })));
-  switcher.addEventListener('click', () => openPlaceMenu(switcher));
-
-  refs.spineHead.replaceChildren(home, switcher);
-}
-
-// The community switcher; current one marked.
-function openPlaceMenu(anchor) {
-  const here = currentRoute();
-  const items = [{ header: 'Communities' }];
-  if (State.servers.length) {
-    for (const server of State.servers) {
-      const isActive = here.startsWith('/server/' + server.id)
-        || here === '/c/' + (server.slug || server.id);
-      items.push({
-        label: server.name,
-        icon: 'grid',
-        checked: isActive,
-        onSelect: () => navigate('/server/' + server.id),
-      });
-    }
-  } else {
-    items.push({ label: 'No communities yet', disabled: true });
-  }
-  items.push({ separator: true });
-  items.push({ label: 'Create a community', icon: 'plus', onSelect: () => navigate('/servers/new') });
-  items.push({ label: 'Browse communities', icon: 'compass', onSelect: () => navigate('/menu') });
-  openMenu({ anchor, align: 'left', items });
-}
-
-// Global destinations, always present regardless of the current place.
-function renderGlobalNav() {
-  if (!refs.globalNav) return;
-  clear(refs.globalNav);
-  const here = currentRoute();
-  for (const page of globalPages()) {
-    const isActive = activeFor(here, page.route);
-    refs.globalNav.appendChild(el('a', {
-      class: 'nav-item' + (isActive ? ' is-active' : ''),
-      href: path(page.route),
-      title: page.nav.label,
-      'aria-label': page.nav.label,
-      'aria-current': isActive ? 'page' : null,
-    },
-      icon(page.nav.icon, { size: 17 }),
-      el('span', { class: 'nav-label truncate' }, page.nav.label),
-      page.id === 'notifications' ? countBadge(State.notifications.unreadCount) : null,
-    ));
-  }
-}
-
-function renderSpineFoot() {
-  if (!refs.spineFoot) return;
-  const me = State.user;
-  const button = el('button', {
-    class: 'spine-account', type: 'button',
-    title: 'Your account', 'aria-label': 'Your account and settings', 'aria-haspopup': 'menu',
-    onClick: (event) => openAccountMenu(event.currentTarget),
-  });
-  if (me) {
-    button.appendChild(avatar(me, { size: 'sm' }));
-    button.appendChild(el('span', { class: 'spine-account-id' },
-      el('span', { class: 'spine-account-name truncate' }, nameOf(me)),
-      el('span', { class: 'spine-account-sub truncate' }, me.statusText || ('@' + (me.username || '')))));
-    button.appendChild(icon('more', { size: 16 }));
-  } else {
-    button.appendChild(icon('user', { size: 18 }));
-    button.appendChild(el('span', { class: 'spine-account-id' },
-      el('span', { class: 'spine-account-name truncate' }, 'Sign in')));
-  }
-  refs.spineFoot.replaceChildren(button);
-}
-
-function renderSpine() {
-  if (!refs.spine) return;
-  renderSpineHead();
-  renderGlobalNav();
-  renderSpineFoot();
-}
-
-// ---- the community rail ----------------------------------------------------
-//
-// The far-left strip: the way home, one mark per community with the open one lit,
-// and the way to start another. It is the communities list, not a second copy of
-// the column - the column belongs to whichever community is open.
 function renderRail() {
-  if (!refs.rail) return;
+  const frame = refs.frame;
+  if (!frame) return;
   const server = currentServer();
 
-  const home = el('a', {
-    class: 'rail-item rail-home' + (server ? '' : ' is-active'),
-    href: path('/home'), title: 'Home', 'aria-label': 'Home',
-    'aria-current': server ? null : 'page',
-  });
-  const img = el('img', {
-    src: brandSymbolUrl, alt: '', loading: 'lazy',
-  });
-  img.addEventListener('error', () => {
-    home.replaceChildren(el('span', { class: 'rail-fallback', 'aria-hidden': 'true' }, 'T'));
-  });
-  home.appendChild(img);
+  const home = brandMark('rail-item rail-home' + (server ? '' : ' is-active'));
+  home.setAttribute('aria-current', server ? 'false' : 'page');
+  home.title = 'Home';
+  home.setAttribute('aria-label', 'Home');
 
   const list = el('div', { class: 'rail-list' });
-  for (const s of State.servers) {
-    const isActive = !!server && server.id === s.id;
+  for (const entry of State.servers) {
+    const isActive = !!server && server.id === entry.id;
     const mark = el('a', {
       class: 'rail-item rail-community' + (isActive ? ' is-active' : ''),
-      href: path('/server/' + s.id),
-      title: s.name,
-      'aria-label': s.name + ' community',
+      href: path('/server/' + entry.id),
+      title: entry.name,
+      'aria-label': entry.name + ' community',
       'aria-current': isActive ? 'page' : null,
-    }, serverMark(s, { size: 'sm' }));
-    attachContextMenu(mark, () => serverMenuItems(s));
+    }, serverMark(entry, { size: 'md' }));
+    attachContextMenu(mark, () => serverMenuItems(entry));
     list.appendChild(mark);
   }
   list.appendChild(el('button', {
@@ -371,12 +262,64 @@ function renderRail() {
     onClick: () => navigate('/servers/new'),
   }, icon('plus', { size: 20 })));
 
-  refs.rail.replaceChildren(home, el('div', { class: 'rail-divider' }), list);
+  frame.rail.replaceChildren(home, el('div', { class: 'rail-divider' }), list);
+}
+
+// The community the address is inside, if it is inside one. The rail lights it
+// and the same lookup was used to name it.
+function currentServer() {
+  const here = currentRoute();
+  const byId = /^\/server\/([^/]+)/.exec(here);
+  if (byId) {
+    return State.servers.find((entry) => entry.id === byId[1])
+      || State.serverDetail.get(byId[1])
+      || null;
+  }
+  const bySlug = /^\/c\/([^/]+)/.exec(here);
+  if (bySlug) return State.servers.find((entry) => (entry.slug || entry.id) === bySlug[1]) || null;
+  return null;
+}
+
+// ---- the command bar -------------------------------------------------------
+
+function renderCommandBar() {
+  const frame = refs.frame;
+  if (!frame) return;
+  const unread = State.notifications.unreadCount;
+  frame.alertsSlot.replaceChildren(el('button', {
+    class: 'icon-btn cmdbar-bell', type: 'button',
+    'aria-label': unread ? 'Alerts, ' + unread + ' unread' : 'Alerts',
+    onClick: () => navigate('/notifications'),
+  }, icon('bell', { size: 18 }), countBadge(unread)));
+}
+
+// ---- the column foot: the account ------------------------------------------
+
+function renderAccount() {
+  const frame = refs.frame;
+  if (!frame) return;
+  const me = State.user;
+  const button = el('button', {
+    class: 'account-button', type: 'button',
+    title: 'Your account', 'aria-label': 'Your account and settings', 'aria-haspopup': 'menu',
+    onClick: (event) => openAccountMenu(event.currentTarget),
+  });
+  if (me) {
+    button.appendChild(avatar(me, { size: 'sm' }));
+    button.appendChild(el('span', { class: 'account-id' },
+      el('span', { class: 'account-name truncate' }, nameOf(me)),
+      el('span', { class: 'account-sub truncate' }, me.statusText || ('@' + (me.username || '')))));
+    button.appendChild(icon('more', { size: 16 }));
+  } else {
+    button.appendChild(icon('user', { size: 18 }));
+    button.appendChild(el('span', { class: 'account-id' },
+      el('span', { class: 'account-name truncate' }, 'Sign in')));
+  }
+  frame.columnFoot.replaceChildren(button);
 }
 
 function openAccountMenu(anchor) {
   const me = State.user;
-  const theme = currentTheme();
   openMenu({
     anchor,
     align: 'right',
@@ -395,33 +338,30 @@ function openAccountMenu(anchor) {
           window.location.assign(siblingMount('desktop', BASE) + '/');
         },
       } : null,
-      { separator: true },
-      { header: 'Theme' },
-      { label: 'Match system', icon: theme === 'system' ? 'check' : 'monitor', onSelect: () => setTheme('system') },
-      { label: 'Dark', icon: theme === 'trycord' || theme === 'dark' ? 'check' : 'moon', onSelect: () => setTheme('trycord') },
-      { label: 'Light', icon: theme === 'light' ? 'check' : 'sun', onSelect: () => setTheme('light') },
-      { separator: true },
+      me && me.isAdmin ? { separator: true } : null,
       me && me.isAdmin ? { label: 'Instance admin', icon: 'shield', onSelect: () => navigate('/admin') } : null,
+      { separator: true },
       { label: 'Sign out', icon: 'logout', danger: true, onSelect: () => requestSignOut() },
     ].filter(Boolean),
   });
 }
 
-let signOutHandler = null;
 export function onSignOut(handler) {
   signOutHandler = handler;
 }
+
 function requestSignOut() {
   if (signOutHandler) signOutHandler();
 }
 
-// ---- region rebuild on state change ----------------------------------------
+// ---- repaint on state change -----------------------------------------------
 
 export function refreshChrome() {
   renderRail();
-  renderSpine();
+  renderCommandBar();
+  renderAccount();
+  paintContext();
 }
-
 
 export function renderAllChrome() {
   refreshChrome();

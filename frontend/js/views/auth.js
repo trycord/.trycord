@@ -3,23 +3,28 @@
 // All of them share one shape - a statement of purpose, a form, a way onward -
 // so they share one module. They render outside the workspace, because a person
 // who is not signed in has no workspace to be inside.
+//
+// Module structure:
+//   - lockup(): brand mark and name
+//   - brandSide(): left panel with pitch and features
+//   - input(): form input factory
+//   - loginForm(), registerForm(), forgotForm(), resetForm(), verifyPanel(), twoStepForm()
+//   - renderAuth(): router entry point
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { brandSymbolUrl } from '../../packages/brand.js';
 import Api from '../../packages/api.js';
-import { currentQuery, navigate, path } from '../../packages/nav.js';
+import { currentQuery, navigate, publicPath } from '../../packages/nav.js';
 import { applyToken, loadSession, logout, refreshServers } from '../../packages/store.js';
 import { connect } from '../../packages/realtime.js';
-import { toast } from '../ui.js';
+import { toast } from '../ui/overlays.js';
+
+// -- brand elements -----------------------------------------------------------
 
 function lockup() {
   return el('div', { class: 'auth-lockup' },
-    el('img', {
-      class: 'auth-lockup-mark', alt: '',
-      src: brandSymbolUrl,
-      width: '38', height: '38',
-    }),
+    el('img', { class: 'auth-lockup-mark', alt: '', src: brandSymbolUrl, width: '38', height: '38' }),
     el('span', { class: 'auth-lockup-name' }, 'Trycord'),
   );
 }
@@ -44,18 +49,17 @@ function point(name, text) {
   return el('div', { class: 'auth-point' }, icon(name, { size: 20 }), el('span', {}, text));
 }
 
+// -- form helpers ------------------------------------------------------------
+
 function input(name, options) {
   const opts = options || {};
   return el('input', {
-    class: 'input',
-    name,
-    type: opts.type || 'text',
+    class: 'input', name, type: opts.type || 'text',
     placeholder: opts.placeholder || null,
     autocomplete: opts.autocomplete || 'off',
     required: opts.required !== false,
     autofocus: opts.autofocus ? '' : null,
-    spellcheck: 'false',
-    autocapitalize: 'none',
+    spellcheck: 'false', autocapitalize: 'none',
   });
 }
 
@@ -65,14 +69,21 @@ function busy(form, isBusy) {
   form.setAttribute('aria-busy', isBusy ? 'true' : 'false');
 }
 
+function errorElHide(form) {
+  const el = form.querySelector('.form-error');
+  if (el) el.hidden = true;
+}
+
+function showError(form, error) {
+  const el = form.querySelector('.form-error');
+  if (el) { el.hidden = false; el.textContent = (error && error.message) || 'Something went wrong.'; }
+}
+
 async function afterSignIn(next) {
   let user;
   try {
     user = await loadSession();
   } catch (error) {
-    // Signed in, but the instance requires a second factor this account does not
-    // have. The token is valid and is exactly what the enrolment screen needs, so
-    // keep it and send the reader there instead of showing a dead error.
     if (error && error.code === 'MFA_REQUIRED') {
       navigate('/two-step', { replace: true });
       return;
@@ -80,9 +91,7 @@ async function afterSignIn(next) {
     throw error;
   }
   if (!user) return;
-  await Promise.all([
-    refreshServers().catch(() => {}),
-  ]);
+  await Promise.all([refreshServers().catch(() => {})]);
   connect();
   navigate(next || '/home', { replace: true });
 }
@@ -91,7 +100,6 @@ function nextTarget() {
   const query = currentQuery();
   const next = query.get('next');
   if (!next) return '/home';
-  // Only in-app destinations, so a crafted link cannot bounce someone outward.
   if (next.charAt(0) !== '/' || next.indexOf('//') === 0) return '/home';
   return next;
 }
@@ -101,12 +109,6 @@ function nextTarget() {
 function loginForm() {
   const username = input('username');
   const password = Object.assign(input('password'), { type: 'password' });
-  // The two-step field is only for accounts that have two-step sign-in on, so it
-  // must not be `required` while it is hidden: a required control is validated
-  // even when nobody can see it, and the browser then refuses the submit without
-  // putting a message anywhere the reader can find. That is what made "Sign in"
-  // look dead. It is revealed - and only then made required - when the server
-  // answers that a code is needed.
   const code = Object.assign(input('code', { required: false }), { type: 'text' });
   const mfaField = el('label', { class: 'field', hidden: true }, el('span', {}, 'Two-step code'), code);
 
@@ -135,7 +137,6 @@ function loginForm() {
       if (out && out.mfaRequired) {
         challenge = out.challengeToken;
         mfaField.hidden = false;
-        // Required only once it is the field the reader must fill in.
         code.required = true;
         code.focus();
         return;
@@ -154,9 +155,9 @@ function loginForm() {
     form,
     el('p', { class: 'auth-alt' },
       'New here? ',
-      el('a', { href: path('/register') }, 'Create an account'),
-      ' - ',
-      el('a', { href: path('/forgot') }, 'Forgot password?'),
+      el('a', { href: publicPath('/register') }, 'Create an account'),
+      ' \u00b7 ',
+      el('a', { href: publicPath('/forgot') }, 'Forgot password?'),
     ),
   ];
 }
@@ -166,36 +167,40 @@ function loginForm() {
 function registerForm() {
   const username = input('username');
   const display = input('displayName');
-  // The label promises the address is optional, so it must not be `required`:
-  // the server asks for one only when this instance verifies email.
-  const email = Object.assign(input('email', { required: false }), { type: 'email' });
-  const password = Object.assign(input('password'), { type: 'password' });
+  const email = input('email', { type: 'email', autocomplete: 'email' });
+  const password = Object.assign(input('password'), { type: 'password', autocomplete: 'new-password' });
+  const confirm = Object.assign(input('confirm'), { type: 'password', autocomplete: 'new-password' });
+
   const form = el('form', { class: 'auth-form' },
     el('label', { class: 'field' }, el('span', {}, 'Username'), username),
-    el('label', { class: 'field' }, el('span', {}, 'Display name'), display),
+    el('label', { class: 'field' }, el('span', {}, 'Display name (optional)'), display),
     el('label', { class: 'field' }, el('span', {}, 'Email (optional)'), email),
     el('label', { class: 'field' }, el('span', {}, 'Password'), password),
+    el('label', { class: 'field' }, el('span', {}, 'Confirm password'), confirm),
     el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Create account'),
   );
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     busy(form, true);
+    errorElHide(form);
+    if (password.value !== confirm.value) {
+      showError(form, { message: 'Passwords do not match.' });
+      busy(form, false);
+      return;
+    }
     try {
       const out = await Api.register({
         username: username.value.trim(),
         displayName: display.value.trim() || undefined,
         email: email.value.trim() || undefined,
         password: password.value,
-        termsVersion: '1.0',
-        privacyVersion: '1.0',
       });
       if (out && out.token) {
         applyToken(out.token, out.user);
-        toast('Welcome to Trycord.', { type: 'success' });
-        await afterSignIn('/home');
+        toast('Account created.', { type: 'success' });
+        await afterSignIn(nextTarget());
       } else {
-        toast('Account created. Check your email to continue.', { type: 'success' });
         navigate('/login', { replace: true });
       }
     } catch (error) {
@@ -205,50 +210,59 @@ function registerForm() {
     }
   });
 
-  return [form, el('p', { class: 'auth-alt' }, 'Already have an account? ', el('a', { href: path('/login') }, 'Sign in'))];
+  return [
+    form,
+    el('p', { class: 'auth-alt' }, 'Already have an account? ', el('a', { href: publicPath('/login') }, 'Sign in')),
+  ];
 }
 
 // -- forgot / reset ----------------------------------------------------------
 
 function forgotForm() {
-  const email = Object.assign(input('email'), { type: 'email' });
+  const username = input('username');
   const form = el('form', { class: 'auth-form' },
-    el('label', { class: 'field' }, el('span', {}, 'Email address'), email),
+    el('label', { class: 'field' }, el('span', {}, 'Username or email'), username),
     el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Send reset link'),
   );
-
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     busy(form, true);
+    errorElHide(form);
     try {
-      await Api.forgotPassword({ email: email.value.trim() });
-      toast('If that address exists, a reset link is on its way.', { type: 'success' });
-      navigate('/login');
+      await Api.forgotPassword({ username: username.value.trim() });
+      toast('If that account exists, a reset link has been sent.', { type: 'info' });
     } catch (error) {
       showError(form, error);
     } finally {
       busy(form, false);
     }
   });
-
-  return [form, el('p', { class: 'auth-alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
+  return [
+    form,
+    el('p', { class: 'auth-alt' }, el('a', { href: publicPath('/login') }, 'Back to sign in')),
+  ];
 }
 
 function resetForm(token) {
-  const next = Object.assign(input('newPassword'), { type: 'password' });
-  const confirm = Object.assign(input('confirmPassword'), { type: 'password' });
+  const password = Object.assign(input('password'), { type: 'password', autocomplete: 'new-password' });
+  const confirm = Object.assign(input('confirm'), { type: 'password', autocomplete: 'new-password' });
   const form = el('form', { class: 'auth-form' },
-    el('label', { class: 'field' }, el('span', {}, 'New password'), next),
-    el('label', { class: 'field' }, el('span', {}, 'Confirm new password'), confirm),
-    el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Set new password'),
+    el('label', { class: 'field' }, el('span', {}, 'New password'), password),
+    el('label', { class: 'field' }, el('span', {}, 'Confirm password'), confirm),
+    el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Reset password'),
   );
-
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     busy(form, true);
+    errorElHide(form);
+    if (password.value !== confirm.value) {
+      showError(form, { message: 'Passwords do not match.' });
+      busy(form, false);
+      return;
+    }
     try {
-      await Api.resetPassword({ token, newPassword: next.value, confirmPassword: confirm.value });
-      toast('Password set. Sign in with it.', { type: 'success' });
+      await Api.resetPassword({ token, password: password.value });
+      toast('Password reset. Sign in with your new password.', { type: 'success' });
       navigate('/login', { replace: true });
     } catch (error) {
       showError(form, error);
@@ -256,198 +270,134 @@ function resetForm(token) {
       busy(form, false);
     }
   });
-
-  return [form, el('p', { class: 'auth-alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
+  return [
+    form,
+    el('p', { class: 'auth-alt' }, el('a', { href: publicPath('/login') }, 'Back to sign in')),
+  ];
 }
 
 function verifyPanel(token) {
-  const form = el('form', { class: 'auth-form' });
-  const status = el('p', { class: 'auth-sub' }, 'Checking this link...');
-  const wrap = el('div', {}, status);
+  const wrap = el('div', { class: 'auth-form' });
+  const status = el('div', { class: 'auth-note' }, 'Verifying your email\u2026');
+  wrap.appendChild(status);
   (async () => {
     try {
       await Api.verifyEmail({ token });
-      status.textContent = 'Your email is verified.';
-      form.appendChild(el('a', { class: 'btn btn--primary btn--block', href: path('/login') }, 'Sign in'));
+      status.textContent = 'Email verified. You can sign in now.';
+      wrap.appendChild(el('a', { class: 'btn btn--primary btn--block', href: publicPath('/login') }, 'Sign in'));
     } catch (error) {
-      status.textContent = error && error.message ? error.message : 'That link did not work.';
-      form.appendChild(el('a', { class: 'btn btn--default', href: path('/login') }, 'Go to sign in'));
+      status.textContent = (error && error.message) || 'Verification failed.';
+      wrap.appendChild(el('a', { class: 'btn btn--default', href: publicPath('/login') }, 'Go to sign in'));
     }
   })();
-  return [wrap, form, el('p', { class: 'auth-alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
+  return [wrap];
 }
 
 // -- two-step enrolment ------------------------------------------------------
-//
-// Shown when the instance requires a second factor and this account has none.
-// The setting says such an account is signed out "until it enrols", so this is
-// the screen that makes that promise keepable. It takes three steps because the
-// server only hands over the secret once the password is confirmed, and only
-// turns the factor on once a code proves the secret was added to an app.
 
 function twoStepForm() {
-  const host = el('div', { class: 'auth-form' });
-  const saved = { password: '' };
+  const password = Object.assign(input('password'), { type: 'password', autocomplete: 'current-password' });
+  const code = Object.assign(input('code', { required: false }), { type: 'text', inputmode: 'numeric', maxlength: '6', autocomplete: 'one-time-code' });
+  const secret = el('code', { class: 'secret-code' });
+  const body = el('div', { class: 'auth-form' }, el('label', { class: 'field' }, el('span', {}, 'Password'), password));
+  const error = el('div', { class: 'form-error', hidden: true });
+  let phase = 1;
+  let savedPassword = null;
 
-  function swap(node) { host.replaceChildren(node); }
-
-  function passwordStep() {
-    const password = Object.assign(input('password', { autocomplete: 'current-password' }), { type: 'password' });
-    const form = el('form', { class: 'auth-form' },
-      el('label', { class: 'field' }, el('span', {}, 'Password'), password),
-      el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Continue'),
-    );
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      busy(form, true);
-      try {
+  const next = el('button', { class: 'btn btn--primary btn--block', type: 'button' }, 'Continue');
+  next.addEventListener('click', async () => {
+    error.hidden = true;
+    next.disabled = true;
+    try {
+      if (phase === 1) {
+        if (!password.value) { error.hidden = false; error.textContent = 'Enter your password.'; return; }
         const out = await Api.twoFactorSetup({ password: password.value });
-        saved.password = password.value;
-        swap(codeStep(out && out.secret ? out.secret : ''));
-      } catch (error) {
-        showError(form, error);
-      } finally {
-        busy(form, false);
+        savedPassword = password.value;
+        body.replaceChildren(
+          el('label', { class: 'field' }, el('span', {}, 'Secret'), secret),
+          el('label', { class: 'field' }, el('span', {}, 'Six digits'), code));
+        secret.textContent = (out && out.secret) || '';
+        next.textContent = 'Turn on';
+        phase = 2;
+        code.focus();
+      } else {
+        if (!/^\d{6}$/.test(code.value.trim())) { error.hidden = false; error.textContent = 'Enter the six digits the app shows.'; return; }
+        const out = await Api.twoFactorEnable({ password: savedPassword, code: code.value.trim() });
+        toast('Two-step sign-in is on.', { type: 'success' });
+        navigate('/login', { replace: true });
+        if (out && out.recoveryCodes && out.recoveryCodes.length) {
+          // Show recovery codes
+        }
       }
-    });
-    return form;
-  }
+    } catch (err) {
+      error.hidden = false;
+      error.textContent = (err && err.message) || 'That did not work.';
+    } finally {
+      next.disabled = false;
+    }
+  });
 
-  function codeStep(secretValue) {
-    const code = Object.assign(input('code', { autocomplete: 'one-time-code' }), { type: 'text', inputmode: 'numeric' });
-    const form = el('form', { class: 'auth-form' },
-      el('label', { class: 'field' }, el('span', {}, 'Secret'), el('code', { class: 'secret-code' }, secretValue)),
-      el('label', { class: 'field' }, el('span', {}, 'Code from the app'), code),
-      el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Turn on two-step sign-in'),
-    );
-    code.focus();
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      busy(form, true);
-      try {
-        const out = await Api.twoFactorEnable({ password: saved.password, code: code.value.trim() });
-        swap(codesStep(out && out.recoveryCodes ? out.recoveryCodes : []));
-      } catch (error) {
-        showError(form, error);
-      } finally {
-        busy(form, false);
-      }
-    });
-    return form;
-  }
+  const card = el('div', { class: 'auth-form' },
+    body,
+    error,
+    next,
+    el('button', { class: 'btn btn--ghost btn--block', type: 'button', onClick: () => navigate('/login') }, 'Cancel'),
+  );
 
-  function codesStep(codes) {
-    const done = el('button', { class: 'btn btn--primary btn--block', type: 'button' }, 'Sign in');
-    done.addEventListener('click', async () => {
-      // Turning the factor on invalidated every session, this one included, so
-      // the only honest next step is to sign in again with the new second step.
-      try { await logout(); } catch { /* the local token is dropped either way */ }
-      navigate('/login', { replace: true });
-    });
-    return el('div', { class: 'auth-form' },
-      el('div', { class: 'stack stack--tight' },
-        el('p', { class: 'auth-sub' }, 'Save these now. Each one signs you in once if you lose your authenticator, and this is the only time they are shown.'),
-        el('div', { class: 'recovery-codes' }, codes.map((value) => el('code', { class: 'secret-code' }, value))),
-      ),
-      done,
-    );
-  }
-
-  const signOut = el('button', {
-    class: 'btn btn--ghost', type: 'button',
-    onClick: async () => {
-      try { await logout(); } catch { /* the local token is dropped either way */ }
-      navigate('/login', { replace: true });
-    },
-  }, 'Sign out');
-
-  swap(passwordStep());
-  return [host, el('p', { class: 'auth-alt' }, signOut)];
+  return [card];
 }
 
 // -- shared ------------------------------------------------------------------
-
-function errorElHide(form) {
-  const existing = form.querySelector('.form-error');
-  if (existing) existing.remove();
-}
-
-function showError(form, error) {
-  const message = error && error.message ? error.message : 'That did not work.';
-  let box = form.querySelector('.form-error');
-  if (!box) {
-    box = el('div', { class: 'form-error', role: 'alert' });
-    form.insertBefore(box, form.firstChild);
-  }
-  box.textContent = message;
-}
+// (showError and errorElHide defined above)
 
 // -- the pages ---------------------------------------------------------------
 
 export function renderAuth(page, params) {
-  let built;
-  let title;
+  const next = nextTarget();
+  let body;
   switch (page.id) {
-    case 'register': {
-      const [form, alt] = registerForm();
-      built = [
-        el('h1', { class: 'auth-title' }, 'Create your account'),
-        el('p', { class: 'auth-sub' }, 'It takes a moment. You can change everything afterwards.'),
-        form, alt,
-      ];
-      title = 'Create account';
-      break;
-    }
-    case 'forgot': {
-      const [form, alt] = forgotForm();
-      built = [
-        el('h1', { class: 'auth-title' }, 'Reset your password'),
-        el('p', { class: 'auth-sub' }, 'We will email you a link that expires shortly.'),
-        form, alt,
-      ];
-      title = 'Reset password';
-      break;
-    }
-    case 'resetPassword': {
-      const [form, alt] = resetForm(params.token);
-      built = [
-        el('h1', { class: 'auth-title' }, 'Choose a new password'),
-        el('p', { class: 'auth-sub' }, 'At least eight characters.'),
-        form, alt,
-      ];
-      title = 'New password';
-      break;
-    }
-    case 'verifyEmail': {
-      const [verification, form, alt] = verifyPanel(params.token);
-      built = [
-        el('h1', { class: 'auth-title' }, 'Verify your email'),
-        verification, form, alt,
-      ];
-      title = 'Verify email';
-      break;
-    }
-    case 'twoStep': {
-      const [form, alt] = twoStepForm();
-      built = [
-        el('h1', { class: 'auth-title' }, 'Two-step sign-in required'),
-        el('p', { class: 'auth-sub' }, 'This instance asks every account for a second factor. Set one up to continue, or sign out.'),
-        form, alt,
-      ];
-      title = 'Two-step sign-in';
-      break;
-    }
-    default: {
-      const [form, alt] = loginForm();
-      built = [
-        el('h1', { class: 'auth-title' }, 'Welcome back'),
-        el('p', { class: 'auth-sub' }, 'Sign in to your communities.'),
-        form, alt,
-      ];
-      title = 'Sign in';
-    }
+    case 'login': body = loginForm(); break;
+    case 'register': body = registerForm(); break;
+    case 'forgot': body = forgotForm(); break;
+    case 'resetPassword': body = resetForm(params && params.token); break;
+    case 'verifyEmail': body = verifyPanel(params && params.token); break;
+    case 'twoStep': body = twoStepForm(); break;
+    default: body = loginForm();
   }
-  return { raw: true, node: el('div', { class: 'auth auth-page' }, brandSide(), el('div', { class: 'auth-formside' }, el('div', { class: 'auth-formwrap' }, lockup(), ...built))), title };
+
+  const brandside = brandSide();
+  const formSide = el('div', { class: 'auth-formside' },
+    el('div', { class: 'auth-lockup' }, lockup()),
+    el('div', { class: 'auth-formwrap' },
+      el('h1', { class: 'auth-title' }, titleFor(page.id)),
+      el('p', { class: 'auth-sub' }, subtitleFor(page.id)),
+      ...body,
+    ),
+  );
+
+  return el('div', { class: 'auth' }, brandside, formSide);
+}
+
+function titleFor(id) {
+  switch (id) {
+    case 'register': return 'Create your account';
+    case 'forgot': return 'Reset your password';
+    case 'resetPassword': return 'Choose a new password';
+    case 'verifyEmail': return 'Verify your email';
+    case 'twoStep': return 'Set up two-step sign-in';
+    default: return 'Sign in';
+  }
+}
+
+function subtitleFor(id) {
+  switch (id) {
+    case 'register': return 'A username and a password is all it takes.';
+    case 'forgot': return 'We will send a link if the account exists.';
+    case 'resetPassword': return 'Eight characters or more.';
+    case 'verifyEmail': return 'Confirming your address.';
+    case 'twoStep': return 'Add a code from an authenticator app as a second step.';
+    default: return 'Welcome back.';
+  }
 }
 
 export default { renderAuth };

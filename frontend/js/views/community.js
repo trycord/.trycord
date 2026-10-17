@@ -7,13 +7,13 @@
 
 import { el, clear, fragment } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { avatar, iconButton, serverMark, fieldRow } from '../components.js';
+import { avatar, iconButton, serverMark, fieldRow } from '../ui/primitives.js';
 import {
   State, normalizeUser, nameOf, refreshServer, refreshServerTree,
   refreshServerMembers, refreshServerRoles, channelsOf, categoriesOf, can, isOwner, serverById,
 } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
-import { openDialog, confirmDialog, toast, errorToast, attachContextMenu } from '../ui.js';
+import { openDialog, confirmDialog, toast, errorToast, attachContextMenu } from '../ui/overlays.js';
 import { openUserMenu, userMenuItems } from '../user-menu.js';
 import { relativeTime } from '../../packages/format.js';
 import Api from '../../packages/api.js';
@@ -68,15 +68,10 @@ function sectionShell() {
   return el('div', { class: 'settings-section' });
 }
 
-// -- the roster that sits beside a conversation ------------------------------
-
+// The roster that sits beside a conversation. It is one tab of the inspector,
+// so it draws no head and no close of its own - the panel owns those.
 function membersPanel(serverId) {
-  const head = el('div', { class: 'members-head' });
   const scroll = el('div', { class: 'members-scroll' });
-
-  head.append(
-    el('span', { class: 'members-title' }, 'Members'),
-    iconButton('x', { label: 'Close members', class: 'members-close', onClick: () => closeContext() }));
 
   function paint() {
     clear(scroll);
@@ -120,7 +115,25 @@ function membersPanel(serverId) {
     }
   }
 
-  return { node: fragment(head, scroll), load };
+  return { node: scroll, load };
+}
+
+// The inspector a channel shows: its roster, rendered the first time the panel
+// is opened rather than on every visit to a channel.
+function channelInspector(serverId) {
+  return {
+    kind: 'channel',
+    tabs: [{
+      id: 'members',
+      label: 'Members',
+      icon: 'users',
+      render() {
+        const roster = membersPanel(serverId);
+        roster.load();
+        return roster.node;
+      },
+    }],
+  };
 }
 
 function roleTag(member) {
@@ -165,12 +178,7 @@ function membersToggle() {
 
 async function toggleContext() {
   const shell = await import('../shell.js');
-  shell.toggleContextPanel();
-}
-
-async function closeContext() {
-  const shell = await import('../shell.js');
-  shell.closeContextPanel();
+  shell.toggleInspector();
 }
 
 export function renderChannel(ctx) {
@@ -195,17 +203,13 @@ export function renderChannel(ctx) {
     icon: iconFor(channel),
   };
   const conversation = renderConversation(ctx, scope);
-  const roster = membersPanel(serverId);
 
   return {
     head: [channelHead(channel, serverId)],
     node: conversation.node,
     composer: conversation.composer,
-    members: roster.node,
-    onMount() {
-      conversation.onMount();
-      roster.load();
-    },
+    inspector: channelInspector(serverId),
+    onMount: conversation.onMount,
     cleanup: conversation.cleanup,
   };
 }
@@ -282,7 +286,7 @@ export function renderChannelPins(ctx) {
     }
   }
 
-  return { node, onMount: load };
+  return { node, onMount: load, inspector: channelInspector(serverId) };
 }
 
 // -- members -----------------------------------------------------------------

@@ -6,10 +6,10 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { serverMark } from '../components.js';
+import { serverMark } from '../ui/primitives.js';
 import { State, refreshServers } from '../../packages/store.js';
 import { navigate } from '../../packages/nav.js';
-import { openDialog, toast, errorToast } from '../ui.js';
+import { openDialog, toast, errorToast } from '../ui/overlays.js';
 import Api from '../../packages/api.js';
 import { page, band, panel, prow, loading, failure, empty } from './util.js';
 

@@ -308,7 +308,7 @@ const SCHEMA = [
   // The driver is read once when the storage module loads, so changing it needs a
   // restart. The quota is read per upload and is live.
   {
-    key: 'storage.driver', env: 'STORAGE_DRIVER', type: 'string', default: 'local',
+    key: 'storage.provider', env: 'STORAGE_DRIVER', type: 'string', default: 'local',
     category: 'storage', label: 'Storage provider',
     description: 'Local writes uploads to this instance\'s filesystem - no external account needed. S3-compatible (Amazon S3, Cloudflare R2, MinIO, Backblaze) needs a bucket, region and credentials. Both are served through authenticated routes; switching preserves existing files - run the storage migration after changing.',
     allowed: ['local', 's3'], live: false,
@@ -441,6 +441,24 @@ const SCHEMA = [
     category: 'limits', label: 'Concurrent jobs per type',
     description: 'Maximum jobs of the same type running at once, so one expensive job type cannot starve the rest. Applied when the process next starts.',
     min: 1, max: 100, live: false,
+  },
+  {
+    key: 'storage.provider', env: 'STORAGE_PROVIDER', type: 'string', default: 'local',
+    category: 'storage', label: 'Storage provider',
+    description: 'Where uploaded files are stored. Local writes to the instance filesystem; S3-compatible stores objects in an object bucket. Applied when the process next starts.',
+    allowed: ['local', 's3'], live: false,
+  },
+  {
+    key: 'search.provider', env: 'SEARCH_PROVIDER', type: 'string', default: 'in-house',
+    category: 'search', label: 'Search provider',
+    description: 'How message and community search is indexed. In-house uses the instance database; no external search service is required. Applied when the process next starts.',
+    allowed: ['in-house'], live: false,
+  },
+  {
+    key: 'notifications.provider', env: 'NOTIFICATIONS_PROVIDER', type: 'string', default: 'in-house',
+    category: 'notifications', label: 'Notification provider',
+    description: 'How notifications are delivered. In-house delivers through the instance itself; external push providers are optional add-ons. Applied when the process next starts.',
+    allowed: ['in-house'], live: false,
   },
 ];
 

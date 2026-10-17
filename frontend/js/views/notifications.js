@@ -6,7 +6,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { avatar } from '../components.js';
+import { avatar } from '../ui/primitives.js';
 import { State, refreshNotifications } from '../../packages/store.js';
 import { navigate } from '../../packages/nav.js';
 import { relativeTime } from '../../packages/format.js';

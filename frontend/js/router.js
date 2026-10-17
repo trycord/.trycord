@@ -13,10 +13,9 @@ import {
   signedIn,
 } from '../packages/store.js';
 import {
-  shellRoot, setStage, setStageHead, setComposer, setContextPanel, setPlaceNav,
+  shellRoot, setStage, setStageHead, setComposer, setInspector, setContextPage,
   setTitle, refreshChrome,
 } from './shell.js';
-import { buildSidebar } from './sidebars.js';
 import { failure } from './views/util.js';
 import { renderNotFound } from './views/plain.js';
 
@@ -65,12 +64,12 @@ function setRoute(route) {
 
 function paintNotFound(route) {
   clearRaw();
-  setPlaceNav(null);
+  setContextPage(null, null, null);
   const result = renderNotFound();
   setStageHead();
   setStage(result.node);
   setComposer(null);
-  setContextPanel(null);
+  setInspector(null);
   setTitle('Not found');
   setRoute(route);
   refreshChrome();
@@ -78,13 +77,13 @@ function paintNotFound(route) {
 
 function paintError(route, error) {
   clearRaw();
-  setPlaceNav(null);
+  setContextPage(null, null, null);
   const box = failure(error, () => run());
   box.setAttribute('data-fault-origin', 'router');
   setStageHead();
   setStage(box);
   setComposer(null);
-  setContextPanel(null);
+  setInspector(null);
   setTitle('Something went wrong');
   setRoute(route);
 }
@@ -94,8 +93,8 @@ function paint(result, page, route) {
     setStageHead();
     setStage(null);
     setComposer(null);
-    setContextPanel(null);
-    setPlaceNav(null);
+    setInspector(null);
+    setContextPage(null, null, null);
     setTitle(result.title || page.label || '');
     showRaw(result.node);
     setRoute(route);
@@ -107,7 +106,7 @@ function paint(result, page, route) {
   else setStageHead();
   setStage(result && result.node);
   setComposer(result && result.composer);
-  setContextPanel(result && result.members);
+  setInspector(result && result.inspector);
   setTitle(page.label || page.nav && page.nav.label || '');
   setRoute(route);
   return true;
@@ -219,10 +218,7 @@ export async function run() {
     }
   }
 
-  let sidebar = null;
-  try { sidebar = buildSidebar(page.sidebar, ctx, page); }
-  catch { sidebar = null; }
-  setPlaceNav(sidebar);
+  setContextPage(page.sidebar, ctx, page);
 
   let result;
   try {

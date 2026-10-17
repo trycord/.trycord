@@ -5,8 +5,8 @@
 // mechanism, which is how every screen ended up with its own slightly different
 // idea of whether Escape cancels or closes.
 
-import { el, qs, trapFocus } from '../packages/dom.js';
-import { icon } from '../packages/icons.js';
+import { el, qs, trapFocus } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 
 // -- toasts ------------------------------------------------------------------
 
@@ -71,20 +71,38 @@ export function closeTopOverlay() {
 // here. `render` receives a close callback and returns the dialog element.
 export function openDialog(options) {
   const opts = options || {};
-  const overlay = el('div', { class: 'overlay', role: 'presentation' });
+  const overlay = el('div', {
+    class: 'overlay' + (opts.overlayClass ? ' ' + opts.overlayClass : ''),
+    role: 'presentation',
+  });
+  const opener = document.activeElement;
   let released = false;
 
   const layer = {
     close() { close(); },
   };
 
+  // Escape belongs to the dialog, but only the topmost one, and a menu open over
+  // it gets first refusal - the same ordering the eye reads.
+  function onEscape(event) {
+    if (event.key !== 'Escape') return;
+    if (openLayers[openLayers.length - 1] !== layer) return;
+    if (isMenuOpen()) return;
+    event.stopPropagation();
+    close(undefined);
+  }
+
   function close(result) {
     if (released) return;
     released = true;
     const index = openLayers.indexOf(layer);
     if (index !== -1) openLayers.splice(index, 1);
+    document.removeEventListener('keydown', onEscape, true);
     releaseFocus();
     overlay.remove();
+    if (opener && opener.focus && document.contains(opener)) {
+      try { opener.focus(); } catch { /* the opener is gone */ }
+    }
     if (opts.onClose) opts.onClose(result);
   }
 
@@ -95,21 +113,31 @@ export function openDialog(options) {
   });
 
   const dialog = el('div', {
-    class: 'dialog' + (opts.wide ? ' dialog--wide' : ''),
+    class: 'dialog' + (opts.class ? ' ' + opts.class : '') + (opts.wide ? ' dialog--wide' : ''),
     role: 'dialog',
     'aria-modal': 'true',
     'aria-label': opts.title || 'Dialog',
   });
 
-  if (opts.title) dialog.appendChild(el('div', { class: 'dialog-head' },
-    el('div', { class: 'dialog-title' }, opts.title),
-    opts.sub ? el('div', { class: 'dialog-sub' }, opts.sub) : null));
+  if (opts.head !== false && (opts.title || opts.dismissable !== false)) {
+    dialog.appendChild(el('div', { class: 'dialog-head' },
+      el('div', { class: 'dialog-head-text' },
+        opts.title ? el('div', { class: 'dialog-title' }, opts.title) : null,
+        opts.sub ? el('div', { class: 'dialog-sub' }, opts.sub) : null),
+      opts.dismissable === false
+        ? null
+        : el('button', {
+          class: 'dialog-close', type: 'button', 'aria-label': 'Close',
+          onClick: () => close(undefined),
+        }, icon('x', { size: 16 }))));
+  }
   if (opts.body) dialog.appendChild(el('div', { class: 'dialog-body' }, opts.body));
   if (opts.foot) dialog.appendChild(el('div', { class: 'dialog-foot' }, opts.foot));
 
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
   openLayers.push(layer);
+  document.addEventListener('keydown', onEscape, true);
 
   const focusTarget = qs('input,textarea,select,button', dialog);
   if (focusTarget) setTimeout(() => { try { focusTarget.focus(); } catch { /* gone */ } }, 30);
@@ -194,7 +222,9 @@ export function openMenu(options) {
   // right-click and a long press need, and both go through the same closing rules.
   const atPoint = opts.x !== undefined && opts.x !== null;
   const anchor = opts.anchor;
-  const rect = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : { left: 12, top: 12, right: 12, bottom: 12, width: 0, height: 0 };
+  const rect = anchor && anchor.getBoundingClientRect
+    ? anchor.getBoundingClientRect()
+    : { left: 12, top: 12, right: 12, bottom: 12, width: 0, height: 0 };
   const menuRect = menu.getBoundingClientRect();
 
   let left = atPoint ? opts.x : (opts.align === 'right' ? rect.right - menuRect.width : rect.left);
@@ -211,12 +241,25 @@ export function openMenu(options) {
   menu.style.left = left + 'px';
   menu.style.top = top + 'px';
 
+  function enabledItems() {
+    return Array.from(menu.querySelectorAll('.menu-item:not([aria-disabled="true"])'));
+  }
+
   function onDocDown(event) {
     if (menu.contains(event.target)) return;
     closeMenu();
   }
   function onKey(event) {
-    if (event.key === 'Escape') { event.stopPropagation(); closeMenu(); }
+    if (event.key === 'Escape') { event.stopPropagation(); closeMenu(); return; }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const items = enabledItems();
+    if (!items.length) return;
+    event.preventDefault();
+    const index = items.indexOf(document.activeElement);
+    const next = event.key === 'ArrowDown'
+      ? (index + 1) % items.length
+      : (index - 1 + items.length) % items.length;
+    items[next].focus();
   }
   function onScroll() { closeMenu(); }
 
@@ -227,12 +270,15 @@ export function openMenu(options) {
     window.addEventListener('scroll', onScroll, true);
   }, 0);
 
+  if (anchor && anchor.setAttribute) anchor.setAttribute('aria-expanded', 'true');
+
   openMenuNode = menu;
   openMenuCleanup = () => {
     document.removeEventListener('mousedown', onDocDown, true);
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onScroll, true);
     window.removeEventListener('scroll', onScroll, true);
+    if (anchor && anchor.setAttribute) anchor.setAttribute('aria-expanded', 'false');
     menu.remove();
     openMenuNode = null;
     openMenuCleanup = null;
@@ -298,33 +344,4 @@ export function attachContextMenu(node, build, options) {
   node.addEventListener('touchend', cancel);
   node.addEventListener('touchcancel', cancel);
   node.addEventListener('scroll', cancel, { passive: true });
-}
-
-// -- page state helpers ------------------------------------------------------
-
-export function emptyState(options) {
-  const opts = options || {};
-  return el('div', { class: 'empty' },
-    el('div', { class: 'empty-icon' }, icon(opts.icon || 'sparkle', { size: 24 })),
-    el('div', { class: 'empty-title' }, opts.title || 'Nothing here'),
-    opts.text ? el('div', { class: 'empty-text' }, opts.text) : null,
-    opts.action || null,
-  );
-}
-
-export function loadingState(label) {
-  return el('div', { class: 'empty' },
-    el('div', { class: 'spinner', role: 'status', 'aria-label': label || 'Loading' }),
-    el('div', { class: 'empty-text' }, label || 'Loading'),
-  );
-}
-
-export function errorState(error, onRetry) {
-  const message = error && error.message ? error.message : 'That did not load.';
-  return el('div', { class: 'empty' },
-    el('div', { class: 'empty-icon' }, icon('alert', { size: 24 })),
-    el('div', { class: 'empty-title' }, 'Could not load this'),
-    el('div', { class: 'empty-text' }, message),
-    onRetry ? el('button', { class: 'btn btn--default', type: 'button', onClick: onRetry }, icon('refresh', { size: 16 }), 'Try again') : null,
-  );
 }

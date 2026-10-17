@@ -9,7 +9,7 @@ import { icon } from '../../packages/icons.js';
 import { State, refreshServers } from '../../packages/store.js';
 import Api from '../../packages/api.js';
 import { path, publicPath, navigate } from '../../packages/nav.js';
-import { toast, errorToast } from '../ui.js';
+import { toast, errorToast } from '../ui/overlays.js';
 import { page, heading, section } from './util.js';
 
 // -- public documents --------------------------------------------------------
