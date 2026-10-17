@@ -11,6 +11,80 @@
 // friendly label.
 
 const db = require('../db');
+const { now, uuid } = require('../util');
+const crypto = require('crypto');
+
+// Community portability: export community metadata, channels, roles, and
+// guidelines into a signed manifest the operator can import elsewhere.
+// Export is read-only and never mutates. The manifest is signed with the
+// instance's Ed25519 Continuum key when available.
+async function exportCommunity(serverId, actorId) {
+  const server = await db.get('SELECT * FROM servers WHERE id = ?', [serverId]);
+  if (!server) throw new Error('community not found');
+
+  const channels = await db.all(
+    'SELECT id, name, type, topic, category_id, position, is_nsfw FROM channels WHERE server_id = ? ORDER BY position, id',
+    [serverId]
+  );
+  const categories = await db.all(
+    'SELECT id, name, position FROM categories WHERE server_id = ? ORDER BY position, id',
+    [serverId]
+  );
+  const roles = await db.all(
+    'SELECT id, name, position, color, hoist, mentionable FROM roles WHERE server_id = ? ORDER BY position, id',
+    [serverId]
+  );
+  const settings = await db.get(
+    'SELECT welcome_content, welcome_enabled, guidelines, notification_defaults, interaction_settings FROM server_settings WHERE server_id = ?',
+    [serverId]
+  );
+
+  const manifest = {
+    kind: 'trycord-community-export',
+    version: '1',
+    exportedAt: now(),
+    source: {
+      instanceId: process.env.TRYCORD_INSTANCE_ID || 'local',
+      serverId: server.id,
+      serverName: server.name,
+      serverSlug: server.slug,
+    },
+    community: {
+      name: server.name,
+      description: server.description || '',
+      iconUrl: server.icon_url || null,
+      bannerUrl: server.banner_url || null,
+      public: !!server.is_public,
+      discoverable: !!server.is_discoverable,
+    },
+    categories: categories.map((c) => ({ id: c.id, name: c.name, position: c.position })),
+    channels: channels.map((c) => ({
+      id: c.id, name: c.name, type: c.type, topic: c.topic || '',
+      categoryId: c.category_id, position: c.position, nsfw: !!c.is_nsfw,
+    })),
+    roles: roles.map((r) => ({
+      id: r.id, name: r.name, position: r.position, color: r.color,
+      hoist: !!r.hoist, mentionable: !!r.mentionable,
+    })),
+    settings: settings || null,
+  };
+
+  // Sign with Ed25519 if the Continuum key pair is available; else unsigned.
+  let signature = null;
+  let keyId = null;
+  try {
+    const continuum = require('./continuum');
+    const pub = continuum.getPublicKey();
+    if (pub) {
+      keyId = continuum.instanceId || process.env.TRYCORD_INSTANCE_ID || 'local';
+      signature = continuum.signEvent({ kind: 'community.export', id: uuid(), timestamp: now(), payload: manifest });
+    }
+  } catch (e) {
+    // Continuum not loaded; leave unsigned.
+  }
+
+  return { manifest, signature, keyId };
+}
 
 // One query per section, written out rather than composed from table names at
 // runtime, so the set of things an export contains is readable in one screen.
@@ -186,4 +260,4 @@ async function exportAccount(userId) {
   return out;
 }
 
-module.exports = { exportAccount };
+module.exports = { exportAccount, exportCommunity };
