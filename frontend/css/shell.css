@@ -1,464 +1,382 @@
-/* The Continuum workspace.
+/* The workspace shell.
  *
- * Reading left to right: the rail of your communities, the column that belongs to
- * whichever one is open, the conversation, and the details panel only when you ask
- * for it. Four regions of one tree, plus the overlay the details panel uses when it
- * cannot have a column. The rail is the one column that is always a column; the rest
- * earn their width back for the conversation.
+ * The workbench is a grid with named areas, so the layout cannot drift from the
+ * regions it lays out: the command bar across the top, then the communities
+ * rail, the open place's column and the stage. The inspector, the backdrop and
+ * the dock float, because a floating thing that took a grid cell would move the
+ * whole workspace instead of covering part of it.
  *
- * The ember runs through it as a single thread: the pip on the live community, the
- * bar on the current destination, the underline on the open tab. One accent, one
- * meaning - this is where you are.
- *
- * The region ids are the contract: the stylesheet and every renderer address them,
- * and the Mobile module builds its own tree with its own ids.
- */
-
-:root {
-  --tc-bg-deep: var(--tc-bg-deep);
-  --tc-bg: var(--tc-bg);
-  --tc-surface: var(--tc-surface);
-  --tc-border: var(--tc-border);
-  --tc-text: var(--tc-text);
-  --tc-text-muted: var(--tc-text-muted);
-  --tc-brand: var(--tc-brand);
-  --tc-brand-hover: var(--tc-brand-hover);
-
-  --bg: var(--tc-bg-deep);
-  --bg-2: var(--tc-bg);
-  --surface: var(--tc-surface);
-  --line: var(--tc-border);
-  --text: var(--tc-text);
-  --muted: var(--tc-text-muted);
-  --ember: var(--tc-brand);
-  --ember-2: var(--tc-brand-hover);
-  --sans: var(--tc-font-sans);
-}
+ * Everything here renders from semantic tokens only - no raw hex, no shadow
+ * recipe the token layer has not agreed to first. */
 
 .ws {
-  height: 100dvh;
   display: grid;
-  grid-template-columns: var(--rail-w) var(--spine-w) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
-  background: var(--tc-bg-deep);
-  font-family: var(--tc-font-sans);
+  grid-template-rows: var(--cmdbar-h) minmax(0, 1fr);
+  grid-template-columns: var(--rail-w) auto minmax(0, 1fr);
+  grid-template-areas:
+    "cmd cmd cmd"
+    "rail column stage";
+  height: 100dvh;
+  min-height: 0;
+  position: relative;
   overflow: hidden;
+  background: var(--app-bg);
 }
-/* The sign-in screens are the whole page, so the router hides the shell while one
-   is up. An author display value defeats the hidden attribute otherwise, and the
-   empty shell would hold the first viewport and push the sign-in page below it. */
-.ws[hidden] { display: none; }
-.ws[data-spine="collapsed"] { grid-template-columns: var(--rail-w) 0 minmax(0, 1fr); }
-.ws[data-context="open"] { grid-template-columns: var(--rail-w) var(--spine-w) minmax(0, 1fr) var(--context-w); }
-.ws[data-spine="collapsed"][data-context="open"] { grid-template-columns: var(--rail-w) 0 minmax(0, 1fr) var(--context-w); }
 
-/* -- the community rail -------------------------------------------------- */
-/* The deepest plane: where you are, which communities you belong to, and the way
-   to start another. It never leaves, so it is the one thing that is always in the
-   same place on every screen. */
-.community-rail {
-  grid-column: 1;
-  grid-row: 1 / -1;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 14px 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-  background: var(--tc-bg-deep);
-  border-right: 1px solid var(--tc-border);
+/* -- the command bar ------------------------------------------------------ */
+
+.cmdbar {
+  grid-area: cmd;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 12px 0 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
   z-index: var(--z-nav);
-  scrollbar-width: none;
 }
-.community-rail::-webkit-scrollbar { display: none; }
+
+.cmdbar-nav { display: none; margin-left: -2px; }
+
+.cmdbar-omni {
+  display: flex; align-items: center; gap: 9px;
+  width: min(560px, 100%);
+  height: 34px; padding: 0 10px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-md);
+  background: var(--app-bg); color: var(--text-3); font-size: var(--fs-sm);
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+    background var(--dur-1) var(--ease);
+}
+.cmdbar-omni:hover { border-color: var(--brand-line); color: var(--text-2); background: var(--panel); }
+.cmdbar-omni svg { flex: none; }
+.cmdbar-omni-label { flex: 1; min-width: 0; text-align: left; }
+.cmdbar-kbd {
+  flex: none; padding: 1px 6px; border: 1px solid var(--line-2); border-radius: var(--radius-xs);
+  background: var(--panel-3); color: var(--text-3);
+  font-family: var(--mono); font-size: var(--fs-micro);
+}
+
+.spacer { flex: 1; }
+
+.cmdbar-alerts { display: flex; align-items: center; }
+.cmdbar-bell .count-badge { margin-left: -6px; min-width: 17px; height: 17px; font-size: 10px; }
+
+/* -- the connection chip -------------------------------------------------- */
+
+.connection {
+  display: none; align-items: center; gap: 7px;
+  height: 26px; padding: 0 10px; border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
+  font-size: var(--fs-meta); font-weight: var(--weight-strong);
+}
+.connection[data-state="offline"], .connection[data-state="reconnecting"] { display: inline-flex; }
+.connection[data-state="offline"] {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+.connection .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* -- the communities rail ------------------------------------------------- */
+
+.rail {
+  grid-area: rail;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 10px 0;
+  background: var(--rail-bg);
+  border-right: 1px solid var(--line);
+  overflow-y: auto; overflow-x: hidden;
+}
 .rail-list { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
 .rail-item {
-  position: relative; width: 56px; height: 56px; flex: none;
-  display: grid; place-items: center; border-radius: var(--radius-md);
-  color: var(--tc-text-muted); background: transparent;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
-              border-radius var(--dur-1) var(--ease);
-}
-.rail-item:hover { background: var(--hover); color: var(--tc-text); }
-/* The live tile: a full-height ember bar set flush into the seam between the rail
-   and the column, so the thread runs the whole of the active community rather than
-   a pip beside it. */
-.rail-item.is-active, .rail-item[aria-current="page"] { color: var(--tc-brand); background: var(--tc-brand-hover); }
-.rail-item.is-active::before, .rail-item[aria-current="page"]::before {
-  content: ""; position: absolute; left: -14px; top: 4px; bottom: 4px;
-  width: 4px; border-radius: 0 4px 4px 0; background: var(--tc-brand);
-}
-.rail-home { background: var(--tc-surface); border: 1px solid var(--tc-border); border-radius: var(--radius-md); }
-.rail-home:hover { border-color: var(--tc-border); }
-.rail-home img, .rail-home svg { width: 26px; height: 26px; object-fit: contain; }
-.rail-home .rail-fallback { font-weight: var(--weight-black); font-size: 1.05rem; color: var(--tc-brand); }
-.rail-community .avatar { width: 40px; height: 40px; --avatar-size: 40px; font-size: 0.9rem; }
-.rail-divider { width: 24px; height: 1px; flex: none; background: var(--tc-border); margin: 8px 0; }
-.rail-add { border: 1px dashed var(--tc-border); color: var(--tc-text-muted); border-radius: var(--radius-md); width: 56px; height: 56px; display: grid; place-items: center; }
-.rail-add:hover { border-color: var(--tc-brand); color: var(--tc-brand); background: var(--tc-brand-hover); }
-
-/* -- the column ---------------------------------------------------------- */
-/* The open place: its identity at the top, the destinations it holds, and the
-   account at the foot so it is never a trip away. */
-.spine {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex; flex-direction: column; min-width: 0; min-height: 0;
-  background: var(--tc-bg); border-right: 1px solid var(--tc-border);
-  z-index: var(--z-nav);
-}
-.ws[data-spine="collapsed"] .spine { display: none; }
-
-.spine-head {
-  flex: none; display: flex; align-items: center; gap: 10px;
-  min-height: var(--head-h); padding: 10px 12px; border-bottom: 1px solid var(--tc-border);
-}
-.spine-mark {
-  width: 36px; height: 36px; flex: none; border-radius: var(--radius-md);
-  display: grid; place-items: center; color: var(--tc-brand);
-  background: var(--tc-brand-hover); border: 1px solid var(--tc-border);
-}
-.spine-mark-img { width: 20px; height: 20px; object-fit: contain; }
-.spine-mark-fallback { font-weight: var(--weight-black); font-size: 0.92rem; color: var(--tc-brand) }
-
-.place-switcher {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
-  height: 40px; padding: 0 10px; border-radius: var(--radius-md);
-  background: var(--panel); border: 1px solid var(--tc-border);
-  color: var(--tc-text); font-weight: var(--weight-strong); font-size: 0.92rem; text-align: left;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
-}
-.place-switcher:hover { background: var(--panel-2); border-color: var(--tc-brand); }
-.place-switcher-title { flex: 1; min-width: 0; }
-.place-switcher-icon { flex: none; display: grid; place-items: center; color: var(--tc-text-muted); }
-.place-switcher-chevron { flex: none; display: grid; place-items: center; color: var(--tc-text-muted); }
-.place-switcher .avatar { flex: none; }
-
-.spine-global {
-  flex: none; display: flex; flex-direction: column; gap: 4px;
-  padding: 8px 10px; border-bottom: 1px solid var(--tc-border);
-}
-.spine-place { flex: 1; min-height: 0; display: flex; flex-direction: column; min-width: 0; }
-.spine-foot { flex: none; padding: 10px 12px; border-top: 1px solid var(--tc-border); }
-
-.spine-account {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px;
-  padding: 10px 12px; border-radius: var(--radius-md); background: var(--tc-surface);
-  border: 1px solid var(--tc-border); text-align: left;
-  transition: background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease);
-}
-.spine-account:hover { background: var(--panel-2); border-color: var(--tc-border); }
-.spine-account-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.spine-account-name { font-weight: var(--weight-strong); font-size: 0.9rem; }
-.spine-account-sub { font-family: var(--mono); font-size: 0.74rem; color: var(--tc-text-muted); }
-
-/* -- the destination list ------------------------------------------------ */
-.sidebar-head {
-  flex: none; display: flex; align-items: center; gap: 8px;
-  min-height: var(--head-h); padding: 8px 10px 6px;
-}
-.sidebar-title {
-  font-size: var(--fs-micro); font-weight: 600; letter-spacing: var(--tracking-label);
-  text-transform: uppercase; color: var(--tc-text-muted);
-}
-.sidebar-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 8px 10px; }
-
-.nav-group { margin-top: 12px; }
-.nav-group:first-child { margin-top: 4px; }
-.nav-item {
-  position: relative; display: flex; align-items: center; gap: 10px; width: 100%;
-  min-height: 40px; padding: 9px 10px; border-radius: var(--radius-sm); color: var(--tc-text-muted);
-  font-size: 0.9rem; font-weight: var(--weight-medium); text-align: left;
+  position: relative; width: 46px; height: 46px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--radius-lg);
+  color: var(--text-2);
   transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-.nav-item:hover { background: var(--hover); color: var(--tc-text); }
-.nav-item[aria-current="page"], .nav-item.is-active {
-  background: var(--selected); color: var(--tc-text); font-weight: var(--weight-strong);
-}
-.nav-item[aria-current="page"]::before, .nav-item.is-active::before {
-  content: ""; position: absolute; left: -8px; top: 6px; bottom: 6px;
-  width: 3px; border-radius: 0 3px 3px 0; background: var(--tc-brand)
-}
-.nav-item svg { width: 17px; height: 17px; color: var(--tc-text-muted); flex: none; }
-.nav-item[aria-current="page"] svg, .nav-item.is-active svg { color: var(--tc-brand) }
-.nav-item .nav-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-item .truncate { flex: 1; min-width: 0; }
-.nav-item .count-badge { flex: none; }
-.nav-item--channel .truncate, .nav-item--dm .truncate { flex: 1; min-width: 0; }
-.nav-item--dm { padding: 5px 10px; }
-.nav-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--tc-brand) flex: none; margin-left: auto; }
-.nav-muted { color: var(--tc-text-muted); flex: none; display: inline-flex; align-items: center; margin-left: auto; }
-.nav-muted ~ .nav-dot { margin-left: 6px; }
+.rail-item:hover { background: var(--hover); color: var(--text-1); }
 
-.sidebar-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; }
-.sidebar-empty { padding: 14px 12px; font-size: 0.85rem; color: var(--tc-text-muted); }
-.sidebar-note { padding: 12px; font-size: 0.84rem; color: var(--tc-text-muted); line-height: 1.5; }
+/* The active mark gets the ember bar on the rail's own edge - the one place in
+ * navigation where the accent is unconditional, because it answers "where". */
+.rail-item::before {
+  content: ""; position: absolute; left: -11px; top: 50%;
+  width: 3px; height: 6px; transform: translateY(-50%);
+  border-radius: var(--radius-pill); background: var(--text-3);
+  opacity: 0;
+  transition: height var(--dur-1) var(--ease), opacity var(--dur-1) var(--ease),
+    background var(--dur-1) var(--ease);
+}
+.rail-item:hover::before { opacity: .55; }
+.rail-item.is-active::before { opacity: 1; height: 22px; background: var(--brand); }
+
+.rail-home img { width: 26px; height: 26px; object-fit: contain; display: block; }
+.brand-fallback {
+  width: 26px; height: 26px; display: grid; place-items: center;
+  font-weight: var(--weight-black); color: var(--brand);
+}
+.rail-community .avatar { width: 38px; height: 38px; }
+.rail-divider { width: 26px; height: 1px; background: var(--line); margin: 2px 0; }
+.rail-add { border: 1px dashed var(--line-2); color: var(--text-3); }
+.rail-add:hover { border-color: var(--brand-line); color: var(--brand); }
+
+/* -- the place column ----------------------------------------------------- */
+
+.context {
+  grid-area: column;
+  position: relative;
+  display: flex; flex-direction: column; min-width: 0;
+  width: var(--context-w);
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+.ws[data-column="off"] .context { display: none; }
+
+.context-head {
+  flex: none; display: flex; align-items: center;
+  min-height: var(--head-h); padding: 0 8px 0 10px;
+}
+.context-identity { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.context-identity-link {
+  display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0;
+  padding: 5px 6px; border-radius: var(--radius-md);
+  font-weight: var(--weight-strong); color: var(--text-1);
+  transition: background var(--dur-1) var(--ease);
+}
+.context-identity-link:hover { background: var(--hover); }
+.context-brand {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 5px 6px; border-radius: var(--radius-md);
+  color: var(--text-1); font-weight: var(--weight-strong);
+  transition: background var(--dur-1) var(--ease);
+}
+.context-brand:hover { background: var(--hover); }
+.context-brand img { width: 22px; height: 22px; object-fit: contain; display: block; }
+.context-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.context-mark-fallback {
+  width: 28px; height: 28px; flex: none; display: grid; place-items: center;
+  border-radius: 30%; background: var(--panel-3); color: var(--text-3);
+}
+
+.context-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 8px 10px; }
+.context-empty {
+  padding: 10px 8px; color: var(--text-3);
+  font-size: var(--fs-meta); line-height: 1.55;
+}
+.context-foot { flex: none; border-top: 1px solid var(--line); padding: 8px; }
+
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-label {
+  padding: 14px 8px 5px;
+  font-family: var(--mono); font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-3);
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  min-height: 34px; padding: 0 8px;
+  border-radius: var(--radius-md);
+  color: var(--text-2); font-size: var(--fs-sm); font-weight: var(--weight-medium);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.nav-item svg { flex: none; color: var(--text-3); transition: color var(--dur-1) var(--ease); }
+.nav-item > .truncate { min-width: 0; flex: 1; }
+.nav-item:hover { background: var(--hover); color: var(--text-1); }
+.nav-item.is-active {
+  background: var(--selected); color: var(--text-1); font-weight: var(--weight-strong);
+}
+.nav-item.is-active svg { color: var(--brand); }
+.nav-item--channel { min-height: 32px; gap: 8px; }
+.nav-item--dm { gap: 9px; }
+.nav-muted { margin-left: auto; display: inline-flex; color: var(--text-3); }
+.nav-dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--brand); flex: none; }
+.nav-sep { height: 1px; background: var(--line); margin: 8px 6px; }
 .dm-stack { display: inline-flex; flex: none; }
-.dm-stack .avatar { border: 2px solid var(--tc-bg); margin-left: -9px; }
-.dm-stack .avatar:first-child { margin-left: 0; }
+.dm-stack .avatar { outline: 2px solid var(--panel); }
+.dm-stack .avatar + .avatar { margin-left: -8px; }
 
-/* -- the conversation ---------------------------------------------------- */
-.stage {
-  grid-column: 3;
-  grid-row: 1;
-  display: flex; flex-direction: column; min-width: 0; min-height: 0;
-  background: var(--tc-bg-deep); position: relative;
+.account-button {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 6px 8px; border-radius: var(--radius-md); text-align: left;
+  transition: background var(--dur-1) var(--ease);
 }
-/* The screen is the stage's single row: the bar, the scrolling body and the
-   composer. It carries the height from the grid down to the body, which is the
-   one element that scrolls. Without it the body grows with its content and the
-   shell clips the overflow, so a long page is unreachable rather than scrollable. */
-.screen {
-  flex: 1; min-height: 0; min-width: 0;
-  display: flex; flex-direction: column;
+.account-button:hover { background: var(--hover); }
+.account-id { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.account-name { font-size: var(--fs-sm); font-weight: var(--weight-strong); color: var(--text-1); }
+.account-sub { font-size: var(--fs-micro); color: var(--text-3); }
+.account-button > svg { flex: none; color: var(--text-3); }
+
+/* A column can be resized by dragging its edge or by nudging the grip with the
+ * keyboard; the grip is a separator to assistive technology, not decoration. */
+.grip {
+  position: absolute; top: 0; bottom: 0; width: 9px; z-index: 2;
+  cursor: col-resize; touch-action: none;
 }
+.grip--column { right: -5px; }
+.grip--inspector { left: -5px; }
+.grip::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px;
+  background: var(--brand-line); opacity: 0;
+  transition: opacity var(--dur-1) var(--ease);
+}
+.grip:hover::after, .grip[data-dragging]::after, .grip:focus-visible::after { opacity: 1; }
+
+/* -- the stage ------------------------------------------------------------ */
+
+.stage { grid-area: stage; display: flex; min-width: 0; min-height: 0; }
+.screen { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+
 .stage-head {
-  position: relative; flex: none; display: flex; align-items: center; gap: 8px;
-  min-height: var(--head-h); padding: 0 12px;
-  background: var(--tc-bg); border-bottom: 1px solid var(--tc-border);
+  flex: none; display: flex; align-items: center; gap: 12px;
+  min-height: var(--head-h); padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
 }
-/* The thread crosses into the conversation: a short ember underline fading out
-   from the leading edge of the bar. */
-.stage-head::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
-  background: linear-gradient(90deg, var(--tc-brand, color-mix(in srgb, var(--tc-brand 30%, transparent) 22%, transparent 55%);
-  opacity: .55;
-}
-/* Two shapes share this bar: the generic page header the shell builds, and the
-   channel or conversation header a view builds. Both are a leading glyph, a
-   title block and trailing actions. */
-.stage-head-inner,
+.stage-head-inner { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; }
 .stage-head-content { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .stage-head-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.stage-head-icon { flex: none; display: grid; place-items: center; color: var(--tc-text-muted); }
+.stage-head-icon { flex: none; display: grid; place-items: center; color: var(--text-3); }
 .stage-head-title {
   font-size: 0.98rem; font-weight: var(--weight-strong);
-  letter-spacing: var(--tracking-tight); color: var(--tc-text);
+  letter-spacing: var(--tracking-tight); color: var(--text-1);
 }
-.stage-head-sub { font-size: var(--fs-micro); color: var(--tc-text-muted); }
+.stage-head-sub { font-size: var(--fs-micro); color: var(--text-3); }
 .stage-head-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
-
-/* The leading control on a desk: collapse the spine, which is a column. */
-.icon-btn {
-  width: 36px; height: 36px; border-radius: var(--radius-sm);
-  display: grid; place-items: center; color: var(--tc-text-muted); position: relative;
-  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-}
-.icon-btn:hover { background: var(--hover); color: var(--tc-text); }
-.icon-btn[aria-pressed="true"], .icon-btn[aria-current="page"] { background: var(--selected); color: var(--tc-brand) }
-.context-toggle[aria-expanded="true"] { background: var(--selected); color: var(--tc-brand) }
-.icon-btn svg { width: 18px; height: 18px; }
-.icon-btn .dot {
-  position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%;
-  background: var(--tc-brand) border: 2px solid var(--tc-bg);
-}
-.icon-btn.spine-toggle { display: grid; flex: none; }
+.context-toggle[aria-expanded="true"] { background: var(--selected); color: var(--brand); }
 
 .stage-body {
-  flex: 1; min-height: 0; overflow-y: auto; position: relative;
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
   display: flex; flex-direction: column;
 }
 .stage-body:focus { outline: none; }
 
-/* -- the details panel --------------------------------------------------- */
-.context-panel {
-  grid-column: 4;
-  grid-row: 1;
-  display: none; flex-direction: column; min-width: 0;
-  background: var(--tc-bg); border-left: 1px solid var(--tc-border);
-}
-.context-panel:not([hidden]) { display: flex; }
-.members-head {
-  flex: none; display: flex; align-items: center; gap: 8px; min-height: var(--head-h);
-  padding: 0 14px; border-bottom: 1px solid var(--tc-border);
-  font-family: var(--mono); font-size: var(--fs-micro); font-weight: 600;
-  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--tc-text-muted);
-}
-.members-close { display: grid; margin-left: auto; color: var(--tc-text-muted); }
-.members-scroll { flex: 1; overflow-y: auto; padding: 8px; }
-.member-group { margin-bottom: 16px; }
-.member-group-head {
-  padding: 6px 10px; font-family: var(--mono); font-size: var(--fs-micro); font-weight: 600;
-  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--tc-text-muted);
-}
-.member-row {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px;
-  padding: 6px 10px; border-radius: var(--radius-sm); text-align: left;
-  transition: background var(--dur-1) var(--ease);
-}
-.member-row:hover { background: var(--hover); }
-.member-row[data-offline="true"] { opacity: .55; }
-.member-name { font-size: 0.88rem; font-weight: var(--weight-strong); min-width: 0; }
-.member-role { color: var(--tc-text-muted); }
+/* -- the composer ---------------------------------------------------------
+ * The form is the shell's; the controls inside it belong to the conversation
+ * that fills the slot. */
 
-/* -- composer ------------------------------------------------------------ */
 .composer-slot {
-  flex: none; padding: 0 16px 14px; background: var(--tc-bg-deep);
-  position: relative; z-index: 4;
+  flex: none; position: relative; z-index: 4;
+  padding: 0 16px 14px;
+  background: var(--app-bg);
 }
 .composer-slot[hidden] { display: none; }
 .composer {
   display: flex; flex-direction: column; gap: 8px;
-  background: var(--tc-bg); border: 1px solid var(--tc-border);
-  border-radius: var(--radius-md); padding: 10px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line-2); border-radius: var(--radius-md);
   transition: border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease);
 }
-.composer:focus-within { border-color: var(--tc-border); box-shadow: 0 0 0 3px var(--tc-brand-hover); }
+.composer:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
 
-/* -- connection ---------------------------------------------------------- */
-.connection {
-  position: fixed; z-index: var(--z-toast); bottom: 20px; left: 50%; transform: translateX(-50%);
-  display: none; align-items: center; gap: 9px; padding: 8px 14px;
-  background: var(--tc-surface); border: 1px solid var(--tc-border); border-radius: var(--radius-sm);
-  font-size: var(--fs-meta); font-weight: var(--weight-strong); box-shadow: var(--shadow-2);
+/* -- the inspector -------------------------------------------------------- */
+
+.inspector {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: var(--z-drawer);
+  width: min(var(--inspector-w), calc(100vw - var(--rail-w)));
+  max-width: 92vw;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--panel);
+  border-left: 1px solid var(--line-2);
+  box-shadow: var(--shadow-2);
+  animation: panel-in var(--dur-2) var(--ease-out);
 }
-.connection[data-state="offline"], .connection[data-state="reconnecting"] { display: inline-flex; }
-.connection .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
-.connection[data-state="offline"] .dot { background: var(--danger); }
+@keyframes panel-in { from { opacity: 0; transform: translateX(14px); } }
+.inspector[hidden] { display: none; }
 
-/* -- the overlay scrim --------------------------------------------------- */
+.inspector-head {
+  flex: none; display: flex; align-items: center; gap: 8px;
+  min-height: var(--head-h); padding: 8px 8px 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.inspector-tabs {
+  flex: 1; min-width: 0;
+  display: inline-flex; gap: 2px; padding: 2px;
+  background: var(--panel-3); border-radius: var(--radius-md);
+}
+.inspector-tab {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  color: var(--text-2); font-size: var(--fs-meta); font-weight: var(--weight-strong);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.inspector-tab:hover { color: var(--text-1); }
+.inspector-tab.is-active { background: var(--raised); color: var(--text-1); box-shadow: var(--shadow-1); }
+.inspector-close { flex: none; }
+.inspector-body { flex: 1; min-height: 0; overflow-y: auto; }
+.inspector-loading { display: grid; place-items: center; padding: 40px 20px; }
+.inspector-note { padding: 24px 18px; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.55; }
+
+/* -- the dock ------------------------------------------------------------- */
+
+.dock {
+  position: fixed; left: calc(var(--rail-w) + 16px); bottom: 16px; z-index: var(--z-drawer);
+  width: min(430px, calc(100vw - var(--rail-w) - 32px));
+  background: var(--raised);
+  border: 1px solid var(--line-2); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  animation: dock-in var(--dur-2) var(--ease-out);
+}
+@keyframes dock-in { from { opacity: 0; transform: translateY(10px); } }
+.dock[hidden] { display: none; }
+
+/* -- the scrim ------------------------------------------------------------ */
+
 .scrim {
-  position: fixed; inset: 0; z-index: var(--z-scrim);
-  background: color-mix(in srgb, #000 58%, transparent); backdrop-filter: blur(2px);
-  opacity: 0; pointer-events: none; transition: opacity var(--dur-2) var(--ease);
+  display: none; position: absolute; inset: 0; z-index: var(--z-scrim);
+  background: color-mix(in srgb, var(--tc-bg-deep) 72%, transparent);
+  animation: overlay-in var(--dur-2) var(--ease);
 }
 
-.settings-centre {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  gap: 16px;
+/* -- the command palette -------------------------------------------------- */
+
+.overlay--top { align-items: flex-start; padding-top: min(13vh, 116px); }
+.dialog--palette { max-width: 580px; margin: 0 auto; }
+.palette { display: flex; flex-direction: column; min-height: 0; max-height: min(560px, 70vh); }
+.palette-input-row {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
 }
-
-.settings-centre-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--tc-border);
-  background: var(--tc-surface);
+.palette-input-row svg { flex: none; color: var(--text-3); }
+.palette-input {
+  flex: 1; min-width: 0;
+  background: none; border: 0; outline: none;
+  color: var(--text-1); font-size: var(--fs-h3);
 }
-
-.settings-centre-title {
-  font-size: var(--fs-h2);
-  font-weight: var(--weight-bold);
-  color: var(--tc-text);
+.palette-input::placeholder { color: var(--text-3); }
+.palette-results { flex: 1; min-height: 72px; overflow-y: auto; padding: 8px; }
+.palette-group + .palette-group { margin-top: 4px; }
+.palette-group-label {
+  padding: 9px 10px 4px;
+  font-family: var(--mono); font-size: var(--fs-micro); font-weight: 600;
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-3);
 }
-
-.settings-centre-subtitle {
-  font-size: var(--fs-sm);
-  color: var(--tc-text-muted);
+.palette-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px;
+  padding: 0 10px; border-radius: var(--radius-md);
+  color: var(--text-2); font-size: var(--fs-sm); text-align: left;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
+.palette-item svg { flex: none; color: var(--text-3); }
+.palette-item.is-active { background: var(--selected); color: var(--text-1); }
+.palette-item.is-active svg { color: var(--brand); }
+.palette-item-label { flex: 1; min-width: 0; }
+.palette-item-hint { flex: none; max-width: 45%; color: var(--text-3); font-size: var(--fs-meta); }
+.palette-note { padding: 18px 12px; color: var(--text-3); font-size: var(--fs-sm); }
 
-.settings-centre-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 24px;
-}
-
-.settings-centre-section {
-  background: var(--tc-surface);
-  border: 1px solid var(--tc-border);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-}
-
-.settings-centre-section-title {
-  font-size: var(--fs-h3);
-  font-weight: var(--weight-strong);
-  color: var(--tc-text);
-  margin-bottom: 16px;
-}
-
-.settings-centre-section-subtitle {
-  font-size: var(--fs-sm);
-  color: var(--tc-text-muted);
-  margin-bottom: 16px;
-}
-
-.settings-centre-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background var(--dur-1) var(--ease);
-}
-
-.settings-centre-row:hover {
-  background: var(--hover);
-}
-
-.settings-centre-row.is-active {
-  background: var(--tc-brand-hover);
-  color: var(--tc-brand);
-}
-
-.settings-centre-row-title {
-  font-size: var(--fs-body);
-  font-weight: var(--weight-medium);
-}
-
-.settings-centre-row-subtitle {
-  font-size: var(--fs-sm);
-  color: var(--tc-text-muted);
-}
-
-.settings-centre-row-toggle {
-  width: 44px;
-  height: 24px;
-  border-radius: var(--radius-pill);
-  background: var(--tc-border);
-  border: none;
-  cursor: pointer;
-  position: relative;
-  transition: background var(--dur-1) var(--ease);
-}
-
-.settings-centre-row-toggle.is-active {
-  background: var(--tc-brand);
-}
-
-.settings-centre-row-toggle::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--tc-text);
-  transition: transform var(--dur-1) var(--ease);
-}
-
-.settings-centre-row-toggle.is-active::after {
-  transform: translateX(20px);
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* -- responsive ---------------------------------------------------------- */
-
-/* Below a wide desk the details panel overlays the conversation instead of taking
-   a column, so a wide conversation keeps its width. It opens from the bar and
-   closes itself. The line matches CONTEXT_COLUMN_MIN in shell.js. */
-@media (max-width: 1280px) {
-  .ws[data-context="open"],
-  .ws[data-spine="collapsed"][data-context="open"] {
-    grid-template-columns: var(--rail-w) var(--spine-w) minmax(0, 1fr);
+/* -- narrow windows -------------------------------------------------------
+ * On a desk the column is a column. On a narrow window it draws over the stage
+ * instead, opened from the command bar and closed by the backdrop or Escape;
+ * the inspector does the same. The line matches the media query in shell.js. */
+@media (max-width: 1080px) {
+  .cmdbar-nav { display: inline-grid; }
+  .context {
+    position: absolute; top: var(--cmdbar-h); bottom: 0; left: var(--rail-w); z-index: var(--z-nav);
+    width: min(var(--context-w), calc(100vw - var(--rail-w)));
+    box-shadow: var(--shadow-3);
+    transform: translateX(-16px); opacity: 0; visibility: hidden;
+    transition: transform var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out),
+      visibility var(--dur-2);
   }
-  .context-panel {
-    position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--context-w), 88vw);
-    z-index: var(--z-drawer); box-shadow: var(--shadow-3);
-  }
-  .ws[data-context="open"] .scrim { opacity: 1; pointer-events: auto; }
+  .ws[data-nav="overlay"] .context { transform: none; opacity: 1; visibility: visible; }
+  .ws[data-nav="overlay"] .scrim,
+  .ws[data-context="open"] .scrim { display: block; }
+  .grip--column { display: none; }
 }
-.settings-centre { display: block; }

@@ -37,193 +37,210 @@
 /* ---- tokens.css ---- */
 /* The application's semantic layer over the token library.
  *
- * The library (inlined above) owns the palette, the type scale and the timing.
- * This file names the surfaces, the states and the measurements the interface
- * actually uses, so a component never reaches for a raw hex or a magic pixel.
+ * The library (inlined above by build-css.js) owns the palette, the type scale
+ * and the timing. This file names the surfaces, the states and the measurements
+ * the interface actually uses, so a component never reaches for a raw hex or a
+ * magic pixel.
  *
- * Trycord is a workspace: navigation is quiet and structural, the conversation
+ * Trycord is a workbench: navigation is quiet and structural, the conversation
  * is the most legible thing on screen, and the ember accent marks only what is
- * live, selected or primary. */
+ * live, selected or primary.
+ *
+ * Reader-authored palettes arrive as inline --c-* properties from
+ * packages/theme.js. The semantic names below fall back through them, so a
+ * custom palette restyles the whole application without a second stylesheet.
+ */
 
 :root {
-  /* -- measurement ------------------------------------------------------- */
-  /* The adaptive workspace: a rail of communities, the open place's column, the
-     conversation, and details on demand. The rail never moves; the column and the
-     context panel come and go with the width, so the conversation always keeps the
-     most room. The numbers match CONTEXT_COLUMN_MIN in shell.js. */
-  --rail-w: 84px;
-  --spine-w: 300px;
-  --context-w: 312px;
-  --head-h: 58px;
-  --composer-max: 260px;
-  --content-max: 940px;
+  /* -- measurement --------------------------------------------------------- */
+  --rail-w: 68px;
+  --context-w: 276px;
+  --inspector-w: 336px;
+  --cmdbar-h: 52px;
+  --head-h: 54px;
+  --composer-max: 300px;
+  --content-max: 1040px;
 
-  /* The readable floor. Nothing renders smaller than this: a monogram that scales
-     with its circle floors here instead of shrinking into illegibility. */
+  /* The readable floor. */
   --text-xs: 0.75rem;
 
   /* -- type ---------------------------------------------------------------- */
-  /* One scale, six steps, named for the job each does rather than its size. A
-     page title is --fs-h1 wherever it appears; a timestamp is --fs-micro. The
-     display step is fluid so a first-run screen breathes on a desk and a phone
-     does not inherit a billboard. */
-  --fs-display: clamp(1.7rem, 1.25rem + 1.7vw, 2.4rem);
-  --fs-h1: 1.4rem;
-  --fs-h2: 1.12rem;
-  --fs-h3: 0.98rem;
-  --fs-body: 0.95rem;
-  --fs-sm: 0.86rem;
-  --fs-meta: 0.79rem;
-  --fs-micro: 0.72rem;
+  --fs-display: clamp(1.9rem, 1.45rem + 1.7vw, 2.7rem);
+  --fs-h1: 1.45rem;
+  --fs-h2: 1.15rem;
+  --fs-h3: 1rem;
+  --fs-body: 0.9375rem;
+  --fs-sm: 0.875rem;
+  --fs-meta: 0.8125rem;
+  --fs-micro: 0.75rem;
   --weight-body: 450;
   --weight-medium: 550;
   --weight-strong: 650;
   --weight-bold: 750;
-  --weight-black: 800;
+  --weight-black: 850;
   --tracking-tight: -0.02em;
-  --tracking-label: 0.1em;
+  --tracking-label: 0.11em;
 
   /* -- space --------------------------------------------------------------- */
-  /* A four-pixel rhythm. Components step by these; nothing reaches for a
-     magic number, so two surfaces built months apart still line up. */
   --space-1: 4px;
-  --space-2: 6px;
-  --space-3: 8px;
-  --space-4: 12px;
-  --space-5: 16px;
-  --space-6: 20px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
   --space-7: 28px;
   --space-8: 40px;
+  --space-9: 56px;
 
-  /* -- radii and motion --------------------------------------------------- */
-  /* Compact and squared, per the brand's shape language: panels and controls are
-     cut close to square, and only the pill stays round. The rounding is the
-     fastest way to tell this client from a dashboard - nothing floats. */
-  --radius-xs: 3px;
-  --radius-sm: 5px;
-  --radius-md: 7px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  /* -- radii and motion ---------------------------------------------------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
   --radius-pill: var(--tc-radius-pill);
   --dur-1: var(--tc-motion-fast);
   --dur-2: var(--tc-motion-normal);
-  --dur-3: 280ms;
+  --dur-3: 300ms;
   --ease: var(--tc-ease);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
 
-  /* The ground under a filled control that carries a label. The bright ember is an
-     accent - a pip, a dot, a glyph, a switch - and white on it is 3.3:1, which a
-     label cannot live on. Anything with text rides this darker one instead, so a
-     button, a badge and the new-messages chip all clear the 4.5:1 a label needs. */
-  --brand-fill: var(--tc-brand-strong);
-  --brand-fill-hover: color-mix(in srgb, var(--tc-brand-strong) 86%, #000);
-  --brand-fill-active: color-mix(in srgb, var(--tc-brand-strong) 72%, #000);
-
-  /* -- layering ----------------------------------------------------------- */
+  /* -- layering ------------------------------------------------------------ */
   --z-nav: 30;
   --z-drawer: 60;
   --z-scrim: 55;
   --z-menu: 75;
   --z-overlay: 80;
   --z-toast: 90;
+  --z-popover: 100;
+  --z-modal: 110;
 
   --font: var(--tc-font-sans);
   --mono: var(--tc-font-mono);
+
+  /* -- interactive accents -------------------------------------------------- */
+  --brand: var(--c-accent, var(--tc-brand));
+  --brand-fill: var(--tc-brand-strong);
+  --brand-fill-hover: var(--tc-brand);
+  --brand-ink: #FFFFFF;
 }
 
-/* Dark is the default product. Charcoal, not slate: the ground is a warm near-black
- * with a little red in it and the panels step up through warmer browns, so the whole
- * workspace sits in the same family as the ember instead of beside it. Nothing here
- * is blue-grey; the cool greys belonged to the previous shell and are what made a
- * recolour read as no change at all. The rail is the deepest plane - the hearth the
- * rest of the client is arranged around. */
+/* Density. The attribute lives on <html> and is written by js/prefs.js; the
+ * default block is cozy, and the two other arrangements change measurements
+ * rather than type, so a row is still a row. */
+:root,
+:root[data-density="cozy"] {
+  --row-h: 44px;
+  --row-pad: 9px 10px;
+  --gap-row: 8px;
+  --msg-gap: 15px;
+  --panel-pad: 16px;
+  --section-gap: 24px;
+}
+:root[data-density="compact"] {
+  --row-h: 36px;
+  --row-pad: 6px 8px;
+  --gap-row: 4px;
+  --msg-gap: 10px;
+  --panel-pad: 12px;
+  --section-gap: 18px;
+}
+:root[data-density="comfortable"] {
+  --row-h: 52px;
+  --row-pad: 12px 12px;
+  --gap-row: 10px;
+  --msg-gap: 20px;
+  --panel-pad: 20px;
+  --section-gap: 32px;
+}
+
+/* Ember - the default dark palette. Charcoal from the canonical library, the
+ * ember accent, and nothing else. */
 :root,
 [data-theme="trycord"],
 [data-theme="dark"] {
   color-scheme: dark;
-  --app-bg: #13100C;
-  --panel: #1B1712;
-  --panel-2: #231E17;
-  --panel-3: #2C2620;
-  --raised: #383026;
-  --rail-bg: #0D0B08;
+  --app-bg: var(--c-pg, var(--tc-bg-deep));
+  --panel: var(--c-base, var(--tc-bg));
+  --panel-2: #1D1F24;
+  --panel-3: var(--tc-surface);
+  --raised: var(--tc-surface);
+  --rail-bg: #0E0F12;
 
-  --line: rgba(255, 236, 214, .07);
-  --line-2: rgba(255, 236, 214, .14);
+  --line: var(--tc-border);
+  --line-2: #3A3D46;
 
-  --text-1: #F6F0E8;
-  --text-2: #B6A99A;
-  --text-3: #A69A8B;
+  --text-1: var(--c-txt, var(--tc-text));
+  --text-2: #B9BDC7;
+  --text-3: #8F949F;
 
-  --hover: rgba(255, 236, 214, .055);
-  --active: rgba(255, 236, 214, .10);
-  --selected: color-mix(in srgb, var(--tc-brand) 16%, transparent);
+  --hover: rgba(244, 245, 247, .06);
+  --active: rgba(244, 245, 247, .10);
+  --selected: color-mix(in srgb, var(--brand) 16%, transparent);
 
-  --brand: var(--tc-brand);
-  --brand-ink: #FFFFFF;
-  --brand-soft: rgba(255, 77, 36, .14);
-  --brand-line: rgba(255, 77, 36, .40);
+  --brand-soft: color-mix(in srgb, var(--brand) 13%, transparent);
+  --brand-line: color-mix(in srgb, var(--brand) 42%, transparent);
   --focus: var(--tc-brand-focus);
 
-  --danger: #F87171;
-  --success: #4ADE9B;
-  --warning: #FBBF67;
-  --info: #7CB2FF;
+  --danger: var(--tc-danger);
+  --success: var(--tc-success);
+  --warning: var(--tc-warning);
+  --info: var(--tc-info);
 
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .34);
-  --shadow-2: 0 8px 24px -8px rgba(0, 0, 0, .55);
-  --shadow-3: 0 24px 60px -16px rgba(0, 0, 0, .7);
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, .4);
+  --shadow-2: 0 10px 30px -10px rgba(0, 0, 0, .65);
+  --shadow-3: 0 26px 70px -18px rgba(0, 0, 0, .78);
 
-  /* A single soft ember wash used behind the rail mark and primary banners. */
-  --ember-wash: radial-gradient(120% 80% at 50% 0%, rgba(255, 77, 36, .22), transparent 70%);
+  --ember-wash: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%);
 
-  --scrollbar: rgba(255, 255, 255, .13);
-  --scrollbar-hover: rgba(255, 255, 255, .22);
+  --scrollbar: rgba(255, 255, 255, .12);
+  --scrollbar-hover: rgba(255, 255, 255, .20);
 }
 
+/* Daylight */
 [data-theme="light"] {
   color-scheme: light;
-  --app-bg: #F4EEE6;
-  --panel: #FFFCF8;
-  --panel-2: #F6F0E7;
-  --panel-3: #EDE4D8;
+  --app-bg: #F1F2F5;
+  --panel: #F7F8FA;
+  --panel-2: #FFFFFF;
+  --panel-3: #EDEFF3;
   --raised: #FFFFFF;
-  --rail-bg: #E9E0D3;
+  --rail-bg: #E8EAEE;
 
-  --text-1: #201C17;
-  --text-2: #574F45;
-  --text-3: #6E6355;
-  --line: rgba(58, 44, 28, .10);
-  --line-2: rgba(58, 44, 28, .18);
+  --line: #E4E6EB;
+  --line-2: #D3D6DD;
 
-  --hover: rgba(58, 44, 28, .05);
-  --active: rgba(58, 44, 28, .09);
-  --selected: rgba(226, 63, 23, .12);
+  --text-1: #1D1E23;
+  --text-2: #4B5058;
+  --text-3: #666B78;
 
-  --brand: #E23F17;
-  --brand-hover: #C93618;
-  --brand-soft: rgba(226, 63, 23, .10);
-  --brand-line: rgba(226, 63, 23, .35);
-  --focus: #C93618;
+  --hover: rgba(29, 30, 35, .05);
+  --active: rgba(29, 30, 35, .09);
+  --selected: rgba(201, 54, 24, .12);
 
-  --danger: #C0392B;
-  --success: #1E8E5A;
-  --warning: #A96A12;
+  --brand: var(--c-accent, #C93618);
+  --brand-fill: #C93618;
+  --brand-fill-hover: #B02F14;
+  --brand-soft: rgba(201, 54, 24, .10);
+  --brand-line: rgba(201, 54, 24, .38);
+  --focus: #B02F14;
+
+  --danger: #B3261E;
+  --success: #1B7A4E;
+  --warning: #8A5A00;
   --info: #1F5FBF;
 
   --shadow-1: 0 1px 2px rgba(20, 22, 28, .06);
   --shadow-2: 0 10px 30px -12px rgba(20, 22, 28, .22);
   --shadow-3: 0 28px 60px -20px rgba(20, 22, 28, .28);
 
-  --ember-wash: radial-gradient(120% 80% at 50% 0%, rgba(226, 63, 23, .12), transparent 70%);
+  --ember-wash: radial-gradient(120% 80% at 50% 0%, rgba(201, 54, 24, .10), transparent 70%);
 
   --scrollbar: rgba(20, 22, 28, .16);
   --scrollbar-hover: rgba(20, 22, 28, .26);
 }
 
-/* Midnight: the same charcoal family, pushed blue and cooler, for a reader who
- * wants the ember accent against a colder room. */
-:root[data-theme="midnight"],
+/* Midnight */
 [data-theme="midnight"] {
   color-scheme: dark;
   --app-bg: #0B0E17;
@@ -238,16 +255,14 @@
 
   --text-1: #EAEFFB;
   --text-2: #9AA6C4;
-  --text-3: #9199AF;
+  --text-3: #98A2B8;
 
   --hover: rgba(190, 210, 255, .06);
   --active: rgba(190, 210, 255, .1);
-  --selected: color-mix(in srgb, var(--tc-brand) 18%, transparent);
+  --selected: color-mix(in srgb, var(--brand) 18%, transparent);
 
-  --brand: var(--tc-brand);
-  --brand-ink: #FFFFFF;
-  --brand-soft: rgba(255, 77, 36, .16);
-  --brand-line: rgba(255, 77, 36, .42);
+  --brand-soft: color-mix(in srgb, var(--brand) 16%, transparent);
+  --brand-line: color-mix(in srgb, var(--brand) 42%, transparent);
   --focus: var(--tc-brand-focus);
 
   --danger: #F87171;
@@ -259,12 +274,11 @@
   --shadow-2: 0 10px 28px -8px rgba(0, 0, 0, .62);
   --shadow-3: 0 26px 64px -18px rgba(0, 0, 0, .76);
 
-  --ember-wash: radial-gradient(120% 80% at 50% 0%, rgba(255, 77, 36, .24), transparent 70%);
+  --ember-wash: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--brand) 24%, transparent), transparent 70%);
 
   --scrollbar: rgba(190, 210, 255, .15);
   --scrollbar-hover: rgba(190, 210, 255, .24);
 }
-
 
 /* ---- mobile.css ---- */
 /* The Mobile presentation stylesheet.

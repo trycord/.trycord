@@ -5,10 +5,17 @@
 // places you can step into, and whatever the instance wants to say. Nothing here
 // is a stack of welcome cards, because a welcome card is a thing you read once
 // and then scroll past forever.
+//
+// Module structure:
+//   - greeting(): time-based greeting
+//   - today(): formatted date string
+//   - renderPlaces(): community list
+//   - renderNews(): announcements
+//   - view(): main view composer
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { serverMark } from '../components.js';
+import { serverMark } from '../ui/primitives.js';
 import { State, nameOf } from '../../packages/store.js';
 import { path } from '../../packages/nav.js';
 import Api from '../../packages/api.js';

@@ -11,7 +11,7 @@
 // before it decides which of the two it is.
 
 import { el } from '../packages/dom.js';
-import { openMenu, openDialog, attachContextMenu, toast, errorToast, confirmDialog } from './ui.js';
+import { openMenu, openDialog, attachContextMenu, toast, errorToast, confirmDialog } from './ui/overlays.js';
 import { State, nameOf, friendshipWith, normalizeUser } from '../packages/store.js';
 import { navigate } from '../packages/nav.js';
 import Api from '../packages/api.js';

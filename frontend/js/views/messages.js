@@ -7,9 +7,9 @@
 
 import { el, clear } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { avatar } from '../components.js';
+import { avatar } from '../ui/primitives.js';
 import { State } from '../../packages/store.js';
-import { openMenu, openDialog, confirmDialog, errorToast, attachContextMenu } from '../ui.js';
+import { openMenu, openDialog, confirmDialog, errorToast, attachContextMenu } from '../ui/overlays.js';
 import { attachUserMenu } from '../user-menu.js';
 import { mediaUrl, isServerPath } from '../../packages/media.js';
 import { dayLabel, toDate, timeOfDay, fullTimestamp, fileSize } from '../../packages/format.js';

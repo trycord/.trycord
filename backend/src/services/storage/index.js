@@ -19,13 +19,24 @@
 //   list(prefix) -> [{ key, size }]   (optional; local supports it)
 //   signedUrl(key, expiresInSeconds) -> string | null   (optional; S3 supports it)
 const path = require('path');
+const settings = require('../settings');
 
 const DRIVERS = { local: () => require('./local'), s3: () => require('./s3') };
 
 let driver = null;
 
 function config() {
-  const kind = String(process.env.STORAGE_DRIVER || 'local').trim().toLowerCase();
+  const kind = String(settings.get('storage.provider') || process.env.STORAGE_DRIVER || 'local').trim().toLowerCase();
+  if (!DRIVERS[kind]) {
+    throw new Error(
+      'STORAGE_DRIVER must be one of: ' + Object.keys(DRIVERS).join(', ') + ' (got "' + kind + '")'
+    );
+  }
+  return { kind };
+}
+
+function config() {
+  const kind = String(settings.get('storage.provider') || process.env.STORAGE_DRIVER || 'local').trim().toLowerCase();
   if (!DRIVERS[kind]) {
     throw new Error(
       'STORAGE_DRIVER must be one of: ' + Object.keys(DRIVERS).join(', ') + ' (got "' + kind + '")'
@@ -37,6 +48,7 @@ function config() {
 function get() {
   if (!driver) {
     const { kind } = config();
+    settings.get('storage.provider');
     driver = DRIVERS[kind]();
     driver.init(kind === 'local' ? { root: localRoot() } : s3Config());
   }

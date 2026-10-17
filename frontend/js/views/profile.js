@@ -7,10 +7,10 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { avatar, bannerNode } from '../components.js';
+import { avatar, bannerNode } from '../ui/primitives.js';
 import { State, normalizeUser, nameOf } from '../../packages/store.js';
 import { navigate } from '../../packages/nav.js';
-import { toast, errorToast, confirmDialog } from '../ui.js';
+import { toast, errorToast, confirmDialog } from '../ui/overlays.js';
 import { joinedLabel } from '../../packages/format.js';
 import Api from '../../packages/api.js';
 import { page, panel, prow, strip, loading, failure } from './util.js';

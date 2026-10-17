@@ -56,18 +56,55 @@ function normalise(hex) {
   return null;
 }
 
-// Resolve a value to a hex literal, following var() chains within the same theme and
-// falling back to the default theme, which is what the cascade does.
+// Resolve a value to a hex literal, following var() chains.
+//
+// Three forms are in use: a bare hex, `var(--token)`, and `var(--token, fallback)`
+// where the fallback is itself a token - the reader-authored palette arrives as
+// inline --c-* properties over the canonical library value, and the semantic
+// names fall back through them. A resolver that stopped at the first var() would
+// report every custom-capable surface as unmeasurable, and a value nothing can
+// read is a pair nothing has verified.
 function resolve(name, theme, all, seen = new Set()) {
   if (!name || seen.has(name)) return null;
   seen.add(name);
   const raw = theme[name];
   if (raw === undefined) return null;
-  const ref = raw.match(/^var\(\s*(--[a-z0-9-]+)\s*(?:,[^)]*)?\)$/);
-  if (ref) {
-    return resolve(ref[1], theme, all, seen) || resolve(ref[1], all.get('trycord') || {}, all, seen);
+  return resolveValue(raw, theme, all, seen);
+}
+
+function resolveValue(raw, theme, all, seen) {
+  const direct = normalise(raw);
+  if (direct) return direct;
+  const ref = varReference(raw);
+  if (!ref) return null;
+  return resolve(ref.name, theme, all, seen)
+    || (ref.fallback !== null ? resolveValue(ref.fallback, theme, all, seen) : null)
+    || resolve(ref.name, all.get('trycord') || {}, all, seen);
+}
+
+// `var(--name)` or `var(--name, fallback)` - enough parsing to keep the fallback
+// whole, including a nested var(). The parens of the fallback are counted so a
+// `var(--a, var(--b, #fff))` reads as one reference rather than a truncated one.
+function varReference(raw) {
+  const text = String(raw).trim();
+  if (!text.startsWith('var(') || !text.endsWith(')')) return null;
+  const inner = text.slice(4, -1);
+  const name = /^\s*(--[a-z0-9-]+)\s*/.exec(inner);
+  if (!name) return null;
+  const rest = inner.slice(name[0].length);
+  if (!rest) return { name: name[1], fallback: null };
+  if (rest[0] !== ',') return null;
+  let depth = 0;
+  let fallback = '';
+  for (const ch of rest.slice(1)) {
+    if (ch === '(') depth++;
+    else if (ch === ')') {
+      if (depth === 0) return null;
+      depth--;
+    }
+    fallback += ch;
   }
-  return normalise(raw);
+  return { name: name[1], fallback: fallback.trim() || null };
 }
 
 function channels(hex) {
@@ -85,10 +122,6 @@ function ratio(a, b) {
   const lb = luminanceOf(b);
   const [hi, lo] = la > lb ? [la, lb] : [lb, la];
   return (hi + 0.05) / (lo + 0.05);
-}
-
-function resolve2(name, theme, all) {
-  return resolve(name, theme, all);
 }
 
 const all = blocks();

@@ -1431,12 +1431,22 @@ async function makeWorld(origin, token) {
     // session while looking entirely healthy.
 
   // A reply to it, an edit on it, and a reaction - the three things the message row is
-  // supposed to show and the three that a single bare message cannot prove.
+  // supposed to show and the three that a single bare message cannot prove. Each of
+  // the three is required to have landed: a seed that silently failed was how this
+  // section spent a session asserting against a message that was never edited.
   const reply = await post({ content: 'A reply, so threads are not empty.', replyToId: seeded.id });
-  await call('PATCH', `/api/channels/${channelId}/messages/${seeded.id}`,
+  const edit = await call('PATCH', `/api/channels/${channelId}/messages/${seeded.id}`,
     { content: 'A message the render check planted, and then edited.' });
-  await call('POST', `/api/channels/${channelId}/messages/${seeded.id}/reactions`,
+  if (edit.status !== 200) {
+    throw new Error('could not edit the seeded message: ' + edit.status + ' '
+      + JSON.stringify(edit.json).slice(0, 200));
+  }
+  const reaction = await call('POST', `/api/channels/${channelId}/messages/${seeded.id}/reactions`,
     { emoji: '\u{1F44D}' });
+  if (reaction.status >= 300) {
+    throw new Error('could not react to the seeded message: ' + reaction.status + ' '
+      + JSON.stringify(reaction.json).slice(0, 200));
+  }
 
   const messageId = seeded.id;
 

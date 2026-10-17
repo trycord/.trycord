@@ -16,9 +16,9 @@
 
 import { el, clear } from '../packages/dom.js';
 import { icon } from '../packages/icons.js';
-import { avatar } from './components.js';
+import { avatar } from './ui/primitives.js';
 import { relativeTime } from '../packages/format.js';
-import { toast, errorToast } from './ui.js';
+import { toast, errorToast } from './ui/overlays.js';
 import Api from '../packages/api.js';
 
 // One live session per channel, so leaving a channel and coming back reuses the
