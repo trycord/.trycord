@@ -442,97 +442,6 @@ function updatesSection() {
   })];
 }
 
-// -- infrastructure ----------------------------------------------------------
-
-function voiceProviderSection() {
-  const select = el('select', { class: 'input input--compact', 'aria-label': 'Media server provider' });
-  select.appendChild(el('option', { value: 'cloudflare' }, 'Cloudflare Realtime SFU (large rooms, screen sharing)'));
-  select.appendChild(el('option', { value: 'mesh' }, 'Self-hosted mesh (peer-to-peer, up to 6 participants)'));
-  const info = el('div', { class: 'prow-sub' }, 'In-house runs the media stack here. Cloudflare routes media; Trycord owns signalling and room management.');
-  select.addEventListener('change', async () => {
-    try {
-      await Api.updateInstanceSettings({ 'voice.provider': select.value });
-      toast('Media provider set to ' + select.value + '.', { type: 'success' });
-    } catch (error) { errorToast(error); }
-  });
-  return [panel({
-    title: 'Voice & video provider',
-    note: 'How real-time media is handled on this instance',
-    rows: [
-      fieldBlock('Media provider', 'In-house requires no external account. Cloudflare Realtime SFU is an optional external provider.', select),
-      info,
-    ],
-  })];
-}
-
-function storageProviderSection() {
-  const select = el('select', { class: 'input input--compact', 'aria-label': 'Storage provider' });
-  select.appendChild(el('option', { value: 'local' }, 'Local filesystem (this instance)'));
-  select.appendChild(el('option', { value: 's3' }, 'S3-compatible (R2, MinIO, S3)'));
-  const detail = el('div', { class: 'stack stack--tight' });
-  const s3Fields = el('div', { class: 'stack stack--tight' },
-    fieldBlock('S3 endpoint', 'https://s3.amazonaws.com or your R2/MinIO endpoint', el('input', { class: 'input', type: 'url', placeholder: 'https://...' })),
-    fieldBlock('Bucket', 'The bucket uploads are written to', el('input', { class: 'input', placeholder: 'bucket-name' })),
-    fieldBlock('Region', 'S3 region', el('input', { class: 'input', placeholder: 'us-east-1' })),
-    fieldBlock('Access key ID', el('input', { class: 'input', placeholder: 'AKIA...' })),
-    fieldBlock('Secret access key', el('input', { class: 'input', type: 'password', placeholder: '••••••••' })),
-  );
-  s3Fields.hidden = true;
-  select.addEventListener('change', () => { s3Fields.hidden = select.value !== 's3'; });
-  const save = el('button', { class: 'btn btn--primary', type: 'button' }, 'Save storage');
-  save.addEventListener('click', async () => {
-    const body = { 'storage.driver': select.value };
-    if (select.value === 's3') {
-      // Read S3 fields from the form
-    }
-    try {
-      await Api.updateInstanceSettings(body);
-      toast('Storage provider saved.', { type: 'success' });
-    } catch (error) { errorToast(error); }
-  });
-  return [panel({
-    title: 'Storage provider',
-    note: 'Where uploads and attachments are stored',
-    rows: [
-      fieldBlock('Provider', 'Local needs nothing else. S3-compatible needs a bucket and credentials.', select),
-      detail,
-      s3Fields,
-    ],
-    foot: save,
-    footEnd: true,
-  })];
-}
-
-function searchProviderSection() {
-  return [panel({
-    title: 'Search provider',
-    note: 'How message and community search is indexed',
-    rows: [
-      prow({
-        title: 'Provider',
-        sub: 'In-house database search',
-        control: el('span', { class: 'prow-sub' }, 'in-house'),
-        actions: el('span', { class: 'badge badge--success' }, 'Active'),
-      }),
-    ],
-  })];
-}
-
-function notificationsProviderSection() {
-  return [panel({
-    title: 'Notifications provider',
-    note: 'How in-app notifications are delivered',
-    rows: [
-      prow({
-        title: 'Provider',
-        sub: 'In-house notification delivery',
-        control: el('span', { class: 'prow-sub' }, 'in-house'),
-        actions: el('span', { class: 'badge badge--success' }, 'Active'),
-      }),
-    ],
-  })];
-}
-
 // -- security ----------------------------------------------------------------
 
 function securitySection() {
@@ -785,13 +694,10 @@ const SECTIONS = {
   sessions: sessionsSection,
   twofactor: twoFactorSection,
   privacy: privacySection,
+  notifications: notificationsSection,
   appearance: appearanceSection,
   backend: backendSection,
   updates: updatesSection,
-  voice: voiceProviderSection,
-  storage: storageProviderSection,
-  search: searchProviderSection,
-  notifications: notificationsSection,
 };
 
 function settingsNav(activeId) {
@@ -812,8 +718,6 @@ function settingsNav(activeId) {
 
 export function renderSettings(ctx) {
   const content = el('div', { class: 'settings-centre' });
-  const body = el('div', { class: 'settings-centre-body' });
-  content.appendChild(body);
   const node = page({ wide: true },
     band({
       eyebrow: 'Settings',
@@ -827,9 +731,9 @@ export function renderSettings(ctx) {
     const build = SECTIONS[tab];
     if (!build) continue;
     try {
-      for (const part of [].concat(build())) if (part) body.appendChild(part);
+      for (const part of [].concat(build())) if (part) content.appendChild(part);
     } catch (error) {
-      body.appendChild(notice({
+      content.appendChild(notice({
         tone: 'danger',
         title: 'This section did not build',
         text: String((error && error.message) || error),
