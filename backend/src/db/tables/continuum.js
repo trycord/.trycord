@@ -65,4 +65,14 @@ module.exports = (engine) => [
       received_at VARCHAR(64) NOT NULL,
       processed   INTEGER NOT NULL DEFAULT 0
     )${engine}`,
+
+  // This instance's own signing identity. Generate-once, persist-forever: a
+  // federation relationship cannot survive an operator restart if the key pair
+  // is regenerated, because remote instances verify our signatures against the
+  // public key they recorded when they added us. One row, id = 1.
+  `CREATE TABLE IF NOT EXISTS continuum_keys (
+      id INTEGER PRIMARY KEY,
+      private_key TEXT NOT NULL,
+      created_at VARCHAR(64) NOT NULL
+    )`,
 ];

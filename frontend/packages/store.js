@@ -314,10 +314,11 @@ export function dmById(id) {
 // The person on the other side of a one-to-one conversation.
 export function dmPeer(dm) {
   if (!dm) return null;
+  // The list answer carries the peer directly; older spells kept a users array.
   const users = dm.users || dm.participants || [];
   const me = State.user && State.user.id;
   const others = users.filter((u) => u.id !== me);
-  const peer = others.length ? others[0] : (users[0] || null);
+  const peer = dm.peer ? dm.peer : (others.length ? others[0] : (users[0] || null));
   return peer ? normalizeUser(peer) : null;
 }
 

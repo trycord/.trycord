@@ -544,10 +544,18 @@ async function applySchema(conn) {
   // full-text path already exists via the engine's own LIKE/FTS (and the search
   // route falls back to its default LIKE query there). Run on every boot, idempotent.
   if (dialect === 'sqlite') {
-    await conn.exec('CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content, content_rowid=rowid)');
-    await conn.exec('CREATE TRIGGER IF NOT EXISTS messages_fts_ai AFTER INSERT ON messages BEGIN INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content); END;');
-    await conn.exec("CREATE TRIGGER IF NOT EXISTS messages_fts_ad AFTER DELETE ON messages BEGIN INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.rowid, old.content); END;");
-    await conn.exec("CREATE TRIGGER IF NOT EXISTS messages_fts_au AFTER UPDATE OF content ON messages BEGIN INSERT INTO messages_fts(messages_fts, rowid, content) VALUES('delete', old.rowid, old.content); INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content); END;");
+    await conn.exec('CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(content)');
+    // Dropped and recreated every boot so the definitions below are the ones the
+    // running code needs - an earlier revision of the update trigger used the
+    // FTS5 'delete' command, which current SQLite rejects with "SQL logic error"
+    // on a plain (non external content) table, so every message edit failed on
+    // databases that still carry it.
+    for (const trigger of ['messages_fts_ai', 'messages_fts_ad', 'messages_fts_au']) {
+      await conn.exec(`DROP TRIGGER IF EXISTS ${trigger}`);
+    }
+    await conn.exec('CREATE TRIGGER messages_fts_ai AFTER INSERT ON messages BEGIN INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content); END');
+    await conn.exec('CREATE TRIGGER messages_fts_ad AFTER DELETE ON messages BEGIN DELETE FROM messages_fts WHERE rowid = old.rowid; END');
+    await conn.exec('CREATE TRIGGER messages_fts_au AFTER UPDATE OF content ON messages BEGIN DELETE FROM messages_fts WHERE rowid = old.rowid; INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content); END');
     await conn.exec('INSERT OR IGNORE INTO messages_fts(rowid, content) SELECT rowid, content FROM messages WHERE rowid NOT IN (SELECT rowid FROM messages_fts)');
   }
 

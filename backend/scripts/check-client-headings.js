@@ -21,8 +21,9 @@ const path = require('path');
 
 const CLIENT = path.join(__dirname, '..', '..', 'frontend', 'js');
 
-// The page furniture: the one shared place a page heading is built.
-const FURNITURE = new Set(['components.js', 'views/util.js']);
+// The page furniture: the one shared place a page heading is built. The
+// views live in features/ now, and their furniture is ui/page.js.
+const FURNITURE = new Set(['ui/page.js']);
 
 function walk(dir) {
   const out = [];
@@ -44,8 +45,13 @@ for (const file of walk(CLIENT)) {
   const source = fs.readFileSync(file, 'utf8');
   const hasHeading = /el\(\s*['"]h1['"]/.test(source);
   const isView = rel.startsWith('views/');
+  // The view modules are features/ now; among them, only the raw surfaces -
+  // the gates and the documents that replace the shell wholesale - may name
+  // their own h1, because there is no shell left above them to compete with.
+  const declaresRaw = /\braw\s*:\s*true\b/.test(source) && /\bnode\s*:/.test(source);
+  const allowed = isView || FURNITURE.has(rel) || (rel.startsWith('features/') && declaresRaw);
 
-  if (hasHeading && !isView && !FURNITURE.has(rel)) {
+  if (hasHeading && !allowed) {
     findings.push(
       `${rel}: an h1 outside a view - the shell wraps every surface, so a heading here`
       + ' is drawn on top of the page\'s own'

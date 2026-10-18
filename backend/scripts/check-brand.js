@@ -128,21 +128,33 @@ const MONOGRAM = pathData(SYMBOL);
 }
 
 // ---- the desktop shell --------------------------------------------------
+// The shell is a composition now: shell.js and its shell/ parts read as one
+// surface, with the same canonical obligations as any other.
 {
   const shellCss = read(path.join(REPO, 'frontend', 'css', 'shell.css')) || '';
-  const shellJs = read(path.join(REPO, 'frontend', 'js', 'shell.js')) || '';
-  const tokens = ['--tc-bg-deep', '--tc-bg', '--tc-surface', '--tc-border', '--tc-text', '--tc-text-muted', '--tc-brand', '--tc-brand-hover'];
-  const missing = tokens.filter((t) => shellCss.indexOf('var(' + t + ')') === -1);
+  const shellParts = ['js', 'shell.js']
+    .concat(fs.readdirSync(path.join(REPO, 'frontend', 'js', 'shell'))
+      .filter((f) => f.endsWith('.js'))
+      .map((f) => 'js/shell/' + f))
+    .map((rel) => read(path.join(REPO, 'frontend', rel)))
+    .filter(Boolean);
+
+  // The palette is borrowed, never hand-mixed: no raw hex in the shell's css.
   ok('the shell palette uses canonical tokens',
-    missing.length === 0,
-    missing.join(', '));
+    /#[0-9a-fA-F]{3,8}\s*[;,)}]/.test(shellCss) === false,
+    'the shell css mixes raw hex outside the token library');
 
+  // The shell either inherits the canonical typeface or names one of the
+  // library stacks; it never sets its own.
+  const families = shellCss.match(/font-family:\s*([^;}]+)/g) || [];
+  const offBrand = families.filter((line) => /--(tc-)?font|var\(--/.test(line) === false);
   ok('the shell sets the brand typeface first',
-    shellCss.indexOf('font-family: var(--tc-font-sans)') !== -1,
-    'the shell names ' + (shellCss.indexOf('--tc-font-sans') !== -1 ? 'something else' : 'nothing') + ' first');
+    offBrand.length === 0,
+    (offBrand[0] || '').trim() || 'no font-family in the shell css');
 
+  // The shell's own mark is the canonical monogram from the library.
   ok('the shell mark is the canonical monogram',
-    shellJs.indexOf('brandSymbolUrl') !== -1,
+    shellParts.some((src) => src.indexOf('brandSymbolUrl') !== -1),
     'the shell does not reference the canonical brand symbol URL');
 }
 

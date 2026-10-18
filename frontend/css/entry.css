@@ -1,0 +1,167 @@
+/* The outside of the workspace.
+ *
+ * Two surfaces mount directly into <body> without the shell, and this layer is
+ * the only place their presentation lives: the gates a visitor meets before
+ * any session exists, and the public documents a reader can open signed out.
+ * Both are deliberately quiet - one centered column, charcoal, the ember
+ * hairline as the single flourish - because a checkpoint is not a billboard.
+ *
+ * Colours come from tokens.css only; no raw values are allowed in this layer. */
+
+/* -- shared ground ----------------------------------------------------------- */
+
+.auth-page,
+.pub-page {
+  min-height: 100vh;
+  background:
+    var(--ember-wash),
+    var(--app-bg);
+  color: var(--text-1);
+  display: flex;
+  flex-direction: column;
+}
+
+/* -- the gates ---------------------------------------------------------------- */
+
+.auth-page {
+  align-items: center;
+  justify-content: flex-start;
+  padding: var(--space-8) var(--space-4);
+  overflow-y: auto;
+}
+
+.gate-card {
+  position: relative;
+  width: min(100%, 400px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-6) var(--space-6);
+  box-shadow: var(--shadow-2);
+  margin: auto;
+  overflow: clip;
+}
+
+/* The one flourish: the ember hairline across the top edge. */
+.gate-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--brand);
+}
+
+.gate-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  text-decoration: none;
+}
+
+.gate-mark:hover { color: var(--text-1); }
+.gate-mark-img { display: block; width: 30px; height: 30px; }
+
+.gate-title {
+  margin: 0;
+  font-size: var(--fs-h1);
+  font-weight: var(--weight-black);
+  letter-spacing: var(--tracking-tight);
+}
+
+.gate-lede { margin: var(--space-2) 0 0; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.6; }
+
+.gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.gate-form [aria-busy='true'] { opacity: .85; }
+
+.gate-alt {
+  margin: var(--space-5) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+}
+
+.gate-alt a { color: var(--text-2); font-weight: var(--weight-medium); text-decoration: underline; text-underline-offset: 2px; }
+.gate-alt a:hover { color: var(--text-1); }
+
+.gate-note { margin: var(--space-5) 0 0; font-size: var(--fs-sm); color: var(--text-2); }
+
+.gate-choices { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-4); }
+
+.gate-secret {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--fs-body);
+  padding: 10px 14px;
+  background: var(--panel-3);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-md);
+  letter-spacing: .05em;
+  overflow-wrap: anywhere;
+  user-select: all;
+  text-align: center;
+}
+
+/* -- the public documents ------------------------------------------------------ */
+
+.pub-page { align-items: stretch; }
+
+.sheet-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+}
+
+.sheet-return {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  margin-left: -6px;
+}
+
+.sheet-return:hover { color: var(--text-1); background: var(--hover); }
+.sheet-return:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sheet-name { margin-left: auto; font-size: var(--fs-micro); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-3); }
+
+.sheet-body {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-7) var(--space-4);
+  overflow-y: auto;
+}
+
+/* The document itself: one narrow reading column. */
+.paper { width: min(100%, 640px); display: flex; flex-direction: column; }
+
+.paper-kicker {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.paper-title { margin: 0; font-size: var(--fs-display); font-weight: var(--weight-black); letter-spacing: var(--tracking-tight); }
+.paper-lede { margin: var(--space-3) 0 0; color: var(--text-2); font-size: var(--fs-body); max-width: 58ch; line-height: 1.65; }
+.paper .actionline { margin-top: var(--space-5); }
+.paper-note { margin: var(--space-5) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--text-3); }

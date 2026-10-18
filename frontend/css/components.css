@@ -73,6 +73,11 @@
 .field-label { font-size: var(--fs-meta); font-weight: 600; color: var(--text-2); }
 .field-hint { font-size: var(--fs-meta); color: var(--text-3); }
 .field-error { font-size: var(--fs-meta); color: var(--danger); }
+
+/* The whole-form answer, next to the submit button: what the server refused. */
+.form-error { font-size: var(--fs-sm); color: var(--danger); }
+.form-note { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6; }
+.form-stack { display: flex; flex-direction: column; gap: var(--space-3); }
 .input--invalid { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
 .input--invalid:focus { border-color: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 14%, transparent); }
 

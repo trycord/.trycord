@@ -196,6 +196,12 @@ const SCHEMA = [
     showIf: { key: 'voice.provider', value: 'cloudflare' },
   },
   {
+    key: 'continuum.enabled', env: 'CONTINUUM_ENABLED', type: 'boolean', default: false,
+    category: 'continuum', label: 'Community Continuum',
+    description: 'Federate with compatible Trycord instances. While on, trusted peers receive signed events from this one and this instance accepts events from instances an administrator added.',
+    live: true, consequential: true,
+  },
+  {
     key: 'voice.turnUsername', env: 'VOICE_VIDEO_TURN_USERNAME', type: 'string', default: '',
     category: 'voice', label: 'TURN username',
     description: 'For a static TURN credential. Leave blank if the provider mints short-lived ones.',
@@ -327,35 +333,35 @@ const SCHEMA = [
     category: 'storage', label: 'S3 bucket',
     description: 'The bucket that holds uploaded files. Shown only when storage provider is S3.',
     live: true,
-    showIf: { key: 'storage.driver', value: 's3' },
+    showIf: { key: 'storage.provider', value: 's3' },
   },
   {
     key: 'storage.s3AccessKeyId', env: 'S3_ACCESS_KEY_ID', type: 'string', default: '',
     category: 'storage', label: 'S3 access key ID',
     description: 'The public half of the S3 credential. Shown only when storage provider is S3.',
     live: true,
-    showIf: { key: 'storage.driver', value: 's3' },
+    showIf: { key: 'storage.provider', value: 's3' },
   },
   {
     key: 'storage.s3Endpoint', env: 'S3_ENDPOINT', type: 'url', default: '',
     category: 'storage', label: 'S3 endpoint',
     description: 'The service endpoint. Leave blank for AWS S3; set for R2, MinIO or others. Shown only when storage provider is S3.',
     live: true,
-    showIf: { key: 'storage.driver', value: 's3' },
+    showIf: { key: 'storage.provider', value: 's3' },
   },
   {
     key: 'storage.s3Region', env: 'S3_REGION', type: 'string', default: 'us-east-1',
     category: 'storage', label: 'S3 region',
     description: 'The bucket region. us-east-1 for AWS S3; other services use different values. Shown only when storage provider is S3.',
     live: true,
-    showIf: { key: 'storage.driver', value: 's3' },
+    showIf: { key: 'storage.provider', value: 's3' },
   },
   {
     key: 'storage.s3ForcePathStyle', env: 'S3_FORCE_PATH_STYLE', type: 'boolean', default: true,
     category: 'storage', label: 'Force path-style addressing',
     description: 'On for R2 and MinIO. Off for AWS S3 with DNS-safe bucket names. Shown only when storage provider is S3.',
     live: true,
-    showIf: { key: 'storage.driver', value: 's3' },
+    showIf: { key: 'storage.provider', value: 's3' },
   },
 
   {
@@ -441,24 +447,6 @@ const SCHEMA = [
     category: 'limits', label: 'Concurrent jobs per type',
     description: 'Maximum jobs of the same type running at once, so one expensive job type cannot starve the rest. Applied when the process next starts.',
     min: 1, max: 100, live: false,
-  },
-  {
-    key: 'storage.provider', env: 'STORAGE_PROVIDER', type: 'string', default: 'local',
-    category: 'storage', label: 'Storage provider',
-    description: 'Where uploaded files are stored. Local writes to the instance filesystem; S3-compatible stores objects in an object bucket. Applied when the process next starts.',
-    allowed: ['local', 's3'], live: false,
-  },
-  {
-    key: 'search.provider', env: 'SEARCH_PROVIDER', type: 'string', default: 'in-house',
-    category: 'search', label: 'Search provider',
-    description: 'How message and community search is indexed. In-house uses the instance database; no external search service is required. Applied when the process next starts.',
-    allowed: ['in-house'], live: false,
-  },
-  {
-    key: 'notifications.provider', env: 'NOTIFICATIONS_PROVIDER', type: 'string', default: 'in-house',
-    category: 'notifications', label: 'Notification provider',
-    description: 'How notifications are delivered. In-house delivers through the instance itself; external push providers are optional add-ons. Applied when the process next starts.',
-    allowed: ['in-house'], live: false,
   },
 ];
 
@@ -562,10 +550,13 @@ const CATEGORIES = [
   { id: 'security', label: 'Authentication and security' },
   { id: 'content', label: 'Content and communities' },
   { id: 'messaging', label: 'Messaging and realtime' },
+  { id: 'notifications', label: 'Notifications' },
   { id: 'voice', label: 'Voice and video' },
   { id: 'mail', label: 'Email' },
   { id: 'storage', label: 'Storage' },
+  { id: 'search', label: 'Search' },
   { id: 'features', label: 'Feature availability' },
+  { id: 'continuum', label: 'Federation' },
   { id: 'limits', label: 'Limits and performance' },
   { id: 'deployment', label: 'Server and deployment' },
 ];
