@@ -432,7 +432,6 @@ const Api = {
   declineFriendRequest: (id) => request('POST', '/api/friends/requests/' + encodeURIComponent(id) + '/decline'),
   cancelFriendRequest: (id) => request('DELETE', '/api/friends/requests/' + encodeURIComponent(id)),
   removeFriend: (userId) => request('DELETE', '/api/friends/' + encodeURIComponent(userId)),
-  searchUsers: (q) => request('GET', '/api/users/search?q=' + encodeURIComponent(q)),
 
   notifications: (opts) => {
     const o = opts || {};
@@ -459,6 +458,8 @@ const Api = {
   setNotificationPrefs: (body) => request('PATCH', '/api/me/notification-prefs', { body }),
   wellbeing: () => request('GET', '/api/me/wellbeing'),
   setWellbeing: (body) => request('PATCH', '/api/me/wellbeing', { body }),
+  exportMyData: (format) =>
+    request('GET', '/api/me/export' + (format ? '?format=' + encodeURIComponent(format) : '')),
 
   deletionStatus: () => request('GET', '/api/account/deletion'),
   requestDeletion: (body) => request('POST', '/api/account/deletion', { body }),
@@ -467,12 +468,14 @@ const Api = {
   adminOverview: () => request('GET', '/api/admin/overview'),
   adminUsers: (opts) => request('GET', '/api/admin/users?' + new URLSearchParams(Object.assign({ limit: '25' }, opts || {})).toString()),
   adminUserActions: (userId) => request('GET', '/api/admin/users/' + encodeURIComponent(userId) + '/actions'),
+  approveUser: (userId) => request('POST', '/api/users/' + encodeURIComponent(userId) + '/approve', { body: {} }),
   adminEnforceUser: (userId, body) => request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/enforce', { body }),
   adminLiftUser: (userId, reason) => request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/lift', { body: { reason } }),
   adminServers: (opts) => request('GET', '/api/admin/servers?' + new URLSearchParams(Object.assign({ limit: '25' }, opts || {})).toString()),
   adminSuspendServer: (id, body) => request('POST', '/api/admin/servers/' + encodeURIComponent(id) + '/suspend', { body }),
   adminLiftServer: (id, reason) => request('POST', '/api/admin/servers/' + encodeURIComponent(id) + '/lift', { body: { reason } }),
   adminReports: (opts) => request('GET', '/api/admin/reports?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
+  adminApprovals: (opts) => request('GET', '/api/admin/approvals?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
   adminReport: (id) => request('GET', '/api/admin/reports/' + encodeURIComponent(id)),
   adminUpdateReport: (id, body) => request('PATCH', '/api/admin/reports/' + encodeURIComponent(id), { body }),
   adminAppeals: (opts) => request('GET', '/api/admin/appeals?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
@@ -488,9 +491,20 @@ const Api = {
   resetInstanceSetting: (key) => request('DELETE', '/api/admin/settings/' + encodeURIComponent(key)),
   instanceSettingsStatus: () => request('GET', '/api/admin/settings/status'),
   adminPages: () => request('GET', '/api/admin/pages'),
+  adminPage: (route) => request('GET', '/api/admin/pages/' + encodeURIComponent(route)),
+  savePageDraft: (route, body) => request('PUT', '/api/admin/pages/' + encodeURIComponent(route), { body }),
+  publishPage: (route, confirm) => request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/publish', { body: { confirm } }),
+  unpublishPage: (route) => request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/unpublish'),
+  pageRevisions: (route, limit) =>
+    request('GET', '/api/admin/pages/' + encodeURIComponent(route) + '/revisions'
+      + (limit ? '?limit=' + encodeURIComponent(limit) : '')),
+  restorePageRevision: (route, revision) =>
+    request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/revisions/' + encodeURIComponent(revision) + '/restore'),
   mailConsole: () => request('GET', '/api/admin/mail'),
   mailValidate: () => request('POST', '/api/admin/mail/validate'),
   mailTestSend: (to) => request('POST', '/api/admin/mail/test', { body: { to } }),
+
+  attachmentQuota: () => request('GET', '/api/attachments/quota'),
 
   // Where the instance keeps its data. Separate from the settings catalogue
   // because it has to be readable before the settings can be, so it is its own
@@ -530,6 +544,30 @@ const Api = {
   voiceScreen: (channelId) => request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/screen'),
   voiceSpeakRequests: (channelId) => request('GET', '/api/voice/channels/' + encodeURIComponent(channelId) + '/speak-requests'),
   requestSpeak: (channelId) => request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/request-speak'),
+
+  // The in-house mesh: the first-party media path where the server relays
+  // offers, answers and ICE between room members and the audio itself runs
+  // browser to browser.
+  voiceMeshJoin: (channelId) =>
+    request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/mesh-join'),
+  voiceMeshLeave: (channelId) =>
+    request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/mesh-leave'),
+  voiceMeshPeers: (channelId) =>
+    request('GET', '/api/voice/channels/' + encodeURIComponent(channelId) + '/mesh-peers'),
+  voiceMeshSignal: (channelId, body) =>
+    request('POST', '/api/voice/channels/' + encodeURIComponent(channelId) + '/mesh-signal', { body }),
+
+  // ---- Community Continuum (instance federation) ----
+  // The discovery document is public: it says who this instance is and what it
+  // can do, no auth needed. Everything else is the operator's admin surface.
+  continuumDiscovery: () => request('GET', '/.well-known/trycord'),
+  continuumInstances: () => request('GET', '/api/continuum/instances'),
+  continuumAddInstance: (body) => request('POST', '/api/continuum/instances', { body }),
+  continuumSetTrust: (id, trustStatus) =>
+    request('PATCH', '/api/continuum/instances/' + encodeURIComponent(id) + '/trust', { body: { trust_status: trustStatus } }),
+  continuumEvents: () => request('GET', '/api/continuum/events'),
+  continuumInbox: () => request('GET', '/api/continuum/inbox'),
+  continuumProbe: (origin) => request('GET', '/api/continuum/probe?origin=' + encodeURIComponent(origin)),
 };
 
 export { Api };

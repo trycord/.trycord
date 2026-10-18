@@ -16,7 +16,7 @@ import { path, currentRoute, navigate } from '../../packages/nav.js';
 import { openMenu, attachContextMenu, confirmDialog, toast, errorToast } from '../ui/overlays.js';
 import { globalPages } from '../../packages/registry.js';
 import { brandMark } from './frame.js';
-import { attachUserMenu } from '../user-menu.js';
+import { personContextMenu } from '../ui/person.js';
 import Api from '../../packages/api.js';
 
 // ---- shared pieces ---------------------------------------------------------
@@ -73,8 +73,8 @@ function globalNavigation() {
 
 function dmUsers(dm) {
   const me = State.user && State.user.id;
-  const users = dm.users || dm.participants || [];
-  return users.filter((user) => user && user.id !== me).map((user) => ({
+  const raw = dm.peer ? [dm.peer] : (dm.users || dm.participants || []);
+  return raw.filter((user) => user && user.id !== me).map((user) => ({
     id: user.id,
     username: user.username,
     displayName: user.display_name || user.displayName || user.username,
@@ -98,7 +98,7 @@ function dmRow(dm, here) {
   );
   // On a person, the conversation is only one of the things the row can do, so
   // the row carries the whole person menu on a right-click or a long press.
-  if (peer.length === 1) attachUserMenu(row, peer[0]);
+  if (peer.length === 1) personContextMenu(row, peer[0]);
   return row;
 }
 

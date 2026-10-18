@@ -8,25 +8,30 @@ recorded as working without a file/route/behaviour reference. Status labels: **w
 Last updated during the rework; keep it in step with the code or it becomes the next
 stale document. Numbers that a check can read are not repeated here.
 
+The client tree was rebuilt after this audit was written, so the sections below keep
+their status labels while the file names in section 1 (the only place this document
+names the tree) have been brought to the current modules.
+
 ## 1. The route, as it actually is
 
 The community tree is a client-side route family rendered by one module,
-`frontend/js/views/community.js`, and registered in `frontend/packages/registry.js` and
-`frontend/js/views/index.js`. `/c/:slug` is the current spelling; `/server/:id` is the
-legacy spelling and is an `aliasOf` the canonical page, so the shell only ever sees an id.
+`frontend/js/features/community.js`, with its pages bound in
+`frontend/packages/registry.js` and `frontend/js/features/index.js`. `/c/:slug` is the
+current spelling; `/server/:id` is the legacy spelling and resolves to the same page,
+so the shell only ever sees an id.
 
 | Page id | Route | Renderer | Layout / sidebar |
 |---|---|---|---|
-| `community` | `/c/:slug` | `renderCommunityHome` | `channel` / `community` |
-| `community.legacy` | `/server/:id` (alias) | `renderCommunityHome` | `channel` / `community` |
-| `community.channel` | `/server/:id/channel/:channel` | `renderChannel` | `channel` / `community` |
-| `community.channelPins` | `/server/:id/channel/:channel/pins` | `renderChannelPins` | `channel` / `community` |
-| `community.members` | `/server/:id/members` | `renderMembersPage` | `channel` / `community` |
-| `community.roles` | `/server/:id/roles` | `renderRolesPage` | `channel` / `community` |
-| `community.invites` | `/server/:id/invites` | `renderInvitesPage` | `channel` / `community` |
-| `community.categories` | `/server/:id/categories` | `renderCategoriesPage` | `channel` / `community` |
-| `community.settings` | `/server/:id/settings` | `renderCommunitySettings` | `channel` / `community` |
-| `community.settings.*` | (no path; resolved against the open community) | `renderCommunitySettings` | `channel` / `community` |
+| `community` | `/c/:slug` | `renderCommunity` | `channel` / `community` |
+| `community.legacy` | `/server/:id` | `renderCommunity` | `channel` / `community` |
+| `community.channel` | `/server/:id/channel/:channel` | `renderChannelView` | `channel` / `community` |
+| `community.channelPins` | `/server/:id/channel/:channel/pins` | `renderChannelView` | `channel` / `community` |
+| `community.members` | `/server/:id/members` | `renderMembers` | `channel` / `community` |
+| `community.roles` | `/server/:id/roles` | `renderRoles` | `channel` / `community` |
+| `community.invites` | `/server/:id/invites` | `renderInvites` | `channel` / `community` |
+| `community.categories` | `/server/:id/categories` | `renderCategories` | `channel` / `community` |
+| `community.settings` | `/server/:id/settings` | `renderCommunity` | `channel` / `community` |
+| `community.settings.*` | (no path; resolved against the open community) | `renderCommunity` | `channel` / `community` |
 | `community.new` | `/servers/new` | `renderServerCreate` (plain) | `plain` |
 
 `community.settings.*` sections declared in the registry: overview, appearance, channels,

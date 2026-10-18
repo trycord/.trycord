@@ -1,6 +1,0 @@
-/* Signing in.
- *
- * The public-facing half of the application: sign in, register, verify, reset,
- * two-step challenge and the invitation landing. It is deliberately not the app
- * shell, so its layout lives here rather than in views.css.
- */

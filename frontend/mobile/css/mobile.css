@@ -1163,6 +1163,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 /* ---- rows, the parts a page supplies -------------------------------------- */
 
 .m-row__actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.m-row__side { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; justify-content: flex-end; }
 .m-row__time { font-size: var(--fs-micro); color: var(--text-3); white-space: nowrap; }
 .m-row__dot {
   width: 8px; height: 8px;
@@ -1502,3 +1503,11 @@ textarea.m-input { min-height: 96px; resize: vertical; }
     transition-duration: .01ms !important;
   }
 }
+
+/* -- the mail console on a phone ------------------------------------------
+ * The three delivery modes as honest radio rows: the chosen one marked, the
+ * status said out loud, and a test send only where a transport could carry it. */
+
+.m-row[role="radio"] { cursor: pointer; }
+.m-row.is-current { background: var(--m-selected); }
+.m-row.is-current .m-row__title { color: var(--m-brand); }

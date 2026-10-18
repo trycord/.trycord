@@ -5,7 +5,7 @@
 // renderers the router dispatches to, and then hands the first address to the
 // router. Everything a reader sees is built from here.
 
-import { mountShell, refreshChrome, setConnection, onSignOut } from './shell.js';
+import { mountShell, refreshChrome, setConnection, setDock, onSignOut } from './shell.js';
 import { applyTheme } from '../packages/theme.js';
 import { preferredEntry, siblingMount } from '../packages/chooser.js';
 import { TrycordConfig } from '../packages/config.js';
@@ -16,7 +16,9 @@ import {
 import { installLinkHandler, installPopStateHandler, navigate, BASE } from '../packages/nav.js';
 import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../packages/realtime.js';
 import { bind } from '../packages/registry.js';
-import { RENDERERS } from './views/index.js';
+import { RENDERERS } from './features/index.js';
+import { mountVoiceDock } from './voice/dock.js';
+import { setLocalUserId, leave as voiceLeave } from './voice/session.js';
 import { run } from './router.js';
 
 function mount() {
@@ -76,12 +78,14 @@ function wireChrome() {
 
 function wireSignOut() {
   onSignOut(async () => {
+    try { await voiceLeave(); } catch { /* the seat clears with the socket */ }
     try { await logout(); } catch { /* signing out is local either way */ }
     realtime.disconnect();
     setSession('out');
     navigate('/login', { replace: true });
   });
   onStore('signed-out', () => {
+    voiceLeave().catch(() => { /* there was nothing to leave */ });
     realtime.disconnect();
     setSession('out');
   });
@@ -106,6 +110,8 @@ async function boot() {
   wireNavigation();
   wireChrome();
   wireSignOut();
+  setLocalUserId(() => (State.user && State.user.id) || '');
+  mountVoiceDock((node) => setDock(node));
 
   try { await TrycordConfig.loadStaticConfig(); } catch { /* the backend resolves from the origin */ }
 
@@ -131,7 +137,7 @@ async function boot() {
     State.user = null;
   }
   setSession(State.user ? 'in' : 'out');
-
+  setLocalUserId(() => (State.user && State.user.id) || '');
   if (State.user) {
     await Promise.allSettled([refreshServers(), refreshDms(), refreshFriends(), refreshNotifications()]);
     realtime.connect();

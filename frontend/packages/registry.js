@@ -22,6 +22,7 @@ export const PAGES = [
   // ---- global destinations. These are the ones the rail carries, and most of
   // them the phone tab bar as well.
   p('home', '/home', {
+    sidebar: 'home',
     nav: { label: 'Home', short: 'Home', icon: 'home', global: true, mobile: true, tabOrder: 1 },
   }),
   p('dms', '/dms', {
@@ -123,6 +124,11 @@ export const PAGES = [
     layout: 'admin', scope: 'admin', group: 'Moderation', order: 1,
     label: 'People', icon: 'users', tabs: ['users'],
     blurb: 'Search an account and act on it',
+  }),
+  p('admin.approvals', '/admin/approvals', {
+    layout: 'admin', scope: 'admin', group: 'Moderation', order: 1.5,
+    label: 'Approvals', icon: 'check', tabs: ['approvals'],
+    blurb: 'Accounts waiting to be let in',
   }),
   p('admin.communities', '/admin/communities', {
     layout: 'admin', scope: 'admin', group: 'Moderation', order: 2,

@@ -12,10 +12,13 @@
 //
 // So: jsdom loads the real index.html, the real modules are imported into it, and
 // fetch is proxied to a real running backend. What comes out is the DOM a reader
-// would get, which is the thing worth asserting on. Layout is not measured - jsdom
-// has no layout engine - so this cannot tell you whether a sidebar is 260px wide.
-// It can tell you that the sidebar has a heading, that the tab bar has five tabs,
-// that a button has an accessible name, or that a page threw.
+// would get, which is the thing worth asserting on. Layout is not measured here -
+// jsdom does not compute geometry itself - so this cannot tell you whether a
+// sidebar is 260px wide. That half lives in scripts/check-layout.js, which paints
+// the real stylesheet through scripts/layout-engine.js and asserts the regions
+// exactly. What this file can tell you is that the sidebar has a heading, that
+// the tab bar has five tabs, that a button has an accessible name, or that a
+// page threw.
 //
 //   node scripts/check-render.js                    every registered page
 //   node scripts/check-render.js --route /dms       one route
@@ -761,6 +764,98 @@ async function settle(window, ms = 400) {
     console.log('  navigated ' + loopTargets.length + ' routes without an uncaught error,'
       + ' plus ' + guestPages.length + ' signed-out screens rendered with no session');
 
+    // ---- the voice room ----
+    //
+    // A voice channel is a room, not a thread. Rendered here rather than trusted:
+    // the honest states it owns (what the instance says about voice, and the
+    // absence of a composer that would claim a message history) are asserted the
+    // way every other page is.
+    console.log('\n  the voice room');
+
+    if (world.voiceId) {
+      const voiceUrl = '/server/' + world.serverId + '/channel/' + world.voiceId;
+      const voiceOutcome = await visit(window, document, Router, voiceUrl, base);
+      if (voiceOutcome.error) {
+        failures.push(`voice room (${voiceUrl}): ${voiceOutcome.error}`);
+        console.log(`    FAIL voice room  <- ${voiceOutcome.error}`);
+      } else {
+        const view = document.getElementById('view-root');
+        const voiceH1s = view.querySelectorAll('h1').length;
+        const voiceText = String(voiceOutcome.text);
+        ok('the voice channel page is one document heading, not a message thread',
+          voiceH1s === 1 && !voiceOutcome.composer,
+          'headings: ' + voiceH1s + ', composer present: ' + !!voiceOutcome.composer);
+        ok('the voice room states where voice stands on this instance',
+          /Voice is off on this instance|In the room|Nobody is in the room/i.test(voiceText),
+          'the page said: ' + voiceText.slice(0, 120).replace(/\s+/g, ' '));
+        ok('the voice room does not claim the room is empty while voice is off',
+          !/Nobody is in the room/i.test(String(voiceOutcome.text)),
+          String(voiceOutcome.text).slice(0, 120).replace(/\s+/g, ' '));
+      }
+    }
+
+    // ---- the federation manager ----
+    //
+    // Continuum is a runtime switch and a working manager, not a sign saying the
+    // server owns it. The block flips the settings-store flag the way the console
+    // does (confirmed, since it is consequential), re-renders the page, and
+    // asserts the surfaces that presence creates.
+    console.log('\n  the continuum manager');
+
+    const adminCall = async (method, p, body) => {
+      const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+      const res = await realFetch(origin() + p, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      let json = {};
+      try { json = await res.json(); } catch { /* empty */ }
+      return { status: res.status, json };
+    };
+
+    const continuumUrl = '/admin/continuum';
+    const before = await visit(window, document, Router, continuumUrl, base);
+    if (before.error) {
+      failures.push(`continuum page first (${continuumUrl}): ${before.error}`);
+      console.log(`    FAIL continuum page first  <- ${before.error}`);
+    } else {
+      const text = String(before.text || '');
+      ok('the continuum page states federation honestly while it is off',
+        /Federation is ?off|nothing is sent/i.test(text) || /The federation switch/i.test(text),
+        'said: ' + text.slice(0, 110).replace(/\s+/g, ' '));
+      ok('the continuum page offers the switch',
+        !!document.querySelector('.switch'),
+        'no .switch rendered');
+    }
+
+    const flip = await adminCall('PUT', '/api/admin/settings', { 'continuum.enabled': true, __confirm: true });
+    ok('the settings store accepts the runtime federation flag', flip.status === 200 || flip.status === 201,
+      'HTTP ' + flip.status + (flip.json && flip.json.error ? ' ' + flip.json.error.code : ''));
+
+    const after = await visit(window, document, Router, continuumUrl, base);
+    const afterText = String(after.text || (document.getElementById('view-root') || {}).textContent || '');
+    if (after.error) {
+      failures.push(`continuum page when on: ${after.error}`);
+      console.log(`    FAIL continuum page when on  <- ${after.error}`);
+    } else {
+      ok('with the flag on the page shows this instance\'s identity card',
+        /\.well-known\/trycord|public key|instance id/i.test(afterText) || !!document.querySelector('.keyblock'),
+        'the page has no identity card');
+      ok('with the flag on the peers card speaks about peers, present or absent',
+        /Connected instances|No peers yet/i.test(afterText),
+        'said: ' + afterText.slice(0, 110).replace(/\s+/g, ' '));
+      ok('with the flag on the outbox says what has left, honestly',
+        /Outbox|Nothing has left/i.test(afterText),
+        'said: ' + afterText.slice(0, 110).replace(/\s+/g, ' '));
+      ok('with the flag on the inbox says what has arrived, honestly',
+        /Inbox|Nothing has arrived/i.test(afterText),
+        'said: ' + afterText.slice(0, 110).replace(/\s+/g, ' '));
+      ok('with the flag on the add flow is reachable',
+        /Add an instance/i.test(afterText),
+        'no add flow on the page');
+    }
+
+    // Leave the flag off again: the throwaway instance is a customer of this
+    // suite, not a federation deployment.
+    await adminCall('PUT', '/api/admin/settings', { 'continuum.enabled': false });
+
     // ---- the spine is actually painted ----
     //
     // The same failure happened here once: a render function existed and nothing called
@@ -1296,8 +1391,8 @@ async function settle(window, ms = 400) {
         current() === 'trycord' && landed.length === 0,
         'data-theme=' + current() + ', ' + landed.length + ' tokens left behind: '
           + (result && result.problems ? result.problems.join('; ') : 'no reasons given'));
-      console.log('    no layout engine here, so the safety net fired - which is the'
-        + ' behaviour that matters; the tokens themselves need a browser');
+      console.log('    the fallback fired without leaving tokens behind - the behaviour'
+        + ' that matters; the rendered geometry itself is check-layout.js\u2019s job');
     }
 
     await boot1.stop();
@@ -1411,6 +1506,13 @@ async function makeWorld(origin, token) {
     { name: 'general', type: 'text' });
   const channelId = channel.json.id || channel.json.channelId || 'general';
 
+  // A voice channel alongside the text one, so the room page - and the promise
+  // it makes about honest states rather than a message thread - is rendered and
+  // asserted like every other page.
+  const voice = await call('POST', `/api/servers/${serverId}/channels`,
+    { name: 'stage one', type: 'voice' });
+  const voiceId = voice.json.id || voice.json.channelId;
+
   // Messages with everything hanging off them, because the conversation is the surface
   // that matters most and "it rendered" says nothing about whether a reply, an edit or a
   // reaction is actually shown. Seeding only a plain message left all three untested and
@@ -1450,7 +1552,7 @@ async function makeWorld(origin, token) {
 
   const messageId = seeded.id;
 
-  return { serverId, channelId, slug, messageId, replyId: reply.id, channels: [channelId] };
+  return { serverId, channelId, slug, messageId, replyId: reply.id, channels: [channelId], voiceId };
 }
 
 /**

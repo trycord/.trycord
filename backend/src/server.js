@@ -203,11 +203,19 @@ async function boot() {
   // default < database < environment, and reading the environment first would let a
   // saved dashboard value be ignored.
   await settings.load();
-  features.load();
-  if (continuum.enabled()) {
-    continuum.setInstanceId(inst.instanceId);
-    continuum.generateKeyPair();
-  }
+  // Reload, not load: features.current can have been built already by a module
+  // that reached for it while the store was still loading, and that build would
+  // answer from the environment for every catalogue-backed flag. Rebuilding
+  // here re-reads every flag with the store in charge, which is the precedence
+  // the whole configuration system promises.
+  features.reload();
+  // The federation identity is prepared unconditionally, not only when
+  // Continuum is enabled: an administrator can switch federation on from the
+  // console at runtime, and the process must already have a stable signing key
+  // to trust or to be trusted. With a persisted key this is a read, not a
+  // regeneration.
+  continuum.setInstanceId(inst.instanceId);
+  await continuum.loadPersistedKeys();
   // Resolved after the store, because the listener and the mount are settings: an
   // administrator changes them in the dashboard and the change takes effect at the
   // next start. This is where a saved value replaces the environment's seed.
@@ -669,6 +677,31 @@ async function boot() {
       resolve();
     });
   });
+
+  // Power-On Self Test: run the full check chain in the background so a deploy
+  // proves itself without blocking startup or crashing the server on failure.
+  // Off in production unless SELFTEST_ON_START=true; on otherwise.
+  const selftestEnabled = process.env.SELFTEST_ON_START === "true"
+    || (process.env.SELFTEST_ON_START !== "false" && process.env.NODE_ENV !== "production");
+  if (selftestEnabled) {
+    try {
+      const { spawn } = require("child_process");
+      const fsMod = require("fs");
+      const logPath = path.join(__dirname, "..", "..", "backend", "tmp", "selftest.log");
+      fsMod.mkdirSync(require("path").dirname(logPath), { recursive: true });
+      const out = fsMod.openSync(logPath, "a");
+      const child = spawn(process.execPath, [path.join(__dirname, "..", "..", "backend", "scripts", "selftest.js")], {
+        cwd: path.join(__dirname, "..", "..", "backend"),
+        detached: true,
+        stdio: ["ignore", out, out],
+      });
+      child.unref();
+      console.log("Power-On Self Test started (pid " + child.pid + "); log: " + logPath);
+    } catch (e) {
+      console.warn("Power-On Self Test could not start:", e && e.message);
+    }
+  }
+
   return { app, server };
 }
 

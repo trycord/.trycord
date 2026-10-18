@@ -26,6 +26,7 @@
 const WebSocket = require('ws');
 const db = require('./db');
 const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
+const voiceMesh = require('./services/voice-mesh');
 
 const createTickets = require('./ws/tickets');
 const createRegistry = require('./ws/registry');
@@ -142,6 +143,7 @@ function createGateway(server) {
       ws.on('close', () => {
         rooms.leaveRoom(ws);
         rooms.leaveServerRoom(ws);
+        voiceMesh.cleanupUser(user.id);
         registry.trackClose(ws, user.id);
       });
 

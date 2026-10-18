@@ -17,7 +17,7 @@ import { scopeNav } from '../../../packages/registry.js';
 import { toast, menu, sheet, confirm } from '../ui.js';
 import { relativeTime } from '../../../packages/format.js';
 import Api from '../../../packages/api.js';
-import { screen, notice, stat } from './util.js';
+import { screen, notice, stat, primaryButton, ghostButton } from './util.js';
 
 function field(label, control, note) {
   return el('label', { class: 'm-field' },
@@ -549,6 +549,97 @@ function pagesBody() {
 
 // -- configuration -----------------------------------------------------------
 
+// The mail console. It answers one honest question on the phone, the same one
+// the desktop answers: does email leave this instance at all. The three modes
+// and their summaries come from the backend's mail registry, so a provider the
+// server does not run cannot be selected here.
+function mailConsoleBlock() {
+  const host = el('div', { class: 'm-stack' });
+
+  async function load() {
+    host.replaceChildren(loading('Reading the mail setup'));
+    try {
+      const out = await Api.mailConsole();
+      const current = (out && out.current) || 'disabled';
+      const providers = (out && out.providers) || [];
+      const describe = out && out.status;
+
+      const statusText = current === 'disabled'
+        ? 'Mail is switched off. Email-dependent features say so rather than pretending to work.'
+        : describe && describe.ready
+          ? 'Mail is configured and ready to send.'
+          : 'Mail is not ready: ' + (((describe && describe.problems) || []).join(' ') || '');
+
+      const parts = [notice({
+        tone: current === 'disabled' ? 'neutral' : (describe && describe.ready ? 'success' : 'warning'),
+        title: 'Mail',
+        meta: null,
+        text: statusText,
+      })];
+
+      const modes = el('div', { class: 'm-list', role: 'radiogroup', 'aria-label': 'Delivery mode' });
+      for (const provider of providers) {
+        const active = provider.mode === current;
+        modes.appendChild(el('button', {
+          class: 'm-row is-active' + (active ? ' is-current' : ''),
+          type: 'button', role: 'radio', 'aria-checked': String(active),
+          onClick: async () => {
+            if (provider.mode === current) { load(); return; }
+            try {
+              await Api.updateInstanceSettings({ 'mail.mode': provider.mode });
+              toast('The delivery mode is ' + String(provider.label || 'changed').toLowerCase(), { type: 'success' });
+              load();
+            } catch (error) {
+              toast((error && error.message) || 'That mode was not accepted.', { type: 'danger' });
+            }
+          },
+        },
+          el('span', { class: 'm-row__lead' }, icon('mail', { size: 17 })),
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__title' }, provider.label || provider.mode),
+            el('span', { class: 'm-row__sub' }, provider.summary || '')),
+          active ? el('span', { class: 'm-row__actions' }, icon('check', { size: 18 })) : null));
+      }
+      parts.push(modes);
+
+      const provider = providers.find((p) => p.mode === current) || null;
+      if (provider && current !== 'disabled') {
+        const to = el('input', {
+          class: 'm-input', type: 'email', inputmode: 'email',
+          placeholder: 'you@example.com',
+          'aria-label': 'Address the test message goes to',
+        });
+        parts.push(el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__sub' }, 'Send a test message through the chosen transport.'),
+            to),
+          el('span', { class: 'm-row__actions' }, el('button', {
+            class: 'm-btn m-btn--primary', type: 'button',
+            onClick: async () => {
+              try {
+                await Api.mailTestSend(to.value.trim() || undefined);
+                toast('A test message was queued.', { type: 'success' });
+              } catch (error) {
+                toast((error && error.message) || 'The test did not send.', { type: 'danger' });
+              }
+            },
+          }, 'Send'))));
+      } else if (provider) {
+        parts.push(el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__sub' }, 'No transport is chosen, so there is nothing to test against.'))));
+      }
+
+      host.replaceChildren(...parts);
+    } catch (error) {
+      host.replaceChildren(failure(error, load));
+    }
+  }
+
+  load();
+  return host;
+}
+
 function instanceSettingsBody() {
   const host = el('div', { class: 'm-stack' });
   let catalogue = [];
@@ -610,7 +701,11 @@ function instanceSettingsBody() {
       body.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Nothing to configure.'))));
     } else {
       const list = el('div', { class: 'm-stack' });
-      for (const entry of entriesOf(category)) list.appendChild(entryRow(entry));
+      for (const entry of entriesOf(category)) {
+        if (entry.key === 'mail.mode') continue; // the mail console owns this choice
+        list.appendChild(entryRow(entry));
+      }
+      if (category.id === 'mail') list.prepend(mailConsoleBlock());
       body.appendChild(group(category.label, list));
     }
     paintSaveBar();
@@ -715,7 +810,19 @@ function instanceSettingsBody() {
       remember(await Api.updateInstanceSettings(payload));
       paint();
       toast('Saved.', { type: 'success' });
-    } catch (error) { toast(error.message, { type: 'danger' }); }
+    } catch (error) {
+      // Consequential values answer CONFIRMATION_REQUIRED on the first attempt;
+      // the save button is itself the confirmation, so repeat the save with the flag.
+      if (error && (error.code === 'CONFIRMATION_REQUIRED' || String(error.message || '').includes('need confirmation'))) {
+        try {
+          remember(await Api.updateInstanceSettings(Object.assign({}, payload, { __confirm: true })));
+          paint();
+          toast('Saved.', { type: 'success' });
+        } catch (error2) { toast(error2.message, { type: 'danger' }); }
+        return;
+      }
+      toast(error.message, { type: 'danger' });
+    }
   }
 
   load();
@@ -908,6 +1015,223 @@ function databaseBody() {
   return host;
 }
 
+// -- federation ----------------------------------------------------------------
+//
+// The Continuum manager, on the phone. The same truth the desktop console reads:
+// the settings store owns the master switch, discovery owns identity, and the
+// admin routes own the peers, the outbox and the inbox. The add flow runs its
+// check first, so what gets stored is what the remote stated about itself.
+
+function continuumBody() {
+  const host = el('div', { class: 'm-stack' });
+
+  const load = async () => {
+    host.replaceChildren(loading('Reading federation'));
+    try {
+      const catalogue = await Api.instanceSettings();
+      let entry = null;
+      for (const category of (catalogue && catalogue.categories) || []) {
+        const found = (category.settings || []).find((s) => s.key === 'continuum.enabled');
+        if (found) { entry = found; break; }
+      }
+      const enabled = !!(entry && entry.value);
+      const nodes = [];
+
+      const flip = async (on) => {
+        try {
+          await Api.updateInstanceSettings(on
+            ? { 'continuum.enabled': true, __confirm: true }
+            : { 'continuum.enabled': false });
+          toast(on ? 'Continuum is on' : 'Continuum is off');
+          await load();
+        } catch (error) { toast(error.message, { type: 'danger' }); }
+      };
+      const toggle = switchControl(enabled, async (on) => {
+        if (on) {
+          const yes = await confirm({
+            title: 'Turn on Community Continuum?',
+            text: 'From then on this instance accepts federation traffic an operator allows, and its discovery document is public.',
+            confirmLabel: 'Turn on',
+          });
+          if (!yes) return;
+        }
+        await flip(on);
+      }, 'Community Continuum');
+      nodes.push(group('The federation switch', [el('div', { class: 'm-row' }, toggle,
+        el('span', { class: 'm-row__sub' }, 'Signed events exchange with peers, opt-in and admin-managed.'))]));
+      if (entry && entry.source === 'environment') {
+        nodes.push(notice({ tone: 'info', title: 'The deployment has the switch', text: 'The environment forces this value; a change saved here takes over.' }));
+      }
+
+      if (!enabled) {
+        nodes.push(notice({
+          tone: 'info',
+          title: 'Nothing is sent, nothing is accepted',
+          text: 'While federation is off this instance is local-only. The discovery document that tells other operators how to reach it answers that the door is closed.',
+        }));
+        host.replaceChildren(...nodes);
+        return;
+      }
+
+      let doc = null;
+      try { doc = await Api.continuumDiscovery(); } catch { doc = null; }
+      if (doc && doc.public_key) {
+        const copy = ghostButton('Copy public key', async () => {
+          try { await navigator.clipboard.writeText(String(doc.public_key || '')); toast('Public key copied'); }
+          catch (error) { toast('The clipboard refused the copy', { type: 'danger' }); }
+        });
+        nodes.push(group('This instance', [
+          notice({ tone: 'neutral', title: 'Identity', text: 'Instance id ' + (doc.instance_id || 'unknown') + ' · protocol ' + (doc.protocol || '?'), body: el('div', { class: 'm-codes' }, el('div', { class: 'm-code' }, String(doc.public_key || ''))), actions: [copy] }),
+        ]));
+      }
+
+      // Peers.
+      const peersHost = el('div', { class: 'm-list' });
+      nodes.push(group('Connected instances', [peersHost]));
+      const paintPeers = async () => {
+        peersHost.replaceChildren(loading('Reading peers'));
+        try {
+          const peers = await Api.continuumInstances();
+          const rows = Array.isArray(peers) ? peers : [];
+          if (!rows.length) {
+            peersHost.replaceChildren(empty({ icon: 'share', title: 'No peers yet', text: 'Add the first one below. The check verifies the remote before anything is stored.' }));
+            return;
+          }
+          const nodes2 = [];
+          for (const peer of rows) nodes2.push(m(peer));
+          peersHost.replaceChildren(...nodes2);
+          function m(peer) {
+            const status = peer.trust_status || 'pending';
+            const actions = [];
+            if (status !== 'trusted') actions.push(ghostButton('Trust', () => void changeTrust(peer.id, 'trusted')));
+            if (status !== 'pending') actions.push(ghostButton('Unblock', () => void changeTrust(peer.id, 'pending')));
+            if (status !== 'blocked') actions.push(ghostButton('Block', () => void changeTrust(peer.id, 'blocked')));
+            return el('div', { class: 'm-row' },
+              el('span', { class: 'm-row__lead' }, icon('server', { size: 17 })),
+              el('span', { class: 'm-row__body' },
+                el('span', { class: 'm-row__title' }, peer.name || 'An unnamed instance'),
+                el('span', { class: 'm-row__sub' }, (peer.id || '') + ' · ' + (peer.origin || ''))),
+              el('span', { class: 'm-row__side' },
+                el('span', { class: 'm-chip' + (status === 'trusted' ? ' m-chip--active' : status === 'blocked' ? ' m-chip--revoked' : '') }, status),
+                actions.length ? el('span', { class: 'm-actions' }, ...actions) : null));
+          }
+        } catch (error) {
+          peersHost.replaceChildren(failure(error, paintPeers));
+        }
+      };
+      async function changeTrust(id, status) {
+        try {
+          await Api.continuumSetTrust(id, status);
+          toast(status === 'trusted' ? 'Instance trusted' : status === 'blocked' ? 'Instance blocked' : 'Trust reset to pending');
+          await paintPeers();
+        } catch (error) { toast(error.message, { type: 'danger' }); await paintPeers(); }
+      }
+      await paintPeers();
+
+      // Add flow inside a sheet, opened by a button row.
+      const addOpen = el('button', { class: 'm-btn m-btn--block m-btn--primary', type: 'button', onClick: () => openAddSheet(paintPeers) }, 'Add an instance');
+      nodes.push(group('Add an instance', [el('div', { class: 'm-list' },
+        el('div', { class: 'm-row' }, addOpen))]));
+
+      // Traffic.
+      const outboxHost = el('div', { class: 'm-list' });
+      const inboxHost = el('div', { class: 'm-list' });
+      const paintOut = async () => {
+        outboxHost.replaceChildren(loading('Reading the outbox'));
+        try {
+          const events = await Api.continuumEvents();
+          const rows = Array.isArray(events) ? events : [];
+          if (!rows.length) { outboxHost.replaceChildren(empty({ icon: 'send', title: 'Nothing sent yet', text: 'A posted message becomes one signed event, delivered to every trusted peer.' })); return; }
+          outboxHost.replaceChildren(...rows.map((event) => {
+            const status = event.status || 'pending';
+            return el('div', { class: 'm-row' },
+              el('span', { class: 'm-row__lead' }, icon('send', { size: 16 })),
+              el('span', { class: 'm-row__body' },
+                el('span', { class: 'm-row__title' }, event.kind || 'an event'),
+                el('span', { class: 'm-row__sub' }, (event.error ? String(event.error).slice(0, 90) + ' · ' : '') + 'attempt ' + (event.attempts != null ? event.attempts : '?') + ' of ' + (event.max_attempts || '?'))),
+              el('span', { class: 'm-row__side' }, el('span', { class: 'm-chip' + (status === 'delivered' ? ' m-chip--active' : '') }, status)));
+          }));
+        } catch (error) { outboxHost.replaceChildren(failure(error, paintOut)); }
+      };
+      const paintIn = async () => {
+        inboxHost.replaceChildren(loading('Reading the inbox'));
+        try {
+          const box = await Api.continuumInbox();
+          const rows = Array.isArray(box) ? box : [];
+          if (!rows.length) { inboxHost.replaceChildren(empty({ icon: 'inbox', title: 'Nothing arrived yet', text: 'Trusted peers deliver here, and each arrival shows whether it was processed.' })); return; }
+          inboxHost.replaceChildren(...rows.map((item) => el('div', { class: 'm-row' },
+            el('span', { class: 'm-row__lead' }, icon('inbox', { size: 16 })),
+            el('span', { class: 'm-row__body' },
+              el('span', { class: 'm-row__title' }, item.kind || 'an event'),
+              el('span', { class: 'm-row__sub' }, 'from ' + (item.instance_id || 'unknown') + ' · ' + relativeTime(item.received_at))),
+            el('span', { class: 'm-row__side' }, el('span', { class: 'm-chip' + (item.processed ? ' m-chip--active' : '') }, item.processed ? 'processed' : 'held')))));
+        } catch (error) { inboxHost.replaceChildren(failure(error, paintIn)); }
+      };
+      await paintOut();
+      await paintIn();
+      nodes.push(group('Outbox', [outboxHost]));
+      nodes.push(group('Inbox', [inboxHost]));
+
+      host.replaceChildren(...nodes);
+    } catch (error) {
+      host.replaceChildren(failure(error, load));
+    }
+  };
+
+  load();
+  return host;
+}
+
+function openAddSheet(refresh) {
+  const origin = el('input', { class: 'm-input', type: 'url', 'aria-label': 'Remote origin', placeholder: 'https://peer.example.dev' });
+  const out = el('div', { class: 'm-stack' });
+  const body = el('div', { class: 'm-stack' },
+    field('Remote origin', origin, 'The base address of the other instance. Its discovery document is fetched.'),
+    out);
+  const check = async () => {
+    out.replaceChildren(loading('Asking the remote instance'));
+    try {
+      const result = await Api.continuumProbe(origin.value.trim());
+      const doc = (result && result.discovery) || {};
+      out.replaceChildren(
+        notice({ tone: 'success', title: 'The remote answered', text: 'Instance id ' + (doc.instance_id || 'unknown') + (doc.enabled === false ? ' · federation off there' : ' · federation on there') })
+      );
+      const id = el('input', { class: 'm-input', 'aria-label': 'Instance id', value: doc.instance_id || '', placeholder: 'their instance id' });
+      const name = el('input', { class: 'm-input', 'aria-label': 'Display name', value: doc.instance_id || '', placeholder: 'what to call them here' });
+      const key = el('textarea', { class: 'm-input m-input--area', rows: 4, 'aria-label': 'Public key', placeholder: '-----BEGIN PUBLIC KEY-----' });
+      key.value = String(doc.public_key || '').trim();
+      const add = async () => {
+        try {
+          await Api.continuumAddInstance({ id: id.value.trim(), name: name.value.trim() || id.value.trim(), origin: origin.value.trim(), public_key: key.value.trim() });
+          toast('Instance added. Trust it to start exchanging events.');
+          if (refresh) await refresh();
+        } catch (error) { toast(error.message, { type: 'danger' }); }
+      };
+      const sheetLayer = sheet({
+        title: 'Confirm the addition',
+        body: el('div', { class: 'm-stack' },
+          field('Instance id', id),
+          field('Display name', name),
+          field('Public key', key, 'Copied from the remote discovery document.'),
+          primaryButton('Add instance', add, { block: true })),
+      });
+      return sheetLayer;
+    } catch (error) {
+      out.replaceChildren(failure(error, check));
+      return null;
+    }
+  };
+
+  const layer = sheet({
+    title: 'Add an instance',
+    body,
+    footer: el('div', { class: 'm-actions' },
+      primaryButton('Check instance', check, { block: true }),
+      ghostButton('Close', () => { if (layer) layer.close(); }, { block: true })),
+  });
+  return layer;
+}
+
 // -- the admin shell ---------------------------------------------------------
 
 export function renderAdmin(ctx) {
@@ -926,6 +1250,7 @@ export function renderAdmin(ctx) {
     'admin.pages': pagesBody,
     'admin.settings': instanceSettingsBody,
     'admin.database': databaseBody,
+    'admin.continuum': continuumBody,
   };
   const active = bodies[initial] ? initial : 'admin';
 

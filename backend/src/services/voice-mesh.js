@@ -11,9 +11,8 @@
 // predictable on a Raspberry Pi-class host.
 const MESH_MAX = 6;
 const { now } = require('../util');
-const channels = require('./channels');
+const db = require('../db');
 const permissions = require('./permissions');
-const enforcement = require('./enforcement');
 
 // room state keyed by channelId
 const rooms = new Map(); // channelId -> Map<userId, session>
@@ -26,7 +25,7 @@ function roomMut(channelId) {
 }
 
 async function authorize(userId, channelId) {
-  const channel = await channels.getById(channelId);
+  const channel = await db.get('SELECT id, server_id, type FROM channels WHERE id = ?', [channelId]);
   if (!channel) return { ok: false, code: 'NOT_FOUND', message: 'channel not found', status: 404 };
   const serverId = channel.server_id || channel.serverId;
   if (!serverId) return { ok: false, code: 'NOT_FOUND', message: 'channel not found', status: 404 };
@@ -86,18 +85,13 @@ function cleanupUser(userId) {
 }
 
 // Operator must supply at least one STUN (and, for restrictive/relay-only scenarios,
-// a TURN) endpoint via VOICE_VIDEO_STUN_URLS / VOICE_VIDEO_TURN_URL. An empty
-// list disables mesh connectivity — the in-house STUN server is expected on a
-// known address (TURN/STUN daemon running locally or on a controlled host).
+// a TURN) endpoint. The truth lives in the configuration centre as before and is read
+// through the features module, so a saved change - not only an environment one -
+// reaches the peers. An empty list leaves the room joinable but warns the client:
+// connections then only form on the same network.
 function iceServers() {
-  const stun = String(process.env.VOICE_VIDEO_STUN_URLS || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const turnUrl = String(process.env.VOICE_VIDEO_TURN_URL || '').trim();
-  const turnUser = String(process.env.VOICE_VIDEO_TURN_USERNAME || '').trim();
-  const out = stun.map((u) => ({ urls: u }));
-  if (turnUrl) {
-    out.push({ urls: turnUrl, username: (turnUser || undefined), credential: undefined });
-  }
-  return out;
+  const features = require('../features');
+  return features.iceServers(features.current);
 }
 
 module.exports = {

@@ -648,6 +648,60 @@ function accessibilityFaults(document) {
     console.log('    ' + (sectionsOk === SECTION_IDS.length ? 'ok  ' : 'note')
       + ' ' + sectionsOk + '/' + SECTION_IDS.length + ' community settings sections rendered');
 
+    // ---- the federation manager, on the phone --------------------------------
+    //
+    // The mobile admin ships the same Continuum manager the desktop console
+    // does. The block flips the settings-store flag through the real API and
+    // asserts the manager's surfaces appear for an enabled instance.
+    console.log('\n  the continuum manager');
+
+    const mobileAdminCall = async (method, p, body) => {
+      const res = await realFetch(origin() + p, {
+        method,
+        headers: Object.assign({ 'Content-Type': 'application/json' }, { Authorization: 'Bearer ' + token }),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      let json = {};
+      try { json = await res.json(); } catch { /* empty */ }
+      return { status: res.status, json };
+    };
+
+    const mobileContinuumUrl = '/admin/continuum';
+    const mobileBefore = await visit(window, document, run, mobileContinuumUrl);
+    const mobileBeforeText = String(mobileBefore.text || document.getElementById('m-view').textContent || '');
+    if (mobileBefore.error) {
+      failures.push(`mobile continuum page (${mobileContinuumUrl}): ${mobileBefore.error}`);
+      console.log(`    FAIL mobile continuum page  <- ${mobileBefore.error}`);
+    } else {
+      ok('the phone\'s continuum page names the switch while federation is off',
+        /The federation switch/i.test(mobileBeforeText) && /Nothing is sent/i.test(mobileBeforeText),
+        'said: ' + mobileBeforeText.slice(0, 110).replace(/\s+/g, ' '));
+    }
+
+    const mobileFlip = await mobileAdminCall('PUT', '/api/admin/settings', { 'continuum.enabled': true, __confirm: true });
+    ok('the phone harness flips the settings-store flag',
+      mobileFlip.status === 200 || mobileFlip.status === 201,
+      'HTTP ' + mobileFlip.status + (mobileFlip.json && mobileFlip.json.error ? ' ' + mobileFlip.json.error.code : ''));
+
+    const mobileAfter = await visit(window, document, run, mobileContinuumUrl);
+    const mobileAfterText = String(mobileAfter.text || document.getElementById('m-view').textContent || '');
+    if (mobileAfter.error) {
+      failures.push(`mobile continuum page when on: ${mobileAfter.error}`);
+      console.log(`    FAIL mobile continuum page when on  <- ${mobileAfter.error}`);
+    } else {
+      ok('the phone\'s continuum page carries identity, peers, outbox and inbox',
+        /This instance|Identity/i.test(mobileAfterText)
+          && /Connected instances/i.test(mobileAfterText)
+          && /Outbox/i.test(mobileAfterText)
+          && /Inbox/i.test(mobileAfterText),
+        'the manager is missing a card');
+      ok('the phone\'s continuum page offers the add flow',
+        /Add an instance/i.test(mobileAfterText),
+        'no add flow on the page');
+    }
+
+    await mobileAdminCall('PUT', '/api/admin/settings', { 'continuum.enabled': false });
+
     // ---- the signed-out screens ---------------------------------------------
     const keep = window.localStorage.getItem('trycord.token');
     window.localStorage.removeItem('trycord.token');

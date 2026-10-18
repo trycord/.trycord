@@ -41,14 +41,8 @@ const LAYERS = [
   'base.css',
   'components.css',
   'shell.css',
-  'messages.css',
-  'views.css',
-  'views-admin.css',
-  'views-community.css',
-  'views-messages.css',
-  'views-auth.css',
-  'views-plain.css',
-  'voice.css',
+  'features.css',
+  'entry.css',
 ];
 
 // The public website is the same product with the same brand. It carries no palette

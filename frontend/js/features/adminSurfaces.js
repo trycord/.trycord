@@ -1,0 +1,458 @@
+// Admin: the people and the moderation queue.
+// Overview, the accounts, the communities, the reports, the appeals, the audit
+// log and the data requests. Every action names what it does in its own label,
+// and every enforcement asks once beside it so a slip needs a second slip.
+
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
+import Api from '../../packages/api.js';
+import { head, card, row, blank, fault, fold, facts, hold } from '../ui/page.js';
+import { errorToast, toast, confirmDialog, openMenu } from '../ui/overlays.js';
+
+// -- overview ----------------------------------------------------------------
+
+export function adminOverview() {
+  const body = el('div', { class: 'anticipation-line' });
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Instance',
+        title: 'Overview',
+        lede: 'Health, counts and what changed lately.',
+      }),
+      card({ label: 'Snapshot', glyph: 'activity', body }),
+    ]),
+    onMount: async () => {
+      try {
+        const data = await Api.adminOverview();
+        const entries = (data && typeof data === 'object' && !Array.isArray(data))
+          ? Object.entries(data).filter(([, v]) => typeof v !== 'object' || v === null)
+          : [];
+        body.replaceChildren(
+          facts(entries.slice(0, 8).map(([key, value]) => ({
+            value: String(value === undefined || value === null ? '—' : value),
+            label: String(key).replace(/_/g, ' '),
+          }))),
+          blank({
+            glyph: 'activity',
+            title: 'The instance at a glance',
+            text: 'Counts and recent activity land here from the live store.',
+          }));
+      } catch (e) {
+        body.replaceChildren(fold([fault(e, null)]));
+      }
+    },
+    cleanup() {},
+  };
+}
+
+// -- people ------------------------------------------------------------------
+
+export function adminPeople() {
+  const results = el('div', { class: 'rowlist' });
+  const input = el('input', {
+    class: 'input', type: 'search', placeholder: 'Search an account',
+    'aria-label': 'Search accounts by name',
+    autocomplete: 'off', spellcheck: 'false',
+  });
+
+  const paintRows = async (q) => {
+    try {
+      const rows = await Api.adminUsers(q ? { q, limit: '25' } : { limit: '25' });
+      const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
+      results.replaceChildren(...(items.length ? items.map((u) => row({
+        lead: el('span', { class: 'role-dot' },
+          icon(u.enforced ? 'shield-off' : 'user', { size: 15 })),
+        title: u.displayName || u.username || 'An account',
+        sub: u.enforced ? 'Enforced: ' + String(u.enforcement || 'unknown') : '@' + (u.username || ''),
+        side: el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Actions for the account ' + (u.username || ''),
+          onClick: (event) => userActions(event, u, () => paintRows(input.value.trim())),
+        }, icon('more', { size: 15 })),
+      })) : [blank({
+        glyph: 'user', title: 'No account by that name',
+        text: 'The search reads names and handles; try fewer letters.',
+      })]));
+    } catch (e) {
+      results.replaceChildren(fold([fault(e, () => paintRows(input.value.trim()))]));
+    }
+  };
+
+  let timer = null;
+  input.addEventListener('input', () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { timer = null; paintRows(input.value.trim()); }, 240);
+  });
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Moderation',
+        title: 'People',
+        lede: 'Search an account, and act on it once on purpose.',
+      }),
+      card({
+        label: 'Accounts', glyph: 'users',
+        body: fold([input, results]),
+      }),
+    ]),
+    onMount: () => paintRows(''),
+    cleanup() { if (timer) clearTimeout(timer); },
+  };
+}
+
+function userActions(event, user, refresh) {
+  const items = [
+    { header: user.displayName || user.username || 'An account' },
+    {
+      label: 'Suspend for one day', icon: 'clock',
+      onSelect: () => enforceWith(user, refresh, {
+        kind: 'suspend', duration: '1d', reason: 'Suspended by an administrator',
+      }),
+    },
+    {
+      label: 'Suspend permanently', icon: 'clock', danger: true,
+      onSelect: () => enforceWith(user, refresh, {
+        kind: 'suspend', reason: 'Suspended by an administrator',
+      }),
+    },
+    {
+      label: 'Ban', icon: 'ban', danger: true,
+      onSelect: () => enforceWith(user, refresh, { kind: 'ban', reason: 'Banned by an administrator' }),
+    },
+    {
+      label: 'Lift enforcement', icon: 'check', checked: true,
+      onSelect: () => lift(user, refresh),
+    },
+    {
+      label: 'Approve account', icon: 'check',
+      onSelect: async () => {
+        try {
+          await Api.approveUser(user.id);
+          toast('Approved');
+          refresh();
+        } catch (e) { errorToast(e); }
+      },
+    },
+  ];
+  openMenu({ anchor: event.currentTarget, items });
+}
+
+async function enforceWith(user, refresh, plan) {
+  const yes = await confirmDialog({
+    title: 'Suspend or ban ' + (user.username || 'this account') + '?',
+    body: 'The person loses access until the enforcement is lifted on purpose.',
+    confirmLabel: 'Apply enforcement',
+    danger: true,
+  });
+  if (!yes) return;
+  try {
+    await Api.adminEnforceUser(user.id, plan);
+    toast('Enforcement applied');
+    refresh();
+  } catch (e) { errorToast(e); }
+}
+
+async function lift(user, refresh) {
+  try {
+    await Api.adminLiftUser(user.id, 'Lifted by an administrator');
+    toast('The enforcement is lifted');
+    refresh();
+  } catch (e) { errorToast(e); }
+}
+
+// -- communities -------------------------------------------------------------
+
+export function adminCommunities() {
+  const list = el('div', { class: 'rowlist' });
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Moderation',
+        title: 'Communities',
+        lede: 'Every community on this instance.',
+      }),
+      card({ label: 'Communities', glyph: 'users', body: list, flush: true }),
+    ]),
+    onMount: async () => {
+      try {
+        const rows = await Api.adminServers({ limit: '50' });
+        const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
+        list.replaceChildren(...(items.length ? items.map((s) => row({
+          lead: el('span', { class: 'role-dot' }, icon('users', { size: 15 })),
+          title: s.name || 'A community',
+          sub: (s.memberCount || s.member_count || 0) + ' members',
+          side: s.suspended ? el('span', { class: 'chip chip--quiet' }, 'suspended') : null,
+        })) : [blank({
+          glyph: 'users', title: 'No communities yet',
+          text: 'Communities appear here once someone creates one.',
+        })]));
+      } catch (e) {
+        list.replaceChildren(fold([fault(e, null)]));
+      }
+    },
+    cleanup() {},
+  };
+}
+
+// -- reports -----------------------------------------------------------------
+
+export function adminReports() {
+  const list = el('div', { class: 'rowlist' });
+
+  const paint = async () => {
+    list.replaceChildren(hold('Reading the reports'));
+    try {
+      const rows = await Api.adminReports({ limit: '50' });
+      const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
+      list.replaceChildren(...(items.length ? items.map((r) => row({
+        lead: el('span', { class: 'role-dot' }, icon('flag', { size: 15 })),
+        title: r.reason || 'A report',
+        sub: (r.reporterUsername ? 'by ' + r.reporterUsername : '') + (r.targetType ? ' · ' + r.targetType : ''),
+        side: el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Update the report',
+          onClick: async () => {
+            try {
+              await Api.adminUpdateReport(r.id, { status: 'resolved' });
+              toast('Report updated');
+              paint();
+            } catch (e) { errorToast(e); }
+          },
+        }, 'Resolve'),
+      })) : [blank({
+        glyph: 'flag', title: 'No reports',
+        text: 'Reports raised by members appear here.',
+      })]));
+    } catch (e) {
+      list.replaceChildren(fold([fault(e, paint)]));
+    }
+  };
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Moderation',
+        title: 'Reports',
+        lede: 'Reports raised by members.',
+      }),
+      card({ label: 'Reports', glyph: 'flag', body: list, flush: true }),
+    ]),
+    onMount: paint,
+    cleanup() {},
+  };
+}
+
+// -- appeals -----------------------------------------------------------------
+
+export function adminAppeals() {
+  const list = el('div', { class: 'rowlist' });
+
+  const paint = async () => {
+    list.replaceChildren(hold('Reading the appeals'));
+    try {
+      const rows = await Api.adminAppeals({ limit: '50' });
+      const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
+      list.replaceChildren(...(items.length ? items.map((a) => row({
+        lead: el('span', { class: 'role-dot' }, icon('mail', { size: 15 })),
+        title: a.username || 'An appeal',
+        sub: a.reason || '',
+        side: el('span', { class: 'rowtools' },
+          el('button', {
+            class: 'btn btn--primary btn--sm', type: 'button',
+            onClick: async () => {
+              try {
+                await Api.adminDecideAppeal(a.id, 'approve', 'Approved by an administrator');
+                toast('Approved');
+                paint();
+              } catch (e) { errorToast(e); }
+            },
+          }, 'Approve'),
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            onClick: async () => {
+              try {
+                await Api.adminDecideAppeal(a.id, 'deny', 'Denied by an administrator');
+                toast('Denied');
+                paint();
+              } catch (e) { errorToast(e); }
+            },
+          }, 'Deny')),
+      })) : [blank({
+        glyph: 'mail', title: 'No appeals',
+        text: 'Requests to reconsider an enforcement land here.',
+      })]));
+    } catch (e) {
+      list.replaceChildren(fold([fault(e, paint)]));
+    }
+  };
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Moderation',
+        title: 'Appeals',
+        lede: 'Requests to reconsider an enforcement.',
+      }),
+      card({ label: 'Appeals', glyph: 'mail', body: list, flush: true }),
+    ]),
+    onMount: paint,
+    cleanup() {},
+  };
+}
+
+// -- audit -------------------------------------------------------------------
+
+export function adminAudit() {
+  const list = el('div', { class: 'rowlist' });
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Moderation',
+        title: 'Audit log',
+        lede: 'Administrative actions, most recent first.',
+      }),
+      card({ label: 'Actions', glyph: 'book', body: list, flush: true }),
+    ]),
+    onMount: async () => {
+      try {
+        const rows = await Api.adminAudit({ limit: '50' });
+        const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
+        list.replaceChildren(...(items.length ? items.map((a) => row({
+          lead: el('span', { class: 'role-dot' }, icon('book', { size: 15 })),
+          title: a.action || 'An action',
+          sub: (a.actorUsername || '') + (a.target ? ' · ' + a.target : ''),
+          meta: a.createdAt || a.created_at || '',
+        })) : [blank({
+          glyph: 'book', title: 'Nothing logged yet',
+          text: 'Administrative actions appear here as they happen.',
+        })]));
+      } catch (e) {
+        list.replaceChildren(fold([fault(e, null)]));
+      }
+    },
+    cleanup() {},
+  };
+}
+
+// -- gdpr --------------------------------------------------------------------
+
+export function adminGdpr() {
+  const list = el('div', { class: 'rowlist' });
+
+  const paint = async () => {
+    list.replaceChildren(hold('Reading the requests'));
+    try {
+      const rows = await Api.adminGdprRequests({ limit: '50' });
+      const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
+      list.replaceChildren(...(items.length ? items.map((r) => row({
+        lead: el('span', { class: 'role-dot' }, icon('lock', { size: 15 })),
+        title: r.username || 'A request',
+        sub: r.type || r.kind || 'data request',
+        side: el('span', { class: 'rowtools' },
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            onClick: async () => {
+              try {
+                await Api.adminReviewGdprRequest(r.id, 'approve', 'Approved by an administrator');
+                toast('Approved');
+                paint();
+              } catch (e) { errorToast(e); }
+            },
+          }, 'Approve'),
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            onClick: async () => {
+              try {
+                await Api.adminProcessGdprRequest(r.id);
+                toast('Processed');
+                paint();
+              } catch (e) { errorToast(e); }
+            },
+          }, 'Process')),
+      })) : [blank({
+        glyph: 'lock', title: 'No data requests',
+        text: 'Erasure and access requests land here.',
+      })]));
+    } catch (e) {
+      list.replaceChildren(fold([fault(e, paint)]));
+    }
+  };
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Moderation',
+        title: 'Data requests',
+        lede: 'Erasure and access requests.',
+      }),
+      card({ label: 'Requests', glyph: 'lock', body: list, flush: true }),
+    ]),
+    onMount: paint,
+    cleanup() {},
+  };
+}
+
+// -- approvals ---------------------------------------------------------------
+
+export function adminApprovals() {
+  const list = el('div', { class: 'rowlist' });
+
+  const paint = async () => {
+    list.replaceChildren(hold('Reading the waiting accounts'));
+    try {
+      const data = await Api.adminApprovals();
+      if (!data || data.enabled === false) {
+        list.replaceChildren(blank({
+          glyph: 'check',
+          title: 'Approval is off',
+          text: 'Registration approval is not enabled for this instance.',
+        }));
+        return;
+      }
+      const items = Array.isArray(data.pending) ? data.pending : [];
+      if (!items.length) {
+        list.replaceChildren(blank({
+          glyph: 'check', title: 'Nobody waiting',
+          text: 'Every account that asked has been let in.',
+        }));
+        return;
+      }
+      list.replaceChildren(...items.map((u) => row({
+        lead: el('span', { class: 'role-dot' }, icon('user', { size: 15 })),
+        title: u.displayName || u.username || 'An account',
+        sub: '@' + (u.username || '') + ' · ' + (u.createdAt || ''),
+        side: el('button', {
+          class: 'btn btn--primary btn--sm', type: 'button',
+          'aria-label': 'Approve ' + (u.username || 'this account'),
+          onClick: async () => {
+            try {
+              await Api.approveUser(u.id);
+              toast('Approved');
+              paint();
+            } catch (e) { errorToast(e); }
+          },
+        }, 'Approve'),
+      })));
+    } catch (e) {
+      list.replaceChildren(fold([fault(e, paint)]));
+    }
+  };
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Moderation',
+        title: 'Approvals',
+        lede: 'Accounts waiting to be let in.',
+      }),
+      card({ label: 'Waiting', glyph: 'check', body: list, flush: true }),
+    ]),
+    onMount: paint,
+    cleanup() {},
+  };
+}

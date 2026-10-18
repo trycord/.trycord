@@ -11,7 +11,7 @@ import { icon } from '../../../packages/icons.js';
 import { avatar, serverMark, empty, loading, failure } from '../components.js';
 import {
   State, normalizeUser, nameOf, refreshServer, refreshServerTree,
-  refreshServerMembers, refreshServerRoles, channelsOf, categoriesOf, can, isOwner, serverById,
+  refreshServerMembers, refreshServerRoles, refreshMutes, isMuted, channelsOf, categoriesOf, can, isOwner, serverById,
 } from '../../../packages/store.js';
 import { path, navigate, BASE } from '../../../packages/nav.js';
 import { setOverride, siblingMount } from '../../../packages/chooser.js';
@@ -111,8 +111,42 @@ function channelItem(serverId, channel) {
   return {
     label: channel.name,
     icon: iconFor(channel),
+    checked: isMuted(channel.id) ? true : null,
     onSelect: () => navigate('/server/' + serverId + '/channel/' + channel.id),
   };
+}
+
+// The actions of the channel the reader is inside. Muting and the link live
+// here rather than buried in the channel jump list, because they act on the
+// channel at hand; the list itself stays a list and marks muted channels.
+function channelActionsSheet(serverId, channel) {
+  const route = '/server/' + serverId + '/channel/' + channel.id;
+  const muted = isMuted(channel.id);
+  const items = [
+    {
+      label: muted ? 'Unmute channel' : 'Mute channel',
+      icon: muted ? 'bell' : 'volume-off',
+      onSelect: async () => {
+        try {
+          if (muted) await Api.unmuteChannel(channel.id);
+          else await Api.muteChannel(channel.id);
+          refreshMutes().catch(() => {});
+          toast(muted ? 'Unmuted.' : 'Muted.', { type: 'success' });
+        } catch (error) {
+          toast((error && error.message) || 'That did not go through.', { type: 'danger' });
+        }
+      },
+    },
+    { label: 'Copy link', icon: 'link', onSelect: () => copyText(origin() + path(route)) },
+  ];
+  if (can(serverId, 'MANAGE_MESSAGES')) {
+    items.push({ label: 'Pins', icon: 'pin', onSelect: () => navigate(route + '/pins') });
+  }
+  menu({ title: '#' + (channel.name || 'channel'), items });
+}
+
+function origin() {
+  try { return window.location.origin || ''; } catch { return ''; }
 }
 
 function communityMenu(serverId) {
@@ -193,6 +227,10 @@ export function renderChannel(ctx) {
           class: 'm-iconbtn', type: 'button', 'aria-label': 'Pinned messages',
           onClick: () => navigate('/server/' + serverId + '/channel/' + channel.id + '/pins'),
         }, icon('pin', { size: 20 })),
+        el('button', {
+          class: 'm-iconbtn', type: 'button', 'aria-label': 'Channel actions',
+          onClick: () => channelActionsSheet(serverId, channel),
+        }, icon('dots', { size: 20 })),
         el('button', {
           class: 'm-iconbtn', type: 'button', 'aria-label': 'Community menu',
           onClick: () => sharedState(serverId).openSheet(),

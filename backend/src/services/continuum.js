@@ -46,11 +46,45 @@ let publicKeyPem = null;
 
 function setInstanceId(id) { instanceId = id; }
 
-function generateKeyPair() {
+function prepareKeys() {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
   publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
   keyPair = privateKey;
   return { publicKey: publicKeyPem, privateKey };
+}
+
+// Restore signing identity that survives restarts. A federation relationship
+// whose public key changes on every boot would strand remote instances: their
+// stored copy of our key would no longer verify our signatures, and every
+// delivery would be rejected until an operator re-copied a new key. The pair
+// is therefore generated once and persisted (continuum_keys, one row), and
+// reloaded at every boot - whether or not federation is currently enabled, so
+// an administrator can turn Continuum on at runtime without first restarting
+// the process.
+async function loadPersistedKeys() {
+  const row = await db.get('SELECT private_key FROM continuum_keys WHERE id = 1');
+  if (row && row.private_key) {
+    try {
+      const restored = crypto.createPrivateKey(String(row.private_key));
+      const certificate = crypto.createPublicKey(restored).export({ type: 'spki', format: 'pem' });
+      keyPair = restored;
+      publicKeyPem = certificate;
+      return { persisted: true };
+    } catch (e) {
+      // Unreadable stored key (corruption or manual edits): regenerate below
+      // rather than failing the boot.
+    }
+  }
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  keyPair = privateKey;
+  publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
+  const pem = keyPair.export({ type: 'pkcs8', format: 'pem' });
+  await db.run('DELETE FROM continuum_keys WHERE id = 1');
+  await db.run(
+    'INSERT INTO continuum_keys (id, private_key, created_at) VALUES (1, ?, ?)',
+    [pem, now()]
+  );
+  return { persisted: false };
 }
 
 function getPublicKey() { return publicKeyPem; }
@@ -155,6 +189,26 @@ async function addInstance(id, name, origin, publicKey) {
 
 async function listInstances() {
   return db.all('SELECT * FROM continuum_instances ORDER BY created_at DESC');
+}
+
+// Operator-facing diagnostics: the durable outbox (what was sent, what is
+// failing, what has been abandoned) and the inbox (what arrived from remote
+// instances, processed or not). Bounded lists - an instance that runs for
+// months should not paste thousands of rows into a console.
+async function listEvents(limit) {
+  const cap = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  return db.all(
+    'SELECT id, kind, status, attempts, max_attempts, error, created_at, updated_at '
+    + 'FROM continuum_events ORDER BY created_at DESC LIMIT ' + cap
+  );
+}
+
+async function listInbox(limit) {
+  const cap = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  return db.all(
+    'SELECT event_id, instance_id, kind, processed, received_at '
+    + 'FROM continuum_inbox ORDER BY received_at DESC LIMIT ' + cap
+  );
 }
 
 async function setTrust(instanceId, trustStatus) {
@@ -314,16 +368,20 @@ async function deliverEvent(payload) {
 module.exports = {
   enabled,
   setInstanceId,
-  generateKeyPair,
+  prepareKeys,
+  loadPersistedKeys,
   getPublicKey,
   signEvent,
   verifyEvent,
   enqueueEvent,
   addInstance,
   listInstances,
+  listEvents,
+  listInbox,
   setTrust,
   discovery,
   receiveEvent,
   deliverEvent,
   processInboundEvent,
+  validateOrigin,
 };

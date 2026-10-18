@@ -229,13 +229,15 @@ const wfText = fs.readdirSync(DIR)
   .join('\n');
 
 const npmText = Object.values(pkg.scripts).join(' ');
+const selftestPath = path.join(scriptsDir, 'selftest.js');
+const selftestText = fs.existsSync(selftestPath) ? fs.readFileSync(selftestPath, 'utf8') : '';
+const searchText = npmText + '\n' + selftestText + '\n' + wfText;
 const checkFiles = fs.readdirSync(scriptsDir)
   .filter((f) => f.startsWith('check') && f.endsWith('.js'));
 
 const unreachable = checkFiles.map((f) => f.slice(0, -3)).filter((name) => {
   if (BY_HAND[name]) return false;
-  if (npmText.includes('scripts/' + name + '.js')) return false;
-  if (wfText.includes('scripts/' + name + '.js')) return false;
+  if (searchText.includes('scripts/' + name + '.js')) return false;
   return true;
 });
 
