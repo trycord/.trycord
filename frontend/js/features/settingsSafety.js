@@ -11,7 +11,10 @@ import { head, card, row, blank, fault, fold } from '../ui/page.js';
 import { errorToast, toast } from '../ui/overlays.js';
 
 export function privacyView() {
-  const blocksList = el('div', { class: 'rowlist' });
+  const reportsList = el('div', { class: 'rowlist' });
+
+  // ... inside node fold, after Blocked card:
+  // I'll insert the card in the node array. Need to edit the node. Let me add card after Blocked.
   const saved = el('p', { class: 'form-error', role: 'status' });
   const selection = new Map();
 
@@ -96,6 +99,7 @@ export function privacyView() {
           'Strangers searching the instance can find you.', discoverToggle)],
       }),
       card({ label: 'Blocked', glyph: 'ban', body: blocksList, flush: true }),
+      card({ label: 'Your reports', glyph: 'flag', body: reportsList, flush: true }),
       card({
         label: 'Your data', glyph: 'download',
         body: fold([
@@ -131,6 +135,20 @@ export function privacyView() {
         }
         body.replaceChildren();
         await paintBlocks();
+        try {
+          const reps = await Api.myReports();
+          const ritems = Array.isArray(reps) ? reps : (reps && (reps.items || reps.reports)) || [];
+          reportsList.replaceChildren(...(ritems.length ? ritems.map((r) => row({
+            lead: el('span', { class: 'role-dot' }, icon('flag', { size: 15 })),
+            title: r.reason || r.targetType || 'A report',
+            sub: r.status || r.createdAt || r.created_at || '',
+          })) : [blank({
+            glyph: 'flag', title: 'No reports filed',
+            text: 'Reports you raise appear here.',
+          })]));
+        } catch (e) {
+          reportsList.replaceChildren(fold([fault(e, null)]));
+        }
       } catch (e) {
         body.replaceChildren(fold([fault(e, null)]));
       }

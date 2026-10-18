@@ -390,6 +390,7 @@ const Api = {
   deleteInvite: (serverId, inviteId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/invites/' + encodeURIComponent(inviteId)),
   joinInvite: (code) => request('POST', '/api/invites/' + encodeURIComponent(code) + '/join'),
+  invitePreview: (code) => request('GET', '/api/invites/' + encodeURIComponent(code) + '/preview'),
 
   discover: (opts) => {
     const o = opts || {};
@@ -517,6 +518,7 @@ const Api = {
   applyDatabaseConfig: () => request('POST', '/api/admin/database/apply'),
 
   reports: (body) => request('POST', '/api/reports', { body }),
+  myReports: () => request('GET', '/api/reports/mine'),
   appeals: (body) => request('POST', '/api/appeals', { body, auth: false }),
   myAppeals: () => request('GET', '/api/appeals/mine'),
 

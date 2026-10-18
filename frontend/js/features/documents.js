@@ -84,6 +84,7 @@ export function renderInvite(ctx) {
 
   function showJoin() {
     const button = el('button', { class: 'btn btn--primary btn--lg', type: 'button' }, 'Join community');
+    const title = el('p', { class: 'lede' }, 'Accept to join this community.');
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
@@ -100,9 +101,15 @@ export function renderInvite(ctx) {
       glyph: 'mail',
       body: [
         el('div', { class: 'joincode' }, code),
+        title,
         el('div', { class: 'actionline' }, button),
       ],
     }));
+    Api.invitePreview(code).then((p) => {
+      if (p && (p.name || p.serverName || p.communityName)) {
+        title.textContent = 'Join ' + (p.name || p.serverName || p.communityName) + '.';
+      }
+    }).catch(() => {});
   }
 
   function load() {
