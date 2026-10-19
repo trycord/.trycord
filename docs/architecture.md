@@ -180,6 +180,7 @@ What remains are the things that are cheap and always true:
 | `cd backend && npm start` | the application itself: the API, the web client and the public site |
 | `cd backend && npm run migrate` | the schema, applied to the configured database |
 | `cd backend && npm run db:backup` | a read-only dump of the live database, verified against what the server reports |
+| `cd backend && npm run db:restore <file>` | verifies a dump, and restores it when told to |
 | `cd backend && npm run css` | rebuilds the stylesheets from the layer sources |
 
 Verification is now something a person does against a running instance rather than a
