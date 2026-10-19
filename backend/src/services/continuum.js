@@ -561,6 +561,23 @@ async function earlierPendingEvent(event) {
   return null;
 }
 
+// What the other end said it would not accept. Bounded, because a peer
+// could answer with anything at all.
+async function readRefusal(res) {
+  try {
+    const text = await res.text();
+    if (!text) return null;
+    let reason = text;
+    try {
+      const parsed = JSON.parse(text);
+      reason = (parsed.error && parsed.error.message) || parsed.message || text;
+    } catch { /* not JSON: the text is the reason */ }
+    return String(reason).slice(0, 300);
+  } catch {
+    return null;
+  }
+}
+
 // Deliver one event to one remote instance. Returns true on success.
 async function deliverEventToInstance(event, instance) {
   const envelope = {
@@ -596,7 +613,10 @@ async function deliverEventToInstance(event, instance) {
       );
       return true;
     }
-    throw new Error(`HTTP ${res.status}`);
+    // The refusal is worth keeping: "HTTP 400" says that something was
+    // refused, and the reason says what.
+    const reason = await readRefusal(res);
+    throw new Error(`HTTP ${res.status}${reason ? ': ' + reason : ''}`);
   } catch (e) {
     await db.run(
       'INSERT INTO continuum_deliveries (id, event_id, instance_id, status, attempted_at, error) VALUES (?, ?, ?, ?, ?, ?)',

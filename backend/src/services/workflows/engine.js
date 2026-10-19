@@ -18,7 +18,6 @@
 //     had a failing step is never reported as succeeded.
 
 const crypto = require('crypto');
-const db = require('../../db');
 const { now, uuid } = require('../../util');
 const store = require('./store');
 const conditions = require('./conditions');

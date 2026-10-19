@@ -99,25 +99,28 @@ async function scanMessages(publish) {
   }
 }
 
+// The ledger keys a reaction by (message, user, emoji), which is a string the
+// database has to build. The two engines spell that differently, so the
+// expression is chosen by the dialect rather than attempted and caught.
+function reactionKeyExpression(alias) {
+  if (db.dialect === 'mysql') {
+    return `CONCAT(${alias}.message_id, '|', ${alias}.user_id, '|', ${alias}.emoji)`;
+  }
+  return `${alias}.message_id || '|' || ${alias}.user_id || '|' || ${alias}.emoji`;
+}
+
 async function scanReactions(publish) {
-  // The ledger keys a reaction by (message, user, emoji), which SQL cannot
-  // express as a join, so the candidates are filtered here rather than in the
-  // query.
   const rows = await db.all(
     'SELECT r.message_id, r.user_id, r.emoji, m.channel_id, c.server_id FROM reactions r '
     + 'JOIN messages m ON m.id = r.message_id '
     + 'JOIN channels c ON c.id = m.channel_id JOIN servers s ON s.id = c.server_id '
     + 'WHERE s.is_public = 1 '
-    + 'ORDER BY r.created_at ASC LIMIT ' + BATCH
+    + 'AND NOT EXISTS (SELECT 1 FROM continuum_publications p WHERE p.source_kind = ? '
+    + 'AND p.source_id = ' + reactionKeyExpression('r') + ') '
+    + 'ORDER BY r.created_at ASC LIMIT ' + BATCH,
+    ['reaction']
   );
-  const candidates = [];
   for (const row of rows) {
-    const key = relay.reactionKey(row.message_id, row.user_id, row.emoji);
-    const known = await ledger.find('reaction', key);
-    if (!known) candidates.push(row);
-    if (candidates.length >= BATCH) break;
-  }
-  for (const row of candidates) {
     await publishOrWithhold(publish, 'reaction.added', {
       serverId: row.server_id,
       channelId: row.channel_id,
@@ -148,8 +151,15 @@ const DELETE_KIND = {
 // Walk the ledger and look at what it says against what is there now.
 async function sweepSource(publish, sourceKind) {
   const after = await feedCursor('sweep:' + sourceKind);
-  const rows = await ledger.listForSweep(sourceKind, { after, limit: BATCH });
-  if (!rows.length) return;
+  let rows = await ledger.listForSweep(sourceKind, { after, limit: BATCH });
+  if (!rows.length) {
+    // The sweep has come to the end of the ledger. It starts again from the
+    // beginning, so a change is noticed within a pass or two of it
+    // happening rather than never.
+    rows = await ledger.listForSweep(sourceKind, { after: '', limit: BATCH });
+    if (!rows.length) return;
+    await setFeedCursor('sweep:' + sourceKind, '');
+  }
 
   for (const row of rows) {
     const local = await relay.readSource(sourceKind, row.source_id);

@@ -325,6 +325,7 @@ async function buildPayload(kind, input, source, opts) {
   } else if (input.channelId) {
     const channel = await channelSection(input.serverId, input.channelId, false);
     if (!channel) return { ok: false, reason: 'the channel does not exist' };
+    payload.channel = channel;
   }
 
   if (events.isSubjectKind(kind, 'message')) {

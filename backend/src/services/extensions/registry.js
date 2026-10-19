@@ -18,7 +18,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const db = require('../../db');
 const store = require('./store');
 const packages = require('./packages');
 const signatures = require('./signature');
