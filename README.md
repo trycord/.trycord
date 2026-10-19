@@ -85,7 +85,8 @@ workflow is still required by your deployment.
 default, where the server refuses to start without them, are `JWT_SECRET`,
 `SERVER_HOST_TYPE` and the database profile. See `docs/selfhosting.md` for
 deployment, including the nginx topology and the Docker volume layout,
-`docs/status-monitor.md` for the optional status monitor, and
+`docs/status-monitor.md` for the optional status monitor,
+`docs/instances.md` for running alongside other instances, and
 `docs/architecture.md` for how the system is put together.
 
 ## Deployment
