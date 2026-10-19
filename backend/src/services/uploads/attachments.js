@@ -11,6 +11,7 @@ const storage = require('../storage');
 const { now, uuid, isMember } = require('../../util');
 const detect = require('./detect');
 const quota = require('./quota');
+const settings = require('../settings');
 
 const PENDING_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -35,6 +36,23 @@ async function store({ uploaderId, channelId, conversationId, buffer, originalNa
     return { error: 'VALIDATION_ERROR', message: 'Empty file' };
   }
   const mime = detect.detectMime(buffer, originalName);
+
+  // What this instance accepts. The list is empty unless an operator set one,
+  // and an empty list means anything goes - the serving side is what makes that
+  // safe. When the list is not empty, the file is refused unless its detected
+  // type is on it. The type is the one the bytes say, not the one the client
+  // claimed, so a renamed file does not get past this.
+  const allowed = settings.isLoaded() ? settings.read('content.allowedUploadTypes', []) : [];
+  if (Array.isArray(allowed) && allowed.length) {
+    const list = allowed.map((t) => String(t).trim().toLowerCase()).filter(Boolean);
+    if (list.length && !list.includes(String(mime).toLowerCase())) {
+      return {
+        error: 'VALIDATION_ERROR',
+        message: 'This instance does not accept ' + mime + ' files.',
+      };
+    }
+  }
+
   const over = await quota.check(uploaderId, buffer.length);
   if (over) return over;
 
