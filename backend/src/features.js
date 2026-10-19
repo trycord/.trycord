@@ -63,7 +63,15 @@ function url(name) {
 }
 
 // The declared flags. Order here is documentation order, not precedence.
+// The media providers this build understands.
+//
+// The first-party mesh is the one an instance is expected to run: the server
+// carries the signalling and the peers carry the media, so a call does not
+// leave the host. The hosted SFU is still read, because a deployment that has
+// it configured should not lose voice on upgrade - but it is not offered as a
+// choice, and the boot says plainly that it is not the supported path.
 const PROVIDERS = ['cloudflare', 'mesh'];
+const SUPPORTED_PROVIDERS = ['mesh'];
 
 // Settings the configuration centre owns. Each of these has a row in
 // services/settings.js, and that module already implements the precedence this
@@ -124,11 +132,15 @@ function valueOf(envName, fallback) {
 }
 
 function providerName() {
-  const raw = text('VOICE_VIDEO_PROVIDER', PROVIDERS[0]).toLowerCase();
+  const raw = text('VOICE_VIDEO_PROVIDER', SUPPORTED_PROVIDERS[0]).toLowerCase();
   if (PROVIDERS.indexOf(raw) === -1) {
     throw new Error(
       `VOICE_VIDEO_PROVIDER must be one of ${PROVIDERS.join(', ')}, got "${raw}".`
     );
+  }
+  if (SUPPORTED_PROVIDERS.indexOf(raw) === -1) {
+    console.warn('[warn] voice and video is configured for the "' + raw + '" provider, which this build does not support.'
+      + ' The in-house mesh is the supported path; set voice.provider to mesh in the admin configuration.');
   }
   return raw;
 }
