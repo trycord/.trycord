@@ -179,6 +179,58 @@ export async function testBackend(url, timeoutMs) {
   }
 }
 
+// The whole picture of an instance, for a reader deciding whether to join it:
+// who it is, what it can tell us, whether it is taking new accounts, and what
+// its own Continuum document says about it.
+//
+// The Continuum document is fetched separately and separately allowed to fail.
+// An instance that does not federate has no document, and that is a fact about
+// it rather than an error - the chooser says so instead of refusing the
+// instance.
+export async function inspectInstance(url, timeoutMs) {
+  const base = testBackend(url, timeoutMs);
+  const info = await base;
+  if (!info.ok) return info;
+
+  const value = plausibleUrl(url);
+  let continuum = null;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), (timeoutMs || 10000) / 2);
+    const res = await fetch(value + '/.well-known/trycord', {
+      cache: 'no-store', signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const doc = await res.json();
+      if (doc && typeof doc === 'object' && doc.instance_id) {
+        continuum = {
+          instanceId: String(doc.instance_id),
+          protocol: String(doc.protocol || ''),
+          protocolVersion: String(doc.protocol_version || ''),
+          federates: doc.enabled === true,
+        };
+      }
+    }
+  } catch { /* no document means no Continuum identity, not a failure */ }
+
+  let details = null;
+  try {
+    const res = await fetch(value + '/api/instance', { cache: 'no-store' });
+    if (res.ok) details = await res.json();
+  } catch { /* the name came from the first probe; this is extra */ }
+
+  return {
+    ok: true,
+    name: info.name,
+    instanceId: (details && details.instanceId) || (continuum && continuum.instanceId) || null,
+    apiVersion: (details && details.apiVersion) || null,
+    protocolVersion: (details && details.protocolVersion) || (continuum && continuum.protocolVersion) || null,
+    registration: (details && details.registration) || null,
+    continuum,
+  };
+}
+
 export const TrycordConfig = {
   DEFAULT_BACKEND_URL,
   loadStaticConfig,
@@ -192,6 +244,7 @@ export const TrycordConfig = {
   pendingQueryBackend,
   clearQueryBackend,
   testBackend,
+  inspectInstance,
 };
 
 export default TrycordConfig;

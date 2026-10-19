@@ -7,7 +7,7 @@
 
 import { el } from '../../../packages/dom.js';
 import Api, { forgetToken } from '../../../packages/api.js';
-import TrycordConfig, { setApiUrl, backendUrl } from '../../../packages/config.js';
+import TrycordConfig, { setApiUrl, backendUrl, inspectInstance } from '../../../packages/config.js';
 import { path, navigate } from '../../../packages/nav.js';
 import { toast } from '../ui.js';
 
@@ -47,7 +47,7 @@ export function renderInstances() {
     if (!target) { note.textContent = 'Enter an address first.'; return; }
     connect.disabled = true;
     note.textContent = 'Checking that address…';
-    const check = await TrycordConfig.testBackend(target, 10000);
+    const check = await inspectInstance(target, 10000);
     if (!check.ok) {
       note.textContent = check.error;
       connect.disabled = false;
