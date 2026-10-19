@@ -1,0 +1,6 @@
+{
+  "name": "trycord-client",
+  "private": true,
+  "type": "module",
+  "description": "The Trycord web client. ES modules served to the browser; this file marks that scope so the same files can be parsed and tested by Node."
+}

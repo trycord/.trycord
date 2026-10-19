@@ -263,7 +263,11 @@ const messageMenu = (m, self, cfg, composer, openThread, del, live) => {
       items.push({
         label: m.pinned ? 'Unpin message' : 'Pin message',
         icon: 'pin', checked: !!m.pinned,
-        onSelect: () => cfg.pin(m.id, !m.pinned),
+        // The caller updates the row when the server has accepted the pin; a
+        // refusal is reported rather than left as an unhandled rejection.
+        onSelect: () => {
+          Promise.resolve(cfg.pin(m.id, !m.pinned)).catch((error) => errorToast(error));
+        },
       });
     }
     if (mine && cfg.unreactFrom) {

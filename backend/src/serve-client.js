@@ -246,14 +246,28 @@ function mountPublicSite(app, opts) {
   ]) {
     if (!fs.existsSync(path.join(candidate, 'home.html'))) continue;
     publicDir = candidate;
-    app.use(express.static(candidate, {
-      setHeaders(res) {
-        res.setHeader('Cache-Control', 'no-cache');
-      },
-    }));
     break;
   }
   if (!publicDir) return null;
+
+  // Where the API for this instance lives.
+  //
+  // The site and the API are usually served by the same process, in which case
+  // the serving origin is the API's address. A deployment that names its API
+  // explicitly - API_URL, or the older TRYCORD_API_URL - knows better, and its
+  // address wins. Anything that cannot be parsed as an http(s) origin is
+  // ignored rather than obeyed, so a typo in a setting cannot become an
+  // address the site's pages start asking.
+  const apiBaseFor = (req) => {
+    const configured = String(process.env.TRYCORD_API_URL || process.env.API_URL || '').trim();
+    if (configured) {
+      try {
+        const u = new URL(configured);
+        if (u.protocol === 'http:' || u.protocol === 'https:') return u.origin;
+      } catch { /* not an address; fall through to the serving origin */ }
+    }
+    return siteOrigin(req) || '';
+  };
 
   // The public site's own backend.json, rewritten to the origin that served
   // it.
@@ -264,6 +278,12 @@ function mountPublicSite(app, opts) {
   // site, which has no API, and the page answers 404. The file names the
   // address; here it is rewritten to whoever is serving, which is the same
   // rule the client's copy follows.
+  //
+  // This route is registered BEFORE the static handler below, because
+  // express.static answers anything that exists on disk - including
+  // backend.json - and the route is the one that rewrites that file. The other
+  // way round, the shipped file wins, the site points at the official
+  // instance, and nothing says so.
   app.get('/backend.json', (req, res, next) => {
     fs.readFile(path.join(publicDir, 'backend.json'), 'utf8', (err, raw) => {
       if (err) return next();
@@ -271,11 +291,35 @@ function mountPublicSite(app, opts) {
       try { json = JSON.parse(raw); } catch { return next(); }
       const self = siteOrigin(req);
       if (self) json.backendUrl = self;
+      const api = apiBaseFor(req);
+      if (api) json.backendUrl = api;
+      // Where the application itself is served. The site's links into the app
+      // used a hardcoded '/app/', which 404s on a deployment that serves the
+      // client from the origin root, and on a static site with no app at all.
+      // The file names the address; the server rewrites it to its own mount.
+      if (json.appUrl === undefined) json.appUrl = (process.env.TRYCORD_APP_MOUNT || '').replace(/\/+$/, '');
       res.set('Cache-Control', 'no-store')
         .type('json')
         .send(JSON.stringify(json, null, 2) + '\n');
     });
   });
+
+  // The site's own files. Registered after the route above, so that route
+  // answers /backend.json and the static handler answers everything else.
+  //
+  // The site's test directory is not part of the site. It is source, and
+  // there is no reason for it to be reachable, so it is refused before the
+  // static handler can offer it - a file that answers 404 is a file nobody
+  // can mistake for a page.
+  app.use('/tests', (req, res) => {
+    res.status(404).type('text').send('Not found');
+  });
+  app.use(express.static(publicDir, {
+    index: false,
+    setHeaders(res) {
+      res.setHeader('Cache-Control', 'no-cache');
+    },
+  }));
 
   const injectOriginMeta = (html, req, route) => {
     const origin = siteOrigin(req);
@@ -307,6 +351,15 @@ function mountPublicSite(app, opts) {
     if (monitorUrl && route === '/status') {
       meta.push('<meta name="status-monitor" content="' + esc(monitorUrl) + '">');
     }
+    // Where the API for this instance lives.
+    //
+    // The public site and the API are often different origins: the site is
+    // frequently a static deployment and the API is the instance behind it. A
+    // page on the site that asks for a relative '/api/...' reaches the site,
+    // which has no API, and the request answers 404. The pages on this site
+    // therefore resolve the API's address rather than assuming it is the page's
+    // own origin, and this tag is where they read it from.
+    meta.push('<meta name="trycord-api" content="' + esc(apiBaseFor(req)) + '">');
     return html.replace('</head>', '  ' + meta.join('\n  ') + '\n</head>');
   };
 

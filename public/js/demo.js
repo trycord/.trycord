@@ -300,6 +300,7 @@
         controlsHost.appendChild(renderControls(server));
       }
       host.appendChild(renderNote());
+      renderSource();
     }
 
     function railMark() {
@@ -331,9 +332,30 @@
     function renderNote() {
       var live = state.source === 'live';
       var text = live
-        ? 'Communities and channels are live from this instance. Messages, members and your membership are simulated.'
-        : (Sample ? Sample.note + ' ' : '') + 'Messages, members and your membership are simulated.';
+        ? 'Live: the public communities and channels below were read from this instance a moment ago. '
+          + 'Simulated: the messages, the member list, presence, and joining or leaving a community. '
+          + 'Nothing you do here is sent anywhere.'
+        : (Sample ? Sample.note + ' ' : '')
+          + 'Simulated: the messages, the member list, presence, and joining or leaving a community. '
+          + 'Nothing you do here is sent anywhere.';
       return el('p', { class: 'mini-note' }, [text]);
+    }
+
+    // Which instance the live half of the demo was read from. A demo that
+    // shows a real community list without saying where it came from reads as
+    // a live instance whether it is one or not.
+    function renderSource() {
+      var host = document.querySelector('[data-demo-source]');
+      if (!host) return;
+      if (state.source !== 'live') {
+        host.textContent = 'Sample content. This is not a live instance.';
+        return;
+      }
+      Api.apiBase().then(function (base) {
+        host.textContent = 'Reading public communities from ' + base + '.';
+      }).catch(function () {
+        host.textContent = 'Reading public communities from this instance.';
+      });
     }
 
     function renderControls(server) {

@@ -9,7 +9,7 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { State, nameOf } from '../../packages/store.js';
-import { path, navigate } from '../../packages/nav.js';
+import { navigate } from '../../packages/nav.js';
 import { avatar, bannerNode } from '../ui/primitives.js';
 import { head, card, blank, fault, fold, facts } from '../ui/page.js';
 import { errorToast, confirmDialog, toast } from '../ui/overlays.js';

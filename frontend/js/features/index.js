@@ -77,6 +77,7 @@ export const RENDERERS = {
 
   admin: (ctx) => renderAdmin(ctx),
   'admin.users': (ctx) => renderAdmin(ctx),
+  'admin.approvals': (ctx) => renderAdmin(ctx), // TEMP-CHECK
   'admin.communities': (ctx) => renderAdmin(ctx),
   'admin.reports': (ctx) => renderAdmin(ctx),
   'admin.appeals': (ctx) => renderAdmin(ctx),
@@ -87,6 +88,7 @@ export const RENDERERS = {
   'admin.settings': (ctx) => renderAdmin(ctx),
   'admin.database': (ctx) => renderAdmin(ctx),
   'admin.continuum': (ctx) => renderAdmin(ctx),
+  'admin.diagnostics': (ctx) => renderAdmin(ctx),
 
   login: gates,
   register: gates,

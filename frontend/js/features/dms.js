@@ -10,7 +10,7 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { EVENTS, on, joinDm, leaveDm } from '../../packages/realtime.js';
 import {
-  State, emit, nameOf, dmPeer, refreshDms, presenceOf,
+  State, emit, nameOf, dmPeer, refreshDms, presenceOf, on as onStore,
 } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
 import { avatar } from '../ui/primitives.js';
@@ -84,6 +84,9 @@ export function renderDms() {
     refreshDms().then(() => paint()).catch(() => {});
   }
 
+  // A conversation read elsewhere clears its badge without a reload.
+  const offDms = onStore('dms', paint);
+
   return {
     node: fold([
       (() => {
@@ -110,7 +113,7 @@ export function renderDms() {
         body.replaceChildren(fold([fault(e, null)]));
       }
     },
-    cleanup() {},
+    cleanup() { offDms(); },
   };
 }
 

@@ -31,11 +31,26 @@ function active() {
 
 // Open one connection and bring its schema up to date. Separate from connect()
 // because a live apply needs exactly this and nothing else.
-async function open(cfg) {
+//
+// The order is deliberate. The baseline schema pass is idempotent and creates
+// the tables; the versioned migrations run after it, because a migration that
+// needs a table the baseline creates would otherwise run before the table
+// exists. The runner records what it applied, refuses to run over a database a
+// newer build wrote to, and stops at a migration that failed rather than
+// running the ones after it.
+//
+// `apply: false` opens the connection and does nothing to the schema. It is
+// for the read-only paths - asking what state a database is in, which must
+// not change it.
+async function open(cfg, { apply = true } = {}) {
   const next = cfg.client === 'sqlite'
     ? await require('./sqlite').connect(cfg.file)
     : await require('./mysql').connect(cfg);
+  if (!apply) return next;
   await applySchema(next);
+  await require('./migrations').run(next, {
+    log: (line) => { if (process.env.TRYCORD_MIGRATION_LOG !== '0') console.log(line); },
+  });
   return next;
 }
 
@@ -74,7 +89,7 @@ async function checkConnectionHeadroom(conn, config) {
   }
 }
 
-async function connect() {
+async function connect(options = {}) {
   if (conn) return conn;
   const tried = dbConfig.candidates();
   if (!tried.length) {
@@ -90,7 +105,7 @@ async function connect() {
   let lastError = null;
   for (const candidate of tried) {
     try {
-      conn = await open(candidate.config);
+      conn = await open(candidate.config, options);
       source = candidate.source;
       activeConfig = candidate.config;
       openedAt = new Date().toISOString();

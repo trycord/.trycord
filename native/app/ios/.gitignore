@@ -1,0 +1,17 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.xccheckout
+
+# CocoaPods
+Pods/
+Podfile.lock
+
+# Metro
+.metro-health-check*

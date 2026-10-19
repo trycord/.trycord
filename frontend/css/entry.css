@@ -179,3 +179,16 @@
 .paper-lede { margin: var(--space-3) 0 0; color: var(--text-2); font-size: var(--fs-body); max-width: 58ch; line-height: 1.65; }
 .paper .actionline { margin-top: var(--space-5); }
 .paper-note { margin: var(--space-5) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--line); font-size: var(--fs-sm); color: var(--text-3); }
+
+/* -- accepting the documents ------------------------------------------------- */
+/* The acceptance control on the registration form: the checkbox, the links to
+   the two documents, and the versions that are being accepted. */
+
+.gate-legal {
+  align-items: flex-start;
+  margin-top: var(--space-2);
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.gate-legal a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+.gate-legal-version { color: var(--text-3); font-size: var(--fs-meta); }

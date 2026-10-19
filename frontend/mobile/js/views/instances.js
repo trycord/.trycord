@@ -7,7 +7,7 @@
 
 import { el } from '../../../packages/dom.js';
 import Api, { forgetToken } from '../../../packages/api.js';
-import TrycordConfig, { setApiUrl, backendUrl, inspectInstance } from '../../../packages/config.js';
+import { setApiUrl, backendUrl, inspectInstance } from '../../../packages/config.js';
 import { clearInstanceState } from '../../../packages/store.js';
 import { disconnect } from '../../../packages/realtime.js';
 import { path, navigate } from '../../../packages/nav.js';

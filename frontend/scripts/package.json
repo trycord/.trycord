@@ -1,0 +1,6 @@
+{
+  "name": "trycord-client-scripts",
+  "private": true,
+  "type": "commonjs",
+  "description": "The build scripts run by Node, not by the browser, so they stay CommonJS inside an ES-module client."
+}

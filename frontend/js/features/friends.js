@@ -9,7 +9,7 @@
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
-import { EVENTS, SESSION_EVENTS, on } from '../../packages/realtime.js';
+import { SESSION_EVENTS, on } from '../../packages/realtime.js';
 import {
   State, nameOf, refreshFriends, refreshPresence, presenceOf,
 } from '../../packages/store.js';

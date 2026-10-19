@@ -4,7 +4,14 @@
 //
 // Boot: validate env -> connect database -> apply schema -> listen.
 //   HTTP -> route (validate + authorize) -> service -> database
-require('dotenv').config();
+//
+// The environment file is `.env` next to this one by default. DOTENV_CONFIG_PATH
+// moves it, which is what a deployment that keeps its configuration somewhere
+// else wants, and what a verification run uses to be sure it is measuring the
+// instance it started rather than the one the machine happens to be serving.
+require('dotenv').config(process.env.DOTENV_CONFIG_PATH
+  ? { path: process.env.DOTENV_CONFIG_PATH, quiet: true }
+  : { quiet: true });
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -23,6 +30,7 @@ const jobs = require('./services/jobs');
 const continuum = require('./services/continuum');
 const retention = require('./services/retention');
 const searchIndex = require('./services/search-index');
+const { VERSION, API_VERSION, PROTOCOL_VERSION } = require('./version');
 
 /**
  * Reduce a configured API location to the origin the client should talk to.
@@ -169,7 +177,7 @@ function reportListen(listen, inst) {
   }
 }
 
-async function boot() {
+async function boot(options = {}) {
   // The signing secret is the one value that cannot come from the configuration
   // store: it is the key the store's encrypted values are derived from. An
   // instance that has none gets one generated on the spot and kept, so nobody
@@ -182,6 +190,13 @@ async function boot() {
     ? '[info] signing secret: JWT_SECRET'
     : '[info] signing secret: ' + secretFilePath());
   const inst = instanceConfig();
+
+  // The dashboard mode is resolved before anything else is opened, because an
+  // unusable value has to stop the boot rather than be discovered on the first
+  // request. The mode is a deployment fact: the separate dashboard service has
+  // no database of its own, so it cannot read a stored value, and the two
+  // processes must not be able to disagree about which one is in force.
+  require('./dashboard/mode').currentMode();
 
   // The desktop app cannot be inferred the way a browser origin can: it is a
   // custom scheme, so it has to be allowlisted explicitly, and a backend that
@@ -222,11 +237,26 @@ async function boot() {
   // administrator changes them in the dashboard and the change takes effect at the
   // next start. This is where a saved value replaces the environment's seed.
   const listen = resolveListenSettings();
+  // A caller that started the process deliberately - a verification instance on
+  // an ephemeral port, a second instance on the same host - may say which port
+  // to bind. The saved setting is the operator's choice and wins over nothing;
+  // this override is above it because it comes from the person who started the
+  // process, and it exists so two instances can run side by side without
+  // editing a file.
+  if (options.port) listen.port = Number(options.port);
+  if (options.host) listen.host = String(options.host);
   reportListen(listen, inst);
   announceQuickSetup(listen.mount);
 
   const app = express();
   const server = http.createServer(app);
+  // The dashboard's deployment mode. In bundled mode this only reports the
+  // mode; in separate mode it also stops this process serving the console's
+  // document, and points that address at the dashboard service instead.
+  require('./dashboard/mount').mountDashboard(app, {
+    appMount: listen.mount,
+    dashboardOrigin: String(process.env.DASHBOARD_URL || '').trim(),
+  });
   // Proxy trust is deliberate and narrow: only a proxy on the loopback
   // interface (nginx on the same host, which fronts Cloudflare in the
   // documented production layout) may supply X-Forwarded-* headers. Arbitrary
@@ -374,12 +404,12 @@ async function boot() {
       await db.get('SELECT 1');
       res.json({
         ok: true, db: 'ok', instanceId: inst.instanceId, client: !!clientDir,
-        version: require('../package.json').version,
+        version: VERSION,
       });
     } catch {
       res.status(503).json({
         ok: false, db: 'unreachable', instanceId: inst.instanceId, client: !!clientDir,
-        version: require('../package.json').version,
+        version: VERSION,
       });
     }
   });
@@ -396,8 +426,8 @@ async function boot() {
       instanceId: inst.instanceId,
       // The build this server is running. The client's Updates page reads it,
       // and it comes from the one place the version is written down: the
-      // package manifest.
-      version: require('../package.json').version,
+      // package manifest, read through src/version.js.
+      version: VERSION,
       name: s.isLoaded() ? s.get('instance.name') : inst.name,
       description: s.isLoaded() ? s.get('instance.description') : '',
       supportUrl: s.isLoaded() ? s.get('instance.supportUrl') : '',
@@ -406,8 +436,8 @@ async function boot() {
       // The version a client checks before it commits to this instance. A client
       // that speaks an older protocol is told so here rather than discovering it
       // through a confusing failure later.
-      apiVersion: 1,
-      protocolVersion: 'trycord-continuum/1.0',
+      apiVersion: API_VERSION,
+      protocolVersion: PROTOCOL_VERSION,
       // What a reader is allowed to do here, and nothing more. These are the
       // capabilities a registration screen needs; they expose no operator
       // configuration, no internal address and no secret.
@@ -474,6 +504,11 @@ async function boot() {
   // under the same prefix as the community routes so they inherit the one
   // access chain rather than introducing a second.
   app.use('/api/servers/:serverId', require('./routes/integrations'));
+  // The collaboration workspace: spaces, community documents, boards, events
+  // and polls. Mounted under the community prefix so it shares the one access
+  // chain - resolveServer, requireMember, requirePerm - rather than inventing
+  // a second notion of who may see what.
+  app.use('/api/servers/:serverId', require('./routes/workspace'));
   app.use('/api/invites', inviteRoutes.byCode);
   app.use('/api/discover', require('./routes/discover'));
   // The public instance listing. Separate from community discovery: this one
@@ -481,6 +516,16 @@ async function boot() {
   app.use('/api/discovery', require('./routes/discovery'));
   app.use('/api/activity', require('./routes/activity'));
   app.use('/api/dms', require('./routes/dms'));
+  // The versioned developer surface: /api/v1. A contracted subset, generated
+  // from the same definitions the OpenAPI document is generated from, so a
+  // route cannot exist without being documented. The unversioned routes
+  // underneath are untouched - a client written against them keeps working.
+  app.use('/api/v1', require('./routes/developer'));
+  // End-to-end encryption: devices, prekey bundles, sessions, conversation
+  // keys, encrypted attachments and recovery. Mounted with the other API
+  // routes so it shares the one authentication chain; every route in it is
+  // authenticated and rate limited.
+  app.use('/api/e2ee', require('./routes/e2ee'));
   // Token-authenticated, not session-authenticated - see the file's header.
   app.use('/api/bot', require('./routes/bot'));
   app.use('/api/friends', require('./routes/friends'));
@@ -522,14 +567,17 @@ async function boot() {
   //
   // clientDir is not known yet here and the public site does not need it: it falls
   // back to its own directory for the favicon.
-  const publicDir = serveClient.mountPublicSite(app, {
+  //
+  // A caller that asked for no public site gets an origin root that the client
+  // answers, which is the shape an API-only instance wants.
+  const publicDir = options.publicSite === false ? null : serveClient.mountPublicSite(app, {
     serverDir: __dirname,
     clientDir: null,
     pages,
     originOf,
   });
 
-  const clientDir = serveClient.mountClient(app, {
+  const clientDir = options.client === false ? null : serveClient.mountClient(app, {
     serverDir: __dirname,
     appMount: listen.mount,
     originOf,
@@ -550,6 +598,9 @@ async function boot() {
   // the Privacy and Notification summaries load in a single round trip.
   app.use('/api/me', require('./routes/privacy'));
   app.use('/api/me', require('./routes/export'));
+  // The devices this instance may reach a reader on. Mounted under /api/me
+  // because a device registration belongs to the account that made it.
+  app.use('/api/me/push-devices', require('./routes/push'));
   app.use('/api/mutes', require('./routes/mutes'));
   app.use('/api/voice', require('./routes/voice'));
   // Instance-wide announcement banners (per-deployment, not global).
@@ -680,35 +731,58 @@ async function boot() {
 
   // Durable background jobs: bounded workers claim due jobs from the database,
   // retry with backoff, and never lose work on restart or crash.
-  jobs.register('continuum_deliver', continuum.deliverEvent, {
-    concurrency: 4,
-    maxAttempts: 5,
-    backoffMs: 1000,
-  });
-  jobs.register('continuum_inbound_process', continuum.processInboundEvent, {
-    concurrency: 2,
-    maxAttempts: 3,
-    backoffMs: 1000,
-  });
-  // Housekeeping: expired sessions, revoked tokens, old notifications and
-  // finished job rows. The first pass is queued at boot and each pass queues
-  // the next, so the rhythm survives a restart.
-  jobs.register('retention', retention.scheduled, {
-    concurrency: 1,
-    maxAttempts: 3,
-    backoffMs: 60000,
-  });
-  // The search index, filled in for the messages that were written before it
-  // existed. Each pass takes another slice and queues the next, so a large
-  // backlog is worked through without one enormous transaction.
-  jobs.register('search_backfill', searchIndex.backfillJob, {
-    concurrency: 1,
-    maxAttempts: 3,
-    backoffMs: 60000,
-  });
-  await jobs.start();
-  await jobs.enqueue('retention', {}, { runAfterMs: 15000, maxAttempts: 3 }).catch(() => {});
-  await jobs.enqueue('search_backfill', {}, { runAfterMs: 20000, maxAttempts: 3 }).catch(() => {});
+  //
+  // A caller that asked for no jobs gets none. The system is a background
+  // service with its own lifecycle, and a verification instance that starts one
+  // on every test file is a host running a dozen processes to prove that a
+  // request handler works.
+  if (options.jobs !== false) {
+    jobs.register('continuum_deliver', continuum.deliverEvent, {
+      concurrency: 4,
+      maxAttempts: 5,
+      backoffMs: 1000,
+    });
+    jobs.register('continuum_inbound_process', continuum.processInboundEvent, {
+      concurrency: 2,
+      maxAttempts: 3,
+      backoffMs: 1000,
+    });
+    // Housekeeping: expired sessions, revoked tokens, old notifications and
+    // finished job rows. The first pass is queued at boot and each pass queues
+    // the next, so the rhythm survives a restart.
+    jobs.register('retention', retention.scheduled, {
+      concurrency: 1,
+      maxAttempts: 3,
+      backoffMs: 60000,
+    });
+    // The search index, filled in for the messages that were written before it
+    // existed. Each pass takes another slice and queues the next, so a large
+    // backlog is worked through without one enormous transaction.
+    jobs.register('search_backfill', searchIndex.backfillJob, {
+      concurrency: 1,
+      maxAttempts: 3,
+      backoffMs: 60000,
+    });
+    // Collaboration workspace: an event's reminder, and a card's due date.
+    // The services enqueue these into the jobs table, so the rows are durable
+    // whether or not a worker is running - but without a handler the claim
+    // fails, and a reminder that never arrives is worse than one that is late.
+    jobs.register('workspace_event_reminder',
+      require('./services/workspace/events').reminderJob, {
+        concurrency: 2,
+        maxAttempts: 3,
+        backoffMs: 60000,
+      });
+    jobs.register('workspace_card_due_reminder',
+      require('./services/workspace/boards').dueReminderJob, {
+        concurrency: 2,
+        maxAttempts: 3,
+        backoffMs: 60000,
+      });
+    await jobs.start();
+    await jobs.enqueue('retention', {}, { runAfterMs: 15000, maxAttempts: 3 }).catch(() => {});
+    await jobs.enqueue('search_backfill', {}, { runAfterMs: 20000, maxAttempts: 3 }).catch(() => {});
+  }
 
   // The sockets, the presence map and the rate-limit counters live in this
   // process. A second copy of the API would have its own copy of each, and a
@@ -738,7 +812,37 @@ async function boot() {
     });
   });
 
-  return { app, server };
+  // A way to shut the instance down that a caller owns.
+  //
+  // The process-level shutdown at the bottom of this file handles SIGTERM. A
+  // caller that started the instance itself - a verification run, an operator
+  // script that wants the port back - needs the same shutdown without the
+  // signal, and needs it to be safe to call twice.
+  let closed = false;
+  const close = async () => {
+    if (closed) return;
+    closed = true;
+    // Idle keep-alive sockets are closed too. server.close() alone waits for
+    // them, and a client that holds a connection open - which every browser
+    // does - keeps the instance alive long after the caller asked it to stop.
+    if (typeof server.closeIdleConnections === 'function') server.closeIdleConnections();
+    if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+    await new Promise((resolve) => server.close(() => resolve()));
+    if (options.jobs !== false) {
+      try { await jobs.stop(); } catch { /* nothing left running */ }
+    }
+    try { await db.close(); } catch { /* already closed */ }
+  };
+
+  return {
+    app,
+    server,
+    close,
+    port: server.address() ? server.address().port : listen.port,
+    host: listen.host,
+    instanceId: inst.instanceId,
+    version: VERSION,
+  };
 }
 
 if (require.main === module) {

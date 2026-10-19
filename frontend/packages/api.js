@@ -518,6 +518,11 @@ const Api = {
   adminDiagnostics: () => request('GET', '/api/admin/diagnostics'),
   adminPage: (route) => request('GET', '/api/admin/pages/' + encodeURIComponent(route)),
   savePageDraft: (route, body) => request('PUT', '/api/admin/pages/' + encodeURIComponent(route), { body }),
+  // The preview is rendered by the server, through the same renderer a
+  // published page goes through, so what an operator sees is what a visitor
+  // gets. The client never renders page content itself.
+  previewPage: (route, body) =>
+    request('PUT', '/api/admin/pages/' + encodeURIComponent(route), { body: { preview: true, body } }),
   publishPage: (route, confirm) => request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/publish', { body: { confirm } }),
   unpublishPage: (route) => request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/unpublish'),
   pageRevisions: (route, limit) =>

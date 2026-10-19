@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Push notifications. The value is development for a build signed with
+	     a development profile and production for a build signed for the
+	     store; Xcode changes it when the provisioning profile changes. -->
+	<key>aps-environment</key>
+	<string>development</string>
+	<!-- The Keychain group the session token is written into. It is the
+	     same group the shared credential library uses, so the token is
+	     protected by the device's own passcode and is never in a plist. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)dev.trycord</string>
+	</array>
+</dict>
+</plist>

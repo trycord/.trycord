@@ -33,6 +33,11 @@ export const State = {
   online: false,
   user: null,
   instance: null,
+  // The legal documents in force on this instance, as the server publishes them:
+  // { termsVersion, privacyVersion, updated }. A registration is only accepted
+  // when it carries exactly these two versions, so they are kept here rather
+  // than written into a client.
+  legal: null,
   announcements: [],
   servers: [],
   serverDetail: new Map(),
@@ -106,10 +111,22 @@ export async function loadInstance() {
 
 export async function loadLegal() {
   try {
-    return await Api.legal();
+    const legal = await Api.legal();
+    // The server answers with the two versions and the date they changed. A
+    // partial answer is no answer: a registration sent with half a version is
+    // refused, so an incomplete document is treated as none.
+    State.legal = legal && legal.termsVersion && legal.privacyVersion
+      ? {
+        termsVersion: String(legal.termsVersion),
+        privacyVersion: String(legal.privacyVersion),
+        updated: legal.updated || null,
+      }
+      : null;
   } catch {
-    return null;
+    State.legal = null;
   }
+  emit('legal', State.legal);
+  return State.legal;
 }
 
 export async function loadSession() {
@@ -320,6 +337,19 @@ export async function refreshDms() {
 
 export function dmById(id) {
   return State.dms.find((d) => d.id === id) || null;
+}
+
+// A conversation has been read - here, or on another device of this account.
+// The unread count in the store is corrected so the badge does not keep
+// claiming there is something unread that is not.
+export function markConversationRead(conversationId) {
+  const id = String(conversationId || '');
+  if (!id) return false;
+  const dm = State.dms.find((entry) => String(entry.id) === id);
+  if (!dm || !dm.unreadCount) return false;
+  dm.unreadCount = 0;
+  emit('dms', State.dms);
+  return true;
 }
 
 // The person on the other side of a one-to-one conversation.

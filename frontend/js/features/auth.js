@@ -14,7 +14,8 @@ import { brandSymbolUrl } from '../../packages/brand.js';
 import Api from '../../packages/api.js';
 import TrycordConfig from '../../packages/config.js';
 import { currentQuery, navigate, publicPath } from '../../packages/nav.js';
-import { applyToken, loadSession, refreshServers } from '../../packages/store.js';
+import { State, applyToken, loadLegal, loadSession, refreshServers } from '../../packages/store.js';
+import { withLegalVersions, isStaleLegalError } from '../../packages/legal.js';
 import { connect } from '../../packages/realtime.js';
 import { toast } from '../ui/overlays.js';
 
@@ -54,7 +55,7 @@ function field(label, control) {
 function gateForm(fields, submitLabel) {
   return el('form', { class: 'gate-form' },
     fields,
-    el('p', { class: 'form-error', hidden: true }),
+    el('div', { class: 'form-error', role: 'alert', hidden: true }),
     el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, submitLabel),
   );
 }
@@ -65,14 +66,23 @@ function busy(form, isBusy) {
   form.setAttribute('aria-busy', isBusy ? 'true' : 'false');
 }
 
-function showError(form, error) {
+// The whole-form answer, with an optional control beside it: some refusals
+// need an action (reload the page), not only a sentence.
+function showError(form, error, action) {
   const node = form.querySelector('.form-error');
-  if (node) { node.hidden = false; node.textContent = (error && error.message) || 'Something went wrong.'; }
+  if (!node) return;
+  node.hidden = false;
+  node.replaceChildren(
+    el('span', {}, (error && error.message) || 'Something went wrong.'),
+    action || null,
+  );
 }
 
 function clearError(form) {
   const node = form.querySelector('.form-error');
-  if (node) node.hidden = true;
+  if (!node) return;
+  node.hidden = true;
+  node.replaceChildren();
 }
 
 // -- landing after a sign-in --------------------------------------------------
@@ -163,6 +173,34 @@ function loginGate() {
 
 // -- account creation ---------------------------------------------------------
 
+// The acceptance control. The server records the exact versions the reader
+// accepted, and refuses a registration whose versions are not the ones in
+// force, so the form states which versions they are and blocks the form until
+// they are accepted.
+function legalAcceptance() {
+  const accepted = el('input', { type: 'checkbox', name: 'legal' });
+  const versions = el('span', { class: 'gate-legal-version' });
+  const terms = el('a', { href: publicPath('/terms') }, 'Terms of Service');
+  const privacy = el('a', { href: publicPath('/privacy') }, 'Privacy Policy');
+
+  const label = el('label', { class: 'checkbox gate-legal' },
+    accepted,
+    el('span', {},
+      'I accept the ', terms, ' and the ', privacy, '. ',
+      versions));
+
+  const paintVersions = () => {
+    const legal = State.legal;
+    versions.textContent = legal && legal.termsVersion
+      ? '(Terms v' + legal.termsVersion + ', Privacy v' + legal.privacyVersion
+        + (legal.updated ? ', updated ' + legal.updated : '') + ')'
+      : '(this instance has not said which version is in force)';
+  };
+  paintVersions();
+
+  return { accepted, label, paintVersions };
+}
+
 function registerGate() {
   const username = input('username');
   const display = input('displayName', { required: false });
@@ -179,17 +217,29 @@ function registerGate() {
     ' ',
     el('a', { href: publicPath('/instances') }, 'Use another instance'));
 
+  const legal = legalAcceptance();
+
   const form = gateForm([
     field('Username', username),
     field('Display name (optional)', display),
     field('Email (optional)', email),
     field('Password', password),
     field('Confirm password', confirm),
+    legal.label,
   ], 'Create account');
   form.insertBefore(instanceNote, form.firstChild);
 
+  const submit = form.querySelector('button[type="submit"]');
+  const syncSubmit = () => { submit.disabled = !legal.accepted.checked; };
+  legal.accepted.addEventListener('change', syncSubmit);
+  syncSubmit();
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (!legal.accepted.checked) {
+      showError(form, { message: 'Accept the Terms of Service and the Privacy Policy to continue.' });
+      return;
+    }
     busy(form, true);
     clearError(form);
     if (confirm.value !== password.value) {
@@ -197,13 +247,25 @@ function registerGate() {
       busy(form, false);
       return;
     }
+    // The versions come from the instance, never from this file. The boot
+    // sequence reads them; if that read failed, the form asks again rather
+    // than sending a registration that could only be refused.
+    if (!State.legal) {
+      try { await loadLegal(); } catch { /* the refusal below says so */ }
+      legal.paintVersions();
+    }
+    if (!State.legal) {
+      showError(form, { message: 'This instance did not say which terms are in force. Reload the page and try again.' });
+      busy(form, false);
+      return;
+    }
     try {
-      const out = await Api.register({
+      const out = await Api.register(withLegalVersions({
         username: username.value.trim(),
         displayName: display.value.trim() || undefined,
         email: email.value.trim() || undefined,
         password: password.value,
-      });
+      }, State.legal));
       if (out && out.token) {
         applyToken(out.token, out.user);
         toast('Account created.', { type: 'success' });
@@ -212,9 +274,23 @@ function registerGate() {
         navigate('/login', { replace: true });
       }
     } catch (error) {
-      showError(form, error);
+      if (isStaleLegalError(error)) {
+        // The documents changed while this form was open. Nothing the reader
+        // typed is wrong, so the answer says what to do about it.
+        showError(form, {
+          message: 'The Terms or Privacy Policy changed since this page was opened. Reload to read the current version.',
+        }, el('button', {
+          class: 'btn btn--default btn--sm', type: 'button',
+          onClick: () => window.location.reload(),
+        }, 'Reload'));
+      } else {
+        showError(form, error);
+      }
     } finally {
       busy(form, false);
+      // The button is closed again until the documents are accepted, whatever
+      // the request did.
+      syncSubmit();
     }
   });
 
@@ -223,16 +299,23 @@ function registerGate() {
 
 // -- recovery -----------------------------------------------------------------
 
+// The reset link is sent to the address on the account, so the form asks for
+// an address and sends it under the name the endpoint reads. A username is
+// not accepted here: the endpoint looks the account up by its verified
+// address, and a name would silently find nothing.
 function forgotGate() {
-  const username = input('username');
-  const form = gateForm([field('Username or email', username)], 'Send reset link');
+  const email = input('email', { type: 'email', autocomplete: 'email' });
+  const form = gateForm([
+    field('Email address', email),
+    el('p', { class: 'gate-note' }, 'We send the link to the address on your account.'),
+  ], 'Send reset link');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     busy(form, true);
     clearError(form);
     try {
-      await Api.forgotPassword({ username: username.value.trim() });
-      toast('If that account exists, a reset link has been sent.', { type: 'info' });
+      await Api.forgotPassword({ email: email.value.trim() });
+      toast('If that address is on an account, a reset link has been sent.', { type: 'info' });
     } catch (error) {
       showError(form, error);
     } finally {
@@ -260,8 +343,19 @@ function resetGate(token) {
       return;
     }
     try {
-      await Api.resetPassword({ token, password: password.value });
-      toast('Password reset. Sign in with your new password.', { type: 'success' });
+      const out = await Api.resetPassword({
+        token,
+        newPassword: password.value,
+        confirmPassword: confirm.value,
+      });
+      // An account with a second factor gets a challenge rather than a
+      // session: the password is changed, and the sign-in still owes the
+      // second step.
+      if (out && out.mfaRequired) {
+        toast('Password reset. Sign in with your two-step code.', { type: 'success' });
+      } else {
+        toast('Password reset. Sign in with your new password.', { type: 'success' });
+      }
       navigate('/login', { replace: true });
     } catch (error) {
       showError(form, error);
@@ -326,8 +420,21 @@ function twoStepGate() {
         if (!/^\d{6}$/.test(code.value.trim())) {
           error.hidden = false; error.textContent = 'Enter the six digits the app shows.'; return;
         }
-        await Api.twoFactorEnable({ password: savedPassword, code: code.value.trim() });
+        const done = await Api.twoFactorEnable({ password: savedPassword, code: code.value.trim() });
         toast('Two-step sign-in is on.', { type: 'success' });
+        // The recovery codes are shown once and never again, so they are shown
+        // here rather than being left in the answer the server sent.
+        const codes = (done && (done.recoveryCodes || done.codes)) || [];
+        if (codes.length) {
+          form.replaceChildren(
+            el('p', { class: 'gate-note' },
+              'Save these now. Each one signs you in once if you lose your authenticator.'),
+            el('pre', { class: 'recovery-codes' }, codes.join('\n')),
+            el('div', { class: 'gate-choices' }, el('a', {
+              class: 'btn btn--primary btn--block', href: publicPath('/login'),
+            }, 'Sign in')));
+          return;
+        }
         navigate('/login', { replace: true });
       }
     } catch (err) {

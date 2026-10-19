@@ -75,4 +75,155 @@ module.exports = (engine) => [
       private_key TEXT NOT NULL,
       created_at VARCHAR(64) NOT NULL
     )`,
+
+  // The publication ledger: what this instance has already federated, and the
+  // state it was in when it was published.
+  //
+  // The relay publishes from the instance's own state rather than from a hook
+  // in every write path, so it needs to know what it has already sent. One row
+  // per local source row (a community, a channel, a message, a reaction),
+  // keyed by the kind and the local id.
+  //
+  //   fingerprint - a hash of the state that was published. A different hash
+  //                 means the row changed and the change has to be relayed.
+  //   state       - 'live' (published), 'withheld' (decided not to federate:
+  //                 a private community, a channel the members cannot post in)
+  //                 or 'deleted' (the local row is gone and the deletion was
+  //                 relayed).
+  //
+  // A withheld row is withheld for good: what was not federable when it was
+  // written is never federated later, when the rule that stopped it has been
+  // changed.
+  `CREATE TABLE IF NOT EXISTS continuum_publications (
+      source_kind   VARCHAR(32) NOT NULL,
+      source_id     VARCHAR(160) NOT NULL,
+      fingerprint   VARCHAR(128) NOT NULL,
+      -- What the publication needs later: where the thing was, who wrote it,
+      -- and the ids a deletion event has to carry once the row is gone.
+      context       TEXT,
+      state         VARCHAR(16) NOT NULL DEFAULT 'live',
+      last_kind     VARCHAR(64),
+      last_event_id VARCHAR(64),
+      published_at  VARCHAR(64) NOT NULL,
+      updated_at    VARCHAR(64) NOT NULL,
+      PRIMARY KEY (source_kind, source_id)
+    )`,
+
+  // The change feed's cursors. The feed reconciles the local tables against
+  // the ledger, and these say where the last pass stopped so the next one
+  // picks up where it left off instead of starting over every time.
+  `CREATE TABLE IF NOT EXISTS continuum_feed_state (
+      name       VARCHAR(64) PRIMARY KEY,
+      \`cursor\`  VARCHAR(160) NOT NULL,
+      updated_at VARCHAR(64) NOT NULL
+    )`,
+
+  // Per-actor sequence counters.
+  //
+  //   'out:<actor id>'                  - the sequence this instance has handed
+  //                                       out for one local actor.
+  //   'in:<origin instance>:<actor id>' - the highest sequence this instance
+  //                                       has accepted from one remote actor.
+  //
+  // The inbound half is the replay floor: an event whose sequence is not
+  // newer than the highest already accepted for that (origin, actor) is
+  // refused as stale.
+  `CREATE TABLE IF NOT EXISTS continuum_sequences (
+      scope      VARCHAR(160) PRIMARY KEY,
+      last_seq   INTEGER NOT NULL DEFAULT 0,
+      updated_at VARCHAR(64) NOT NULL
+    )`,
+
+  // The remote communities this instance knows about. One row per community
+  // on another instance, keyed by the instance it lives on and its id there.
+  //
+  // A remote community is a reference, never a copy: it is not a row in
+  // `servers`, it grants no role and no permission here, and the instance it
+  // lives on stays the only authority over it.
+  `CREATE TABLE IF NOT EXISTS continuum_communities (
+      id                  VARCHAR(64) PRIMARY KEY,
+      origin_instance_id  VARCHAR(64) NOT NULL,
+      origin_community_id VARCHAR(64) NOT NULL,
+      name                VARCHAR(255) NOT NULL,
+      description         TEXT,
+      icon_url            VARCHAR(512),
+      -- The channels the origin exposes, as JSON: one entry per channel with
+      -- its origin id, name, type, topic and whether the members may post.
+      channels            TEXT NOT NULL,
+      state               VARCHAR(16) NOT NULL DEFAULT 'discovered',
+      synced_at           VARCHAR(64) NOT NULL,
+      created_at          VARCHAR(64) NOT NULL,
+      updated_at          VARCHAR(64) NOT NULL,
+      UNIQUE (origin_instance_id, origin_community_id)
+    )`,
+
+  // Which local account follows which remote community. The local side of a
+  // federated membership: it says that a person here joined a community that
+  // lives on another instance, and it carries no authority over it.
+  `CREATE TABLE IF NOT EXISTS continuum_memberships (
+      id                  VARCHAR(64) PRIMARY KEY,
+      user_id             VARCHAR(64) NOT NULL,
+      origin_instance_id  VARCHAR(64) NOT NULL,
+      origin_community_id VARCHAR(64) NOT NULL,
+      state               VARCHAR(16) NOT NULL DEFAULT 'joined',
+      created_at          VARCHAR(64) NOT NULL,
+      updated_at          VARCHAR(64) NOT NULL,
+      UNIQUE (user_id, origin_instance_id, origin_community_id)
+    )`,
+
+  // The relay store: a message that arrived from another instance.
+  //
+  // Keyed by (origin instance, origin id) so a remote id can never collide
+  // with a local one, and so the same message arriving twice lands on the
+  // same row. It is not a local message: it keeps the origin's timestamp, the
+  // origin's author and the origin's ids, and it is presented as relayed.
+  `CREATE TABLE IF NOT EXISTS continuum_relay_messages (
+      id                  VARCHAR(64) PRIMARY KEY,
+      origin_instance_id  VARCHAR(64) NOT NULL,
+      origin_message_id   VARCHAR(64) NOT NULL,
+      origin_community_id VARCHAR(64) NOT NULL,
+      origin_channel_id   VARCHAR(64) NOT NULL,
+      author_origin_id    VARCHAR(64) NOT NULL,
+      author_username     VARCHAR(128),
+      author_display_name VARCHAR(128),
+      content             TEXT,
+      -- The origin's own timestamps, kept as they were there.
+      created_at          VARCHAR(64) NOT NULL,
+      edited_at           VARCHAR(64),
+      deleted_at          VARCHAR(64),
+      thread_root_id      VARCHAR(64),
+      event_id            VARCHAR(64),
+      relayed_at          VARCHAR(64) NOT NULL,
+      UNIQUE (origin_instance_id, origin_message_id)
+    )`,
+
+  // A reaction that arrived from another instance, keyed the same way.
+  `CREATE TABLE IF NOT EXISTS continuum_relay_reactions (
+      id                  VARCHAR(64) PRIMARY KEY,
+      origin_instance_id  VARCHAR(64) NOT NULL,
+      origin_message_id   VARCHAR(64) NOT NULL,
+      origin_user_id      VARCHAR(64) NOT NULL,
+      username            VARCHAR(128),
+      display_name        VARCHAR(128),
+      emoji               VARCHAR(32) NOT NULL,
+      created_at          VARCHAR(64) NOT NULL,
+      relayed_at          VARCHAR(64) NOT NULL,
+      UNIQUE (origin_instance_id, origin_message_id, origin_user_id, emoji)
+    )`,
+
+  // A member of one of this instance's communities who lives on another
+  // instance. The origin decides what such a member may do; this row is the
+  // origin's record of them, and it grants nothing here.
+  `CREATE TABLE IF NOT EXISTS continuum_relay_memberships (
+      id                  VARCHAR(64) PRIMARY KEY,
+      origin_instance_id  VARCHAR(64) NOT NULL,
+      origin_community_id VARCHAR(64) NOT NULL,
+      origin_user_id      VARCHAR(64) NOT NULL,
+      username            VARCHAR(128),
+      display_name        VARCHAR(128),
+      state               VARCHAR(16) NOT NULL DEFAULT 'joined',
+      joined_at           VARCHAR(64),
+      updated_at          VARCHAR(64) NOT NULL,
+      UNIQUE (origin_instance_id, origin_community_id, origin_user_id)
+    )`,
 ];

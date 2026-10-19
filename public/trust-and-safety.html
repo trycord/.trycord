@@ -52,7 +52,7 @@
             </div>
             <div class="nav-menu-foot">
               <p>Private, self-hostable community messaging.</p>
-              <a class="text-link" href="/demo">Try the live demo</a>
+              <a class="text-link" href="/demo">Try the demo</a>
             </div>
           </div>
         </div>
@@ -64,7 +64,7 @@
           </button>
           <div class="nav-menu">
             <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
-            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+            <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
           </div>
         </div>
 
@@ -101,7 +101,7 @@
           <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
           <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
         </button>
-        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
     </div>
   </header>
@@ -113,55 +113,217 @@
         <p class="kicker">Trust and safety</p>
         <h1>Trust &amp; Safety</h1>
         <p class="lede">
-        How Trycord handles abuse, reports, and the people who get hurt by
-        it. Each instance sets its own rules; this is the baseline the
-        software is built to support.
-      </p>
+          How abuse is reported, what happens to a report, and what the people
+          behind an instance are expected to do about it. Every instance sets
+          its own rules; this is the floor the software is built to support,
+          and it is the part that does not vary.
+        </p>
       </div>
       <div class="prose-layout">
-        <div class="prose">
+        <article class="prose">
           <!-- page:begin -->
-          <!-- Everything between the two markers below is the editable region: publishing replaces it with the body of the draft. The title and lead above, the contents list to the side, and the header and footer all sit outside the markers, so publishing cannot change them. -->
-          <h2>Reporting</h2>
-                <p>
-                  Report from inside the app. A report reaches the moderators of the
-                  community it happened in, and on an official instance it also
-                  escalates to the project. Reports are not anonymous to moderators:
-                  they include who filed them, because that is usually needed to act.
-                </p>
-          
-                <h2>What the software enforces</h2>
-                <ul>
-                  <li>Permission checks on every request, not only in the interface.</li>
-                  <li>A role hierarchy, so a moderator cannot act on someone who outranks them.</li>
-                  <li>Upload size and count limits, image-only checks on avatars and community icons, and a rule that a file the server cannot identify is served as a download rather than interpreted.</li>
-                  <li>Rate limits on registration and messaging.</li>
-                </ul>
-                <p>
-                  Enforcement decisions are made by people, not only by software. That
-                  is deliberate, and it is also why every instance must offer an appeal
-                  route &mdash; see <a href="/support">Support</a>.
-                </p>
-          
-                <h2>Appeals</h2>
-                <p>
-                  Anyone actioned can appeal at the
-                  <a href="/app/support/appeals/new">appeal form</a>, signed in or not.
-                  On official instances appeals are reviewed centrally, so a community
-                  you were removed from cannot refuse to hear you.
-                </p>
-          
-                <h2>What we ask of you</h2>
-                <p>
-                  Report in good faith, and say what you actually saw. Do not report
-                  someone to settle a disagreement, and do not coordinate reports to
-                  pressure an instance. Both make a moderation system worse for
-                  everyone living inside it.
-                </p>
+          <div class="draft-note" role="note">
+            <strong>Legal review required before publication.</strong> This
+            document comes from the Trycord project as a starting point for an
+            instance. It is not legal advice, and nobody has reviewed it for the
+            instance serving it. The fields marked <code>OPERATOR</code> are
+            facts only the operator can supply: where reports go, who handles
+            child safety reports, and where the instance publishes what it has
+            done about them. Fill them in, and have a qualified lawyer read the
+            result, before presenting this document as binding.
+          </div>
+          <p class="small muted">
+            <strong>Version:</strong> <code>1.0</code> &middot;
+            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
+            <strong>Effective on this instance:</strong>
+            <span class="op-field" data-op="effective-date">OPERATOR: the date this policy takes effect on this instance</span>
+          </p>
+
+          <h2>1. What this page covers</h2>
+          <p>
+            It covers the handling of abuse reports, the enforcement that
+            follows, the appeal route, and the duties that fall on the
+            operator of an instance. It does not replace the
+            <a href="/guidelines">acceptable use rules</a>, which say what
+            people may and may not do in the first place.
+          </p>
+          <p>
+            Where an instance has published its own rules, those rules add to
+            this one. They may be stricter. They may not be weaker, and they
+            may not provide for anything this page prohibits.
+          </p>
+
+          <h2>2. Reporting abuse</h2>
+          <p>There are three ways to report, and all of them reach a person:</p>
+          <ul>
+            <li><strong>In the app.</strong> A report filed in a community goes to that community's moderators. A report about a moderator, or about the operator, goes further up.</li>
+            <li><strong>Directly to the operator.</strong> <span class="op-field" data-op="report-contact">OPERATOR: the address for abuse reports on this instance</span></li>
+            <li><strong>To a law enforcement authority.</strong> Where something is illegal, report it to the authority in the country where it happened. The operator may be the only party able to act on it, and telling the operator does not replace telling the authority.</li>
+          </ul>
+          <p>
+            Reports are not anonymous to the people who receive them: they
+            include who filed them, because that is usually what is needed to
+            act. What is done with a report, and how long it is kept, is
+            covered by the <a href="/privacy">Privacy Policy</a>.
+          </p>
+
+          <h2>3. Child safety</h2>
+          <p>
+            The operator of an instance is responsible for the safety of the
+            children on it, and for the law that applies where they are. The
+            software provides the tools; it cannot carry the responsibility.
+          </p>
+
+          <h3>Child sexual abuse material is prohibited without exception</h3>
+          <p>
+            No instance may host child sexual abuse material, and no instance
+            may be used to ask for it, offer it, trade it, or help somebody
+            else to get it. There is no exception for a small community, for a
+            private community, for a community with a rule against it, for
+            material that is fictional, for material that has been altered or
+            generated, or for material that is described rather than shown.
+          </p>
+          <p>
+            The prohibition covers every route into the instance: messages,
+            direct messages, files and attachments, profile pictures, avatars,
+            banners, community icons, link previews, uploads that nobody has
+            opened yet, the output of a bot, the result of an extension or
+            integration, and content arriving over federation from another
+            instance. A route that is technically obscure is still a route.
+          </p>
+          <p>
+            Running an instance does not create an exception. An operator who
+            knows such material is present and does not remove it, or who is
+            told and does not act, is responsible for that failure under the
+            law that applies to them. No operator, administrator, community
+            owner, moderator or user can grant permission to break this rule,
+            and no appeal overrides it.
+          </p>
+          <p>
+            When such material is reported or found, the operator removes it,
+            removes the accounts and automated processes used to share it, and
+            preserves what the law requires them to preserve. Where the law
+            requires the material to be reported to an authority, the operator
+            reports it, and does so without waiting for the person who
+            reported it to supply anything else.
+          </p>
+          <p>
+            Reports of this kind are handled by a named person on this
+            instance, and can be made to
+            <span class="op-field" data-op="csam-contact">OPERATOR: the contact for child safety reports on this instance</span>.
+            Treat them as urgent: the platform moderation team for official
+            instances is told about every one of them.
+          </p>
+
+          <h3>Other content that harms children</h3>
+          <p>
+            Content that encourages a child to meet an adult alone, that asks a
+            child to send images, or that pressures a child into sexual
+            situations is prohibited under the
+            <a href="/guidelines">acceptable use rules</a> whether or not it
+            meets the definition of abuse material, and it is handled the same
+            way. Grooming, sextortion, and an adult contacting a child in a
+            sexual way are all reportable here and are all actionable.
+          </p>
+
+          <h2>4. What the software enforces</h2>
+          <ul>
+            <li>Permission checks on every request, not only in the interface.</li>
+            <li>A role hierarchy, so a moderator cannot act on somebody who outranks them.</li>
+            <li>Upload size and count limits, image-only checks on avatars and community icons, and a rule that a file the server cannot identify is served as a download rather than interpreted.</li>
+            <li>Rate limits on registration and on messaging.</li>
+            <li>An audit log of administrative and moderation actions, so a decision can be explained afterwards.</li>
+          </ul>
+          <p>
+            None of that is a moderation system. Software can enforce a
+            boundary; it cannot judge a conversation, weigh an excuse, or
+            decide whether a person is safe to let back in. That is why the
+            rules that matter are enforced by people, and why section 7 exists.
+          </p>
+
+          <h2>5. Enforcement</h2>
+          <p>
+            An operator or a community moderator may take any of these actions,
+            in roughly ascending order of severity:
+          </p>
+          <ul>
+            <li>Explain the rule, or warn the person.</li>
+            <li>Remove or edit content, and note why.</li>
+            <li>Remove a message, a file, a community, or a bot.</li>
+            <li>Time out an account for a stated period.</li>
+            <li>Suspend an account.</li>
+            <li>Terminate an account and erase its data, as described in the <a href="/privacy">Privacy Policy</a>.</li>
+          </ul>
+          <p>
+            The action should match the conduct, and the same conduct should
+            get the same answer from the same people. A rule that is applied
+            to some members and not to others is worse than no rule, because
+            it teaches people that the rule is negotiable.
+          </p>
+
+          <h2>6. Record keeping</h2>
+          <p>
+            Every action is recorded with who took it, when, and against
+            what, and a report is recorded with what it was about. These
+            records are what make an appeal possible, and they are what an
+            investigator would ask for. How long they are kept is
+            <span class="op-field" data-op="record-retention">OPERATOR: how long moderation and audit records are kept on this instance</span>.
+          </p>
+
+          <h2>7. Appeals</h2>
+          <p>
+            Anyone actioned can ask for the decision to be looked at again,
+            whether or not they can sign in. The route is the appeal form in
+            the application, and the
+            <a href="/support">Support</a> page describes what to send with
+            it.
+          </p>
+          <p>
+            An appeal is read by a person who was not the person who made the
+            original decision, wherever that is practical. The answer says
+            what was decided and why. Where the action was taken because
+            content was illegal, or because a law required it, there may be no
+            appeal, and the operator may not be able to explain the decision
+            in full.
+          </p>
+
+          <h2>8. Reports about another instance</h2>
+          <p>
+            A report about something that happened on a different instance
+            cannot be handled here. Send it to the operator of that instance.
+            Where the other instance is federated with this one and the
+            material arrived by federation, tell this operator as well, so
+            that the federated link can be cut. The
+            <a href="/federation-policy">Federation Policy</a> describes how
+            that is done.
+          </p>
+
+          <h2>9. What is expected of people who report</h2>
+          <p>
+            Report in good faith, and say what you actually saw: the account
+            or community, roughly when it happened, and what was said or
+            shared. Do not report somebody to settle a disagreement, and do not
+            organise reports to put pressure on an instance. Both make a
+            moderation system worse for the people living inside it, and both
+            make real reports harder to take seriously.
+          </p>
+          <p>
+            Do not keep copies of illegal material you have been asked to
+            delete, and do not pass it on to anyone else. Forwarding it makes
+            you part of its distribution.
+          </p>
+
+          <h2>10. What this instance publishes</h2>
+          <p>
+            An instance that keeps reports and actions is better at this than
+            one that does not, and an operator who can show what was done
+            earns more trust than one who asks for it.
+            <span class="op-field" data-op="transparency">OPERATOR: where this instance publishes its moderation statistics, or a statement that it does not publish them</span>
+          </p>
           <!-- page:end -->
-        </div>
-        <aside class="toc" aria-label="Table of contents">
-          <h2 class="toc-title">On this page</h2>
+        </article>
+        <aside class="toc" aria-label="On this page">
+          <p class="toc-title">On this page</p>
         </aside>
       </div>
     </div>
@@ -180,7 +342,7 @@
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
@@ -193,7 +355,7 @@
       <div class="footer-col">
         <h2 class="footer-heading">Explore</h2>
         <a href="/communities">Communities</a>
-        <a href="/demo">Live demo</a>
+        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
@@ -218,6 +380,7 @@
   </footer>
 
 
+  <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>

@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+local.properties
+captures/
+
+# Keys. A release key never belongs in the repository.
+keystore.properties
+*.jks
+*.keystore
+!debug.keystore
+
+# Firebase
+google-services.json
+
+# Metro
+.metro-health-check*

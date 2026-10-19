@@ -693,6 +693,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   flex-wrap: wrap;
 }
 .m-msg__author { font-weight: var(--weight-strong); color: var(--text-1); font-size: var(--fs-sm); }
+.m-msg__time { font-size: var(--fs-micro); color: var(--text-3); }
 .m-msg__stamp { font-size: var(--fs-micro); color: var(--text-3); }
 .m-msg__text {
   font-size: var(--fs-body);
@@ -1525,3 +1526,10 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-row[role="radio"] { cursor: pointer; }
 .m-row.is-current { background: var(--m-selected); }
 .m-row.is-current .m-row__title { color: var(--m-brand); }
+
+/* -- accepting the documents ------------------------------------------------- */
+/* The acceptance control on the registration form. */
+
+.m-auth__legal { align-items: flex-start; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+.m-auth__legal a { color: var(--m-brand); text-decoration: underline; }
+.m-auth__legal-version { color: var(--text-3); font-size: var(--fs-micro); }

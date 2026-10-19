@@ -208,18 +208,75 @@ async function attemptOne(hook, eventType, payload) {
 
 // Fan out to every active hook. Awaited by the caller only because tests and
 // the delivery log need the result; nothing user-facing waits on it.
+//
+// A webhook that has been given a subscription through the developer platform
+// receives only the event types it subscribed to. A webhook with no
+// subscription is an ordinary webhook and receives everything, the way it
+// always did - a subscriber that had not chosen its events yet is not a
+// subscriber that chose none.
+//
+// The body is the versioned envelope, which is a superset of the body this
+// used to send: it keeps `event`, `at` and the event's own fields, and adds
+// the envelope's version, id, instance and actor. A receiver written against
+// the older body reads it unchanged.
 async function emit(serverId, eventType, payload) {
   if (EVENTS.indexOf(eventType) === -1) return [];
   const rows = await db.all(
     'SELECT * FROM webhooks WHERE server_id = ? AND active = 1', [serverId]
   );
+  const filters = await subscriptionFilters(serverId);
   const out = [];
   for (const row of rows) {
+    const filter = filters.get(row.id);
+    if (filter && filter.indexOf(eventType) === -1) continue;
     try {
-      out.push(await attemptOne(row, eventType, Object.assign({ event: eventType, at: now() }, payload)));
+      out.push(await attemptOne(row, eventType, envelopeFor(eventType, serverId, payload)));
     } catch { /* one dead endpoint must not stop the others */ }
   }
   return out;
+}
+
+// The subscriptions this community's webhooks have, by webhook id.
+//
+// The developer platform's own module is required lazily, because it requires
+// this one for the event vocabulary and the signing. Asking it at the moment
+// of a delivery, rather than at load time, keeps that a one-way dependency.
+function subscriptionFilters(serverId) {
+  let developer = null;
+  try {
+    developer = require('./developer/events');
+  } catch {
+    return Promise.resolve(new Map());
+  }
+  return db.all(
+    'SELECT webhook_id, events FROM developer_subscriptions WHERE community_id = ?',
+    [serverId]
+  ).then((rows) => {
+    const out = new Map();
+    for (const row of rows) {
+      out.set(row.webhook_id, developer.readEvents(row.events));
+    }
+    return out;
+  }).catch(() => new Map());
+}
+
+// The body a delivery carries.
+function envelopeFor(eventType, serverId, payload) {
+  let developer = null;
+  try {
+    developer = require('./developer/events');
+  } catch {
+    return Object.assign({ event: eventType, at: now() }, payload);
+  }
+  return developer.buildEnvelope({
+    type: eventType,
+    id: uuid(),
+    instance: { id: null, name: null },
+    communityId: serverId,
+    channelId: payload && payload.channelId ? payload.channelId : null,
+    actor: null,
+    data: payload,
+  });
 }
 
 module.exports = {

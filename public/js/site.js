@@ -150,6 +150,25 @@
     }
   });
 
+  /* ---- the links into the application ------------------------------------
+     The application is served from the instance's own mount: the origin root on
+     one deployment, a prefix such as /app on the next. A path written into the
+     markup is therefore wrong on at least one of them, so every link into the
+     application says which page inside it it wants, and the instance's mount is
+     put in front of it.
+
+     The markup keeps a working address for readers without JavaScript; this
+     replaces it with the right one. */
+  var appLinks = Array.prototype.slice.call(document.querySelectorAll('[data-app-link]'));
+  if (appLinks.length && window.TrycordApi && typeof window.TrycordApi.appHref === 'function') {
+    appLinks.forEach(function (link) {
+      var path = link.getAttribute('data-app-link') || '';
+      window.TrycordApi.appHref(path).then(function (href) {
+        if (href) link.setAttribute('href', href);
+      });
+    });
+  }
+
   var reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
   if (reveals.length && 'IntersectionObserver' in window) {
     document.documentElement.classList.add('js');

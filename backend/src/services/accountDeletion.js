@@ -220,6 +220,20 @@ async function eraseAccount({ userId, actorId }) {
   await db.run('DELETE FROM profile_media WHERE user_id = ?', [userId]);
   await db.run('DELETE FROM password_resets WHERE user_id = ?', [userId]);
   await db.run('DELETE FROM email_verifications WHERE user_id = ?', [userId]);
+  // The devices this instance was told to reach the reader on. A registration
+  // left behind would keep an instance holding a token for an account that no
+  // longer exists, and the reader has asked for their data to go.
+  try {
+    await db.run('DELETE FROM push_devices WHERE user_id = ?', [userId]);
+  } catch { /* an instance without push devices has nothing to remove */ }
+  // The encryption keys the reader's devices held. The server cannot read
+  // them, but it can stop offering them: a sealed key for a device that no
+  // longer exists is a key nobody can use and nobody should keep.
+  try {
+    await db.run('DELETE FROM e2ee_devices WHERE user_id = ?', [userId]);
+    await db.run('DELETE FROM e2ee_prekeys WHERE user_id = ?', [userId]);
+    await db.run('DELETE FROM e2ee_sessions WHERE user_id = ?', [userId]);
+  } catch { /* an instance without encryption has nothing to remove */ }
 
   // Messages stay, attributed to the anonymised account. Removing them would
   // delete other people's conversations; the author reference becomes a

@@ -27,7 +27,15 @@ router.get('/', rateLimit(30), async (req, res, next) => {
       const index = require('../services/search-index');
       if (await index.available()) {
         const rows = await index.find(q, { userId: req.user.id, serverId, limit });
-        return res.json(rows);
+        // Community documents are found by the same query. They are a
+        // different kind of thing, so they carry a kind, and the client
+        // decides how to present them. A document is never returned for a
+        // reader who is not in the community it belongs to.
+        let documents = [];
+        try {
+          documents = await index.findDocuments(q, { userId: req.user.id, serverId, limit });
+        } catch { /* an instance without documents still searches messages */ }
+        return res.json(rows.concat(documents));
       }
     } catch (e) {
       // A search that cannot use the index still has to answer. The slower

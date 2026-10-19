@@ -67,7 +67,7 @@
 
   window.TrycordSample = {
     label: 'Sample data',
-    note: 'This instance has no public communities, so the demo is showing sample content.',
+    note: 'Sample data, not a live instance: this instance has no public communities, so the demo is showing example content.',
     servers: servers,
     people: people,
     messages: pool,

@@ -31,14 +31,30 @@
   function initial(name) { return (String(name || '?').trim().charAt(0) || '?').toUpperCase(); }
   function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
 
+  // A link into the application. Where the application is served from is the
+  // instance's business - the origin root on one deployment, a mount on the
+  // next - so the address is asked for rather than written down here.
+  function appLink(className, text, path) {
+    var a = el('a', { class: className }, [text]);
+    Api.appHref(path).then(function (href) { a.setAttribute('href', href); });
+    return a;
+  }
+
   function mark(server, size) {
     var m = el('div', { class: 'community-mark' + (size ? ' community-mark--' + size : '') });
+    m.textContent = initial(server.name);
+    // The API returns the icon as a path, because the API is what serves it. A
+    // path on its own resolves against this page's origin, which on a site and
+    // an API in different places is the wrong host entirely, so the address is
+    // completed against the API the page is already talking to.
     if (server.icon_url && server.icon_url.charAt(0) === '/') {
-      var img = el('img', { src: server.icon_url, alt: '' });
-      img.addEventListener('error', function () { clear(m); m.textContent = initial(server.name); });
-      m.appendChild(img);
-    } else {
-      m.textContent = initial(server.name);
+      Api.assetUrl(server.icon_url).then(function (src) {
+        if (!src) return;
+        var img = el('img', { src: src, alt: '' });
+        img.addEventListener('error', function () { clear(m); m.textContent = initial(server.name); });
+        clear(m);
+        m.appendChild(img);
+      });
     }
     return m;
   }
@@ -58,7 +74,15 @@
     loading: false, error: null, disabled: false,
     selected: null, selectedId: null, previewLoading: false, previewError: null,
     joined: [],
+    signedIn: false,
   };
+
+  // The session belongs to the instance the API belongs to, which is not
+  // necessarily the origin this page was served from.
+  Api.signedIn().then(function (yes) {
+    state.signedIn = yes;
+    if (state.selectedId) renderPreview();
+  });
 
   function renderResults() {
     clear(resultsEl);
@@ -158,10 +182,10 @@
     }
 
     var actions = el('div', { class: 'dir-preview-actions' });
-    actions.appendChild(el('a', { class: 'btn btn-primary btn-sm', href: '/app/' }, ['Open in Trycord']));
+    actions.appendChild(appLink('btn btn-primary btn-sm', 'Open in Trycord', ''));
 
     var joined = state.joined.indexOf(s.id) !== -1;
-    if (Api.signedIn()) {
+    if (state.signedIn) {
       if (joined) {
         actions.appendChild(el('span', { class: 'pill', text: 'Joined' }));
       } else {
@@ -170,7 +194,7 @@
         actions.appendChild(joinBtn);
       }
     } else {
-      actions.appendChild(el('a', { class: 'btn btn-sm', href: '/app/' }, ['Sign in to join']));
+      actions.appendChild(appLink('btn btn-sm', 'Sign in to join', ''));
     }
     previewEl.appendChild(actions);
 

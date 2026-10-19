@@ -10,7 +10,7 @@ import { State, nameOf } from '../../../packages/store.js';
 import { path } from '../../../packages/nav.js';
 import Api from '../../../packages/api.js';
 import { relativeTime } from '../../../packages/format.js';
-import { screen, heading, notice, section } from './util.js';
+import { screen, notice, section } from './util.js';
 
 function greeting() {
   const hour = new Date().getHours();

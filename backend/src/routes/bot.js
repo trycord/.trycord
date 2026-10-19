@@ -29,6 +29,13 @@ async function requireApp(req, res, next) {
     if (!token) return fail(res, 'NOT_FOUND', 'not found');
     const app = await bots.appByToken(token[1]);
     if (!app) return fail(res, 'NOT_FOUND', 'not found');
+    // A disabled application is switched off, not merely quiet. The token
+    // still matches - it is the same token - so the status has to be checked
+    // here, or an administrator's "disable" does nothing and the application
+    // keeps posting.
+    if (String(app.status || 'active') !== 'active') {
+      return fail(res, 'BOT_NOT_ALLOWED', 'this application is disabled', 403);
+    }
     // Not req.app: Express puts the application instance there, and anything
     // downstream that reaches for it gets the wrong object.
     req.botApp = app;

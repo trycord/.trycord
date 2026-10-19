@@ -17,13 +17,24 @@ function issued(res, user, req, extra) {
       ip: req.ip,
     }))
     .catch((e) => { console.error('[auth] session record failed', e && e.message); });
-  return res.json(Object.assign({
+  const payload = {
     token,
     user: {
       id: user.id, username: user.username,
       displayName: user.display_name, createdAt: user.created_at,
     },
-  }, extra || {}));
+  };
+  // A caller that knows more about the account than the row does - an address
+  // that was just given, whether it has been verified - says so here. The extra
+  // fields merge into the user object rather than replacing it, so a caller
+  // cannot accidentally drop the identity fields by passing one of its own.
+  if (extra && extra.user) Object.assign(payload.user, extra.user);
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      if (key !== 'user') payload[key] = value;
+    }
+  }
+  return res.json(payload);
 }
 
 module.exports = { issued };

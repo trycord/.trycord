@@ -12,6 +12,7 @@ import { TrycordConfig } from '../packages/config.js';
 import {
   State, on as onStore, loadInstance, loadLegal, loadSession, logout,
   refreshServers, refreshDms, refreshFriends, refreshNotifications,
+  markConversationRead,
 } from '../packages/store.js';
 import { installLinkHandler, installPopStateHandler, navigate, BASE } from '../packages/nav.js';
 import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../packages/realtime.js';
@@ -73,6 +74,17 @@ function wireChrome() {
   });
   onRealtime(SESSION_EVENTS.SESSION_REVOKED, () => {
     logout().catch(() => { /* the token is already gone */ });
+  });
+  // A conversation read elsewhere. The event says who read it: when that is
+  // this account - on another device - the badge here is stale and is
+  // cleared. When it is somebody else, the unread count is still this
+  // account's own, so nothing about it changes.
+  onRealtime(EVENTS.DM_READ, (event) => {
+    const reader = event.userId || event.user_id;
+    const me = State.user && State.user.id;
+    if (reader && me && String(reader) !== String(me)) return;
+    const id = event.conversationId || event.conversation_id || event.id;
+    if (markConversationRead(id)) refreshChrome();
   });
 }
 

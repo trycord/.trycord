@@ -50,6 +50,37 @@ const Codes = {
   ACCOUNT_PENDING: 403,
   // A full voice channel. 409 rather than 403: the member is allowed in, the room is not.
   ROOM_FULL: 409,
+  // End-to-end encryption. A refusal that means the request was not understood
+  // or not accepted, kept apart from the ordinary validation failure so a
+  // client can say "this is an encryption problem" rather than "you filled
+  // the form in wrong".
+  E2EE_VALIDATION_ERROR: 400,
+  // A signature that did not verify. 403 when the request carried a
+  // credential: the key did not match what the server has for that device.
+  E2EE_INVALID_SIGNATURE: 403,
+  // An envelope whose protocol version this build does not speak. Refused
+  // rather than downgraded: there is no plaintext path to fall back to.
+  E2EE_UNSUPPORTED_VERSION: 400,
+  E2EE_CRYPTO_ERROR: 400,
+  E2EE_FORBIDDEN: 403,
+  E2EE_DEVICE_REVOKED: 403,
+  E2EE_NOT_FOUND: 404,
+  E2EE_CONFLICT: 409,
+  // A message or a state push that has already been applied.
+  E2EE_REPLAY: 409,
+  // A one-time prekey that has already been claimed.
+  E2EE_PREKEY_GONE: 409,
+  // The developer platform. A credential that is not what it claims to be,
+  // and a credential that is real but does not hold the scope the request
+  // needs. The missing scopes are named in the error's details, so a
+  // developer is told which one to ask for rather than only that it failed.
+  API_KEY_INVALID: 401,
+  API_KEY_REVOKED: 401,
+  API_KEY_EXPIRED: 401,
+  INSUFFICIENT_SCOPE: 403,
+  // A bot application that is disabled, or that is not in the community the
+  // request names.
+  BOT_NOT_ALLOWED: 403,
 };
 
 function fail(res, code, message, status, extra) {

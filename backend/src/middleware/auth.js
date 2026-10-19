@@ -59,7 +59,12 @@ function auth(req, res, next) {
     [user.jti || '', user.id]
   )
     .then(async (row) => {
-      if (!row) return fail(res, 'NOT_FOUND', 'user not found');
+      // A token that names an account this instance does not have is a failed
+      // authentication, not a missing resource. The distinction matters: the
+      // reader's own profile is not "not found" when their session is bad, and
+      // a client that reads 404 as "this endpoint does not exist" reports the
+      // wrong thing to the person staring at it.
+      if (!row) return fail(res, 'AUTH_REQUIRED', 'invalid or expired session');
       if (user.jti && row.revoked) return fail(res, 'SESSION_REVOKED', 'session revoked');
       if (tokenStale(user, row)) return fail(res, 'SESSION_REVOKED', 'session revoked');
       // Authoritative: a token minted before the version was bumped is dead,

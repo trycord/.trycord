@@ -13,11 +13,11 @@ import Api from '../../packages/api.js';
 import { EVENTS, on, joinChannel, leaveChannel } from '../../packages/realtime.js';
 import {
   State, nameOf, refreshServerTree, refreshServerMembers,
-  refreshServerRoles, refreshMutes, can, isOwner, serverById, channelById,
+  refreshServerRoles, can, isOwner, serverById, channelById,
 } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
-import { avatar, serverMark, channelIcon } from '../ui/primitives.js';
-import { head, card, row, blank, fault, fold, facts, hold } from '../ui/page.js';
+import { avatar } from '../ui/primitives.js';
+import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
 import { conversationSurface, asMessage, messageRow, copyText } from '../ui/chat.js';
 import { communitySettingsSections } from './communitySettings.js';
 import { renderVoiceRoom } from '../voice/room.js';
@@ -141,9 +141,17 @@ export function renderChannelView(ctx) {
     del: (messageId) => Api.deleteMessage(channelId, messageId),
     reactTo: (messageId, emoji) => Api.reactChannel(channelId, messageId, emoji),
     unreactFrom: (messageId, emoji) => Api.unreactChannel(channelId, messageId, emoji),
-    pin: (messageId, pinned) => pinned
-      ? Api.pinMessage(serverId, channelId, messageId)
-      : Api.unpinMessage(serverId, channelId, messageId),
+    pin: async (messageId, pinned) => {
+      const out = pinned
+        ? await Api.pinMessage(serverId, channelId, messageId)
+        : await Api.unpinMessage(serverId, channelId, messageId);
+      // The row is updated from the server's answer rather than from a
+      // realtime event: the gateway does not announce pins, so waiting for one
+      // would leave the row saying it is unpinned after it was pinned.
+      surface.api.pinned(messageId, pinned);
+      if (isPins) open();
+      return out;
+    },
     threadOf: (messageId) => Api.thread('channel', channelId, messageId),
     upload: (file, onProgress) => Api.uploadAttachment(channelId, file, onProgress),
     copyHref: () => path('/server/' + serverId + '/channel/' + channelId),
@@ -201,6 +209,14 @@ export function renderChannelView(ctx) {
     }
   };
 
+  // A pin event about another channel says nothing about this one. The event
+  // names its channel when it carries one; when it does not, the message id
+  // decides, because the surface only knows this channel's messages.
+  const isThisChannel = (event) => {
+    const id = event.channel_id || event.channelId || event.channel;
+    return !id || String(id) === String(channelId);
+  };
+
   const unsubs = [
     on(EVENTS.MESSAGE, (event) => {
       if (String(event.channel_id || event.channelId) !== String(channelId)) return;
@@ -222,8 +238,16 @@ export function renderChannelView(ctx) {
       if (String(event.channel_id || event.channelId) !== String(channelId)) return;
       surface.api.embeds(event.messageId, event.embeds || []);
     }),
-    on(EVENTS.MESSAGE_PINNED, (event) => surface.api.pinned(event.id, true)),
-    on(EVENTS.MESSAGE_UNPINNED, (event) => surface.api.pinned(event.id, false)),
+    on(EVENTS.MESSAGE_PINNED, (event) => {
+      if (!isThisChannel(event)) return;
+      surface.api.pinned(event.id, true);
+      if (isPins) open();
+    }),
+    on(EVENTS.MESSAGE_UNPINNED, (event) => {
+      if (!isThisChannel(event)) return;
+      surface.api.pinned(event.id, false);
+      if (isPins) open();
+    }),
   ];
 
   return {

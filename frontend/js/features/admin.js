@@ -12,8 +12,9 @@ import {
   adminAudit, adminGdpr, adminApprovals,
 } from './adminSurfaces.js';
 import {
-  adminAnnouncements, adminPageDirectory, adminDatabase, adminContinuum, adminDiagnostics,
+  adminAnnouncements, adminDatabase, adminContinuum, adminDiagnostics,
 } from './adminInfra.js';
+import { adminPageEditor } from './adminPages.js';
 import { adminConfiguration } from './adminCfg.js';
 import { scopeNav } from '../../packages/registry.js';
 import { icon } from '../../packages/icons.js';
@@ -22,6 +23,7 @@ import { path } from '../../packages/nav.js';
 
 const LAYOUTS = new Map([
   ['admin', () => adminOverview()],
+  ['admin.users', () => adminPeople()],
   ['admin.approvals', () => adminApprovals()],
   ['admin.communities', () => adminCommunities()],
   ['admin.reports', () => adminReports()],
@@ -29,7 +31,7 @@ const LAYOUTS = new Map([
   ['admin.audit', () => adminAudit()],
   ['admin.gdpr', () => adminGdpr()],
   ['admin.announcements', () => adminAnnouncements()],
-  ['admin.pages', () => adminPageDirectory()],
+  ['admin.pages', () => adminPageEditor()],
   ['admin.settings', () => adminConfiguration()],
   ['admin.database', () => adminDatabase()],
   ['admin.continuum', () => adminContinuum()],

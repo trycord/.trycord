@@ -52,7 +52,7 @@
             </div>
             <div class="nav-menu-foot">
               <p>Private, self-hostable community messaging.</p>
-              <a class="text-link" href="/demo">Try the live demo</a>
+              <a class="text-link" href="/demo">Try the demo</a>
             </div>
           </div>
         </div>
@@ -64,7 +64,7 @@
           </button>
           <div class="nav-menu">
             <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
-            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+            <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
           </div>
         </div>
 
@@ -101,7 +101,7 @@
           <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
           <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
         </button>
-        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
     </div>
   </header>
@@ -113,191 +113,376 @@
         <p class="kicker">Legal</p>
         <h1>Terms of Service</h1>
         <p class="lede">
-        These terms cover your use of any Trycord instance you did not run
-        yourself. They are written to work the same way on an official hosted
-        instance and on a community-run one, because the software is the same
-        and so are your expectations of it.
-      </p>
+          The agreement between you and the person or organisation running the
+          instance you use. It says what the service is, what you may not do
+          with it, who holds what you post, and what happens when something
+          goes wrong. It is written to read the same way on an instance you run
+          yourself and on one someone else runs, because the software is the
+          same on both.
+        </p>
       </div>
       <div class="prose-layout">
-        <div class="prose">
+        <article class="prose">
           <!-- page:begin -->
-          <!-- Everything between the two markers below is the editable region: publishing replaces it with the body of the draft. The title and lead above, the contents list to the side, and the header and footer all sit outside the markers, so publishing cannot change them. -->
           <div class="draft-note" role="note">
-                  <strong>Operator action required.</strong> Items marked
-                  <code>OPERATOR</code> are details only the operator of a given
-                  instance can supply: their legal name, contact address, and where to
-                  send formal notices. The project cannot fill these in, because they
-                  differ per instance. Until they are set, an instance should present
-                  these terms as a draft rather than as binding terms.
-                </div>
-                <p class="small muted"><strong>Version:</strong> <code>1.0</code> &middot; <strong>Effective date:</strong> <span class="op-field" data-op="effective-date">OPERATOR: the date these terms take effect on this instance</span></p>
-          
-                <h2>1. Who you are agreeing to</h2>
-                <p>
-                  Trycord is self-hostable software. The party you agree to when you
-                  create an account is the <strong>operator of that instance</strong>,
-                  not the Trycord project. The project publishes the software; it does
-                  not run instances on your behalf unless the instance is an official one
-                  (see section 2).
-                </p>
-                <p>
-                  Operator: <span class="op-field" data-op="operator">OPERATOR: the legal name of whoever runs this instance</span> &middot; Contact for legal
-                  notices: <span class="op-field" data-op="legal-notices">OPERATOR: your address for legal notices</span>
-                </p>
-          
-                <h2>2. Official instances and self-hosted instances</h2>
-                <p>
-                  An <strong>official instance</strong> is operated by the Trycord project
-                  or by a partner acting under its published terms. A
-                  <strong>self-hosted instance</strong> is operated by someone else,
-                  usually a community, and is governed by that operator's own policies.
-                </p>
-                <p>
-                  Where the two differ, the additional
-                  <a href="/instances-terms">Terms for Official Instances</a> apply on
-                  top of these terms. If you are self-hosting, you are the operator, and
-                  these terms govern your relationship with your own users rather than
-                  with yourself.
-                </p>
-          
-                <h2>3. The service</h2>
-                <p>
-                  An instance provides registered users with communities, channels, and
-                  direct messages. Features may be added, changed, or removed. Where an
-                  instance advertises a capability, it is provided on an as-available
-                  basis and may be limited for capacity, abuse prevention, or legal
-                  reasons.
-                </p>
-          
-                <h2>4. Accounts</h2>
-                <ul>
-                  <li>You must be old enough to form a binding contract where you live, and at least 13 years old. Younger users need an account held by a parent or guardian.</li>
-                  <li>Provide accurate registration details and keep them current. You are responsible for activity under your account.</li>
-                  <li>One person, one account is the default expectation. Additional accounts are allowed only where an instance permits them.</li>
-                  <li>Keep your credentials to yourself. You are responsible for anything done with your account, including by someone you gave access to.</li>
-                  <li>You may delete your account at any time. Deletion is described in the <a href="/privacy">Privacy Policy</a>.</li>
-                </ul>
-          
-                <h2>5. Acceptable use</h2>
-                <p>You agree not to use an instance to:</p>
-                <ul>
-                  <li>Break the law, or infringe anyone else's rights.</li>
-                  <li>Harass, threaten, stalk, or incite violence against anyone.</li>
-                  <li>Distribute malware, or content that is illegal or fraudulent.</li>
-                  <li>Impersonate others or misrepresent your identity.</li>
-                  <li>Exploit the service: scrape, resell, overload, or circumvent rate and permission limits.</li>
-                  <li>Access instances, communities, or messages you are not authorised to see.</li>
-                  <li>Upload content you have no right to upload.</li>
-                </ul>
-                <p>
-                  Communities may set additional rules for their own members. Those rules
-                  are the community's, and breaking them is a matter for that community's
-                  moderators, not only for the operator.
-                </p>
-          
-                <h2>6. Content, and who owns it</h2>
-                <p>
-                  You keep ownership of what you post. You give the operator a licence to
-                  host, copy, transmit, and display your content for the purpose of
-                  running the service &mdash; including showing it to the people you send
-                  it to, backing it up, and moderating it. That licence ends when you
-                  delete the content, except for copies still held in backups or required
-                  by law.
-                </p>
-                <p>
-                  You accept that you are responsible for your content, including whether
-                  you have the right to post it. An operator may remove content that
-                  breaks these terms or breaks the law.
-                </p>
-          
-                <h2>7. Moderation</h2>
-                <p>
-                  Operators and community moderators may act on accounts, communities, and
-                  content that breaks the rules. Actions can include warnings, removal of
-                  content, timeouts, suspension, and banning. Enforcement is a judgement
-                  call by a person, and mistakes happen. Every instance that offers an
-                  appeals process must publish it, and you can use it: see
-                  <a href="/support">Support</a>.
-                </p>
-          
-                <h2>8. Privacy</h2>
-                <p>
-                  Personal data is handled as described in the
-                  <a href="/privacy">Privacy Policy</a>. That policy is the operative
-                  document on what is collected, why, and for how long. The operator is
-                  the data controller for that instance; the project is not, except on an
-                  official instance where the two roles are set out in the
-                  <a href="/instances-terms">Terms for Official Instances</a>.
-                </p>
-          
-                <h2>9. Suspension and termination</h2>
-                <p>
-                  You can stop using an instance and delete your account whenever you
-                  like. An operator may suspend or terminate an account that breaks these
-                  terms, and must give you a route to appeal that decision.
-                </p>
-                <p>
-                  If an instance is shut down, the operator should give reasonable notice
-                  and a documented path to export your data. No operator can promise
-                  indefinite availability of a free service.
-                </p>
-          
-                <h2>10. Disclaimers</h2>
-                <p>
-                  The service is provided as-is. To the fullest extent the law allows,
-                  the operator makes no warranties about availability, fitness for a
-                  particular purpose, or that the service will be uninterrupted or error
-                  free. Where a consumer law cannot be excluded, it still applies.
-                </p>
-          
-                <h2>11. Limitation of liability</h2>
-                <p>
-                  To the fullest extent the law allows, neither the operator nor the
-                  Trycord project is liable for indirect or consequential loss, or for
-                  loss of data, profits, or goodwill, arising from your use of the
-                  service. Aggregate liability is limited to the amount you paid the
-                  operator in the twelve months before the claim, or to
-                  <span class="op-field" data-op="liability-floor">OPERATOR: your liability floor for users who paid nothing</span>. Nothing here limits
-                  liability that cannot lawfully be limited, including for death or
-                  personal injury caused by negligence, or for fraud.
-                </p>
-          
-                <h2>12. Your liability</h2>
-                <p>
-                  You are responsible for what you post and how you use the service. If
-                  your content or your actions cause the operator a loss, you may be
-                  liable for it, as far as the law allows.
-                </p>
-          
-                <h2>13. Changes to these terms</h2>
-                <p>
-                  Terms can change. Material changes will be announced in the app or on
-                  the instance before they take effect, and the version and effective date
-                  are kept at the top of this page. Continuing to use an instance after a
-                  change takes effect means you accept the updated terms. If you do not
-                  accept them, you may delete your account.
-                </p>
-          
-                <h2>14. Governing law</h2>
-                <p>
-                  These terms are governed by the laws of
-                  <span class="op-field" data-op="governing-law">OPERATOR: your governing law</span>, and disputes are subject to the exclusive
-                  courts of <span class="op-field" data-op="jurisdiction">OPERATOR: your jurisdiction</span>, without affecting any mandatory
-                  consumer protections available where you live.
-                </p>
-          
-                <h2>15. Contact</h2>
-                <p>
-                  Legal notices and formal complaints go to
-                  <span class="op-field" data-op="complaints">OPERATOR: where complaints are sent</span>. For anything that is not a formal notice,
-                  start on the <a href="/support">Support</a> page &mdash; it routes to
-                  the right place faster.
-                </p>
+            <strong>Legal review required before publication.</strong> This
+            document comes from the Trycord project as a starting point for an
+            instance. It is not legal advice, and nobody has reviewed it for the
+            instance serving it. The fields marked <code>OPERATOR</code> are
+            facts only the operator can supply: the legal identity behind the
+            instance, its jurisdiction, its liability floor, where notices go,
+            and the date the document takes effect. Fill them in, and have a
+            qualified lawyer read the result, before presenting this document as
+            binding.
+          </div>
+          <p class="small muted">
+            <strong>Version:</strong> <code>1.0</code> &middot;
+            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
+            <strong>Effective on this instance:</strong>
+            <span class="op-field" data-op="effective-date">OPERATOR: the date these terms take effect on this instance</span>
+          </p>
+
+          <h2>1. Who you are agreeing to</h2>
+          <p>
+            Trycord is self-hostable software. The party you agree to when you
+            create an account is the <strong>operator of that instance</strong>,
+            not the Trycord project. The project publishes the software and
+            nothing else; it does not run instances on your behalf unless the
+            instance is an official one, which is covered in section 2.
+          </p>
+          <p>
+            Operator:
+            <span class="op-field" data-op="operator">OPERATOR: the legal name of whoever runs this instance</span>
+            &middot; Notices:
+            <span class="op-field" data-op="legal-notices">OPERATOR: the address for legal notices on this instance</span>
+          </p>
+          <p>
+            If you run the instance yourself, you are the operator, and these
+            terms govern your relationship with your own users rather than with
+            yourself. You may publish your own terms instead of these; these
+            are the ones the software ships with.
+          </p>
+
+          <h2>2. Official instances and self-hosted instances</h2>
+          <p>
+            An <strong>official instance</strong> is operated by the Trycord
+            project, or by a partner the project has appointed and published.
+            A <strong>self-hosted instance</strong> is operated by someone else,
+            usually a community, and is governed by that operator's own
+            policies.
+          </p>
+          <p>
+            On an official instance the
+            <a href="/instances-terms">Terms for Official Instances</a> apply
+            in addition to these terms, and win where the two conflict. Nothing
+            in them removes a right you have under these terms.
+          </p>
+
+          <h2>3. The service</h2>
+          <p>
+            An instance gives registered users communities, channels and direct
+            messages, with membership, roles and permissions enforced by the
+            server. Features are added, changed and removed over time. A
+            capability an instance advertises is provided on an as-available
+            basis and may be limited for capacity, for abuse prevention, or
+            because of a legal obligation on the operator.
+          </p>
+          <p>
+            An instance may also be connected to other instances over
+            federation. Federation is off unless the operator turns it on, and
+            section 10 says what that changes for you.
+          </p>
+
+          <h2>4. Accounts</h2>
+          <ul>
+            <li>You must be old enough to enter a binding contract where you live, and at least 13 years old. Younger users need an account held by a parent or guardian.</li>
+            <li>Give accurate registration details and keep them current. You are responsible for everything done under your account.</li>
+            <li>One account per person is the default expectation. Extra accounts are allowed only where the operator permits them.</li>
+            <li>Keep your credentials to yourself. You are responsible for what is done with your account, including by someone you gave access to.</li>
+            <li>You may delete your account at any time. Section 13 says what happens to your content when you do.</li>
+          </ul>
+
+          <h2>5. Acceptable use</h2>
+          <p>You agree not to use an instance to:</p>
+          <ul>
+            <li>Break the law, or infringe anyone else's rights.</li>
+            <li>Harass, threaten, stalk, defame, or incite violence against anyone.</li>
+            <li>Distribute malware, or content that is illegal, fraudulent, or stolen.</li>
+            <li>Impersonate others or misrepresent who you are.</li>
+            <li>Exploit the service: scrape it, resell access, overload it, or work around rate limits, bans, or permission checks.</li>
+            <li>Reach instances, communities, channels or messages you are not authorised to see, or ask for credentials you were not given.</li>
+            <li>Upload content you have no right to upload.</li>
+            <li>Use the service to send bulk unsolicited messages, or to advertise to people who asked for nothing.</li>
+          </ul>
+
+          <h3>Child sexual abuse material</h3>
+          <p>
+            Child sexual abuse material is prohibited on every instance, without
+            exception, and the prohibition is not limited to what the law of one
+            country happens to forbid. It covers any image, video, audio, text
+            or other material that depicts, describes, or was made to depict a
+            child in a sexual or exploitative context, and it covers every route
+            into the instance: a message, a direct message, a file or
+            attachment, a profile picture, an avatar, a banner, a community icon,
+            a link or preview, an upload that no one has opened yet, the output
+            of a bot, the result of an extension or integration, and content
+            that arrived over federation from another instance.
+          </p>
+          <p>
+            Attempting it is prohibited as well. Asking for such material,
+            offering it, arranging to obtain it, helping someone else obtain
+            it, and setting up a bot or an integration to move it around are all
+            covered, and none of them is excused by the material being
+            fictional, generated, edited, or described rather than shown.
+          </p>
+          <p>
+            Running an instance does not create an exception. An operator who
+            knows such material is on an instance and does not remove it, or
+            who is told about it and does not act, is responsible for that
+            failure under the law that applies to them. Nobody can grant
+            permission to break this rule, and no operator, administrator,
+            community owner or moderator can override it.
+          </p>
+          <p>
+            Accounts, communities, bots and integrations used for this are
+            removed, and the operator may be required to preserve evidence or
+            report to an authority. See <a href="/trust-and-safety">Trust and
+            Safety</a> for how to report it.
+          </p>
+
+          <h3>Community rules</h3>
+          <p>
+            Communities may set further rules for their own members. Those
+            rules belong to the community, and breaking them is a matter for
+            that community's moderators first, and for the operator as well.
+            A community rule may not weaken this section, and it may not make
+            private material public.
+          </p>
+
+          <h2>6. Content you post, and who holds it</h2>
+          <p>
+            You keep ownership of what you post. You give the operator a
+            licence to host, copy, transmit, display and back up your content
+            for the purpose of running the service: showing it to the people
+            you send it to, storing it, and moderating it. That licence ends
+            when you delete the content, except for copies still held in
+            backups, or copies the operator is required to keep by law.
+          </p>
+          <p>
+            You are responsible for your content, including whether you had the
+            right to post it. The operator may remove content that breaks
+            these terms or the law, and may pass it to a law enforcement
+            authority where it is required to.
+          </p>
+          <p>
+            A community's moderators may also remove or edit content in that
+            community. If you believe a moderator's decision was wrong, the
+            appeal route in section 7 applies to you as much as to anyone else.
+          </p>
+
+          <h2>7. Moderation, enforcement and appeals</h2>
+          <p>
+            Operators and community moderators may act on accounts,
+            communities and content that breaks the rules. The actions
+            available include a warning, removal or edit of content, a
+            timeout, suspension, and a ban. Enforcement is a decision made by
+            a person, and people make mistakes.
+          </p>
+          <p>
+            For that reason an instance that takes action against an account
+            must give that account a way to ask for the decision to be looked
+            at again, and must answer the request. The appeal route is
+            described on the <a href="/support">Support</a> page. An appeal is
+            read by a person, and a decision that is not explained is a
+            decision that cannot be reviewed.
+          </p>
+          <p>
+            Where an action is taken because content is illegal, or because a
+            law requires it, the operator may not be able to offer an appeal,
+            and may not be able to tell you why.
+          </p>
+
+          <h2>8. Security, and reporting abuse</h2>
+          <p>
+            Keep your credentials to yourself, keep your client up to date, and
+            tell the operator if you think someone else is using your account.
+            Report abuse of the service, of a community, or of another person
+            to the operator, using the route on the
+            <a href="/trust-and-safety">Trust and Safety</a> page. Where the
+            material is illegal, report it to the operator and to the
+            authorities in your country; the operator may be the only party
+            able to act on it.
+          </p>
+          <p>
+            A vulnerability in the software is a different thing from abuse of
+            an instance, and it has its own route, described on the
+            <a href="/security">Security</a> page. Do not test against an
+            instance that has not agreed to it.
+          </p>
+
+          <h2>9. Your personal data</h2>
+          <p>
+            Personal data is handled as described in the
+            <a href="/privacy">Privacy Policy</a>, which is the operative
+            document on what is collected, why, and for how long. The operator
+            is the controller of that data. The project is not, except on an
+            official instance, where the arrangement is set out in the
+            <a href="/instances-terms">Terms for Official Instances</a>.
+          </p>
+
+          <h2>10. Federation and other instances</h2>
+          <p>
+            An instance may exchange content with other instances over
+            federation. What is exchanged is what a community or a member has
+            explicitly authorised, and nothing else. Direct messages are not
+            federated unless the sender has turned that on for them, and a
+            remote instance cannot see a private channel, a local ban, or a
+            local permission.
+          </p>
+          <p>
+            You are responsible for what you publish to a federated
+            destination, in the same way you are responsible for what you post
+            on this instance. A remote instance is operated by someone else,
+            under their own rules and their own law, and the operator of this
+            instance cannot control what it does with what it receives. Read
+            the <a href="/federation-policy">Federation Policy</a> before you
+            federate anything.
+          </p>
+
+          <h2>11. Bots, extensions and integrations</h2>
+          <p>
+            A bot, extension or integration acts on the instance using
+            credentials you or the operator gave it. You are responsible for
+            what you install and for what it does: the permissions it holds, the
+            content it posts, the people it messages, and the requests it makes
+            on your behalf. An integration that is not maintained, or that
+            starts behaving in a way you did not intend, is yours to remove.
+          </p>
+          <p>
+            The operator may remove a bot, extension or integration that
+            breaks these terms, and may require one to be removed without
+            telling you first where the terms give it the right to. Installing
+            third-party code gives it access to your account, and the operator
+            cannot vouch for code it did not write.
+          </p>
+
+          <h2>12. Availability, and changes to the service</h2>
+          <p>
+            The service is provided as it stands. Where an instance publishes a
+            <a href="/status">status page</a>, it describes that instance at a
+            moment, and it is not a commitment about the future. No operator
+            can promise that a free or self-hosted service will be available
+            without interruption, and no feature advertised on a page is a
+            guarantee that it will always be there.
+          </p>
+          <p>
+            The operator may change the service, and may add, change or
+            remove features, for any reason including capacity, security or
+            legal obligation. Where a change removes something you rely on, the
+            operator should tell you before it takes effect.
+          </p>
+
+          <h2>13. Suspension, termination and deletion</h2>
+          <p>
+            You may stop using an instance and delete your account whenever you
+            like. An operator may suspend or terminate an account that breaks
+            these terms, and must give that account a route to appeal under
+            section 7, except where the law does not allow it.
+          </p>
+          <p>
+            When an account is closed, the operator erases the account data
+            described in section 6 of the <a href="/privacy">Privacy Policy</a>.
+            Messages you posted may be kept, so that other people's
+            conversations still make sense, and so that action taken against
+            your account, or by your account, stays on the record. Those
+            messages are attributed to a deleted account rather than to you.
+          </p>
+          <p>
+            If an instance is shut down, the operator should give reasonable
+            notice and a documented way to export your data, and should keep
+            the export available for a stated period.
+          </p>
+
+          <h2>14. Intellectual property</h2>
+          <p>
+            The Trycord software is published under an open source licence,
+            which is set out on the <a href="/licenses">Licenses</a> page and
+            in the repository. That licence covers the software; it does not
+            cover the content people post on an instance, and it does not make
+            the project responsible for what an operator does with it.
+          </p>
+          <p>
+            You keep your content. You grant the licence in section 6, and no
+            wider one. The operator keeps ownership of the instance's own
+            configuration, its community names and icons, and the branding it
+            uses. Nothing here transfers the Trycord name or logo to you, and
+            nothing lets you use them in a way that suggests the project
+            endorses your instance.
+          </p>
+          <p>
+            If you send the project feedback, a suggestion or a contribution,
+            you give the project a licence to use it in the software under the
+            same licence, and you say so.
+          </p>
+
+          <h2>15. Disclaimers and limitation of liability</h2>
+          <p>
+            The service is provided as-is. To the fullest extent the law
+            allows, the operator makes no warranty about availability,
+            fitness for a particular purpose, or that the service will be
+            uninterrupted or free of error. Where a consumer law cannot be
+            excluded, it still applies.
+          </p>
+          <p>
+            To the fullest extent the law allows, neither the operator nor the
+            Trycord project is liable for indirect or consequential loss, or
+            for loss of data, profits or goodwill, arising from your use of
+            the service. Aggregate liability is limited to the amount you paid
+            the operator in the twelve months before the claim, or to
+            <span class="op-field" data-op="liability-floor">OPERATOR: the liability floor that applies to users who paid nothing</span>.
+            Nothing here limits liability that cannot lawfully be limited,
+            including for death or personal injury caused by negligence, or
+            for fraud.
+          </p>
+          <p>
+            You are responsible for your content and for your use of the
+            service. Where your content or your actions cause the operator a
+            loss, you may be liable for it, as far as the law allows.
+          </p>
+
+          <h2>16. Governing law and disputes</h2>
+          <p>
+            These terms are governed by the laws of
+            <span class="op-field" data-op="governing-law">OPERATOR: the law that governs this instance</span>,
+            and disputes are subject to the courts of
+            <span class="op-field" data-op="jurisdiction">OPERATOR: the jurisdiction for this instance</span>,
+            without affecting any mandatory protection available where you
+            live. Where you are a consumer, the protections your local law
+            gives you are unaffected by this section.
+          </p>
+
+          <h2>17. Changes to these terms</h2>
+          <p>
+            These terms can change. The version and the date are at the top of
+            this page, and a material change is announced on the instance
+            before it takes effect. Continuing to use the instance after a
+            change takes effect means you accept the updated terms; if you do
+            not accept them, you may delete your account and export your data
+            first.
+          </p>
+
+          <h2>18. Contact</h2>
+          <p>
+            Formal notices and complaints go to
+            <span class="op-field" data-op="complaints">OPERATOR: where complaints about this instance are sent</span>.
+            For anything that is not a formal notice, start on the
+            <a href="/support">Support</a> page, which routes to the right
+            place faster.
+          </p>
           <!-- page:end -->
-        </div>
-        <aside class="toc" aria-label="Table of contents">
-          <h2 class="toc-title">On this page</h2>
+        </article>
+        <aside class="toc" aria-label="On this page">
+          <p class="toc-title">On this page</p>
         </aside>
       </div>
     </div>
@@ -316,7 +501,7 @@
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
@@ -329,7 +514,7 @@
       <div class="footer-col">
         <h2 class="footer-heading">Explore</h2>
         <a href="/communities">Communities</a>
-        <a href="/demo">Live demo</a>
+        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
@@ -354,6 +539,7 @@
   </footer>
 
 
+  <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>
