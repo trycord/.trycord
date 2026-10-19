@@ -8,6 +8,8 @@
 import { el } from '../../../packages/dom.js';
 import Api, { forgetToken } from '../../../packages/api.js';
 import TrycordConfig, { setApiUrl, backendUrl, inspectInstance } from '../../../packages/config.js';
+import { clearInstanceState } from '../../../packages/store.js';
+import { disconnect } from '../../../packages/realtime.js';
 import { path, navigate } from '../../../packages/nav.js';
 import { toast } from '../ui.js';
 
@@ -54,8 +56,12 @@ export function renderInstances() {
       return;
     }
     const previous = backendUrl();
-    setApiUrl(target);
+    // The old instance's socket is closed, its cached data is dropped, and its
+    // token is forgotten before the new address takes effect.
+    try { disconnect(); } catch { /* no socket was open */ }
+    clearInstanceState();
     forgetToken(previous);
+    setApiUrl(target);
     toast('Now using ' + check.name);
     navigate('/register');
   }

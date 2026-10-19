@@ -18,6 +18,8 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api, { forgetToken } from '../../packages/api.js';
 import TrycordConfig, { setApiUrl, resetBackend, backendUrl, backendSource } from '../../packages/config.js';
+import { clearInstanceState } from '../../packages/store.js';
+import { disconnect } from '../../packages/realtime.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
 import { errorToast, toast } from '../ui/overlays.js';
 import { navigate, path } from '../../packages/nav.js';
@@ -123,8 +125,13 @@ export function renderInstances() {
       notes.push('not accepting new accounts');
     }
     const previous = backendUrl();
-    setApiUrl(target);
+    // The old instance's socket is closed, its cached data is dropped, and its
+    // token is forgotten. What is left in this browser belongs to the instance
+    // being left alone.
+    try { disconnect(); } catch { /* no socket was open */ }
+    clearInstanceState();
     forgetToken(previous);
+    setApiUrl(target);
     customNote.textContent = 'Connected to ' + notes.join(' · ') + '.';
     customButton.disabled = false;
     toast('Now using ' + check.name);
