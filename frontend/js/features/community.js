@@ -145,7 +145,7 @@ export function renderChannelView(ctx) {
       ? Api.pinMessage(serverId, channelId, messageId)
       : Api.unpinMessage(serverId, channelId, messageId),
     threadOf: (messageId) => Api.thread('channel', channelId, messageId),
-    upload: (file) => Api.uploadAttachment(channelId, file),
+    upload: (file, onProgress) => Api.uploadAttachment(channelId, file, onProgress),
     copyHref: () => path('/server/' + serverId + '/channel/' + channelId),
     emptyHint: { title: 'This channel is quiet', text: 'The first message starts it.' },
   });

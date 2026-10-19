@@ -350,6 +350,23 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* An upload in flight: how far it has got, and how to stop it. */
+.upload-bar {
+  display: inline-block; width: 90px; height: 4px; flex: none;
+  border-radius: var(--radius-pill); background: var(--panel-3); overflow: hidden;
+}
+.upload-bar-fill {
+  display: block; height: 100%; width: 0;
+  background: var(--brand); border-radius: var(--radius-pill);
+  transition: width var(--dur-1) var(--ease);
+}
+
+/* A file dragged over the composer. */
+.composer.is-dropping {
+  outline: 2px dashed var(--brand-line);
+  outline-offset: 2px;
+}
+
 /* Discover's public communities land on a grid of cards. */
 .cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-4); }
 

@@ -834,21 +834,94 @@ export function conversationSurface(config) {
     fileInput.click();
   };
   attachBtn.addEventListener('click', pickFile);
-  fileInput.addEventListener('change', async () => {
+  fileInput.addEventListener('change', () => {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
-    const chip = el('span', { class: 'composer-context-note holdline' }, spinner(), file.name);
+    startUpload(file);
+  });
+
+  // A file dropped on the composer is a file the composer accepts. The drop
+  // only happens over the composer, so a stray drag across the page does not
+  // open anything.
+  form.addEventListener('dragover', (event) => {
+    if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
+    event.preventDefault();
+    form.classList.add('is-dropping');
+  });
+  form.addEventListener('dragleave', (event) => {
+    if (form.contains(event.relatedTarget)) return;
+    form.classList.remove('is-dropping');
+  });
+  form.addEventListener('drop', (event) => {
+    if (!event.dataTransfer || !event.dataTransfer.files || !event.dataTransfer.files.length) return;
+    event.preventDefault();
+    form.classList.remove('is-dropping');
+    const file = event.dataTransfer.files[0];
+    if (file) startUpload(file);
+  });
+
+  // One upload at a time, so two files cannot race for the same context slot.
+  // The upload itself reports how far it has got, can be stopped, and can be
+  // tried again without the reader losing their draft.
+  let uploading = null;
+
+  function startUpload(file) {
+    if (!cfg.upload) {
+      composer.setError('Attachments are not open here.');
+      return;
+    }
+    if (uploading) {
+      composer.setError('Wait for the current upload to finish.');
+      return;
+    }
+
+    const bar = el('span', { class: 'upload-bar' }, el('span', { class: 'upload-bar-fill' }));
+    const label = el('span', { class: 'composer-context-text' }, '0%');
+    const cancel = el('button', {
+      class: 'btn btn--ghost btn--sm', type: 'button',
+      'aria-label': 'Cancel this upload',
+      onClick: () => {
+        if (uploading && uploading.abort) uploading.abort();
+      },
+    }, 'Cancel');
+    const chip = el('span', { class: 'composer-context-note' },
+      spinner(), file.name, ' ', label, bar, ' ', cancel);
     showContext([chip]);
-    try {
-      const created = await cfg.upload(file);
-      uploadIds.push({ id: typeof created === 'object' && created ? created.id : created, name: file.name });
+
+    const started = cfg.upload(file, (fraction) => {
+      const pct = Math.max(0, Math.min(100, Math.round((Number(fraction) || 0) * 100)));
+      label.textContent = pct + '%';
+      const fill = bar.querySelector('.upload-bar-fill');
+      if (fill) fill.style.width = pct + '%';
+    });
+
+    const handle = started && typeof started === 'object' && started.promise
+      ? started
+      : { promise: Promise.resolve(started) };
+    uploading = handle;
+
+    handle.promise.then((created) => {
+      uploading = null;
+      const id = typeof created === 'object' && created ? created.id : created;
+      uploadIds.push({ id, name: file.name });
       showContext([el('span', { class: 'composer-context-note' }, 'Attached: ' + file.name)]);
       composer.clearError();
-    } catch (e) {
-      showContext(null);
+    }).catch((e) => {
+      uploading = null;
+      // A cancelled upload is the reader's own doing, not a failure to report.
+      if (e && e.name === 'AbortError') {
+        showContext(null);
+        return;
+      }
+      const retry = el('button', {
+        class: 'btn btn--ghost btn--sm', type: 'button',
+        onClick: () => startUpload(file),
+      }, 'Try again');
+      showContext([el('span', { class: 'composer-context-note' },
+        'Could not attach ' + file.name + '. ', retry)]);
       errorToast(e);
-    }
-  });
+    });
+  }
 
   // -- typing -------------------------------------------------------------------------
 

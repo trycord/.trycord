@@ -140,6 +140,9 @@ export function renderDmConversation(ctx) {
       return { messages: Array.isArray(page) ? page : (page && page.messages) || [] };
     },
     send: (payload) => Api.sendDm(conversationId, payload),
+    // The backend has always accepted an attachment on a direct message; the
+    // composer simply never offered one.
+    upload: (file, onProgress) => Api.uploadDmAttachment(conversationId, file, onProgress),
     edit: (messageId, content) => Api.updateDm(conversationId, messageId, { content }),
     del: (messageId) => Api.deleteDm(conversationId, messageId),
     reactTo: (messageId, emoji) => Api.reactDm(conversationId, messageId, emoji),

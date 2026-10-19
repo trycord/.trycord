@@ -328,10 +328,12 @@ check trusts the CSS text.
 Real, known gaps. None blocks ordinary use.
 
 - **The S3 driver has never completed a live round trip**, for the reason above.
-- **Any file may be attached, and anything unrecognised is served as a download.**
-  There is no list of accepted types. Size (8 MB), a per-account quota, a
-  per-route rate limit, a per-message count and filename cleaning are all still
-  enforced; nothing is refused for what it is.
+- **Any file may be attached by default, and anything unrecognised is served as
+  a download.** An operator can set a list of accepted types in the
+  configuration, and a file whose *detected* type is not on it is refused. Out
+  of the box the list is empty, which means anything goes. Size (8 MB), a
+  per-account quota, a per-route rate limit, a per-message count and filename
+  cleaning are always enforced.
 
   What makes that safe is the serving side rather than the extension. The type
   is detected from the bytes rather than trusted - magic bytes for the binary
@@ -354,7 +356,8 @@ Real, known gaps. None blocks ordinary use.
   the reader is not in cannot answer a query.
 - **`docs/selfhosting.md` is a deployment narrative, not a variable reference.**
   Every variable is documented in `backend/.env.example`.
-- **Attachment progress, cancel and retry, drop and paste, and a lightbox.**
+- **Attachment progress, cancel and retry, and dropping a file on the composer**
+  are in the desktop composer; a lightbox for reading an image in place is not.
 - **Voice carries media peer to peer.** The in-house mesh is the supported
   provider: the server holds the signalling and the peers hold the media. It
   suits small rooms - the media is relayed between every participant - and a
