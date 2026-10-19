@@ -24,6 +24,27 @@ module.exports = (engine) => [
          FOREIGN KEY (author_id) REFERENCES users(id)
        )${engine}`,
 
+  // The in-house search index.
+  //
+  // One row per distinct word per message. The words are lowercased and
+  // trimmed, so a query is a lookup rather than a scan, and the same shape
+  // works on every database this application runs on - which matters, because
+  // the alternative (a vendor's full-text extension) is not something a
+  // self-hosted instance can rely on being able to install.
+  //
+  // The permission columns are copied here on purpose: the query asks for
+  // matching words and the rows it gets back already say who may see them, so
+  // the permission check cannot be forgotten by a later change to the query.
+  `CREATE TABLE IF NOT EXISTS message_search_words (
+      message_id  VARCHAR(64) NOT NULL,
+      word        VARCHAR(64) NOT NULL,
+      server_id   VARCHAR(64) NOT NULL,
+      channel_id  VARCHAR(64) NOT NULL,
+      author_id   VARCHAR(64) NOT NULL,
+      created_at  VARCHAR(64) NOT NULL,
+      PRIMARY KEY (message_id, word)
+    )${engine}`,
+
   `CREATE TABLE IF NOT EXISTS message_embeds (
       id          VARCHAR(64) PRIMARY KEY,
       message_id  VARCHAR(64),

@@ -278,6 +278,10 @@ const INDEXES = [
   'CREATE INDEX idx_messages_created ON messages(created_at)',
   'CREATE INDEX idx_invites_server ON invites(server_id)',
   'CREATE INDEX idx_messages_thread ON messages(thread_root_id, seq)',
+  // The in-house search index. The word lookup is the one that matters; the
+  // server column narrows it when a search is scoped to one community.
+  'CREATE INDEX idx_search_words_word ON message_search_words(word)',
+  'CREATE INDEX idx_search_words_server ON message_search_words(server_id, word)',
   'CREATE INDEX idx_membership_events ON server_membership_events(server_id, kind, created_at)',
   'CREATE INDEX idx_embeds_message ON message_embeds(message_id)',
   'CREATE INDEX idx_embeds_dm_message ON message_embeds(dm_message_id)',

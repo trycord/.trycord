@@ -279,6 +279,14 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       }
     }
     if (!inserted) return fail(res, 'CONFLICT', 'could not assign a message position, please retry');
+    // The search index follows the message. A failure here must not lose the
+    // message - it is already written, and the backfill will pick it up.
+    require('../services/search-index')
+      .indexMessage({
+        id: msg.id, channelId: msg.channel_id, authorId: msg.author_id,
+        content: msg.content, createdAt: msg.created_at, serverId: ch.server_id,
+      })
+      .catch(() => {});
     msg.attachments = ids.length
       ? await uploads.attachToMessage(ids, msg.id, req.user.id, { channelId: ch.id })
       : [];
@@ -371,6 +379,9 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
     // make the thread permanently unreachable.
     await db.run('UPDATE messages SET thread_root_id = NULL WHERE thread_root_id = ?', [msg.id]);
     await db.run('DELETE FROM messages WHERE id = ?', [msg.id]);
+    // The search index loses the message with it. A deleted message that still
+    // answered a search would be a message nobody can open.
+    require('../services/search-index').removeMessage(msg.id).catch(() => {});
     uploads.removeFiles(fileRows.map((r) => r.id));
     broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_DELETED, id: msg.id, channel_id: ch.id });
     res.json({ ok: true });
@@ -393,6 +404,12 @@ router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, m
     if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
     const editedAt = now();
     await db.run('UPDATE messages SET content = ?, edited_at = ? WHERE id = ?', [content, editedAt, msg.id]);
+    // The index follows the new words. The old ones are removed first, so an
+    // edit cannot leave a word behind that the message no longer contains.
+    require('../services/search-index').indexMessage({
+      id: msg.id, channelId: msg.channel_id, authorId: msg.author_id,
+      content, createdAt: msg.created_at, serverId: ch.server_id,
+    }).catch(() => {});
     const author = await db.get('SELECT username, display_name FROM users WHERE id = ?', [msg.author_id]);
     const out = {
       id: msg.id, channel_id: ch.id, server_id: ch.server_id,
