@@ -160,6 +160,28 @@ export function securityView() {
         }, 'Set up a second factor')]),
       }),
       card({ label: 'Signed-in devices', glyph: 'monitor', body: sessionsList, flush: true }),
+      card({
+        label: 'Close account', glyph: 'user-minus',
+        body: fold([
+          el('p', { class: 'lede' }, 'Request deletion of this account and everything held for it.'),
+          el('button', {
+            class: 'btn btn--danger btn--sm', type: 'button',
+            onClick: async () => {
+              const yes = await confirmDialog({
+                title: 'Close this account?',
+                body: 'This asks the instance to delete the account. It cannot be undone once processed.',
+                confirmLabel: 'Request deletion',
+                danger: true,
+              });
+              if (!yes) return;
+              try {
+                await Api.requestDeletion({ confirm: true });
+                toast('Deletion requested');
+              } catch (e) { errorToast(e); }
+            },
+          }, 'Request deletion'),
+        ]),
+      }),
     ]),
     onMount: async () => {
       try {
