@@ -92,6 +92,7 @@ const FROM_SETTINGS = {
   WS_MAX_PAYLOAD: 'messaging.maxPayload',
   WS_HEARTBEAT_MS: 'messaging.heartbeatMs',
   VOICE_VIDEO_ENABLED: 'voice.enabled',
+  VOICE_VIDEO_PROVIDER: 'voice.provider',
   VOICE_VIDEO_MAX_PARTICIPANTS: 'voice.maxParticipants',
   VOICE_VIDEO_SCREEN_SHARING: 'voice.screenSharing',
   VOICE_VIDEO_STAGE_CHANNELS: 'voice.stageChannels',
@@ -132,7 +133,11 @@ function valueOf(envName, fallback) {
 }
 
 function providerName() {
-  const raw = text('VOICE_VIDEO_PROVIDER', SUPPORTED_PROVIDERS[0]).toLowerCase();
+  // Through valueOf, not the environment directly: every other flag is read
+  // from the settings store first, and a provider read straight from the
+  // environment would ignore what an administrator saved in the configuration
+  // centre - the setting would save and change nothing.
+  const raw = String(valueOf('VOICE_VIDEO_PROVIDER', SUPPORTED_PROVIDERS[0])).toLowerCase();
   if (PROVIDERS.indexOf(raw) === -1) {
     throw new Error(
       `VOICE_VIDEO_PROVIDER must be one of ${PROVIDERS.join(', ')}, got "${raw}".`

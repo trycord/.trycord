@@ -108,6 +108,12 @@ const SCHEMA = [
   },
 
   {
+    key: 'content.allowedUploadTypes', env: 'ALLOWED_UPLOAD_TYPES', type: 'list', default: [],
+    category: 'content', label: 'Allowed upload types',
+    description: 'MIME types members may attach, for example image/png, application/pdf. Empty means anything is accepted and is served as a download when its type is not recognised. When this is set, a file whose detected type is not on the list is refused - the type is detected from the bytes, never from what the client claims.',
+    live: true,
+  },
+  {
     key: 'content.maxUploadBytes', env: 'MAX_UPLOAD_BYTES', type: 'integer', default: 8388608,
     category: 'content', label: 'Maximum upload size (bytes)',
     description: 'Per file. 8388608 is 8 MB.',
