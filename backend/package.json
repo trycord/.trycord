@@ -26,7 +26,8 @@
     "db:backup": "node scripts/db-backup.js",
     "seed": "node scripts/seed.js",
     "migrate": "node scripts/migrate.js",
-    "css": "node ../frontend/scripts/build-css.js"
+    "css": "node ../frontend/scripts/build-css.js",
+    "db:restore": "node scripts/db-restore.js"
   },
   "license": "MIT",
   "dependencies": {
