@@ -55,11 +55,23 @@ const E2EE_EVENTS = {
   SAFETY_NUMBER: 'e2ee:safety-number',
 };
 
+// Federation events.
+//
+// Something arrived from an instance this account follows: a message that was
+// relayed, or a reaction on one. The payload says which instance it came from
+// and that it is relayed, so a client never shows a relayed message as if it
+// were written here.
+const CONTINUUM_EVENTS = {
+  RELAY_MESSAGE: 'continuum:relay-message',
+  RELAY_REACTION: 'continuum:relay-reaction',
+};
+
 // Every event name, for the checks that need to know the whole vocabulary.
 const ALL = [
   ...Object.values(EVENTS),
   ...Object.values(SESSION_EVENTS),
   ...Object.values(E2EE_EVENTS),
+  ...Object.values(CONTINUUM_EVENTS),
 ];
 
-module.exports = { EVENTS, SESSION_EVENTS, E2EE_EVENTS, ALL };
+module.exports = { EVENTS, SESSION_EVENTS, E2EE_EVENTS, CONTINUUM_EVENTS, ALL };

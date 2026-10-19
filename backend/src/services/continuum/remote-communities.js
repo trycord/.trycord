@@ -16,7 +16,6 @@
 // community differently.
 
 const db = require('../../db');
-const { now } = require('../../util');
 const netguard = require('../netguard');
 const guard = require('./guard');
 const rules = require('./rules');
@@ -103,8 +102,11 @@ async function federatedCommunities() {
 
 // The local relationship with a remote community: 'joined' when somebody
 // here is a member of it, 'left' when everybody who joined has left again,
-// 'discovered' when nobody has.
+// 'discovered' when nobody has. A community whose instance has been removed
+// is 'revoked': the relationship is over, whatever the memberships say.
 async function relationshipState(originInstanceId, originCommunityId) {
+  const community = await store.findCommunity(originInstanceId, originCommunityId);
+  if (community && community.state === 'revoked') return 'revoked';
   const rows = await db.all(
     'SELECT state FROM continuum_memberships WHERE origin_instance_id = ? AND origin_community_id = ?',
     [String(originInstanceId), String(originCommunityId)]

@@ -51,6 +51,7 @@ async function startFederatedInstance(instanceId, env) {
     relay: require('../../src/services/continuum/relay'),
     ledger: require('../../src/services/continuum/ledger'),
     store: require('../../src/services/continuum/store'),
+    inbound: require('../../src/services/continuum/inbound'),
     feed: require('../../src/services/continuum/feed'),
   };
   return instance;
@@ -105,8 +106,9 @@ async function peerInstances(a, b, adminA, adminB) {
  * not keep the signature.
  */
 async function startCapturePeer(instanceId) {
-  const { publicKey } = crypto.generateKeyPairSync('ed25519');
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
   const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
+  const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' });
   const received = [];
 
   const server = http.createServer((req, res) => {
@@ -154,6 +156,19 @@ async function startCapturePeer(instanceId) {
     envelopes() { return received.slice(); },
     /** The first envelope of a kind, if one has arrived. */
     envelopeOfKind(kind) { return received.find((envelope) => envelope.kind === kind) || null; },
+    /**
+     * Sign an envelope the way a peer signs one: every field except the
+     * signature and the key id, in a stable order.
+     */
+    sign(envelope) {
+      const signed = Object.assign({}, envelope);
+      const { signature, key_id, ...rest } = signed;
+      signed.signature = crypto
+        .sign(null, Buffer.from(JSON.stringify(rest, Object.keys(rest).sort()), 'utf8'), privateKey)
+        .toString('base64');
+      signed.key_id = key_id || instanceId;
+      return signed;
+    },
     async stop() {
       await new Promise((resolve) => server.close(resolve));
     },

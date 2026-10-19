@@ -46,15 +46,6 @@ async function nextOutbound(actorId) {
   });
 }
 
-// The highest sequence accepted so far from one remote actor.
-async function inboundHighWater(originInstanceId, actorId) {
-  const row = await db.get(
-    'SELECT last_seq FROM continuum_sequences WHERE scope = ?',
-    [inboundScope(originInstanceId, actorId)]
-  );
-  return row ? Number(row.last_seq) : 0;
-}
-
 // Accept an inbound sequence. An event without a sequence carries no order
 // information, so there is nothing to check and it is accepted.
 //
@@ -90,9 +81,6 @@ async function acceptInbound(originInstanceId, actorId, seq) {
 }
 
 module.exports = {
-  outboundScope,
-  inboundScope,
   nextOutbound,
-  inboundHighWater,
   acceptInbound,
 };

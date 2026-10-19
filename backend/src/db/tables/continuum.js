@@ -107,7 +107,7 @@ module.exports = (engine) => [
       published_at  VARCHAR(64) NOT NULL,
       updated_at    VARCHAR(64) NOT NULL,
       PRIMARY KEY (source_kind, source_id)
-    )`,
+    )${engine}`,
 
   // The change feed's cursors. The feed reconciles the local tables against
   // the ledger, and these say where the last pass stopped so the next one
@@ -116,7 +116,7 @@ module.exports = (engine) => [
       name       VARCHAR(64) PRIMARY KEY,
       \`cursor\`  VARCHAR(160) NOT NULL,
       updated_at VARCHAR(64) NOT NULL
-    )`,
+    )${engine}`,
 
   // Per-actor sequence counters.
   //
@@ -132,7 +132,7 @@ module.exports = (engine) => [
       scope      VARCHAR(160) PRIMARY KEY,
       last_seq   INTEGER NOT NULL DEFAULT 0,
       updated_at VARCHAR(64) NOT NULL
-    )`,
+    )${engine}`,
 
   // The remote communities this instance knows about. One row per community
   // on another instance, keyed by the instance it lives on and its id there.
@@ -155,7 +155,7 @@ module.exports = (engine) => [
       created_at          VARCHAR(64) NOT NULL,
       updated_at          VARCHAR(64) NOT NULL,
       UNIQUE (origin_instance_id, origin_community_id)
-    )`,
+    )${engine}`,
 
   // Which local account follows which remote community. The local side of a
   // federated membership: it says that a person here joined a community that
@@ -169,7 +169,7 @@ module.exports = (engine) => [
       created_at          VARCHAR(64) NOT NULL,
       updated_at          VARCHAR(64) NOT NULL,
       UNIQUE (user_id, origin_instance_id, origin_community_id)
-    )`,
+    )${engine}`,
 
   // The relay store: a message that arrived from another instance.
   //
@@ -195,7 +195,7 @@ module.exports = (engine) => [
       event_id            VARCHAR(64),
       relayed_at          VARCHAR(64) NOT NULL,
       UNIQUE (origin_instance_id, origin_message_id)
-    )`,
+    )${engine}`,
 
   // A reaction that arrived from another instance, keyed the same way.
   `CREATE TABLE IF NOT EXISTS continuum_relay_reactions (
@@ -209,7 +209,7 @@ module.exports = (engine) => [
       created_at          VARCHAR(64) NOT NULL,
       relayed_at          VARCHAR(64) NOT NULL,
       UNIQUE (origin_instance_id, origin_message_id, origin_user_id, emoji)
-    )`,
+    )${engine}`,
 
   // A member of one of this instance's communities who lives on another
   // instance. The origin decides what such a member may do; this row is the
@@ -225,5 +225,5 @@ module.exports = (engine) => [
       joined_at           VARCHAR(64),
       updated_at          VARCHAR(64) NOT NULL,
       UNIQUE (origin_instance_id, origin_community_id, origin_user_id)
-    )`,
+    )${engine}`,
 ];

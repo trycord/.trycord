@@ -34,6 +34,32 @@ function canonical(envelope) {
   return JSON.stringify(rest, Object.keys(rest).sort());
 }
 
+// A payload of the shape the protocol expects, for an event a test signs
+// itself.
+function relayPayload(communityId, channelId, seq) {
+  const stamp = new Date().toISOString();
+  return {
+    origin: {
+      instance_id: 'capture-peer',
+      actor_id: 'an-actor',
+      author_username: 'an-actor',
+      author_display_name: 'An Actor',
+      community_origin_id: communityId,
+      channel_origin_id: channelId,
+      message_origin_id: 'a-crafted-message',
+      thread_root_origin_id: null,
+      occurred_at: stamp,
+      seq: seq === undefined ? 1 : seq,
+    },
+    community: { id: communityId, name: 'Relay Community' },
+    channel: { id: channelId, name: 'general', type: 'text' },
+    message: {
+      id: 'a-crafted-message', content: 'a crafted message',
+      created_at: stamp, edited_at: null, deleted_at: null,
+    },
+  };
+}
+
 test('a community relays between two instances', async (t) => {
   const a = await startFederatedInstance('instance-a');
   const b = await startFederatedInstance('instance-b');
@@ -401,6 +427,89 @@ test('a community relays between two instances', async (t) => {
     assert.equal(after.length, before.length, 'a forged event changes nothing');
   });
 
+  await t.test('an event whose timestamp is outside the accepted window is refused', async () => {
+    // The capture peer is a peer of the receiving instance too, so the test
+    // can sign an envelope of its own and see what the receiver makes of it.
+    const added = await adminB.post('/api/continuum/instances', {
+      id: capture.instanceId, name: 'capture', origin: capture.origin, public_key: capture.publicKey,
+    });
+    assert.equal(added.status, 201, JSON.stringify(added.data));
+    await adminB.patch('/api/continuum/instances/' + capture.instanceId + '/trust', { trust_status: 'trusted' });
+
+    const stale = capture.sign({
+      id: 'stale-' + Date.now(),
+      kind: 'message.posted',
+      actor: 'an-actor',
+      target: null,
+      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+      payload: relayPayload(communityId, channelId),
+    });
+    const res = await apiClient(b.baseUrl).post('/api/continuum/inbox', stale);
+    assert.equal(res.status, 400, 'an event from three hours ago is refused');
+    assert.match(res.data.error.message, /timestamp/i);
+  });
+
+  await t.test('an event whose sequence is not newer than the last one is refused', async () => {
+    const first = capture.sign({
+      id: 'sequenced-1-' + Date.now(),
+      kind: 'message.posted',
+      actor: 'an-actor',
+      target: null,
+      timestamp: new Date().toISOString(),
+      payload: relayPayload(communityId, channelId, 7),
+    });
+    const accepted = await apiClient(b.baseUrl).post('/api/continuum/inbox', first);
+    assert.equal(accepted.status, 202, JSON.stringify(accepted.data));
+
+    const older = capture.sign({
+      id: 'sequenced-2-' + Date.now(),
+      kind: 'message.posted',
+      actor: 'an-actor',
+      target: null,
+      timestamp: new Date().toISOString(),
+      payload: relayPayload(communityId, channelId, 6),
+    });
+    const refused = await apiClient(b.baseUrl).post('/api/continuum/inbox', older);
+    assert.equal(refused.status, 400, 'an event that is not newer than the last one is refused');
+    assert.match(refused.data.error.message, /sequence/i);
+  });
+
+  await t.test('a deletion for a message the peer never saw is a no-op', async () => {
+    const applied = await b.modules.inbound.apply({
+      instance_id: 'instance-a',
+      kind: 'message.deleted',
+      event_id: 'an-event',
+      payload: {
+        origin: {
+          instance_id: 'instance-a',
+          actor_id: 'somebody',
+          author_username: 'somebody',
+          author_display_name: 'Somebody',
+          community_origin_id: communityId,
+          channel_origin_id: channelId,
+          message_origin_id: 'never-seen-here',
+          thread_root_origin_id: null,
+          occurred_at: new Date().toISOString(),
+          seq: 900,
+        },
+        community: { id: communityId, name: 'Relay Community' },
+        channel: { id: channelId, name: 'general', type: 'text' },
+        message: {
+          id: 'never-seen-here', content: null,
+          created_at: new Date().toISOString(), edited_at: null, deleted_at: new Date().toISOString(),
+        },
+      },
+    });
+    assert.equal(applied.applied, false, 'a deletion for an unknown message changes nothing');
+    assert.match(applied.reason, /no such message/);
+
+    const list = await relayed();
+    assert.ok(
+      !list.some((m) => m.origin_message_id === 'never-seen-here'),
+      'no relayed message is created for it'
+    );
+  });
+
   await t.test('an event from a peer that was removed is refused', async () => {
     const envelope = capture.envelopeOfKind('message.posted');
     const before = await relayed();
@@ -413,5 +522,10 @@ test('a community relays between two instances', async (t) => {
 
     const after = await relayed();
     assert.equal(after.length, before.length, 'an event from an unknown instance changes nothing');
+
+    const remote = await adminB.get('/api/continuum/communities');
+    const community = remote.data.find((c) => c.origin_community_id === communityId);
+    assert.ok(community, 'the community is still on record');
+    assert.equal(community.relationship, 'revoked', 'the relationship is over');
   });
 });

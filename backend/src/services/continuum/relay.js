@@ -402,16 +402,16 @@ async function prepare(kind, payload, opts = {}) {
   }
 
   const source = await resolveSource(kind, input);
+  const existing = source ? await ledger.find(source.kind, source.id) : null;
 
   // What the ledger already says comes first: a row that was withheld stays
   // withheld, and a row that was published in exactly this state has nothing
   // left to say.
-  if (source) {
-    const existing = await ledger.find(source.kind, source.id);
-    if (existing && existing.state === 'live' && existing.fingerprint === source.fingerprint) {
+  if (existing) {
+    if (existing.state === 'live' && existing.fingerprint === source.fingerprint) {
       return { ok: false, reason: 'already published', duplicate: true, eventId: existing.last_event_id, source };
     }
-    if (existing && existing.state === 'withheld') {
+    if (existing.state === 'withheld') {
       return {
         ok: false,
         reason: 'this content was not federable when it was written',
@@ -424,15 +424,14 @@ async function prepare(kind, payload, opts = {}) {
   const gate = await gateFor(kind, input);
   if (!gate.ok) return { ok: false, reason: gate.reason, withhold: true, source };
 
-  if (source) {
-    const existing = await ledger.find(source.kind, source.id);
-    if (!existing) {
-      const claimed = await ledger.claim(source.kind, source.id, source.fingerprint, source.context);
-      if (!claimed) {
-        const row = await ledger.find(source.kind, source.id);
-        if (row && row.state === 'live' && row.fingerprint === source.fingerprint) {
-          return { ok: false, reason: 'already published', duplicate: true, eventId: row.last_event_id, source };
-        }
+  // The row is claimed before the event is written, so two writers racing
+  // over the same message publish it once between them.
+  if (source && !existing) {
+    const claimed = await ledger.claim(source.kind, source.id, source.fingerprint, source.context);
+    if (!claimed) {
+      const row = await ledger.find(source.kind, source.id);
+      if (row && row.state === 'live' && row.fingerprint === source.fingerprint) {
+        return { ok: false, reason: 'already published', duplicate: true, eventId: row.last_event_id, source };
       }
     }
   }
@@ -498,15 +497,9 @@ function deletionInput(sourceKind, sourceId, context) {
 }
 
 module.exports = {
-  fingerprint,
-  reactionKey,
-  authorSnapshot,
   readSource,
   sourceFingerprint,
-  contextFor,
-  resolveSource,
   prepare,
   updateInput,
   deletionInput,
-  effectiveKind,
 };

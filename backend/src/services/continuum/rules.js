@@ -123,11 +123,6 @@ async function mayFederateMessage({ serverId, channelId, authorId }) {
   return { ok: true, community: channel.community, channel: channel.channel };
 }
 
-// The whole gate for a community-shaped event.
-async function mayFederateCommunity(serverId) {
-  return communityMayFederate(serverId);
-}
-
 // The whole gate for a reaction-shaped event. A reaction is a thing written
 // in a channel, so it answers to the same channel rule, and to the same
 // question of whether the person who wrote it could write there.
@@ -183,7 +178,6 @@ module.exports = {
   channelMayFederate,
   authorMayPost,
   mayFederateMessage,
-  mayFederateCommunity,
   mayFederateReaction,
   encryptedContent,
   federableChannels,

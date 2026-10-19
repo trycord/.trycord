@@ -205,7 +205,6 @@ async function run(publish) {
 
 // The rules a community has to pass to be listed in the discovery document.
 module.exports = {
-  BATCH,
   run,
   feedCursor,
   setFeedCursor,
