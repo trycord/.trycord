@@ -13,7 +13,6 @@ import { errorToast, toast } from '../ui/overlays.js';
 export function privacyView() {
   const reportsList = el('div', { class: 'rowlist' });
 
-  // ... inside node fold, after Blocked card:
   // I'll insert the card in the node array. Need to edit the node. Let me add card after Blocked.
   const saved = el('p', { class: 'form-error', role: 'status' });
   const selection = new Map();
