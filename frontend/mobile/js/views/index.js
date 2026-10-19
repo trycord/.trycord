@@ -15,6 +15,7 @@ import { renderFriends } from './friends.js';
 import { renderMenu } from './menu.js';
 import { renderProfile } from './profile.js';
 import { renderAuth } from './auth.js';
+import { renderInstances } from './instances.js';
 import { renderSettings } from './settings.js';
 import { renderAdmin } from './admin.js';
 import {
@@ -51,6 +52,7 @@ export const RENDERERS = {
   invite: (ctx) => renderInvite(ctx),
   login: auth,
   register: auth,
+  instances: () => renderInstances(),
   forgot: auth,
   resetPassword: auth,
   verifyEmail: auth,

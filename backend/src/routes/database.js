@@ -135,4 +135,27 @@ router.post('/apply', rateLimit({ windowMs: 60000, max: 10 }), wrap(async (req, 
   res.json(Object.assign(describe(), { ok: true, applied: true }));
 }));
 
+// A redacted configuration snapshot, for an operator who wants to see what the
+// instance is actually configured with without exposing a single credential.
+//
+// A secret is reported as set or unset and carries no value at all. The database
+// itself is not dumped here: a full backup is a file operation, and pretending a
+// JSON body is one would be a lie about what it protects.
+router.get('/backup', wrap(async (req, res) => {
+  await settings.load();
+  const cat = settings.catalogue();
+  const safe = cat.map((c) => ({
+    id: c.id,
+    label: c.label,
+    settings: c.settings.map((s) => (s.type === 'secret'
+      ? { key: s.key, set: !!s.set, source: s.source }
+      : { key: s.key, value: s.value, source: s.source })),
+  }));
+  res.json({
+    exportedAt: new Date().toISOString(),
+    dialect: db.status().dialect,
+    settings: safe,
+  });
+}));
+
 module.exports = router;

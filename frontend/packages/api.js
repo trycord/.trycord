@@ -7,7 +7,7 @@
 
 import { TrycordConfig } from './config.js';
 
-const TOKEN_KEY = 'trycord.token';
+const TOKEN_PREFIX = 'trycord.token.';
 const REQUEST_TIMEOUT_MS = 25000;
 
 export class ApiError extends Error {
@@ -21,14 +21,35 @@ export class ApiError extends Error {
   }
 }
 
+// A session belongs to the instance that issued it. The token is therefore stored
+// under the origin of the backend in force, so switching instances can never send
+// one instance's bearer token to another. A single global key would hand the
+// previous instance's session to whatever address the reader picked next.
+function tokenKey() {
+  let origin = TrycordConfig.backendUrl();
+  try { origin = new URL(origin).origin; } catch { /* keep the raw address */ }
+  return TOKEN_PREFIX + origin;
+}
+
 export function token() {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try { return localStorage.getItem(tokenKey()); } catch { return null; }
 }
 
 export function setToken(value) {
   try {
-    if (value) localStorage.setItem(TOKEN_KEY, value);
-    else localStorage.removeItem(TOKEN_KEY);
+    const key = tokenKey();
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
+  } catch { /* storage disabled */ }
+}
+
+// Forgets the session held for one instance. Switching to another instance calls
+// this for the instance being left, so nothing signed in there survives the move.
+export function forgetToken(baseUrl) {
+  try {
+    let origin = baseUrl || TrycordConfig.backendUrl();
+    try { origin = new URL(origin).origin; } catch { /* keep the raw address */ }
+    localStorage.removeItem(TOKEN_PREFIX + origin);
   } catch { /* storage disabled */ }
 }
 
@@ -570,6 +591,11 @@ const Api = {
   continuumEvents: () => request('GET', '/api/continuum/events'),
   continuumInbox: () => request('GET', '/api/continuum/inbox'),
   continuumProbe: (origin) => request('GET', '/api/continuum/probe?origin=' + encodeURIComponent(origin)),
+
+  // ---- instance discovery ----
+  // The list of instances this one knows about. Public on purpose: it is a
+  // listing of public instances and carries nothing private.
+  discoverInstances: () => request('GET', '/api/discovery/instances', { auth: false }),
 };
 
 export { Api };

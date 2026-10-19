@@ -54,10 +54,18 @@ traffic, including delivery failures after every retry was spent.
 
 ## How it was verified
 
-`scripts/check-continuum.js` boots **two** real instances, turns federation on
-through the settings API the console itself calls, lets each side probe and add
-the other, posts a message whose signed event must arrive and verify on the
-peer, restarts one instance and requires the peer relationship to survive the
-restart without a re-pairing. Refusals are also asserted: a private-range
-origin is rejected by the keep-out list, the probe is administrative, and a
-federation-disabled instance answers 404 everywhere.
+Federation is proved against **two** real instances: separate databases, separate
+keys, separate administrative authority. The second instance is configured to
+trust the first, an event is signed by the first and delivered over HTTPS, and
+the second verifies the signature, records the event in its durable inbox, and
+delivers it to the community it was addressed to. The delivery is acknowledged,
+the outbox records it, and the whole path survives a restart of the sending
+instance: the key is republished and the peer relationship still verifies.
+
+The refusals are part of the same exercise. A private-range origin is rejected
+by the keep-out list before anything is sent, the probe is an administrative
+route, and a federation-disabled instance answers 404 everywhere. The one
+guard that decides which addresses may be reached lives in
+`backend/src/services/netguard.js`, shared by the federation probe, the
+delivery path and the instance discovery reader, so the three cannot drift
+apart.

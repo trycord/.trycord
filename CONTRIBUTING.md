@@ -98,8 +98,9 @@ This creates a local installer without publishing a release.
 Make sure:
 
 - [ ] The change is focused on one purpose.
-- [ ] `cd backend && npm run check && npm run check:routes && npm run check:client` passes.
 - [ ] The affected application starts successfully.
+- [ ] The changed functionality has been exercised against a running instance, and
+      `docs/verification-matrix.md` says how.
 - [ ] The changed functionality works as expected.
 - [ ] You haven't introduced unnecessary dependencies.
 - [ ] You haven't added unrelated formatting or refactoring.

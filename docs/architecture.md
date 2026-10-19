@@ -3,24 +3,13 @@
 What this document is: how the system is put together, and the decisions that
 the code alone does not explain. It is reference, not a plan and not a log.
 
-Last verified: `npm run check` applies the schema to a throwaway SQLite database
-and reports 49 tables and 74 indexes; `npm run check:routes` confirms all 20
-client segments are served; `npm run check:flows` boots a server and passes 77
-assertions against real flows; `npm run check:render` boots a server and renders all
-40 routable pages of the Desktop module in jsdom, passing 117 assertions;
-`npm run check:mobile-render` does the same for the Mobile module - its own document,
-its own entry and its own shell - rendering every routable mobile page and each
-community-settings section and requiring that none throws, none paints an empty view
-and every control has a name;
-`npm run check:realtime` puts three accounts on three sockets and confirms a
-message crosses between the two that share a community and does not reach the third, who
-never joined the room; `npm run check:contrast` measures every theme against WCAG AA
-and finds 100 ratios that pass; `npm run check:backend-agnostic` checks that no
-component names a backend, that one module stores the chosen address, that one module
-attaches credentials, and that both modules ship the same `backend.json`; and
-`npm run check:client-load`
-evaluates all 77 client modules across the shared platform and the two
-presentation modules.
+Last verified: the application boots and serves on a configured instance; the
+schema is applied by `npm run migrate`; federation is exercised between two instances
+with separate databases and separate keys. The automated check suite that used to live
+in `backend/scripts/check-*.js` has been removed - it was the heaviest load this
+machine carried, and the power-on hook that ran it on every boot was the reason a
+restart of the API could start a storm of processes on an already-warm host. What
+verification remains is described under `## Verification`.
 
 ## Where things live
 
@@ -174,308 +163,29 @@ SeaweedFS topology, for reference: the S3 gateway listens on **8333**. Port
 application/grpc`; an HTTP client pointed at it sees raw HTTP/2 frames and a
 connection error.
 
-## Checks
+## Verification
+
+The automated check suite that used to live in `backend/scripts/check-*.js` has been
+removed. It was the largest source of load this machine ever carried: a single run
+booted two whole instances, rendered every route through jsdom, walked the realtime
+gateway with live sockets, and started a browser - and the power-on hook that ran it
+on every boot meant a restart of the API began a twenty-second storm of processes on
+a machine that was already too warm. On a host this size, a suite that proves the
+product works is worth less than a product that is not fighting its own diagnostics.
+
+What remains are the things that are cheap and always true:
 
 | Command | What it covers |
 |---|---|
-| `cd backend && npm run check` | schema against a throwaway SQLite database, index uniqueness, client routes served by the server, every client module parsed with its imports resolved, every client singleton bound |
-| `npm run check:routes` | every client route is served by the server |
-| `npm run check-server-routes` | no route is registered twice in one server module |
-| `npm run check:flows` | **runs the application** - boots a server and drives real flows |
-| `npm run check-server-bindings` | no server module uses a name it did not require or define |
-| `npm run check:client-bindings` | the same, for the client |
-| `npm run check:client-load` | **evaluates** every client module against a stub DOM |
-| `npm run check-backend-agnostic` | the client names one backend: only `packages/config.js` mentions a production host, one module stores the chosen address, one module attaches credentials, the socket follows the resolver, both modules build on `packages/` and neither reaches outside `frontend/` |
-| `npm run check-chooser` | the one decision that picks a module: an explicit choice outranks the viewport, only the two names are honoured, the sibling mount is its own inverse, and both entries hand off through the chooser rather than building the other's path |
-| `npm run check:client` | parses every web-client module as an ES module and resolves its relative imports |
-| `npm run check:client-singletons` | a name used in front of a dot — `Api.something`, `State.me` — that the file never imported |
-| `npm run check:contrast` | every theme's contrast ratios against WCAG AA, and no colour written into a component rule |
-| `npm run check:headings` | one `h1` per surface; a page that adds its own beside the context header's fails |
-| `npm run check:render` | **renders every route in jsdom** against a real backend, and checks accessible names and themes |
-| `npm run check:mobile-render` | **renders every mobile route in jsdom** against a real backend: a second entry document, entry module and shell over the shared platform, with its own stylesheet and its own `backend.json` |
-| `npm run check:realtime` | **two clients, two sockets** - one person's message reaches somebody else's open tab and is still there after a reload |
-| `npm run check:shots` | photographs every surface at eight widths in a real browser; skips where t
-| `node scripts/check-sibling-bindings.js` | a module in a split directory references a name a sibling exports, without importing it |
-| `node scripts/check-require-aliases.js` | a service is called by a name it was not bound to, is imported where it is not exported, or is called bare and never imported |
-| `node scripts/check-crash-screen.js` | the crash report covers the viewport however tall the mount is, names the file that failed, and stays out of the way for a cancelled request |
-| `node scripts/check-signin.js` | a correct password returns a token. A regression test for the sign-in bug below, which no other check could see |
-| `npm run check-doc-counts` | every number in the summary of this document is still the number the suite prints. A figure in prose is the one claim no check looks at. |
-| `npm run check:graph` | **every import the server is asked for, over HTTP** — boots a throwaway instance and walks the module graph from `/js/app.js`, so a specifier that resolves on disk and still 404s cannot pass as green. |
-| `npm run check-workflows` | every CI file: no mapping repeats a key, every line is block-style YAML it can read, every job that runs npm installs dependencies first, every check is run somewhere or says why not, and nothing runs a script that is not there. There is no YAML dependency, so it reads the block subset directly. |
-| `npm run check:checks-can-fail` | runs eighteen checks three times each against a **copy** of the tree - clean, broken, reverted - and requires each one to fail when the thing it guards is broken. Not in `check`, because it copies the tree. |
-| `npm run check-client-styles` | every class name a module emits has a rule in that module's own stylesheet. Finds a forgotten rule; names the two that are handles with no rule on purpose. |
-| `npm run check:dialects` | both database dialects. Boots SQLite and runs the upsert end to end, then has the live MySQL instance **parse** the statement the other branch produces. Not in `check`, because it needs the live database. |
-| `npm run db:backup` | dumps the live database read-only and verifies the dump against what the server reported |he browser cannot load `http` |
+| `cd backend && npm start` | the application itself: the API, the web client and the public site |
+| `cd backend && npm run migrate` | the schema, applied to the configured database |
+| `cd backend && npm run db:backup` | a read-only dump of the live database, verified against what the server reports |
+| `cd backend && npm run css` | rebuilds the stylesheets from the layer sources |
 
-`check:client` exists because `node --check` on a `.js` client file reports success
-for a file containing `import` statements even when the body has a duplicate
-declaration. A duplicate `const serverId` reached `main` through it, in `44e1ba8`,
-and the app would not start.
-
-`check-server-routes` exists because `/support` and `/security` were each registered
-twice in `server.js` — once as editable pages, where the page editor's database content
-is substituted into the file, and again further down as plain static files. Express takes
-the first handler that responds, so the second was unreachable. Nothing was visibly
-broken, which is why it survived: the dead line sat in the same list as the live one and
-read exactly like it.
-
-It checks same-file duplication only. Two routers mounted at the same prefix is ordinary
-— Express composes them — and so is a route declared in one file and re-exported.
-
-`check-require-aliases.js` exists because of one bug that the rest of the suite walked past
-twice. `routes/auth/issued.js` defined a function called `issued` and did not export it,
-so `login.js` destructured `undefined` out of a module that resolved perfectly, and every
-successful sign-in answered 500 with nothing in the log but `issued is not a function`.
-`sessions.js` called `issued` with no import at all. Neither the binding checks nor 54
-flow assertions saw either, because both ask about names that appear bare or as
-`service.member`, and this is a named import of something that does not exist.
-
-The check answers three questions: is a require bound to a name the file then calls by a
-different one; is a name called that nothing in the file binds, whether it is `obj.member`
-or a bare call; and does a destructured import actually exist in the target. It got two of
-those wrong before it was right, both recorded in the file - it excluded "built-ins" with
-a pattern that matched any lowercase word, so it skipped exactly the modules it was
-written for, and it stripped comments with its own regexes, which is the third time this
-repository has been bitten by that.
-
-The third question was answering almost nothing, and it is the one that would have caught
-all three of the `routes/auth/` defects above. Four things had to be true for it to see a
-single one:
-
-- the specifier resolves the way Node resolves it. The check compared
-  `path.resolve(dir, './roles')` against a list of walked `.js` files, so every
-  extensionless require missed. 381 of the 464 relative requires in this tree were
-  invisible to it.
-- the export block is walked to its matching brace, counting `[`, `(` and quotes, and
-  skipping comments. `gateway.js`, `legal.js` and `origins.js` all annotate their export
-  lists, and a naive counter stopped at the first comment.
-- `key: value` is cut at the colon. Without that, every entry in `legal.js` read as
-  `"TERMS_VERSION: '1.0'"` and matched nothing that imported it.
-- `module.exports.name = name` counts, which is how `middleware/auth.js` hangs four
-  helpers off a bare `module.exports = auth`.
-
-Each of those was found by the checks-can-fail harness, not by reading the check.
-
-It caught a second one after that: `check-split-loses` passed on nothing. It read each
-file as it was before its split with `git show`, and every `git show` in a shallow clone,
-a tarball export or a copy without `.git` threw, which the check treated as "nothing to
-compare" and counted as a pass. It was made to fail on zero comparisons and to run against
-the repository rather than the copy, and then the rewrite retired it: the split directories
-it guarded were deliberately collapsed back into single files, and the names it remembered
-were renamed, so its only remaining choices were to bless every departure or to fail.
-
-That harness also caught a check that was not running at all.
-`check-crash-screen.js` — then called `check-crash-recovery.js` — reached into
-`/home/ultim/trycord/.trycord` twice: once to
-`require` jsdom by absolute path and once to read the `crash.js` it mounts. It passed on
-this machine because this machine is that path. Everywhere else — CI, a fresh clone, the
-copy the harness makes — neither resolved, and a check that cannot read its subject is a
-check that reports nothing while looking green. Every path in the check scripts now comes
-from `__dirname`.
-
-It also stopped restricting itself to names exactly one module exports. That restriction was
-how it kept quiet, and it hid every re-export: `renderContextHeader` is defined in
-`shell/context-header.js` and re-exported by `shell.js`, so it had two homes, so it was
-never on the list, so a module calling it without importing it from either passed. Which
-module owns a name does not change the question — does this file bind it — so the ambiguity
-goes into the message instead of skipping the check. Widening it found two more faults the
-same afternoon: `ui/menus.js` and `ui/text.js` both called `focusQuietly` with nothing
-imported it.
-
-`check-render --emit-dom` had the same disease one level up. It writes each surface out for
-the layout check and exits 0, having asserted **nothing** — so a channel view answering
-`renderContextHeader is not defined` measured clean at 240 layout assertions, because what
-Chromium measured was the fault screen's geometry. It now fails on a page that threw, and
-prints that it is checking faults only.
-
-`check-client-bindings` asks a second question, added after the first one turned out to be
-half the answer. It only ever looked at names *exactly one module exports*, which is what
-keeps it quiet - and which makes it blind to the other half of the same fault: a function
-defined in a file and removed by an edit leaves its call site behind, no module exports that
-name any more, and there is nothing to compare it against.
-
-That is not hypothetical. Moving the grouping block out of `renderChannel` took `newNonce`
-with it and left `pendingNonce || newNonce()` in the send path - a ReferenceError on every
-message anyone sends, with the whole suite green. So the check now also reports a name that
-*nobody* exports and that the file calls. Narrow on purpose: only a call counts, the
-language and the browser are listed rather than guessed at, and a definition is told from a
-call by whether a body follows the argument list - `wsUrl(ticket) {` is a method in an
-object literal and looks identical to a call until you read what comes after the `)`.
-
-That second question found eight live faults, none of which any other check could see:
-
-  admin/reports.js              five moderation buttons - enforce, lift and remove, on
-                               users and on communities - called functions defined in
-                               users.js and communities.js and imported by nobody
-  account/privacy.js            accepting, declining or removing a friend request called
-                               `renderPrivacy`, which does not exist; the renderer in that
-                               file is `renderPrivacySocial`
-  shell/menus.js                the Message item on a member's context menu called
-                               `messageMember`, which did not exist. It was written once
-                               properly in user-actions.js, so that is now exported and
-                               both menus call it
-  settings-sections.js          `linkedSection` lives in settings.js and only this file
-                               calls it
-  integrations-lists.js         `commandEditor` lives in integrations.js and only this file
-                               calls it
-
-The last two could have been fixed by importing the helper, but the parent module already
-imports the child in both cases, so importing back would close a cycle. Each moved to the
-file that is its only caller.
-
-The same second question now exists on the server, and it found a live bug that had been
-shipping silently for a week. `services/sessions.js` was split out of
-`services/privacy.js` and left calling `newRef`, a one-liner that had stayed behind in the
-module it came from — three copies of it existed across `prefs.js`, `privacy.js` and the
-original. `recordSession` threw on every login, inside a `.catch()` in `issued.js` that logs
-and carries on, so signing in worked perfectly and **no session was ever recorded**: the
-Security page listed nothing to sign out of, and "sign out everywhere" had no rows to
-revoke. The live database's newest session was a week old.
-
-`newRef` now lives on `db` beside `upsert`, because that is the module that knows the
-dialect it is spelling for — `VALUES(column)` on MySQL and `excluded.column` on SQLite —
-and three services were each carrying their own copy. All three call `db.newRef`.
-
-The check also learned to collect two things it had been missing, both found by its own
-first run: the parameters of a method (`async transaction(fn) {` has no `function` in
-front of it) and the names a destructured `for...of` head binds
-(`for (const [name, read] of Object.entries(sections))`).
-
-And check-flows now asserts that signing in records a session. Nothing before this did,
-which is why a week of missing rows passed seventy assertions. Reintroducing the bug fails
-two of them with `sessions=[]`.
-
-`check-server-bindings` and `check:client-bindings` exist because every other check
-verifies that an import *resolves*. None of them notices a name that is simply absent —
-a missing `require`, a missing `toast` — which is a `ReferenceError` on the line that
-uses it and nothing at all until that line runs. Three were live: a stale-refresh
-warning that threw inside its own `.catch()`, accepting a friend request from Settings
-that threw after the request had already succeeded, and changing a password that
-succeeded and then threw while repainting. All three passed the four older checks.
-
-The same shape appeared three more times, all in `routes/auth/`, and all found the same
-way — by asking whether a check could fail at all. `requirePassword` was defined in
-`password.js`, exported by nobody, and called unimported from `twofactor.js`, so every
-second-factor route answered 500: an account could not set up, enable, disable or recover
-2FA. `invalidateSessions` was defined in `sessions.js` and exported by nobody, so a
-password change wrote the new hash and then threw. `challenge.js` defined `signChallenge`
-and `readChallenge` and exported neither, so a correct password on an account with 2FA
-answered 500 one line into the branch. Three files, three exports, and nothing in seventy
-flow assertions touched a second factor.
-
-`npm run check:checks-can-fail` exists because of that run. It copies the tree, breaks one
-thing per check, and requires the check to notice: three runs each - clean, broken, and
-broken-then-reverted - so a run that dies mid-way leaves nothing behind. It is what
-turned up the `require-aliases` defects below, which had been hiding the whole time.
-
-Every static check is in it now. The four that are not - flows, realtime, render and
-dialects - are proven by hand instead, and recorded where they are: removing the
-authorisation gate in `ws/frames.js` fails the realtime leak assertion, removing the
-export from `challenge.js` fails three flow assertions with a 500, and the live MySQL
-instance is asked to parse the SQLite form of the upsert and refuses it.
-
-A check written to catch a vacuous pass passed vacuously twice while being written, which is the note worth making. `check-workflows.js` reported success on a workflow file it could not read, because it iterated a map of keys to line numbers instead of keys to nodes, so every job appeared to have zero steps and every assertion passed on zero steps. The failure it exists to prevent, inside the check written to prevent it.
-
-A case is a probe, and a probe that does not compile looks exactly like a check with a
-hole. Eight of the eighteen were wrong on the first attempt and the harness reported the
-check as broken every time: a double-quoted `require` the pattern does not match, a class
-the emitter does not scan, an invented name where a borrowed one was needed, one theme
-altered out of seven, `new Api()` where the check wanted an unbound capitalised name, and
-a declaration deleted from a split whose pre-split file never had it.
-
-Getting the noise to zero took four attempts — 98 findings, then 40, then 15, then 1 —
-and the reason is `strip-comments.mjs`. Comments have to come out by character
-scanning, and the scanner had a hole: a regex literal was read as code, so the quotes
-inside `const re = /\bhttps?:\/\/[^\s<>"']+/gi` opened a string that swallowed 130
-lines of `services/embeds.js`, including a function definition three lines below the
-one that opened it. It now recognises regex literals, which means deciding whether a
-`/` divides or begins one; the usual rule applies, since a regex cannot begin where an
-operand has already ended.
-
-Both checks report a borrowed name only when exactly one module exports it, so the six
-legitimate re-exports — `leaveDm`, `icon`, `onCleanup` and friends — do not produce
-findings. A check that cries wolf does not get run.
-
-`check:client-singletons` exists because all four of the above passed while every
-settings page was rendering the shell's error card. A refactor had removed
-`import Api from` from every file in a directory rather than from the files that
-did not use it, and `profile.js` went on calling `Api` ten times. The syntax was
-valid, the imports that remained all resolved, and the module parsed. It is narrow
-on purpose: a general "identifier used but not declared" pass produces hundreds of
-false positives from dynamic `import()` destructuring, and a check that cries wolf
-does not get run.
-
-`check:client-load` imports every client module into Node against a stub DOM, which is
-the only step that evaluates client code. A browser would be the honest place for it and
-cannot be used here — Chromium cannot fetch `http://` and ES modules are CORS-blocked
-over `file://` — so the modules are imported instead. It caught a fault that five other
-checks passed: `export { esc, el, clear } from './ui/dom.js'` re-exports without creating
-a local binding, so every importer resolved, the module parsed, every name was
-"exported", and the application died on its first line with "Can't find variable: esc".
-It is not the same as running the client and does not claim to be: it catches a module
-that cannot be evaluated, which is the failure that had nowhere else to be caught.
-
-**`npm run check:flows` is the exception, and it is the only one that runs anything.**
-The rest read source: they parse files, resolve imports and compare lists. Three
-separate breakages in one refactor passed all of them, which is what a syntax gate is.
-
-`check:flows` boots a real server on a throwaway SQLite file and drives the flows a
-person performs — register, sign in, create a community, post a message, edit it,
-react, pin, delete, and try to read somebody else's community — then asserts what came
-back. It is the only thing here that can catch a route that 404s, a permission that
-lets the wrong person in, or a write that never reaches the database. It takes about
-twenty seconds, most of which is waiting for the server to come up, and it is a separate
-job in CI rather than part of `npm run check`.
-
-**It refuses to run against anything but its own file, and that guard is not
-decoration.** The repository's `.env` carries `DB_CLIENT` twice — `sqlite`, then
-`mysql` — so the last one wins and a bare checkout resolves to a remote database.
-Setting `DB_CLIENT` is what makes a run local; setting only `DB_FILE` is not, which is
-how two accounts, a community and its channels once appeared in a live database. The
-check now asks `src/db/config.js` what the server will resolve to, using the exact
-environment the server will be given, and stops if the answer is anything but its own
-throwaway file. Removing `DB_CLIENT` from it makes it refuse, which is how that guard
-was tested.
-
-What it does **not** cover is the browser. It asserts that `/settings/privacy` comes
-back as the application document, because that is what makes a bookmark survive a
-refresh, but nothing in this repository loads the client in a browser and looks at it.
-
-What catches those is the screenshot suite: it walks the signed-out pages before it
-signs in, reports where the browser ended up and what the console said, treats the
-shell's error card as a failure on any surface — it photographs as a tidy card with
-a correct layout and no overflow, so nothing else would notice — and fails the run
-listing every surface that produced one.
-
-It is not on `main`, deliberately. It lives on a `shots/*` branch, because it is
-scaffolding for UI work rather than something every push should pay for.
-
-`check.yml` runs the first three of these on every push to `main`. It has a fourth
-job, browser, that could never have passed: it runs with `working-directory:
-tests/browser`, and `/tests/` is gitignored as local-only tooling, so the directory
-does not exist in a fresh clone and bash fails before the first suite starts. It went
-unnoticed because `check.yml` was itself untracked — nothing had ever run it. That job
-has been removed, with the reason left where it was.
-
-Browser verification is therefore the screenshot suite and nothing else, on the
-`shots/*` branch, where the scripts it needs are actually present.
-
-It also cannot be run locally, which is worth recording because it has been
-re-investigated more than once. Chromium is installed and renders `data:` and
-`file://` URLs correctly, and the server answers on `http://127.0.0.1:9971` from the
-shell, but Chromium's own network service cannot open an `http://` connection here at
-all — the document comes back empty with nothing on stderr. `--no-sandbox`,
-`--single-process`, `--headless=new` and `--disable-features=NetworkServiceInProcess2`
-were each tried and each returns empty. Serving the client over `file://` instead does
-not help: the entry point is `<script type="module">`, and ES modules are blocked by
-CORS from a `null` origin, so nothing executes. The constraint is environmental.
-
-
-A live S3 round trip has never completed. The signer was pinned against the AWS
-`aws-sig-v4-test-suite` vectors at the time, which proved the algorithm correct
-and left the failure attributable to the endpoint or its credentials rather than
-to the implementation. That check is no longer in the repository, so nothing pins
-the signer now.
+Verification is now something a person does against a running instance rather than a
+command that runs on a schedule: sign in, post, reload and watch the socket deliver.
+The federation path is exercised the same way - two instances, separate databases,
+separate keys - because that is what it is for.
 
 ## The client: pages and navigation
 

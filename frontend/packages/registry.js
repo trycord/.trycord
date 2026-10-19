@@ -210,6 +210,7 @@ export const PAGES = [
 
   p('login', '/login', { access: 'guest', guestTo: '/home', layout: 'plain' }),
   p('register', '/register', { access: 'guest', guestTo: '/home', layout: 'plain' }),
+  p('instances', '/instances', { access: 'guest', guestTo: '/home', layout: 'plain' }),
   p('forgot', '/forgot', { access: 'guest', guestTo: '/home', layout: 'plain' }),
   p('resetPassword', '/reset-password/:token', { access: 'guest', guestTo: '/home', layout: 'plain' }),
   p('verifyEmail', '/verify-email/:token', { access: 'public', layout: 'plain' }),

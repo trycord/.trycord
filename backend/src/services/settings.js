@@ -401,6 +401,18 @@ const SCHEMA = [
   // Off by default. With it on, the boot sequence logs a line saying the guided
   // setup is available, so an operator on a fresh install is not left to find it.
   {
+    key: 'instance.discoverable', env: 'TRYCORD_DISCOVERABLE', type: 'boolean', default: false,
+    category: 'general', label: 'List this instance in discovery',
+    description: 'When on, this instance appears in the public listing other readers browse. Being listed is not federation: it says where the instance is, not that it trusts anyone.',
+    live: true,
+  },
+  {
+    key: 'instance.discoverySources', env: 'TRYCORD_DISCOVERY_SOURCES', type: 'list', default: [],
+    category: 'general', label: 'Discovery directories',
+    description: 'Addresses of JSON directories listing other instances. Each is read over https, never followed past a redirect, and a directory that is down costs nothing. Leave empty to publish only this instance.',
+    live: true,
+  },
+  {
     key: 'instance.quickSetup', env: 'TRYCORD_QUICK_SETUP', type: 'boolean', default: false,
     category: 'general', label: 'Quick setup',
     description: 'Offer a guided first-run setup that sets the instance name, public URL, registration and mail in one pass.',

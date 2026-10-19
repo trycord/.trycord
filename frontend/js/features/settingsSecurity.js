@@ -5,7 +5,7 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { head, card, row, blank, fault, fold } from '../ui/page.js';
-import { errorToast, toast, openDialog } from '../ui/overlays.js';
+import { errorToast, toast, openDialog, confirmDialog } from '../ui/overlays.js';
 
 export function securityView() {
   const sessionsList = el('div', { class: 'rowlist' });

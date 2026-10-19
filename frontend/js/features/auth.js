@@ -12,6 +12,7 @@
 import { el } from '../../packages/dom.js';
 import { brandSymbolUrl } from '../../packages/brand.js';
 import Api from '../../packages/api.js';
+import TrycordConfig from '../../packages/config.js';
 import { currentQuery, navigate, publicPath } from '../../packages/nav.js';
 import { applyToken, loadSession, refreshServers } from '../../packages/store.js';
 import { connect } from '../../packages/realtime.js';
@@ -169,6 +170,15 @@ function registerGate() {
   const password = input('password', { type: 'password', autocomplete: 'new-password' });
   const confirm = input('confirm', { type: 'password', required: false, autocomplete: 'new-password' });
 
+  // The instance in force, named on the form. An account made here belongs to
+  // this instance, so the reader is told which one before they type, and the
+  // way to another instance is one click away.
+  const instanceNote = el('p', { class: 'gate-instance' },
+    el('span', {}, 'Joining '),
+    el('strong', { class: 'gate-instance-name' }, TrycordConfig.backendUrl()),
+    ' ',
+    el('a', { href: publicPath('/instances') }, 'Use another instance'));
+
   const form = gateForm([
     field('Username', username),
     field('Display name (optional)', display),
@@ -176,6 +186,7 @@ function registerGate() {
     field('Password', password),
     field('Confirm password', confirm),
   ], 'Create account');
+  form.insertBefore(instanceNote, form.firstChild);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();

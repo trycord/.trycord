@@ -1,67 +1,127 @@
-// Public discovery: paginated index + safe previews of public, discoverable servers.
-// Private or non-discoverable servers can never appear here.
+// Instance discovery.
+//
+// Two sources, neither of them required:
+//   - this instance, when its operator has said it may be listed;
+//   - directories the operator configured, each a plain JSON document served
+//     by whoever runs it.
+//
+// A directory is not an authority. It holds pointers to instances; a client
+// checks the instance itself before offering it, and nothing here decides who
+// trusts whom. An instance that is listed is not thereby federated, and an
+// instance that is not listed is not thereby unreachable.
+//
+// A directory that is slow, broken or hostile costs the reader nothing: the
+// failure is reported per source, and the rest of the answer still comes back.
+
+const settings = require('./settings');
+const netguard = require('./netguard');
 const db = require('../db');
+const features = require('../features');
 
-const MAX_LIMIT = 24;
+const MAX_SOURCES = 8;
+const MAX_RECORDS_PER_SOURCE = 100;
+const MAX_TOTAL = 200;
 
-const SORTS = {
-  members: 'member_count DESC, s.created_at DESC',
-  newest: 's.created_at DESC',
-  name: 's.name ASC',
-};
-const DEFAULT_SORT = 'members';
-
-function pageArgs(page, limit) {
-  limit = Math.min(Math.max(parseInt(limit || '12', 10) || 12, 1), MAX_LIMIT);
-  page = Math.max(parseInt(page || '1', 10) || 1, 1);
-  return { limit, page, offset: (page - 1) * limit };
-}
-
-function sortArgs(sort) {
-  const key = String(sort || '').trim().toLowerCase();
-  return SORTS[key] ? key : DEFAULT_SORT;
-}
-
-async function search({ q, page, limit, sort }) {
-  const { limit: lim, page: pg, offset } = pageArgs(page, limit);
-  const order = SORTS[sortArgs(sort)];
-  const term = String(q || '').trim();
-  const where = ['s.is_public = 1', 's.is_discoverable = 1', 's.enforcement_state IS NULL'];
-  const vals = [];
-  if (term) {
-    where.push('(s.name LIKE ? OR s.description LIKE ?)');
-    vals.push(`%${term}%`, `%${term}%`);
-  }
-  const whereSql = `WHERE ${where.join(' AND ')}`;
-  const totalRow = await db.get(`SELECT COUNT(*) AS n FROM servers s ${whereSql}`, vals);
-  const items = await db.all(
-    `SELECT s.id, s.name, s.description, s.icon_url, s.banner_url, s.created_at,
-     (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count,
-     (SELECT COUNT(*) FROM channels c WHERE c.server_id = s.id) AS channel_count
-     FROM servers s ${whereSql}
-     ORDER BY ${order}
-     LIMIT ${lim} OFFSET ${offset}`,
-    vals
-  );
+// The public shape of one instance in a listing. Only what a reader needs to
+// decide whether to look closer.
+function shape(record) {
+  const url = String(record && (record.url || record.baseUrl || record.origin) || '').trim()
+    .replace(/\/+$/, '');
   return {
-    items, page: pg, limit: lim, total: totalRow.n,
-    pages: Math.max(1, Math.ceil(totalRow.n / lim)), sort: sortArgs(sort),
+    url,
+    name: String(record && (record.name || record.displayName) || '').trim(),
+    description: String(record && record.description || '').trim().slice(0, 200),
+    instanceId: record && record.instanceId ? String(record.instanceId) : null,
+    // A directory may say an instance accepts registrations. That is a claim by
+    // the directory, not a fact, and the client confirms it with the instance.
+    registrationOpen: record && typeof record.registrationOpen === 'boolean'
+      ? record.registrationOpen : null,
+    // Whether the directory claims cryptographic verification. A claim is not a
+    // proof, and the client checks the instance's own document before saying so.
+    verified: record && typeof record.verified === 'boolean' ? record.verified : null,
   };
 }
 
-// Safe public representation — no join codes, members, messages, or settings.
-async function preview(serverId) {
-  const srv = await db.get(
-    `SELECT s.id, s.name, s.description, s.icon_url, s.banner_url, s.created_at,
-     (SELECT COUNT(*) FROM server_members m WHERE m.server_id = s.id) AS member_count
-     FROM servers s
-     WHERE s.id = ? AND s.is_public = 1 AND s.is_discoverable = 1 AND s.enforcement_state IS NULL`,
-    [serverId]
-  );
-  if (!srv) return null;
-  srv.channels = await db.all('SELECT id, name, topic FROM channels WHERE server_id = ? ORDER BY position, name', [serverId]);
-  srv.channel_count = srv.channels.length;
-  return srv;
+function validRecord(record) {
+  if (!record || typeof record !== 'object') return false;
+  const shaped = shape(record);
+  if (!shaped.url) return false;
+  try {
+    netguard.validateOrigin(shaped.url, { allowLocalhost: false, allowInsecure: false });
+  } catch {
+    return false;
+  }
+  return true;
 }
 
-module.exports = { search, preview, MAX_LIMIT };
+async function readSource(source) {
+  const out = await netguard.fetchJson(source, {
+    allowLocalhost: false,
+    allowInsecure: false,
+    timeoutMs: 5000,
+    maxBytes: 262144,
+  });
+  if (!out.ok) return { ok: false, source, error: out.error };
+
+  const body = out.data;
+  const list = Array.isArray(body) ? body
+    : (body && Array.isArray(body.instances) ? body.instances : null);
+  if (!list) return { ok: false, source, error: 'the directory did not answer with a list of instances' };
+
+  const records = [];
+  for (const item of list.slice(0, MAX_RECORDS_PER_SOURCE)) {
+    if (!validRecord(item)) continue;
+    records.push(shape(item));
+  }
+  return { ok: true, source, records };
+}
+
+// This instance's own entry, when the operator has allowed it to be listed.
+async function selfEntry() {
+  if (!settings.isLoaded()) return null;
+  if (settings.get('instance.discoverable') !== true) return null;
+  return {
+    url: String(settings.get('instance.publicUrl') || '').trim(),
+    name: String(settings.get('instance.name') || 'Trycord'),
+    description: String(settings.get('instance.description') || ''),
+    instanceId: null,
+    registrationOpen: !!features.current.registration,
+    verified: null,
+  };
+}
+
+// The answer: the instances that could be reached, and what went wrong with
+// the ones that could not.
+async function discover() {
+  const instances = [];
+  const problems = [];
+  const seen = new Set();
+
+  const self = await selfEntry();
+  if (self && self.url && netguard.validateOrigin) {
+    try {
+      netguard.validateOrigin(self.url, { allowLocalhost: false, allowInsecure: false });
+      if (!seen.has(self.url)) { seen.add(self.url); instances.push(self); }
+    } catch {
+      problems.push({ source: 'this instance', error: 'the public URL is not a usable address' });
+    }
+  }
+
+  const sources = settings.isLoaded() ? settings.get('instance.discoverySources') : [];
+  const list = Array.isArray(sources) ? sources.slice(0, MAX_SOURCES) : [];
+  for (const source of list) {
+    const result = await readSource(String(source));
+    if (!result.ok) { problems.push({ source: String(source), error: result.error }); continue; }
+    for (const record of result.records) {
+      if (seen.has(record.url)) continue;
+      seen.add(record.url);
+      instances.push(record);
+      if (instances.length >= MAX_TOTAL) break;
+    }
+    if (instances.length >= MAX_TOTAL) break;
+  }
+
+  return { instances, problems, generatedAt: new Date().toISOString() };
+}
+
+module.exports = { discover, shape, validRecord };

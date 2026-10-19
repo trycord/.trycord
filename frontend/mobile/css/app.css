@@ -1236,6 +1236,20 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-auth__title { font-size: var(--fs-display); font-weight: var(--weight-bold); letter-spacing: var(--tracking-tight); margin: 0; }
 .m-auth__sub { color: var(--text-2); font-size: var(--fs-sm); margin: -8px 0 0; }
 .m-auth__alt { text-align: center; font-size: var(--fs-sm); color: var(--text-2); }
+
+/* The instance an account would be created on. */
+.m-auth__instance {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text-2);
+  font-size: var(--fs-meta);
+  line-height: 1.5;
+  word-break: break-all;
+}
+.m-auth__instance strong { color: var(--text-1); }
 .m-auth__foot { text-align: center; font-size: var(--fs-micro); color: var(--text-3); }
 .m-secret {
   display: block;

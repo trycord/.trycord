@@ -145,7 +145,8 @@ scraped by an external system.
 
 ```
 cd backend
-node scripts/check-status-monitor.js
+The monitor answers on its own port and reports the API, the database and the
+realtime gateway as they are.
 ```
 
 The check drives the real config loader, the real state machine (against

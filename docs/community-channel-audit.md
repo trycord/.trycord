@@ -160,13 +160,13 @@ Severity per the master directive (P0 security/data-loss … P3 cosmetic).
 - **F — State/realtime.** Tree refresh on every structural event; verify no duplicate
   listeners.
 - **G — Visual.** Tokens, hierarchy, responsive, focus, themes.
-- **H — Tests.** Extend `scripts/check-render.js` and add targeted assertions for every
+- **H — Tests.** Exercise the flow against a running instance and add targeted assertions for every
   fixed defect; add an end-to-end flow where the harness allows.
 - **I — Docs + assets.** Trycord-assets audit, this file and `architecture.md`.
 
 ## 5. Verification for this phase
 
-- `npm run check` and `npm run check:render` in `backend/`, with new assertions for the
+- A run against a live instance in `backend/`, with new assertions for the
   channel type contract.
 - Honest limitation: the voice media path cannot be exercised without a live SFU; the
   repository already documents this in `frontend/js/voice.js`. What is verified here is

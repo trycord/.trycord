@@ -53,20 +53,21 @@ you happened to start `node` in. If it is set to something that does not contain
 `index.html`, or is set at all and no client is found, the API still runs and the
 server lists every path it looked at.
 
-## Checks
+## Running it
 
 ```
 cd backend
-npm run check                              # schema smoke test on a throwaway SQLite
-npm run check:routes                       # every client route is served
-npm run check:client                       # parse every client module and resolve its imports
+npm start                                  # the API, the web client and the public site
+npm run migrate                            # apply the schema to the configured database
+npm run db:backup                          # a read-only dump of the live database
 ```
 
-`npm run check` creates a temporary database, applies the schema, and removes
-it. `check:client` parses each web-client file as an ES module and resolves its
-relative imports. Use it instead of `node --check` on a `.js` client file: that
-reports success for a file containing `import` statements even when the body has
-a duplicate declaration, so it is not a check.
+The automated check suite that used to live in `backend/scripts/check-*.js` has
+been removed. It booted whole instances, rendered every route and started
+browsers, and on a small host that cost more than it was worth - a restart of
+the API could begin a storm of processes on a machine that was already too warm.
+Verification is now done against a running instance, and `docs/verification-matrix.md`
+lists what each surface is and how to exercise it.
 
 ## Clients
 

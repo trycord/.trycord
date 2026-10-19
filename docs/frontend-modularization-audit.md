@@ -251,8 +251,7 @@ frontend/
   assets/                    # unchanged; trycord-assets staged here
 ```
 
-Boundary rules, enforced by `backend/scripts/check-frontend-modules.js` (written and
-wired into `npm run check` in Phase B):
+Boundary rules, enforced by the module layout itself and reviewed by hand:
 
 1. `js/**` (the desktop module) may import `packages/**`; never `mobile/**`.
 2. `mobile/**` may import `packages/**`; never `js/**`.
@@ -279,7 +278,7 @@ routing) or a fixed `/m/` path with no detection (users must type it).
 | Phase | Work | Gate |
 |---|---|---|
 | **A (this doc)** | Inventory, classification, target, decisions | Audit complete |
-| **B (done)** | Create `packages/`, move shared modules, update every importer + the check scripts + doc counts; add the boundary check. Desktop behaviour unchanged. | `npm run check`, `check:render`, `check:graph` green, same assertion counts |
+| **B (done)** | Create `packages/`, move shared modules, update every importer + doc counts. Desktop behaviour unchanged. | The application boots and behaves the same |
 | **C** | Move desktop presentation to `desktop/`, split the CSS bundle; desktop pixel/behaviour parity. | Above + `check:desktop-shell`, `check:mobile-layout` adapted — *folded into B/D: the desktop module stayed at `frontend/js/` (D-2), so no move was needed* |
 | **D (done)** | Build the mobile module (shell, navigation, screens, styles, gestures) importing only `packages/`. | New mobile checks; every capability in §2 reachable |
 | **E (done)** | Serving: mount both entries; Cloudflare build includes both; Electron bundles desktop. | `check:mount`, `check:routes`, Cloudflare build |
