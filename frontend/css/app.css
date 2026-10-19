@@ -407,6 +407,17 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 
 /* -- primitives ---------------------------------------------------------- */
 
+/* The hidden attribute has to win.
+ *
+ * A component that sets its own display - a grid, a flex box - beats the
+ * browser's rule for [hidden], because an author style beats a user-agent one.
+ * An element asked to hide therefore stays on screen, still holding its
+ * height. The sign-in pages hide the shell this way: without this rule the
+ * empty shell keeps the viewport and the page that was meant to stand alone
+ * is pushed below it.
+ */
+[hidden] { display: none !important; }
+
 .app-root { height: 100dvh; }
 /* A sign-in or public page is a direct child of <body>, beside the app host. While
    one is up the shell inside the host is hidden, so the host must stop reserving

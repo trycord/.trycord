@@ -372,9 +372,15 @@ async function boot() {
   app.get('/api/health', async (req, res) => {
     try {
       await db.get('SELECT 1');
-      res.json({ ok: true, db: 'ok', instanceId: inst.instanceId, client: !!clientDir });
+      res.json({
+        ok: true, db: 'ok', instanceId: inst.instanceId, client: !!clientDir,
+        version: require('../package.json').version,
+      });
     } catch {
-      res.status(503).json({ ok: false, db: 'unreachable', instanceId: inst.instanceId, client: !!clientDir });
+      res.status(503).json({
+        ok: false, db: 'unreachable', instanceId: inst.instanceId, client: !!clientDir,
+        version: require('../package.json').version,
+      });
     }
   });
 
@@ -388,6 +394,10 @@ async function boot() {
     const features = require('./features');
     res.json({
       instanceId: inst.instanceId,
+      // The build this server is running. The client's Updates page reads it,
+      // and it comes from the one place the version is written down: the
+      // package manifest.
+      version: require('../package.json').version,
       name: s.isLoaded() ? s.get('instance.name') : inst.name,
       description: s.isLoaded() ? s.get('instance.description') : '',
       supportUrl: s.isLoaded() ? s.get('instance.supportUrl') : '',
