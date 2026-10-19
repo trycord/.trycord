@@ -351,6 +351,20 @@ Real, known gaps. None blocks ordinary use.
 - **`docs/selfhosting.md` is a deployment narrative, not a variable reference.**
   Every variable is documented in `backend/.env.example`.
 - **Attachment progress, cancel and retry, drop and paste, and a lightbox.**
+- **Voice carries media peer to peer.** The in-house mesh is the supported
+  provider: the server holds the signalling and the peers hold the media. It
+  suits small rooms - the media is relayed between every participant - and a
+  stage with many listeners and a few speakers does not work that way. A hosted
+  SFU is no longer offered, and this build does not contain one.
+- **Restoration is a command, not a button.** The dump is complete and
+  verified; putting it back is `npm run db:restore`, which asks for the
+  database name before it replaces anything. There is no scheduled backup on
+  this host: an operator who wants one owns that decision.
+- **The database account's connection limit is a deployment fact.** The pool
+  this process opens is compared with the account's own limit at connect time,
+  and the boot says so when the pool would fill it. Two processes share one
+  account here, so the pool has to be a fraction of the limit rather than all
+  of it.
 
 ### Where a request actually goes
 

@@ -365,6 +365,30 @@ const SCHEMA = [
   },
 
   {
+    key: 'retention.notificationsDays', env: 'RETENTION_NOTIFICATIONS_DAYS', type: 'integer', default: 90,
+    category: 'retention', label: 'Keep notifications for (days)',
+    description: 'How long an unread or read notification stays in the inbox. 90 days is about a quarter.',
+    min: 1, max: 3650, live: true,
+  },
+  {
+    key: 'retention.jobHistoryDays', env: 'RETENTION_JOB_HISTORY_DAYS', type: 'integer', default: 30,
+    category: 'retention', label: 'Keep job history for (days)',
+    description: 'How long the record of finished and failed background work is kept. A month is enough to see what happened.',
+    min: 1, max: 3650, live: true,
+  },
+  {
+    key: 'retention.auditDays', env: 'RETENTION_AUDIT_DAYS', type: 'integer', default: 365,
+    category: 'retention', label: 'Keep the audit trail for (days)',
+    description: 'How long the record of administrative actions is kept. This is the one history whose loss matters, so it is the longest.',
+    min: 30, max: 3650, live: true,
+  },
+  {
+    key: 'retention.continuumDays', env: 'RETENTION_CONTINUUM_DAYS', type: 'integer', default: 90,
+    category: 'retention', label: 'Keep federation delivery records for (days)',
+    description: 'How long delivered federation traffic is recorded. Undelivered and failed events are always kept until they are resolved.',
+    min: 1, max: 3650, live: true,
+  },
+  {
     key: 'limits.rateMax', env: 'RATE_LIMIT_MAX', type: 'integer', default: 0,
     category: 'limits', label: 'Rate-limit ceiling override',
     description: 'Raises every per-endpoint ceiling to this one number. 0 means leave each endpoint at its own default.',
@@ -570,6 +594,7 @@ const CATEGORIES = [
   { id: 'features', label: 'Feature availability' },
   { id: 'continuum', label: 'Federation' },
   { id: 'limits', label: 'Limits and performance' },
+  { id: 'retention', label: 'Retention and cleanup' },
   { id: 'deployment', label: 'Server and deployment' },
 ];
 
