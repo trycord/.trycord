@@ -680,6 +680,19 @@ async function boot() {
   });
   await jobs.start();
 
+  // The sockets, the presence map and the rate-limit counters live in this
+  // process. A second copy of the API would have its own copy of each, and a
+  // message written by one would not reach a reader connected to the other.
+  // The deployment runs one API process, with a standby for failover rather
+  // than a second worker; this says so out loud, because a supervisor that
+  // scales the process count by accident would otherwise look fine until a
+  // message went missing.
+  if (process.env.NODE_APP_INSTANCE !== undefined || process.env.PM2_INSTANCE_ID !== undefined) {
+    console.log('[info] running under a process supervisor as one instance of this application.');
+    console.log('[info] sockets, presence and rate limits belong to this process. Run one API process;');
+    console.log('[info] a standby for failover is a separate deployment, not a second worker here.');
+  }
+
   // The WebSocket gateway shares this HTTP server: same bind address, no second port.
   await new Promise((resolve, reject) => {
     server.on('error', reject);
