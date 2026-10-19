@@ -21,6 +21,7 @@ const features = require('./features');
 const settings = require('./services/settings');
 const jobs = require('./services/jobs');
 const continuum = require('./services/continuum');
+const retention = require('./services/retention');
 
 /**
  * Reduce a configured API location to the origin the client should talk to.
@@ -678,7 +679,16 @@ async function boot() {
     maxAttempts: 3,
     backoffMs: 1000,
   });
+  // Housekeeping: expired sessions, revoked tokens, old notifications and
+  // finished job rows. The first pass is queued at boot and each pass queues
+  // the next, so the rhythm survives a restart.
+  jobs.register('retention', retention.scheduled, {
+    concurrency: 1,
+    maxAttempts: 3,
+    backoffMs: 60000,
+  });
   await jobs.start();
+  await jobs.enqueue('retention', {}, { runAfterMs: 15000, maxAttempts: 3 }).catch(() => {});
 
   // The sockets, the presence map and the rate-limit counters live in this
   // process. A second copy of the API would have its own copy of each, and a

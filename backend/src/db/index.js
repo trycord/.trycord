@@ -39,6 +39,41 @@ async function open(cfg) {
   return next;
 }
 
+// How much room the database has left for this process.
+//
+// A pool that is larger than the account's own connection limit is not a
+// generous pool; it is a pool that will start failing claims at the worst
+// moment. The limit is the server's, not this application's, so the only way
+// to know it is to ask - once, at connect.
+//
+// The count is per database user, and this instance may run more than one
+// process against the same account, so the pool is compared against the limit
+// rather than against the limit minus one. A pool that is a comfortable
+// fraction of the limit leaves room for the other processes and for the
+// operator's own session.
+async function checkConnectionHeadroom(conn, config) {
+  if (!conn || conn.dialect !== 'mysql' || !config || !config.connectionLimit) return;
+  try {
+    const row = await conn.get("SHOW VARIABLES LIKE 'max_user_connections'");
+    const limit = row && row.Value ? Number(row.Value) : null;
+    if (!limit || !Number.isFinite(limit)) return;
+    const pool = Number(config.connectionLimit);
+    if (pool >= limit) {
+      console.warn('[warn] the database connection pool is ' + pool
+        + ' and the account "' + config.user + '" may open at most ' + limit
+        + ' connections. A pool that reaches the account limit fails work rather'
+        + ' than waiting for a connection. Lower DB_POOL, or raise the account'
+        + " limit with 'GRANT MAX_USER_CONNECTIONS ON *.* TO '" + config.user + "'@'%';");
+    } else if (pool > limit * 0.75) {
+      console.warn('[warn] the database connection pool is ' + pool + ' of the '
+        + limit + ' connections this account may open. One more process against'
+        + ' the same account would not fit.');
+    }
+  } catch (e) {
+    // Not being able to ask is not a reason to refuse to start.
+  }
+}
+
 async function connect() {
   if (conn) return conn;
   const tried = dbConfig.candidates();
@@ -59,6 +94,7 @@ async function connect() {
       source = candidate.source;
       activeConfig = candidate.config;
       openedAt = new Date().toISOString();
+      await checkConnectionHeadroom(conn, candidate.config);
       return conn;
     } catch (e) {
       lastError = e;
