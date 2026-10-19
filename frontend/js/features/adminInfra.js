@@ -276,6 +276,44 @@ export function adminPageDirectory() {
 export function adminDatabase() {
   const factsBody = el('div', { class: 'anticipation-line' });
   const quotaBody = el('div', { class: 'anticipation-line' });
+  const backupBody = el('div', { class: 'fold fold--tight' });
+  const backupButton = el('button', {
+    class: 'btn btn--primary btn--sm', type: 'button',
+    onClick: async () => {
+      backupButton.disabled = true;
+      backupBody.replaceChildren(hold('Taking the backup'));
+      try {
+        const out = await Api.adminTakeBackup();
+        const info = (out && out.backup) || {};
+        toast('Backup written');
+        backupBody.replaceChildren(
+          el('p', { class: 'lede' },
+            (info.tables || 0) + ' tables, ' + (info.rows || 0) + ' rows, '
+            + Math.round((info.bytes || 0) / 1048576) + ' MB.'),
+          el('p', { class: 'form-note' }, info.path || ''));
+        paintBackups();
+      } catch (e) {
+        backupBody.replaceChildren(fold([fault(e, null)]));
+        backupButton.disabled = false;
+      }
+    },
+  }, 'Back up now');
+
+  async function paintBackups() {
+    try {
+      const out = await Api.adminBackups();
+      const items = (out && out.backups) || [];
+      if (!items.length) {
+        backupBody.replaceChildren(el('p', { class: 'form-note' },
+          'No backups on this host yet. ' + ((out && out.directory) || '')));
+        return;
+      }
+      backupBody.replaceChildren(...items.map((b) => el('p', { class: 'form-note' },
+        b.name + ' · ' + Math.round(b.bytes / 1048576) + ' MB · ' + b.writtenAt)));
+    } catch (e) {
+      backupBody.replaceChildren(fold([fault(e, null)]));
+    }
+  }
 
   return {
     node: fold([
@@ -286,6 +324,10 @@ export function adminDatabase() {
       }),
       card({ label: 'Where it lives', glyph: 'database', body: factsBody }),
       card({ label: 'Storage quota', glyph: 'hard-drive', body: quotaBody }),
+      card({
+        label: 'Backups', glyph: 'download',
+        body: fold([backupButton, backupBody]),
+      }),
     ]),
     onMount: async () => {
       try {
@@ -323,6 +365,7 @@ export function adminDatabase() {
       } catch (e) {
         quotaBody.replaceChildren(fold([fault(e, null)]));
       }
+      await paintBackups();
     },
     cleanup() {},
   };
