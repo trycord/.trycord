@@ -121,6 +121,17 @@
 
       <ol class="timeline">
         <li>
+          <p class="when">3.0.0 &middot; 20 October 2026</p>
+          <h2>Standalone sign-in, a demo that reaches its instance, and a version that says what it is</h2>
+          <ul>
+            <li>The sign-in and registration pages now stand alone. The shell that was meant to hide was not hiding: a component that sets its own display beats the browser's rule for the hidden attribute, so the empty shell kept the viewport and pushed the page below it.</li>
+            <li>The demo and the community directory reach the instance again. The public site and the API are different origins in a real deployment, and the pages were asking for a relative path that the site cannot answer; they now resolve the address the same way the application does.</li>
+            <li>The deployment build was shipping an old tree: it fetched the newest source and then checked out the branch it already had. It now deploys what it fetched.</li>
+            <li>Instance discovery, per-instance sessions, an in-house search index, backups with a restore path, housekeeping, and one honest report per subsystem all land in this release.</li>
+            <li>The version is reported by the server, the API and the application, and all of them say the same thing.</li>
+          </ul>
+        </li>
+        <li>
           <p class="when">2.5.0 &middot; 19 October 2026</p>
           <h2>One backend, a chosen instance, and a machine that is not fighting itself</h2>
           <ul>
