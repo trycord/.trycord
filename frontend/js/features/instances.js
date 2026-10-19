@@ -105,16 +105,27 @@ export function renderInstances() {
     }
     customButton.disabled = true;
     customNote.textContent = 'Asking that address whether it is a Trycord instance…';
-    const check = await TrycordConfig.testBackend(target, 10000);
+    const check = await TrycordConfig.inspectInstance(target, 10000);
     if (!check.ok) {
       customNote.textContent = check.error;
       customButton.disabled = false;
       return;
     }
+    // An instance that refuses new accounts is still worth connecting to - the
+    // reader may already have an account there - so this says so rather than
+    // refusing the switch.
+    const notes = [check.name];
+    if (check.instanceId) notes.push('instance ' + check.instanceId);
+    if (check.continuum) {
+      notes.push(check.continuum.federates ? 'federates with other instances' : 'does not federate');
+    }
+    if (check.registration && check.registration.enabled === false) {
+      notes.push('not accepting new accounts');
+    }
     const previous = backendUrl();
     setApiUrl(target);
     forgetToken(previous);
-    customNote.textContent = 'Connected to ' + check.name + '.';
+    customNote.textContent = 'Connected to ' + notes.join(' · ') + '.';
     customButton.disabled = false;
     toast('Now using ' + check.name);
     navigate('/register');
