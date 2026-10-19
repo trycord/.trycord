@@ -22,6 +22,7 @@ const settings = require('./services/settings');
 const jobs = require('./services/jobs');
 const continuum = require('./services/continuum');
 const retention = require('./services/retention');
+const searchIndex = require('./services/search-index');
 
 /**
  * Reduce a configured API location to the origin the client should talk to.
@@ -687,8 +688,17 @@ async function boot() {
     maxAttempts: 3,
     backoffMs: 60000,
   });
+  // The search index, filled in for the messages that were written before it
+  // existed. Each pass takes another slice and queues the next, so a large
+  // backlog is worked through without one enormous transaction.
+  jobs.register('search_backfill', searchIndex.backfillJob, {
+    concurrency: 1,
+    maxAttempts: 3,
+    backoffMs: 60000,
+  });
   await jobs.start();
   await jobs.enqueue('retention', {}, { runAfterMs: 15000, maxAttempts: 3 }).catch(() => {});
+  await jobs.enqueue('search_backfill', {}, { runAfterMs: 20000, maxAttempts: 3 }).catch(() => {});
 
   // The sockets, the presence map and the rate-limit counters live in this
   // process. A second copy of the API would have its own copy of each, and a

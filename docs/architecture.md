@@ -347,7 +347,11 @@ Real, known gaps. None blocks ordinary use.
   every environment variable does. Credentials are encrypted at rest with
   AES-256-GCM under a key derived from `JWT_SECRET`, and are never returned by
   the API, only reported as set or unset and readable or not.
-- **Full-text search is prefix-based.** There is no index and no ranking.
+- **Search is word-based, not a ranked engine.** The in-house index holds one row
+  per distinct word per message, and a query matches when every word in it is
+  present. There is no stemming, no ranking by relevance and no phrase search.
+  The permission check lives in the index itself, so a message from a community
+  the reader is not in cannot answer a query.
 - **`docs/selfhosting.md` is a deployment narrative, not a variable reference.**
   Every variable is documented in `backend/.env.example`.
 - **Attachment progress, cancel and retry, drop and paste, and a lightbox.**

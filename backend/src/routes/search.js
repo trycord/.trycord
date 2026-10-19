@@ -20,6 +20,20 @@ router.get('/', rateLimit(30), async (req, res, next) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit || '25', 10) || 25, 1), 50);
     const serverId = req.query.serverId ? String(req.query.serverId) : null;
 
+    // The in-house index, when it is there. It is permission-scoped in the
+    // index itself, so the query cannot return a message the reader may not
+    // see.
+    try {
+      const index = require('../services/search-index');
+      if (await index.available()) {
+        const rows = await index.find(q, { userId: req.user.id, serverId, limit });
+        return res.json(rows);
+      }
+    } catch (e) {
+      // A search that cannot use the index still has to answer. The slower
+      // path below is correct, just slower.
+    }
+
     let rows = null;
     let useFts = false;
     try {
