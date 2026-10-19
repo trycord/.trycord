@@ -175,6 +175,11 @@ export const PAGES = [
     label: 'Database', icon: 'database', tabs: ['database'],
     blurb: 'Where this instance keeps its data, and how to move it',
   }),
+  p('admin.diagnostics', '/admin/diagnostics', {
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 7,
+    label: 'Diagnostics', icon: 'activity', tabs: ['diagnostics'],
+    blurb: 'What each subsystem of this instance is really doing',
+  }),
   p('admin.continuum', '/admin/continuum', {
     layout: 'admin', scope: 'admin', group: 'Instance', order: 6,
     label: 'Continuum', icon: 'share', tabs: ['continuum'],

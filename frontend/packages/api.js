@@ -515,6 +515,7 @@ const Api = {
   adminPages: () => request('GET', '/api/admin/pages'),
   adminBackups: () => request('GET', '/api/admin/database/backups'),
   adminTakeBackup: () => request('POST', '/api/admin/database/backup', { body: {} }),
+  adminDiagnostics: () => request('GET', '/api/admin/diagnostics'),
   adminPage: (route) => request('GET', '/api/admin/pages/' + encodeURIComponent(route)),
   savePageDraft: (route, body) => request('PUT', '/api/admin/pages/' + encodeURIComponent(route), { body }),
   publishPage: (route, confirm) => request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/publish', { body: { confirm } }),

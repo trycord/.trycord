@@ -12,7 +12,7 @@ import {
   adminAudit, adminGdpr, adminApprovals,
 } from './adminSurfaces.js';
 import {
-  adminAnnouncements, adminPageDirectory, adminDatabase, adminContinuum,
+  adminAnnouncements, adminPageDirectory, adminDatabase, adminContinuum, adminDiagnostics,
 } from './adminInfra.js';
 import { adminConfiguration } from './adminCfg.js';
 import { scopeNav } from '../../packages/registry.js';
@@ -33,6 +33,7 @@ const LAYOUTS = new Map([
   ['admin.settings', () => adminConfiguration()],
   ['admin.database', () => adminDatabase()],
   ['admin.continuum', () => adminContinuum()],
+  ['admin.diagnostics', () => adminDiagnostics()],
 ]);
 
 // Same rail as the settings studio, one scope over; the registry owns the

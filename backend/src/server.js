@@ -481,6 +481,7 @@ async function boot() {
   app.use('/api/admin/pages', require('./routes/adminPages'));
   app.use('/api/admin/settings', require('./routes/settings'));
   app.use('/api/admin/database', require('./routes/database'));
+  app.use('/api/admin/diagnostics', require('./routes/diagnostics'));
   app.use('/api/admin/mail', require('./routes/mail'));
   app.use(require('./routes/continuum'));
   // Test hooks for automated suites (email verification without an inbox).

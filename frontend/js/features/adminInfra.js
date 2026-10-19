@@ -273,6 +273,70 @@ export function adminPageDirectory() {
 
 // -- database ----------------------------------------------------------------------
 
+// -- diagnostics ------------------------------------------------------------------
+//
+// What each subsystem of this instance is really doing. The backend asks each
+// one in its own terms, so a subsystem that is configured but cannot prove
+// itself says so rather than showing a green tick.
+
+const STATE_TONE = {
+  healthy: 'chip--on',
+  degraded: 'chip--quiet',
+  failed: 'chip--quiet',
+  disabled: 'chip--quiet',
+  configured: 'chip--quiet',
+  unknown: 'chip--quiet',
+};
+
+export function adminDiagnostics() {
+  const body = el('div', { class: 'anticipation-line' });
+  const summary = el('div', { class: 'factline' });
+
+  const describe = (detail) => {
+    if (!detail) return '';
+    if (typeof detail === 'string') return detail;
+    if (detail.note) return detail.note;
+    if (detail.error) return detail.error;
+    return '';
+  };
+
+  return {
+    node: fold([
+      head({
+        kicker: 'Instance',
+        title: 'Diagnostics',
+        lede: 'What each subsystem of this instance is really doing.',
+      }),
+      card({ label: 'This instance', glyph: 'activity', body: summary }),
+      card({ label: 'Subsystems', glyph: 'settings', body }),
+    ]),
+    onMount: async () => {
+      try {
+        const report = await Api.adminDiagnostics();
+        const subsystems = report.subsystems || {};
+        summary.replaceChildren(
+          facts([
+            { value: report.instanceId || 'local', label: 'instance' },
+            { value: report.version || '—', label: 'version' },
+            { value: report.node || '—', label: 'node' },
+            { value: report.overall || '—', label: 'overall' },
+          ]));
+
+        const rows = Object.entries(subsystems).map(([name, entry]) => row({
+          lead: el('span', { class: 'role-dot' }, icon('activity', { size: 15 })),
+          title: name,
+          sub: describe(entry.detail),
+          side: el('span', { class: 'chip ' + (STATE_TONE[entry.state] || 'chip--quiet') }, entry.state),
+        }));
+        body.replaceChildren(...rows);
+      } catch (e) {
+        body.replaceChildren(fold([fault(e, null)]));
+      }
+    },
+    cleanup() {},
+  };
+}
+
 export function adminDatabase() {
   const factsBody = el('div', { class: 'anticipation-line' });
   const quotaBody = el('div', { class: 'anticipation-line' });
