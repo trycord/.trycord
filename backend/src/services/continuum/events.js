@@ -49,8 +49,6 @@ const KINDS = {
   'membership.left': { sections: ['origin', 'community', 'membership'], subject: 'membership' },
 };
 
-const KIND_NAMES = Object.keys(KINDS);
-
 // How far an event's timestamp may be from the receiver's clock. An event
 // that claims to have happened more than an hour ago, or to happen in the
 // future, is refused: the sequence numbers and the event ids already refuse
@@ -160,8 +158,6 @@ function channelDescriptor(channel, isPublic) {
 
 module.exports = {
   KINDS,
-  KIND_NAMES,
-  CLOCK_SKEW_MS,
   isKnownKind,
   sectionsFor,
   isSubjectKind,

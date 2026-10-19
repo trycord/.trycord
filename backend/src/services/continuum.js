@@ -89,6 +89,7 @@ function prepareKeys() {
 // an administrator can turn Continuum on at runtime without first restarting
 // the process.
 async function loadPersistedKeys() {
+  let persisted = false;
   const row = await db.get('SELECT private_key FROM continuum_keys WHERE id = 1');
   if (row && row.private_key) {
     try {
@@ -96,24 +97,27 @@ async function loadPersistedKeys() {
       const certificate = crypto.createPublicKey(restored).export({ type: 'spki', format: 'pem' });
       keyPair = restored;
       publicKeyPem = certificate;
-      await scheduleFeed();
-      return { persisted: true };
+      persisted = true;
     } catch (e) {
       // Unreadable stored key (corruption or manual edits): regenerate below
       // rather than failing the boot.
     }
   }
-  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
-  keyPair = privateKey;
-  publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
-  const pem = keyPair.export({ type: 'pkcs8', format: 'pem' });
-  await db.run('DELETE FROM continuum_keys WHERE id = 1');
-  await db.run(
-    'INSERT INTO continuum_keys (id, private_key, created_at) VALUES (1, ?, ?)',
-    [pem, now()]
-  );
+  if (!persisted) {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+    keyPair = privateKey;
+    publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' });
+    const pem = keyPair.export({ type: 'pkcs8', format: 'pem' });
+    await db.run('DELETE FROM continuum_keys WHERE id = 1');
+    await db.run(
+      'INSERT INTO continuum_keys (id, private_key, created_at) VALUES (1, ?, ?)',
+      [pem, now()]
+    );
+  }
+  // The database is connected by the time the boot gets here, so the change
+  // feed can be queued now.
   await scheduleFeed();
-  return { persisted: false };
+  return { persisted };
 }
 
 function getPublicKey() { return publicKeyPem; }
@@ -163,10 +167,17 @@ async function listInstances() {
 
 // Remove a peer. Its events are refused from then on: an instance that is no
 // longer known is not one whose signatures mean anything here.
+//
+// The communities that lived on it are revoked rather than deleted: they were
+// here, they are on record, and the relationship is over.
 async function removeInstance(id) {
   const existing = await db.get('SELECT id FROM continuum_instances WHERE id = ?', [id]);
   if (!existing) throw { code: 'NOT_FOUND', message: 'no such instance' };
   await db.run('DELETE FROM continuum_instances WHERE id = ?', [id]);
+  await db.run(
+    "UPDATE continuum_communities SET state = 'revoked', updated_at = ? WHERE origin_instance_id = ?",
+    [now(), String(id)]
+  );
   return { ok: true, id: String(id) };
 }
 
@@ -203,10 +214,10 @@ async function listInbox(limit) {
 
 // The delivery status per event and per destination.
 //
-// The deliveries table is the attempt log; this is what it adds up to. An
-// event that has reached a destination is 'delivered', one that is still being
-// retried is 'pending' with the last error, and one whose attempts are spent
-// is 'failed' with the reason it failed.
+// The deliveries table is the attempt log; this is what it adds up to. A
+// destination that has reached the event is 'delivered', one that is still
+// being retried is 'pending' with the last error, and one whose attempts are
+// spent is 'failed' with the reason it failed.
 async function listDeliveries({ eventId, limit } = {}) {
   const cap = Math.min(Math.max(Number(limit) || 100, 1), 500);
   const rows = eventId
@@ -226,8 +237,10 @@ async function listDeliveries({ eventId, limit } = {}) {
       status: 'pending',
       error: null,
       last_attempt_at: null,
+      delivered: false,
     };
     entry.attempts += 1;
+    if (row.status === 'delivered') entry.delivered = true;
     if (!entry.last_attempt_at || row.attempted_at > entry.last_attempt_at) {
       entry.last_attempt_at = row.attempted_at;
       entry.error = row.error || null;
@@ -236,8 +249,6 @@ async function listDeliveries({ eventId, limit } = {}) {
     byTarget.set(key, entry);
   }
 
-  // An event whose attempts are spent is 'failed' whatever the last attempt
-  // said, and an event that reached every destination is 'delivered'.
   const eventIds = [...new Set([...byTarget.values()].map((entry) => entry.event_id))];
   const events2 = eventIds.length
     ? await db.all(
@@ -246,10 +257,32 @@ async function listDeliveries({ eventId, limit } = {}) {
     )
     : [];
   const eventStatus = new Map(events2.map((row) => [row.id, row.status]));
+
+  // A destination that has not been tried yet is still a target, and it is
+  // pending until it is.
+  for (const id of eventIds) {
+    const event = await db.get('SELECT * FROM continuum_events WHERE id = ?', [id]);
+    if (!event) continue;
+    for (const target of await deliveryTargets(event)) {
+      const key = id + '|' + target.id;
+      if (byTarget.has(key)) continue;
+      byTarget.set(key, {
+        event_id: id,
+        instance_id: String(target.id),
+        attempts: 0,
+        status: 'pending',
+        error: null,
+        last_attempt_at: null,
+        delivered: false,
+      });
+    }
+  }
+
   for (const entry of byTarget.values()) {
-    const status = eventStatus.get(entry.event_id);
-    if (status === 'failed') entry.status = 'failed';
-    else if (status === 'delivered' && entry.status !== 'delivered') entry.status = 'delivered';
+    if (entry.delivered) entry.status = 'delivered';
+    else if (eventStatus.get(entry.event_id) === 'failed') entry.status = 'failed';
+    else entry.status = 'pending';
+    delete entry.delivered;
   }
   return [...byTarget.values()].sort((a, b) => String(b.last_attempt_at).localeCompare(String(a.last_attempt_at)));
 }
@@ -331,13 +364,10 @@ async function publishEvent(kind, payload, opts = {}) {
     };
   }
 
+  // The outbox row. The envelope is signed when the event is delivered: the
+  // signature covers the payload and the moment of delivery, so a row that
+  // has been waiting in the outbox is signed with the time it actually left.
   const id = uuid();
-  const envelope = {
-    id, kind: prepared.kind, actor: opts.actorId || null, target: opts.targetId || null,
-    timestamp: now(), payload: prepared.payload,
-  };
-  envelope.signature = signEvent(envelope);
-  envelope.key_id = identity.getInstanceId();
   await db.run(
     'INSERT INTO continuum_events (id, kind, actor_id, target_id, payload, status, attempts, max_attempts, backoff_ms, run_after, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [

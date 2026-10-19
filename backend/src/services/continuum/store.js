@@ -89,11 +89,6 @@ async function listCommunities() {
   return rows.map(shapeCommunity);
 }
 
-async function findCommunityById(id) {
-  const row = await db.get('SELECT * FROM continuum_communities WHERE id = ?', [String(id)]);
-  return row ? shapeCommunity(row) : null;
-}
-
 function shapeCommunity(row) {
   return {
     ...row,
@@ -370,12 +365,10 @@ async function listRelayMemberships({ originCommunityId, originInstanceId } = {}
 }
 
 module.exports = {
-  parseChannels,
   upsertCommunity,
   upsertCommunityChannel,
   findCommunity,
   listCommunities,
-  findCommunityById,
   setCommunityState,
   upsertMembership,
   listMemberships,
@@ -384,7 +377,6 @@ module.exports = {
   findRelayMessage,
   listRelayMessages,
   listAllRelayMessages,
-  shapeRelayMessage,
   upsertRelayReaction,
   removeRelayReaction,
   listRelayReactions,

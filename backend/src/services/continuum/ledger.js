@@ -112,12 +112,6 @@ async function listForSweep(sourceKind, { after, limit }) {
   );
 }
 
-// Has this source already been published in exactly this state?
-async function isPublished(sourceKind, sourceId, fingerprint) {
-  const row = await find(sourceKind, sourceId);
-  return !!(row && row.state === 'live' && row.fingerprint === fingerprint && row.last_event_id);
-}
-
 module.exports = {
   find,
   claim,
@@ -126,5 +120,4 @@ module.exports = {
   markWithheld,
   markDeleted,
   listForSweep,
-  isPublished,
 };
