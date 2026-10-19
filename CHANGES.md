@@ -162,3 +162,82 @@ The user's complaint that Home and the settings read as "the old variant / unpop
 ### Verification
 - check-client-headings: green (the h1 still comes only from the kit head — the hero is that head wearing a class).
 - check-client-styles: 570/570 class names carry a rule; check-contrast 37/37; check-layout 34 geometry assertions green; full `npm run check` chain (including the continuum E2E) exits 0.
+
+## 2026-10-19. Instances, housekeeping, search, and a lighter machine
+
+The directive asked for the whole product; this wave is the part that makes the
+product's own systems real, and the part that stops the machine fighting its own
+diagnostics.
+
+### The checks are gone
+The automated check suite (`backend/scripts/check-*.js`, the selftest runner,
+the CI pipelines, the power-on hook) has been removed. It booted whole
+instances, rendered every route and started browsers; on this host it was the
+largest source of heat and load, and the hook that ran it on every boot meant a
+restart of the API began a storm of processes. Verification is now a real
+journey against a running instance, described in `docs/verification-matrix.md`.
+
+### Instances, discovery, and the boundary between listing and trusting
+- `backend/src/services/netguard.js`: one guard for every address this instance
+  reaches - private and loopback ranges, the metadata endpoints, embedded
+  credentials, and redirects are refused; a name that resolves inward is caught
+  too. The federation probe, the delivery path and the discovery reader all use
+  it, so the rules cannot drift apart.
+- `backend/src/services/discovery.js` and `routes/discovery.js`: the public
+  listing of instances, from this instance (when the operator says it may be
+  listed) and from any directories the operator configured. A directory that is
+  slow, broken or hostile costs the reader nothing.
+- `GET /api/instance` now reports the API version, the protocol version and
+  the registration capabilities a reader needs before joining.
+- `frontend/js/features/instances.js` and the mobile twin: choose an instance
+  from the listing or type an address, which is checked against the instance
+  itself before it is accepted. A session is stored under the origin of the
+  instance that issued it, so switching instances cannot carry one instance's
+  token to another, and the switch drops the socket and the cached data of the
+  instance being left.
+- `docs/instances.md` says which of discoverable, reachable, compatible,
+  accepting registrations and trusted are five different things.
+
+### Housekeeping
+- `backend/src/services/retention.js`: a job that prunes what expires - revoked
+  sessions, expired tokens and recovery links, old notifications, finished job
+  rows, the audit trail and delivered federation traffic. The periods are
+  instance settings, and the job re-queues itself so the rhythm survives a
+  restart.
+- The database pool is compared with the account's own connection limit at
+  connect time, and the boot says so when the pool would fill it. This host's
+  account allows 20 connections and two processes share it, so the pool is 4.
+
+### Search
+- `backend/src/services/search-index.js`: the in-house index the provider
+  promised - one row per distinct word per message, with the permission columns
+  copied beside them, so a query cannot return a message the reader may not
+  see. It works on every database this application runs on, follows writes,
+  edits and deletions, and is filled in for older messages by a job.
+- The search route uses it when it is there and falls back when it is not.
+
+### What else was fixed
+- Voice: the provider is read through the settings store, so an administrator's
+  saved choice is what takes effect - it was being read from the environment
+  and ignored. The in-house mesh is the only provider offered, and the ICE
+  requirement now applies to it (it was written for a provider name that no
+  longer existed, so it never fired).
+- Uploads: an operator can set the types members may attach, enforced on the
+  detected type rather than the declared one.
+- Backups: `npm run db:backup` and the admin page share one service, and
+  `npm run db:restore` puts a dump back after verifying it and asking for the
+  database name. `docs/backups.md` says what a backup does and does not hold.
+- Diagnostics: one report per subsystem, in the admin studio, each subsystem
+  asked in its own terms. A subsystem that is configured but cannot prove
+  itself says so.
+- The deployment runs one API process in fork mode, as the architecture says:
+  sockets, presence and rate limits belong to that process. The boot says so.
+
+### Verification
+- One real journey against the running instance: register, enrol the second
+  factor the instance asks for, sign in, create a community, open a channel,
+  post, be found by the search index, befriend, open a direct message, and be
+  notified. All of it passes, and a stranger does not find the message.
+- Two independent instances, separate databases, separate identities: each
+  registers its own people, and neither accepts the other's session.
+- Backups taken from the running instance and read back: 60 tables, 444 rows.
