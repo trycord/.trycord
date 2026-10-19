@@ -9,7 +9,7 @@
 import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar, empty, loading, failure } from '../components.js';
-import { State, loadSession } from '../../../packages/store.js';
+import { State, loadSession, applyToken } from '../../../packages/store.js';
 import Api from '../../../packages/api.js';
 import { TrycordConfig } from '../../../packages/config.js';
 import { path, publicPath } from '../../../packages/nav.js';
@@ -186,7 +186,11 @@ function securityBody() {
     if (next.value !== again.value) { toast('The two new passwords do not match.', { type: 'info' }); return; }
     change.disabled = true;
     try {
-      await Api.changePassword({ currentPassword: current.value, newPassword: next.value });
+      const out = await Api.changePassword({ currentPassword: current.value, newPassword: next.value });
+      // The server ends every session when the password changes and hands
+      // back one for this device. Without taking it, the next request would
+      // be refused and the reader signed out by their own password change.
+      if (out && out.token) applyToken(out.token, out.user);
       current.value = next.value = again.value = '';
       toast('Password changed.', { type: 'success' });
     } catch (error) { toast(error.message, { type: 'danger' }); }
@@ -351,15 +355,23 @@ function recoveryCodes(reload) {
 
 function disableTwoFactor(reload) {
   const password = el('input', { class: 'm-input', type: 'password', autocomplete: 'current-password', 'aria-label': 'Password' });
+  const code = el('input', { class: 'm-input', type: 'text', inputmode: 'numeric', maxlength: '6', 'aria-label': 'Code from your app' });
   const layer = sheet({
     title: 'Turn off two-step sign-in',
-    body: el('div', { class: 'm-stack' }, el('p', { class: 'm-lede' }, 'Your password is the only key again.'), field('Password', password)),
+    body: el('div', { class: 'm-stack' },
+      el('p', { class: 'm-lede' }, 'Your password and a code from your app are both needed.'),
+      field('Password', password),
+      field('Code from your app', code)),
     footer: el('button', {
       class: 'm-btn m-btn--block m-btn--primary', type: 'button',
       onClick: async (event) => {
         event.currentTarget.disabled = true;
-        try { await Api.twoFactorDisable({ password: password.value }); layer.close(); toast('Two-step sign-in is off.', { type: 'success' }); reload(); }
-        catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
+        try {
+          await Api.twoFactorDisable({ password: password.value, code: code.value.trim() });
+          layer.close();
+          toast('Two-step sign-in is off.', { type: 'success' });
+          reload();
+        } catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
       },
     }, 'Turn off'),
   });

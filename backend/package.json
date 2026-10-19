@@ -26,8 +26,13 @@
     "db:backup": "node scripts/db-backup.js",
     "seed": "node scripts/seed.js",
     "migrate": "node scripts/migrate.js",
+    "db:import": "node scripts/db-import.js",
     "css": "node ../frontend/scripts/build-css.js",
-    "db:restore": "node scripts/db-restore.js"
+    "db:restore": "node scripts/db-restore.js",
+    "test": "node --test \"tests/**/*.test.js\"",
+    "test:unit": "node --test \"tests/unit/**/*.test.js\"",
+    "test:integration": "node --test \"tests/integration/**/*.test.js\"",
+    "test:client": "node --test \"tests/client/**/*.test.js\""
   },
   "license": "MIT",
   "dependencies": {

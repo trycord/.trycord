@@ -24,6 +24,9 @@ function paint(identity, user) {
     'aria-label': 'About you',
     placeholder: 'A few words for the people who open your profile',
   });
+  // The words the reader already wrote are shown, so saving the page does not
+  // quietly replace them with an empty box.
+  about.value = user.bio || '';
   let avatarFile = null;
   let bannerFile = null;
 

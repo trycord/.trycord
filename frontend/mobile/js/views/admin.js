@@ -11,7 +11,6 @@
 import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar, serverMark, empty, loading, failure } from '../components.js';
-import { nameOf } from '../../../packages/store.js';
 import { path, navigate } from '../../../packages/nav.js';
 import { scopeNav } from '../../../packages/registry.js';
 import { toast, menu, sheet, confirm } from '../ui.js';
@@ -537,6 +536,88 @@ function pagesBody() {
           el('span', { class: 'm-row__actions' },
             el('a', { class: 'm-btn m-btn--sm m-btn--ghost', href: path('/' + row.route), target: '_blank', rel: 'noopener' },
               'View', el('span', { class: 'm-row__lead' }, icon('external', { size: 14 }))))));
+      }
+    } catch (error) {
+      list.replaceChildren(failure(error, load));
+    }
+  }
+
+  load();
+  return host;
+}
+
+// -- approvals ----------------------------------------------------------------
+
+function approvalsBody() {
+  const host = el('div', { class: 'm-stack' });
+  const list = el('div', { class: 'm-list' });
+  host.appendChild(list);
+
+  async function load() {
+    list.replaceChildren(loading('Loading the waiting accounts'));
+    try {
+      const data = await Api.adminApprovals();
+      list.replaceChildren();
+      if (!data || data.enabled === false) {
+        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Approval is off for this instance.'))));
+        return;
+      }
+      const pending = Array.isArray(data.pending) ? data.pending : [];
+      if (!pending.length) {
+        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Nobody is waiting to be let in.'))));
+        return;
+      }
+      for (const account of pending) {
+        list.appendChild(el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__lead' }, icon('user', { size: 17 })),
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__title truncate' }, account.displayName || account.username || 'An account'),
+            el('span', { class: 'm-row__sub truncate' }, '@' + (account.username || ''))),
+          el('span', { class: 'm-row__actions' },
+            el('button', {
+              class: 'm-btn m-btn--sm m-btn--primary', type: 'button',
+              onClick: async () => {
+                try {
+                  await Api.approveUser(account.id);
+                  toast('Approved.', { type: 'success' });
+                  load();
+                } catch (error) { toast(error.message, { type: 'danger' }); }
+              },
+            }, 'Approve'))));
+      }
+    } catch (error) {
+      list.replaceChildren(failure(error, load));
+    }
+  }
+
+  load();
+  return host;
+}
+
+// -- diagnostics --------------------------------------------------------------
+
+function diagnosticsBody() {
+  const host = el('div', { class: 'm-stack' });
+  const list = el('div', { class: 'm-list' });
+  host.appendChild(list);
+
+  async function load() {
+    list.replaceChildren(loading('Reading the subsystems'));
+    try {
+      const report = await Api.adminDiagnostics();
+      const subsystems = report.subsystems || {};
+      list.replaceChildren();
+      for (const [name, entry] of Object.entries(subsystems)) {
+        const detail = entry && (entry.note || entry.error || (typeof entry.detail === 'string' ? entry.detail : ''));
+        list.appendChild(el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__lead' }, icon('activity', { size: 17 })),
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__title truncate' }, name),
+            el('span', { class: 'm-row__sub truncate' }, String(entry.state || 'unknown') + (detail ? ' · ' + detail : ''))),
+          el('span', { class: 'm-row__actions' }, icon('check', { size: 16 }))));
+      }
+      if (!Object.keys(subsystems).length) {
+        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'This instance reported no subsystems.'))));
       }
     } catch (error) {
       list.replaceChildren(failure(error, load));
@@ -1241,6 +1322,7 @@ export function renderAdmin(ctx) {
   const bodies = {
     admin: overviewBody,
     'admin.users': usersBody,
+    'admin.approvals': approvalsBody,
     'admin.communities': communitiesBody,
     'admin.reports': reportsBody,
     'admin.appeals': appealsBody,
@@ -1251,6 +1333,7 @@ export function renderAdmin(ctx) {
     'admin.settings': instanceSettingsBody,
     'admin.database': databaseBody,
     'admin.continuum': continuumBody,
+    'admin.diagnostics': diagnosticsBody,
   };
   const active = bodies[initial] ? initial : 'admin';
 

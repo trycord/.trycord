@@ -9,11 +9,11 @@
 
 import { el } from '../../packages/dom.js';
 import Api from '../../packages/api.js';
-import theme, { THEMES, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS, DEFAULT_THEME } from '../../packages/theme.js';
+import theme, { THEMES, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS } from '../../packages/theme.js';
 import { readPrefs, patchPrefs, applyDensity, DENSITIES } from '../prefs.js';
 import { switchControl, fieldRow } from '../ui/primitives.js';
 import { head, card, blank, fault, fold, facts } from '../ui/page.js';
-import { errorToast, toast } from '../ui/overlays.js';
+import { toast } from '../ui/overlays.js';
 
 // A colour choice names a theme the stylesheet actually knows, and its swatch
 // carries the target theme as an attribute so the preview shows that theme's
@@ -102,9 +102,17 @@ function densityControls() {
     }, name.charAt(0).toUpperCase() + name.slice(1))));
 }
 
+// The motion the reader asked for, as it is stored: the choice wins over what
+// the system asks for, because the reader made it on purpose.
+function storedMotion() {
+  try { return localStorage.getItem('trycord-motion') || ''; } catch { return ''; }
+}
+
 export function appearanceView() {
+  const stored = storedMotion();
+  const asked = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
   const reduce = switchControl(
-    window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false,
+    stored ? stored === 'reduced' : asked,
     async (on) => {
       document.documentElement.dataset.motion = on ? 'reduced' : '';
       try { localStorage.setItem('trycord-motion', on ? 'reduced' : ''); } catch { /* session only */ }
@@ -205,17 +213,21 @@ export function updatesView() {
     ]),
     onMount: async () => {
       try {
+        // The build this client talks to is the one the server reports: the
+        // number is read from the instance, never written into this file.
         const instance = await Api.instance();
         const built = instance && (instance.version || instance.build);
         body.replaceChildren(fold([
           facts([
             { value: built || 'unknown', label: 'version' },
-            { value: instance && instance.legacy ? 'legacy mode' : 'current', label: 'mode' },
+            { value: (instance && instance.apiVersion) || 'unknown', label: 'api' },
+            { value: (instance && instance.protocolVersion) || 'unknown', label: 'protocol' },
+            { value: (instance && instance.name) || 'this instance', label: 'instance' },
           ]),
           blank({
             glyph: 'refresh',
-            title: 'The client is current',
-            text: 'A reload keeps the session and picks up whatever shipped since you opened this tab.',
+            title: 'A reload keeps the session',
+            text: 'Reloading picks up whatever shipped since this tab was opened; the session and the settings stay.',
           }),
         ]));
       } catch (e) {

@@ -6,7 +6,19 @@ const db = require('../db');
 const { now, uuid } = require('../util');
 const wellbeing = require('./wellbeing');
 
-const TYPES = ['dm', 'friend_request', 'friend_accepted', 'mention', 'reply'];
+// The kinds of notification this instance can raise.
+//
+// A closed list on purpose: a notification with a type nobody handles is a
+// row in a table that appears in the interface with no meaning, and the
+// exception is thrown at the point of creation rather than discovered later.
+//
+// The collaboration workspace adds two: a card assigned to a member, and a
+// reminder about an event they are coming to. Both carry a reference to the
+// card or the event, which the client resolves.
+const TYPES = [
+  'dm', 'friend_request', 'friend_accepted', 'mention', 'reply',
+  'card_assigned', 'event_reminder',
+];
 
 // `held` means this account's wellbeing settings say not to interrupt them right now.
 // The row is still written: a held notification is waiting next time they open the app,

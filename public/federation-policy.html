@@ -14,11 +14,9 @@
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
-</head>
   <title>Federation Policy — Trycord</title>
   <meta name="description" content="How Trycord instances exchange information, and what is never shared.">
 </head>
-<body>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
 
@@ -55,7 +53,7 @@
             </div>
             <div class="nav-menu-foot">
               <p>Private, self-hostable community messaging.</p>
-              <a class="text-link" href="/demo">Try the live demo</a>
+              <a class="text-link" href="/demo">Try the demo</a>
             </div>
           </div>
         </div>
@@ -67,7 +65,7 @@
           </button>
           <div class="nav-menu">
             <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
-            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+            <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
           </div>
         </div>
 
@@ -104,30 +102,168 @@
           <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
           <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
         </button>
-        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
     </div>
   </header>
 
   <main id="main" class="page">
-  <div class="wrap">
-    <div class="page-head">
-      <p class="kicker">Federation policy</p>
-      <h1>Federation Policy</h1>
-      <p class="lede"><p>Trycord supports Community Continuum: compatible Trycord instances can exchange explicitly authorized information so communities can continue across instances. Federation is opt-in and off by default.</p>
-   <h3>What is federated</h3>
-   <p>Only content that a community or member has explicitly authorized to be shared. Nothing is federated without that authorization.</p>
-   <h3>What is never federated</h3>
-   <p>Private messages are not federated by default. Private channels do not become remotely visible without explicit authorization. Local bans and permissions remain effective, and remote requests cannot bypass local access controls.</p>
-   <h3>You stay in control</h3>
-   <p>An instance can enable or disable federation, manage its remote relationships, and review delivery failures. Remote instances cannot assign themselves local administrator privileges or overwrite local permissions.</p>
-   <p>If federation is disabled, the instance remains fully functional on its own.</p></p>
+    <div class="wrap">
+      <div class="page-head">
+        <p class="kicker">Federation policy</p>
+        <h1>Federation Policy</h1>
+        <p class="lede">
+          Trycord can exchange explicitly authorised information with other
+          Trycord instances, so a community can continue across a boundary.
+          Federation is opt-in, it is off by default, and it carries
+          obligations. This page describes both.
+        </p>
+      </div>
+      <div class="prose-layout">
+        <article class="prose">
+          <div class="draft-note" role="note">
+            <strong>Legal review required before publication.</strong> This
+            document comes from the Trycord project as a starting point for an
+            instance. It is not legal advice, and nobody has reviewed it for the
+            instance serving it. The fields marked <code>OPERATOR</code> are
+            facts only the operator can supply: who to contact about
+            federation, and which remote instances this one will and will not
+            talk to. Fill them in, and have a qualified lawyer read the
+            result, before presenting this document as binding.
+          </div>
+          <p class="small muted">
+            <strong>Version:</strong> <code>1.0</code> &middot;
+            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
+            <strong>Effective on this instance:</strong>
+            <span class="op-field" data-op="effective-date">OPERATOR: the date this policy takes effect on this instance</span>
+          </p>
+
+          <h2>1. What federation is</h2>
+          <p>
+            Federation is how one instance exchanges content with another.
+            It exists so that a community can keep talking to its members when
+            the members are spread across more than one server, and so that
+            two communities that already know each other can share what they
+            choose to share.
+          </p>
+          <p>
+            It is not a social network of instances, and it does not make one
+            instance part of another. Each instance remains its own system,
+            with its own accounts, its own rules, and its own operator.
+          </p>
+
+          <h2>2. It is off unless somebody turns it on</h2>
+          <p>
+            Federation is disabled by default, and an instance that leaves it
+            off is fully functional on its own: communities, channels, direct
+            messages, roles and moderation all work exactly as they do
+            elsewhere. Turning it on is a decision for the operator, and
+            turning it off again must always be possible.
+          </p>
+
+          <h2>3. What is shared, and what never is</h2>
+          <p>
+            Only content that a community or a member has explicitly
+            authorised is shared. Nothing is federated because it happens to
+            be on the instance.
+          </p>
+          <ul>
+            <li><strong>Direct messages are not federated</strong> by default. A member has to turn it on for a conversation, per conversation, and the operator can prevent it entirely.</li>
+            <li><strong>Private channels do not become remotely visible</strong> without an explicit decision by the people who control them.</li>
+            <li><strong>Local bans, permissions and roles stay local.</strong> A remote instance cannot see them, and cannot grant itself access that a local role has not given it.</li>
+            <li><strong>Account data stays where the account is.</strong> A federated account is a reference, not a copy of somebody's account.</li>
+          </ul>
+
+          <h2>4. What turning it on takes on</h2>
+          <p>
+            An operator who enables federation is accepting content from
+            servers they do not control, run by people they have not met,
+            under laws they do not write. Before enabling it, the operator
+            should be able to answer a few questions:
+          </p>
+          <ul>
+            <li>Who is responsible for the content that arrives, and what happens to it when it breaks a rule?</li>
+            <li>Which remote instances will be allowed in, and which will be refused?</li>
+            <li>How will a person whose content arrived here get it removed, and how quickly?</li>
+            <li>What will happen to a remote instance that keeps sending material that breaks the rules here?</li>
+          </ul>
+          <p>
+            The contact for federation questions on this instance is
+            <span class="op-field" data-op="federation-contact">OPERATOR: who to contact about federation on this instance</span>,
+            and the list of remote instances it will talk to is
+            <span class="op-field" data-op="federation-allowlist">OPERATOR: which remote instances this instance will federate with, and how that list is changed</span>.
+          </p>
+
+          <h2>5. A remote instance is not trusted</h2>
+          <p>
+            A remote instance is a server operated by somebody else. It cannot
+            assign itself administrative rights on this instance, it cannot
+            override a local ban, and it cannot see anything here that a local
+            role has not authorised. Where a remote instance sends something
+            that breaks the rules here, the content is treated as content
+            posted here.
+          </p>
+          <p>
+            The rules in the <a href="/guidelines">acceptable use rules</a> apply
+            to federated content exactly as they apply to everything else.
+          </p>
+
+          <h2>6. Moderation across a federation</h2>
+          <p>
+            A member of this instance can be banned here even when their
+            account lives on a remote instance, and a remote instance can
+            refuse to deliver anything from a member banned here. Local
+            decisions are local, and a remote instance's decision does not
+            bind this one, though this instance's may be respected by the
+            other.
+          </p>
+          <p>
+            A complaint about content that arrived by federation is handled
+            here for the content that arrived, and the operator may also pass
+            it to the operator of the remote instance. How that is done is
+            <span class="op-field" data-op="federation-complaints">OPERATOR: how a complaint about a remote instance is made to this operator, and how it is passed on</span>.
+          </p>
+
+          <h2>7. Child safety across a federation</h2>
+          <p>
+            Child sexual abuse material is prohibited on every instance, and
+            federation is not a way around it. Material of that kind that
+            arrives over federation is removed, the account and any bot or
+            integration that sent it is removed, and the remote instance is
+            told, and is cut off where the operator has the ability to cut it
+            off. Where the law requires the material to be reported to an
+            authority, it is reported.
+          </p>
+          <p>
+            An operator who runs an instance does not become exempt from the
+            law that applies to them, and neither does anybody else who runs
+            one. The <a href="/trust-and-safety">Trust and Safety</a> page
+            describes the reporting route.
+          </p>
+
+          <h2>8. Turning it off</h2>
+          <p>
+            Federation can be turned off without taking the instance offline,
+            and doing so should not silently delete the content that has
+            already been exchanged. When it is turned off, remote
+            relationships are closed, delivery failures are visible to the
+            operator, and members are told what has changed.
+          </p>
+
+          <h2>9. Changes to this policy</h2>
+          <p>
+            This policy changes with the software and with the operator's
+            decisions. The version and the date are at the top of the page,
+            and a change that removes a capability people rely on is
+            announced on the instance before it takes effect.
+          </p>
+        </article>
+        <aside class="toc" aria-label="On this page">
+          <p class="toc-title">On this page</p>
+        </aside>
+      </div>
     </div>
-    <section class="section">
-undefined
-    </section>
-  </div>
-</main>
+  </main>
 
 
   <footer class="site-footer">
@@ -143,7 +279,7 @@ undefined
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
@@ -156,7 +292,7 @@ undefined
       <div class="footer-col">
         <h2 class="footer-heading">Explore</h2>
         <a href="/communities">Communities</a>
-        <a href="/demo">Live demo</a>
+        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
@@ -180,7 +316,7 @@ undefined
     </div>
   </footer>
 
-  <script src="/js/status.js"></script>
+  <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>

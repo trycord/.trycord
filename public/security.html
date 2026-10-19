@@ -52,7 +52,7 @@
             </div>
             <div class="nav-menu-foot">
               <p>Private, self-hostable community messaging.</p>
-              <a class="text-link" href="/demo">Try the live demo</a>
+              <a class="text-link" href="/demo">Try the demo</a>
             </div>
           </div>
         </div>
@@ -64,7 +64,7 @@
           </button>
           <div class="nav-menu">
             <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
-            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+            <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
           </div>
         </div>
 
@@ -101,7 +101,7 @@
           <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
           <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
         </button>
-        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
     </div>
   </header>
@@ -112,51 +112,117 @@
         <p class="kicker">Security</p>
         <h1>Security</h1>
         <p class="lede">
-          Trycord enforces who can do what on the server, not in the browser. The
-          server decides, and the interface only shows you what you are allowed to
-          do. This page covers how the pieces are handled, which versions are
-          supported, and the private route for reporting a problem.
+          Trycord enforces who can do what on the server, not in the browser.
+          The server decides, and the interface only shows what you are
+          allowed to do. This page covers how the pieces are handled, which
+          versions are supported, and the private route for reporting a
+          problem.
         </p>
       </div>
       <div class="prose-layout">
         <article class="prose">
           <!-- page:begin -->
-          <h2>Sign-in</h2>
-          <p>
-            Passwords are hashed before they are stored, never kept in a form the
-            server could hand back. Sessions use tokens that can be revoked
-            individually or all at once, and optional two-factor authentication adds
-            a second step for an account that wants it.
+          <div class="draft-note" role="note">
+            <strong>Legal review required before publication.</strong> This
+            document comes from the Trycord project as a starting point for an
+            instance. It is not legal advice, and nobody has reviewed it for the
+            instance serving it. The fields marked <code>OPERATOR</code> are
+            facts only the operator can supply: a security contact for the
+            instance, and the disclosure terms the operator commits to. Fill
+            them in, and have a qualified lawyer read the result, before
+            presenting this document as binding.
+          </div>
+          <p class="small muted">
+            <strong>Version:</strong> <code>1.0</code> &middot;
+            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
+            <strong>Effective on this instance:</strong>
+            <span class="op-field" data-op="effective-date">OPERATOR: the date this page takes effect on this instance</span>
           </p>
 
-          <h2>Permissions</h2>
+          <h2>1. Sign-in</h2>
           <p>
-            Community roles and admin powers are checked on the server for every
-            request. The client never decides for itself what you may do; it draws
-            the answer the server gives. A permission that was misspelled in
-            configuration is a startup error rather than a silent grant or refusal.
+            Passwords are hashed before they are stored, and are never kept in
+            a form the server could hand back. The work factor is 12 by
+            default and can be raised per instance. Sessions use signed tokens
+            with an individual identifier, so one session can be revoked and
+            all of them can be revoked at once, and revoking them also
+            disconnects any live connection opened by the old session.
+            Optional two-step authentication adds a second factor for an
+            account that wants one.
+          </p>
+          <p>
+            Email verification and password recovery are supported. A
+            self-hosted instance with no mail configured sends no mail at all,
+            which means it also cannot verify addresses or reset passwords by
+            email; the operator has to handle those by hand.
           </p>
 
-          <h2>Uploads</h2>
+          <h2>2. Permissions</h2>
           <p>
-            Avatars and file attachments are served through routes that check who is
-            asking, not from a public folder anyone can browse. Upload size is a
-            per-instance setting, and uploads can be switched off entirely.
+            Community roles and administrative powers are checked on the
+            server for every request. The client never decides for itself what
+            you may do; it draws the answer the server gives. A permission
+            that was misspelled in configuration is a startup error rather
+            than a silent grant or a silent refusal.
           </p>
 
-          <h2>Moderation and records</h2>
+          <h2>3. Uploads</h2>
+          <p>
+            Avatars and file attachments are served through routes that check
+            who is asking, not from a public folder anyone can browse. Uploads
+            are identified by their contents rather than by the name the
+            sender supplied, and a file the server cannot place is served as a
+            download, so a browser is never asked to interpret bytes the
+            server did not recognise. Avatars, banners and community icons
+            must be images. The size limit is a per-instance setting, and
+            uploads can be switched off entirely.
+          </p>
+
+          <h2>4. Rate limits and abuse controls</h2>
+          <p>
+            Registration, email verification, direct messages and other
+            abuse-prone endpoints are rate limited per account and per
+            address, with the limits configurable per instance. The limits are
+            a speed bump, not a defence: they make casual abuse inconvenient
+            and they do nothing about a determined attacker.
+          </p>
+
+          <h2>5. Moderation and records</h2>
           <p>
             Reports, appeals and administrative actions are written to a
-            server-side log, and only people permitted to see them can. An action
-            records who took it and when, and appeals create a record an
-            administrator can act on rather than a message in a private inbox.
+            server-side log that only people permitted to see it can read. An
+            action records who took it and when, and an appeal creates a
+            record an administrator can act on rather than a message in a
+            private inbox.
           </p>
 
-          <h2>Supported versions</h2>
+          <h2>6. Federation</h2>
           <p>
-            Trycord is developed continuously on <code>main</code>. Security fixes
-            land on the current codebase and are included in later releases. There
-            is no long-term-support branch.
+            Federation is off unless an operator turns it on. Where it is on,
+            a remote instance is not trusted: it cannot read a private
+            channel, cannot see a local ban, and cannot grant itself local
+            administrative rights. Material that arrives over federation is
+            still content on this instance, and the rules in the
+            <a href="/guidelines">acceptable use rules</a> apply to it in full,
+            including the prohibition on child sexual abuse material. The
+            <a href="/federation-policy">Federation Policy</a> describes what
+            an operator takes on when enabling it.
+          </p>
+
+          <h2>7. Transport security</h2>
+          <p>
+            Trycord speaks plain HTTP and expects to sit behind a proxy that
+            terminates TLS, except in local development. Transport encryption
+            is therefore the operator's responsibility. No method of
+            transmission is perfect, and no operator can promise absolute
+            security.
+          </p>
+
+          <h2>8. Supported versions</h2>
+          <p>
+            Trycord is developed continuously on <code>main</code>. Security
+            fixes land on the current codebase and are included in later
+            releases. There is no long-term-support branch.
           </p>
           <table class="plain">
             <thead><tr><th>Component</th><th>Supported</th></tr></thead>
@@ -174,43 +240,53 @@
             <a href="/changelog">changelog</a> is where releases are described.
           </p>
 
-          <h2>Reporting a vulnerability</h2>
+          <h2>9. Reporting a vulnerability</h2>
           <p>
-            Report privately, and only when it could allow unauthorized access, data
-            exposure, privilege escalation, or other harm to users or self-hosted
-            instances.
+            Report privately, and only when it could allow unauthorized
+            access, data exposure, privilege escalation, or other harm to
+            users or self-hosted instances.
           </p>
           <p>
-            <strong>Preferred route:</strong> use GitHub's private vulnerability
-            reporting. Do <strong>not</strong> open a public issue for a security
-            vulnerability.
+            <strong>Preferred route:</strong> use GitHub's private
+            vulnerability reporting on the repository. Do <strong>not</strong>
+            open a public issue for a security vulnerability.
           </p>
           <p>
-            A useful report says what you found, where, how to reproduce it, and
-            what the impact could be. If you can, include the version or commit, the
-            configuration that matters, and a minimal reproduction. Please do not
-            test against instances that have not agreed to it, and do not access,
-            change, or keep other people's data while demonstrating an issue.
+            A useful report says what you found, where, how to reproduce it,
+            and what the impact could be. If you can, include the version or
+            commit, the configuration that matters, and a minimal
+            reproduction.
           </p>
           <p>
-            <span class="op-field" data-op="security-contact">OPERATOR: a security contact for this instance, if you want one besides the project</span>
+            Please do not test against instances that have not agreed to it,
+            and do not access, change, or keep other people's data while
+            demonstrating an issue. Do not send material that is itself
+            illegal to possess, and do not include other people's personal data
+            in a report; a description is enough.
+          </p>
+          <p>
+            A security contact for this instance, if you want one besides the
+            project:
+            <span class="op-field" data-op="security-contact">OPERATOR: a security contact for this instance, if the operator wants one besides the project</span>.
+            The terms the operator commits to on disclosure are
+            <span class="op-field" data-op="security-disclosure">OPERATOR: how long the operator takes to release a fix, and what it will tell the reporter</span>.
           </p>
 
-          <h2>If you run an instance</h2>
+          <h2>10. If you run an instance</h2>
           <p>
-            Your users' security is your responsibility, because the data is yours.
-            Keep the server updated, set a unique <code>JWT_SECRET</code>, put the
-            service behind TLS, and review the settings that widen access before you
-            turn them on. The <a href="/docs">documentation</a> covers the options
-            that have security consequences.
+            Your users' security is your responsibility, because their data is
+            yours. Keep the server updated, set a unique
+            <code>JWT_SECRET</code>, put the service behind TLS, keep the
+            database and the upload directory off the public internet, and
+            review the settings that widen access before you turn them on. The
+            <a href="/docs">documentation</a> covers the options that have
+            security consequences.
           </p>
-
-          <div class="draft-note" role="note">
-            <strong>Operator note.</strong> Every instance serves this page, so it
-            stays generic. Edit it in Admin, or edit the file
-            <code>public/security.html</code>, to add your own security contact or
-            disclosure policy where the placeholder appears.
-          </div>
+          <p>
+            A secret that is shared between two instances is a secret that
+            neither of them can rotate on its own. A default value left in
+            place is not a secret at all.
+          </p>
           <!-- page:end -->
         </article>
         <aside class="toc" aria-label="On this page">
@@ -233,7 +309,7 @@
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
@@ -246,7 +322,7 @@
       <div class="footer-col">
         <h2 class="footer-heading">Explore</h2>
         <a href="/communities">Communities</a>
-        <a href="/demo">Live demo</a>
+        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
@@ -270,6 +346,7 @@
     </div>
   </footer>
 
+  <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>

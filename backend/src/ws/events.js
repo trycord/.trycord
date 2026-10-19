@@ -44,7 +44,22 @@ const SESSION_EVENTS = {
   SESSION_REVOKED: 'session-revoked',
 };
 
-// Every event name, for the checks that need to know the whole vocabulary.
-const ALL = [...Object.values(EVENTS), ...Object.values(SESSION_EVENTS)];
+// End-to-end encryption events.
+//
+// A device came or went, a key was published, or the safety number a reader
+// compares with their peer's changed. They are account-scoped rather than
+// channel-scoped, so they live with the other account events.
+const E2EE_EVENTS = {
+  DEVICE: 'e2ee:device',
+  KEY_CHANGE: 'e2ee:key-change',
+  SAFETY_NUMBER: 'e2ee:safety-number',
+};
 
-module.exports = { EVENTS, SESSION_EVENTS, ALL };
+// Every event name, for the checks that need to know the whole vocabulary.
+const ALL = [
+  ...Object.values(EVENTS),
+  ...Object.values(SESSION_EVENTS),
+  ...Object.values(E2EE_EVENTS),
+];
+
+module.exports = { EVENTS, SESSION_EVENTS, E2EE_EVENTS, ALL };

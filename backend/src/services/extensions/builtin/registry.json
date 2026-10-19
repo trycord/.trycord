@@ -1,0 +1,94 @@
+[
+  {
+    "id": "trycord.welcome",
+    "name": "Welcome messages",
+    "version": "1.0.0",
+    "description": "Greets a new member in the community's first channel.",
+    "author": "Trycord",
+    "maintainers": ["Trycord"],
+    "homepage": "https://trycord.dev/extensions/welcome",
+    "entryPoint": "welcome.json",
+    "capabilities": ["members.read", "messages.write"],
+    "compatibility": { "api": "3.0", "minInstance": "3.0.0", "maxInstance": null },
+    "dependencies": {},
+    "trusted": false,
+    "reviewStatus": "approved",
+    "triggers": [
+      {
+        "event": "member.joined",
+        "conditions": [],
+        "steps": [
+          {
+            "type": "action",
+            "action": "message.post",
+            "params": {
+              "serverId": "{{serverId}}",
+              "content": "Welcome to the community, {{userId}}."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "trycord.member-digest",
+    "name": "Member digest",
+    "version": "1.0.0",
+    "description": "Records how many members a community has each time somebody joins.",
+    "author": "Trycord",
+    "maintainers": ["Trycord"],
+    "homepage": "https://trycord.dev/extensions/member-digest",
+    "entryPoint": "digest.json",
+    "capabilities": ["members.read"],
+    "compatibility": { "api": "3.0", "minInstance": "3.0.0", "maxInstance": null },
+    "dependencies": {},
+    "trusted": false,
+    "reviewStatus": "approved",
+    "triggers": [
+      {
+        "event": "member.joined",
+        "conditions": [],
+        "steps": [
+          {
+            "type": "action",
+            "action": "member.count",
+            "params": { "serverId": "{{serverId}}" }
+          },
+          {
+            "type": "action",
+            "action": "log",
+            "params": { "message": "the community has {{steps.0.output.count}} members" }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "trycord.message-log",
+    "name": "Message log",
+    "version": "1.0.0",
+    "description": "Writes a line about every message into the run history. Needs no capability.",
+    "author": "Trycord",
+    "maintainers": ["Trycord"],
+    "homepage": "https://trycord.dev/extensions/message-log",
+    "entryPoint": "log.json",
+    "capabilities": [],
+    "compatibility": { "api": "3.0", "minInstance": "3.0.0", "maxInstance": null },
+    "dependencies": {},
+    "trusted": false,
+    "reviewStatus": "approved",
+    "triggers": [
+      {
+        "event": "message.created",
+        "conditions": [],
+        "steps": [
+          {
+            "type": "action",
+            "action": "log",
+            "params": { "message": "a message was posted in {{channelId}}" }
+          }
+        ]
+      }
+    ]
+  }
+]

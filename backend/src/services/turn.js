@@ -177,7 +177,17 @@ function cleanupAllocations() {
     }
   }
 }
-setInterval(cleanupAllocations, 30000);
+
+// The sweep that expires stale allocations.
+//
+// Two things about it are deliberate. It is unref'd, so requiring this module
+// - which the voice route does, on every boot - does not by itself keep a
+// process alive: the server's own socket is what holds the standalone TURN
+// process open, and nothing should hold it open after it has been stopped. And
+// the handle is kept, so stopServer() can clear it; an interval that cannot be
+// cleared is a leak that only shows up as a process that will not exit.
+const allocationSweeper = setInterval(cleanupAllocations, 30000);
+allocationSweeper.unref();
 
 // ===== Auth =====
 
@@ -435,6 +445,8 @@ function issueCredentials(username) {
 // ===== Server lifecycle =====
 
 let server = null;
+// The running server's own sweep, so stopping the server stops the sweep.
+let activeSweeper = null;
 
 function startServer(config) {
   const host = (config && config.host) || '0.0.0.0';
@@ -447,13 +459,20 @@ function startServer(config) {
   socket.bind(port, host, () => {
     console.log('[turn] STUN/TURN server listening on ' + host + ':' + port);
   });
-  setInterval(cleanupAllocations, 30000);
+  // The same sweep, started again for the running server. The module-level one
+  // is already doing this work, so this is redundant - but the server's own
+  // lifetime is what should decide, and the module-level sweep is unref'd, so
+  // it is not a reason to keep a stopped server alive.
+  const sweeper = setInterval(cleanupAllocations, 30000);
+  sweeper.unref();
+  activeSweeper = sweeper;
   return socket;
 }
 
 function stopServer() {
   try { server && server.close(); } catch {}
   server = null;
+  if (activeSweeper) { clearInterval(activeSweeper); activeSweeper = null; }
   for (const a of allocations.values()) try { a.relaySocket.close(); } catch {}
   allocations.clear();
 }

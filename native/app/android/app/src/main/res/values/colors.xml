@@ -1,0 +1,7 @@
+<resources>
+    <!-- The charcoal ground the app is drawn on, and the flame orange used
+         for the accent. Both are the values in the design tokens. -->
+    <color name="app_background">#121317</color>
+    <color name="ember">#FF4D24</color>
+    <color name="text_primary">#F4F5F7</color>
+</resources>

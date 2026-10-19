@@ -10,7 +10,7 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import {
-  State, nameOf, refreshServerTree, refreshServerMembers, isOwner, serverById,
+  State, nameOf, refreshServer, refreshServerTree, refreshServerMembers, isOwner, serverById,
 } from '../../packages/store.js';
 import { navigate } from '../../packages/nav.js';
 import { switchControl, fieldRow, bannerNode, channelIcon, serverMark } from '../ui/primitives.js';
@@ -41,6 +41,13 @@ function overviewSection(ctx) {
   });
   const status = el('p', { class: 'form-error', role: 'status' });
 
+  // This instance has no endpoint that reads the community settings back, so
+  // the guidelines cannot be shown as they stand. An empty field that is saved
+  // unchanged would therefore wipe the rules the community has, so the field
+  // is only written once it has actually been edited.
+  let guidelinesEdited = false;
+  guidelines.addEventListener('input', () => { guidelinesEdited = true; });
+
   const saveIdentity = async () => {
     try {
       await Api.updateServer(serverId, { name: name.value.trim(), description: description.value.trim() });
@@ -48,8 +55,13 @@ function overviewSection(ctx) {
     } catch (e) { errorToast(e); }
   };
   const saveGuidelines = async () => {
+    if (!guidelinesEdited) {
+      status.textContent = 'The guidelines are unchanged, so nothing was written.';
+      return;
+    }
     try {
       await Api.updateServerSettings(serverId, { guidelines: guidelines.value });
+      guidelinesEdited = false;
       status.textContent = 'Guidelines saved';
     } catch (e) { errorToast(e); }
   };
@@ -76,9 +88,12 @@ function overviewSection(ctx) {
         label: 'Guidelines', glyph: 'book',
         body: fold([
           guidelines,
+          el('p', { class: 'form-note' },
+            'This instance cannot show the rules as they stand, so write them out again to change them.'),
           el('button', {
             class: 'btn btn--default btn--sm', type: 'button', onClick: saveGuidelines,
           }, 'Save guidelines'),
+          status,
         ]),
       }),
     ]),
@@ -95,9 +110,31 @@ function imageField(server, kind, label) {
     : (url ? bannerNode(url, 'settings-banner') : null);
   const file = el('input', {
     type: 'file', class: 'visually-hidden', tabindex: '-1',
+    accept: 'image/png,image/jpeg,image/webp,image/gif',
     'aria-label': 'Upload a new ' + label,
   });
   const note = el('p', { class: 'form-error', role: 'status' });
+
+  // The picker is opened by the button, and the file that comes back is what
+  // changes the picture. Without this the control opened a file dialog and
+  // then did nothing with the answer.
+  file.addEventListener('change', async () => {
+    const chosen = file.files && file.files[0];
+    if (!chosen) return;
+    note.textContent = 'Uploading…';
+    try {
+      await Api.setServerImage(server.id, kind, chosen);
+      note.textContent = 'Updated';
+      toast(label + ' updated');
+      await refreshServer(server.id);
+    } catch (error) {
+      note.textContent = (error && error.message) || 'The upload failed.';
+      errorToast(error);
+    } finally {
+      file.value = '';
+    }
+  });
+
   return el('div', { class: 'settings-image-field' },
     preview,
     el('div', { class: 'settings-image-tools' },
@@ -109,8 +146,9 @@ function imageField(server, kind, label) {
         class: 'btn btn--ghost btn--sm', type: 'button',
         onClick: async () => {
           try {
-            await Api.removeServerImage(server._id || server.id, kind);
+            await Api.removeServerImage(server.id, kind);
             note.textContent = 'Removed';
+            await refreshServer(server.id);
           } catch (e) { errorToast(e); }
         },
       }, 'Remove') : null,
@@ -146,7 +184,7 @@ function appearanceSection(ctx) {
         label: 'House', glyph: 'image',
         body: fold([imageField(server, 'icon', 'Icon'), imageField(server, 'banner', 'Banner')]),
       }),
-      card({}, {
+      card({
         label: 'Reach', glyph: 'compass',
         rows: [
           fieldRow('Public', 'Anyone with the address can read it.', publicToggle),
@@ -397,7 +435,7 @@ function ownershipSection(ctx) {
 
 function analyticsSection(ctx) {
   const serverId = ctx.serverId;
-  const body = el('div', { class: 'anticipation' });
+  const body = el('div', { class: 'anticipation-line' });
 
   return {
     node: fold([
@@ -415,7 +453,7 @@ function analyticsSection(ctx) {
         const totals = (report && (report.totals || report)) || {};
         const labels = {
           messages: 'messages sent',
-          members: 'people aound',
+          members: 'people around',
           joined: 'joined',
           left: 'left',
           reactions: 'reactions given',
@@ -452,7 +490,7 @@ function integrationsSection(ctx) {
       return;
     }
     body.replaceChildren(...hooks.map((hook) => row({
-      lead: el('span', { class: 'role-dot' }, icon('webhook', { size: 15 })),
+      lead: el('span', { class: 'role-dot' }, icon('zap', { size: 15 })),
       title: hook.name || 'Webhook',
       sub: hook.channel ? '#' + hook.channel.name : hook.channelId || '',
       side: el('button', {

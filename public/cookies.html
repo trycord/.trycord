@@ -14,11 +14,9 @@
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
-</head>
   <title>Cookies — Trycord</title>
   <meta name="description" content="What cookies and local storage Trycord uses and why.">
 </head>
-<body>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
 
@@ -55,7 +53,7 @@
             </div>
             <div class="nav-menu-foot">
               <p>Private, self-hostable community messaging.</p>
-              <a class="text-link" href="/demo">Try the live demo</a>
+              <a class="text-link" href="/demo">Try the demo</a>
             </div>
           </div>
         </div>
@@ -67,7 +65,7 @@
           </button>
           <div class="nav-menu">
             <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
-            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+            <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
           </div>
         </div>
 
@@ -104,31 +102,124 @@
           <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
           <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
         </button>
-        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
     </div>
   </header>
 
   <main id="main" class="page">
-  <div class="wrap">
-    <div class="page-head">
-      <p class="kicker">Cookies</p>
-      <h1>Cookies and local storage</h1>
-      <p class="lede"><p>Trycord uses cookies and browser storage only for what the instance needs to work: your session, your preferences, and security. No advertising or tracking cookies are set.</p>
-   <h3>Session cookie</h3>
-   <p>When you sign in, a session cookie identifies your authenticated requests to the API. Without it you cannot post or access private content.</p>
-   <h3>Preferences</h3>
-   <p>Your theme choice (light or dark) and other display preferences are stored in your browser so they persist across reloads.</p>
-   <h3>Security</h3>
-   <p>Cookies are scoped to the instance origin and marked so they are not sent to other sites. Signing out clears your session.</p>
-   <h3>Your choices</h3>
-   <p>You can clear cookies in your browser settings at any time. Doing so signs you out and resets stored preferences.</p></p>
+    <div class="wrap">
+      <div class="page-head">
+        <p class="kicker">Cookies</p>
+        <h1>Cookies and local storage</h1>
+        <p class="lede">
+          What Trycord keeps in your browser, why each thing is there, and how
+          to get rid of it. The short version: no cookies are set, and
+          nothing is tracked.
+        </p>
+      </div>
+      <div class="prose-layout">
+        <article class="prose">
+          <div class="draft-note" role="note">
+            <strong>Legal review required before publication.</strong> This
+            document comes from the Trycord project as a starting point for an
+            instance. It is not legal advice, and nobody has reviewed it for the
+            instance serving it. The field marked <code>OPERATOR</code> is a
+            fact only the operator can supply: the address for questions about
+            storage and consent on this instance. Fill it in, and have a
+            qualified lawyer read the result, before presenting this document as
+            binding.
+          </div>
+          <p class="small muted">
+            <strong>Version:</strong> <code>1.0</code> &middot;
+            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
+            <strong>Effective on this instance:</strong>
+            <span class="op-field" data-op="effective-date">OPERATOR: the date this document takes effect on this instance</span>
+          </p>
+
+          <h2>1. No cookies are set</h2>
+          <p>
+            The server sets no cookies at all, and the application never reads
+            one. There is no advertising cookie, no tracking cookie, no
+            third-party cookie, and no cookie that follows you to another site.
+            If a cookie appears in your browser for this instance, it was put
+            there by something else.
+          </p>
+
+          <h2>2. What the browser stores instead</h2>
+          <p>
+            A few things are kept in your browser's local storage, which is
+            part of the browser rather than part of the site. They stay on your
+            device and are not sent anywhere until the application needs them.
+          </p>
+          <ul>
+            <li><strong>Your session token.</strong> When you sign in, the server issues a signed token and the browser keeps it under a key that includes the instance's own address, so a token from one instance is never handed to another. It is sent back on each request as an authorisation header. Clearing it signs you out; it is not a cookie and it is not readable by another site.</li>
+            <li><strong>Your theme and your preferences.</strong> The light or dark choice, any custom palette, the motion setting, and the layout of your workspace are stored so they survive a reload.</li>
+            <li><strong>The API address you are using.</strong> If you point the client at a different instance, that address is remembered, along with the token for that instance, under that instance's own key.</li>
+            <li><strong>The demo's state.</strong> The <a href="/demo">demo</a> keeps which community you were looking at and which sample you had joined in the tab's session storage, and forgets it when the tab closes.</li>
+            <li><strong>This site's theme choice.</strong> The website keeps it under its own key, separately from the application's, so a theme picked here never changes how the app looks.</li>
+          </ul>
+
+          <h2>3. Why each one is there</h2>
+          <p>
+            The token is the session: without it the server cannot tell who you
+            are, and you cannot post, read private channels, or send a direct
+            message. The preferences are convenience. The API address is what
+            lets one browser hold a session on more than one instance at once,
+            which is the point of self-hosting.
+          </p>
+          <p>
+            None of them is used to build a profile of you, to count visits, or
+            to measure an advertising campaign, because there is no such
+            campaign.
+          </p>
+
+          <h2>4. Other sites</h2>
+          <p>
+            A page on this site can embed an image or a link from somewhere
+            else, and a browser will tell that other place your address when
+            it does. The website itself embeds nothing from another origin.
+            The application connects only to the instance it is talking to,
+            and the demo connects only to the instance whose public community
+            list it is reading.
+          </p>
+
+          <h2>5. Clearing it</h2>
+          <p>
+            You can clear site data in your browser's settings at any time.
+            Doing so signs you out, resets the stored preferences, and forgets
+            the instance you were pointed at. Nothing on the server is affected:
+            your account, your messages and your settings are still there when
+            you sign in again.
+          </p>
+          <p>
+            Clearing a single item is usually possible as well: the browser's
+            storage viewer lists each key, and removing the session token signs
+            you out on that instance only.
+          </p>
+
+          <h2>6. Consent</h2>
+          <p>
+            Some jurisdictions require consent before non-essential storage is
+            used. Trycord stores nothing that is not needed for the service to
+            work, and asks for nothing, but the operator of an instance is the
+            one who has to answer that question for their users:
+            <span class="op-field" data-op="cookie-contact">OPERATOR: how consent is handled on this instance, if the law where it operates requires it</span>.
+          </p>
+
+          <h2>7. Changes</h2>
+          <p>
+            If the software starts storing something new, this page changes
+            with it, and the version and the date at the top of the page tell
+            you when.
+          </p>
+        </article>
+        <aside class="toc" aria-label="On this page">
+          <p class="toc-title">On this page</p>
+        </aside>
+      </div>
     </div>
-    <section class="section">
-undefined
-    </section>
-  </div>
-</main>
+  </main>
 
 
   <footer class="site-footer">
@@ -144,7 +235,7 @@ undefined
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
@@ -157,7 +248,7 @@ undefined
       <div class="footer-col">
         <h2 class="footer-heading">Explore</h2>
         <a href="/communities">Communities</a>
-        <a href="/demo">Live demo</a>
+        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
@@ -181,7 +272,7 @@ undefined
     </div>
   </footer>
 
-  <script src="/js/status.js"></script>
+  <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>

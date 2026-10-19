@@ -12,7 +12,7 @@ import { avatar } from '../components.js';
 import { State } from '../../../packages/store.js';
 import { menu, confirm, toast, sheet } from '../ui.js';
 import { mediaUrl } from '../../../packages/media.js';
-import { dayLabel, toDate, timeOfDay, fullTimestamp, fileSize } from '../../../packages/format.js';
+import { dayLabel, toDate, timeOfDay, fileSize } from '../../../packages/format.js';
 import realtime, { EVENTS } from '../../../packages/realtime.js';
 import { navigate, path } from '../../../packages/nav.js';
 import Api from '../../../packages/api.js';

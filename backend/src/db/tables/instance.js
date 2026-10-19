@@ -1,10 +1,33 @@
 // This deployment, rather than any one community's data.
 //
-// The public pages an editor can change, and the announcements the operator posts. Kept
-// apart because these are the tables an instance operator reasons about, and none of
-// them are reachable from a community id.
+// The public pages an editor can change, the announcements the operator posts,
+// and the devices this instance may reach a reader on. Kept apart because
+// these are the tables an instance operator reasons about, and none of them
+// are reachable from a community id.
 
 module.exports = (engine) => [
+
+  // The devices a reader has asked this instance to reach them on.
+  //
+  // A device belongs to one account on one instance. The token is the handle
+  // the push transport uses; it is the device's own secret and is not
+  // readable by anybody else, so the row is keyed by it rather than by an id
+  // the client has to remember separately.
+  //
+  // The instance origin is stored with it because a reader may be signed in to
+  // more than one instance from one device, and a token issued by one of them
+  // must never be offered to another.
+  `CREATE TABLE IF NOT EXISTS push_devices (
+      id          VARCHAR(64) PRIMARY KEY,
+      user_id     VARCHAR(64) NOT NULL,
+      token       VARCHAR(255) NOT NULL,
+      platform    VARCHAR(16) NOT NULL,
+      instance_origin VARCHAR(255),
+      created_at  VARCHAR(64) NOT NULL,
+      last_seen_at VARCHAR(64),
+      UNIQUE (user_id, token),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
 
   `CREATE TABLE IF NOT EXISTS pages (
       id          VARCHAR(64) PRIMARY KEY,

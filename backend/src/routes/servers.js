@@ -73,6 +73,19 @@ router.patch('/:id', resolveServer, auth.requireVerified, requirePerm('MANAGE_SE
   } catch (e) { serviceError(res, e); }
 });
 
+// The community's settings, as they stand.
+//
+// The PATCH route below writes these, so a member who can manage the
+// community has to be able to read them back. A member who cannot manage it
+// may read them too: the guidelines and the welcome text are what the
+// community shows its own members, and a member who cannot see them cannot
+// follow them.
+router.get('/:id/settings', resolveServer, requireMember, async (req, res, next) => {
+  try {
+    res.json(await servers.settings(req.server.id));
+  } catch (e) { next(e); }
+});
+
 // Community settings: welcome content, guidelines, notification defaults,
 // interaction settings. All server-side enforced with MANAGE_SERVER permission.
 router.patch('/:id/settings', resolveServer, auth.requireVerified, requirePerm('MANAGE_SERVER'), async (req, res, next) => {

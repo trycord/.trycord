@@ -96,3 +96,10 @@ backend/shots/
 # document for the developer AI on this machine, not a public advisory.
 # Publishing it would disclose live vulnerabilities.
 /REDTEAM-FINDINGS.md
+
+# Verification scratch: SQLite side files and temporary databases. The pattern
+# covers the .sqlite names as well as the .db ones, because a test instance
+# that names its file .sqlite leaves the same debris behind.
+*.sqlite-wal
+*.sqlite-shm
+backend/tmp/

@@ -6,9 +6,9 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { State, refreshMutes, serverById } from '../../packages/store.js';
-import { switchControl, fieldRow } from '../ui/primitives.js';
+import { switchControl, setSwitch, fieldRow } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold } from '../ui/page.js';
-import { errorToast, toast } from '../ui/overlays.js';
+import { errorToast } from '../ui/overlays.js';
 
 function channelLabel(channelId) {
   for (const [serverId, tree] of State.serverTree) {
@@ -101,8 +101,7 @@ export function notificationsView() {
       try {
         const wellbeing = await Api.wellbeing();
         if (wellbeing) {
-          const box = dndToggle.querySelector('input');
-          if (box) box.checked = !!wellbeing.dndEnabled;
+          setSwitch(dndToggle, !!wellbeing.dndEnabled);
           startSelect.value = String(Number(wellbeing.quietStart || 0));
           endSelect.value = String(Number(wellbeing.quietEnd || 0));
         }

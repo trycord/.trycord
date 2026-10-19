@@ -202,8 +202,13 @@ router.post('/:id/read', async (req, res, next) => {
   try {
     const out = await dms.markRead(req.user.id, req.params.id);
     const members = await dms.memberIds(req.params.id);
+    // Everybody in the conversation, including the reader. The reader's other
+    // devices are the ones that need to know: the conversation is read for
+    // the account, not for the tab that happened to open it, and a badge that
+    // stays lit on the phone because the conversation was read on the laptop
+    // is a badge that is lying.
     gateway.broadcastDm(
-      members.filter((id) => String(id) !== String(req.user.id)),
+      members,
       { type: EVENTS.DM_READ, conversationId: out.conversationId, userId: req.user.id, lastReadAt: out.lastReadAt }
     );
     res.json(out);

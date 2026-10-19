@@ -21,7 +21,7 @@ import TrycordConfig, { setApiUrl, resetBackend, backendUrl, backendSource } fro
 import { clearInstanceState } from '../../packages/store.js';
 import { disconnect } from '../../packages/realtime.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
-import { errorToast, toast } from '../ui/overlays.js';
+import { toast } from '../ui/overlays.js';
 import { navigate, path } from '../../packages/nav.js';
 
 const currentLabel = () => {

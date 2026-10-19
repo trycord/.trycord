@@ -382,6 +382,16 @@ router.delete('/:messageId', auth.requireVerified, async (req, res, next) => {
     // The search index loses the message with it. A deleted message that still
     // answered a search would be a message nobody can open.
     require('../services/search-index').removeMessage(msg.id).catch(() => {});
+    // A card converted from this message keeps a link back to it. The message
+    // is gone, so the link is too - a card pointing at a message that does not
+    // exist is a broken reference in the interface.
+    //
+    // The card's own source_message_id is cleared by the foreign key's ON
+    // DELETE SET NULL. The link table is polymorphic and has no foreign key,
+    // so it is cleaned here.
+    try {
+      await db.run("DELETE FROM card_links WHERE kind = 'message' AND target_id = ?", [msg.id]);
+    } catch { /* an instance without the workspace has no card links */ }
     uploads.removeFiles(fileRows.map((r) => r.id));
     broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_DELETED, id: msg.id, channel_id: ch.id });
     res.json({ ok: true });

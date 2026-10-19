@@ -17,13 +17,32 @@
 // then this deployment.
 
 const identity = require('./identity');
+const e2ee = require('./e2ee');
 const communities = require('./communities');
 const messaging = require('./messaging');
 const social = require('./social');
 const moderation = require('./moderation');
 const instance = require('./instance');
 const continuum = require('./continuum');
+const developer = require('./developer');
+const extensions = require('./extensions');
+const workspace = require('./workspace');
 
-const GROUPS = [identity, communities, messaging, social, moderation, instance, continuum];
+// e2ee sits next to identity because every table in it points at users(id)
+// and nothing in it points at anything else: the sessions, the prekeys and
+// the conversation keys all hang off a device, and a device hangs off an
+// account.
+//
+// The developer tables come last because they point at more than one thing:
+// a credential points at a user and, for an application, at the application
+// row that owns its token.
+//
+// The workspace tables come after everything they reference - servers, roles,
+// users, channels, messages - and before nothing, because nothing references
+// them yet.
+const GROUPS = [
+  identity, e2ee, communities, messaging, social, moderation, instance, continuum,
+  developer, extensions, workspace,
+];
 
 module.exports = (engine) => GROUPS.flatMap((group) => group(engine));

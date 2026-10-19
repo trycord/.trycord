@@ -15,7 +15,7 @@ import { mailConsolePanel } from './adminMail.js';
 
 // The value of one setting, edited by its own type. Booleans flip, enums pick,
 // numbers stay numbers; everything else is text.
-function settingField(setting, onSaved) {
+function settingField(setting, save) {
   const kind = setting.type || 'string';
   if (kind === 'bool') {
     return switchControl(!!setting.value, async (on) => save({ [setting.key]: on }), setting.label);
@@ -40,7 +40,20 @@ function settingField(setting, onSaved) {
   return input;
 }
 
-async function save(patch) {
+// The value the control holds, read the way its kind is written.
+function controlValue(control, setting) {
+  const field = control.tagName === 'SELECT' || control.tagName === 'INPUT'
+    ? control
+    : control.querySelector('[data-setting-key]') || control.querySelector('input');
+  if (!field) return '';
+  if (setting.type === 'number') {
+    const parsed = parseInt(field.value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return field.value;
+}
+
+async function save(patch, onDone) {
   try {
     await Api.updateInstanceSettings(patch);
     toast('Saved');
@@ -52,16 +65,19 @@ async function save(patch) {
       try {
         await Api.updateInstanceSettings(Object.assign({}, patch, { __confirm: true }));
         toast('Saved');
+        if (onDone) onDone();
         return;
       } catch (e2) { errorToast(e2); return; }
     }
     errorToast(e);
+    return;
   }
+  if (onDone) onDone();
 }
 
-function settingRow(setting) {
+function settingRow(setting, onDone) {
   const note = el('p', { class: 'settings-note' }, setting.description || '');
-  const control = settingField(setting, null);
+  const control = settingField(setting, (patch) => save(patch, onDone));
   return el('div', { class: 'settings-item' + (setting.pendingRestart ? ' settings-item--pending' : '') },
     el('div', { class: 'settings-item-main' },
       el('p', { class: 'settings-item-label' }, setting.label,
@@ -74,33 +90,35 @@ function settingRow(setting) {
         el('button', {
           class: 'btn btn--primary btn--sm', type: 'button',
           'aria-label': 'Save ' + setting.label,
-          onClick: () => {
-            const field = control.value !== undefined ? control : control.querySelector('input');
-            if (field && field.dataset) void field;
-            const value = field ? field.value : control.value;
-            void value;
-            const box = control;
-            void box;
-            const readFrom = control.tagName === 'SELECT' || control.tagName === 'INPUT'
-              ? control
-              : control.querySelector('[data-setting-key]') || control.querySelector('input');
-            const fieldValue = readFrom
-              ? (setting.type === 'number' ? (parseInt(readFrom.value, 10) || 0) : readFrom.value)
-              : control.value;
-            save({ [setting.key]: fieldValue });
-          },
-        }, 'Save'))
+          onClick: () => save({ [setting.key]: controlValue(control, setting) }, onDone),
+        }, 'Save'),
+        // A value the operator has changed can be put back to the default the
+        // instance shipped with. The setting is only resettable once it has
+        // been saved here, which is what the source says.
+        setting.source === 'stored'
+          ? el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            'aria-label': 'Reset ' + setting.label + ' to its default',
+            onClick: async () => {
+              try {
+                await Api.resetInstanceSetting(setting.key);
+                toast(setting.label + ' is back to its default');
+                if (onDone) onDone();
+              } catch (e) { errorToast(e); }
+            },
+          }, 'Reset')
+          : null)
       : null);
 }
 
-function categorySection(category) {
+function categorySection(category, onDone) {
   if (category.id === 'mail') {
     const consoleData = mailConsolePanel();
     // The panel fetches its providers and current mode itself; this view mounts
     // it directly, since it is painted in one step rather than mounted after.
     void consoleData.onMount();
     const rows = (category.settings || []).filter((s) => s.key !== 'mail.mode')
-      .map((setting) => settingRow(setting));
+      .map((setting) => settingRow(setting, onDone));
     return el('div', { class: 'fold fold--tight' },
       consoleData.node,
       rows.length ? card({ label: 'From address and footers', glyph: 'mail', body: el('div', { class: 'fold' }, rows) }) : null);
@@ -115,7 +133,7 @@ function categorySection(category) {
     label: category.label, glyph: 'settings',
     body: el('div', { class: 'fold' }, settings
       .filter((s) => !s.deploymentOnly)
-      .map((setting) => settingRow(setting))),
+      .map((setting) => settingRow(setting, onDone))),
     flush: false,
   });
 }
@@ -126,6 +144,11 @@ export function adminConfiguration() {
   let categories = [];
   let current = null;
 
+  const paint = () => {
+    if (!current) return;
+    stage.replaceChildren(categorySection(current, refresh));
+  };
+
   const pick = async (category) => {
     current = category;
     for (const button of nav.querySelectorAll('.cfg-nav__item')) {
@@ -134,7 +157,23 @@ export function adminConfiguration() {
     }
     stage.replaceChildren(el('p', { class: 'holdline' }, 'Reading the category'));
     await Promise.resolve(); // let the hold paint before the section is built
-    stage.replaceChildren(categorySection(category));
+    paint();
+  };
+
+  // After a value is saved the catalogue is read again, so the field shows the
+  // value that is actually in force rather than the one that was typed.
+  const refresh = async () => {
+    try {
+      const data = await Api.instanceSettings();
+      categories = (data && data.categories) || [];
+      const still = current ? categories.find((entry) => entry.id === current.id) : null;
+      if (still) {
+        current = still;
+        paint();
+      }
+    } catch (e) {
+      errorToast(e);
+    }
   };
 
   const paintNav = () => {

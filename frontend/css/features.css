@@ -658,12 +658,12 @@
   color: var(--brand); text-decoration: underline; font: inherit; font-size: var(--fs-sm);
 }
 .voice-dock__controls { display: flex; align-items: center; gap: var(--space-2); justify-content: flex-end; }
-.dock-btn--round {
+.dock-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 38px; height: 38px; border-radius: 999px;
   background: var(--panel-2); border: 1px solid var(--line-2); color: var(--text-1);
   cursor: pointer;
 }
+.dock-btn--round { width: 38px; height: 38px; border-radius: 999px; }
 .dock-btn--round:hover { background: var(--hover); }
 .dock-btn--round.is-off { color: var(--danger); border-color: var(--danger); }
 .dock-btn--round.is-off:hover { background: var(--panel-2); }
@@ -994,3 +994,100 @@
 /* -- anchor offset ----------------------------------------------------------- */
 
 .anchor { scroll-margin-top: var(--space-6); }
+
+/* -- the page editor --------------------------------------------------------- */
+/* One block of a page body, and the two ways of writing the same body. The
+   editor is a working surface: the blocks are stacked, each one named, and
+   the tools sit at the right of the name. */
+
+.pageblock {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.pageblock-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.pageblock-kind {
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.pageblock-body { display: flex; flex-direction: column; gap: var(--space-2); }
+.pageblock-row { display: flex; gap: var(--space-2); align-items: flex-start; }
+.pageblock-row > .input, .pageblock-row > .select { flex: 1 1 0; min-width: 0; }
+.pageblock-row > .select { flex: 0 0 140px; }
+.pageblock-items { display: flex; flex-direction: column; gap: var(--space-2); }
+.pageblock-item { display: flex; gap: var(--space-2); align-items: center; }
+.pageblock-item > .input { flex: 1 1 auto; min-width: 0; }
+
+.icon-btn--sm { width: 26px; height: 26px; }
+
+.page-source {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  min-height: 320px;
+}
+
+/* The preview is the server's own rendering of the body, shown in the reading
+   column a visitor gets. */
+.page-preview {
+  max-width: 62ch;
+  font-size: var(--fs-body);
+  line-height: 1.65;
+  color: var(--text-2);
+}
+.page-preview:empty { display: none; }
+.page-preview h2 { color: var(--text-1); margin: var(--space-6) 0 var(--space-2); }
+.page-preview h3 { color: var(--text-1); margin: var(--space-5) 0 var(--space-2); }
+.page-preview p { margin: 0 0 var(--space-3); }
+.page-preview p.lede { color: var(--text-2); font-size: var(--fs-body); }
+.page-preview ul, .page-preview ol { padding-left: var(--space-5); margin: 0 0 var(--space-3); }
+.page-preview li { margin-bottom: var(--space-1); }
+.page-preview a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
+.page-preview blockquote {
+  margin: var(--space-4) 0;
+  padding: var(--space-2) var(--space-4);
+  border-left: 3px solid var(--brand-line);
+}
+.page-preview pre {
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  overflow-x: auto;
+}
+.page-preview .draft-note {
+  background: var(--panel-3);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+}
+
+/* The comparison of a draft against the published page. */
+.pagediff {
+  font-family: var(--mono);
+  font-size: var(--fs-meta);
+  line-height: 1.6;
+  max-height: 60vh;
+  overflow: auto;
+}
+.pagediff-line { display: flex; gap: var(--space-2); white-space: pre-wrap; }
+.pagediff-mark { flex: none; width: 1ch; color: var(--text-3); }
+.pagediff-text { min-width: 0; }
+.pagediff-line--added { background: color-mix(in srgb, var(--success) 12%, transparent); }
+.pagediff-line--removed { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.pagediff-line--added .pagediff-mark { color: var(--success); }
+.pagediff-line--removed .pagediff-mark { color: var(--danger); }

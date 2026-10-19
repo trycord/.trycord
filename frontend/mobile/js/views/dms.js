@@ -7,7 +7,7 @@
 import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar, empty, loading, failure, badge } from '../components.js';
-import { State, dmPeer, nameOf, refreshDms, presenceOf } from '../../../packages/store.js';
+import { State, dmPeer, nameOf, refreshDms, presenceOf, on as onStore } from '../../../packages/store.js';
 import { path, navigate } from '../../../packages/nav.js';
 import { relativeTime } from '../../../packages/format.js';
 import Api from '../../../packages/api.js';
@@ -46,8 +46,13 @@ export function renderDms() {
     host,
   );
 
+  // A conversation read elsewhere clears its badge without a reload.
+  let ready = false;
+  const offDms = onStore('dms', () => { if (ready) paint(); });
+
   async function load() {
     host.replaceChildren(loading('Loading your conversations'));
+    ready = true;
     try {
       await refreshDms();
       paint();
@@ -91,7 +96,7 @@ export function renderDms() {
         updated ? el('span', { class: 'm-row__time' }, relativeTime(updated)) : null));
   }
 
-  return { node, head: { title: 'Messages' }, onMount: load };
+  return { node, head: { title: 'Messages' }, onMount: load, cleanup() { offDms(); } };
 }
 
 export function renderDm(ctx) {

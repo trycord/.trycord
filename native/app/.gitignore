@@ -1,0 +1,24 @@
+node_modules/
+.DS_Store
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+*.keystore
+!debug.keystore
+
+# iOS
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/DerivedData/
+
+# Metro
+.metro-health-check*
+/tmp/
+
+# Testing
+coverage/

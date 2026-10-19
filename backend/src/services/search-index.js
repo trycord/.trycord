@@ -134,6 +134,67 @@ async function find(query, options) {
     .map((row) => Object.assign({}, row, { matched_words: matched.get(row.id) || 0 }));
 }
 
+// Documents are searchable the same way messages are.
+//
+// A community document is indexed into document_search_words - the same shape
+// as the message index, with the community copied beside the words - so a
+// query cannot return a document the reader may not see. The permission check
+// lives in the index, exactly as it does for messages.
+async function findDocuments(query, options) {
+  const opts = options || {};
+  const terms = wordsOf(query);
+  if (!terms.length) return [];
+
+  const userId = opts.userId;
+  const serverId = opts.serverId || null;
+  const limit = Math.min(Math.max(Number(opts.limit) || 25, 1), 50);
+
+  const params = [];
+  const placeholders = terms.map(() => '?').join(', ');
+  for (const term of terms) params.push(term);
+
+  let sql = 'SELECT document_id, COUNT(*) AS matched FROM document_search_words'
+    + ' WHERE word IN (' + placeholders + ')';
+  if (serverId) { sql += ' AND server_id = ?'; params.push(serverId); }
+  sql += ' GROUP BY document_id';
+  if (userId) {
+    sql += ' HAVING SUM(CASE WHEN EXISTS ('
+      + 'SELECT 1 FROM server_members sm WHERE sm.server_id = document_search_words.server_id'
+      + ' AND sm.user_id = ?'
+      + ' AND sm.server_id = document_search_words.server_id'
+      + ') THEN 1 ELSE 0 END) > 0';
+    params.push(userId);
+  }
+  sql += ' ORDER BY matched DESC, document_id DESC LIMIT ' + (limit * 4);
+
+  let hits;
+  try {
+    hits = await db.all(sql, params);
+  } catch (e) {
+    // The document index is not there on an instance that has never had a
+    // document. A search that cannot find documents still finds messages.
+    return [];
+  }
+  if (!hits.length) return [];
+
+  const ids = hits.map((h) => h.document_id);
+  const rows = await db.all(
+    'SELECT d.id, d.server_id, d.space_id, d.title, d.updated_at, s.name AS server_name'
+    + ' FROM documents d JOIN servers s ON s.id = d.server_id'
+    + ' WHERE d.id IN (' + ids.map(() => '?').join(', ') + ')',
+    ids
+  );
+
+  const matched = new Map(hits.map((h) => [h.document_id, h.matched]));
+  const order = new Map(ids.map((id, i) => [id, i]));
+  return rows
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+    .map((row) => Object.assign({}, row, {
+      kind: 'document',
+      matched_words: matched.get(row.id) || 0,
+    }));
+}
+
 // Walks the messages that are not in the index yet and puts them in. It is
 // bounded, so it can be run again and again: each pass takes another slice.
 async function backfill(limit) {
@@ -195,4 +256,7 @@ async function backfillJob() {
   return out;
 }
 
-module.exports = { indexMessage, removeMessage, wordsOf, find, backfill, backfillJob, available };
+module.exports = {
+  indexMessage, removeMessage, wordsOf, find, findDocuments,
+  backfill, backfillJob, available,
+};

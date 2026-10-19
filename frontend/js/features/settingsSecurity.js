@@ -1,9 +1,15 @@
 // Settings: security.
 // Prove it is you, keep the door shut, know who is inside.
+//
+// Every change to the second factor is confirmed with the password, because
+// the server asks for it: a stolen session is not enough to take an account
+// over. The client sends what the endpoint reads, so a change that the server
+// would refuse is never attempted.
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
+import { applyToken } from '../../packages/store.js';
 import { head, card, row, blank, fault, fold } from '../ui/page.js';
 import { errorToast, toast, openDialog, confirmDialog } from '../ui/overlays.js';
 
@@ -11,7 +17,9 @@ export function securityView() {
   const sessionsList = el('div', { class: 'rowlist' });
   const twofaStatus = el('p', { class: 'form-error', role: 'status' }, 'Reading the second factor…');
   const codesBody = el('div', { class: 'anticipation-line' });
+  const twofaTools = el('div', { class: 'rowtools' });
   let recoveryCodes = null;
+  let twofaEnabled = false;
 
   // -- sessions ---------------------------------------------------------------
 
@@ -55,57 +63,152 @@ export function securityView() {
         recoveryCodes.join('\n')),
       el('button', {
         class: 'btn btn--default btn--sm', type: 'button',
-        onClick: async () => {
+        onClick: () => newRecoveryCodes(),
+      }, 'New codes'));
+  };
+
+  // The server issues a fresh set of recovery codes against the password. The
+  // codes themselves are shown once, so the dialog that mints them is also
+  // where they are read.
+  const newRecoveryCodes = () => {
+    const password = el('input', {
+      class: 'input', type: 'password', autocomplete: 'current-password',
+      'aria-label': 'Your password',
+    });
+    const dialog = openDialog({
+      title: 'New recovery codes',
+      sub: 'Each code signs you in once if you lose your authenticator. The old set stops working.',
+      body: el('form', {
+        class: 'fold',
+        onSubmit: async (event) => {
+          event.preventDefault();
           try {
-            const out = await Api.twoFactorRecoveryCodes();
+            const out = await Api.twoFactorRecoveryCodes({ password: password.value });
             recoveryCodes = (out && (out.codes || out.recoveryCodes)) || [];
             paintCodes();
-          } catch (e) { errorToast(e); }
+            dialog.close();
+            toast('New recovery codes issued');
+          } catch (error) {
+            errorToast(error);
+          }
         },
-      }, 'New codes'));
+      }, password, el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Issue codes')),
+    });
+    password.focus();
   };
 
   // -- enrolment ----------------------------------------------------------------
 
-  const enrol = async () => {
-    try {
-      const out = await Api.twoFactorSetup({});
-      const status = el('p', { class: 'form-error', role: 'status' }, out && out.qr
-        ? 'Scan it, then type the six-digit code from your app.'
-        : 'Type the six-digit code from your second factor.');
-      const setup = el('input', {
-        class: 'input', type: 'text', inputmode: 'numeric', maxlength: '6',
-        'aria-label': 'Type a six-digit code from your TOTP app',
-        placeholder: '123456',
-      });
-      const dialog = openDialog({
-        title: 'Enrol a second factor',
-        body: el('form', {
-          class: 'fold', onSubmit: async (event) => {
-            event.preventDefault();
-            try {
-              const done = await Api.twoFactorEnable({ code: setup.value.trim() });
-              if (done && done.ok !== false) {
-                twofaStatus.textContent = 'The second factor is active.';
-                recoveryCodes = done.recoveryCodes || done.codes || [];
-                paintCodes();
-                toast('Two-step is on');
-                dialog.close();
-              } else {
-                status.textContent = 'The code was not accepted.';
-              }
-            } catch (e) {
-              status.textContent = (e && e.message) || 'The code was not accepted.';
+  // Two steps in one dialog: the password, then the six digits. The secret is
+  // shown as text rather than a picture, because the server hands over a
+  // secret and a URI and no image.
+  const enrol = () => {
+    const password = el('input', {
+      class: 'input', type: 'password', autocomplete: 'current-password',
+      'aria-label': 'Your password',
+    });
+    const code = el('input', {
+      class: 'input', type: 'text', inputmode: 'numeric', maxlength: '6',
+      'aria-label': 'Six digits from your authenticator', placeholder: '123456',
+    });
+    const secret = el('code', { class: 'keyblock' });
+    const status = el('p', { class: 'form-error', role: 'status' });
+    let savedPassword = '';
+
+    const body = el('div', { class: 'fold' }, password, secret, code, status);
+    const submit = el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Continue');
+    const dialog = openDialog({
+      title: 'Enrol a second factor',
+      sub: 'Scan the secret in your authenticator app, then type the six digits it shows.',
+      body: el('form', {
+        class: 'fold',
+        onSubmit: async (event) => {
+          event.preventDefault();
+          submit.disabled = true;
+          try {
+            if (!savedPassword) {
+              const out = await Api.twoFactorSetup({ password: password.value });
+              savedPassword = password.value;
+              secret.textContent = (out && out.secret) || '';
+              submit.textContent = 'Turn on';
+              status.textContent = 'Type the six digits the app shows.';
+              code.focus();
+              return;
             }
-          },
+            const done = await Api.twoFactorEnable({ password: savedPassword, code: code.value.trim() });
+            recoveryCodes = (done && (done.recoveryCodes || done.codes)) || [];
+            paintCodes();
+            twofaEnabled = true;
+            paintTwoFactor();
+            dialog.close();
+            toast('Two-step is on');
+          } catch (error) {
+            status.textContent = (error && error.message) || 'That did not work.';
+          } finally {
+            submit.disabled = false;
+          }
         },
-          status,
-          out && out.qr ? el('img', { src: out.qr, alt: 'The QR code to scan', class: 'auth-qr' }) : null,
-          setup,
-          el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Confirm')),
-      });
-      setup.focus();
-    } catch (e) { errorToast(e); }
+      }, body, submit),
+    });
+    password.focus();
+  };
+
+  // Turning the factor off is confirmed with the password and a current code:
+  // the server wants both before it lets go of the secret.
+  const turnOff = () => {
+    const password = el('input', {
+      class: 'input', type: 'password', autocomplete: 'current-password',
+      'aria-label': 'Your password',
+    });
+    const code = el('input', {
+      class: 'input', type: 'text', inputmode: 'numeric', maxlength: '6',
+      'aria-label': 'Six digits from your authenticator', placeholder: '123456',
+    });
+    const status = el('p', { class: 'form-error', role: 'status' });
+    const dialog = openDialog({
+      title: 'Turn off two-step sign-in',
+      sub: 'Your password is the only key again. Every signed-in device is signed out.',
+      body: el('form', {
+        class: 'fold',
+        onSubmit: async (event) => {
+          event.preventDefault();
+          try {
+            await Api.twoFactorDisable({ password: password.value, code: code.value.trim() });
+            recoveryCodes = null;
+            twofaEnabled = false;
+            paintCodes();
+            paintTwoFactor();
+            dialog.close();
+            toast('Two-step sign-in is off');
+          } catch (error) {
+            status.textContent = (error && error.message) || 'That did not work.';
+          }
+        },
+      }, password, code, status,
+      el('button', { class: 'btn btn--danger btn--sm', type: 'submit' }, 'Turn off')),
+    });
+    password.focus();
+  };
+
+  // The controls the second factor offers depend on whether it is on.
+  const paintTwoFactor = () => {
+    twofaTools.replaceChildren(...(twofaEnabled
+      ? [
+        el('button', {
+          class: 'btn btn--default btn--sm', type: 'button',
+          onClick: newRecoveryCodes,
+        }, 'New recovery codes'),
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          onClick: turnOff,
+        }, 'Turn off two-step sign-in'),
+      ]
+      : [
+        el('button', {
+          class: 'btn btn--default btn--sm', type: 'button',
+          onClick: enrol,
+        }, 'Set up a second factor'),
+      ]));
   };
 
   return {
@@ -127,9 +230,14 @@ export function securityView() {
               return;
             }
             try {
-              await Api.changePassword({
-                password: inputs[0].value, newPassword: inputs[1].value,
+              const out = await Api.changePassword({
+                currentPassword: inputs[0].value, newPassword: inputs[1].value,
               });
+              // The server ends every session when the password changes and
+              // hands back a session for this one. Without taking it, the next
+              // request would be refused and the reader would be signed out by
+              // their own password change.
+              if (out && out.token) applyToken(out.token, out.user);
               toast('The password is changed');
               form.reset();
             } catch (e) {
@@ -140,24 +248,24 @@ export function securityView() {
         },
           el('input', {
             class: 'input', type: 'password', placeholder: 'Current password',
+            autocomplete: 'current-password',
             'aria-label': 'Current password',
           }),
           el('input', {
             class: 'input', type: 'password', placeholder: 'New password',
+            autocomplete: 'new-password',
             'aria-label': 'New password',
           }),
           el('input', {
             class: 'input', type: 'password', placeholder: 'New password again',
+            autocomplete: 'new-password',
             'aria-label': 'New password again',
           }),
           el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Change password')),
       }),
       card({
         label: 'Two-step sign-in', glyph: 'shield',
-        body: fold([twofaStatus, codesBody, el('button', {
-          class: 'btn btn--default btn--sm', type: 'button',
-          onClick: enrol,
-        }, 'Set up a second factor')]),
+        body: fold([twofaStatus, codesBody, twofaTools]),
       }),
       card({ label: 'Signed-in devices', glyph: 'monitor', body: sessionsList, flush: true }),
       card({
@@ -186,12 +294,14 @@ export function securityView() {
     onMount: async () => {
       try {
         const st = await Api.twoFactorStatus();
-        twofaStatus.textContent = st && st.enabled
+        twofaEnabled = !!(st && st.enabled);
+        twofaStatus.textContent = twofaEnabled
           ? 'A second factor is guarding this account.'
           : 'A second factor is not on yet - set one up below.';
       } catch (e) {
         twofaStatus.textContent = (e && e.message) || 'The second factor could not be read.';
       }
+      paintTwoFactor();
       paintCodes();
       await paintSessions();
     },

@@ -13,11 +13,15 @@ import { icon } from '../../packages/icons.js';
 import { avatar, channelIcon, countBadge, iconButton, serverMark } from '../ui/primitives.js';
 import { State, can, isMuted, nameOf, refreshMutes, refreshServers } from '../../packages/store.js';
 import { path, currentRoute, navigate } from '../../packages/nav.js';
-import { openMenu, attachContextMenu, confirmDialog, toast, errorToast } from '../ui/overlays.js';
+import { openMenu, openDialog, attachContextMenu, confirmDialog, toast, errorToast } from '../ui/overlays.js';
 import { globalPages } from '../../packages/registry.js';
 import { brandMark } from './frame.js';
 import { personContextMenu } from '../ui/person.js';
 import Api from '../../packages/api.js';
+import {
+  openChannelDialog, openCategoryDialog, createChannel, moveChannel,
+  channelMenuItems, categoryMenuItems,
+} from '../community/manage.js';
 
 // ---- shared pieces ---------------------------------------------------------
 
@@ -29,10 +33,14 @@ function headIdentity(node, actions) {
   );
 }
 
-function group(label, nodes) {
-  if (!nodes.length) return null;
+function group(label, nodes, action) {
+  if (!nodes.length && !action) return null;
   return el('div', { class: 'nav-group' },
-    label ? el('div', { class: 'nav-label' }, label) : null,
+    label
+      ? el('div', { class: 'nav-head' },
+        el('div', { class: 'nav-label' }, label),
+        action || null)
+      : null,
     nodes);
 }
 
@@ -159,6 +167,10 @@ function communityContext(serverId) {
   // and the question is asked of the permission system rather than of a cache
   // that nothing fills.
   const manages = can(serverId, 'MANAGE_SERVER');
+  // Creating a channel, a category or a role is a different permission from
+  // running the community, and a moderator can hold one without the other.
+  const managesChannels = can(serverId, 'MANAGE_CHANNELS');
+
   const actions = [
     manages ? iconButton('settings', {
       label: 'Community settings',
@@ -170,6 +182,20 @@ function communityContext(serverId) {
       onClick: (event) => openCommunityMenu(event, serverId, server),
     }),
   ];
+
+  // The menu a channel offers. The management entries are only here for a
+  // reader who may actually use them, and the whole menu opens at the pointer
+  // on a right-click as well as from the button.
+  const channelMenu = (channel) => channelMenuItems(serverId, channel, {
+    canManageChannels: managesChannels,
+    muted: isMuted(channel.id),
+    onOpen: () => navigate('/server/' + serverId + '/channel/' + channel.id),
+    onCopyLink: () => copyLink('/server/' + serverId + '/channel/' + channel.id),
+    onCopyTopic: () => copyValue(channel.topic),
+    onToggleMute: () => toggleMute(channel),
+    onMove: () => openMoveDialog(serverId, channel),
+    onPermissions: () => navigate('/server/' + serverId + '/settings/channels'),
+  });
 
   const channelItem = (channel) => {
     const route = '/server/' + serverId + '/channel/' + channel.id;
@@ -183,7 +209,7 @@ function communityContext(serverId) {
       isMuted(channel.id) ? el('span', { class: 'nav-muted', title: 'Muted' }, icon('bell', { size: 13 })) : null,
       channel.unread ? el('span', { class: 'nav-dot' }) : null,
     );
-    attachContextMenu(link, () => channelMenuItems(serverId, channel));
+    attachContextMenu(link, () => channelMenu(channel));
     return link;
   };
 
@@ -197,19 +223,93 @@ function communityContext(serverId) {
   const sections = [];
   const named = tree.categories.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
   for (const category of named) {
-    sections.push(group(category.name, (byCategory.get(category.id) || []).map(channelItem)));
+    // The control on the category's heading creates a channel in that
+    // category. It is there for a reader who may create channels and for
+    // nobody else - a control that cannot work should not be offered.
+    const add = managesChannels
+      ? el('button', {
+        class: 'nav-add',
+        type: 'button',
+        'aria-label': 'Create a channel in ' + category.name,
+        title: 'Create a channel in ' + category.name,
+        onClick: (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          createChannel(serverId, category.id);
+        },
+      }, icon('plus', { size: 14 }))
+      : null;
+
+    // The heading itself carries the category's menu, so a right-click on the
+    // name reaches the same actions the control does.
+    const heading = el('div', { class: 'nav-label' }, category.name);
+    attachContextMenu(heading, () => categoryMenuItems(serverId, category, {
+      canManageChannels: managesChannels,
+      onCreateChannel: () => createChannel(serverId, category.id),
+    }));
+
+    sections.push(group(category.name, (byCategory.get(category.id) || []).map(channelItem), add));
     byCategory.delete(category.id);
   }
   const loose = byCategory.get('') || [];
   const orphans = [];
   for (const [key, list] of byCategory) if (key !== '') orphans.push(...list);
   const uncategorised = loose.concat(orphans);
-  if (uncategorised.length) sections.push(group(named.length ? 'Other' : 'Channels', uncategorised.map(channelItem)));
+  if (uncategorised.length) {
+    sections.push(group(named.length ? 'Other' : 'Channels', uncategorised.map(channelItem)));
+  }
+
+  // A community with no channels at all still needs a way to make one.
+  if (managesChannels && !tree.channels.length) {
+    sections.push(el('div', { class: 'context-empty' },
+      'No channels yet.',
+      el('button', {
+        class: 'btn btn--default btn--sm', type: 'button',
+        onClick: () => createChannel(serverId, ''),
+      }, icon('plus', { size: 14 }), 'Create the first channel')));
+  }
+
+  // The two things a manager creates most, at the end of the column.
+  if (managesChannels) {
+    sections.push(el('div', { class: 'context-actions-row' },
+      el('button', {
+        class: 'btn btn--ghost btn--sm', type: 'button',
+        onClick: () => createChannel(serverId, ''),
+      }, icon('plus', { size: 14 }), 'Channel'),
+      el('button', {
+        class: 'btn btn--ghost btn--sm', type: 'button',
+        onClick: () => openCategoryDialog(serverId, {}),
+      }, icon('folder', { size: 14 }), 'Category')));
+  }
 
   return {
     head: headIdentity(communityIdentity(server), actions),
     body: sections.length ? sections : [el('div', { class: 'context-empty' }, 'No channels yet.')],
   };
+}
+
+// Move a channel into another category.
+function openMoveDialog(serverId, channel) {
+  const tree = State.serverTree.get(serverId) || { categories: [] };
+  const categories = tree.categories.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
+  const pick = async (categoryId) => {
+    await moveChannel(serverId, channel, categoryId);
+  };
+  const list = el('div', { class: 'rowlist' },
+    el('button', {
+      class: 'row row--button', type: 'button',
+      onClick: () => pick(null),
+    }, el('span', { class: 'row-title' }, 'No category')),
+    categories.map((category) => el('button', {
+      class: 'row row--button', type: 'button',
+      onClick: () => pick(category.id),
+    }, el('span', { class: 'row-title' }, category.name))),
+  );
+  openDialog({
+    title: 'Move ' + channel.name,
+    sub: 'The channel keeps its messages and its order.',
+    body: list,
+  });
 }
 
 function openCommunityMenu(event, serverId, server) {
@@ -242,17 +342,10 @@ async function leaveCommunity(serverId, server) {
 }
 
 // ---- a channel carries a menu too -------------------------------------------
-
-function channelMenuItems(serverId, channel) {
-  const muted = isMuted(channel.id);
-  const items = [
-    { header: (channel.type === 'voice' ? '' : '#') + channel.name },
-    { label: 'Copy link', icon: 'link', onSelect: () => copyLink('/server/' + serverId + '/channel/' + channel.id) },
-    { label: muted ? 'Unmute' : 'Mute', icon: 'bell', onSelect: () => toggleMute(channel) },
-  ];
-  if (channel.topic) items.push({ label: 'Copy topic', icon: 'copy', onSelect: () => copyValue(channel.topic) });
-  return items;
-}
+//
+// The menu itself is the shared one, in community/manage.js: the column and
+// the settings page draw the same entries for the same channel, and one
+// place decides what a moderator may do with it.
 
 async function toggleMute(channel) {
   const muted = isMuted(channel.id);

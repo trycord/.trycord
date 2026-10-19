@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- A debug build talks to the Metro development server over plain HTTP
+         on the developer's own machine, which the release build must not. -->
+    <application
+        android:usesCleartextTraffic="true"
+        tools:targetApi="28"
+        tools:ignore="GoogleAppIndexingWarning" />
+</manifest>

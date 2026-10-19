@@ -6,14 +6,13 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { nameOf } from '../../packages/store.js';
-import { avatar, switchControl, fieldRow } from '../ui/primitives.js';
+import { avatar, switchControl, setSwitch, fieldRow } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold } from '../ui/page.js';
 import { errorToast, toast } from '../ui/overlays.js';
 
 export function privacyView() {
+  const blocksList = el('div', { class: 'rowlist' });
   const reportsList = el('div', { class: 'rowlist' });
-
-  // I'll insert the card in the node array. Need to edit the node. Let me add card after Blocked.
   const saved = el('p', { class: 'form-error', role: 'status' });
   const selection = new Map();
 
@@ -33,34 +32,76 @@ export function privacyView() {
     } catch (e) { errorToast(e); }
   }, 'In the directory');
 
-  const body = el('div', { class: 'anticipation-line' }, holdBlock());
+  // The reach card holds the working state until the policy has been read, so
+  // the reader is not shown a guess while it loads.
+  const reachBody = el('div', { class: 'fold' }, el('p', { class: 'holdline' }, 'Reading your contact policy'));
 
-  function holdBlock() {
-    return el('p', { class: 'holdline' }, 'Reading your contact policy');
-  }
+  // The rows are built once, before the policy is read: the values the server
+  // gives are set on these very controls, so building them afterwards would
+  // throw the answer away.
+  const reachRows = [
+    scopePick('friendRequests', 'Friend requests', 'Who can ask to be your friend'),
+    scopePick('dms', 'Messages', 'Who can open a conversation with you'),
+    scopePick('presence', 'Presence', 'Who can tell when you are here'),
+  ];
+
+  const saveReach = el('button', {
+    class: 'btn btn--primary btn--sm', type: 'button',
+    onClick: async () => {
+      try {
+        await Api.setPrivacy({
+          friendRequests: selection.get('friendRequests').value,
+          dms: selection.get('dms').value,
+          presence: selection.get('presence').value,
+        });
+        saved.textContent = 'Saved';
+      } catch (e) { errorToast(e); }
+    },
+  }, 'Save reach');
 
   const paintBlocks = async () => {
-    const blocks = await Api.blocks();
-    const rows = Array.isArray(blocks) ? blocks : (blocks && blocks.items) || [];
-    blocksList.replaceChildren(...(rows.length ? rows.map((blocked) => row({
-      lead: avatar(blocked, { size: 'sm', rounded: true }),
-      title: nameOf(blocked) || blocked.username || 'Someone',
-      sub: 'Blocked',
-      side: el('button', {
-        class: 'btn btn--ghost btn--sm', type: 'button',
-        'aria-label': 'Unblock ' + (blocked.username || 'this person'),
-        onClick: async () => {
-          try {
-            await Api.unblockUser(blocked.id);
-            toast('Unblocked');
-            paintBlocks();
-          } catch (e) { errorToast(e); }
-        },
-      }, 'Unblock'),
-    })) : [blank({
-      glyph: 'ban', title: 'Nobody blocked',
-      text: 'Blocking starts on a person, in their profile.',
-    })]));
+    try {
+      const blocks = await Api.blocks();
+      const rows = Array.isArray(blocks) ? blocks : (blocks && blocks.items) || [];
+      blocksList.replaceChildren(...(rows.length ? rows.map((blocked) => row({
+        lead: avatar(blocked, { size: 'sm', rounded: true }),
+        title: nameOf(blocked) || blocked.username || 'Someone',
+        sub: 'Blocked',
+        side: el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Unblock ' + (blocked.username || 'this person'),
+          onClick: async () => {
+            try {
+              await Api.unblockUser(blocked.id);
+              toast('Unblocked');
+              paintBlocks();
+            } catch (e) { errorToast(e); }
+          },
+        }, 'Unblock'),
+      })) : [blank({
+        glyph: 'ban', title: 'Nobody blocked',
+        text: 'Blocking starts on a person, in their profile.',
+      })]));
+    } catch (e) {
+      blocksList.replaceChildren(fold([fault(e, null)]));
+    }
+  };
+
+  const paintReports = async () => {
+    try {
+      const reps = await Api.myReports();
+      const ritems = Array.isArray(reps) ? reps : (reps && (reps.items || reps.reports)) || [];
+      reportsList.replaceChildren(...(ritems.length ? ritems.map((r) => row({
+        lead: el('span', { class: 'role-dot' }, icon('flag', { size: 15 })),
+        title: r.reason || r.targetType || 'A report',
+        sub: r.status || r.createdAt || r.created_at || '',
+      })) : [blank({
+        glyph: 'flag', title: 'No reports filed',
+        text: 'Reports you raise appear here.',
+      })]));
+    } catch (e) {
+      reportsList.replaceChildren(fold([fault(e, null)]));
+    }
   };
 
   return {
@@ -72,25 +113,7 @@ export function privacyView() {
       }),
       card({
         label: 'Reach', glyph: 'compass',
-        body: fold([
-          scopePick('friendRequests', 'Friend requests', 'Who can ask to be your friend'),
-          scopePick('dms', 'Messages', 'Who can open a conversation with you'),
-          scopePick('presence', 'Presence', 'Who can tell when you are here'),
-          el('button', {
-            class: 'btn btn--primary btn--sm', type: 'button',
-            onClick: async () => {
-              try {
-                await Api.setPrivacy({
-                  friendRequests: selection.get('friendRequests').value,
-                  dms: selection.get('dms').value,
-                  presence: selection.get('presence').value,
-                });
-                saved.textContent = 'Saved';
-              } catch (e) { errorToast(e); }
-            },
-          }, 'Save reach'),
-          saved,
-        ]),
+        body: reachBody,
       }),
       card({
         label: 'Directory', glyph: 'users',
@@ -129,28 +152,14 @@ export function privacyView() {
           if (privacy && privacy[key]) select.value = privacy[key];
         }
         if (privacy && typeof privacy.discoverable === 'boolean') {
-          const box = discoverToggle.querySelector('input');
-          if (box) box.checked = privacy.discoverable;
+          setSwitch(discoverToggle, privacy.discoverable);
         }
-        body.replaceChildren();
-        await paintBlocks();
-        try {
-          const reps = await Api.myReports();
-          const ritems = Array.isArray(reps) ? reps : (reps && (reps.items || reps.reports)) || [];
-          reportsList.replaceChildren(...(ritems.length ? ritems.map((r) => row({
-            lead: el('span', { class: 'role-dot' }, icon('flag', { size: 15 })),
-            title: r.reason || r.targetType || 'A report',
-            sub: r.status || r.createdAt || r.created_at || '',
-          })) : [blank({
-            glyph: 'flag', title: 'No reports filed',
-            text: 'Reports you raise appear here.',
-          })]));
-        } catch (e) {
-          reportsList.replaceChildren(fold([fault(e, null)]));
-        }
+        reachBody.replaceChildren(...reachRows, saveReach, saved);
       } catch (e) {
-        body.replaceChildren(fold([fault(e, null)]));
+        reachBody.replaceChildren(fold([fault(e, null)]));
       }
+      await paintBlocks();
+      await paintReports();
     },
     cleanup() {},
   };

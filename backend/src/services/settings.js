@@ -479,6 +479,13 @@ const SCHEMA = [
     live: false,
   },
   {
+    key: 'dashboard.mode', env: 'DASHBOARD_MODE', type: 'string', default: 'bundled',
+    allowed: ['bundled', 'separate'],
+    category: 'deployment', label: 'Dashboard deployment',
+    description: 'Where the administrative console is served. "bundled" serves it from the main application; "separate" runs it as its own service that talks to the API over HTTP. The environment variable decides at startup and an unusable value stops the boot rather than being ignored. Applied when the process next starts.',
+    live: false,
+  },
+  {
     key: 'cpu.worker_count', env: 'JOBS_WORKERS', type: 'integer', default: 0,
     category: 'limits', label: 'CPU worker count',
     description: 'Number of background job workers the job system runs. 0 means auto: half the logical CPUs, at least one, capped at eight. Applied when the process next starts.',
@@ -525,7 +532,17 @@ const SECRETS = new Set([
 //
 // The shape stays: the settings API returns this list and the interface renders
 // it as a read-only section, so a future entry has somewhere to go.
-const DEPLOYMENT_ONLY = [];
+//
+// The dashboard's mode is here, and here rather than among the ordinary
+// settings, for a reason that is not tidiness. The separate dashboard service
+// has no database of its own - it is a presentation surface for the main
+// instance - so it cannot read a value saved here. If an administrator could
+// save "separate" in the console while the process kept running "bundled",
+// the console would report a mode that is not in force, and the two processes
+// would disagree about which deployment they are part of. The environment is
+// the authority for this one, and the console shows the deployment's choice
+// rather than offering a different one.
+const DEPLOYMENT_ONLY = ['dashboard.mode'];
 
 const BY_KEY = new Map(SCHEMA.map((s) => [s.key, s]));
 

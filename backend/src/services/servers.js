@@ -119,6 +119,31 @@ async function detail(serverId, userId, perms) {
   return withAccess(row, userId, perms);
 }
 
+// The community's own settings, as they stand.
+//
+// The PATCH route writes these, and a setting that can be written but not
+// read is a setting the interface cannot show: the box is empty, the
+// operator types what they think is there, and the write replaces whatever
+// was actually there. They are in the community's detail rather than in the
+// community's list, because a list of communities does not need every
+// community's rules in it.
+async function settings(serverId) {
+  const row = await db.get(
+    `SELECT welcome_content, welcome_enabled, guidelines,
+            notification_defaults, interaction_settings
+     FROM servers WHERE id = ?`,
+    [serverId]
+  );
+  if (!row) return null;
+  return {
+    welcomeContent: row.welcome_content || '',
+    welcomeEnabled: !!row.welcome_enabled,
+    guidelines: row.guidelines || '',
+    notificationDefaults: row.notification_defaults || '',
+    interactionSettings: row.interaction_settings || '',
+  };
+}
+
 async function mine(userId) {
   const rows = await db.all(
     `SELECT ${LIST_COLS} FROM servers s
@@ -240,4 +265,4 @@ async function transferOwnership(serverId, actorId, targetUserId) {
   });
 }
 
-module.exports = { create, detail, mine, update, remove, transferOwnership };
+module.exports = { create, detail, settings, mine, update, remove, transferOwnership };

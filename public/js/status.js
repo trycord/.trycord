@@ -1,3 +1,22 @@
+// The status page's live checks.
+//
+// Four rows, four questions, and the answer to each comes from a different
+// origin than the last:
+//
+//   This website  - did the web server that served this page answer?
+//   Application API - is the process that answers the app running?
+//   Database      - does the instance's own health answer about its database?
+//   Web app       - did the server find the client it was told to serve?
+//
+// The last three are asked of the API, not of the page. A relative '/health' on
+// a deployment where the site and the API are different origins asks the site,
+// which has no health endpoint, and the page then reports a healthy instance as
+// unavailable. So the API's address is resolved the way the rest of the site
+// resolves it, and the probes go there.
+//
+// The first row is deliberately the other way round: it asks the origin that
+// served this page, because that is the one thing this page can check for
+// itself.
 (function () {
   'use strict';
 
@@ -35,14 +54,41 @@
     el.textContent = LABEL[state];
   }
 
-  function probe(path) {
-    return fetch(path, { cache: 'no-store', headers: { Accept: 'application/json' } })
+  // The API this instance runs. The site's own resolver answers it, so the
+  // status page and the directory cannot disagree about which API they are
+  // talking to.
+  function apiBase() {
+    var Api = window.TrycordApi;
+    if (Api && typeof Api.apiBase === 'function') {
+      return Api.apiBase().catch(function () { return location.origin; });
+    }
+    return Promise.resolve(location.origin);
+  }
+
+  function probe(url) {
+    return fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } })
       .then(function (res) {
         return res.text().then(function (text) {
           var data = null;
           try { data = JSON.parse(text); } catch (e) { data = null; }
           return { reached: true, ok: res.ok, status: res.status, data: data };
         });
+      })
+      .catch(function () {
+        return { reached: false, ok: false, status: 0, data: null };
+      });
+  }
+
+  // The website's own origin. A HEAD is enough: the question is whether the
+  // server answered, not what it would have said.
+  function probeSite() {
+    var url = String(location.origin || '').replace(/\/+$/, '') + '/';
+    return fetch(url, { method: 'HEAD', cache: 'no-store' })
+      .then(function (res) {
+        // Any answer at all means the web server is up. A 404 still means it
+        // answered; a 5xx means it answered and is broken.
+        if (res.status >= 500) return { reached: true, ok: false, status: res.status, data: null };
+        return { reached: true, ok: true, status: res.status, data: null };
       })
       .catch(function () {
         return { reached: false, ok: false, status: 0, data: null };
@@ -62,33 +108,42 @@
   }
 
   function runLocal(extraNote) {
-    var startedAt = new Date();
     if (tbody && staticRows) tbody.innerHTML = staticRows;
     set('site', 'unknown');
     set('api', 'unknown');
     set('db', 'unknown');
     set('app', 'unknown');
 
-    set('site', 'ok');
+    return apiBase().then(function (base) {
+      var api = String(base || '').replace(/\/+$/, '');
+      return Promise.all([
+        probeSite(),
+        probe(api + '/health'),
+        probe(api + '/api/health'),
+      ]);
+    }).then(function (out) {
+      var site = out[0];
+      var health = out[1];
+      var detail = out[2];
 
-    return Promise.all([probe('/health'), probe('/api/health')]).then(function (out) {
-      var health = out[0];
-      var api = out[1];
+      if (!site.reached) set('site', 'unknown');
+      else if (site.ok) set('site', 'ok');
+      else set('site', 'bad');
 
       if (!health.reached) set('api', 'unknown');
       else if (health.ok && health.data && health.data.ok === true) set('api', 'ok');
       else set('api', 'bad');
 
-      if (!api.reached || !api.data) {
+      if (!detail.reached || !detail.data) {
         set('db', 'unknown');
         set('app', 'unknown');
       } else {
-        if (api.data.db === 'ok') set('db', 'ok');
-        else if (api.data.db === 'unreachable') set('db', 'bad');
+        if (detail.data.db === 'ok') set('db', 'ok');
+        else if (detail.data.db === 'unreachable') set('db', 'bad');
         else set('db', 'unknown');
 
-        if (api.data.client === true) set('app', 'ok');
-        else if (api.data.client === false) set('app', 'warn');
+        if (detail.data.client === true) set('app', 'ok');
+        else if (detail.data.client === false) set('app', 'warn');
         else set('app', 'unknown');
       }
 

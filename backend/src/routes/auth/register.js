@@ -6,7 +6,7 @@ const recovery = require('../../auth/recovery');
 
 const db = require('../../db');
 const { fail, serviceError } = require('../../errors');
-const { now, uuid, sign, signWithJti, secret } = require('../../util');
+const { now, uuid } = require('../../util');
 const rateLimit = require('../../middleware/ratelimit');
 const { TERMS_VERSION, PRIVACY_VERSION } = require('../../legal');
 const { checkPassword, BCRYPT_COST } = require('../../auth/passwords');
@@ -72,11 +72,22 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
     await enforcement.ensureListedAdmin(id, name);
     // A pending account gets a token so it can see the waiting screen, which is
     // the only thing that token can reach. Everything else refuses it.
-    const token = sign({ id, username: name });
-    res.json({
-      token,
+    //
+    // The session is issued through the one shared path, so the session that
+    // registration creates is recorded like any other: it appears in the
+    // account's own list of signed-in devices and can be ended on its own.
+    // Registration used to mint a token directly, which produced a session the
+    // Security page could not show and could not revoke.
+    const { issued } = require('./issued');
+    issued(res, {
+      id,
+      username: name,
+      display_name: String(displayName || name).slice(0, 32),
+      created_at: now(),
+      session_version: 0,
+    }, req, {
       pendingApproval: !!awaitingApproval,
-      user: { id, username: name, displayName: displayName || name, email: email || null, emailVerified: false, createdAt: now() },
+      user: { email: email || null, emailVerified: false },
     });
   } catch (e) { next(e); }
 });

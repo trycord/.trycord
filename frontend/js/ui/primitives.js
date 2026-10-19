@@ -120,13 +120,33 @@ export function countBadge(count) {
   return el('span', { class: 'count-badge' }, count > 99 ? '99+' : String(count));
 }
 
+// A switch. Its state is the attribute, not a value held in a closure: a
+// closure that captured the state at the moment the control was built could
+// only ever report the same answer, so the switch could be turned on but
+// never off.
 export function switchControl(checked, onChange, label) {
-  return el('button', {
+  const node = el('button', {
     class: 'switch', type: 'button', role: 'switch',
     'aria-checked': String(!!checked),
     'aria-label': label || undefined,
-    onClick: () => onChange(!checked),
   });
+  node.addEventListener('click', () => {
+    const next = node.getAttribute('aria-checked') !== 'true';
+    node.setAttribute('aria-checked', String(next));
+    onChange(next);
+  });
+  return node;
+}
+
+// Put a switch where the server says it is, without pretending it was
+// pressed: a control that shows a state nobody set is a control that lies.
+export function setSwitch(control, value) {
+  if (!control) return;
+  control.setAttribute('aria-checked', String(!!value));
+}
+
+export function switchValue(control) {
+  return !!control && control.getAttribute('aria-checked') === 'true';
 }
 
 // The label / description / control row every settings surface arranges itself
@@ -146,5 +166,6 @@ export function spinner() {
 
 export default {
   avatar, serverMark, bannerNode, channelIcon, channelName,
-  iconButton, badge, countBadge, switchControl, fieldRow, spinner,
+  iconButton, badge, countBadge, switchControl, setSwitch, switchValue,
+  fieldRow, spinner,
 };

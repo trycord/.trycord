@@ -1,0 +1,91 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+# Firebase is only wired in when a project has been configured for this
+# application. Without it the app builds and runs, and push notifications are
+# simply unavailable.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+}
+
+react {
+    // The root of the React Native project, used by the codegen.
+    root = file("../../")
+    reactNativeDir = file("../../node_modules/react-native")
+    codegenDir = file("../../node_modules/@react-native/codegen")
+    cliFile = file("../../node_modules/react-native/cli.js")
+}
+
+def enableProguardInReleaseBuilds = false
+def jscFlavor = 'org.webkit:android-jsc:+'
+def isHermesEnabled = (findProperty("hermesEnabled") ?: "true").toBoolean()
+
+# A release build is signed with the developer's own key. The properties live
+# in android/keystore.properties, which is not in the repository.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "dev.trycord.app"
+
+    defaultConfig {
+        applicationId "dev.trycord.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "3.0.0"
+    }
+
+    signingConfigs {
+        debug {
+            // The Android Gradle plugin generates and uses the standard debug
+            // keystore, so no key file is kept in the repository.
+        }
+        if (hasReleaseKeystore) {
+            release {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+
+    if (isHermesEnabled) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+}

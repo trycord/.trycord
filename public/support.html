@@ -52,7 +52,7 @@
             </div>
             <div class="nav-menu-foot">
               <p>Private, self-hostable community messaging.</p>
-              <a class="text-link" href="/demo">Try the live demo</a>
+              <a class="text-link" href="/demo">Try the demo</a>
             </div>
           </div>
         </div>
@@ -64,7 +64,7 @@
           </button>
           <div class="nav-menu">
             <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
-            <a href="/demo"><strong>Live demo</strong><span>Try Trycord without an account.</span></a>
+            <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
           </div>
         </div>
 
@@ -101,7 +101,7 @@
           <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
           <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
         </button>
-        <a class="btn btn-primary btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
     </div>
   </header>
@@ -113,68 +113,126 @@
         <h1>Support and community</h1>
         <p class="lede">
           Trycord is software you run yourself, so the person who can fix most
-          problems is the operator of the instance you are on. This page explains
-          which problem belongs to whom, and where the community talks.
+          problems is the operator of the instance you are on. This page
+          explains which problem belongs to whom, and where the rest of the
+          community talks.
         </p>
       </div>
       <div class="prose-layout">
         <article class="prose">
           <!-- page:begin -->
-          <h2>Start here: which instance are you on?</h2>
+          <div class="draft-note" role="note">
+            <strong>Legal review required before publication.</strong> This
+            document comes from the Trycord project as a starting point for an
+            instance. It is not legal advice, and nobody has reviewed it for the
+            instance serving it. The fields marked <code>OPERATOR</code> are
+            facts only the operator can supply: the address for support, the
+            address for privacy requests, the address for formal notices, and
+            any response times the operator commits to. Fill them in, and have
+            a qualified lawyer read the result, before presenting this
+            document as binding.
+          </div>
+          <p class="small muted">
+            <strong>Version:</strong> <code>1.0</code> &middot;
+            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
+            <strong>Effective on this instance:</strong>
+            <span class="op-field" data-op="effective-date">OPERATOR: the date this support policy takes effect on this instance</span>
+          </p>
+
+          <h2>1. Start here: which instance are you on?</h2>
           <p>This decides who can actually fix your problem.</p>
           <ul>
             <li>
-              <strong>An official instance</strong>, run by the project or a partner
-              and listed in the app. One organisation operates all of them, so you
-              can escalate straight to us. See the
+              <strong>An official instance</strong>, run by the project or by a
+              partner and listed in the app. One party operates all of them, so
+              you can escalate straight to that party. See the
               <a href="/instances-terms">official instance terms</a>.
             </li>
             <li>
-              <strong>Your own, or a community's</strong>, run by whoever set it up.
-              They are the operator, they control the data, and they are the ones who
-              can change anything.
+              <strong>Your own, or a community's</strong>, run by whoever set
+              it up. They are the operator, they control the data, and they are
+              the only people who can change anything.
             </li>
           </ul>
           <p>
-            Not sure? The instance's name and owner are shown in the app, and
-            self-hosted instances usually name their own admin contact.
+            If you are not sure, the instance's name and owner are shown in the
+            application, and self-hosted instances usually publish an admin
+            contact of their own.
           </p>
 
-          <h2>Account, community, or content problem</h2>
+          <h2>2. An account, community or content problem</h2>
           <p>
-            A ban, a timeout, a deleted message, a role you think you should have, a
-            channel you cannot see. This is moderation, and it is the
-            <strong>instance operator or the community moderators</strong>, not the
-            project. They can undo what they did; we cannot.
+            A ban, a timeout, a deleted message, a role you think you should
+            have, a channel you cannot see: this is moderation, and it belongs
+            to the <strong>instance operator or the community moderators</strong>,
+            not to the project. They can undo what they did. The project cannot,
+            because it does not run your instance.
           </p>
           <p>
-            Report it in the app where you can, or contact the operator directly.
-            <span class="op-field" data-op="support-contact">OPERATOR: your contact address</span>
+            Report it in the application where you can, or contact the
+            operator at
+            <span class="op-field" data-op="support-contact">OPERATOR: the address for support requests on this instance</span>.
           </p>
 
-          <h2>Appealing a moderation decision</h2>
+          <h2>3. Appealing a decision</h2>
           <p>
-            If an account, community, or message was actioned, you can appeal. Start
-            at the <a href="/app/support/appeals/new">appeal form</a>.
+            If an account, a community or a message was actioned, you can
+            appeal. Start at the
+            <a href="/app/support/appeals/new" data-app-link="support/appeals/new">appeal form</a>.
           </p>
           <ul>
             <li>You need the action ID from the enforcement notice.</li>
-            <li>You do <strong>not</strong> need to be signed in to submit an appeal. Being banned should not stop you appealing.</li>
-            <li>Signed-in users can review past decisions under <a href="/app/support/appeals">My appeals</a>.</li>
+            <li>You do <strong>not</strong> need to be signed in. Being banned should not stop you appealing.</li>
+            <li>Signed-in users can review past decisions under <a href="/app/support/appeals" data-app-link="support/appeals">My appeals</a>.</li>
             <li>On an official instance, appeals are reviewed centrally, so a community you were removed from cannot refuse to hear you.</li>
-            <li>Appeals are reviewed by a person. Expect a real answer, not an autoresponder.</li>
+            <li>Appeals are read by a person. Expect a real answer, not an autoresponder.</li>
           </ul>
-
-          <h2>Talk to the community</h2>
           <p>
-            For questions, ideas, and the kind of help that is easier as a
-            conversation, the project runs a Discord server:
-            <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">discord.gg/dSF7eqsJuP</a>.
-            It is the same community the issues and the roadmap come from, and it is
-            a good place to ask before you file something.
+            Where the action was taken because content was illegal, or because
+            a law required it, there may be no appeal, and the operator may not
+            be able to explain the decision in full. The
+            <a href="/trust-and-safety">Trust and Safety</a> page says more
+            about that.
           </p>
 
-          <h2>Something is broken</h2>
+          <h2>4. Reporting abuse, and anything involving a child</h2>
+          <p>
+            Abuse of a person, of a community, or of the service is reported to
+            the operator at
+            <span class="op-field" data-op="support-report-contact">OPERATOR: the address for abuse reports on this instance</span>.
+            The rules that apply are in the
+            <a href="/guidelines">acceptable use rules</a>.
+          </p>
+          <p>
+            Anything involving the sexual exploitation of a child is treated as
+            urgent and goes to a named person:
+            <span class="op-field" data-op="support-csam-contact">OPERATOR: the contact for child safety reports on this instance</span>.
+            Report it to the operator and, where the law requires it, to the
+            authority in the country where it happened. Do not forward or keep
+            copies of the material.
+          </p>
+          <p>
+            The <a href="/trust-and-safety">Trust and Safety</a> page describes
+            what the operator does with a report, and what happens to the
+            account and to any bot or integration involved.
+          </p>
+
+          <h2>5. Your data, or a legal request</h2>
+          <p>
+            Access, export, correction and deletion are handled by the
+            <strong>operator of your instance</strong>, because they are the
+            data controller. If you are self-hosting, that is you. The
+            <a href="/privacy">Privacy Policy</a> says what is held, for how
+            long, and what the process is.
+          </p>
+          <p>
+            A privacy request goes to
+            <span class="op-field" data-op="support-privacy-contact">OPERATOR: the address for privacy requests on this instance</span>.
+            A formal legal notice goes to
+            <span class="op-field" data-op="support-notices">OPERATOR: the address for formal notices on this instance</span>.
+          </p>
+
+          <h2>6. Something is broken</h2>
           <p>Work down this list; it finds the cause most of the time.</p>
           <ol>
             <li>
@@ -182,65 +240,56 @@
               degraded, nothing you do locally will help.
             </li>
             <li>
-              Reload, and try a private window. A stale cached build or a stuck
-              service worker causes a surprising share of "the app is broken"
-              reports.
+              Reload, and try a private window. A stale cached build or a
+              stuck service worker causes a surprising share of "the app is
+              broken" reports.
             </li>
             <li>
-              If the desktop app misbehaves, update it. It does not auto-update
-              mid-session, so an old build against a new server is a common cause of
-              odd failures.
+              If the desktop app misbehaves, update it. It does not
+              auto-update mid-session, so an old build against a new server is
+              a common cause of odd failures.
             </li>
             <li>
               Still stuck? Report it on
               <a href="https://github.com/trycord/.trycord/issues" rel="noopener">GitHub</a>.
-              Include the instance URL, what you expected, what happened, and your
-              app version, from <a href="/app/settings/updates">Settings, Updates</a>.
+              Include the instance URL, what you expected, what happened, and
+              your app version, from <a href="/app/settings/updates" data-app-link="settings/updates">Settings, Updates</a>.
             </li>
           </ol>
 
-          <h2>Found something wrong on this site?</h2>
+          <h2>7. Talking to other people</h2>
           <p>
-            If a page here says something the product does not do, or a self-hosting
-            step does not work, that is worth reporting too. The documentation ships
-            with the code, so an issue is the right place.
+            For questions, ideas, and the kind of help that is easier as a
+            conversation, the project runs a Discord server:
+            <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">discord.gg/dSF7eqsJuP</a>.
+            It is the same community the issues and the roadmap come from, and
+            it is a good place to ask before you file something.
+          </p>
+          <p>
+            The Discord is not the support route for an instance, and it is not
+            a place to report abuse, child safety concerns or legal requests.
+            Those go to the operator, as above.
           </p>
 
-          <h2>Privacy, your data, or a legal request</h2>
+          <h2>8. Something wrong on this website</h2>
           <p>
-            Access, export, correction, and deletion are handled by the
-            <strong>operator of your instance</strong>, because they are the data
-            controller. If you are self-hosting, that is you. See the
-            <a href="/privacy">Privacy Policy</a> for what is held and for how long.
-          </p>
-          <p>
-            A request about an official instance can go to
-            <span class="op-field" data-op="support-privacy-contact">OPERATOR: the privacy contact for official instances</span>.
-            Formal legal notices go to
-            <span class="op-field" data-op="support-notices">OPERATOR: your address for formal legal notices</span>.
+            If a page here says something the product does not do, or a
+            self-hosting step does not work, that is worth reporting too. The
+            documentation ships with the code, so an issue is the right place.
           </p>
 
-          <h2>Security report</h2>
+          <h2>9. What to put in a report</h2>
           <p>
-            Found a vulnerability? Read the <a href="/security">security page</a>
-            first, then follow its reporting route. Please do not test against
-            instances that have not agreed to it.
+            A report that says what happened, where, when, and who was
+            involved is usually enough to act on. Where you can, add the
+            message ID, the channel, the account, and a screenshot. Do not
+            include material that is itself illegal to hold, and do not send
+            it to a public issue tracker.
           </p>
-
-          <h2>Still stuck?</h2>
           <p>
-            Tell us what you tried and what happened. The most useful reports are
-            short and specific: which instance, which action, what you expected, what
-            you saw instead. "It does not work" is much harder to act on than
-            "scrolling the member list freezes the tab after about 200 rows".
+            Response times on this instance:
+            <span class="op-field" data-op="support-response">OPERATOR: the response times this instance commits to, or a statement that it does not commit to any</span>.
           </p>
-
-          <div class="draft-note" role="note">
-            <strong>Operator note.</strong> Every instance serves this page, so it
-            stays generic. Anyone running one can edit it in Admin, or edit the file
-            <code>public/support.html</code>, to add their own address, email, or
-            support hours where the placeholders appear.
-          </div>
           <!-- page:end -->
         </article>
         <aside class="toc" aria-label="On this page">
@@ -263,7 +312,7 @@
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-sm" href="/app/">Open the app</a>
+        <a class="btn btn-sm" href="/app/" data-app-link>Open the app</a>
       </div>
       <div class="footer-col">
         <h2 class="footer-heading">Product</h2>
@@ -276,7 +325,7 @@
       <div class="footer-col">
         <h2 class="footer-heading">Explore</h2>
         <a href="/communities">Communities</a>
-        <a href="/demo">Live demo</a>
+        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </div>
       <div class="footer-col">
@@ -300,6 +349,7 @@
     </div>
   </footer>
 
+  <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>

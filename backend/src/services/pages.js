@@ -186,8 +186,13 @@ async function unpublish({ route, actorId }) {
 async function revisions({ route, limit } = {}) {
   const row = await ensureRow(route);
   const cap = Math.min(parseInt(limit, 10) || 50, 200);
+  // The body travels with the revision, because a revision list that cannot
+  // be compared against another revision is a list of dates. It is a list of
+  // whole documents, so it is bounded by the cap above rather than by the
+  // size of one document.
   return db.all(
-    'SELECT r.id, r.revision, r.title, r.state, r.author_id, r.created_at FROM page_revisions r WHERE r.page_id = ? ORDER BY r.revision DESC LIMIT ' + cap,
+    'SELECT r.id, r.revision, r.title, r.state, r.author_id, r.created_at, r.body'
+    + ' FROM page_revisions r WHERE r.page_id = ? ORDER BY r.revision DESC LIMIT ' + cap,
     [row.id]
   );
 }
