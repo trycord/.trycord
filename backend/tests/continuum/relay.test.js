@@ -231,10 +231,10 @@ test('a community relays between two instances', async (t) => {
   await t.test('a private community produces no outbound event', async () => {
     const priv = await adminA.post('/api/servers', { name: 'Private Community' });
     assert.equal(priv.status, 200, JSON.stringify(priv.data));
-    const posted = await memberA.post('/api/channels/' + priv.data.channelId + '/messages', {
+    const posted = await adminA.post('/api/channels/' + priv.data.channelId + '/messages', {
       content: 'words that stay here',
     });
-    assert.equal(posted.status, 200);
+    assert.equal(posted.status, 200, JSON.stringify(posted.data));
 
     // Give the feed time to notice, and prove it published nothing.
     await sleep(1200);
@@ -260,11 +260,10 @@ test('a community relays between two instances', async (t) => {
     });
     assert.equal(restricted.status, 200, JSON.stringify(restricted.data));
 
-    const denied = await adminA.put(
-      '/api/servers/' + communityId + '/channels/' + restricted.data.id + '/overrides/SEND_MESSAGES',
-      { effect: 'deny' }
+    const denied = await a.modules.permissions.setOverride(
+      'channel_permission_overrides', restricted.data.id, 'SEND_MESSAGES', 'deny'
     );
-    assert.equal(denied.status, 200, JSON.stringify(denied.data));
+    assert.equal(denied.effect, 'deny');
 
     // The owner may still post there - ownership grants every permission -
     // and the message still may not leave: the channel is not one the

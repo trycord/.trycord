@@ -13,7 +13,10 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { start } = require('./support');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { start, writeRegistry, useMirror } = require('./support');
 
 test('the extension sandbox', async (t) => {
   const { close } = await start();
@@ -136,6 +139,16 @@ test('the extension sandbox', async (t) => {
     assert.match(result.output, /there is no action called "rm.rf"/);
   });
 
+  await t.test('an extension that allocates without bound is stopped by the memory ceiling', async () => {
+    const result = await sandbox.run({
+      code: 'const a = []; while (true) { a.push(new Array(500000).fill("x")); }',
+      host: async () => ({ ok: true }),
+      limits: { timeoutMs: 30000, memoryMb: 32 },
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /memory limit|heap out of memory/);
+  });
+
   await t.test('the extension can call the instance, and the answer comes back', async () => {
     const budget = { limit: 10, used: 0, consume() { this.used += 1; } };
     const host = bridge.createHost({ grants: new Set(), budget, ctx: {} });
@@ -150,5 +163,61 @@ test('the extension sandbox', async (t) => {
     assert.equal(result.ok, true);
     assert.equal(result.output.answer.message, 'hello from the sandbox');
     assert.equal(result.output.hasConsole, 'function');
+  });
+});
+
+test('a trusted extension runs its own code, and only when the operator allows it', async (t) => {
+  const { db, ext, close } = await start();
+  t.after(() => close());
+
+  const registryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-registry-'));
+  writeRegistry(registryDir, [{
+    id: 'test.trusted',
+    name: 'A trusted package',
+    version: '1.0.0',
+    description: 'A package that runs code on the server.',
+    author: 'Test',
+    maintainers: ['Test'],
+    capabilities: [],
+    compatibility: { api: '3.0', minInstance: '3.0.0', maxInstance: null },
+    dependencies: {},
+    trusted: true,
+    reviewStatus: 'approved',
+    entry: {
+      file: 'index.js',
+      source: `
+        const answer = await trycord.call('log', { message: 'the trusted extension ran' });
+        return answer;
+      `,
+    },
+    triggers: [{ event: 'message.created', conditions: [], steps: [{ type: 'code' }] }],
+  }]);
+  await useMirror(ext.admin, registryDir);
+
+  await t.test('a trusted package is refused while the policy forbids server-side code', async () => {
+    const res = await ext.admin.post('/api/extensions/install', { id: 'test.trusted', grants: [] });
+    assert.equal(res.status, 403, JSON.stringify(res.data));
+    assert.match(res.data.error.message, /runs code on the server/);
+  });
+
+  await t.test('once the policy allows it, the code runs in the sandbox', async () => {
+    await useMirror(ext.admin, registryDir, { allowTrusted: true });
+    const installed = await ext.admin.post('/api/extensions/install', { id: 'test.trusted', grants: [] });
+    assert.equal(installed.status, 201, JSON.stringify(installed.data));
+    await ext.admin.post('/api/extensions/test.trusted/enable');
+
+    const res = await ext.admin.post('/api/extensions/events', {
+      type: 'message.created',
+      payload: { id: 'trusted-1' },
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    assert.equal(res.data.dispatched[0].status, 'succeeded');
+
+    const steps = await db.all(
+      'SELECT status, error FROM workflow_run_steps WHERE type = ?', ['code']
+    );
+    assert.equal(steps.length, 1);
+    assert.equal(steps[0].status, 'succeeded');
+    assert.equal(steps[0].error, null);
   });
 });

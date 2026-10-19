@@ -11,6 +11,7 @@
 // see is a package asking for something the operator cannot grant.
 
 const capabilities = require('./capabilities');
+const workflowTriggers = require('../workflows/triggers');
 const { VERSION } = require('../../version');
 
 // The extension API version this build implements. A package declares the
@@ -247,8 +248,11 @@ function normaliseTriggers(value) {
   if (value.length > 10) invalid('a package may declare at most 10 triggers');
   return value.map((entry, index) => {
     if (!entry || typeof entry !== 'object') invalid('trigger ' + index + ' is not an object');
-    const event = String(entry.event || '').trim();
-    if (!event || event.length > 64) invalid('trigger ' + index + ' needs an event name');
+    const named = String(entry.event || '').trim();
+    // The event has to be one this instance publishes, or the trigger would
+    // wait for something that never happens.
+    const event = workflowTriggers.normalise(named);
+    if (!event) invalid('trigger ' + index + ' names an event this instance does not publish: ' + named);
     return {
       event,
       conditions: normaliseConditions(entry.conditions),

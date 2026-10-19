@@ -461,13 +461,13 @@ Mounted at `/api/extensions`.
 | `DELETE` | `/api/extensions/:extensionId/grants/:capability` | administrator |
 | `GET` | `/api/extensions/workflows` | any account |
 | `POST` | `/api/extensions/workflows` | any account |
-| `GET` | `/api/extensions/workflows/:workflowId` | the owner, or an administrator |
+| `GET` | `/api/extensions/workflows/:workflowId` | the owner, an administrator, or anyone for a workflow an extension owns |
 | `PUT` | `/api/extensions/workflows/:workflowId` | the owner, or an administrator |
 | `POST` | `/api/extensions/workflows/:workflowId/run` | the owner, or an administrator |
 | `POST` | `/api/extensions/workflows/:workflowId/dry-run` | the owner, or an administrator |
 | `POST` | `/api/extensions/workflows/:workflowId/pause` | the owner, or an administrator |
 | `POST` | `/api/extensions/workflows/:workflowId/resume` | the owner, or an administrator |
-| `GET` | `/api/extensions/workflows/:workflowId/runs` | the owner, or an administrator |
+| `GET` | `/api/extensions/workflows/:workflowId/runs` | the owner, an administrator, or anyone for a workflow an extension owns |
 | `POST` | `/api/extensions/workflows/:workflowId/grants` | administrator |
 | `DELETE` | `/api/extensions/workflows/:workflowId/grants/:capability` | administrator |
 | `GET` | `/api/extensions/workflows/runs/:runId` | the owner, or an administrator |

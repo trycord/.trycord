@@ -61,4 +61,36 @@ test('a required module does not keep the process alive', async (t) => {
     assert.ok(timers.length <= 1,
       'stopping an instance must not leave a ref\'d timer behind: ' + after.join(', '));
   });
+
+  await t.test('the server boots with the background job system running', async () => {
+    // The job kinds are registered during the boot, and a kind whose handler
+    // is missing turns every claimed job into a failure. Registering one
+    // whose module does not export it puts the instance into a restart loop
+    // that only a log shows - so the boot is exercised here, with the jobs
+    // on, and every kind that was registered is checked.
+    const { startInstance } = require('../helpers/instance');
+    const instance = await startInstance({ jobs: true });
+    try {
+      const jobs = require('../../src/services/jobs');
+      const stats = await jobs.stats();
+      assert.ok(Array.isArray(stats.kinds), 'the job system reports the kinds it knows');
+
+      // The kinds this build registers. A kind that was asked for and is not
+      // there is a job that can only fail.
+      for (const kind of [
+        'continuum_deliver',
+        'continuum_inbound_process',
+        'retention',
+        'search_backfill',
+        'workspace_event_reminder',
+        'workspace_card_due_reminder',
+        'workflow.schedule',
+      ]) {
+        assert.ok(stats.kinds.indexOf(kind) !== -1,
+          'the ' + kind + ' job kind is registered: ' + JSON.stringify(stats.kinds));
+      }
+    } finally {
+      await instance.stop();
+    }
+  });
 });

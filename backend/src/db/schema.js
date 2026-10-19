@@ -321,6 +321,17 @@ const INDEXES = [
   'CREATE INDEX idx_e2ee_sessions_peer ON e2ee_sessions(peer_device_id)',
   'CREATE INDEX idx_e2ee_group_keys_conversation ON e2ee_group_keys(conversation_id)',
   'CREATE INDEX idx_e2ee_attachments_conversation ON e2ee_attachments(conversation_id)',
+
+  // The extension registry, the installed extensions, and the workflows they
+  // own. Every one of these is a query the console or the engine makes.
+  'CREATE INDEX idx_extensions_state ON extensions(state)',
+  'CREATE INDEX idx_extension_grants_extension ON extension_grants(extension_id, revoked_at)',
+  'CREATE INDEX idx_workflows_owner ON workflows(owner_id)',
+  'CREATE INDEX idx_workflows_extension ON workflows(extension_id)',
+  'CREATE INDEX idx_workflows_state ON workflows(state)',
+  'CREATE INDEX idx_workflow_runs_workflow ON workflow_runs(workflow_id, created_at)',
+  'CREATE INDEX idx_workflow_runs_created ON workflow_runs(created_at)',
+  'CREATE INDEX idx_workflow_run_steps_run ON workflow_run_steps(run_id, step_index)',
   // Backs ORDER BY created_at DESC scans that are not scoped to one
   // channel (the /api/activity feed). Write overhead is one narrow index.
   'CREATE INDEX idx_messages_created ON messages(created_at)',
