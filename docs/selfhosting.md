@@ -231,18 +231,17 @@ runtime surprise discovered at the first join.
 
 ### Provider
 
-There is exactly one provider: **Cloudflare Realtime SFU**. Set it explicitly
-or leave it unset — the value defaults to it.
+There is exactly one provider: the **in-house mesh**. Set it explicitly or
+leave it unset — the value defaults to it.
 
 ```
-VOICE_VIDEO_PROVIDER=cloudflare
+VOICE_VIDEO_PROVIDER=mesh
 ```
 
-Its own documentation is explicit that it does not provide signalling or room
-management: *"The backend holds the SFU App Secret and manages application
-state and permissions"*. So Trycord's backend remains the authority on who is
-a user, which community they belong to, and whether they may speak. The
-provider only creates sessions and moves SDP; it never decides who may join.
+Trycord's own backend is the authority on who is a user, which community they
+belong to, and whether they may speak. It holds the room state, issues the
+signalling ticket, and relays the offers, answers and ICE candidates between
+the clients. The media itself goes from peer to peer.
 
 ```
 VOICE_VIDEO_SFU_APP_ID=...
@@ -609,24 +608,26 @@ reload means the WebSocket is not connecting — check the proxy
 
 ## Voice and media
 
-### Two supported providers
+### One supported provider
 
-Trycord provides two mutually exclusive voice paths:
+Trycord's voice path is its own. `VOICE_VIDEO_PROVIDER=mesh` is a peer-to-peer
+WebRTC mesh: the server carries the signalling, the ICE candidates and the
+room state, and the media flows between the clients. Nothing about a call
+leaves the host, and no account with anybody else is needed.
 
-1. **Cloudflare Realtime SFU** (`VOICE_VIDEO_PROVIDER=cloudflare`) — full voice,
-   video, and screen sharing, large rooms, adaptive quality. Requires a
-   Cloudflare account with Realtime enabled **and** a self-hosted (or known
-   trusted) STUN/TURN endpoint.
+It suits small rooms. Media is relayed between every participant, so a room of
+n people carries n×(n-1) streams; in practice that is a handful of people per
+channel. A stage with many listeners and a few speakers does not work this
+way, and this build says so rather than pretending otherwise.
 
-2. **Self-hosted mesh** (`VOICE_VIDEO_PROVIDER=mesh`) — peer-to-peer WebRTC
-   between clients. The server only relays signaling, ICE candidates, and room
-   state. No external media service is required; media flows browser-to-browser.
-   Practical up to ~6 participants per room (O(N^2) packets). Stage channels
-   with many listeners and a few speakers do NOT work with mesh — use the SFU
-   provider for those.
+This build used to offer a hosted SFU as a second choice. It no longer does: a
+self-hosted instance should not have to send its voice to somebody else's
+server. A deployment that is already configured for it keeps booting, with a
+warning at startup, and the setting in the admin configuration only offers the
+mesh.
 
-Both providers require a self-hosted STUN endpoint, and (for restrictive-network
-clients) a self-hosted TURN endpoint. There is NO default third-party Google STUN
+Voice needs a self-hosted STUN endpoint, and (for restrictive-network clients)
+a self-hosted TURN endpoint. There is NO default third-party Google STUN
 fallback; `VOICE_VIDEO_STUN_URLS` defaults to `[]` and voice will refuse to
 enable until it is set.
 
@@ -684,8 +685,8 @@ server emits `[voice.mesh] ... joined channel ...` for each participant.
 
 - `VOICE_VIDEO_STUN_URLS` default: `[]` — must be set explicitly.
 - `VOICE_VIDEO_TURN_URL` default: '' — no relay fallback unless configured.
-- `VOICE_VIDEO_PROVIDER` default: `cloudflare` (requires CF credentials). Switch to
-  `mesh` for self-hosted STUN+TURN-only operation.
+- `VOICE_VIDEO_PROVIDER` default: `mesh` — the in-house path. No account with
+  anybody else is needed for a call to work.
 - Signaling via Trycord's WebSocket gateway (first-party, server-owned).
 - All media routes (signaling, join, leave, state, credentials) defined in
   `backend/src/routes/voice.js` — none delegate to a third-party control plane.

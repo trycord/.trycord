@@ -140,10 +140,10 @@ const SCHEMA = [
     live: true, consequential: true,
   },
   {
-    key: 'voice.provider', env: 'VOICE_VIDEO_PROVIDER', type: 'string', default: 'cloudflare',
+    key: 'voice.provider', env: 'VOICE_VIDEO_PROVIDER', type: 'string', default: 'mesh',
     category: 'voice', label: 'Media server provider',
-    description: 'cloudflare routes media through Cloudflare Realtime SFU (supports large rooms and screen sharing). mesh is a self-hosted peer-to-peer WebRTC fallback for small rooms (up to 6 participants) — no SFU needed, but media flows browser-to-browser and scales as O(N^2); not suited to stage channels or large rooms. Set STUN/TURN URLs for either, plus Cloudflare credentials for sfu.',
-    allowed: ['cloudflare', 'mesh'], live: true, consequential: true,
+    description: 'mesh is this instance\'s own media path: peers connect to each other over WebRTC and the server carries the signalling, so nothing about a call leaves the host. It suits small rooms; media flows browser-to-browser and scales as the square of the room size. The hosted SFU this build used to offer is not offered here: a self-hosted instance should not have to send its voice to somebody else\'s server.',
+    allowed: ['mesh'], live: true, consequential: true,
   },
   {
     key: 'search.provider', env: 'SEARCH_PROVIDER', type: 'string', default: 'in-house',
@@ -875,26 +875,25 @@ async function save(entries, adminId) {
     return !!secretValues[key];
   };
   const voiceOnAfter = after('voice.enabled') === true;
-  const voiceProviderAfter = String(after('voice.provider') || 'cloudflare');
+  const voiceProviderAfter = String(after('voice.provider') || 'mesh');
   if (voiceOnAfter) {
+    // ICE is not a provider preference: without a STUN or a TURN address the
+    // peers cannot find each other across a NAT, and a call that cannot connect
+    // is worse than a refusal. This applies to every provider, which is why it
+    // used to be inside one provider's branch and quietly did nothing for the
+    // others.
+    const stun = after('voice.stunUrls');
+    const turnUrl = String(after('voice.turnUrl') || '');
+    const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turnUrl;
+    if (!hasIce) {
+      problems.push('voice.stunUrls: at least one STUN server or a TURN URL is required when voice is on');
+    }
+    // The hosted SFU's own credentials, when that provider is the one in force.
     if (voiceProviderAfter === 'cloudflare') {
       const appId = String(after('voice.sfuAppId') || '');
-      const stun = after('voice.stunUrls');
-      const turnUrl = String(after('voice.turnUrl') || '');
-      const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turnUrl;
-      if (!appId) problems.push('voice.sfuAppId: required when voice and video is on with Cloudflare provider');
-      if (!secretAfter('voice.sfuAppSecret')) problems.push('voice.sfuAppSecret: required when voice and video is on with Cloudflare provider');
-      if (!hasIce) problems.push('voice.stunUrls: at least one STUN server or a TURN URL is required when voice is on with Cloudflare provider');
-    } else if (voiceProviderAfter === 'in-house') {
-      // In-house WebRTC still needs at least one ICE (STUN/TURN) server for NAT
-      // traversal. These are network peers, not provider-specific credentials, so
-      // they apply to both providers.
-      const stun = after('voice.stunUrls');
-      const turnUrl = String(after('voice.turnUrl') || '');
-      const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turnUrl;
-      if (!hasIce) problems.push('voice.stunUrls: at least one STUN server or a TURN URL is required when voice is on (in-house WebRTC still needs ICE candidates)');
+      if (!appId) problems.push('voice.sfuAppId: required when voice and video is on with the Cloudflare provider');
+      if (!secretAfter('voice.sfuAppSecret')) problems.push('voice.sfuAppSecret: required when voice and video is on with the Cloudflare provider');
     }
-    // In-house provider: no third-party credentials required, but ICE is mandatory.
     if (problems.length) return { ok: false, problems };
   }
 
