@@ -189,6 +189,17 @@ function clearCaches() {
   State.mutedChannels.clear();
 }
 
+// Forgets everything this browser knows about the instance it was reading.
+//
+// Switching instances is not a sign-out: the reader may keep the old account
+// and come back to it. But the communities, conversations, people and presence
+// held here belong to that instance alone, and carrying them into another
+// instance's workspace would show one server's data under another's name.
+export function clearInstanceState() {
+  clearCaches();
+  emit('instance-cleared', null);
+}
+
 export function ownJti() {
   const claims = tokenClaims();
   return claims && claims.jti ? String(claims.jti) : null;
