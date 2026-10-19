@@ -18,6 +18,7 @@ const dbConfig = require('../db/config');
 const db = require('../db');
 const settings = require('../services/settings');
 const features = require('../features');
+const backup = require('../services/backup');
 
 const router = express.Router();
 router.use(adminGuard);
@@ -138,9 +139,7 @@ router.post('/apply', rateLimit({ windowMs: 60000, max: 10 }), wrap(async (req, 
 // A redacted configuration snapshot, for an operator who wants to see what the
 // instance is actually configured with without exposing a single credential.
 //
-// A secret is reported as set or unset and carries no value at all. The database
-// itself is not dumped here: a full backup is a file operation, and pretending a
-// JSON body is one would be a lie about what it protects.
+// A secret is reported as set or unset and carries no value at all.
 router.get('/backup', wrap(async (req, res) => {
   await settings.load();
   const cat = settings.catalogue();
@@ -156,6 +155,29 @@ router.get('/backup', wrap(async (req, res) => {
     dialect: db.status().dialect,
     settings: safe,
   });
+}));
+
+// The backups already on this host, newest first. Names, sizes and dates only:
+// the files themselves are the operator's to move.
+router.get('/backups', wrap(async (req, res) => {
+  res.json({ backups: backup.list(), directory: backup.backupDirectory() });
+}));
+
+// Take a backup now. The dump is written to the backup directory, verified by
+// reading it back, and reported with what it contains.
+//
+// A dump of the instance's rows belongs on the host: the path is returned so an
+// operator can move it, and it is not served over HTTP.
+router.post('/backup', rateLimit({ windowMs: 60000, max: 2 }), wrap(async (req, res) => {
+  try {
+    const out = await backup.create();
+    res.json({ ok: true, backup: out });
+  } catch (e) {
+    if (e && e.result) {
+      return fail(res, e.code || 'BACKUP_FAILED', e.message, 500);
+    }
+    return fail(res, (e && e.code) || 'BACKUP_FAILED', (e && e.message) || 'The backup did not complete.', 500);
+  }
 }));
 
 module.exports = router;
