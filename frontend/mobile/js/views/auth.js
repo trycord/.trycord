@@ -9,6 +9,7 @@ import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { brandMark } from '../../../packages/brand.js';
 import Api from '../../../packages/api.js';
+import TrycordConfig from '../../../packages/config.js';
 import { currentQuery, navigate, path } from '../../../packages/nav.js';
 import { applyToken, loadSession, logout, refreshServers } from '../../../packages/store.js';
 import { connect } from '../../../packages/realtime.js';
@@ -106,6 +107,8 @@ function registerForm() {
   const email = textInput({ name: 'email', type: 'email' });
   const password = textInput({ name: 'password', type: 'password', autocomplete: 'new-password' });
   const form = el('form', { class: 'm-auth__form' },
+    el('p', { class: 'm-auth__instance' },
+      'Joining ', el('strong', {}, TrycordConfig.backendUrl())),
     field({ label: 'Username', control: username }),
     field({ label: 'Display name', control: display }),
     field({ label: 'Email (optional)', control: email }),

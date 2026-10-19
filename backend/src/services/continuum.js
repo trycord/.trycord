@@ -29,6 +29,7 @@ const db = require('../db');
 const { now, uuid } = require('../util');
 const features = require('../features');
 const jobs = require('./jobs');
+const netguard = require('./netguard');
 
 // Continuum is opt-in. Checked on every operation; when disabled the instance
 // never sends or receives federation events.
@@ -138,41 +139,23 @@ function allowLocalhost() {
   return v === 'true' || v === '1' || v === 'yes' || v === 'on';
 }
 
+// The rules themselves live in one place (services/netguard.js) so the
+// federation probe, the delivery path and the discovery reader cannot drift
+// apart. This module only decides when local addresses are permitted.
 function forbiddenHost(host) {
-  const h = String(host || '').toLowerCase().trim();
-  if (h === '' || h === 'localhost' || h === '::1' || h === '[::1]') {
-    return !allowLocalhost();
-  }
-  // IPv4 literal in a private/loopback/link-local/multicast range.
-  const ipv4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const o = ipv4.slice(1).map((x) => Number(x));
-    if (o.some((x) => x > 255)) return true;
-    if (o[0] === 127) return !allowLocalhost();         // loopback (allowed only with explicit opt-in)
-    if (o[0] === 10) return true;                        // private 10/8
-    if (o[0] === 172 && o[1] >= 16 && o[1] <= 31) return true; // private 172.16/12
-    if (o[0] === 192 && o[1] === 168) return true;      // private 192.168/16
-    if (o[0] === 169 && o[1] === 254) return true;      // link-local / metadata 169.254/16
-    if (o[0] === 0) return true;
-    if (o[0] >= 224 && o[0] <= 239) return true;       // multicast
-  }
-  // Known metadata endpoint names and IPv6 special forms.
-  const specialNames = ['metadata.google.internal', 'metadata', 'instance-data', 'magic-mirror'];
-  if (specialNames.indexOf(h) !== -1) return true;
-  if (h.startsWith('[::') || h.startsWith('[fc') || h.startsWith('[fd')) return true;
-  return false;
+  return netguard.forbiddenHost(host, { allowLocalhost: allowLocalhost() });
 }
 
+
 async function validateOrigin(origin) {
-  const m = String(origin || '').trim().match(/^(\w+:)\/\/([^\/\s:?#]+)(:\d+)?(\/.*)?$/);
-  if (!m) throw new Error('origin must be http(s)://host[/path]');
-  const scheme = m[1].toLowerCase();
-  const host = m[2];
-  if (scheme !== 'http:' && scheme !== 'https:') throw new Error('origin must be http(s)');
-  // Embedded credentials are never allowed.
-  if (origin.includes('@')) throw new Error('origin must not contain credentials');
-  if (forbiddenHost(host)) throw new Error('origin host is not allowed');
-  return origin;
+  // The shared guard does the checking. Plain http is still accepted for a
+  // peer, because a self-hosted instance on a private network is a legitimate
+  // setup and refusing it would break one that works today; the private-range
+  // rules are unchanged.
+  return netguard.validateOrigin(origin, {
+    allowLocalhost: allowLocalhost(),
+    allowInsecure: true,
+  });
 }
 
 async function addInstance(id, name, origin, publicKey) {
@@ -300,10 +283,15 @@ async function deliverEventToInstance(event, instance) {
   try {
     // Revalidate origin at delivery time: hostnames may have changed, and a
     // saved instance could now resolve to a private address (DNS rebinding).
+    // The name is resolved as well as read, so a name that points inward is
+    // caught here and not only when the address was first saved.
     const parsed = String(instance.origin || '').trim().match(/^(\w+:)\/\/([^\/\s:?#]+)(:\d+)?(\/.*)?$/);
     const host = parsed ? parsed[2] : '';
     if (!parsed || forbiddenHost(host)) {
       throw new Error('origin host is not allowed at delivery time');
+    }
+    if (await netguard.resolvesToPrivate(host, { allowLocalhost: allowLocalhost() })) {
+      throw new Error('origin resolves to a private address at delivery time');
     }
     const res = await fetch(`${instance.origin}/api/continuum/inbox`, {
       method: 'POST',

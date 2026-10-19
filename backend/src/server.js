@@ -391,6 +391,19 @@ async function boot() {
       supportUrl: s.isLoaded() ? s.get('instance.supportUrl') : '',
       backendRole: s.isLoaded() ? s.get('instance.backendRole') : 'primary',
       globalSync: inst.globalUrl !== '',
+      // The version a client checks before it commits to this instance. A client
+      // that speaks an older protocol is told so here rather than discovering it
+      // through a confusing failure later.
+      apiVersion: 1,
+      protocolVersion: 'trycord-continuum/1.0',
+      // What a reader is allowed to do here, and nothing more. These are the
+      // capabilities a registration screen needs; they expose no operator
+      // configuration, no internal address and no secret.
+      registration: {
+        enabled: !!features.current.registration,
+        approvalRequired: !!features.current.registrationApproval,
+        emailVerificationRequired: !!features.current.emailVerificationRequired,
+      },
       features: {
         publicDiscovery: features.current.communityDiscovery,
         uploads: features.current.uploads,
@@ -451,6 +464,9 @@ async function boot() {
   app.use('/api/servers/:serverId', require('./routes/integrations'));
   app.use('/api/invites', inviteRoutes.byCode);
   app.use('/api/discover', require('./routes/discover'));
+  // The public instance listing. Separate from community discovery: this one
+  // is about instances, not about the communities inside one.
+  app.use('/api/discovery', require('./routes/discovery'));
   app.use('/api/activity', require('./routes/activity'));
   app.use('/api/dms', require('./routes/dms'));
   // Token-authenticated, not session-authenticated - see the file's header.
@@ -677,30 +693,6 @@ async function boot() {
       resolve();
     });
   });
-
-  // Power-On Self Test: run the full check chain in the background so a deploy
-  // proves itself without blocking startup or crashing the server on failure.
-  // Off in production unless SELFTEST_ON_START=true; on otherwise.
-  const selftestEnabled = process.env.SELFTEST_ON_START === "true"
-    || (process.env.SELFTEST_ON_START !== "false" && process.env.NODE_ENV !== "production");
-  if (selftestEnabled) {
-    try {
-      const { spawn } = require("child_process");
-      const fsMod = require("fs");
-      const logPath = path.join(__dirname, "..", "..", "backend", "tmp", "selftest.log");
-      fsMod.mkdirSync(require("path").dirname(logPath), { recursive: true });
-      const out = fsMod.openSync(logPath, "a");
-      const child = spawn(process.execPath, [path.join(__dirname, "..", "..", "backend", "scripts", "selftest.js")], {
-        cwd: path.join(__dirname, "..", "..", "backend"),
-        detached: true,
-        stdio: ["ignore", out, out],
-      });
-      child.unref();
-      console.log("Power-On Self Test started (pid " + child.pid + "); log: " + logPath);
-    } catch (e) {
-      console.warn("Power-On Self Test could not start:", e && e.message);
-    }
-  }
 
   return { app, server };
 }

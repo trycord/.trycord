@@ -16,6 +16,7 @@ import {
 import { renderDms, renderDmConversation } from './dms.js';
 import { renderFriends } from './friends.js';
 import { renderDiscover } from './discover.js';
+import { renderInstances } from './instances.js';
 import { renderProfile } from './profile.js';
 import { renderCommunity, renderChannelView, renderMembers, renderRoles, renderInvites, renderCategories } from './community.js';
 import { renderSettings } from './settings.js';
@@ -31,6 +32,7 @@ export const RENDERERS = {
   legal: (ctx) => renderLegal(ctx),
   invite: (ctx) => renderInvite(ctx),
   discover: () => renderDiscover(),
+  instances: () => renderInstances(),
   friends: () => renderFriends(),
   dms: () => renderDms(),
   'dms.conversation': (ctx) => renderDmConversation(ctx),
