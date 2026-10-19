@@ -11,7 +11,7 @@
 
 const express = require('express');
 const rateLimit = require('../middleware/ratelimit');
-const discovery = require('../services/discovery');
+const discovery = require('../services/instanceDiscovery');
 const { wrap } = require('../errors');
 
 const router = express.Router();

@@ -121,8 +121,8 @@
 
       <ol class="timeline">
         <li>
-          <p class="when">Unreleased &middot; October 2026</p>
-          <h2>One backend, one design system, and a rebuilt public site</h2>
+          <p class="when">2.5.0 &middot; 19 October 2026</p>
+          <h2>One backend, a chosen instance, and a machine that is not fighting itself</h2>
           <ul>
             <li>The backend was consolidated on <code>backend/</code>: the features and tables that lived only in the legacy <code>server/</code> package were merged in, and a production instance now runs one backend instead of the split that had drifted.</li>
             <li>The application was put on the canonical asset library: one generated set of design tokens that the app, the themes and the website all read.</li>
@@ -130,6 +130,13 @@
             <li>Registration approval was added, with the migration parity check that had been missing.</li>
             <li>Realtime naming was made consistent across the gateway and the client, kept in agreement by a check rather than by discipline.</li>
             <li>This public site was rebuilt as its own composition, with a working demo and a public community directory, instead of a smaller copy of the app's layout.</li>
+            <li>Registration now takes an instance: browse the instances an instance knows about, or give the address of one you run. The address is checked against that instance before it is accepted, and a session belongs to the instance that issued it, so switching never carries a token across.</li>
+            <li>Search became an in-house index that works on every database this runs on, and the permission check lives inside it: a message from a community you are not in cannot answer a query.</li>
+            <li>Backups can be taken from the administration page and put back with a command that verifies the dump first and asks for the database name before it replaces anything.</li>
+            <li>The administration pages grew a rail, so every settings door and every moderation queue is one click away, and a diagnostics page that reports each subsystem as it really is rather than as its configuration implies.</li>
+            <li>The voice path is the in-house one, and an administrator's saved choice is what takes effect: the provider used to be read from the environment, which meant a setting that saved and changed nothing.</li>
+            <li>Housekeeping came with the jobs: expired sessions, old notifications and finished work are cleaned up on a rhythm that survives a restart.</li>
+            <li>The automated check suite was removed. It booted whole instances and started browsers, and on a small host it was more load than the product was worth; verification is now a real journey against a running instance.</li>
             <li>Plain-language passes on error messages, settings and navigation.</li>
           </ul>
         </li>

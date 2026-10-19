@@ -255,6 +255,28 @@ function mountPublicSite(app, opts) {
   }
   if (!publicDir) return null;
 
+  // The public site's own backend.json, rewritten to the origin that served
+  // it.
+  //
+  // The demo and the community directory read the instance's API. The site and
+  // the API are not always the same origin - the site is often a static
+  // deployment elsewhere - so a relative '/api/...' on the site reaches the
+  // site, which has no API, and the page answers 404. The file names the
+  // address; here it is rewritten to whoever is serving, which is the same
+  // rule the client's copy follows.
+  app.get('/backend.json', (req, res, next) => {
+    fs.readFile(path.join(publicDir, 'backend.json'), 'utf8', (err, raw) => {
+      if (err) return next();
+      let json;
+      try { json = JSON.parse(raw); } catch { return next(); }
+      const self = siteOrigin(req);
+      if (self) json.backendUrl = self;
+      res.set('Cache-Control', 'no-store')
+        .type('json')
+        .send(JSON.stringify(json, null, 2) + '\n');
+    });
+  });
+
   const injectOriginMeta = (html, req, route) => {
     const origin = siteOrigin(req);
     if (!origin) return html;
