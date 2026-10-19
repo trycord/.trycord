@@ -221,6 +221,21 @@ async function attemptOne(hook, eventType, payload) {
 // the older body reads it unchanged.
 async function emit(serverId, eventType, payload) {
   if (EVENTS.indexOf(eventType) === -1) return [];
+  // The workflow engine hears about the same events the webhooks do. It is
+  // told here, rather than by each route calling it, so a workflow and a
+  // webhook see the same event at the same moment - and so a new event type
+  // reaches both without two edits.
+  //
+  // The engine is optional: the workflows service is not loaded until a
+  // workflow exists, so an instance that never installs one does not carry
+  // the module.
+  try {
+    const engine = require('./workflows/engine');
+    engine.publish(eventType, Object.assign({ serverId }, payload || {}), {
+      origin: { type: 'webhook' },
+    });
+  } catch { /* the workflow engine is not part of this build */ }
+
   const rows = await db.all(
     'SELECT * FROM webhooks WHERE server_id = ? AND active = 1', [serverId]
   );

@@ -27,7 +27,7 @@ const FEDERATION_ENV = {
  * @param {object} [env]       extra environment
  */
 async function startFederatedInstance(instanceId, env) {
-  return startInstance({
+  const instance = await startInstance({
     jobs: true,
     env: Object.assign(
       {},
@@ -36,6 +36,24 @@ async function startFederatedInstance(instanceId, env) {
       env || {}
     ),
   });
+  // The modules of this instance, captured now.
+  //
+  // Starting another instance clears the module cache, and the shared code
+  // reaches for a module at request time in one place (the channel lookup by
+  // slug). After that clear, such a lookup finds the other instance's copy
+  // and reads the other instance's database. Holding this instance's own
+  // modules here means a test can act on this instance directly.
+  instance.modules = {
+    db: require('../../src/db'),
+    continuum: require('../../src/services/continuum'),
+    permissions: require('../../src/services/permissions'),
+    rules: require('../../src/services/continuum/rules'),
+    relay: require('../../src/services/continuum/relay'),
+    ledger: require('../../src/services/continuum/ledger'),
+    store: require('../../src/services/continuum/store'),
+    feed: require('../../src/services/continuum/feed'),
+  };
+  return instance;
 }
 
 /** The public discovery document of an instance. */
@@ -146,6 +164,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** A port nothing is listening on: an origin that cannot be reached. */
+async function closedPort() {
+  const net = require('net');
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
 /**
  * Wait for a condition to hold.
  *
@@ -201,6 +232,7 @@ module.exports = {
   peerInstances,
   startCapturePeer,
   sleep,
+  closedPort,
   waitFor,
   eventsAboutMessage,
   registerUser,

@@ -821,6 +821,7 @@ module.exports = {
   processInboundEvent,
   runFeed,
   validateOrigin,
+  deliveryTargets,
   listRemoteCommunities,
   syncPeerCommunities,
   listRelayedMessages,

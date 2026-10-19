@@ -103,10 +103,13 @@ async function contextFor(sourceKind, row) {
     };
   }
   if (sourceKind === 'reaction') {
-    const message = await db.get('SELECT channel_id, server_id FROM messages WHERE id = ?', [row.message_id]);
+    const message = await db.get('SELECT channel_id FROM messages WHERE id = ?', [row.message_id]);
+    const channel = message
+      ? await db.get('SELECT id, server_id FROM channels WHERE id = ?', [message.channel_id])
+      : null;
     const author = await authorSnapshot(row.user_id);
     return {
-      serverId: message ? message.server_id : null,
+      serverId: channel ? channel.server_id : null,
       channelId: message ? message.channel_id : null,
       messageId: row.message_id,
       userId: row.user_id,
@@ -390,6 +393,14 @@ async function prepare(kind, payload, opts = {}) {
   const input = payload || {};
   if (!events.isKnownKind(kind)) return { ok: false, reason: 'unknown event kind' };
 
+  // Encrypted content is never relayed, not even as a ciphertext nobody can
+  // read. See rules.encryptedContent(). The rule is checked before anything
+  // else, because it does not depend on the content being valid to begin
+  // with: encrypted content is refused whatever it is.
+  if (rules.encryptedContent(input)) {
+    return { ok: false, reason: 'encrypted content is never federated', withhold: true };
+  }
+
   const source = await resolveSource(kind, input);
 
   // What the ledger already says comes first: a row that was withheld stays
@@ -412,12 +423,6 @@ async function prepare(kind, payload, opts = {}) {
 
   const gate = await gateFor(kind, input);
   if (!gate.ok) return { ok: false, reason: gate.reason, withhold: true, source };
-
-  // Encrypted content is never relayed, not even as a ciphertext nobody can
-  // read. See rules.encryptedContent().
-  if (rules.encryptedContent(input)) {
-    return { ok: false, reason: 'encrypted content is never federated', withhold: true, source };
-  }
 
   if (source) {
     const existing = await ledger.find(source.kind, source.id);

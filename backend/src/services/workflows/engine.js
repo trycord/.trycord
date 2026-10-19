@@ -24,6 +24,7 @@ const conditions = require('./conditions');
 const actions = require('./actions');
 const triggers = require('./triggers');
 const extensionStore = require('../extensions/store');
+const capabilities = require('../extensions/capabilities');
 const signature = require('../extensions/signature');
 const sandbox = require('../extensions/sandbox');
 const bridge = require('../extensions/bridge');
@@ -206,7 +207,18 @@ async function executeSteps(workflow, run, values, startIndex) {
     if (run.dryRun) {
       // A dry run reports what would happen and does nothing. The action is
       // not executed, so the outcome recorded is the plan, not a result.
-      const plan = { dryRun: true, action: step.action, capability, description: action ? action.description : null };
+      // Whether the step would be allowed is part of the plan: a step that
+      // needs a capability the workflow does not hold would fail, and saying
+      // so is the point of asking before doing.
+      const permitted = !capability || capabilities.granted(grants, capability);
+      const plan = {
+        dryRun: true,
+        action: step.action,
+        capability,
+        permitted,
+        description: action ? action.description : null,
+        note: permitted ? null : 'the capability "' + capability + '" has not been granted to this workflow',
+      };
       await store.updateStep(record.id, { status: 'planned', output: plan, finishedAt: now(), durationMs: 0 });
       values.steps[index] = { output: plan };
       continue;
@@ -561,6 +573,7 @@ async function recordSkipped(workflow, eventName, payload, origin, reason) {
     dryRun: false,
     startedAt: now(),
   }).catch(() => null);
+  if (record) await store.finishRun(record.id, 'skipped', reason, 0);
   return record;
 }
 

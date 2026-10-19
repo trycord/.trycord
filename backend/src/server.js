@@ -521,6 +521,7 @@ async function boot(options = {}) {
   // route cannot exist without being documented. The unversioned routes
   // underneath are untouched - a client written against them keeps working.
   app.use('/api/v1', require('./routes/developer'));
+  app.use('/api/extensions', require('./routes/extensions'));
   // End-to-end encryption: devices, prekey bundles, sessions, conversation
   // keys, encrypted attachments and recovery. Mounted with the other API
   // routes so it shares the one authentication chain; every route in it is
@@ -779,6 +780,17 @@ async function boot(options = {}) {
         maxAttempts: 3,
         backoffMs: 60000,
       });
+    // The workflow scheduler. A tick runs the schedules that are due and
+    // queues the next one, so a schedule survives a restart and two instances
+    // cannot both run it: the run key's unique index makes the second one
+    // resolve to the run that already happened rather than repeating it.
+    const schedule = require('./services/workflows/schedule');
+    jobs.register('workflow.schedule', schedule.handleScheduleTick, {
+      concurrency: 1,
+      maxAttempts: 3,
+      backoffMs: 60000,
+    });
+    schedule.startScheduler();
     await jobs.start();
     await jobs.enqueue('retention', {}, { runAfterMs: 15000, maxAttempts: 3 }).catch(() => {});
     await jobs.enqueue('search_backfill', {}, { runAfterMs: 20000, maxAttempts: 3 }).catch(() => {});

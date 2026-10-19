@@ -82,6 +82,24 @@ function validateDefinition(definition) {
 }
 
 /**
+ * The capabilities a definition names, checked against the catalogue.
+ *
+ * A capability this instance does not know is refused rather than stored: a
+ * grant that names nothing is a grant that does nothing, and the operator
+ * has to be able to see that.
+ */
+function knownGrants(list) {
+  const out = [];
+  for (const raw of Array.isArray(list) ? list : []) {
+    const id = String(raw || '').trim();
+    if (!id) continue;
+    if (!capabilities.isKnown(id)) fail('"' + id + '" is not a capability this instance knows');
+    if (!out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/**
  * The capabilities a workflow may use without an operator granting them.
  *
  * A workflow owned by an ordinary member runs as that member, so it may do
@@ -89,19 +107,17 @@ function validateDefinition(definition) {
  * administrator.
  */
 function requestedGrants(definition) {
-  const asked = Array.isArray(definition.grants) ? definition.grants : [];
+  const asked = knownGrants(definition.grants);
   const granted = [];
   const refused = [];
-  for (const raw of asked) {
-    const id = String(raw || '').trim();
-    if (!id) continue;
+  for (const id of asked) {
     if (!engine.SELF_SERVICE.includes(id)) {
       refused.push({ capability: id, reason: 'an administrator has to grant this capability' });
       continue;
     }
     granted.push(id);
   }
-  return { granted: [...new Set(granted)], refused };
+  return { granted, refused };
 }
 
 /**
@@ -115,7 +131,7 @@ function requestedGrants(definition) {
 async function create(definition, ownerId, options = {}) {
   const validated = validateDefinition(definition);
   const grants = options.asAdmin
-    ? { granted: (definition.grants || []).map(String), refused: [] }
+    ? { granted: knownGrants(definition.grants), refused: [] }
     : requestedGrants(definition);
 
   const workflow = await store.insertWorkflow(Object.assign({}, validated, {
@@ -150,7 +166,7 @@ async function update(workflowId, definition, actorId, options = {}) {
   const validated = validateDefinition(definition);
 
   const grants = options.asAdmin
-    ? { granted: (definition.grants || []).map(String), refused: [] }
+    ? { granted: knownGrants(definition.grants), refused: [] }
     : requestedGrants(definition);
   const kept = options.asAdmin ? grants.granted : (definition.grants === undefined ? existing.grants : grants.granted);
 
@@ -267,6 +283,8 @@ async function dryRun(options) {
       capability: step.capability,
       status: step.status,
       description: step.output && step.output.description ? step.output.description : null,
+      permitted: step.output && step.output.permitted !== undefined ? step.output.permitted : null,
+      note: step.output && step.output.note ? step.output.note : null,
     })),
   };
 }
