@@ -35,6 +35,7 @@ const APP_ROUTE_PREFIXES = new Set([
 const CLEAN_PAGES = [
   { route: '/demo', file: 'demo.html' },
   { route: '/communities', file: 'communities.html' },
+  { route: '/instances', file: 'instances.html' },
   { route: '/features', file: 'features.html' },
   { route: '/docs', file: 'documentation.html' },
   { route: '/download', file: 'download.html' },
