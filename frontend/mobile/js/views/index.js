@@ -19,6 +19,7 @@ import { renderInstances } from './instances.js';
 import { renderSettings } from './settings.js';
 import { renderAdmin } from './admin.js';
 import { renderExtensions } from './extensions.js';
+import { onboardingScreen as renderOnboarding } from './onboarding.js';
 import { renderDeveloper } from './developer.js';
 import {
   renderChannel, renderChannelPins, renderMembersPage, renderRolesPage,
@@ -62,6 +63,7 @@ export const RENDERERS = {
   'community.invites': (ctx) => renderInvitesPage(ctx),
   'community.categories': (ctx) => renderCategoriesPage(ctx),
   'community.settings': (ctx) => renderCommunitySettings(ctx),
+  'community.onboarding': (ctx) => renderOnboarding(ctx),
   'community.workspace': (ctx) => renderWorkspace(ctx),
   'community.workspace.spaces': (ctx) => renderSpaces(ctx),
   'community.workspace.space': (ctx) => renderSpace(ctx),

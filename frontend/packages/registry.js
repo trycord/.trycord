@@ -108,6 +108,9 @@ export const PAGES = [
   p('community.invites', '/server/:id/invites', { layout: 'channel', sidebar: 'community', hidden: true }),
   p('community.categories', '/server/:id/categories', { layout: 'channel', sidebar: 'community', hidden: true }),
   p('community.settings', '/server/:id/settings', { layout: 'channel', sidebar: 'community', hidden: true }),
+  // The onboarding a member is shown when they arrive. It is a place of its
+  // own, because a member is sent to it and may come back to it.
+  p('community.onboarding', '/server/:id/onboarding', { layout: 'channel', sidebar: 'community', hidden: true }),
 
   // ---- the workspace. Five surfaces, each with its own address, so a reader
   // can link to a document and a phone can open a board. The landing page

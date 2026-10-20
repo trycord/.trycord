@@ -767,6 +767,7 @@ const SETTINGS_SECTIONS = [
   ['invites', 'Invites', 'mail'],
   ['moderation', 'Moderation', 'flag'],
   ['voice', 'Voice and video', 'mic'],
+  ['onboarding', 'Onboarding', 'help'],
   ['integrations', 'Integrations', 'rocket'],
   ['analytics', 'Analytics', 'chart'],
   ['ownership', 'Ownership', 'crown'],

@@ -38,6 +38,7 @@ import { overviewSection } from './communitySettings/overview.js';
 import { moderationSection } from './communitySettings/moderation.js';
 import { integrationsSection } from './communitySettings/integrations.js';
 import { voiceSection } from './communitySettings/voice.js';
+import { onboardingSection } from './communitySettings/onboarding.js';
 import {
   membersSection, rolesSection, invitesSection, categoriesSection,
 } from './communitySettings/access.js';
@@ -400,6 +401,7 @@ export function communitySettingsSections() {
     ['invites', invitesSection],
     ['moderation', moderationSection],
     ['voice', voiceSection],
+    ['onboarding', onboardingSection],
     ['ownership', ownershipSection],
     ['analytics', analyticsSection],
     ['integrations', integrationsSection],
