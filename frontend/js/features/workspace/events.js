@@ -28,7 +28,7 @@ import { path } from '../../../packages/nav.js';
 import { State } from '../../../packages/store.js';
 import {
   Workspace, RSVP_STATUSES, RSVP_LABELS, ATTENDANCE_VISIBILITY_LABELS,
-  mayManageStructure, mayPost,
+  mayManageStructure, mayPost, paramId,
   eventRoute, formatInstant, readerZone, attendanceCounts, attendanceRows,
   instantInZone, toZoneInput,
 } from '../../../packages/workspace.js';
@@ -84,7 +84,7 @@ export function eventsList(ctx) {
 
 export function eventsDetail(ctx) {
   const serverId = ctx.serverId;
-  const eventId = ctx.params.eventId;
+  const eventId = paramId(ctx.params, 'event');
 
   if (!eventId) {
     return {

@@ -14,7 +14,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { card, fold, row, blank } from '../ui/page.js';
+import { card, fold, row } from '../ui/page.js';
 import { path } from '../../packages/nav.js';
 import {
   SURFACES, Workspace, surfaceRoute, mayManageStructure, mayModerate,
@@ -131,22 +131,26 @@ function workspaceLanding(ctx) {
   };
 
   return {
-    node: el('div', { class: 'collection-layout' },
-      el('div', { class: 'collection-list' }, list),
-      el('div', { class: 'collection-detail' }, detail)),
-    onMount: async () => {
-      paintGates();
-      const answers = await Promise.all(SURFACES.map((surface) => (
-        countOf(serverId, surface.id).catch(() => null)
-      )));
-      const tally = new Map();
-      SURFACES.forEach((surface, index) => {
-        const answer = answers[index];
-        tally.set(surface.id, answer === null ? '—' : String(answer));
-      });
-      paintCounts(tally);
+    list: {
+      node: list,
+      onMount: async () => {
+        const answers = await Promise.all(SURFACES.map((surface) => (
+          countOf(serverId, surface.id).catch(() => null)
+        )));
+        const tally = new Map();
+        SURFACES.forEach((surface, index) => {
+          const answer = answers[index];
+          tally.set(surface.id, answer === null ? '—' : String(answer));
+        });
+        paintCounts(tally);
+      },
+      cleanup() {},
     },
-    cleanup() {},
+    detail: {
+      node: detail,
+      onMount: async () => { paintGates(); },
+      cleanup() {},
+    },
   };
 }
 
@@ -170,16 +174,14 @@ export function renderWorkspace(ctx) {
   const landing = ctx.page.id === 'community.workspace';
   const surface = SURFACE_OF_PAGE[ctx.page.id] || 'spaces';
 
-  const list = landing ? workspaceLanding(ctx) : VIEWS[surface].list(ctx);
-  const detail = landing ? null : VIEWS[surface].detail(ctx);
+  // The landing is a surface of its own: it says what the community holds
+  // beside what the reader may do with it.
+  const parts = landing
+    ? workspaceLanding(ctx)
+    : { list: VIEWS[surface].list(ctx), detail: VIEWS[surface].detail(ctx) };
 
-  const middle = el('div', { class: 'collection-list' }, list.node);
-  const right = el('div', { class: 'collection-detail' },
-    detail ? detail.node : blank({
-      glyph: 'layers',
-      title: 'The workspace',
-      text: 'Five things live here. Choose one on the left and it opens.',
-    }));
+  const middle = el('div', { class: 'collection-list' }, parts.list.node);
+  const right = el('div', { class: 'collection-detail' }, parts.detail.node);
 
   const node = el('div', { class: 'studio' },
     workspaceRail(serverId, landing ? null : surface),
@@ -189,12 +191,12 @@ export function renderWorkspace(ctx) {
   return {
     node,
     onMount: async () => {
-      await list.onMount();
-      if (detail) await detail.onMount();
+      await parts.list.onMount();
+      await parts.detail.onMount();
     },
     cleanup() {
-      if (list.cleanup) list.cleanup();
-      if (detail && detail.cleanup) detail.cleanup();
+      if (parts.list.cleanup) parts.list.cleanup();
+      if (parts.detail.cleanup) parts.detail.cleanup();
     },
   };
 }

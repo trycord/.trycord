@@ -29,7 +29,7 @@ import { path } from '../../../packages/nav.js';
 import { State } from '../../../packages/store.js';
 import {
   Workspace, POLL_SCORINGS, POLL_SCORING_LABELS, POLL_ELIGIBILITY_LABELS,
-  mayPost, mayActOn,
+  mayPost, mayActOn, paramId,
   pollRoute, bordaPoints,
 } from '../../../packages/workspace.js';
 
@@ -87,7 +87,7 @@ export function pollsList(ctx) {
 
 export function pollsDetail(ctx) {
   const serverId = ctx.serverId;
-  const pollId = ctx.params.pollId;
+  const pollId = paramId(ctx.params, 'poll');
 
   if (!pollId) {
     return {

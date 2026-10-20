@@ -28,7 +28,7 @@ import { State, channelsOf, refreshServerTree } from '../../../packages/store.js
 import {
   Workspace, CARD_PRIORITIES, CARD_STATUSES, CARD_LINK_KINDS, CARD_LINK_LABELS,
   PRIORITY_LABELS, STATUS_LABELS,
-  mayManageStructure, mayPost, mayActOn,
+  mayManageStructure, mayPost, mayActOn, paramId,
   boardRoute, cardRoute, documentRoute, eventRoute,
   toZoneInput, instantInZone, readerZone,
 } from '../../../packages/workspace.js';
@@ -83,8 +83,8 @@ export function boardsList(ctx) {
 
 export function boardsDetail(ctx) {
   const serverId = ctx.serverId;
-  const boardId = ctx.params.boardId;
-  const cardId = ctx.params.cardId;
+  const boardId = paramId(ctx.params, 'board');
+  const cardId = paramId(ctx.params, 'card');
 
   if (cardId && boardId) return cardView(ctx, boardId, cardId);
   if (!boardId) {

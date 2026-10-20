@@ -58,6 +58,18 @@ export function pollRoute(serverId, pollId) {
   return surfaceRoute(serverId, 'poll') + '/' + encodeURIComponent(pollId);
 }
 
+// The id of the thing a page is showing.
+//
+// The registry names the parameter after the thing it names, so a document
+// arrives in `params.document`. The `Id` spelling is read as well, so a route
+// that names it that way answers the same surface.
+export function paramId(params, name) {
+  if (!params) return null;
+  const value = params[name] !== undefined ? params[name] : params[name + 'Id'];
+  if (value === undefined || value === null || value === '') return null;
+  return String(value);
+}
+
 // -- the five surfaces ---------------------------------------------------------
 
 export const SURFACES = [
@@ -479,7 +491,7 @@ export const Workspace = {
 };
 
 export default {
-  Workspace, SURFACES, surfaceById,
+  Workspace, SURFACES, surfaceById, paramId,
   workspaceRoute, surfaceRoute, spaceRoute, documentRoute, boardRoute, cardRoute,
   eventRoute, pollRoute,
   mayManageStructure, mayWriteDocuments, mayPost, mayModerate, mayActOn,

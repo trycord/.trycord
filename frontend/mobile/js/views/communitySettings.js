@@ -137,16 +137,18 @@ function overviewSection(serverId) {
       'aria-label': 'The interaction settings of this community',
     }, settings.interactionSettings || '');
 
-    form.set('name', community.name || '');
-    form.set('description', community.description || '');
-    form.set('isPublic', !!community.is_public);
-    form.set('isDiscoverable', !!community.is_discoverable);
-    form.set('federated', community.federated !== false);
-    form.set('welcomeContent', settings.welcomeContent || '');
-    form.set('welcomeEnabled', !!settings.welcomeEnabled);
-    form.set('guidelines', settings.guidelines || '');
-    form.set('notificationDefaults', settings.notificationDefaults || '');
-    form.set('interactionSettings', settings.interactionSettings || '');
+    form.load({
+      name: community.name || '',
+      description: community.description || '',
+      isPublic: !!community.is_public,
+      isDiscoverable: !!community.is_discoverable,
+      federated: community.federated !== false,
+      welcomeContent: settings.welcomeContent || '',
+      welcomeEnabled: !!settings.welcomeEnabled,
+      guidelines: settings.guidelines || '',
+      notificationDefaults: settings.notificationDefaults || '',
+      interactionSettings: settings.interactionSettings || '',
+    });
 
     name.addEventListener('input', () => form.set('name', name.value));
     description.addEventListener('input', () => form.set('description', description.value));
@@ -1186,7 +1188,7 @@ export function renderCommunitySettings(ctx) {
     };
   }
 
-  const wanted = String(ctx.query ? ctx.query.get('section') : '' || 'overview');
+  const wanted = ctx.query ? (ctx.query.get('section') || 'overview') : 'overview';
   const table = builders(serverId);
   const active = table[wanted] ? wanted : 'overview';
   const host = el('div', { class: 'm-stack' });

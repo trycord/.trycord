@@ -306,6 +306,14 @@ export function createFormState(initial) {
   const original = Object.assign({}, initial || {});
   const current = Object.assign({}, initial || {});
   return {
+    // The values the server holds. These are the baseline the section
+    // compares against, so a field that has just been read is not dirty.
+    load(values) {
+      for (const field of Object.keys(values || {})) {
+        original[field] = values[field];
+        current[field] = values[field];
+      }
+    },
     set(field, value) { current[field] = value; },
     value(field) { return current[field]; },
     original(field) { return original[field]; },

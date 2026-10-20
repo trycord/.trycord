@@ -27,7 +27,7 @@ import { path, navigate } from '../../../packages/nav.js';
 import { State } from '../../../packages/store.js';
 import { blockErrors, LIMITS } from '../pageSource.js';
 import {
-  Workspace, BLOCK_LABELS, mayWriteDocuments, mayPost, mayActOn,
+  Workspace, BLOCK_LABELS, mayWriteDocuments, mayPost, mayActOn, paramId,
   documentRoute,
 } from '../../../packages/workspace.js';
 
@@ -81,7 +81,7 @@ export function documentsList(ctx) {
 
 export function documentsDetail(ctx) {
   const serverId = ctx.serverId;
-  const documentId = ctx.params.documentId;
+  const documentId = paramId(ctx.params, 'document');
 
   if (!documentId) {
     return {

@@ -76,6 +76,18 @@ test('a document opens and shows its blocks', async () => {
   assert.ok(callTo(calls, 'GET', api('/documents/doc-1')), 'the document was not read');
 });
 
+test('a document opens under the address the registry gives it', async () => {
+  asWriter();
+  installFetchStub(routes());
+  // The registry names the parameter after the thing it names.
+  const view = documentsDetail({
+    page: { id: 'community.workspace.document' }, params: { document: 'doc-1' }, serverId: 's1',
+  });
+  await view.onMount();
+
+  assert.ok(byText(view.node, 'We write it down.').length > 0, 'the document did not open');
+});
+
 test('a save carries the revision it was written against', async () => {
   asWriter();
   const calls = installFetchStub(routes({

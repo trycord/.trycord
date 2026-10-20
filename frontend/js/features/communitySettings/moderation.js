@@ -85,7 +85,13 @@ export function moderationSection(ctx) {
     const removalBody = el('div', { class: 'rowlist' });
 
     // -- the bans ------------------------------------------------------------
-    if (!bans.length) {
+    if (!canModerate()) {
+      banBody.replaceChildren(blank({
+        glyph: 'ban',
+        title: 'You cannot lift bans here',
+        text: 'Lifting a ban takes a permission this account does not hold.',
+      }));
+    } else if (!bans.length) {
       banBody.replaceChildren(blank({
         glyph: 'ban',
         title: 'Nobody is banned',
