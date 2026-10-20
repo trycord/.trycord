@@ -63,7 +63,7 @@ export const COMMUNITY_SECTIONS = [
     blurb: 'Bans, timeouts and removing a member',
   },
   {
-    id: 'voice', label: 'Voice', icon: 'volume', group: 'This community',
+    id: 'voice', label: 'Voice and video', icon: 'mic', group: 'Structure',
     blurb: 'The voice channels of this community',
   },
   {

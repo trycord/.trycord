@@ -306,7 +306,9 @@ export async function upload(conversationId, file, post) {
  * says so, and says which of the two it is.
  */
 export function describe(answer) {
-  if (!answer || !answer.state) return '';
+  // A state that has not been asked for yet is not "not encrypted". It is
+  // unknown, and saying otherwise would be a claim the server has not made.
+  if (!answer || !answer.state) return 'Encryption not checked yet';
   if (answer.state === 'encrypted') return 'End-to-end encrypted';
   if (answer.state === 'not-encrypted') return 'Not encrypted';
   if (answer.state === 'mixed') {
@@ -320,15 +322,31 @@ export function describe(answer) {
 
 /**
  * The badge that says how a conversation is encrypted.
+ *
+ * It always answers with a node. A badge that returns nothing is a null
+ * waiting to be dereferenced, and the one place that reads it reads it
+ * before the server has been asked - so it would have crashed on every
+ * channel the reader opened.
  */
 export function badge(answer) {
   const text = describe(answer);
-  if (!text) return null;
-  const encrypted = answer.state === 'encrypted';
+  const known = !!(answer && answer.state);
+  const encrypted = known && answer.state === 'encrypted';
   return el('span', {
-    class: 'badge ' + (encrypted ? 'badge--success' : 'badge--warning'),
+    class: 'badge ' + (known ? (encrypted ? 'badge--success' : 'badge--warning') : 'badge--muted'),
     title: text,
-  }, icon(encrypted ? 'lock' : 'unlock', { size: 13 }), el('span', {}, text));
+  }, icon(known ? (encrypted ? 'lock' : 'unlock') : 'help', { size: 13 }), el('span', {}, text));
+}
+
+/**
+ * Whether the state of a conversation is known.
+ *
+ * The answer arrives from the server, so a control that offers to change it
+ * has to say so until it does: offering "turn on" for a conversation whose
+ * state is unknown is offering a control whose effect is a guess.
+ */
+export function isKnown(answer) {
+  return !!(answer && answer.state);
 }
 
 /**

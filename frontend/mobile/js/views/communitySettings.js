@@ -20,9 +20,9 @@
 import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import Api from '../../../packages/api.js';
-import { path, navigate } from '../../../packages/nav.js';
+import { navigate } from '../../../packages/nav.js';
 import { screen } from './util.js';
-import { empty, loading, failure, list } from '../components.js';
+import { empty, loading, failure } from '../components.js';
 import { sheet, confirm, toast } from '../ui.js';
 import {
   State, serverById, refreshServer, refreshServerTree, refreshServerRoles,
@@ -35,9 +35,7 @@ import { voiceSection } from './communityVoice.js';
 import {
   renderMembersPage, renderRolesPage, renderInvitesPage, renderCategoriesPage,
 } from './community.js';
-import {
-  openChannelEditor, deleteChannel, openCategoryEditor, deleteCategory,
-} from '../manage.js';
+import { openChannelEditor, deleteChannel } from '../manage.js';
 
 // The name of a member, however the server spells it.
 function memberName(member) {

@@ -15,4 +15,5 @@ require('./documents.test');
 require('./boards.test');
 require('./events.test');
 require('./polls.test');
+require('./polls-edit.test');
 require('./spaces.test');
