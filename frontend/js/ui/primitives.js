@@ -13,6 +13,7 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { initials, hueOf } from '../../packages/format.js';
 import { mediaUrl, isServerPath } from '../../packages/media.js';
+import { avatarUrlOf, serverIconOf } from '../../packages/identity.js';
 
 function identityGradient(hue) {
   const second = (hue + 38) % 360;
@@ -46,7 +47,7 @@ export function avatar(user, options) {
     style: { background: identityGradient(hue) },
   }, initials(name));
 
-  paintImage(node, user && user.avatarUrl ? user.avatarUrl : null);
+  paintImage(node, avatarUrlOf(user));
 
   if (opts.presence) {
     node.appendChild(el('span', {
@@ -71,7 +72,7 @@ export function serverMark(server, options) {
     title: name,
   }, initials(name));
 
-  paintImage(node, server && server.icon_url ? server.icon_url : null);
+  paintImage(node, serverIconOf(server));
   return node;
 }
 

@@ -99,12 +99,32 @@ export function publicPath(route) {
 
 // The current route as the router sees it: always leading-slash, never
 // carrying the mount prefix.
+//
+// A document served off disk cannot carry a route in its address - there is
+// no server to answer a path - so a harness that drives the client from a
+// file names the route it wants here. It is read only when the document is
+// off disk, so a served document is never affected by it, and it is a fixed
+// name rather than a URL parameter, so nothing a reader can send reaches it.
 export function currentRoute() {
+  const override = offDiskRoute();
+  if (override) return override;
   const pathname = String(window.location.pathname || '/');
   if (!BASE) return '/' + pathname.replace(/^\/+/, '');
   if (pathname === BASE) return '/';
   const rest = pathname.startsWith(BASE + '/') ? pathname.slice(BASE.length) : pathname;
   return '/' + rest.replace(/^\/+/, '');
+}
+
+// The route a harness asked for, when the document is off disk.
+function offDiskRoute() {
+  try {
+    if (window.location.protocol !== 'file:') return null;
+    const wanted = window.__trycordRoute;
+    if (typeof wanted !== 'string' || wanted.charAt(0) !== '/') return null;
+    return '/' + wanted.replace(/^\/+/, '');
+  } catch {
+    return null;
+  }
 }
 
 export function currentQuery() {
@@ -124,15 +144,26 @@ export function navigate(route, options) {
     notify(clean, { same: true });
     return;
   }
-  if (opts.replace) {
-    // A redirect does not grow the stack: it corrects the entry that is already
-    // showing, so it keeps the cursor where it is and does not animate.
-    window.history.replaceState(entry(clean, cursor), '', target);
-    direction = 'replace';
-  } else {
-    cursor += 1;
-    window.history.pushState(entry(clean, cursor), '', target);
-    direction = 'forward';
+  // The history entry is written, and the navigation happens either way.
+  //
+  // A browser can refuse the write: a document off disk cannot change its
+  // own address, and a sandboxed frame cannot write a URL it does not own.
+  // The reader asked to go somewhere, and not being able to record how they
+  // got there is not a reason to stay where they are.
+  try {
+    if (opts.replace) {
+      // A redirect does not grow the stack: it corrects the entry that is
+      // already showing, so it keeps the cursor where it is and does not
+      // animate.
+      window.history.replaceState(entry(clean, cursor), '', target);
+      direction = 'replace';
+    } else {
+      cursor += 1;
+      window.history.pushState(entry(clean, cursor), '', target);
+      direction = 'forward';
+    }
+  } catch {
+    direction = 'same';
   }
   notify(clean, opts);
 }

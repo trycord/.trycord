@@ -10,6 +10,7 @@ import { brandMark } from '../../packages/brand.js';
 import { path } from '../../packages/nav.js';
 import { mediaUrl } from '../../packages/media.js';
 import { initials, hueOf } from '../../packages/format.js';
+import { avatarUrlOf, serverIconOf } from '../../packages/identity.js';
 import { presenceOf } from '../../packages/store.js';
 
 // A round button carrying one icon. The label is required and becomes the
@@ -47,7 +48,7 @@ export function avatar(user, options) {
     'aria-hidden': opts.decorative ? 'true' : null,
   }, initials(name));
 
-  const url = user && user.avatarUrl;
+  const url = avatarUrlOf(user);
   if (url) mediaUrl(url).then((src) => { if (src) paintFace(node, src); });
 
   if (opts.presence && user && user.id) {
@@ -73,7 +74,7 @@ export function serverMark(server, options) {
     style: { background: 'hsl(' + hueOf(server && server.id || name) + ' 34% 24%)' },
     'aria-hidden': opts.decorative ? 'true' : null,
   }, initials(name));
-  const url = server && (server.icon_url || server.iconUrl);
+  const url = serverIconOf(server);
   if (url) mediaUrl(url).then((src) => { if (src) { node.textContent = ''; node.appendChild(el('img', { src, alt: '' })); } });
   return node;
 }

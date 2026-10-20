@@ -11,6 +11,7 @@ import { State, dmPeer, nameOf, refreshDms, presenceOf, on as onStore } from '..
 import { path, navigate } from '../../../packages/nav.js';
 import { relativeTime } from '../../../packages/format.js';
 import Api from '../../../packages/api.js';
+import { avatarUrlOf } from '../../../packages/identity.js';
 import { screen, section } from './util.js';
 import { attachLongPress } from '../ui.js';
 import { personActions } from '../person.js';
@@ -27,7 +28,7 @@ function peerOf(dm) {
     id: other.id,
     username: other.username,
     displayName: other.display_name || other.displayName || other.username,
-    avatarUrl: other.avatar_url !== undefined ? other.avatar_url : other.avatarUrl,
+    avatarUrl: avatarUrlOf(other),
   };
 }
 

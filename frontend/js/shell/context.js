@@ -18,6 +18,7 @@ import { globalPages } from '../../packages/registry.js';
 import { brandMark } from './frame.js';
 import { personContextMenu } from '../ui/person.js';
 import Api from '../../packages/api.js';
+import { avatarUrlOf } from '../../packages/identity.js';
 import {
   openCategoryDialog, createChannel, moveChannel, toggleMute,
   channelMenuItems, categoryMenuItems, reorderChannels, reorderCategories,
@@ -90,7 +91,7 @@ function dmUsers(dm) {
     id: user.id,
     username: user.username,
     displayName: user.display_name || user.displayName || user.username,
-    avatarUrl: user.avatar_url !== undefined ? user.avatar_url : user.avatarUrl,
+    avatarUrl: avatarUrlOf(user),
   }));
 }
 

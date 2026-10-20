@@ -119,6 +119,30 @@ async function maybeFailover() {
   return false;
 }
 
+// What a status means, in words a person can act on.
+//
+// A bare status text - "Forbidden", "Not Found" - tells a reader that
+// something went wrong and nothing about what to do about it. These say
+// what happened and what the next step is, and they are the last resort:
+// the server's own message is used whenever there is one, because it knows
+// more than a status code does.
+const BY_STATUS = {
+  400: 'That request was not understood. Try again.',
+  401: 'Your session has ended. Sign in again to continue.',
+  403: "You don't have permission to do that.",
+  404: "That's no longer there.",
+  405: 'That cannot be done here.',
+  409: 'Someone else got there first. Refresh and try again.',
+  413: 'That file is too large.',
+  415: 'That file is not a kind of file this accepts.',
+  422: 'Some of that is not right. Check the details and try again.',
+  429: 'Too many of those in a row. Wait a moment and try again.',
+  500: 'Something went wrong on our side. It has been logged.',
+  502: 'The server is not answering. Try again in a moment.',
+  503: 'That is not available right now. Try again in a moment.',
+  504: 'The server took too long to answer. Try again in a moment.',
+};
+
 async function readError(res) {
   let parsed = null;
   try { parsed = await res.json(); } catch { /* the body was not json */ }
@@ -126,7 +150,8 @@ async function readError(res) {
   if (err && err.code) {
     return new ApiError(err.code, err.message, res.status, Number(res.headers.get('retry-after')) || 0, err.details);
   }
-  return new ApiError('HTTP_' + res.status, res.statusText || 'The request failed.', res.status);
+  const said = BY_STATUS[res.status] || res.statusText || 'The request failed.';
+  return new ApiError('HTTP_' + res.status, said, res.status);
 }
 
 export async function request(method, path, options) {

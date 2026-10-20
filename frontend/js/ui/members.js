@@ -25,6 +25,7 @@ import {
   nameOf, presenceOf, refreshPresence, can, isOwner, on as onStore,
 } from '../../packages/store.js';
 import { on as onRealtime, EVENTS } from '../../packages/realtime.js';
+import { avatarUrlOf } from '../../packages/identity.js';
 import { avatar } from './primitives.js';
 import { row, blank, fault, hold } from './page.js';
 import { personSheet, personContextMenu } from './person.js';
@@ -107,7 +108,7 @@ export function memberRow(serverId, member, repaint) {
     username: member.username,
     displayName: member.display_name || member.displayName || member.username,
     nickname: member.nickname || null,
-    avatarUrl: member.avatar_url !== undefined ? member.avatar_url : member.avatarUrl,
+    avatarUrl: avatarUrlOf(member),
     statusText: member.status_text || null,
   };
   const status = presenceOf(member.id);

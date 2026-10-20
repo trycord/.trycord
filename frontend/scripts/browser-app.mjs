@@ -44,6 +44,10 @@ function arg(name, fallback) {
 const BASE = String(arg('base', '')).replace(/\/+$/, '');
 const WIDTHS = String(arg('widths', '390,768,1280,1920')).split(',').map((n) => Number(n.trim())).filter(Boolean);
 const ROUTES = String(arg('routes', '/home,/dms,/search,/settings,/menu')).split(',').map((r) => r.trim()).filter(Boolean);
+// The Mobile module is a shell of its own, so it is driven separately.
+const MOBILE = arg('mobile', 'yes') !== 'no';
+const MOBILE_WIDTHS = String(arg('mobile-widths', '320,390,430')).split(',').map((n) => Number(n.trim())).filter(Boolean);
+const MOBILE_ROUTES = String(arg('mobile-routes', '/home,/dms,/search,/settings,/menu')).split(',').map((r) => r.trim()).filter(Boolean);
 const SHOTS = arg('shots', '');
 const PORT = Number(process.env.BROWSER_APP_PORT || 9377);
 
@@ -110,9 +114,26 @@ const ANSWERS = {
 const STUB = `
 (function () {
   var answers = ${JSON.stringify(ANSWERS)};
-  var errors = [];
-  window.__errors = errors;
+  var errors = window.__trycordErrors = window.__trycordErrors || [];
   var original = window.fetch;
+
+  // A signed-in reader.
+  //
+  // The token is kept under the address of the instance, and the harness
+  // answers the configuration with an empty address, so the key is the
+  // prefix on its own. Without a token the client is signed out, and a
+  // signed-out client draws the sign-in screen - so the harness was
+  // measuring a page no reader ever sees.
+  // The key is the prefix and the address of the instance the client
+  // resolved. A document off disk has no address of its own, so it falls
+  // back to the default one - and the stub answers the configuration with
+  // an empty address, which is the same key. Both are set, so the reader is
+  // signed in whichever the client ends up talking to.
+  try {
+    window.localStorage.setItem('trycord.token.', 'harness-token');
+    window.localStorage.setItem('trycord.token.https://api.trycord.dev', 'harness-token');
+    window.localStorage.setItem('trycord.token.http://localhost:9971', 'harness-token');
+  } catch (e) { /* storage is off; the client will be signed out */ }
   window.fetch = function (input, options) {
     var url = String(input);
     var method = String((options && options.method) || 'GET').toUpperCase();
@@ -176,6 +197,37 @@ function writeHarnessDocument() {
   return HARNESS_DOCUMENT;
 }
 
+// The Mobile module's own entry document, the same way.
+//
+// It is a second shell over the same packages, with its own stylesheet and
+// its own router, so it has to be driven as its own document. The base is
+// the module root, and every asset below it is relative to that, so the
+// document is copied with the base rewritten to the directory it sits in.
+function writeMobileHarnessDocument() {
+  // The document is written two levels below the client, so the module's own
+  // relative imports - "../../packages/..." - still reach the real packages
+  // rather than a copy of them.
+  const dir = path.join(CLIENT, '.browser-harness', 'mobile');
+  fs.mkdirSync(dir, { recursive: true });
+  const original = fs.readFileSync(path.join(CLIENT, 'mobile', 'index.html'), 'utf8');
+  const target = path.join(dir, 'index.html');
+  fs.writeFileSync(target, original.replace(
+    /<base href="[^"]*">/,
+    '<base href="./">',
+  ));
+  // The stylesheet is asked for as "./css/app.css", and the icons as
+  // "../assets/...", so those two are copied beside the document.
+  fs.cpSync(path.join(CLIENT, 'mobile', 'css'), path.join(dir, 'css'), { recursive: true });
+  fs.cpSync(path.join(CLIENT, 'mobile', 'js'), path.join(dir, 'js'), { recursive: true });
+  fs.cpSync(path.join(CLIENT, 'assets'), path.join(CLIENT, '.browser-harness', 'assets'),
+    { recursive: true });
+  // The module's own imports reach up two directories for the packages, so
+  // they are copied to where that path lands.
+  fs.cpSync(path.join(CLIENT, 'packages'), path.join(CLIENT, '.browser-harness', 'packages'),
+    { recursive: true });
+  return target;
+}
+
 // ---- the browser ------------------------------------------------------------
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-app-'));
@@ -202,6 +254,7 @@ async function shutdown() {
   try { chrome.kill('SIGKILL'); } catch { /* already gone */ }
   try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* already gone */ }
   try { fs.rmSync(HARNESS_DOCUMENT, { force: true }); } catch { /* already gone */ }
+  try { fs.rmSync(path.join(CLIENT, '.browser-harness'), { recursive: true, force: true }); } catch { /* already gone */ }
 }
 
 class Page {
@@ -273,12 +326,29 @@ try {
 
   const document = writeHarnessDocument();
 
+  // The route has to be named before the client boots: a document off disk
+  // has no path that carries one, and the client routes on the address.
+  // A script added to every new document is the only thing that runs early
+  // enough, so it is registered per route and the previous one removed.
+  let routeScript = null;
+  const nameRoute = async (route) => {
+    if (routeScript) {
+      await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: routeScript });
+      routeScript = null;
+    }
+    const added = await page.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: 'window.__trycordRoute = ' + JSON.stringify(route) + ';',
+    });
+    routeScript = added && added.identifier;
+  };
+
   for (const width of WIDTHS) {
     await page.send('Emulation.setDeviceMetricsOverride', {
       width, height: 900, deviceScaleFactor: 1, mobile: false,
     });
 
     for (const route of ROUTES) {
+      await nameRoute(route);
       await page.send('Page.navigate', { url: 'file://' + document });
       // The client reads its configuration, asks the instance, and draws.
       // Give it the time it needs rather than a fixed guess.
@@ -290,10 +360,6 @@ try {
         await wait(120);
       }
       await wait(400);
-
-      // The client routes on the location, which a file:// document cannot
-      // carry, so the route is set the way the router reads it.
-      await page.evaluate('window.__trycordRoute = ' + JSON.stringify(route) + '; return true;');
 
       const measured = await page.evaluate(`
         var root = document.querySelector('.ws');
@@ -309,8 +375,8 @@ try {
             shown: style.display !== 'none' && style.visibility !== 'hidden',
           };
         }
-        var errors = (window.__errors || []).slice();
-        window.__errors = [];
+        var errors = (window.__trycordErrors || []).slice();
+        window.__trycordErrors = [];
         return {
           regions: root ? root.getAttribute('data-regions') : null,
           column: root ? root.getAttribute('data-column') : null,
@@ -369,6 +435,105 @@ try {
       }
     }
   }
+// ---- the mobile shell --------------------------------------------------------
+//
+// The Mobile module is a second shell over the same packages, with its own
+// entry document, its own stylesheet and its own router. It is driven here
+// as its own document, at the widths a phone is, and what is measured is
+// what a thumb has to reach: every control is at least a touch target, and
+// nothing is drawn outside the width of the screen.
+//
+// The limit of this is the same as the limit of the desktop pass: the
+// browser here cannot reach the network, so the instance's answers are
+// stubbed and the module is measured against those. It is a real browser,
+// real CSS and real pixels; it is not a real phone.
+
+if (MOBILE) {
+  console.log('\n--- the mobile shell ---');
+  const mobileDocument = writeMobileHarnessDocument();
+
+  for (const width of MOBILE_WIDTHS) {
+    await page.send('Emulation.setDeviceMetricsOverride', {
+      width, height: 844, deviceScaleFactor: 1, mobile: true,
+    });
+
+    for (const route of MOBILE_ROUTES) {
+      await nameRoute(route);
+      await page.send('Page.navigate', { url: 'file://' + mobileDocument });
+      for (let i = 0; i < 60; i++) {
+        const ready = await page.evaluate(
+          'return !!(document.querySelector(".m-app") || document.querySelector(".auth-page")'
+          + ' || (document.getElementById("app") && document.getElementById("app").childNodes.length));',
+        ).catch(() => false);
+        if (ready) break;
+        await wait(120);
+      }
+      await wait(400);
+      const measured = await page.evaluate(`
+        // Every control a thumb has to reach.
+        var small = [];
+        var controls = Array.from(document.querySelectorAll(
+          'button, a[href], [role="button"], [role="tab"], input[type="checkbox"], input[type="radio"]'
+        ));
+        for (var i = 0; i < controls.length; i++) {
+          var node = controls[i];
+          var rect = node.getBoundingClientRect();
+          var style = getComputedStyle(node);
+          if (style.display === 'none' || style.visibility === 'hidden') continue;
+          if (rect.width === 0 && rect.height === 0) continue;
+          // A link inside a line of text is not a control a thumb presses.
+          if (node.tagName === 'A' && node.closest('p, li, .lede, .m-row__sub')) continue;
+          // A control whose middle is not on the screen is not one a thumb
+          // reaches: the skip link sits off the top until it is focused, and
+          // it is a keyboard affordance rather than a touch one.
+          var cx = rect.left + rect.width / 2;
+          var cy = rect.top + rect.height / 2;
+          if (cy < 0 || cy > window.innerHeight || cx < 0 || cx > window.innerWidth) continue;
+          if (rect.width < 44 || rect.height < 44) {
+            small.push({
+              tag: node.tagName,
+              cls: String(node.className || '').slice(0, 40),
+              label: String(node.getAttribute('aria-label') || node.textContent || '').trim().slice(0, 40),
+              w: Math.round(rect.width), h: Math.round(rect.height),
+            });
+          }
+        }
+        var errors = (window.__trycordErrors || []).slice();
+        window.__trycordErrors = [];
+        return {
+          small: small,
+          errors: errors,
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          controls: controls.length,
+          text: String(document.body.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 90),
+          appChildren: (document.getElementById('app') || {}).childNodes
+            ? document.getElementById('app').childNodes.length : -1,
+        };
+      `);
+
+      const faults = [];
+      for (const error of measured.errors || []) faults.push(error);
+      if (measured.overflow > 2) {
+        faults.push('the page scrolls sideways by ' + measured.overflow + ' pixels');
+      }
+      for (const control of measured.small || []) {
+        faults.push('a control is ' + control.w + 'x' + control.h
+          + ' (' + control.cls + (control.label ? ' "' + control.label + '"' : '') + ')');
+      }
+      if (measured.appChildren <= 0) faults.push('the module drew nothing');
+
+      if (faults.length) {
+        failures += faults.length;
+        for (const fault of faults) console.log('        ' + fault);
+      }
+      console.log('  ' + (faults.length ? 'FAIL' : 'ok ') + '    ' + width + 'px ' + route
+        + ' controls=' + measured.controls
+        + ' small=' + (measured.small || []).length
+        + ' | ' + (measured.text || ''));
+    }
+  }
+}
+
 } catch (error) {
   console.log('the run failed: ' + (error && error.message));
   console.log(chromeErrors.slice(0, 600));
