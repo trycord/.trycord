@@ -72,7 +72,6 @@ export class E2eeClient {
     if (!this.device) await this.load();
     if (!this.device) {
       this.device = await createDevice({ userId: options.userId, label: options.label });
-      this.device.registered = false;
       await saveDevice(this.store, this.device);
       this.manager = new SessionManager({ device: this.device, store: this.store, api: this.api });
     }
@@ -348,6 +347,10 @@ export class E2eeClient {
 
   /**
    * The bytes of an attachment, opened with the key sealed to this device.
+   *
+   * The ciphertext is fetched from where the server stored it and opened
+   * here: the key was sealed to the member devices, and this device's own
+   * seal is the only one it can open.
    */
   async openAttachment(conversationId, attachmentId, bytes) {
     const opened = await attachmentKeyForDevice(
@@ -357,7 +360,8 @@ export class E2eeClient {
     if (!opened) {
       throw protocolError('E2EE_FORBIDDEN', 'this attachment was not sealed to this device', 403);
     }
-    return decryptFile(opened.key, bytes);
+    const ciphertext = bytes || await this.api.attachmentBytes(attachmentId);
+    return decryptFile(opened.key, ciphertext);
   }
 
   /**

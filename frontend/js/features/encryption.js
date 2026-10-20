@@ -267,13 +267,13 @@ export function encryptionView() {
           await open.adoptDevice(newDevice);
           await open.register();
           await open.publishPrekeys();
-          status.textContent = 'This browser is now a new device. Revoke the lost one when you are ready: '
-            + 'until it is revoked it can still read this account\'s conversations.';
+          status.textContent = 'This browser is now a new device'
+            + (answer && answer.device && answer.device.label ? ' (' + answer.device.label + ')' : '')
+            + '. Revoke the lost one when you are ready: until it is revoked it can still read this account\'s conversations.';
           key.value = '';
           toast('Recovered: this browser is a new device');
           paintDevices();
           paintThisDevice();
-          void answer;
         } catch (error) {
           status.textContent = '';
           errorToast(error);

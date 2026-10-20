@@ -25,9 +25,9 @@
 
 import { b64, unb64, utf8, fromUtf8 } from './bytes.js';
 import { sign } from './primitives.js';
-import { canonical, PROTOCOL_VERSION, RECOVERY_PROOF_CONTEXT, RECOVERY_WRAP_INFO, ZERO_SALT } from './protocol.js';
+import { canonical, PROTOCOL_VERSION, RECOVERY_PROOF_CONTEXT, RECOVERY_WRAP_INFO } from './protocol.js';
 import { deriveWrappingKey, privateKeySet, restoreKeySet } from './deviceKeys.js';
-import { encrypt, decrypt, randomBytes, GCM_IV_BYTES, KEY_BYTES } from './primitives.js';
+import { encrypt, decrypt, randomBytes, GCM_IV_BYTES } from './primitives.js';
 import { RECOVERY_PBKDF2_ITERATIONS, RECOVERY_SALT_BYTES } from './protocol.js';
 
 /**

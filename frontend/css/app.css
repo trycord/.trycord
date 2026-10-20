@@ -1526,6 +1526,14 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .msg-author { font-weight: 700; font-size: var(--fs-sm); color: var(--text-1); }
 .msg-stamp { font-size: var(--fs-xs); color: var(--text-3); }
 .msg-edited { font-size: var(--fs-xs); color: var(--text-3); font-style: italic; }
+/* A message this device could not open. It is not an error in the message and
+   it is not empty: the text is in the envelope, and this device does not have
+   the key. */
+.msg-unreadable {
+  font-size: var(--fs-sm);
+  color: var(--text-3);
+  font-style: italic;
+}
 .msg-pinflag { color: var(--text-3); display: inline-flex; vertical-align: middle; }
 .msg-sending { font-size: var(--fs-xs); color: var(--text-3); font-style: italic; }
 

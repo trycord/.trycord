@@ -9,8 +9,8 @@
 // the reader wants a backup - the private material sealed under a key derived
 // from a recovery key the server never sees.
 
-import { b64, unb64, randomBytes, utf8 } from './bytes.js';
-import { generateKeyPair, sign, GCM_IV_BYTES } from './primitives.js';
+import { b64, randomBytes } from './bytes.js';
+import { generateKeyPair, sign } from './primitives.js';
 import { generateKeySet, publicKeySet, privateKeySet, restoreKeySet, fingerprint, generateRecoveryKey, sealPrivateMaterial, sealPrivateBytes } from './deviceKeys.js';
 import { bundleSignatureBytes, prekeySignatureBytes } from './prekeys.js';
 import { readRecord, writeRecord } from './store.js';
@@ -52,6 +52,9 @@ export class Device {
     this.oneTimePreKeys = record.oneTimePreKeys || {};
     this.recoveryKey = record.recoveryKey || null;
     this.sealedPrivateKey = record.sealedPrivateKey || null;
+    // Whether the server has been told about this device. A device that has
+    // been registered is not registered again every time the page opens.
+    this.registered = !!record.registered;
   }
 
   /** The public halves, in the shape the API uses. */
@@ -176,6 +179,7 @@ export class Device {
       oneTimePreKeys: this.oneTimePreKeys,
       recoveryKey: this.recoveryKey,
       sealedPrivateKey: this.sealedPrivateKey,
+      registered: this.registered,
     };
   }
 }

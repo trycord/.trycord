@@ -54,6 +54,11 @@ export function asMessage(raw) {
     reactions: Array.isArray(reactions) ? reactions.slice() : [],
     pinned: !!raw.pinned,
     pending: !!raw.pending,
+    // An encrypted message, and whether this device could open it. The server
+    // holds no text for an encrypted message, so a message that could not be
+    // opened has a reason and not an empty body.
+    encrypted: !!raw.encrypted,
+    unreadable: !!raw.unreadable,
   };
 }
 
@@ -141,6 +146,15 @@ function richText(text) {
 }
 
 function inlineContent(m) {
+  // A message this device could not open is said so, rather than drawn as an
+  // empty line. The server holds no text for it — the text is in the envelope,
+  // and this device does not have the key.
+  if (m.unreadable) {
+    return [
+      el('span', { class: 'msg-unreadable' },
+        m.content || 'This message could not be opened on this device.'),
+    ];
+  }
   const nodes = richText(m.content || '');
   if (m.editedAt) nodes.push(' ', el('span', { class: 'msg-edited' }, '(edited)'));
   return nodes;

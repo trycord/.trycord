@@ -81,6 +81,18 @@ export class SessionManager {
     this.api = deps.api;
   }
 
+  /**
+   * Say that something did not work, out loud.
+   *
+   * A failure that does not stop the message is still a failure, and a
+   * failure nobody hears about is a failure nobody fixes.
+   */
+  report(message, error) {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[trycord] ' + message, error);
+    }
+  }
+
   /** The index from peer device to session id. */
   async index() {
     return (await readRecord(this.store, SESSION_INDEX)) || {};
@@ -191,22 +203,36 @@ export class SessionManager {
     return this.establish(peerDeviceId, options);
   }
 
-  /** Tell the server about a session the client has opened. */
+  /**
+   * Tell the server about a session the client has opened.
+   *
+   * The server's record of a session is bookkeeping: the server allows an
+   * envelope whose session it has not seen, and the state it stores is a
+   * backup of what the device already holds. So a server that will not take
+   * the record does not stop the message - but it is reported, because a
+   * session the server does not know about is a session whose state is not
+   * backed up.
+   */
   async registerOnServer(session) {
-    const sealed = await ratchet.sealState(session.state, unb64(session.secret));
-    await this.api.createSession({
-      id: session.id,
-      deviceId: session.deviceId,
-      peerDeviceId: session.peerDeviceId,
-      peerUserId: session.peerUserId,
-      conversationId: session.conversationId,
-      ratchetState: sealed,
-      sendCounter: session.state.ctr,
-      recvCounter: session.state.peerCtr,
-    });
-    session.pushedCounter = session.state.ctr;
-    await this.saveSession(session);
-    return session;
+    try {
+      const sealed = await ratchet.sealState(session.state, unb64(session.secret));
+      await this.api.createSession({
+        id: session.id,
+        deviceId: session.deviceId,
+        peerDeviceId: session.peerDeviceId,
+        peerUserId: session.peerUserId,
+        conversationId: session.conversationId,
+        ratchetState: sealed,
+        sendCounter: session.state.ctr,
+        recvCounter: session.state.peerCtr,
+      });
+      session.pushedCounter = session.state.ctr;
+      await this.saveSession(session);
+      return session;
+    } catch (error) {
+      this.report('the session could not be recorded with the server', error);
+      return session;
+    }
   }
 
   /**
@@ -299,20 +325,27 @@ export class SessionManager {
    *
    * The private half is on the device, or - when the device has lost it - in
    * the sealed copy the server keeps, which the recovery key opens.
+   *
+   * @returns {Promise<{publicKey: Uint8Array, privateKey: Uint8Array}>}
    */
   async oneTimePreKey(prekeyId) {
     const local = this.device.oneTimePreKeys[prekeyId];
-    if (local) return unb64(local.privateKey);
+    if (local) {
+      return { publicKey: unb64(local.publicKey), privateKey: unb64(local.privateKey) };
+    }
     const claimed = await this.api.claimPrekey(this.device.id, prekeyId);
-    const sealed = claimed && claimed.prekey && claimed.prekey.sealedPrivateKey;
-    if (!sealed) {
+    const prekey = claimed && claimed.prekey;
+    if (!prekey || !prekey.sealedPrivateKey) {
       throw protocolError(
         'E2EE_PREKEY_GONE',
         'the one-time prekey this message used is not available any more',
         409,
       );
     }
-    return openPrivateBytes(JSON.parse(sealed), this.device.recoveryKey);
+    return {
+      publicKey: unb64(prekey.publicKey),
+      privateKey: await openPrivateBytes(JSON.parse(prekey.sealedPrivateKey), this.device.recoveryKey),
+    };
   }
 
   /**
@@ -350,8 +383,8 @@ export class SessionManager {
       ownIdentityDhPublic: this.device.keys.ik.publicKey,
       ownSignedPreKeyPrivate: this.device.keys.spk.privateKey,
       ownSignedPreKeyPublic: this.device.keys.spk.publicKey,
-      ownOneTimePreKeyPrivate: oneTime,
-      ownOneTimePreKeyPublic: oneTime ? this.device.oneTimePreKeys[init.oneTimePreKeyId].publicKey : null,
+      ownOneTimePreKeyPrivate: oneTime ? oneTime.privateKey : null,
+      ownOneTimePreKeyPublic: oneTime ? oneTime.publicKey : null,
       peerEphemeralPublicKey: unb64(init.ek),
       peerSignedPreKeyPublic: unb64(init.spk),
     });

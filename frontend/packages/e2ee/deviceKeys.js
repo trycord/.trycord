@@ -23,7 +23,6 @@
 
 import { b64, unb64, utf8, fromUtf8 } from './bytes.js';
 import {
-  b64 as b64Key,
   generateKeyPair,
   hkdf,
   pbkdf2,
@@ -58,9 +57,9 @@ export function generateKeySet() {
 /** The public halves of a key set, base64url, in the shape the API uses. */
 export function publicKeySet(keySet) {
   return {
-    identityKey: b64Key(keySet.sk.publicKey),
-    identityDhKey: b64Key(keySet.ik.publicKey),
-    signedPreKey: b64Key(keySet.spk.publicKey),
+    identityKey: b64(keySet.sk.publicKey),
+    identityDhKey: b64(keySet.ik.publicKey),
+    signedPreKey: b64(keySet.spk.publicKey),
   };
 }
 
@@ -69,8 +68,8 @@ export function privateKeySet(keySet) {
   const out = {};
   for (const name of KEY_NAMES) {
     out[name] = {
-      publicKey: b64Key(keySet[name].publicKey),
-      privateKey: b64Key(keySet[name].privateKey),
+      publicKey: b64(keySet[name].publicKey),
+      privateKey: b64(keySet[name].privateKey),
     };
   }
   return out;
@@ -108,7 +107,7 @@ export async function fingerprint(identityPublicKey) {
  * The user keeps it. The server never sees it - not even at recovery time.
  */
 export function generateRecoveryKey() {
-  return b64Key(randomBytes(32));
+  return b64(randomBytes(32));
 }
 
 /**
@@ -146,11 +145,11 @@ export async function sealPrivateMaterial(keySet, recoveryKey, options = {}) {
     utf8(RECOVERY_WRAP_INFO),
   );
   return {
-    salt: b64Key(salt),
+    salt: b64(salt),
     iterations,
-    iv: b64Key(sealed.iv),
-    ciphertext: b64Key(sealed.ciphertext),
-    tag: b64Key(sealed.tag),
+    iv: b64(sealed.iv),
+    ciphertext: b64(sealed.ciphertext),
+    tag: b64(sealed.tag),
   };
 }
 
@@ -168,11 +167,11 @@ export async function sealPrivateBytes(bytes, recoveryKey, options = {}) {
   const iv = randomBytes(GCM_IV_BYTES);
   const sealed = await encrypt(wrappingKey, iv, bytes, utf8(RECOVERY_WRAP_INFO));
   return {
-    salt: b64Key(salt),
+    salt: b64(salt),
     iterations,
-    iv: b64Key(sealed.iv),
-    ciphertext: b64Key(sealed.ciphertext),
-    tag: b64Key(sealed.tag),
+    iv: b64(sealed.iv),
+    ciphertext: b64(sealed.ciphertext),
+    tag: b64(sealed.tag),
   };
 }
 

@@ -1281,6 +1281,14 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 
 /* Recovery codes and any other single-strength token the reader copies. */
 .m-codes { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+/* A message this device could not open. It is not an error in the message and
+   it is not empty: the text is in the envelope, and this device does not have
+   the key. */
+.m-unreadable {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+  font-style: italic;
+}
 .m-code {
   padding: 8px 10px;
   border: 1px solid var(--line);

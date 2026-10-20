@@ -17,6 +17,7 @@ import {
 import { path, navigate } from '../../packages/nav.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
 import { conversationSurface, asMessage, messageRow, copyText } from '../ui/chat.js';
+import * as encrypted from '../ui/encrypted.js';
 import { memberList } from '../ui/members.js';
 import {
   openCategoryDialog, createChannel, renameCategory, deleteCategory,
@@ -161,7 +162,7 @@ export function renderChannelView(ctx) {
       const page = await Api.messages(channelId, { before: anchor, limit: 40 });
       return { messages: Array.isArray(page) ? page : (page && page.messages) || [] };
     },
-    send: (payload) => Api.sendMessage(channelId, payload),
+    send: (payload) => encrypted.send(channelId, payload, (body) => Api.sendMessage(channelId, body)),
     edit: (messageId, content) => Api.updateMessage(channelId, messageId, { content }),
     del: (messageId) => Api.deleteMessage(channelId, messageId),
     reactTo: (messageId, emoji) => Api.reactChannel(channelId, messageId, emoji),
@@ -220,8 +221,14 @@ export function renderChannelView(ctx) {
     try {
       const page = await Api.messages(channelId, { limit: 50 });
       if (mine !== generation) return;
-      surface.api.paint((Array.isArray(page) ? page : (page && page.messages) || []).map(asMessage),
-        { hasOlder: (Array.isArray(page) ? page : page && page.messages || []).length >= 50 });
+      // The rows are opened before they are drawn. An encrypted row carries no
+      // text from the server - the server holds none - so it has to be opened
+      // here or it is drawn as an empty message.
+      const rows = await encrypted.readRows(
+        Array.isArray(page) ? page : (page && page.messages) || [], channelId);
+      if (mine !== generation) return;
+      surface.api.paint(rows.map(asMessage),
+        { hasOlder: rows.length >= 50 });
       surface.wireScroller();
       joinChannel(channelId);
     } catch (e) {

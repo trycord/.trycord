@@ -16,6 +16,7 @@ import { path, navigate } from '../../packages/nav.js';
 import { avatar } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold, stamp } from '../ui/page.js';
 import { conversationSurface, asMessage } from '../ui/chat.js';
+import * as encrypted from '../ui/encrypted.js';
 import { personSheetEntries } from '../ui/person.js';
 
 // -- the list -----------------------------------------------------------------
@@ -146,7 +147,7 @@ export function renderDmConversation(ctx) {
       const page = await Api.dmMessages(conversationId, { before: anchor, limit: 40 });
       return { messages: Array.isArray(page) ? page : (page && page.messages) || [] };
     },
-    send: (payload) => Api.sendDm(conversationId, payload),
+    send: (payload) => encrypted.send(conversationId, payload, (body) => Api.sendDm(conversationId, body)),
     // The backend has always accepted an attachment on a direct message; the
     // composer simply never offered one.
     upload: (file, onProgress) => Api.uploadDmAttachment(conversationId, file, onProgress),
@@ -223,8 +224,13 @@ export function renderDmConversation(ctx) {
       if (mine !== openGeneration) return;
       if (!host.querySelector('.convo-page')) host.replaceChildren(buildStructure());
       paintPeer(dm);
-      surface.api.paint((dm.messages || []).map(asMessage),
-        { hasOlder: (dm.messages || []).length >= 50 });
+      // The rows are opened before they are drawn: an encrypted row carries no
+      // text from the server, so it has to be opened here or it is drawn as an
+      // empty message.
+      const rows = await encrypted.readRows(dm.messages || [], conversationId);
+      if (mine !== openGeneration) return;
+      surface.api.paint(rows.map(asMessage),
+        { hasOlder: rows.length >= 50 });
       surface.wireScroller();
       joinDm(conversationId);
       markRead();

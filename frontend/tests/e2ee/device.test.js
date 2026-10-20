@@ -128,4 +128,54 @@ test('the device, against a running server', async (t) => {
     assert.equal(opened.rk, sent.session.state.rk);
     assert.ok(!primitives.b64(opened.rk).includes('nothing'), 'the state is the state');
   });
+
+  await t.test('the client opens a message addressed to it, and answers', async () => {
+    // The peer starts the session this time: the client's device is the
+    // responder, which is the half a client spends most of its life in.
+    const peer = serverClient.createDevice(bob.user.id, 'bob phone');
+    await bob.post('/api/e2ee/devices', serverClient.registerBody(peer));
+    await bob.post('/api/e2ee/prekeys', serverClient.publishBody(peer, 4));
+
+    // The peer takes the client's bundle from the server, the way any peer
+    // does, and opens a session with it.
+    const bundleAnswer = await bob.get('/api/e2ee/prekeys/' + client.device.id);
+    assert.equal(bundleAnswer.status, 200, JSON.stringify(bundleAnswer.data));
+    const bundle = bundleAnswer.data.bundle;
+    const verified = serverClient.verifyBundle(bundle);
+    assert.ok(verified.bundleOk, 'the bundle the server hands out must be signed');
+    assert.ok(verified.prekeyOk, 'the one-time prekey must be signed too');
+
+    const context = {
+      sid: 'session-the-server-chose',
+      cid: 'conversation-2',
+      from: peer.deviceId,
+      to: client.device.id,
+    };
+    const agreed = serverClient.initiate(peer, bundle);
+    const init = serverClient.buildInit(peer, context, agreed);
+    const sent = serverClient.encrypt(peer, agreed.state, Buffer.from('hello from the server'), { ...context, init });
+
+    // The client opens it: the agreement is checked against the identity key
+    // the server published for that device.
+    const opened = await client.manager.decryptEnvelope(sent.envelope, { conversationId: 'conversation-2' });
+    assert.equal(e.fromUtf8(opened.plaintext), 'hello from the server');
+    assert.equal(opened.session.role, 'responder');
+    assert.equal(opened.session.peerDeviceId, peer.deviceId);
+
+    // And the client answers, with a session of its own.
+    const reply = await client.manager.encryptTo(opened.session, {
+      conversationId: 'conversation-2',
+      plaintext: e.utf8('hello from the client'),
+    });
+    assert.equal(reply.envelope.to, peer.deviceId);
+    assert.equal(reply.envelope.from, client.device.id);
+    assert.equal(reply.envelope.init, undefined, 'the agreement travels with the first message only');
+
+    const read = server.ratchet.decrypt(agreed.state, reply.envelope, {
+      sid: reply.envelope.sid,
+      cid: 'conversation-2',
+      to: peer.deviceId,
+    });
+    assert.equal(read.plaintext.toString('utf8'), 'hello from the client');
+  });
 });

@@ -20,6 +20,7 @@ import { navigate, path } from '../../../packages/nav.js';
 import Api from '../../../packages/api.js';
 import { empty } from '../components.js';
 import { templateSheet, collectionSheet, expandInDraft } from '../saved.js';
+import * as encrypted from '../encrypted.js';
 
 const QUICK = ['\u{1F44D}', '\u{1F525}', '\u{1F389}', '\u{1F602}', '\u{1F440}', '\u{2705}'];
 
@@ -57,6 +58,11 @@ function normalizeMessage(raw) {
       reactions: raw.reactions || [],
       embeds: raw.embeds || [],
       pinned: !!raw.pinned,
+      // An encrypted message, and whether this device could open it. The
+      // server holds no text for an encrypted message, so a message that
+      // could not be opened has a reason and not an empty body.
+      encrypted: !!raw.encrypted,
+      unreadable: !!raw.unreadable,
     };
   }
   return {
@@ -74,6 +80,8 @@ function normalizeMessage(raw) {
     reactions: raw.reactions || [],
     embeds: raw.embeds || [],
     pinned: !!raw.pinned,
+    encrypted: !!raw.encrypted,
+    unreadable: !!raw.unreadable,
   };
 }
 
@@ -90,7 +98,11 @@ async function readPage(scope, options) {
   const rows = scope.kind === 'dm'
     ? await Api.dmMessages(scope.id, options)
     : await Api.messages(scope.id, options);
-  return (Array.isArray(rows) ? rows : []).map(normalizeMessage).filter(Boolean).sort(bySeq);
+  // The rows are opened before they are drawn: an encrypted row carries no
+  // text from the server, so it has to be opened here or it is drawn as an
+  // empty message.
+  const opened = await encrypted.readRows(Array.isArray(rows) ? rows : [], scope.id);
+  return opened.map(normalizeMessage).filter(Boolean).sort(bySeq);
 }
 
 function renderRich(container, text) {
@@ -200,7 +212,15 @@ function messageRow(message, previous, handlers) {
   }
   if (message.content) {
     const body = el('div', { class: 'm-msg__text' });
-    renderRich(body, message.content);
+    if (message.unreadable) {
+      // A message this device could not open. It is not an error in the
+      // message and it is not empty: the text is in the envelope, and this
+      // device does not have the key.
+      body.appendChild(el('p', { class: 'm-unreadable' },
+        message.content || 'This message could not be opened on this device.'));
+    } else {
+      renderRich(body, message.content);
+    }
     main.appendChild(body);
   }
   for (const att of message.attachments || []) main.appendChild(attachmentNode(att));
@@ -576,7 +596,10 @@ export function renderConversation(ctx, scope) {
     const body = { content: draft.content };
     if (ids.length) body.attachmentIds = ids;
     if (draft.replyTo) body.replyToId = draft.replyTo.id;
-    const sent = isDm ? await Api.sendDm(scope.id, body) : await Api.sendMessage(scope.id, body);
+    const post = isDm
+      ? (b) => Api.sendDm(scope.id, b)
+      : (b) => Api.sendMessage(scope.id, b);
+    const sent = await encrypted.send(scope.id, body, post);
     if (sent && sent.id) upsert(normalizeMessage(sent));
   });
 
