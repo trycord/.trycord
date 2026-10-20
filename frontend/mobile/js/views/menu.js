@@ -21,7 +21,11 @@ const GLOBAL = [
   { route: '/dms', label: 'Direct messages', icon: 'message' },
   { route: '/friends', label: 'Friends', icon: 'users' },
   { route: '/notifications', label: 'Notifications', icon: 'bell' },
+  { route: '/search', label: 'Search', icon: 'search' },
+  { route: '/collections', label: 'Collections', icon: 'folder' },
+  { route: '/federation', label: 'Federation reports', icon: 'share' },
   { route: '/discover', label: 'Discover', icon: 'compass' },
+  { route: '/status', label: 'Service status', icon: 'activity' },
 ];
 
 function channelIcon(channel) {

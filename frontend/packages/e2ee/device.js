@@ -11,7 +11,7 @@
 
 import { b64, unb64, randomBytes, utf8 } from './bytes.js';
 import { generateKeyPair, sign, GCM_IV_BYTES } from './primitives.js';
-import { generateKeySet, publicKeySet, privateKeySet, restoreKeySet, fingerprint, generateRecoveryKey, sealPrivateMaterial } from './deviceKeys.js';
+import { generateKeySet, publicKeySet, privateKeySet, restoreKeySet, fingerprint, generateRecoveryKey, sealPrivateMaterial, sealPrivateBytes } from './deviceKeys.js';
 import { bundleSignatureBytes, prekeySignatureBytes } from './prekeys.js';
 import { readRecord, writeRecord } from './store.js';
 
@@ -91,7 +91,7 @@ export class Device {
    * server with the bundle, so a device that loses its store can still be
    * recovered.
    */
-  oneTimePreKeyBatch(count) {
+  async oneTimePreKeyBatch(count) {
     const out = [];
     for (let i = 0; i < count; i += 1) {
       const pair = generateKeyPair('x25519');
@@ -110,11 +110,18 @@ export class Device {
         prekeyId: id,
         publicKey: b64(pair.publicKey),
       });
-      out.push({
+      const entry = {
         id,
         publicKey: b64(pair.publicKey),
         signature: b64(sign(this.keys.sk.privateKey, bytes)),
-      });
+      };
+      if (this.recoveryKey) {
+        // The sealed private half goes to the server with the bundle, so a
+        // device that has lost its store can still open a session that used
+        // one of these prekeys. The server cannot open it.
+        entry.sealedPrivateKey = await sealPrivateBytes(pair.privateKey, this.recoveryKey);
+      }
+      out.push(entry);
     }
     return out;
   }

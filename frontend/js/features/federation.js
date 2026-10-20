@@ -12,7 +12,7 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
-import { openDialog, errorToast } from '../ui/overlays.js';
+import { openDialog } from '../ui/overlays.js';
 import { relativeTime } from '../../packages/format.js';
 import { disclosurePanel, reportDialog } from '../ui/federation.js';
 

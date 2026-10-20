@@ -9,7 +9,6 @@
 // instance console. This page only reads.
 
 import { el } from '../../packages/dom.js';
-import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { head, card, blank, fault, fold, memo } from '../ui/page.js';
 import { formatDateTime } from '../../packages/locale.js';

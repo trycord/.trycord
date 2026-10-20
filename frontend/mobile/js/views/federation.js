@@ -12,9 +12,8 @@ import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import Api from '../../../packages/api.js';
 import { empty, loading, failure, iconButton } from '../components.js';
-import { screen, section, actions, primaryButton, notice } from './util.js';
+import { screen, section, actions, primaryButton } from './util.js';
 import { sheet, toast } from '../ui.js';
-import { relativeTime } from '../../../packages/format.js';
 
 // What the server says crosses with a report, and what does not.
 export function disclosurePanel(disclosure) {

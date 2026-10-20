@@ -228,11 +228,13 @@ export function renderSearch(ctx) {
   async function run() {
     const query = queryText();
     if (query.length < MIN_LENGTH) {
-      results.replaceChildren(blank({
-        glyph: 'search',
-        title: 'Type to search',
-        text: 'Two characters or more, and the instance answers from the communities you are in.',
-      }));
+      results.replaceChildren(problem
+        ? fault(new Error(problem), null)
+        : blank({
+          glyph: 'search',
+          title: 'Type to search',
+          text: 'Two characters or more, and the instance answers from the communities you are in.',
+        }));
       resultNote.textContent = '';
       return;
     }

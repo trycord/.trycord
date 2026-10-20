@@ -9,9 +9,8 @@
 // nothing recorded, and closing an incident is a status, not a deletion.
 
 import { el } from '../../packages/dom.js';
-import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
-import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
+import { head, card, row, blank, fault, fold } from '../ui/page.js';
 import { confirmDialog, errorToast, toast } from '../ui/overlays.js';
 import { formatDateTime } from '../../packages/locale.js';
 
