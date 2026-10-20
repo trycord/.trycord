@@ -10,7 +10,14 @@ import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub, waitFor } from '../helpers/dom-stub.js';
 
-installDomStub();
+// The document is installed once for the module, because the modules beside
+// this one read it as they load, and again for every check: a check that
+// draws a dialog must not find the dialog of the check before it.
+//
+// The first install is guarded. Two files in one run would otherwise replace
+// the document under a check that is already running, and the check would be
+// looking at a document that is no longer there.
+if (!globalThis.document) installDomStub();
 
 // The phone's sheet asks the browser for the next frame. Node has no such
 // thing, so the check gives it one.
@@ -127,6 +134,7 @@ function baseRoutes(extra) {
 // -- the tests --------------------------------------------------------------------
 
 test('the phone creates a key and shows the secret once', async () => {
+  installDomStub();
   const calls = installFetchStub(baseRoutes({
     [V1 + '/keys']: (body) => {
       if (body) return { json: { key: KEY, secret: SECRET } };
@@ -173,6 +181,7 @@ test('the phone creates a key and shows the secret once', async () => {
 });
 
 test('the phone does not keep the secret after the sheet is closed', async () => {
+  installDomStub();
   installFetchStub(baseRoutes({
     [V1 + '/keys']: (body) => {
       if (body) return { json: { key: KEY, secret: SECRET } };
@@ -208,6 +217,7 @@ test('the phone does not keep the secret after the sheet is closed', async () =>
 });
 
 test('the phone revokes a key', async () => {
+  installDomStub();
   const calls = installFetchStub(baseRoutes({
     [V1 + '/keys/k_abc/revoke']: { json: { key: Object.assign({}, KEY, { status: 'revoked' }) } },
   }));
@@ -241,6 +251,7 @@ test('the phone revokes a key', async () => {
 });
 
 test('the phone shows an application token once', async () => {
+  installDomStub();
   State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
   const calls = installFetchStub(baseRoutes({
     [V1 + '/communities/s1/applications']: (body) => {

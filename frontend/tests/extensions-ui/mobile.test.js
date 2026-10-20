@@ -10,7 +10,14 @@ import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub, waitFor } from '../helpers/dom-stub.js';
 
-installDomStub();
+// The document is installed once for the module, because the modules beside
+// this one read it as they load, and again for every check: a check that
+// draws a dialog must not find the dialog of the check before it.
+//
+// The first install is guarded. Two files in one run would otherwise replace
+// the document under a check that is already running, and the check would be
+// looking at a document that is no longer there.
+if (!globalThis.document) installDomStub();
 
 // The phone's sheet asks the browser for the next frame. Node has no such
 // thing, so the check gives it one.
@@ -118,6 +125,7 @@ function routes(extra) {
 // -- the tests --------------------------------------------------------------------
 
 test('the phone lists what the registry offers', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(routes());
 
@@ -129,6 +137,7 @@ test('the phone lists what the registry offers', async () => {
 });
 
 test('the phone asks for the consent before it installs', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(routes({
     [BASE + '/install']: { json: { extension: {}, granted: ['messages.read'], refused: [] } },
@@ -172,6 +181,7 @@ test('the phone asks for the consent before it installs', async () => {
 });
 
 test('the phone asks before it lets code run on the server', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(routes({
     [BASE + '/policy']: {
@@ -215,6 +225,7 @@ test('the phone asks before it lets code run on the server', async () => {
 });
 
 test('a dry run on the phone says that nothing was done', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   installFetchStub(routes({
     [BASE + '/workflows']: { json: { workflows: [WORKFLOW] } },
@@ -261,6 +272,7 @@ test('a dry run on the phone says that nothing was done', async () => {
 });
 
 test('the phone does not offer an install to an account that may not install', async () => {
+  installDomStub();
   State.user = { id: 'u2', isAdmin: false };
   installFetchStub(routes());
 
