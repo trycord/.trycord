@@ -14,7 +14,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { card, fold, row, blank } from '../../ui/page.js';
+import { card, fold, row, blank } from '../ui/page.js';
 import { path } from '../../packages/nav.js';
 import {
   SURFACES, Workspace, surfaceRoute, mayManageStructure, mayModerate,

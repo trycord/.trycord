@@ -201,7 +201,7 @@ test('the consent screen shows what the package asks for', async () => {
   assert.match(text, /Quiet Notes/, 'the consent did not name the package');
   assert.match(text, /Messages · Read/, 'the consent did not show a requested capability');
   assert.match(text, /Messages · Write/, 'the consent did not show the second requested capability');
-  assert.match(text, /Reviewed/, 'the consent did not show the review status');
+  assert.match(text, /reviewed/, 'the consent did not show the review status');
   assert.match(text, /signed/, 'the consent did not show the signature status');
   assert.match(text, /3\.0/, 'the consent did not show the compatibility');
 });

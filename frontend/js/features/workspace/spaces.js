@@ -14,12 +14,12 @@
 // one the reader may see: the channels of the community they are in, the
 // documents the server lists for them and the boards they may open.
 
-import { el } from '../../packages/dom.js';
-import { icon } from '../../packages/icons.js';
+import { el } from '../../../packages/dom.js';
+import { icon } from '../../../packages/icons.js';
 import { card, row, blank, fault, fold, hold } from '../../ui/page.js';
 import { iconButton } from '../../ui/primitives.js';
 import { openDialog, confirmDialog, toast, errorToast } from '../../ui/overlays.js';
-import Api from '../../packages/api.js';
+import Api from '../../../packages/api.js';
 import { State, channelsOf, refreshServerTree, isOwner } from '../../../packages/store.js';
 import { path } from '../../../packages/nav.js';
 import {

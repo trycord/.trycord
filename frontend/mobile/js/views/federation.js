@@ -591,7 +591,7 @@ export function renderFederation(ctx) {
 
       clear(moderation);
       moderation.appendChild(moderationSurface({
-        messages, members, names, refresh: paintModeration, answer,
+        messages, members, names, refresh: paintModeration, answer, say,
       }));
       if (failures.length) moderation.appendChild(failure(failures[0], paintModeration));
     } catch (error) {
@@ -631,165 +631,165 @@ export function moderationSurface(options) {
   const members = Array.isArray(opts.members) ? opts.members : [];
   const names = opts.names && typeof opts.names === 'object' ? opts.names : {};
   const refresh = typeof opts.refresh === 'function' ? opts.refresh : async () => {};
+  const say = typeof opts.say === 'function' ? opts.say : () => {};
+
+  // The sheet for one message a member wrote elsewhere: what it says, where it
+  // was written, and the one decision the owner has about it.
+  function openMessage(message, community) {
+    const body = el('div', { class: 'm-stack' },
+      el('p', { class: 'm-lede' }, String(message.content || '').replace(/\s+/g, ' ').trim()
+        || 'This message has been taken back.'),
+      el('p', { class: 'm-row__sub' }, authorName(message) + ' · written on '
+        + message.origin_instance_id + (community ? ' · in ' + community : '')));
+
+    const layer = sheet({
+      title: 'A message written elsewhere',
+      body,
+      footer: message.deleted ? null : el('button', {
+        class: 'm-btn m-btn--block m-btn--danger', type: 'button',
+        onClick: () => { layer.close(); takeBack(message); },
+      }, 'Take back'),
+    });
+    return layer;
+  }
+
+  function takeBack(message) {
+    actionSheet({
+      title: 'Take this message back?',
+      what: 'The message leaves this community, and ' + message.origin_instance_id
+        + ' is told, so the copy over there goes too.',
+      confirmLabel: 'Take it back',
+      danger: true,
+      onConfirm: (reason) => continuum.removeModerationMessage(
+        message.origin_instance_id, message.origin_message_id, reason),
+      onAnswer: (result) => {
+        if (result && result.relayed) {
+          say('Taken back', 'The message is gone from here, and ' + message.origin_instance_id
+            + ' was told, so the copy there goes too.', 'success');
+        } else {
+          say('Taken back here', 'The message is gone from here, but ' + message.origin_instance_id
+            + ' was not told' + ((result && result.reason) ? ': ' + result.reason : '.'), 'warning');
+        }
+        refresh();
+      },
+    });
+  }
+
+  // The sheet for one member of one of this instance's communities who lives
+  // on another instance, with the three decisions the owner has about them.
+  function openMember(member, community) {
+    const state = MEMBER_STATE[String(member.state || 'joined')] || MEMBER_STATE.joined;
+    const name = member.display_name || member.username || 'Someone';
+    const body = el('div', { class: 'm-stack' },
+      notice({
+        tone: 'info',
+        title: state,
+        text: 'They live on ' + member.origin_instance_id
+          + (community ? ' and are a member of ' + community + '.' : '.'),
+      }));
+
+    const layer = sheet({
+      title: name,
+      body,
+      footer: el('div', { class: 'm-actions' }, MEMBER_ACTIONS.map((action) => el('button', {
+        class: 'm-btn m-btn--sm' + (action.action === 'remove' ? ' m-btn--danger' : ' m-btn--ghost'),
+        type: 'button',
+        onClick: () => { layer.close(); decide(member, action); },
+      }, action.label))),
+    });
+    return layer;
+  }
+
+  function decide(member, action) {
+    actionSheet({
+      title: action.label + ' ' + (member.display_name || member.username || 'this member') + '?',
+      what: action.what,
+      confirmLabel: action.label,
+      danger: action.action === 'remove',
+      onConfirm: (reason) => continuum.restrictMember(
+        member.origin_instance_id,
+        member.origin_user_id,
+        {
+          community_id: member.origin_community_id,
+          action: action.action,
+          reason: reason || undefined,
+        }),
+      onAnswer: (result) => {
+        const name = member.display_name || member.username || 'This member';
+        if (result && result.relayed) {
+          say(action.done, name + ' ' + action.state + ', and '
+            + member.origin_instance_id + ' was told.', 'success');
+        } else {
+          say(action.done, name + ' ' + action.state + ', but '
+            + member.origin_instance_id + ' was not told'
+            + ((result && result.reason) ? ': ' + result.reason : '.'), 'warning');
+        }
+        refresh();
+      },
+    });
+  }
+
+  function messageList() {
+    const list = el('div', { class: 'm-list' });
+    if (!messages.length) {
+      list.appendChild(empty({
+        icon: 'message',
+        title: 'Nothing has been written elsewhere',
+        text: 'When a member of one of your communities writes on another instance, it is listed here.',
+      }));
+      return list;
+    }
+    for (const message of messages) {
+      const community = names[message.origin_community_id];
+      list.appendChild(el('button', {
+        class: 'm-row', type: 'button',
+        onClick: () => openMessage(message, community),
+      },
+      el('span', { class: 'm-row__lead' }, icon('message', { size: 17 })),
+      el('span', { class: 'm-row__body' },
+        el('span', { class: 'm-row__title truncate' },
+          String(message.content || '').replace(/\s+/g, ' ').trim() || '(a message that was taken back)'),
+        el('span', { class: 'm-row__sub truncate' },
+          authorName(message) + ' · on ' + message.origin_instance_id
+          + (community ? ' · ' + community : ''))),
+      el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
+    }
+    return list;
+  }
+
+  function memberList() {
+    const list = el('div', { class: 'm-list' });
+    if (!members.length) {
+      list.appendChild(empty({
+        icon: 'users',
+        title: 'No members live on another instance',
+        text: 'When a member of one of your communities lives on another instance, they are listed here.',
+      }));
+      return list;
+    }
+    for (const member of members) {
+      const community = names[member.origin_community_id];
+      const state = MEMBER_STATE[String(member.state || 'joined')] || MEMBER_STATE.joined;
+      const name = member.display_name || member.username || 'Someone';
+      list.appendChild(el('button', {
+        class: 'm-row', type: 'button',
+        onClick: () => openMember(member, community),
+      },
+      el('span', { class: 'm-row__lead' }, icon('user', { size: 17 })),
+      el('span', { class: 'm-row__body' },
+        el('span', { class: 'm-row__title truncate' }, name),
+        el('span', { class: 'm-row__sub truncate' },
+          'on ' + member.origin_instance_id + (community ? ' · ' + community : ''))),
+      el('span', { class: 'm-row__actions' }, el('span', { class: 'm-chip' }, state)),
+      el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
+    }
+    return list;
+  }
 
   return el('div', { class: 'm-stack' },
     opts.answer || null,
-    section('Messages members wrote elsewhere', messageList(messages, names, refresh)),
-    section('Members who live on another instance', memberList(members, names, refresh)));
-}
-
-function messageList(messages, names, refresh) {
-  const list = el('div', { class: 'm-list' });
-  if (!messages.length) {
-    list.appendChild(empty({
-      icon: 'message',
-      title: 'Nothing has been written elsewhere',
-      text: 'When a member of one of your communities writes on another instance, it is listed here.',
-    }));
-    return list;
-  }
-  for (const message of messages) {
-    const community = names[message.origin_community_id];
-    list.appendChild(el('button', {
-      class: 'm-row', type: 'button',
-      onClick: () => openModerationMessage(message, community, refresh),
-    },
-    el('span', { class: 'm-row__lead' }, icon('message', { size: 17 })),
-    el('span', { class: 'm-row__body' },
-      el('span', { class: 'm-row__title truncate' },
-        String(message.content || '').replace(/\s+/g, ' ').trim() || '(a message that was taken back)'),
-      el('span', { class: 'm-row__sub truncate' },
-        authorName(message) + ' · on ' + message.origin_instance_id
-        + (community ? ' · ' + community : ''))),
-    el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
-  }
-  return list;
-}
-
-function memberList(members, names, refresh) {
-  const list = el('div', { class: 'm-list' });
-  if (!members.length) {
-    list.appendChild(empty({
-      icon: 'users',
-      title: 'No members live on another instance',
-      text: 'When a member of one of your communities lives on another instance, they are listed here.',
-    }));
-    return list;
-  }
-  for (const member of members) {
-    const community = names[member.origin_community_id];
-    const state = MEMBER_STATE[String(member.state || 'joined')] || MEMBER_STATE.joined;
-    const name = member.display_name || member.username || 'Someone';
-    list.appendChild(el('button', {
-      class: 'm-row', type: 'button',
-      onClick: () => openModerationMember(member, community, refresh),
-    },
-    el('span', { class: 'm-row__lead' }, icon('user', { size: 17 })),
-    el('span', { class: 'm-row__body' },
-      el('span', { class: 'm-row__title truncate' }, name),
-      el('span', { class: 'm-row__sub truncate' },
-        'on ' + member.origin_instance_id + (community ? ' · ' + community : ''))),
-    el('span', { class: 'm-row__actions' }, el('span', { class: 'm-chip' }, state)),
-    el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
-  }
-  return list;
-}
-
-// The sheet for one message a member wrote elsewhere: what it says, where it
-// was written, and the one decision the owner has about it.
-function openModerationMessage(message, community, refresh) {
-  const body = el('div', { class: 'm-stack' },
-    el('p', { class: 'm-lede' }, String(message.content || '').replace(/\s+/g, ' ').trim()
-      || 'This message has been taken back.'),
-    el('p', { class: 'm-row__sub' }, authorName(message) + ' · written on '
-      + message.origin_instance_id + (community ? ' · in ' + community : '')));
-
-  const layer = sheet({
-    title: 'A message written elsewhere',
-    body,
-    footer: message.deleted ? null : el('button', {
-      class: 'm-btn m-btn--block m-btn--danger', type: 'button',
-      onClick: () => { layer.close(); takeBackModerationMessage(message, refresh); },
-    }, 'Take back'),
-  });
-  return layer;
-}
-
-function takeBackModerationMessage(message, refresh) {
-  actionSheet({
-    title: 'Take this message back?',
-    what: 'The message leaves this community, and ' + message.origin_instance_id
-      + ' is told, so the copy over there goes too.',
-    confirmLabel: 'Take it back',
-    danger: true,
-    onConfirm: (reason) => continuum.removeModerationMessage(
-      message.origin_instance_id, message.origin_message_id, reason),
-    onAnswer: (result) => {
-      if (result && result.relayed) {
-        toast('The message is gone from here, and ' + message.origin_instance_id
-          + ' was told, so the copy there goes too.', { type: 'success' });
-      } else {
-        toast('The message is gone from here, but ' + message.origin_instance_id
-          + ' was not told' + ((result && result.reason) ? ': ' + result.reason : '.'),
-        { type: 'error' });
-      }
-      refresh();
-    },
-  });
-}
-
-// The sheet for one member of one of this instance's communities who lives
-// on another instance, with the three decisions the owner has about them.
-function openModerationMember(member, community, refresh) {
-  const state = MEMBER_STATE[String(member.state || 'joined')] || MEMBER_STATE.joined;
-  const name = member.display_name || member.username || 'Someone';
-  const body = el('div', { class: 'm-stack' },
-    notice({
-      tone: 'info',
-      title: state,
-      text: 'They live on ' + member.origin_instance_id
-        + (community ? ' and are a member of ' + community + '.' : '.'),
-    }));
-
-  const layer = sheet({
-    title: name,
-    body,
-    footer: el('div', { class: 'm-actions' }, MEMBER_ACTIONS.map((action) => el('button', {
-      class: 'm-btn m-btn--sm' + (action.action === 'remove' ? ' m-btn--danger' : ' m-btn--ghost'),
-      type: 'button',
-      onClick: () => { layer.close(); decideMember(member, action, refresh); },
-    }, action.label))),
-  });
-  return layer;
-}
-
-function decideMember(member, action, refresh) {
-  actionSheet({
-    title: action.label + ' ' + (member.display_name || member.username || 'this member') + '?',
-    what: action.what,
-    confirmLabel: action.label,
-    danger: action.action === 'remove',
-    onConfirm: (reason) => continuum.restrictMember(
-      member.origin_instance_id,
-      member.origin_user_id,
-      {
-        community_id: member.origin_community_id,
-        action: action.action,
-        reason: reason || undefined,
-      }),
-    onAnswer: (result) => {
-      const name = member.display_name || member.username || 'This member';
-      if (result && result.relayed) {
-        toast(action.done + ': ' + name + ' ' + action.state + ', and '
-          + member.origin_instance_id + ' was told.', { type: 'success' });
-      } else {
-        toast(action.done + ': ' + name + ' ' + action.state + ', but '
-          + member.origin_instance_id + ' was not told'
-          + ((result && result.reason) ? ': ' + result.reason : '.'), { type: 'error' });
-      }
-      refresh();
-    },
-  });
+    section('Messages members wrote elsewhere', messageList()),
+    section('Members who live on another instance', memberList()));
 }
 
 export default { renderFederation, moderationSurface, continuum };

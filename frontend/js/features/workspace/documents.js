@@ -25,7 +25,7 @@ import { openDialog, openMenu, confirmDialog, toast, errorToast } from '../../ui
 import { relativeTime } from '../../../packages/format.js';
 import { path, navigate } from '../../../packages/nav.js';
 import { State } from '../../../packages/store.js';
-import { blockErrors, LIMITS } from '../../pageSource.js';
+import { blockErrors, LIMITS } from '../pageSource.js';
 import {
   Workspace, BLOCK_LABELS, mayWriteDocuments, mayPost, mayActOn,
   documentRoute,
