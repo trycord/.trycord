@@ -163,7 +163,7 @@ test('a key is created and the secret is shown once', async () => {
     return /tc_handle/.test(String(found.textContent || '')) ? found : null;
   });
   assert.ok(secret, 'the secret was never shown');
-  assert.match(secret.textContent, /only time it is shown/,
+  assert.match(secret.textContent, /only time the secret is shown/,
     'the secret was not marked as the only time it is shown');
   assert.match(secret.textContent, /cannot be recovered/,
     'the secret did not say that it cannot be recovered');
@@ -307,7 +307,7 @@ test('an application is not a person, and its token is shown once', async () => 
     return /bot_token_value/.test(String(found.textContent || '')) ? found : null;
   });
   assert.ok(token, 'the token was never shown');
-  assert.match(token.textContent, /only time it is shown/,
+  assert.match(token.textContent, /only time the token is shown/,
     'the token was not marked as the only time it is shown');
   assert.match(token.textContent, /no account behind it/,
     'the token did not say what it is');

@@ -110,25 +110,14 @@ export function documentsDetail(ctx) {
   const history = el('div', { class: 'rowlist' });
   const comments = el('div', { class: 'rowlist' });
   const links = el('div', { class: 'rowlist' });
+  const actions = el('span', { class: 'rowtools' });
 
   const node = fold([
     conflict,
     card({
       label: 'The document',
       glyph: 'file',
-      actions: el('span', { class: 'rowtools' },
-        canWrite
-          ? el('button', {
-            class: 'btn btn--default btn--sm', type: 'button',
-            onClick: () => (editing ? save() : startEditing()),
-          }, icon(editing ? 'check' : 'edit', { size: 14 }), editing ? 'Save' : 'Edit')
-          : null,
-        canWrite && editing
-          ? el('button', {
-            class: 'btn btn--ghost btn--sm', type: 'button',
-            onClick: () => stopEditing(),
-          }, 'Cancel')
-          : null),
+      actions,
       body: fold([title, meta, body], { tight: true }),
     }),
     card({ label: 'History', glyph: 'book', body: history, flush: true }),
@@ -176,6 +165,27 @@ export function documentsDetail(ctx) {
 
   // -- writing -----------------------------------------------------------------
 
+  // The controls of the document change with what the reader is doing: an
+  // editor is offered a save, and a reader is offered the editor.
+  const paintActions = () => {
+    if (!canWrite) {
+      actions.replaceChildren();
+      return;
+    }
+    actions.replaceChildren(
+      el('button', {
+        class: 'btn btn--default btn--sm', type: 'button',
+        onClick: () => (editing ? save() : startEditing()),
+      }, icon(editing ? 'check' : 'edit', { size: 14 }), editing ? 'Save' : 'Edit'),
+      editing
+        ? el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          onClick: () => stopEditing(),
+        }, 'Cancel')
+        : null,
+    );
+  };
+
   const startEditing = () => {
     working = {
       title: doc.title,
@@ -183,6 +193,7 @@ export function documentsDetail(ctx) {
     };
     editing = true;
     dirty = false;
+    paintActions();
     paintMeta();
     paintBody();
   };
@@ -191,6 +202,7 @@ export function documentsDetail(ctx) {
     editing = false;
     working = null;
     dirty = false;
+    paintActions();
     paintMeta();
     paintBody();
   };
@@ -291,6 +303,7 @@ export function documentsDetail(ctx) {
       working = { title: saved.title, blocks: (saved.body || []).map((block) => Object.assign({}, block)) };
       dirty = false;
       conflict.replaceChildren();
+      paintActions();
       paintMeta();
       paintBody();
       toast('Saved as revision ' + saved.revision);
@@ -823,6 +836,7 @@ export function documentsDetail(ctx) {
     try {
       doc = await Workspace.document(serverId, documentId);
       title.textContent = doc.title;
+      paintActions();
       paintMeta();
       paintBody();
     } catch (error) {

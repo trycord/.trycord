@@ -19,23 +19,7 @@ import { refreshServer } from '../../../packages/store.js';
 import {
   createFormState, readDocument, communityApi,
 } from '../../../packages/communitySettings.js';
-
-// A place to say what happened.
-//
-// Two lines rather than one: what worked is a note, what failed is an error,
-// and only one of them is ever written at a time. Both are announced.
-function reporter() {
-  const note = el('p', { class: 'form-note', role: 'status' });
-  const problem = el('p', { class: 'form-error', role: 'alert' });
-  return {
-    node: fold([note, problem]),
-    ok(message) { note.textContent = message; problem.textContent = ''; },
-    fail(error) {
-      problem.textContent = (error && error.message) ? error.message : 'That did not save.';
-      note.textContent = '';
-    },
-  };
-}
+import { reporter } from './parts.js';
 
 export function overviewSection(ctx) {
   const serverId = ctx.serverId;

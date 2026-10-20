@@ -211,8 +211,13 @@ export const PAGES = [
     label: 'Database', icon: 'database', tabs: ['database'],
     blurb: 'Where this instance keeps its data, and how to move it',
   }),
-  p('admin.diagnostics', '/admin/diagnostics', {
+  p('admin.voice', '/admin/voice', {
     layout: 'admin', scope: 'admin', group: 'Instance', order: 7,
+    label: 'Voice and video', icon: 'mic', tabs: ['voice'],
+    blurb: 'The media provider this instance uses, and what it still needs',
+  }),
+  p('admin.diagnostics', '/admin/diagnostics', {
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 8,
     label: 'Diagnostics', icon: 'activity', tabs: ['diagnostics'],
     blurb: 'What each subsystem of this instance is really doing',
   }),
@@ -222,7 +227,7 @@ export const PAGES = [
     blurb: 'Federation with compatible Trycord instances',
   }),
   p('admin.incidents', '/admin/incidents', {
-    layout: 'admin', scope: 'admin', group: 'Instance', order: 8,
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 9,
     label: 'Incidents', icon: 'alert', tabs: ['incidents'],
     blurb: 'What has happened to this instance, and what is being done about it',
   }),

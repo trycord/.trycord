@@ -141,7 +141,7 @@ function askAction(options) {
     class: 'input', type: 'text',
     'aria-label': 'Why (it goes into the audit trail)',
   });
-  const note = el('p', { class: 'form-note', role: 'status', 'aria-live': 'polite' });
+  const note = el('p', { class: 'form-error', role: 'alert' });
   const submit = el('button', {
     class: 'btn ' + (opts.danger ? 'btn--danger' : 'btn--primary') + ' btn--sm',
     type: 'submit',
@@ -516,7 +516,7 @@ export function renderFederation(ctx) {
     const content = el('textarea', {
       class: 'textarea', rows: '4', 'aria-label': 'The message you wrote',
     }, message.content || '');
-    const note = el('p', { class: 'form-note', role: 'status', 'aria-live': 'polite' });
+    const note = el('p', { class: 'form-error', role: 'alert' });
     const submit = el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save the change');
 
     const dialog = openDialog({

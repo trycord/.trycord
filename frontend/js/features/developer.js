@@ -194,7 +194,8 @@ function openCreateKey(onDone) {
       dialog.close();
       showSecret(answer && answer.secret, {
         title: 'Your new key',
-        sub: 'This is the only time the secret is shown. The server keeps a hash and nothing else.',
+        sub: 'This is the only time the secret is shown. The server keeps a hash and nothing else, '
+          + 'so it cannot be recovered.',
       });
       if (onDone) onDone();
     } catch (error) {
@@ -577,7 +578,7 @@ function openCreateApplication(serverId, onDone) {
       showSecret(answer && answer.token, {
         title: 'The token of ' + name.value.trim(),
         sub: 'This is the only time the token is shown. It is the application\'s credential: '
-          + 'there is no account behind it and no password to lose.',
+          + 'there is no account behind it and no password to lose, and it cannot be recovered.',
       });
       if (onDone) onDone();
     } catch (error) {
@@ -593,6 +594,7 @@ function openCreateApplication(serverId, onDone) {
 function applicationsSection() {
   const picker = el('select', { class: 'input', 'aria-label': 'The community whose applications are shown' });
   const list = el('div', { class: 'rowlist' });
+  const tools = el('span', { class: 'chips' });
   let serverId = null;
 
   function communities() {
@@ -608,6 +610,8 @@ function applicationsSection() {
     if (!options.length) {
       picker.replaceChildren(el('option', { value: '' }, 'No community you manage'));
       picker.disabled = true;
+      // Nothing is offered where there is nowhere to put it.
+      tools.replaceChildren();
       return;
     }
     picker.disabled = false;
@@ -616,6 +620,11 @@ function applicationsSection() {
     }
     picker.replaceChildren(...options.map((server) => el('option', { value: server.id }, server.name)));
     picker.value = serverId;
+    tools.replaceChildren(el('button', {
+      class: 'btn btn--primary btn--sm', type: 'button',
+      'aria-label': 'Create a bot application',
+      onClick: () => openCreateApplication(serverId, paint),
+    }, 'Create an application'));
   }
 
   function applicationRow(application) {
@@ -721,11 +730,7 @@ function applicationsSection() {
         label: 'The applications of this community',
         glyph: 'bot',
         note: 'who they are, what they may do, and the commands they answer',
-        actions: el('button', {
-          class: 'btn btn--primary btn--sm', type: 'button',
-          'aria-label': 'Create a bot application',
-          onClick: () => openCreateApplication(serverId, paint),
-        }, 'Create an application'),
+        actions: tools,
         body: el('div', { class: 'form-stack' }, picker, list),
       }),
     ]),

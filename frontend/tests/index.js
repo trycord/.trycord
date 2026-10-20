@@ -11,6 +11,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+// The federation checks live in a directory of their own: the directory is not
+// a module the runner can search, so it is pointed at directly.
+await import(path.join(here, 'federation', 'index.js'));
+
 for (const name of fs.readdirSync(here).sort()) {
   if (!name.endsWith('.test.js')) continue;
   await import(path.join(here, name));
@@ -20,5 +24,6 @@ for (const name of fs.readdirSync(here).sort()) {
 // pointed at it: the directory is not a module the runner can search.
 await import(path.join(here, 'e2ee', 'index.js'));
 
-// The federation checks live in a directory of their own, for the same reason.
-await import(path.join(here, 'federation', 'index.js'));
+// The phone's encryption checks live in a directory of their own, for the same
+// reason.
+await import(path.join(here, 'e2ee-mobile', 'index.js'));
