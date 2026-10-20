@@ -139,6 +139,107 @@ async function create(serverId, actorId, input) {
   return get(serverId, id);
 }
 
+// Whether anybody has answered the poll yet.
+//
+// A poll that has answers is a record: the ballots were given for the options
+// as they stood, and an option that is renamed or taken away leaves a ballot
+// that means nothing. So a poll with answers is not edited at all.
+async function hasAnswers(pollId) {
+  const votes = await db.get('SELECT COUNT(*) AS n FROM poll_votes WHERE poll_id = ?', [pollId]);
+  const ballots = await db.get('SELECT COUNT(*) AS n FROM poll_ballots WHERE poll_id = ?', [pollId]);
+  return Number(votes && votes.n ? votes.n : 0) > 0
+    || Number(ballots && ballots.n ? ballots.n : 0) > 0;
+}
+
+// Edit a poll.
+//
+// A poll that has closed is not edited: its result has been written down, and
+// the question it asked is part of that record. Neither is a poll that has
+// answers, for the reason hasAnswers() gives.
+//
+// What can be edited, then, is a poll nobody has answered: its question, its
+// options, how the answers are counted, whether more than one answer may be
+// given, and whether it names its voters.
+//
+// The fields the body does not carry are left as they are. This is a partial
+// change, not a replacement: a body with only a question changes the question
+// and nothing else.
+async function update(serverId, pollId, input) {
+  const poll = await pollOf(serverId, pollId);
+  if (poll.status === 'closed') {
+    fail('CONFLICT', 'a closed poll cannot be edited: its result is on record');
+  }
+  if (await hasAnswers(poll.id)) {
+    fail('CONFLICT', 'a poll that has answers cannot be edited: the ballots were given for the options as they stand');
+  }
+
+  const question = input.question === undefined || input.question === null
+    ? poll.question
+    : required(input.question, 500, 'question');
+
+  // The options, when the body carries them. The same rules the create route
+  // enforces: at least two, at most twenty, each one a line of text.
+  let labels = null;
+  if (input.options !== undefined && input.options !== null) {
+    const raw = Array.isArray(input.options) ? input.options : [];
+    if (raw.length < MIN_OPTIONS) fail('VALIDATION_ERROR', `a poll needs at least ${MIN_OPTIONS} options`);
+    if (raw.length > MAX_OPTIONS) fail('VALIDATION_ERROR', `a poll may have at most ${MAX_OPTIONS} options`);
+    labels = raw.map((o) => required(o, 255, 'option'));
+  }
+
+  const scoring = input.scoring === undefined || input.scoring === null || input.scoring === ''
+    ? poll.scoring
+    : oneOf(input.scoring, SCORINGS, 'scoring', 'plurality');
+
+  const allowsMultiple = booleanField(input.allowsMultiple, poll.allows_multiple, 'allowsMultiple');
+  const isAnonymous = booleanField(input.isAnonymous, poll.is_anonymous, 'isAnonymous');
+
+  const optionCount = labels ? labels.length : await optionTotal(poll.id);
+  let maxChoices = 1;
+  if (allowsMultiple) {
+    maxChoices = positiveInt(input.maxChoices, 'maxChoices') || optionCount;
+    if (maxChoices > optionCount) fail('VALIDATION_ERROR', 'maxChoices cannot be larger than the number of options');
+  }
+
+  await db.transaction(async (t) => {
+    await t.run(
+      'UPDATE polls SET question = ?, scoring = ?, allows_multiple = ?, max_choices = ?, is_anonymous = ?'
+      + ' WHERE id = ?',
+      [question, scoring, allowsMultiple ? 1 : 0, maxChoices, isAnonymous ? 1 : 0, poll.id]
+    );
+    if (!labels) return;
+    // The options are replaced, not merged: a poll nobody has answered has
+    // nothing that refers to an option, so the old ones can go. The ids are
+    // new, and a client reads them again after the change.
+    await t.run('DELETE FROM poll_options WHERE poll_id = ?', [poll.id]);
+    let pos = 0;
+    for (const label of labels) {
+      await t.run(
+        'INSERT INTO poll_options (id, poll_id, position, label) VALUES (?, ?, ?, ?)',
+        [uuid(), poll.id, pos++, label]
+      );
+    }
+  });
+  return get(serverId, poll.id);
+}
+
+// A flag, when the body carries it, and the one the poll has when it does not.
+//
+// A flag is a yes or a no, so a body that carries anything else is refused
+// rather than guessed at: "true" and 1 are not flags, and treating them as
+// flags would let a body mean two things at once.
+function booleanField(value, current, field) {
+  if (value === undefined || value === null) return !!current;
+  if (typeof value !== 'boolean') fail('VALIDATION_ERROR', `${field} must be true or false`);
+  return value;
+}
+
+// How many options a poll has.
+async function optionTotal(pollId) {
+  const row = await db.get('SELECT COUNT(*) AS n FROM poll_options WHERE poll_id = ?', [pollId]);
+  return Number(row && row.n ? row.n : 0);
+}
+
 // Whether the poll is open for voting right now.
 function isOpen(poll) {
   if (poll.status !== 'open') return false;
@@ -419,5 +520,5 @@ async function close(serverId, pollId, actorId) {
 
 module.exports = {
   SCORINGS, ELIGIBILITIES,
-  list, get, create, vote, results, close,
+  list, get, create, update, vote, results, close,
 };

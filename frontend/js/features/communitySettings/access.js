@@ -19,7 +19,7 @@ import { path } from '../../../packages/nav.js';
 import { card, row, blank, fault, fold, hold } from '../../ui/page.js';
 import { confirmDialog } from '../../ui/overlays.js';
 import {
-  State, refreshServerTree, refreshServerRoles, refreshServerMembers, can, isOwner,
+  State, refreshServerRoles, refreshServerMembers, can, isOwner,
 } from '../../../packages/store.js';
 import { communityApi } from '../../../packages/communitySettings.js';
 import { reporter } from './parts.js';

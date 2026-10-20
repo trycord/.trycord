@@ -13,20 +13,32 @@
 
 const REFLECTED = ['value', 'checked', 'disabled', 'hidden', 'selected', 'type', 'name', 'id'];
 
+// One simple selector: a tag, some classes, an id, some attributes, and the
+// things it must NOT be.
+function parseSimple(piece) {
+  const simple = { tag: null, id: null, classes: [], attrs: [], not: [] };
+  const re = /:not\(([^)]*)\)|([a-zA-Z][\w-]*)|\.([\w-]+)|#([\w-]+)|\[([\w-]+)(?:=["']?([^\]"']*)["']?)?\]/g;
+  let match;
+  while ((match = re.exec(piece))) {
+    if (match[1]) {
+      // :not(...) - the simple selectors inside it are the ones the node must
+      // NOT match. The client uses this to find the items a reader may act
+      // on, so a stub that cannot parse it cannot test the keyboard path.
+      for (const inner of match[1].split(',')) {
+        const trimmed = inner.trim();
+        if (trimmed) simple.not.push(parseSimple(trimmed));
+      }
+    } else if (match[2]) simple.tag = match[2].toUpperCase();
+    else if (match[3]) simple.classes.push(match[3]);
+    else if (match[4]) simple.id = match[4];
+    else if (match[5]) simple.attrs.push([match[5], match[6] === undefined ? null : match[6]]);
+  }
+  return simple;
+}
+
 function parseSelector(selector) {
   return String(selector).split(',').map((part) => part.trim()).filter(Boolean)
-    .map((part) => part.split(/\s+/).map((piece) => {
-      const simple = { tag: null, id: null, classes: [], attrs: [] };
-      const re = /([a-zA-Z][\w-]*)|\.([\w-]+)|#([\w-]+)|\[([\w-]+)(?:=["']?([^\]"']*)["']?)?\]/g;
-      let match;
-      while ((match = re.exec(piece))) {
-        if (match[1]) simple.tag = match[1].toUpperCase();
-        else if (match[2]) simple.classes.push(match[2]);
-        else if (match[3]) simple.id = match[3];
-        else if (match[4]) simple.attrs.push([match[4], match[5] === undefined ? null : match[5]]);
-      }
-      return simple;
-    }));
+    .map((part) => part.split(/\s+/).map(parseSimple));
 }
 
 function attrOf(node, name) {
@@ -46,6 +58,9 @@ function matchesSimple(node, simple) {
     const actual = attrOf(node, name);
     if (actual === null) return false;
     if (value !== null && actual !== value) return false;
+  }
+  for (const excluded of simple.not || []) {
+    if (matchesSimple(node, excluded)) return false;
   }
   return true;
 }
@@ -243,9 +258,68 @@ export function installDomStub() {
   doc.querySelector = (selector) => doc.body.querySelector(selector);
   doc.querySelectorAll = (selector) => doc.body.querySelectorAll(selector);
   doc.contains = (node) => doc.body.contains(node);
-  doc.addEventListener = () => {};
-  doc.removeEventListener = () => {};
   doc.title = '';
+
+  // The document and the window are real event targets.
+  //
+  // They used to swallow every listener, which meant that anything the client
+  // does in response to a key, a click outside, a resize or a scroll could not
+  // be tested at all: a menu that closes on Escape, a dialog that closes on a
+  // click outside it, a menu that stays open when it is scrolled - all
+  // untestable, and therefore all unverified.
+  //
+  // The listeners are stored and called in the order they were added, and a
+  // capture-phase listener is called for an event on any descendant, which is
+  // how the window really behaves.
+  function makeEventTarget() {
+    const handlers = new Map();
+    return {
+      addEventListener(type, handler, options) {
+        if (!handlers.has(type)) handlers.set(type, []);
+        handlers.get(type).push({ handler, capture: !!(options && options.capture) });
+      },
+      removeEventListener(type, handler) {
+        const list = handlers.get(type);
+        if (!list) return;
+        const index = list.findIndex((entry) => entry.handler === handler);
+        if (index !== -1) list.splice(index, 1);
+      },
+      // The DOM's own way: hand it an event that already exists.
+      dispatchEvent(event) {
+        const type = event && event.type;
+        for (const list of Array.from(handlers.get(type) || [])) {
+          list.handler(event);
+        }
+        return true;
+      },
+      // The event's own target, so a listener can ask where it came from.
+      dispatch(type, payload) {
+        const event = Object.assign({
+          type,
+          target: null,
+          preventDefault() {},
+          stopPropagation() {},
+        }, payload || {});
+        for (const list of Array.from(handlers.values())) {
+          for (const entry of list.slice()) {
+            if (entry.capture && event.target && event.target !== this
+              && !(event.target && event.target.contains
+                && event.target.contains(this))) {
+              // A capture listener on the window sees an event aimed at any
+              // element in the document.
+            }
+            entry.handler(event);
+          }
+        }
+        return event;
+      },
+    };
+  }
+  const documentTarget = makeEventTarget();
+  doc.addEventListener = documentTarget.addEventListener;
+  doc.removeEventListener = documentTarget.removeEventListener;
+  doc.dispatch = documentTarget.dispatch;
+  doc.dispatchEvent = documentTarget.dispatchEvent;
 
   const storage = new Map();
   const localStorage = {
@@ -261,12 +335,15 @@ export function installDomStub() {
 
   const media = { matches: false, addEventListener() {}, removeEventListener() {} };
 
+  const windowTarget = makeEventTarget();
   globalThis.window = {
     document: doc,
     localStorage,
     matchMedia: () => media,
-    addEventListener() {},
-    removeEventListener() {},
+    addEventListener: windowTarget.addEventListener,
+    removeEventListener: windowTarget.removeEventListener,
+    dispatch: windowTarget.dispatch,
+    dispatchEvent: windowTarget.dispatchEvent,
     location: {
       href: 'http://localhost/', pathname: '/', origin: 'http://localhost',
       protocol: 'http:', search: '', host: 'localhost',
@@ -277,7 +354,17 @@ export function installDomStub() {
     scrollTo() {},
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
     CustomEvent: class CustomEvent { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
-    Event: class Event { constructor(type) { this.type = type; } },
+    // The event's own methods. A client that calls preventDefault on an
+    // event must not be told it is not a function.
+    Event: class Event {
+      constructor(type) {
+        this.type = type;
+        this.defaultPrevented = false;
+        this.propagationStopped = false;
+      }
+      preventDefault() { this.defaultPrevented = true; }
+      stopPropagation() { this.propagationStopped = true; }
+    },
   };
   globalThis.document = doc;
   globalThis.Node = DomNode;

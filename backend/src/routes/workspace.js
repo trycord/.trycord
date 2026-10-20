@@ -432,6 +432,22 @@ router.get('/polls/:pollId', requireMember, wrap(async (req, res) => {
   res.json(await polls.get(req.server.id, req.params.pollId));
 }));
 
+// Editing a poll. The person who set it up, or somebody who manages the
+// community's content, may edit it - the same bar the close route uses, and
+// the same words to say no. What may not be edited is a poll that has closed
+// or that has answers: the service refuses those, and says why.
+router.patch('/polls/:pollId', requireMember,
+  rateLimit({ windowMs: 60000, max: 60, key: 'workspace:poll' }),
+  wrap(async (req, res) => {
+    const poll = await polls.get(req.server.id, req.params.pollId);
+    if (String(poll.createdBy) !== String(req.user.id) && !isContentManager(req)) {
+      return fail(res, 'PERMISSION_DENIED', 'only the author or a moderator can edit this poll');
+    }
+    const out = await polls.update(req.server.id, req.params.pollId, req.body || {});
+    events.emit(req.server.id, 'workspace_poll_updated', { pollId: out.id });
+    res.json(out);
+  }));
+
 router.post('/polls/:pollId/vote', requirePerm('SEND_MESSAGES'),
   rateLimit({ windowMs: 60000, max: 120, key: 'workspace:poll' }),
   wrap(async (req, res) => {

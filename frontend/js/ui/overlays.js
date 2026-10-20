@@ -227,15 +227,23 @@ export function openMenu(options) {
     : { left: 12, top: 12, right: 12, bottom: 12, width: 0, height: 0 };
   const menuRect = menu.getBoundingClientRect();
 
-  let left = atPoint ? opts.x : (opts.align === 'right' ? rect.right - menuRect.width : rect.left);
-  let top = atPoint ? (opts.y === undefined || opts.y === null ? 12 : opts.y) : rect.bottom + 6;
+  // A menu opened at a point is placed a couple of pixels away from it.
+  //
+  // Putting the pointer exactly on the corner of the menu means the first
+  // item is under the cursor, and the natural movement of the hand - to the
+  // right, to the right and down - leaves the menu immediately. A couple of
+  // pixels of offset puts the pointer just outside the menu, which is where
+  // every other menu on every other platform puts it.
+  const POINTER_OFFSET = 2;
+  let left = atPoint ? opts.x + POINTER_OFFSET : (opts.align === 'right' ? rect.right - menuRect.width : rect.left);
+  let top = atPoint ? ((opts.y === undefined || opts.y === null ? 12 : opts.y) + POINTER_OFFSET) : rect.bottom + 6;
 
   if (left + menuRect.width > window.innerWidth - 8) left = window.innerWidth - menuRect.width - 8;
   if (left < 8) left = 8;
   if (top + menuRect.height > window.innerHeight - 8) {
     // Flip above the anchor - or, for a point, above the pointer - but never off
     // the top of the window, which would hide the first items.
-    top = Math.max(8, atPoint ? opts.y - menuRect.height : rect.top - menuRect.height - 6);
+    top = Math.max(8, atPoint ? opts.y - menuRect.height - POINTER_OFFSET : rect.top - menuRect.height - 6);
   }
 
   menu.style.left = left + 'px';
@@ -247,6 +255,21 @@ export function openMenu(options) {
 
   function onDocDown(event) {
     if (menu.contains(event.target)) return;
+    closeMenu();
+  }
+
+  // A scroll inside the menu is not a reason to close the menu.
+  //
+  // The listener is on the window in the capture phase, so it sees the scroll
+  // of every element in the document - including the menu's own. A menu with
+  // more items than fit could therefore never be scrolled: the scroll closed
+  // the menu that was being scrolled. Worse, the menu's first item is focused
+  // a moment after it opens, and focusing an item inside a scrolling box
+  // scrolls that box, so a long menu closed itself before a pointer could
+  // reach it.
+  function onScroll(event) {
+    const target = event && event.target;
+    if (target && menu.contains(target)) return;
     closeMenu();
   }
   function onKey(event) {
@@ -261,9 +284,22 @@ export function openMenu(options) {
       : (index - 1 + items.length) % items.length;
     items[next].focus();
   }
-  function onScroll() { closeMenu(); }
-
+  // The listeners are registered a tick later, so that the click which opened
+  // the menu is not the click which closes it. The `armed` flag is what makes
+  // that safe: a menu closed inside that tick never registers its listeners
+  // at all.
+  //
+  // Without it, a menu opened and closed inside one tick left its handlers
+  // behind - the removal ran before the registration, so the registration
+  // happened afterwards and nothing ever took it off again. Those handlers
+  // were not harmless. The stale scroll handler called closeMenu(), which
+  // closes whatever menu is open *now* - so a menu could be closed by a scroll
+  // that had nothing to do with it. The stale key handler moved the focus
+  // into a menu that was no longer on the page, and the live menu then found
+  // no focused item and sent the focus back to its first one.
+  let armed = true;
   setTimeout(() => {
+    if (!armed) return;
     document.addEventListener('mousedown', onDocDown, true);
     document.addEventListener('keydown', onKey, true);
     window.addEventListener('resize', onScroll, true);
@@ -274,6 +310,7 @@ export function openMenu(options) {
 
   openMenuNode = menu;
   openMenuCleanup = () => {
+    armed = false;
     document.removeEventListener('mousedown', onDocDown, true);
     document.removeEventListener('keydown', onKey, true);
     window.removeEventListener('resize', onScroll, true);
@@ -284,8 +321,18 @@ export function openMenu(options) {
     openMenuCleanup = null;
   };
 
+  // The first item is focused a moment later, so the menu takes the keyboard
+  // without the click that opened it being swallowed. A menu that has been
+  // closed by then must not take the focus: the reader has moved on, and
+  // pulling the focus back to a removed item is how a reader ends up typing
+  // into nothing.
   const first = menu.querySelector('.menu-item:not([aria-disabled="true"])');
-  if (first) setTimeout(() => { try { first.focus(); } catch { /* gone */ } }, 20);
+  if (first) {
+    setTimeout(() => {
+      if (!armed) return;
+      try { first.focus(); } catch { /* gone */ }
+    }, 20);
+  }
 
   return { close: closeMenu, element: menu };
 }

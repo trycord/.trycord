@@ -108,12 +108,16 @@ export function renderChannelView(ctx) {
     const holder = el('span', { class: 'pagehead-actions' });
     const paint = () => {
       const answer = encrypted.knownState(channelId);
+      const known = encrypted.isKnown(answer);
       const mark = encrypted.badge(answer);
+      const label = mark.getAttribute('title') || 'Encryption';
       const button = el('button', {
         class: 'btn btn--ghost btn--sm',
         type: 'button',
-        'aria-label': 'Encryption: ' + mark.text,
-        title: mark.text,
+        'aria-label': 'Encryption: ' + label,
+        title: known
+          ? label
+          : 'The server has not said yet whether this conversation is encrypted.',
         onClick: async () => {
           try {
             await encrypted.turnOn(channelId);
@@ -122,15 +126,15 @@ export function renderChannelView(ctx) {
           }
           paint();
         },
-      }, icon('lock', { size: 14 }), mark.text);
+      }, icon('lock', { size: 14 }), label);
       holder.replaceChildren(button);
     };
     paint();
-    // The state arrives from the server, so the control waits for it rather
-    // than showing "not encrypted" before it knows.
+    // The state arrives from the server, so the control says so until it
+    // does rather than claiming "not encrypted" before it knows.
     encrypted.conversationState(channelId)
       .then(paint)
-      .catch(() => { /* the button still works; the state is unknown */ });
+      .catch(() => { /* the state is unknown, and the badge says that */ });
     return holder;
   }
 
