@@ -117,6 +117,12 @@ async function revokeApplication(req, res) {
   const body = req.body || {};
   const out = await developerBots.revoke(req.params.applicationId, req.server.id, body.reason);
   if (!out) return fail(res, 'NOT_FOUND', 'application not found');
+  // The application is disconnected at once. An administrator who revokes a
+  // token has said that the application must stop hearing things, and a
+  // socket that is already open would otherwise keep hearing them until it
+  // noticed.
+  const gateway = require('../../services/developer/gateway');
+  await gateway.disconnectRevoked();
   res.json({ application: out });
 }
 

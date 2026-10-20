@@ -11,6 +11,7 @@ here.
 | [scopes.md](scopes.md) | the scope catalogue: what a key may be given |
 | [reference.md](reference.md) | every route of the surface, with the scope it needs |
 | [events.md](events.md) | the event envelope a webhook receives, and the vocabulary |
+| [gateway.md](gateway.md) | the socket an application holds open to receive events |
 | [migration.md](migration.md) | moving an integration from the unversioned routes to `/api/v1` |
 | [deprecation.md](deprecation.md) | how a version is deprecated, and for how long |
 | [sandbox.md](sandbox.md) | running the surface against a disposable instance |

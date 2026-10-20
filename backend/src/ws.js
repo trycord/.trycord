@@ -27,6 +27,7 @@ const WebSocket = require('ws');
 const db = require('./db');
 const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
 const voiceMesh = require('./services/voice-mesh');
+const gateway = require('./services/developer/gateway');
 
 const createTickets = require('./ws/tickets');
 const createRegistry = require('./ws/registry');
@@ -54,6 +55,25 @@ function createGateway(server) {
     onFirstOpen: (userId) => presence.announceQuiet(userId, 'online'),
     onLastClose: (userId) => presence.announceQuiet(userId, 'offline'),
   });
+
+  // An application's handshake.
+  //
+  // The ticket is spent here and nowhere else, and the application is read
+  // again: a ticket issued before the application was disabled, or before its
+  // token was revoked, must not open a socket afterwards.
+  async function authenticateApplication(ws, params) {
+    const ticket = params.get('ticket');
+    if (!ticket) {
+      ws.close(1008, 'ticket required');
+      return null;
+    }
+    const application = await gateway.applicationFor(ticket);
+    if (!application) {
+      ws.close(1008, 'invalid or expired ticket');
+      return null;
+    }
+    return application;
+  }
 
   // Reject a handshake before a socket is ever tracked. Returns the claims, or null with
   // the reason already sent as a close frame.
@@ -119,6 +139,44 @@ function createGateway(server) {
       params = new URL(`ws://${req.headers.host}${req.url}`).searchParams;
     } catch {
       ws.close();
+      return;
+    }
+
+    // An application connects with a ticket of its own, not a session.
+    //
+    // A bot has no session: it has a token, and the token is its own. The
+    // handshake is the same shape as a user's - a short-lived, single-use
+    // ticket - so the token never rides in a URL.
+    if (params.get('application')) {
+      authenticateApplication(ws, params).then((application) => {
+        if (!application) return;
+        const connection = gateway.register(application, ws);
+        ws.gatewayConnection = connection;
+
+        ws.on('close', () => gateway.unregister(connection));
+        ws.on('error', () => { /* avoid an uncaught from racing terminate() */ });
+
+        ws.on('message', (raw) => {
+          let data;
+          try { data = JSON.parse(raw); } catch { return; }
+          if (!data || typeof data !== 'object') return;
+          if (data.op === 'subscribe' || data.type === 'subscribe') {
+            const events = gateway.subscribe(connection, data.events);
+            try {
+              ws.send(JSON.stringify({
+                op: 'subscribed',
+                events: Array.from(events),
+                application: application.applicationId,
+                community: application.communityId,
+              }));
+            } catch { /* the socket is gone */ }
+            return;
+          }
+          if (data.op === 'ping' || data.type === 'ping') {
+            try { ws.send(JSON.stringify({ op: 'pong', at: Date.now() })); } catch { /* gone */ }
+          }
+        });
+      }).catch(() => ws.close());
       return;
     }
 
