@@ -37,6 +37,21 @@ export function clearMediaCache() {
   cache.clear();
 }
 
+// Forget one path, without forgetting the rest.
+//
+// A picture that was replaced keeps its path - the address of an avatar does
+// not change when the picture behind it does - so the cache would keep
+// showing the old one. The faces in the rail and the member list ask for the
+// same handful of paths on every render, so the whole cache is not worth
+// throwing away for one of them; the one that changed is.
+export function forgetMedia(path) {
+  if (!path) return;
+  const promise = cache.get(path);
+  if (!promise) return;
+  cache.delete(path);
+  promise.then((objectUrl) => { if (objectUrl) URL.revokeObjectURL(objectUrl); }).catch(() => {});
+}
+
 // Set an <img> to a protected or public address, calling `fallback` when there
 // is nothing to show rather than leaving a broken image icon.
 export function applyImage(img, url, fallback) {
@@ -50,4 +65,4 @@ export function applyImage(img, url, fallback) {
   }).catch(() => { if (fallback) fallback(); });
 }
 
-export default { mediaUrl, applyImage, isCached, clearMediaCache, isServerPath };
+export default { mediaUrl, applyImage, isCached, clearMediaCache, forgetMedia, isServerPath };

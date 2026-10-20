@@ -16,7 +16,10 @@
 // answer is welcome, what the response says. Those belong to the caller.
 
 const dns = require('dns').promises;
+const dnsCallback = require('dns');
 const net = require('net');
+const http = require('http');
+const https = require('https');
 
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_MAX_BYTES = 262144;
@@ -54,6 +57,41 @@ function isPrivateIpv6(host) {
 }
 
 const METADATA_NAMES = ['metadata.google.internal', 'metadata', 'instance-data', 'magic-mirror'];
+
+// Whether an address is one this instance refuses to reach.
+//
+// A complete list of the ranges that are not the public internet, so that a
+// name which answers with one of them cannot be used to reach the network
+// the instance sits in. The ranges that matter are the private ones, the
+// loopback one, the link-local one - which is where the cloud metadata
+// endpoints live - and the ranges that are neither public nor routable.
+function isPrivateAddress(address) {
+  const raw = String(address || '').trim().toLowerCase();
+  if (!raw) return true;
+  const o = isIpv4(raw);
+  if (o) {
+    if (o[0] === 0 || o[0] === 10 || o[0] === 127) return true;
+    if (o[0] === 172 && o[1] >= 16 && o[1] <= 31) return true;
+    if (o[0] === 192 && o[1] === 168) return true;
+    if (o[0] === 169 && o[1] === 254) return true;
+    if (o[0] === 100 && o[1] >= 64 && o[1] <= 127) return true; // carrier-grade NAT
+    if (o[0] === 192 && o[1] === 0 && o[2] === 0) return true; // IETF protocol assignments
+    if (o[0] === 198 && (o[1] === 18 || o[1] === 19)) return true; // benchmarking
+    if (o[0] >= 224) return true; // multicast and reserved
+    return false;
+  }
+  const bare = raw.replace(/^\[|\]$/g, '');
+  if (net.isIPv6(bare)) {
+    if (bare === '::' || bare === '::1') return true;
+    if (bare.startsWith('::ffff:')) return isPrivateAddress(bare.slice(7));
+    if (bare.startsWith('fe80') || bare.startsWith('fc') || bare.startsWith('fd')) return true;
+    // The documentation range, and the unique-local range in its other spellings.
+    if (bare.startsWith('2001:db8')) return true;
+    return false;
+  }
+  // Not an address at all: treat it as a name and let the caller resolve it.
+  return forbiddenHost(raw, {});
+}
 
 // Whether a host name is one this instance refuses to reach.
 function forbiddenHost(host, options) {
@@ -218,6 +256,156 @@ async function readBounded(res, maxBytes) {
   return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8');
 }
 
+// A DNS lookup that refuses to hand back a private address.
+//
+// The check that a name resolves to a public address, and the connection
+// that follows it, are two different resolutions of the same name. A name
+// with a short TTL can answer one way for the check and another way for the
+// connection, and the second answer is the one that is connected to - which
+// is how a hostname check is walked past.
+//
+// So the address that is connected to is the address that was checked: the
+// lookup is done here, and the result is refused if it is not a public
+// address.
+function guardedLookup(hostname, options, callback) {
+  const done = typeof options === 'function' ? options : callback;
+  const flags = typeof options === 'function' ? {} : (options || {});
+  const allowLocal = !!(flags.trycordAllowLocalhost);
+  dnsCallback.lookup(hostname, { all: false }, (error, address, family) => {
+    if (error) return done(error);
+    if (!allowLocal && isPrivateAddress(address)) {
+      return done(new Error('that host resolves to a private address'));
+    }
+    done(null, address, family);
+  });
+}
+
+// Fetches an HTML document from an address somebody else chose.
+//
+// The rules, all of them about the fact that the instance is doing the
+// asking and the other side is choosing:
+//
+//   - the name is resolved and checked, and the address connected to is the
+//     address that was checked;
+//   - redirects are followed one at a time and every hop is checked before
+//     it is fetched, so a redirect into the instance's own network is
+//     refused rather than fetched and then noticed;
+//   - there is a cap on the number of hops, on the time and on the size;
+//   - only HTML is read.
+//
+// Returns { ok, status, html, finalUrl } or { ok: false, error }.
+async function fetchHtml(url, options) {
+  const opts = options || {};
+  const timeoutMs = opts.timeoutMs || DEFAULT_TIMEOUT_MS;
+  const maxBytes = opts.maxBytes || DEFAULT_MAX_BYTES;
+  const maxRedirects = opts.maxRedirects === undefined ? 3 : opts.maxRedirects;
+  const accept = opts.accept || 'text/html,application/xhtml+xml';
+  const userAgent = opts.userAgent || 'TrycordBot/1.0 (+link preview)';
+
+  let target;
+  try { target = new URL(String(url)); } catch { return { ok: false, error: 'not a URL' }; }
+  if (target.protocol !== 'https:' && target.protocol !== 'http:') {
+    return { ok: false, error: 'only http and https are fetched' };
+  }
+  if (target.username || target.password) {
+    return { ok: false, error: 'the URL carries credentials' };
+  }
+
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    if (await resolvesToPrivate(target.hostname, { allowLocalhost: !!opts.allowLocalhost })) {
+      return { ok: false, error: 'that host resolves to a private address' };
+    }
+    const answer = await request(target, {
+      timeoutMs, maxBytes, accept, userAgent,
+      allowLocalhost: !!opts.allowLocalhost,
+    });
+    if (answer.error) return answer;
+    if (answer.redirect) {
+      let next;
+      try { next = new URL(answer.location, target); } catch {
+        return { ok: false, error: 'the redirect was not a URL' };
+      }
+      if (next.protocol !== 'https:' && next.protocol !== 'http:') {
+        return { ok: false, error: 'the redirect left http and https' };
+      }
+      if (next.username || next.password) {
+        return { ok: false, error: 'the redirect carried credentials' };
+      }
+      target = next;
+      continue;
+    }
+    return answer;
+  }
+  return { ok: false, error: 'too many redirects' };
+}
+
+// One request, without following anything.
+function request(target, opts) {
+  return new Promise((resolve) => {
+    const transport = target.protocol === 'https:' ? https : http;
+    let settled = false;
+    const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
+
+    const req = transport.request(target, {
+      method: 'GET',
+      // The lookup is told whether a local address is allowed, so the
+      // address that is connected to is the one that was checked.
+      lookup: (hostname, flags, done) => guardedLookup(
+        hostname, { ...(flags || {}), trycordAllowLocalhost: opts.allowLocalhost }, done,
+      ),
+      headers: { Accept: opts.accept, 'User-Agent': opts.userAgent },
+      // The address is checked by the lookup, so the connection cannot land
+      // somewhere the check did not look at.
+    }, (res) => {
+      const status = res.statusCode || 0;
+      if (status >= 300 && status < 400 && res.headers.location) {
+        res.resume();
+        finish({ redirect: true, location: res.headers.location });
+        return;
+      }
+      const type = String(res.headers['content-type'] || '').toLowerCase();
+      if (status < 200 || status >= 300) {
+        res.resume();
+        finish({ ok: false, error: 'answered HTTP ' + status });
+        return;
+      }
+      if (type && !/text\/html|application\/xhtml/.test(type)) {
+        res.resume();
+        finish({ ok: false, error: 'answered with ' + type + ' rather than HTML', contentType: type });
+        return;
+      }
+      const chunks = [];
+      let size = 0;
+      res.on('data', (chunk) => {
+        if (settled) return;
+        size += chunk.length;
+        if (size > opts.maxBytes) {
+          res.destroy();
+          finish({ ok: false, error: 'the answer was too large' });
+          return;
+        }
+        chunks.push(chunk);
+      });
+      res.on('end', () => {
+        finish({
+          ok: true,
+          status,
+          html: Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8'),
+          finalUrl: target.toString(),
+        });
+      });
+      res.on('error', (error) => finish({ ok: false, error: error.message }));
+    });
+
+    req.setTimeout(opts.timeoutMs, () => {
+      req.destroy();
+      finish({ ok: false, error: 'the request timed out' });
+    });
+    req.on('error', (error) => finish({ ok: false, error: error.message }));
+    req.end();
+  });
+}
+
 // Assert that a host may be reached.
 //
 // The check is the one `fetchJson` makes, reduced to the question on its own:
@@ -254,7 +442,9 @@ module.exports = {
   validateOrigin,
   resolvesToPrivate,
   fetchJson,
+  fetchHtml,
   assertPublicHost,
+  isPrivateAddress,
   isPrivateIpv4,
   isPrivateIpv6,
 };

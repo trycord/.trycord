@@ -13,7 +13,7 @@
 const crypto = require('crypto');
 const db = require('../db');
 const { now, uuid } = require('../util');
-const { isPrivateAddress, assertPublicHost } = require('./netguard');
+const { assertPublicHost, fetchHtml } = require('./netguard');
 const jobs = require('./jobs');
 
 const FETCH_TIMEOUT_MS = 4000;
@@ -44,41 +44,33 @@ function extractUrls(content) {
   return [...new Set(out)].slice(0, 3);
 }
 
+// The document behind a link.
+//
+// The fetch is the whole risk, so it is done by the guard rather than by
+// fetch(): the name is resolved and checked and the address that is
+// connected to is the address that was checked, and a redirect is followed
+// one hop at a time with every hop checked before it is fetched.
+//
+// `redirect: 'follow'` did neither. It followed the whole chain before
+// anything was looked at, so a link to a public address that redirects to
+// 127.0.0.1 was fetched from the instance's own network - the request was
+// made, the side effect happened, and only the answer was then thrown away.
 async function fetchHead(url) {
-  const u = new URL(url);
-  await assertPublicHost(u.hostname);
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const r = await fetch(url, {
-      redirect: 'follow',
-      signal: ctrl.signal,
-      headers: {
-        // Ask for HTML and nothing else. Without this a link to a large binary
-        // would be pulled into this process just to be thrown away.
-        accept: 'text/html,application/xhtml+xml',
-        'user-agent': 'TrycordBot/1.0 (+link preview)',
-      },
-    });
-    if (!r.ok) return { error: 'Http ' + r.status };
-    // A redirect can land on a private host, so the final URL is re-checked.
-    await assertPublicHost(new URL(r.url).hostname);
-    const type = String(r.headers.get('content-type') || '');
-    if (!/text\/html|application\/xhtml/i.test(type)) return { kind: 'link', siteName: new URL(r.url).hostname };
-    const reader = r.body.getReader();
-    const chunks = [];
-    let total = 0;
-    while (total < MAX_BYTES) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      total += value.length;
+  const answer = await fetchHtml(url, {
+    timeoutMs: FETCH_TIMEOUT_MS,
+    maxBytes: MAX_BYTES,
+    accept: 'text/html,application/xhtml+xml',
+    userAgent: 'TrycordBot/1.0 (+link preview)',
+  });
+  if (!answer.ok) {
+    // A page that answered with something that is not HTML is still a link,
+    // and the site name is worth keeping.
+    if (answer.contentType) {
+      return { kind: 'link', siteName: new URL(url).hostname };
     }
-    try { await reader.cancel(); } catch { /* already finished */ }
-    return { html: Buffer.concat(chunks.map(Buffer.from)).toString('utf8'), finalUrl: r.url };
-  } finally {
-    clearTimeout(timer);
+    return { error: answer.error };
   }
+  return { html: answer.html, finalUrl: answer.finalUrl };
 }
 
 // The metadata parsers. Deliberately small and deliberately not a real HTML

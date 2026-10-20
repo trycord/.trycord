@@ -108,3 +108,9 @@ backend/shots/
 *.sqlite-wal
 *.sqlite-shm
 backend/tmp/
+
+# The browser harness's own files. It copies the client beside itself so the
+# modules can be driven from disk, and those copies are not part of the
+# product.
+/frontend/.browser-harness/
+/frontend/.browser-harness.html

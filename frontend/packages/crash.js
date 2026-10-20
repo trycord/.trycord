@@ -9,6 +9,22 @@
 (function () {
   'use strict';
 
+  // What went wrong, for a harness to read.
+  //
+  // The report a reader is shown is a picture of the failure, and it is
+  // replaced by the next one. A harness needs the list, not the picture: it
+  // drives the application in a browser and has to be able to say "this page
+  // threw" rather than "this page looks fine".
+  //
+  // The list is on the window because that is the only thing both the
+  // reporter and a driver can reach. It is harmless in a served document.
+  window.__trycordErrors = window.__trycordErrors || [];
+
+  function record(message, reason) {
+    window.__trycordErrors.push(String(message || 'Unknown error')
+      + (reason ? ' — ' + String(reason) : ''));
+  }
+
   function render(message, reason) {
     var root = document.getElementById('app');
     if (!root) {
@@ -105,11 +121,15 @@
     if (target && target !== window && (target.src || target.href)) {
       var tag = target.tagName ? target.tagName.toLowerCase() : 'resource';
       if (tag === 'script' || tag === 'link') {
+        record('A required file failed to load.',
+          tag + ': ' + String(target.src || target.href));
         render('A required file failed to load.',
           tag + ': ' + String(target.src || target.href));
       }
       return;
     }
+    record(event && event.message ? event.message : 'Unexpected error',
+      event && event.filename ? event.filename + ':' + event.lineno : '');
     render(event && event.message ? event.message : 'Unexpected error',
       event && event.filename ? event.filename + ':' + event.lineno : '');
   }, true);
@@ -118,6 +138,8 @@
     var reason = event && event.reason;
     // A cancelled fetch is routine during navigation and is not a crash.
     if (reason && (reason.name === 'AbortError' || reason.code === 'ABORTED')) return;
+    record('Something went wrong handling a response.',
+      reason && reason.stack ? reason.stack : String(reason || ''));
     render('Something went wrong handling a response.',
       reason && reason.stack ? reason.stack : String(reason || ''));
   });

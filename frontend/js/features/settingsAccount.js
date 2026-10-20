@@ -6,6 +6,7 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { State } from '../../packages/store.js';
 import { avatar, bannerNode } from '../ui/primitives.js';
+import { forgetMedia } from '../../packages/media.js';
 import { head, card, fault, fold } from '../ui/page.js';
 import { errorToast, toast } from '../ui/overlays.js';
 
@@ -71,6 +72,10 @@ function paint(identity, user, reload) {
               onClick: async () => {
                 try {
                   await Api.removeProfileImage('banner');
+                  // The banner keeps its path, so the picture that was
+                  // fetched for it is still in the cache - and the banner
+                  // would come straight back.
+                  forgetMedia(user.bannerUrl);
                   toast('Banner removed');
                   reload();
                 } catch (e) { errorToast(e); }
@@ -82,6 +87,7 @@ function paint(identity, user, reload) {
               onClick: async () => {
                 try {
                   await Api.removeProfileImage('avatar');
+                  forgetMedia(user.avatarUrl);
                   toast('Avatar removed');
                   reload();
                 } catch (e) { errorToast(e); }
@@ -104,8 +110,17 @@ function paint(identity, user, reload) {
                 statusText: status.value.trim(),
                 bio: about.value,
               });
-              if (avatarFile) await Api.uploadProfileImage('avatar', avatarFile);
-              if (bannerFile) await Api.uploadProfileImage('banner', bannerFile);
+              // A new picture replaces the old one at the same path, so the
+              // bytes that were fetched for that path have to be forgotten -
+              // otherwise the old picture is still the one on screen.
+              if (avatarFile) {
+                await Api.uploadProfileImage('avatar', avatarFile);
+                forgetMedia(user.avatarUrl);
+              }
+              if (bannerFile) {
+                await Api.uploadProfileImage('banner', bannerFile);
+                forgetMedia(user.bannerUrl);
+              }
               toast('Saved');
               reload();
             } catch (e) { errorToast(e); }
