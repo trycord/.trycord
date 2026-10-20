@@ -21,6 +21,10 @@ import { renderProfile } from './profile.js';
 import { renderCommunity, renderChannelView, renderMembers, renderRoles, renderInvites, renderCategories } from './community.js';
 import { renderSettings } from './settings.js';
 import { renderAdmin } from './admin.js';
+import { renderSearch } from './search.js';
+import { renderCollections } from './collections.js';
+import { renderFederation } from './federation.js';
+import { renderStatus } from './status.js';
 
 const gates = (ctx) => renderAuth(ctx.page, ctx.params);
 
@@ -37,6 +41,12 @@ export const RENDERERS = {
   dms: () => renderDms(),
   'dms.conversation': (ctx) => renderDmConversation(ctx),
   profile: (ctx) => renderProfile(ctx),
+
+  // What the reader keeps, and what happened to the instance.
+  search: (ctx) => renderSearch(ctx),
+  collections: (ctx) => renderCollections(ctx),
+  federation: (ctx) => renderFederation(ctx),
+  status: (ctx) => renderStatus(ctx),
 
   // The community surfaces. The bare community and the settings addresses all
   // answer to one dispatcher; the channels are the conversation pages.

@@ -176,6 +176,16 @@ async function applyDecision(event, origin, payload) {
       reason: 'the decision is not about a message of this instance',
     };
   }
+  // The answer is the owner's. A peer that is not the owner of the
+  // community has no standing to say that a message was taken.
+  const communityOwner = origin.community_owner_id;
+  if (communityOwner && communityOwner !== origin.instance_id) {
+    return {
+      applied: false,
+      subject: 'decision',
+      reason: 'only the owner of a community may decide about a message in it',
+    };
+  }
   const outgoing = await store.findOutgoing(messageId);
   if (!outgoing) {
     return { applied: false, subject: 'decision', reason: 'no such message' };
@@ -271,6 +281,17 @@ async function apply(event, options = {}) {
     // The message this instance owns, taken back at its owner.
     const messageOwner = origin.message_owner_id || origin.instance_id;
     if (messageOwner === instanceId && kind === 'message.deleted') {
+      // Only the owner of the community may take back a message a member
+      // wrote in it.
+      if (origin.community_owner_id !== origin.instance_id) {
+        return {
+          applied: false,
+          subject: 'message',
+          reason: 'only the owner of a community may take back a message in it',
+          originInstanceId,
+          originCommunityId: serverId,
+        };
+      }
       const outgoing = await store.findOutgoing(messageId);
       if (!outgoing) {
         return {

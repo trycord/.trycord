@@ -324,9 +324,39 @@ async function resolveCommand(serverId, content) {
 // The one way an application posts. Both the bot HTTP API and a slash-command
 // reply go through here, so a bot message is written and broadcast exactly the
 // way a user message is, and there is no second insert path to keep correct.
+//
+// An application posts **in the clear**, and it cannot post into a
+// conversation that is encrypted. The application holds no conversation key and
+// cannot produce an envelope, so a plaintext post into an encrypted
+// conversation would be the one message the members cannot read — and it
+// would be readable by the server, which is exactly what the conversation was
+// closed to. The refusal is the honest answer.
+// Refuse to write in the clear into a conversation that is encrypted.
+//
+// This is shared with the workflow engine, because both write into the same
+// table and neither holds a conversation key. The question is asked of the
+// encryption service rather than worked out here, so the two paths cannot
+// disagree about what counts as encrypted.
+async function refuseIfEncrypted(channelRow, reason) {
+  let encrypted = false;
+  try {
+    const e2ee = require('./e2ee');
+    if (typeof e2ee.conversationEncryption === 'function') {
+      const summary = await e2ee.conversationEncryption(channelRow.id);
+      encrypted = !!(summary && summary.encrypted);
+    }
+  } catch { /* the encryption subsystem is not part of this build */ }
+  if (!encrypted) return;
+  const e = new Error(reason);
+  e.code = 'E2EE_VALIDATION_ERROR';
+  e.status = 400;
+  throw e;
+}
+
 async function postAsApp(app, channelRow, content, { kind } = {}) {
   const text = String(content || '').trim().slice(0, 2000);
   if (!text) return null;
+  await refuseIfEncrypted(channelRow, 'an application cannot post into an encrypted conversation');
   const id = uuid();
   const ts = now();
   const seqRow = await db.get('SELECT COALESCE(MAX(seq), 0) AS m FROM messages WHERE channel_id = ?', [channelRow.id]);
@@ -395,6 +425,7 @@ module.exports = {
   listApps, getApp, createApp, removeApp,
   listCommands, setCommand, removeCommand,
   appByToken, resolveCommand, postAsApp, respond, hashToken, appShape, commandShape, bad,
+  refuseIfEncrypted,
   updateApp, normaliseOptions, bindArguments, readOptions,
   MAX_RESPONSE, OPTION_TYPES, substitute,
 };

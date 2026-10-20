@@ -218,11 +218,43 @@ async function readBounded(res, maxBytes) {
   return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8');
 }
 
+// Assert that a host may be reached.
+//
+// The check is the one `fetchJson` makes, reduced to the question on its own:
+// is this host somewhere the instance is allowed to go? It is what a caller
+// asks before it fetches a URL somebody else chose - a link preview's image,
+// a webhook's endpoint - where the answer has to be "yes" before the request
+// is made rather than after.
+//
+// The name it had in the callers - `assertPublicHost` - is what it is called
+// there, and the function was **not exported**. The import therefore resolved
+// to `undefined`, every call raised a TypeError, and the callers caught it:
+// every link preview came back "unavailable" and every outgoing webhook was
+// refused with "must be a public address". The hole was closed by accident,
+// and removing the dead call would have opened it.
+//
+// So it exists, and it throws rather than returning a boolean: a caller that
+// forgets to handle the refusal should fail loudly.
+async function assertPublicHost(host, options = {}) {
+  const name = String(host || '').trim().toLowerCase();
+  if (!name) {
+    throw new Error('a host is required');
+  }
+  if (forbiddenHost(name, options)) {
+    throw new Error('that host is not a public address');
+  }
+  if (await resolvesToPrivate(name, options)) {
+    throw new Error('that host resolves to a private address');
+  }
+  return true;
+}
+
 module.exports = {
   forbiddenHost,
   validateOrigin,
   resolvesToPrivate,
   fetchJson,
+  assertPublicHost,
   isPrivateIpv4,
   isPrivateIpv6,
 };

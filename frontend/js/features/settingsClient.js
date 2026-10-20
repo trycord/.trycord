@@ -14,6 +14,7 @@ import { readPrefs, patchPrefs, applyDensity, rememberRegions, rememberStageWidt
 import { switchControl, fieldRow } from '../ui/primitives.js';
 import { head, card, blank, fault, fold, facts } from '../ui/page.js';
 import { toast } from '../ui/overlays.js';
+import { themePackages } from './settingsThemes.js';
 
 // A colour choice names a theme the stylesheet actually knows, and its swatch
 // carries the target theme as an attribute so the preview shows that theme's
@@ -166,6 +167,10 @@ export function appearanceView() {
     try { return localStorage.getItem('trycord.theme') || 'trycord'; } catch { return 'trycord'; }
   })();
 
+  // The theme packages this instance runs. They are their own surface, because
+  // importing one is an act with a consequence and not another colour button.
+  const packages = themePackages();
+
   return {
     node: fold([
       head({
@@ -206,9 +211,10 @@ export function appearanceView() {
         label: 'Motion', glyph: 'wind',
         rows: [fieldRow('Less motion', 'Backgrounds stop drifting; nothing slides in.', reduce)],
       }),
+      packages.node,
     ]),
-    onMount: null,
-    cleanup() {},
+    onMount: packages.onMount,
+    cleanup: packages.cleanup,
   };
 }
 

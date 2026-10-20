@@ -25,8 +25,8 @@ import { head, card, row, blank, fault, fold, facts, hold, memo } from '../ui/pa
 import { errorToast, toast, confirmDialog, openDialog, openMenu } from '../ui/overlays.js';
 import { iconButton } from '../ui/primitives.js';
 import {
-  sourceToBlocks, blocksToSource, blockErrors, linkProblem, imageProblem,
-  languageProblem, LIMITS,
+  sourceToBlocks, blocksToSource, blockErrors, blockToSource, linkProblem,
+  imageProblem, languageProblem, LIMITS,
 } from './pageSource.js';
 
 // -- reusable blocks ----------------------------------------------------------
@@ -83,6 +83,34 @@ function renderServerHtml(host, html) {
 // rewritten, because how two revisions are shown is the client's decision and
 // a server that answered with markup would be deciding it for everybody.
 
+// What the server says changed, as lines an operator can read. A block is
+// shown as the source writes it, which is text and never markup.
+function comparisonLines(report) {
+  const answer = report || {};
+  const summary = answer.summary || {};
+  const lines = [el('p', { class: 'form-note' },
+    (summary.added || 0) + ' added, ' + (summary.removed || 0) + ' removed, '
+    + (summary.changed || 0) + ' changed, ' + (summary.unchanged || 0) + ' unchanged'
+    + (answer.titleChanged ? ' · the title changed' : ''))];
+  for (const entry of answer.added || []) {
+    lines.push(el('p', { class: 'pagediff-line pagediff-line--added' },
+      el('span', { class: 'pagediff-mark' }, '+'),
+      el('span', { class: 'pagediff-text' }, blockToSource(entry.block))));
+  }
+  for (const entry of answer.removed || []) {
+    lines.push(el('p', { class: 'pagediff-line pagediff-line--removed' },
+      el('span', { class: 'pagediff-mark' }, '−'),
+      el('span', { class: 'pagediff-text' }, blockToSource(entry.block))));
+  }
+  for (const entry of answer.changed || []) {
+    lines.push(el('p', { class: 'pagediff-line' },
+      el('span', { class: 'pagediff-mark' }, '~'),
+      el('span', { class: 'pagediff-text' },
+        blockToSource(entry.before) + ' → ' + blockToSource(entry.after))));
+  }
+  return lines;
+}
+
 // -- the editor ---------------------------------------------------------------
 
 const BLOCK_LABELS = {
@@ -112,6 +140,7 @@ export function adminPageEditor() {
   let dirty = false;
   let openedAt = null;     // the draft timestamp the editor opened with
   let canEdit = false;
+  let revisions = [];      // the revisions the server holds for this page
 
   const mayEdit = () => !!(State.user && State.user.isAdmin);
 
@@ -249,6 +278,54 @@ export function adminPageEditor() {
     markDirty();
   };
 
+  // A field the operator empties is taken out of the block rather than left
+  // empty in it, so the body that is written is the body that was meant.
+  const clearBlockField = (index, field) => {
+    if (!working) return;
+    const next = Object.assign({}, working.blocks[index]);
+    delete next[field];
+    working.blocks[index] = next;
+    markDirty();
+  };
+
+  // A column is added to every row, and a row is added with a cell for every
+  // column, so a table is never ragged: the server refuses a row that is not
+  // as wide as the headings.
+  const addColumn = (index) => {
+    const block = working && working.blocks[index];
+    if (!block) return;
+    const headers = (block.headers || []).concat(['']);
+    const rows = (block.rows || []).map((row) => (row || []).concat(['']));
+    writeBlock(index, { headers, rows });
+    renderBlocks();
+  };
+
+  const removeColumn = (index, column) => {
+    const block = working && working.blocks[index];
+    if (!block) return;
+    const headers = (block.headers || []).filter((_, one) => one !== column);
+    const rows = (block.rows || []).map((row) => (row || []).filter((_, one) => one !== column));
+    writeBlock(index, { headers, rows });
+    renderBlocks();
+  };
+
+  const addRow = (index) => {
+    const block = working && working.blocks[index];
+    if (!block) return;
+    const columns = Math.max(1, (block.headers || []).length);
+    const rows = (block.rows || []).concat([new Array(columns).fill('')]);
+    writeBlock(index, { rows });
+    renderBlocks();
+  };
+
+  const removeRow = (index, row) => {
+    const block = working && working.blocks[index];
+    if (!block) return;
+    const rows = (block.rows || []).filter((_, one) => one !== row);
+    writeBlock(index, { rows });
+    renderBlocks();
+  };
+
   const moveBlock = (index, delta) => {
     if (!working) return;
     const to = index + delta;
@@ -300,23 +377,32 @@ export function adminPageEditor() {
     const block = working.blocks[index];
     if (!block) return;
     const name = el('input', { class: 'input', type: 'text', 'aria-label': 'Name for this reusable block', placeholder: 'Contact details' });
+    const scope = el('select', { class: 'select', 'aria-label': 'Who may use this reusable block' },
+      el('option', { value: 'SHARED', selected: true }, 'Every administrator on this instance'),
+      el('option', { value: 'PERSONAL', selected: false }, 'Only me'));
     const dialog = openDialog({
       title: 'Save as a reusable block',
-      sub: 'It joins the library in this browser and can be inserted in any page.',
+      sub: 'It joins the library on the server and can be inserted in any page.',
       body: el('form', {
         class: 'fold',
-        onSubmit: (event) => {
+        onSubmit: async (event) => {
           event.preventDefault();
           const label = name.value.trim();
           if (!label) { name.focus(); return; }
-          const list = readSnippets();
-          list.push({ id: newSnippetId(), name: label, blocks: [Object.assign({}, block)] });
-          writeSnippets(list);
-          toast('Saved to the reusable blocks');
-          dialog.close();
-          paintSnippets();
+          try {
+            await libraryWrite({
+              name: label,
+              body: [Object.assign({}, block)],
+              scope: scope.value || 'SHARED',
+            });
+            toast('Saved to the reusable blocks');
+            dialog.close();
+            await loadLibrary();
+          } catch (error) {
+            errorToast(error);
+          }
         },
-      }, name, el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save')),
+      }, name, scope, el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save')),
     });
     name.focus();
   };
@@ -411,15 +497,15 @@ export function adminPageEditor() {
               },
             })));
         });
-        body.appendChild(items,
-          el('button', {
-            class: 'btn btn--ghost btn--sm', type: 'button',
-            onClick: () => {
-              const next = (working.blocks[index].items || []).concat(['']);
-              writeBlock(index, { items: next });
-              renderBlocks();
-            },
-          }, icon('plus', { size: 14 }), 'Add item'));
+        body.appendChild(items);
+        body.appendChild(el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          onClick: () => {
+            const next = (working.blocks[index].items || []).concat(['']);
+            writeBlock(index, { items: next });
+            renderBlocks();
+          },
+        }, icon('plus', { size: 14 }), 'Add item'));
         break;
       }
       case 'link': {
@@ -430,8 +516,156 @@ export function adminPageEditor() {
         target.value = block.href || '';
         target.addEventListener('input', () => writeBlock(index, { href: target.value }));
         const problem = linkProblem(block.href);
-        body.appendChild(el('div', { class: 'pageblock-row' }, label, target),
-          problem ? el('p', { class: 'field-error' }, problem) : null);
+        body.appendChild(el('div', { class: 'pageblock-row' }, label, target));
+        if (problem) body.appendChild(el('p', { class: 'field-error' }, problem));
+        break;
+      }
+      case 'image': {
+        const source = el('input', {
+          class: 'input', type: 'text', 'aria-label': 'Image source',
+          placeholder: 'https://example.org/picture.png',
+        });
+        source.value = block.src || '';
+        source.addEventListener('input', () => writeBlock(index, { src: source.value }));
+        // The alt text is what a reader who cannot see the picture is told,
+        // so the server refuses an image without one.
+        const alt = el('input', {
+          class: 'input', type: 'text', 'aria-label': 'Image alt text',
+          placeholder: 'What the picture shows',
+        });
+        alt.value = block.alt || '';
+        alt.addEventListener('input', () => writeBlock(index, { alt: alt.value }));
+        const width = el('input', {
+          class: 'input', type: 'number', min: '1', max: String(LIMITS.imageWidth),
+          'aria-label': 'Image width in pixels',
+        });
+        width.value = block.width == null ? '' : String(block.width);
+        width.addEventListener('input', () => {
+          const value = width.value.trim();
+          if (!value) { clearBlockField(index, 'width'); return; }
+          writeBlock(index, { width: Number(value) });
+        });
+        const problem = imageProblem(block.src);
+        body.appendChild(el('div', { class: 'pageblock-row' }, source, width));
+        body.appendChild(alt);
+        if (problem) body.appendChild(el('p', { class: 'field-error' }, problem));
+        break;
+      }
+      case 'quote': {
+        const text = el('textarea', { class: 'input', rows: '3', 'aria-label': 'Quotation text' });
+        text.value = block.text || '';
+        text.addEventListener('input', () => writeBlock(index, { text: text.value }));
+        const attribution = el('input', {
+          class: 'input', type: 'text', 'aria-label': 'Quotation attribution',
+        });
+        attribution.value = block.attribution || '';
+        attribution.addEventListener('input', () => {
+          const value = attribution.value.trim();
+          if (!value) { clearBlockField(index, 'attribution'); return; }
+          writeBlock(index, { attribution: value });
+        });
+        body.appendChild(text);
+        body.appendChild(attribution);
+        break;
+      }
+      case 'code': {
+        // The code is written in a field that keeps its indentation, because
+        // the indentation is what the code means.
+        const text = el('textarea', {
+          class: 'input', rows: '8', spellcheck: 'false', 'aria-label': 'Code text',
+        });
+        text.value = block.text || '';
+        text.addEventListener('input', () => writeBlock(index, { text: text.value }));
+        const language = el('input', {
+          class: 'input', type: 'text', 'aria-label': 'Code language', placeholder: 'javascript',
+        });
+        language.value = block.language || '';
+        language.addEventListener('input', () => {
+          const value = language.value.trim().toLowerCase();
+          if (!value) { clearBlockField(index, 'language'); return; }
+          writeBlock(index, { language: value });
+        });
+        const problem = languageProblem(block.language);
+        body.appendChild(text);
+        body.appendChild(el('div', { class: 'pageblock-row' }, language));
+        if (problem) body.appendChild(el('p', { class: 'field-error' }, problem));
+        break;
+      }
+      case 'table': {
+        const headers = Array.isArray(block.headers) ? block.headers : [];
+        const rows = Array.isArray(block.rows) ? block.rows : [];
+
+        const caption = el('input', { class: 'input', type: 'text', 'aria-label': 'Table caption' });
+        caption.value = block.caption || '';
+        caption.addEventListener('input', () => {
+          const value = caption.value.trim();
+          if (!value) { clearBlockField(index, 'caption'); return; }
+          writeBlock(index, { caption: value });
+        });
+
+        // The table is a table, so the columns line up: the headings, the
+        // control that takes a column away under each of them, and a row for
+        // every line of the table.
+        const grid = el('table');
+        const headingRow = el('tr');
+        headers.forEach((heading, column) => {
+          const field = el('input', {
+            class: 'input', type: 'text', 'aria-label': 'Column ' + (column + 1) + ' heading',
+          });
+          field.value = heading == null ? '' : String(heading);
+          field.addEventListener('input', () => {
+            const next = (working.blocks[index].headers || []).slice();
+            next[column] = field.value;
+            writeBlock(index, { headers: next });
+          });
+          headingRow.appendChild(el('th', {}, field));
+        });
+        const toolsRow = el('tr');
+        headers.forEach((heading, column) => {
+          toolsRow.appendChild(el('th', {}, iconButton('x', {
+            label: 'Remove column ' + (column + 1),
+            class: 'icon-btn--sm',
+            onClick: () => removeColumn(index, column),
+          })));
+        });
+        grid.appendChild(el('thead', {}, headingRow, toolsRow));
+
+        const bodyRows = el('tbody');
+        rows.forEach((row, rowIndex) => {
+          const line = el('tr');
+          (row || []).forEach((cell, column) => {
+            const field = el('input', {
+              class: 'input', type: 'text',
+              'aria-label': 'Row ' + (rowIndex + 1) + ', column ' + (column + 1),
+            });
+            field.value = cell == null ? '' : String(cell);
+            field.addEventListener('input', () => {
+              const next = (working.blocks[index].rows || []).map((one) => (one || []).slice());
+              next[rowIndex][column] = field.value;
+              writeBlock(index, { rows: next });
+            });
+            line.appendChild(el('td', {}, field));
+          });
+          line.appendChild(el('td', {}, iconButton('x', {
+            label: 'Remove row ' + (rowIndex + 1),
+            class: 'icon-btn--sm',
+            onClick: () => removeRow(index, rowIndex),
+          })));
+          bodyRows.appendChild(line);
+        });
+        grid.appendChild(bodyRows);
+
+        body.appendChild(caption);
+        body.appendChild(grid);
+        body.appendChild(el('div', { class: 'pageblock-row' },
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            onClick: () => addColumn(index),
+          }, icon('plus', { size: 14 }), 'Add column'),
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            onClick: () => addRow(index),
+          }, icon('plus', { size: 14 }), 'Add row')));
         break;
       }
       case 'rule':
@@ -476,7 +710,8 @@ export function adminPageEditor() {
     sourceHost.replaceChildren(
       el('p', { class: 'form-note' },
         'One block per paragraph. ## heading, ! description, > quotation, ~ note, - item, 1. item, '
-        + '[label](target) for a link, --- for a rule. **bold**, *italic*, `code` inside a line.'),
+        + '[label](target) for a link, ![alt](src) for an image, ``` for a code block, '
+        + '| a | b | for a table and --- for a rule. **bold**, *italic*, `code` inside a line.'),
       sourceArea,
     );
     paintProblems();
@@ -551,41 +786,103 @@ export function adminPageEditor() {
   };
 
   // -- reusable blocks -------------------------------------------------------
+  //
+  // The library is the server's: the blocks an administrator may use, and the
+  // ones they wrote. A block is inserted as its content rather than as a
+  // reference, so a page that has taken a block keeps it whatever happens to
+  // the library afterwards.
 
-  const snippetHost = el('div', { class: 'rowlist' });
+  const libraryHost = el('div', { class: 'rowlist' });
+  let library = [];
 
-  const paintSnippets = () => {
-    const list = readSnippets();
-    if (!list.length) {
-      snippetHost.replaceChildren(blank({
+  const paintLibrary = () => {
+    if (!library.length) {
+      libraryHost.replaceChildren(blank({
         glyph: 'copy', title: 'No reusable blocks yet',
-        text: 'Save a block as reusable and it can be inserted in any page you edit.',
+        text: 'Save a block as reusable and it can be inserted in any page on this instance.',
       }));
       return;
     }
-    snippetHost.replaceChildren(...list.map((snippet) => row({
+    libraryHost.replaceChildren(...library.map((entry) => row({
       lead: el('span', { class: 'role-dot' }, icon('copy', { size: 15 })),
-      title: snippet.name,
-      sub: (snippet.blocks || []).map((block) => BLOCK_LABELS[block.type] || block.type).join(', '),
+      title: entry.name,
+      sub: (entry.body || []).map((block) => BLOCK_LABELS[block.type] || block.type).join(', '),
+      meta: el('span', { class: 'chip chip--quiet' }, entry.scope === 'SHARED' ? 'shared' : 'personal'),
       side: el('span', { class: 'rowtools' },
         el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
-          'aria-label': 'Insert ' + snippet.name,
+          'aria-label': 'Insert ' + entry.name,
           onClick: () => {
-            for (const block of snippet.blocks || []) {
+            for (const block of entry.body || []) {
               insertBlock(Object.assign({}, block), working ? working.blocks.length : undefined);
             }
           },
         }, 'Insert'),
         el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
-          'aria-label': 'Delete the reusable block ' + snippet.name,
-          onClick: () => {
-            writeSnippets(readSnippets().filter((entry) => entry.id !== snippet.id));
-            paintSnippets();
-          },
+          'aria-label': 'Rename the reusable block ' + entry.name,
+          onClick: () => renameLibraryEntry(entry),
+        }, 'Rename'),
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Delete the reusable block ' + entry.name,
+          onClick: () => deleteLibraryEntry(entry),
         }, 'Delete')),
     })));
+  };
+
+  const loadLibrary = async () => {
+    try {
+      const listed = await libraryList();
+      library = Array.isArray(listed) ? listed : [];
+      paintLibrary();
+    } catch (error) {
+      library = [];
+      libraryHost.replaceChildren(fold([fault(error, loadLibrary)]));
+    }
+  };
+
+  const renameLibraryEntry = (entry) => {
+    const name = el('input', { class: 'input', type: 'text', 'aria-label': 'Name for this reusable block' });
+    name.value = entry.name || '';
+    const dialog = openDialog({
+      title: 'Rename this reusable block',
+      sub: 'The blocks it holds do not change.',
+      body: el('form', {
+        class: 'fold',
+        onSubmit: async (event) => {
+          event.preventDefault();
+          const label = name.value.trim();
+          if (!label) { name.focus(); return; }
+          try {
+            await libraryRename(entry.id, { name: label });
+            toast('Renamed');
+            dialog.close();
+            await loadLibrary();
+          } catch (error) {
+            errorToast(error);
+          }
+        },
+      }, name, el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save')),
+    });
+    name.focus();
+  };
+
+  const deleteLibraryEntry = async (entry) => {
+    const yes = await confirmDialog({
+      title: 'Delete ' + entry.name + '?',
+      body: 'The block is taken out of the library. The pages that already hold it keep it.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!yes) return;
+    try {
+      await libraryRemove(entry.id);
+      toast('Deleted from the reusable blocks');
+      await loadLibrary();
+    } catch (error) {
+      errorToast(error);
+    }
   };
 
   // -- saving, publishing, history -------------------------------------------
@@ -732,18 +1029,18 @@ export function adminPageEditor() {
   const paintHistory = async () => {
     historyHost.replaceChildren(hold('Reading the history'));
     try {
-      const revisions = await Api.pageRevisions(current.route, 20);
-      const items = Array.isArray(revisions) ? revisions : (revisions && revisions.items) || [];
-      if (!items.length) {
+      const listed = await Api.pageRevisions(current.route, 20);
+      revisions = Array.isArray(listed) ? listed : (listed && listed.items) || [];
+      if (!revisions.length) {
         historyHost.replaceChildren(blank({
           glyph: 'book', title: 'No history yet', text: 'Every save and every publish is recorded here.',
         }));
         return;
       }
-      historyHost.replaceChildren(...items.map((revision) => row({
+      historyHost.replaceChildren(...revisions.map((revision) => row({
         title: 'Revision ' + revision.revision,
-        sub: (revision.state || 'draft') + ' · ' + (revision.created_at || revision.createdAt || '')
-          + (revision.author_id ? ' · ' + revision.author_id : ''),
+        sub: (revision.state || 'draft') + ' · ' + (revision.createdAt || '')
+          + (revision.authorId ? ' · ' + revision.authorId : ''),
         meta: revision.title || '',
         side: el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
@@ -777,25 +1074,50 @@ export function adminPageEditor() {
     }
   };
 
-  // The comparison the server can support: the working draft against the
-  // published page. The revision list carries no body, so a revision can be
-  // restored but not diffed.
+  // The comparison the server can support: what changed between two
+  // revisions. The answer is a report about the content - the blocks that
+  // were added, removed and rewritten - rather than a diff of two texts, so
+  // the blocks are shown as the source writes them.
   const compare = () => {
-    const published = current && current.published ? current.published : [];
-    const before = blocksToSource(published);
-    const after = mode === 'source' ? source : blocksToSource(working ? working.blocks : []);    const lines = diffLines(before, after);
-    const body = el('div', { class: 'pagediff' });
-    for (const line of lines) {
-      body.appendChild(el('p', { class: 'pagediff-line pagediff-line--' + line.kind },
-        el('span', { class: 'pagediff-mark' }, line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '),
-        el('span', { class: 'pagediff-text' }, line.text || ' ')));
+    if (!current) return;
+    if (revisions.length < 2) {
+      toast('There are not two revisions to compare yet', { type: 'error' });
+      return;
     }
+    const name = (revision) => 'Revision ' + revision.revision
+      + (revision.isPublished ? ' (published)' : '')
+      + (revision.isDraft ? ' (draft)' : '');
+    const from = el('select', { class: 'select', 'aria-label': 'The revision to compare from' },
+      ...revisions.map((revision) => el('option', { value: String(revision.revision) }, name(revision))));
+    from.value = String(revisions[1].revision);
+    const to = el('select', { class: 'select', 'aria-label': 'The revision to compare to' },
+      ...revisions.map((revision) => el('option', { value: String(revision.revision) }, name(revision))));
+    to.value = String(revisions[0].revision);
+    const report = el('div', { class: 'pagediff' });
+
+    const show = async () => {
+      report.replaceChildren(hold('Asking what changed'));
+      try {
+        const answer = await request('GET', '/api/admin/pages/' + encodeURIComponent(current.route)
+          + '/revisions/compare?from=' + encodeURIComponent(from.value)
+          + '&to=' + encodeURIComponent(to.value));
+        report.replaceChildren(...comparisonLines(answer));
+      } catch (error) {
+        report.replaceChildren(fold([fault(error, show)]));
+      }
+    };
+
     openDialog({
-      title: 'Draft against the published page',
-      sub: published.length ? 'The published page is on the left of each pair.' : 'Nothing is published yet.',
+      title: 'Compare two revisions',
+      sub: 'What the server says changed between them.',
       wide: true,
-      body,
+      body: el('div', { class: 'fold' },
+        el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'From'), from),
+        el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'To'), to),
+        el('button', { class: 'btn btn--default btn--sm', type: 'button', onClick: show }, 'Compare'),
+        report),
     });
+    show();
   };
 
   const preview = async () => {
@@ -837,7 +1159,7 @@ export function adminPageEditor() {
     renderBlocks();
     renderSource();
     paintBody();
-    paintSnippets();
+    paintLibrary();
 
     stage.replaceChildren(
       head({
@@ -852,7 +1174,7 @@ export function adminPageEditor() {
           el('button', {
             class: 'btn btn--default btn--sm', type: 'button',
             onClick: compare,
-          }, icon('edit', { size: 14 }), 'Compare'),
+          }, icon('edit', { size: 14 }), 'Compare revisions'),
           el('button', {
             class: 'btn btn--primary btn--sm', type: 'button',
             disabled: canEdit ? null : true,
@@ -893,8 +1215,8 @@ export function adminPageEditor() {
       }),
       card({
         label: 'Reusable blocks', glyph: 'copy',
-        note: 'kept in this browser',
-        body: snippetHost,
+        note: 'the library on this instance',
+        body: libraryHost,
         flush: true,
       }),
       card({
@@ -930,6 +1252,7 @@ export function adminPageEditor() {
     ]),
     onMount: async () => {
       await loadList();
+      await loadLibrary();
       if (pages.length) await openPage(pages[0].route);
     },
     cleanup() {},

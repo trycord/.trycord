@@ -14,6 +14,7 @@
 'use strict';
 
 const events = require('../events');
+const db = require('../../db');
 const { E2EE_EVENTS } = require('./eventNames');
 const { protocolError } = require('./envelope');
 
@@ -77,6 +78,46 @@ async function publishPrekeys(userId, deviceId, input) {
     availablePreKeys: result.availablePreKeys,
   });
   return result;
+}
+
+/**
+ * Tell the members of a community that its conversation key has to move.
+ *
+ * A membership change means the devices sealed at the current epoch no
+ * longer match the member devices: somebody arrived, or somebody left, and
+ * the group the key was shared with is not the group it is now. The devices
+ * that are still members have to be told, or they keep using a key the group
+ * no longer shares.
+ *
+ * This is a **notification**, not a rekey. The server cannot reseal the key —
+ * it holds no conversation key — so it tells the members, and a member's
+ * client fetches the new key and seals it for the devices that need it.
+ *
+ * A community with no published key has nothing to move, and asking about it
+ * would be a query per member for nothing.
+ */
+async function announceKeyChange(serverId, reason) {
+  const rows = await db.all(
+    'SELECT id FROM e2ee_group_sessions WHERE id = ?',
+    [serverId]
+  );
+  if (!rows.length) return { notified: 0 };
+
+  // The members of the community. A member with no registered device has
+  // nothing to rekey, so it is not told.
+  const devices = await db.all(
+    'SELECT user_id FROM e2ee_devices WHERE user_id IN (SELECT user_id FROM server_members WHERE server_id = ?)',
+    [serverId]
+  );
+  const userIds = [...new Set(devices.map((d) => d.user_id))];
+  for (const userId of userIds) {
+    events.emitTo(userId, E2EE_EVENTS.KEY_CHANGE, {
+      conversationId: serverId,
+      action: 'membership-changed',
+      reason: reason || 'membership',
+    });
+  }
+  return { notified: userIds.length };
 }
 
 /** Take a peer's prekey bundle, consuming a one-time prekey. */
@@ -270,6 +311,7 @@ module.exports = {
   conversationKey,
   conversationState,
   conversationEncryption,
+  announceKeyChange,
   acceptMessageBody,
   readMessageBody,
   shapeMessage,

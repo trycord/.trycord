@@ -15,6 +15,7 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
+const { singleFile } = require('../middleware/upload');
 const { fail, wrap, serviceError } = require('../errors');
 const e2ee = require('../services/e2ee');
 const { protocolError } = require('../services/e2ee/envelope');
@@ -328,5 +329,46 @@ router.get('/safety-number', limited('safety-number', 60), route(async (req, res
   const peerUserId = required(req.query, 'userId');
   res.json(await e2ee.safetyNumber(req.user.id, peerUserId));
 }));
+
+// POST /api/e2ee/attachments/upload - the ciphertext of an attachment.
+//
+// The client encrypts the file with a random key, seals that key to each
+// member device, and uploads the ciphertext. The server stores the
+// ciphertext and the seals, and holds no key it can open - the attachment
+// record carries the name the client sent, and the name is metadata, so the
+// real one belongs inside the encrypted message.
+//
+// The client chooses the attachment's id, because the key has to be sealed to
+// it before the file is uploaded, and the id is what the seal names.
+router.post('/attachments/upload', auth.requireVerified, limited('attachments', 30), singleFile,
+  route(async (req, res) => {
+    const body = req.body || {};
+    if (!req.file || !req.file.buffer) {
+      throw protocolError('E2EE_VALIDATION_ERROR',
+        'send the file as a multipart field named "file"', 400);
+    }
+    const attachment = await e2ee.storeEncryptedAttachment(req.user.id, {
+      id: body.id,
+      conversationId: required(body, 'conversationId'),
+      filename: body.filename || 'attachment',
+      mime: body.mime || 'application/octet-stream',
+      buffer: req.file.buffer,
+      sealedKeys: sealedKeysFrom(body.sealedKeys),
+    });
+    res.status(201).json({ attachment });
+  }));
+
+// The seals, which arrive as a JSON string in a multipart field.
+function sealedKeysFrom(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    throw protocolError('E2EE_VALIDATION_ERROR',
+      'sealedKeys is not a list of seals', 400);
+  }
+}
 
 module.exports = router;

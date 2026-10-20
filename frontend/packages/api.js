@@ -369,6 +369,8 @@ const Api = {
   unpinMessage: (serverId, channelId, messageId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId) + '/pins/' + encodeURIComponent(messageId)),
 
+  // The search itself. The filters travel in the query, because that is where
+  // the server reads them from: `from:ada in:"general chat" has:file`.
   search: (q, opts) => {
     const o = opts || {};
     const p = new URLSearchParams({ q: String(q || '') });
@@ -376,6 +378,18 @@ const Api = {
     if (o.limit) p.set('limit', String(o.limit));
     return request('GET', '/api/search?' + p.toString());
   },
+
+  // ---- the searches a reader keeps -----------------------------------------
+  // Both lists belong to the reader alone. The server answers them from the
+  // owner, so the client asks for its own and never names another reader.
+  savedSearches: () => request('GET', '/api/search/saved'),
+  createSavedSearch: (body) => request('POST', '/api/search/saved', { body }),
+  updateSavedSearch: (id, body) =>
+    request('PATCH', '/api/search/saved/' + encodeURIComponent(id), { body }),
+  deleteSavedSearch: (id) => request('DELETE', '/api/search/saved/' + encodeURIComponent(id)),
+  searchHistory: () => request('GET', '/api/search/history'),
+  clearSearchHistory: () => request('DELETE', '/api/search/history'),
+  deleteSearchHistoryEntry: (id) => request('DELETE', '/api/search/history/' + encodeURIComponent(id)),
 
   uploadAttachment: (channelId, file, onProgress) => {
     const fd = new FormData();
@@ -550,6 +564,85 @@ const Api = {
   myReports: () => request('GET', '/api/reports/mine'),
   appeals: (body) => request('POST', '/api/appeals', { body, auth: false }),
   myAppeals: () => request('GET', '/api/appeals/mine'),
+
+  // ---- the things a reader keeps --------------------------------------------
+  // A template is a named piece of text the reader inserts; a collection is a
+  // named list of saved things, private or shared with a community.
+  templates: () => request('GET', '/api/personal/templates'),
+  createTemplate: (body) => request('POST', '/api/personal/templates', { body }),
+  templateByShortcut: (shortcut) =>
+    request('GET', '/api/personal/templates/shortcut/' + encodeURIComponent(shortcut)),
+  updateTemplate: (id, body) =>
+    request('PATCH', '/api/personal/templates/' + encodeURIComponent(id), { body }),
+  deleteTemplate: (id) => request('DELETE', '/api/personal/templates/' + encodeURIComponent(id)),
+  collections: () => request('GET', '/api/personal/collections'),
+  collection: (id) => request('GET', '/api/personal/collections/' + encodeURIComponent(id)),
+  createCollection: (body) => request('POST', '/api/personal/collections', { body }),
+  updateCollection: (id, body) =>
+    request('PATCH', '/api/personal/collections/' + encodeURIComponent(id), { body }),
+  deleteCollection: (id) => request('DELETE', '/api/personal/collections/' + encodeURIComponent(id)),
+  addCollectionItem: (id, body) =>
+    request('POST', '/api/personal/collections/' + encodeURIComponent(id) + '/items', { body }),
+  removeCollectionItem: (id, itemId) =>
+    request('DELETE', '/api/personal/collections/' + encodeURIComponent(id)
+      + '/items/' + encodeURIComponent(itemId)),
+
+  // ---- localisation ----------------------------------------------------------
+  // The catalogue and the locale the instance answers in; the reader's own
+  // preference, which the server keeps for them.
+  localisation: (serverId) => request('GET', '/api/localisation'
+    + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
+  localisationLocales: (serverId) => request('GET', '/api/localisation/locales'
+    + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
+  localisationPreference: () => request('GET', '/api/localisation/preference'),
+  setLocalisationPreference: (locale) =>
+    request('PUT', '/api/localisation/preference', { body: { locale: locale || null } }),
+
+  // ---- theme packages --------------------------------------------------------
+  // Importing a package puts it in force; rollback goes back to the theme that
+  // was in force before the last change.
+  themes: (serverId) => request('GET', '/api/themes'
+    + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
+  theme: (id) => request('GET', '/api/themes/' + encodeURIComponent(id)),
+  exportTheme: (id) => request('GET', '/api/themes/' + encodeURIComponent(id) + '/export'),
+  importTheme: (body) => request('POST', '/api/themes/import', { body }),
+  rollbackTheme: (serverId) =>
+    request('POST', '/api/themes/rollback', { body: serverId ? { serverId } : {} }),
+
+  // ---- the incident timeline --------------------------------------------------
+  incidents: (opts) => {
+    const o = opts || {};
+    const p = new URLSearchParams();
+    if (o.limit) p.set('limit', String(o.limit));
+    if (o.kind) p.set('kind', String(o.kind));
+    const qs = p.toString();
+    return request('GET', '/api/incidents' + (qs ? '?' + qs : ''));
+  },
+  incidentStatus: (opts) => {
+    const o = opts || {};
+    const qs = o.limit ? '?limit=' + encodeURIComponent(o.limit) : '';
+    return request('GET', '/api/incidents/status' + qs);
+  },
+  incident: (id) => request('GET', '/api/incidents/' + encodeURIComponent(id)),
+  createIncident: (body) => request('POST', '/api/incidents', { body }),
+  updateIncident: (id, body) => request('PATCH', '/api/incidents/' + encodeURIComponent(id), { body }),
+
+  // ---- cross-instance reports -------------------------------------------------
+  // Filing one needs an account; reading the ones that arrived needs the
+  // platform administration gate.
+  myFederationReports: () => request('GET', '/api/federation-reports/mine'),
+  federationReport: (id) => request('GET', '/api/federation-reports/mine/' + encodeURIComponent(id)),
+  fileFederationReport: (body) => request('POST', '/api/federation-reports', { body }),
+  inboundFederationReports: (limit) => request('GET', '/api/federation-reports'
+    + (limit ? '?limit=' + encodeURIComponent(limit) : '')),
+
+  // ---- the communities this account follows on other instances ---------------
+  continuumMemberships: () => request('GET', '/api/continuum/memberships'),
+  continuumRelayedMessages: (instanceId, communityId, limit) => {
+    const qs = limit ? '?limit=' + encodeURIComponent(limit) : '';
+    return request('GET', '/api/continuum/communities/' + encodeURIComponent(instanceId)
+      + '/' + encodeURIComponent(communityId) + '/messages' + qs);
+  },
 
   webhooks: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/webhooks'),
   createWebhook: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/webhooks', { body }),

@@ -115,9 +115,10 @@ async function write({
 
 // Edit a message written here for a community that lives elsewhere.
 //
-// Only the author may edit it, and only while it is there: an edit is a
-// write, so it is subject to the same rules a new message is. The change
-// itself is published by the feed, like every other change.
+// Only the author may edit it, and only while it is there. An edit is a
+// write, so the same rules apply to it as to a new message: the writer is
+// told here rather than finding out that the change did not leave. The
+// change itself is published by the feed, like every other change.
 async function edit({ user, outgoingId, content }) {
   const outgoing = await store.findOutgoing(outgoingId);
   if (!outgoing) throw { code: 'NOT_FOUND', message: 'no such message' };
@@ -125,6 +126,13 @@ async function edit({ user, outgoingId, content }) {
     throw { code: 'PERMISSION_DENIED', message: 'only the author can edit it' };
   }
   if (outgoing.deleted_at) throw { code: 'NOT_FOUND', message: 'the message is gone' };
+  const gate = await rules.mayPublishRemoteMessage({
+    originInstanceId: outgoing.origin_instance_id,
+    originCommunityId: outgoing.origin_community_id,
+    originChannelId: outgoing.origin_channel_id,
+    userId: user.id,
+  });
+  if (!gate.ok) throw { code: 'PERMISSION_DENIED', message: gate.reason };
   const text = readContent(content);
   await store.updateOutgoing(outgoing.id, { content: text, editedAt: now() });
   return store.shapeOutgoing(await store.findOutgoing(outgoing.id));

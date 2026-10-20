@@ -153,6 +153,7 @@ export function renderChannelView(ctx) {
   const surface = conversationSurface({
     kind: 'channel',
     scopeId: channelId,
+    serverId: serverId,
     composerLabel: 'Message #' + channel.name,
     composerHint: 'Message #' + channel.name,
     canManage: can(serverId, 'MANAGE_MESSAGES'),

@@ -439,9 +439,7 @@ async function buildPayload(kind, input, source, opts) {
   // Which instance owns the community the event is about. Everything this
   // instance federates, it owns; a message written here for a community that
   // lives elsewhere belongs to that other instance.
-  const communityOwnerId = outgoing
-    ? String(input.originInstanceId)
-    : (input.communityOwnerId || instanceId);
+  const communityOwnerId = outgoing ? String(input.originInstanceId) : instanceId;
 
   // Which instance holds the message. The message this instance publishes is
   // this instance's, unless it is a message that arrived from a peer and is
@@ -525,10 +523,10 @@ async function buildPayload(kind, input, source, opts) {
       // it has is the one it has there.
       payload.message = {
         id: row.origin_message_id,
-        content: null,
+        content: kind === 'message.deleted' ? null : row.content,
         created_at: row.created_at,
         edited_at: row.edited_at || null,
-        deleted_at: now(),
+        deleted_at: kind === 'message.deleted' ? now() : null,
       };
     } else if (row) {
       payload.message = {

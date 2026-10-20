@@ -169,7 +169,24 @@ function invalidateMembership(serverId) {
 async function join(serverId, user) {
   const out = await db.transaction((t) => joinInner(serverId, user.id, user.username, t));
   invalidateMembership(serverId);
+  announceKeyChange(serverId, 'joined');
   return out;
+}
+
+// A membership change means the conversation's key has to move.
+//
+// The devices sealed at the current epoch no longer match the member devices,
+// so the epoch moves and the key is resealed for the new membership. The
+// devices that are still members have to be told, or they keep using a key
+// the group no longer shares.
+function announceKeyChange(serverId, reason) {
+  try {
+    const e2ee = require('./e2ee');
+    if (typeof e2ee.announceKeyChange !== 'function') return;
+    e2ee.announceKeyChange(serverId, reason).catch(() => {
+      /* the membership change itself has already happened */
+    });
+  } catch { /* the encryption subsystem is not part of this build */ }
 }
 
 async function joinByCode(code, user) {
@@ -287,6 +304,7 @@ async function leave(serverId, userId) {
   });
   events.emit(serverId, 'member_left', { userId: String(userId) });
   events.evict(serverId, userId, 'left server');
+  announceKeyChange(serverId, 'left');
   return out;
 }
 

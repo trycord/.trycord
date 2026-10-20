@@ -178,6 +178,31 @@ test('the declared schema is portable', async (t) => {
     assert.deepEqual(problems, [], problems.join('\n'));
   });
 
+  await t.test('a table is declared after every table it points at', () => {
+    // MySQL checks a referenced table when the referencing one is created, so a
+    // table that points at one declared later cannot be created. SQLite does
+    // not check at DDL time, which is why a fresh MySQL database failed with
+    // errno 150 while every SQLite instance was perfectly happy.
+    //
+    // The declaration order is the order the tables are created in, so this is
+    // the order the check has to be made in.
+    const declared = [];
+    const problems = [];
+    for (const statement of statements()) {
+      const table = tableName(statement);
+      const re = /FOREIGN KEY\s*\([^)]*\)\s*REFERENCES\s+(\w+)\s*\(/gi;
+      let m;
+      while ((m = re.exec(statement)) !== null) {
+        if (m[1] === table) continue; // a self-reference
+        if (!declared.includes(m[1])) {
+          problems.push(table + ' is declared before ' + m[1] + ', which it points at');
+        }
+      }
+      declared.push(table);
+    }
+    assert.deepEqual(problems, [], problems.join('\n'));
+  });
+
   await t.test('every table module is readable and exports the same shape', () => {
     const files = fs.readdirSync(TABLES_DIR).filter((f) => f.endsWith('.js') && f !== 'index.js');
     for (const file of files) {

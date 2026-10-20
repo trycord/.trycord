@@ -49,10 +49,31 @@ async function register(userId, input) {
     throw protocolError('E2EE_VALIDATION_ERROR', 'a device needs its three public keys', 400);
   }
   const timestamp = now();
-  const existing = await db.get('SELECT id, user_id FROM e2ee_devices WHERE id = ?', [id]);
+  const existing = await db.get(
+    'SELECT id, user_id, identity_key, key_fingerprint FROM e2ee_devices WHERE id = ?', [id]);
   if (existing) {
     if (existing.user_id !== userId) {
       throw protocolError('E2EE_FORBIDDEN', 'that device id belongs to somebody else', 403);
+    }
+    // A device's identity key is pinned the first time it is seen.
+    //
+    // A device that could swap its identity key would break the whole
+    // guarantee: the key fingerprint is what two people compare to be sure
+    // they are talking to the same device, and a fingerprint that changed
+    // under them would mean nothing. So a registered device keeps the key it
+    // was registered with, and a change is refused rather than accepted.
+    //
+    // The way a device legitimately changes its key is to be revoked and
+    // registered again, which is a new device id and a new fingerprint - and
+    // that is exactly what the safety number is for.
+    if (existing.identity_key && input.identityKey
+        && existing.identity_key !== input.identityKey) {
+      throw protocolError(
+        'E2EE_VALIDATION_ERROR',
+        'this device is already registered with a different identity key. '
+        + 'Revoke the device and register it again to change its key.',
+        400,
+      );
     }
     await db.run(
       `UPDATE e2ee_devices

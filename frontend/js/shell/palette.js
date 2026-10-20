@@ -16,6 +16,7 @@ import { openDialog } from '../ui/overlays.js';
 import { globalPages, pageById } from '../../packages/registry.js';
 import { State, dmPeer, nameOf } from '../../packages/store.js';
 import { currentRoute, navigate } from '../../packages/nav.js';
+import { parseQuery, filterChips } from '../../packages/search.js';
 import Api from '../../packages/api.js';
 
 const SEARCH_DEBOUNCE_MS = 220;
@@ -127,15 +128,47 @@ export function openPalette() {
   }
 
   function render() {
-    const query = input.value.trim().toLowerCase();
+    const raw = input.value.trim();
+    // The query is parsed the way the search panel parses it, so a filter
+    // written here means the same thing there. A filter the server would
+    // refuse is refused here, with the same words.
+    let parsed = null;
+    let problem = null;
+    if (raw) {
+      try { parsed = parseQuery(raw); } catch (error) { problem = error.message; }
+    }
+    const query = parsed ? parsed.terms.join(' ').toLowerCase() : '';
     const filtered = entries.filter((entry) => !query
       || entry.label.toLowerCase().includes(query)
       || entry.group.toLowerCase().includes(query));
 
     results.replaceChildren();
+    if (problem) {
+      results.appendChild(el('div', { class: 'palette-note' }, problem));
+      return;
+    }
+
+    const chips = parsed ? filterChips(parsed.filters) : [];
+    if (chips.length) {
+      results.appendChild(el('div', { class: 'palette-group' },
+        el('div', { class: 'palette-group-label' }, 'Filters'),
+        el('button', {
+          class: 'palette-item', type: 'button',
+          onClick: () => {
+            dialog.close();
+            navigate('/search?q=' + encodeURIComponent(raw));
+          },
+        },
+        icon('filter', { size: 16 }),
+        el('span', { class: 'palette-item-label truncate' }, 'Search messages with these filters'),
+        el('span', { class: 'palette-item-hint truncate' },
+          chips.map((chip) => chip.text).join(' ')))));
+    }
+
     if (!filtered.length) {
       results.appendChild(el('div', { class: 'palette-note' },
         query ? 'Nothing matches.' : 'Start typing to search.'));
+      paintActive();
       return;
     }
 
@@ -193,6 +226,8 @@ export function openPalette() {
       render();
     }).catch(() => { /* people search is best-effort */ });
 
+    // The whole query goes, filters and all: the server reads the filters out
+    // of it and applies them together with the permission check.
     Api.search(query, serverId ? { serverId, limit: 12 } : { limit: 12 }).then((rows) => {
       if (token !== searchToken) return;
       for (const row of (Array.isArray(rows) ? rows : []).slice(0, 8)) {
@@ -215,7 +250,7 @@ export function openPalette() {
     if (searchTimer) clearTimeout(searchTimer);
     if (query.length >= SEARCH_MIN) {
       const token = searchToken;
-      searchTimer = setTimeout(() => { if (token === searchToken) runSearch(query.toLowerCase()); }, SEARCH_DEBOUNCE_MS);
+      searchTimer = setTimeout(() => { if (token === searchToken) runSearch(query); }, SEARCH_DEBOUNCE_MS);
     }
     activeIndex = 0;
     render();
