@@ -4,7 +4,7 @@
 // the answer: one answer per member, and the attendance list showing exactly
 // what the server allows it to show.
 
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub } from '../helpers/dom-stub.js';
@@ -15,6 +15,10 @@ installDomStub();
 const { eventsList, eventsDetail } = await import('../../js/features/workspace/events.js');
 const { attendanceRows } = await import('../../packages/workspace.js');
 const { State } = await import('../../packages/store.js');
+
+// The store is shared with the other checks, so what these checks put in it
+// is taken out again when they are done.
+after(() => { State.servers = []; State.user = null; });
 
 const EVENT = {
   id: 'event-1',

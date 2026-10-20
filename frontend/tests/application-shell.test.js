@@ -71,11 +71,34 @@ test('the application keeps the application', async (t) => {
     const added = [
       'search', 'collections', 'federation', 'status',
       'settings.language', 'admin.incidents', 'admin.federation',
+      // The consoles and the surfaces that arrived with the later subsystems.
+      'admin.voice', 'extensions', 'developer',
+      'community.workspace', 'community.workspace.spaces',
+      'community.workspace.documents', 'community.workspace.boards',
+      'community.workspace.events', 'community.workspace.polls',
+      'community.settings.voice',
     ];
     for (const id of added) {
       const page = registry.pageById(id);
       assert.ok(page, id + ' is registered');
       assert.notEqual(page.access, 'guest', id + ' is not a gate');
+    }
+  });
+
+  await t.test('every page is drawn inside the application, not beside it', () => {
+    // A page that renders the application beside itself rather than inside it
+    // is a page where the rail, the column or the stage went missing. The
+    // question is whether the page has somewhere to be drawn: a column of its
+    // own, or one of the scopes that draws a navigation inside the stage.
+    const scopes = ['admin', 'account', 'community'];
+    for (const page of registry.PAGES) {
+      if (page.layout === 'plain') continue;
+      const hasPlace = !!page.sidebar
+        || scopes.includes(page.scope)
+        || page.id.startsWith('community.');
+      assert.ok(hasPlace,
+        page.id + ' has no column and no navigation of its own, so the '
+        + 'application around it would have nowhere to go');
     }
   });
 

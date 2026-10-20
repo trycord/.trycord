@@ -74,13 +74,44 @@ function shape(address) {
 }
 
 // The routes a community router declares.
+//
+// The path is read as it is written, so a route whose address is assembled
+// at boot - the community's icon and banner are built in a loop - is seen as
+// the loop it is and expanded into the addresses it produces.
 function routesOf(file, router) {
   const source = fs.readFileSync(path.join(BACKEND, 'src', 'routes', file + '.js'), 'utf8');
   const found = [];
-  const re = new RegExp('\\b' + router + '\\.(get|post|patch|put|delete)\\(\\s*\'([^\']*)\'', 'g');
+  const re = new RegExp('\\b' + router + '\\.(get|post|patch|put|delete)\\(\\s*([^,)]*)', 'g');
   let match;
   while ((match = re.exec(source)) !== null) {
-    found.push({ method: match[1].toUpperCase(), path: match[2] });
+    const expression = match[2].trim();
+    const literal = /'([^']*)'/.exec(expression);
+    if (!literal) continue;
+    if (expression.indexOf('+') === -1) {
+      found.push({ method: match[1].toUpperCase(), path: literal[1] });
+      continue;
+    }
+    const kinds = /const\s+[A-Z_]*KINDS\s*=\s*\[([^\]]*)\]/.exec(source);
+    const list = kinds
+      ? kinds[1].split(',').map((kind) => kind.trim().replace(/'/g, '')).filter(Boolean)
+      : [];
+    for (const kind of list) {
+      found.push({ method: match[1].toUpperCase(), path: literal[1] + kind });
+    }
+  }
+  return found;
+}
+
+// Every route the community routers declare, with the address they answer at.
+function communityRoutes() {
+  const found = [];
+  for (const mount of MOUNTS) {
+    for (const route of routesOf(mount.file, mount.router)) {
+      found.push({
+        method: route.method,
+        path: route.path === '/' ? mount.mount : mount.mount + route.path,
+      });
+    }
   }
   return found;
 }
@@ -88,20 +119,37 @@ function routesOf(file, router) {
 // The community routers the server mounts, read from the server itself.
 function serverMounts() {
   const source = fs.readFileSync(path.join(BACKEND, 'src', 'server.js'), 'utf8');
+  // A router may be held in a variable: `const inviteRoutes = require(...)`.
+  const aliases = new Map();
+  const alias = /const\s+([a-zA-Z]+)\s*=\s*require\('\.\/routes\/([a-zA-Z]+)'\)/g;
+  let match;
+  while ((match = alias.exec(source)) !== null) aliases.set(match[1], match[2]);
+
   const found = [];
   const re = /app\.use\('(\/api\/servers[^']*)',\s*([^)]+)\);/g;
-  let match;
   while ((match = re.exec(source)) !== null) {
-    const target = match[2];
+    const target = match[2].trim();
     const file = /require\('\.\/routes\/([a-zA-Z]+)'\)/.exec(target);
     const router = /([a-zA-Z]+)\.([a-zA-Z]+)$/.exec(target);
+    const name = file ? file[1] : (router ? router[1] : null);
     found.push({
       mount: match[1],
-      file: file ? file[1] : (router ? router[1] : null),
+      file: name && aliases.has(name) ? aliases.get(name) : name,
       router: router ? router[2] : 'router',
     });
   }
   return found;
+}
+
+// The routes of the given list that the console cannot reach.
+function unreachable(routes) {
+  return routes.filter((route) => {
+    const known = COMMUNITY_ROUTES.some((entry) =>
+      entry.method === route.method && shape(entry.path) === shape(route.path));
+    if (known) return false;
+    return !NOT_CONFIGURATION.some((entry) =>
+      entry.method === route.method && shape(entry.path) === shape(route.path));
+  }).map((route) => route.method + ' ' + route.path);
 }
 
 // The console's own source: the studio, the pages it delegates to, and the
@@ -140,48 +188,25 @@ test('the community settings console reaches every route that configures a commu
   });
 
   await t.test('every route that configures a community is in the catalogue', () => {
-    const missing = [];
-    for (const mount of MOUNTS) {
-      for (const route of routesOf(mount.file, mount.router)) {
-        const address = route.path === '/'
-          ? mount.mount
-          : mount.mount + route.path;
-        // The community's icon and banner are built in a loop, so the address
-        // is assembled at boot. The two of them are named here.
-        if (route.path.indexOf("' + ") !== -1) {
-          for (const kind of ['icon', 'banner']) {
-            const full = mount.mount + '/:id/' + kind;
-            if (!inCatalogue(route.method, full) && !isExcluded(route.method, full)) {
-              missing.push(route.method + ' ' + full);
-            }
-          }
-          continue;
-        }
-        if (!inCatalogue(route.method, address) && !isExcluded(route.method, address)) {
-          missing.push(route.method + ' ' + address);
-        }
-      }
-    }
+    const missing = unreachable(communityRoutes());
     assert.deepEqual(missing, [],
       'routes the server has and the console does not reach:\n' + missing.join('\n'));
   });
 
+  await t.test('the check would notice a route the console does not reach', () => {
+    // The check is only worth having if it fails when it should. A route
+    // that is added to the server and not to the console has to be caught,
+    // and the only way to know that is to ask.
+    const withOneMore = communityRoutes().concat([
+      { method: 'POST', path: '/api/servers/:id/fabricate' },
+    ]);
+    const missing = unreachable(withOneMore);
+    assert.ok(missing.includes('POST /api/servers/:id/fabricate'),
+      'a route the console does not reach was not noticed');
+  });
+
   await t.test('every route in the catalogue is a route the server has', () => {
-    const server = new Set();
-    for (const mount of MOUNTS) {
-      for (const route of routesOf(mount.file, mount.router)) {
-        const address = route.path === '/'
-          ? mount.mount
-          : mount.mount + route.path;
-        if (route.path.indexOf("' + ") !== -1) {
-          for (const kind of ['icon', 'banner']) {
-            server.add(route.method + ' ' + shape(mount.mount + '/:id/' + kind));
-          }
-          continue;
-        }
-        server.add(route.method + ' ' + shape(address));
-      }
-    }
+    const server = new Set(communityRoutes().map((route) => route.method + ' ' + shape(route.path)));
     const unknown = COMMUNITY_ROUTES
       .filter((route) => !server.has(route.method + ' ' + shape(route.path)))
       .map((route) => route.method + ' ' + route.path);
@@ -226,15 +251,7 @@ test('the community settings console reaches every route that configures a commu
   await t.test('the exclusions are the ones the check says they are', () => {
     // An exclusion that names a route the server does not have is a stale
     // excuse, and a stale excuse is how a route stops being checked.
-    const server = new Set();
-    for (const mount of MOUNTS) {
-      for (const route of routesOf(mount.file, mount.router)) {
-        const address = route.path === '/'
-          ? mount.mount
-          : mount.mount + route.path;
-        server.add(route.method + ' ' + shape(address));
-      }
-    }
+    const server = new Set(communityRoutes().map((route) => route.method + ' ' + shape(route.path)));
     const stale = NOT_CONFIGURATION
       .filter((route) => !server.has(route.method + ' ' + shape(route.path)))
       .map((route) => route.method + ' ' + route.path);
@@ -242,11 +259,3 @@ test('the community settings console reaches every route that configures a commu
       'exclusions for routes the server does not have:\n' + stale.join('\n'));
   });
 });
-
-function inCatalogue(method, address) {
-  return COMMUNITY_ROUTES.some((route) => route.method === method && shape(route.path) === shape(address));
-}
-
-function isExcluded(method, address) {
-  return NOT_CONFIGURATION.some((route) => route.method === method && shape(route.path) === shape(address));
-}

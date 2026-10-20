@@ -5,7 +5,7 @@
 // nothing, and with one that holds what it needs, and ask what is on the
 // screen.
 
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub } from '../helpers/dom-stub.js';
@@ -19,6 +19,10 @@ const { boardsDetail } = await import('../../js/features/workspace/boards.js');
 const { eventsDetail } = await import('../../js/features/workspace/events.js');
 const { pollsDetail } = await import('../../js/features/workspace/polls.js');
 const { State } = await import('../../packages/store.js');
+
+// The store is shared with the other checks, so what these checks put in it
+// is taken out again when they are done.
+after(() => { State.servers = []; State.user = null; });
 
 const SPACE = {
   id: 'space-1', name: 'Engineering', description: '', isPrivate: false, items: [

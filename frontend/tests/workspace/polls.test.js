@@ -4,7 +4,7 @@
 // counting: a vote replaces the previous one rather than adding to it, an
 // anonymous poll names nobody, and a ranked poll is scored by position.
 
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub } from '../helpers/dom-stub.js';
@@ -15,6 +15,10 @@ installDomStub();
 const { pollsList, pollsDetail } = await import('../../js/features/workspace/polls.js');
 const { bordaPoints } = await import('../../packages/workspace.js');
 const { State } = await import('../../packages/store.js');
+
+// The store is shared with the other checks, so what these checks put in it
+// is taken out again when they are done.
+after(() => { State.servers = []; State.user = null; });
 
 const POLL = {
   id: 'poll-1',

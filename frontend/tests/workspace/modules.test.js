@@ -5,7 +5,7 @@
 // read both and ask each for its own shape, and read the sources to ask that
 // neither reaches into the other.
 
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +19,10 @@ installDomStub();
 const { renderWorkspace } = await import('../../js/features/workspace.js');
 const phone = await import('../../mobile/js/views/workspace.js');
 const { State } = await import('../../packages/store.js');
+
+// The store is shared with the other checks, so what these checks put in it
+// is taken out again when they are done.
+after(() => { State.servers = []; State.user = null; });
 
 const DOCUMENT = {
   id: 'doc-1', serverId: 's1', title: 'How we work', body: [{ type: 'paragraph', text: 'We write it down.' }],
