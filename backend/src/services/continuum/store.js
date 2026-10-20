@@ -24,6 +24,11 @@ function parseChannels(raw) {
   }
 }
 
+// The channels a community exposes, as the origin described them.
+function channelsOf(community) {
+  return community ? parseChannels(community.channels) : [];
+}
+
 // ---- remote communities ---------------------------------------------------
 
 // Record a community that lives on another instance.
@@ -352,6 +357,30 @@ async function upsertRelayMembership(membership) {
   return id;
 }
 
+// The record of one remote member of one of this instance's communities.
+async function findRelayMembership(originInstanceId, originCommunityId, originUserId) {
+  return db.get(
+    'SELECT * FROM continuum_relay_memberships WHERE origin_instance_id = ? AND origin_community_id = ? '
+    + 'AND origin_user_id = ?',
+    [
+      String(originInstanceId), String(originCommunityId), String(originUserId),
+    ]
+  );
+}
+
+// The owner's decision about a remote member: muted, removed, or restored.
+// The row is the record of it, and the rule that reads it is the one that
+// refuses their next message.
+async function setRelayMembershipState(originInstanceId, originCommunityId, originUserId, state) {
+  const existing = await findRelayMembership(originInstanceId, originCommunityId, originUserId);
+  if (!existing) return null;
+  await db.run(
+    'UPDATE continuum_relay_memberships SET state = ?, updated_at = ? WHERE id = ?',
+    [String(state), now(), existing.id]
+  );
+  return findRelayMembership(originInstanceId, originCommunityId, originUserId);
+}
+
 async function listRelayMemberships({ originCommunityId, originInstanceId } = {}) {
   const clauses = [];
   const args = [];
@@ -364,12 +393,144 @@ async function listRelayMemberships({ originCommunityId, originInstanceId } = {}
   );
 }
 
+// ---- messages written here for a community that lives elsewhere -------------
+
+// A message written here for a community on another instance.
+//
+// The row's id is the message's id on this instance: that is the id the
+// owner knows it by, and the one its answer refers to.
+async function createOutgoing(message) {
+  const stamp = now();
+  const id = uuid();
+  await db.run(
+    'INSERT INTO continuum_relay_outgoing '
+    + '(id, origin_instance_id, origin_community_id, origin_channel_id, author_id, username, display_name, '
+    + 'content, created_at, edited_at, deleted_at, thread_root_id, thread_root_instance_id, state, reason, '
+    + 'event_id, decided_at, updated_at) '
+    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      id, String(message.originInstanceId), String(message.originCommunityId),
+      String(message.originChannelId), String(message.authorId),
+      message.username || null, message.displayName || null,
+      message.content == null ? null : String(message.content),
+      String(message.createdAt || stamp), message.editedAt || null, message.deletedAt || null,
+      message.threadRootId || null, message.threadRootInstanceId || null,
+      message.state || 'pending', message.reason || null,
+      message.eventId || null, message.decidedAt || null, stamp,
+    ]
+  );
+  return id;
+}
+
+async function findOutgoing(id) {
+  if (!id) return null;
+  return db.get('SELECT * FROM continuum_relay_outgoing WHERE id = ?', [String(id)]);
+}
+
+// The outgoing message of one community, written by one person.
+async function listOutgoing({ userId, originInstanceId, originCommunityId } = {}) {
+  const clauses = [];
+  const args = [];
+  if (userId) { clauses.push('author_id = ?'); args.push(String(userId)); }
+  if (originInstanceId) { clauses.push('origin_instance_id = ?'); args.push(String(originInstanceId)); }
+  if (originCommunityId) { clauses.push('origin_community_id = ?'); args.push(String(originCommunityId)); }
+  const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+  return db.all(
+    'SELECT * FROM continuum_relay_outgoing ' + where + ' ORDER BY created_at DESC',
+    args
+  );
+}
+
+// Change the state of an outgoing message: the owner accepted it, refused
+// it, or took it back.
+async function updateOutgoing(id, changes) {
+  const current = await findOutgoing(id);
+  if (!current) return null;
+  const next = {
+    content: changes.content === undefined ? current.content : changes.content,
+    edited_at: changes.editedAt === undefined ? current.edited_at : changes.editedAt,
+    deleted_at: changes.deletedAt === undefined ? current.deleted_at : changes.deletedAt,
+    state: changes.state === undefined ? current.state : changes.state,
+    reason: changes.reason === undefined ? current.reason : changes.reason,
+    event_id: changes.eventId === undefined ? current.event_id : changes.eventId,
+    decided_at: changes.decidedAt === undefined ? current.decided_at : changes.decidedAt,
+  };
+  await db.run(
+    'UPDATE continuum_relay_outgoing SET content = ?, edited_at = ?, deleted_at = ?, state = ?, reason = ?, '
+    + 'event_id = ?, decided_at = ?, updated_at = ? WHERE id = ?',
+    [
+      next.content, next.edited_at, next.deleted_at, next.state, next.reason,
+      next.event_id, next.decided_at, now(), current.id,
+    ]
+  );
+  return findOutgoing(id);
+}
+
+// A message written here, as the writer sees it.
+function shapeOutgoing(row) {
+  return {
+    id: row.id,
+    relayed: true,
+    origin_instance_id: row.origin_instance_id,
+    origin_community_id: row.origin_community_id,
+    origin_channel_id: row.origin_channel_id,
+    author_id: row.author_id,
+    username: row.username,
+    display_name: row.display_name,
+    content: row.deleted_at ? null : row.content,
+    created_at: row.created_at,
+    edited_at: row.edited_at,
+    deleted_at: row.deleted_at,
+    deleted: !!row.deleted_at,
+    thread_root_id: row.thread_root_id,
+    thread_root_instance_id: row.thread_root_instance_id,
+    state: row.state,
+    reason: row.reason,
+    decided_at: row.decided_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// ---- the origin's moderation surface ----------------------------------------
+
+// The messages remote members wrote in this instance's own communities.
+//
+// A relay message whose community id is one of this instance's communities is
+// a message a member wrote here on a federated community. It is not a local
+// message - it grants nothing and it is nobody's - but the owner of the
+// community has to be able to see it, moderate it and take it back.
+async function listRelayMessagesForLocalCommunities({ limit } = {}) {
+  const cap = Math.min(Math.max(Number(limit) || 100, 1), 500);
+  const rows = await db.all(
+    'SELECT r.* FROM continuum_relay_messages r JOIN servers s ON s.id = r.origin_community_id '
+    + 'ORDER BY r.created_at DESC, r.id DESC LIMIT ' + cap
+  );
+  return rows.map(shapeRelayMessage);
+}
+
+// The remote members of this instance's communities, with what the owner has
+// decided about them.
+async function listRelayMembersOfLocalCommunities({ communityId } = {}) {
+  const rows = communityId
+    ? await db.all(
+      'SELECT m.* FROM continuum_relay_memberships m JOIN servers s ON s.id = m.origin_community_id '
+      + 'WHERE m.origin_community_id = ? ORDER BY m.updated_at DESC',
+      [String(communityId)]
+    )
+    : await db.all(
+      'SELECT m.* FROM continuum_relay_memberships m JOIN servers s ON s.id = m.origin_community_id '
+      + 'ORDER BY m.updated_at DESC'
+    );
+  return rows;
+}
+
 module.exports = {
   upsertCommunity,
   upsertCommunityChannel,
   findCommunity,
   listCommunities,
   setCommunityState,
+  channelsOf,
   upsertMembership,
   listMemberships,
   findMembership,
@@ -377,9 +538,18 @@ module.exports = {
   findRelayMessage,
   listRelayMessages,
   listAllRelayMessages,
+  listRelayMessagesForLocalCommunities,
   upsertRelayReaction,
   removeRelayReaction,
   listRelayReactions,
   upsertRelayMembership,
+  findRelayMembership,
+  setRelayMembershipState,
   listRelayMemberships,
+  listRelayMembersOfLocalCommunities,
+  createOutgoing,
+  findOutgoing,
+  listOutgoing,
+  updateOutgoing,
+  shapeOutgoing,
 };

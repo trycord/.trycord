@@ -67,4 +67,42 @@ module.exports = (engine) => [
       created_at VARCHAR(64) NOT NULL,
       FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
+
+  // A report about activity on another instance.
+  //
+  // The row is the record of what was sent, and it deliberately holds a
+  // reference and not a copy: the identifier of the reported thing on the
+  // instance that owns it, the reason, and the reporter's account on that
+  // instance. The content itself is never here, and neither is anything
+  // personal about the reporter.
+  //
+  // Direction says which side of the exchange this row is on: 'outbound' is a
+  // report this instance filed about something on another instance,
+  // 'inbound' is one that arrived from another instance about something here.
+  `CREATE TABLE IF NOT EXISTS cross_instance_reports (
+      id                     VARCHAR(64) PRIMARY KEY,
+      direction              VARCHAR(16) NOT NULL,
+      origin_instance_id     VARCHAR(64) NOT NULL,
+      target_instance_id     VARCHAR(64) NOT NULL,
+      target_instance_origin VARCHAR(512),
+      community_id           VARCHAR(64),
+      channel_id             VARCHAR(64),
+      content_id             VARCHAR(64) NOT NULL,
+      content_type           VARCHAR(32) NOT NULL,
+      reason                 VARCHAR(255) NOT NULL,
+      description            TEXT,
+      reporter_id            VARCHAR(64),
+      reporter_origin_id     VARCHAR(64),
+      status                 VARCHAR(16) NOT NULL DEFAULT 'FILED',
+      -- Whether the receiving instance holds the reported thing and can
+      -- therefore act on it. A report about something it has never seen is
+      -- still a report; it just cannot be acted on.
+      actionable             INTEGER NOT NULL DEFAULT 0,
+      disclosure             TEXT,
+      envelope_id            VARCHAR(64),
+      delivery_error         TEXT,
+      created_at             VARCHAR(64) NOT NULL,
+      received_at            VARCHAR(64),
+      FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE SET NULL
+    )${engine}`,
 ];

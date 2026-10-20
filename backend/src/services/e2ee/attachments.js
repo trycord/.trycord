@@ -8,15 +8,56 @@
 //
 // filename and mime describe the ciphertext, not the content. The server
 // has no idea what the attachment is, and the API does not accept a
-// plaintext key - there is no field to put one in.
+// plaintext key - there is no field to put one in, and a body that carries
+// one is refused rather than quietly dropped.
 
 'use strict';
 
 const db = require('../../db');
 const { now, uuid } = require('../../clock');
+const { Codes } = require('../../errors');
 const { protocolError } = require('./envelope');
 const membership = require('./membership');
 const devices = require('./devices');
+const uploads = require('../uploads');
+
+// The name the ciphertext is stored under. The server does not know what the
+// attachment is, so it does not get a name that says: the file is opaque
+// bytes, and the name the client gave is kept in the encrypted record.
+const STORED_FILENAME = 'attachment.enc';
+
+// The fields a client must never send. An attachment key is sealed to the
+// member devices; there is no field in this subsystem that holds one.
+const KEY_FIELDS = ['key', 'attachmentKey', 'fileKey', 'secret'];
+
+/**
+ * Check the seals of an attachment.
+ *
+ * Every device the key is sealed to has to belong to somebody in the
+ * conversation: a seal for a stranger is a key the stranger did not ask
+ * for.
+ *
+ * @param {{userIds: string[]}} group
+ * @param {object[]} seals
+ */
+async function checkSeals(group, seals) {
+  if (!seals.length) {
+    throw protocolError('E2EE_VALIDATION_ERROR', 'an attachment needs its key sealed to somebody', 400);
+  }
+  const memberUserIds = new Set(group.userIds);
+  for (const entry of seals) {
+    const device = await devices.get(entry.deviceId);
+    if (!device) {
+      throw protocolError('E2EE_VALIDATION_ERROR', 'unknown device in the sealed key list', 400);
+    }
+    if (!memberUserIds.has(device.user_id)) {
+      throw protocolError('E2EE_FORBIDDEN', 'a device outside the conversation cannot be given the key', 403);
+    }
+    if (device.revoked_at) {
+      throw protocolError('E2EE_DEVICE_REVOKED', 'a revoked device cannot be given the key', 403);
+    }
+  }
+}
 
 /**
  * Register an encrypted attachment.
@@ -26,20 +67,8 @@ const devices = require('./devices');
  */
 async function register(userId, input) {
   const group = await membership.requireMembership(input.conversationId, userId);
-  const memberUserIds = new Set(group.userIds);
   const seals = Array.isArray(input.sealedKeys) ? input.sealedKeys : [];
-  if (!seals.length) {
-    throw protocolError('E2EE_VALIDATION_ERROR', 'an attachment needs its key sealed to somebody', 400);
-  }
-  for (const entry of seals) {
-    const device = await devices.get(entry.deviceId);
-    if (!device) {
-      throw protocolError('E2EE_VALIDATION_ERROR', 'unknown device in the sealed key list', 400);
-    }
-    if (!memberUserIds.has(device.user_id)) {
-      throw protocolError('E2EE_FORBIDDEN', 'a device outside the conversation cannot be given the key', 403);
-    }
-  }
+  await checkSeals(group, seals);
   const id = String(input.id || uuid());
   const timestamp = now();
   await db.transaction(async (t) => {
@@ -58,6 +87,70 @@ async function register(userId, input) {
     }
   });
   return { id, conversationId: input.conversationId, filename: input.filename, mime: input.mime, size: input.size };
+}
+
+/**
+ * Store an encrypted attachment: the ciphertext, and the key sealed to each
+ * member device.
+ *
+ * The bytes go through the ordinary attachment storage, so the file is
+ * served, counted and deleted the way every other attachment is. What is
+ * stored is the ciphertext: the client encrypted the file before it
+ * uploaded it, and the server cannot tell the difference - which is exactly
+ * what an end-to-end encrypted attachment is.
+ *
+ * @param {string} userId
+ * @param {object} input { conversationId, filename, mime, buffer, sealedKeys }
+ */
+async function store(userId, input) {
+  const group = await membership.requireMembership(input.conversationId, userId);
+  for (const field of KEY_FIELDS) {
+    if (input[field] !== undefined && input[field] !== null) {
+      throw protocolError(
+        'E2EE_VALIDATION_ERROR',
+        'an attachment key is never sent to the server: seal it to the member devices instead',
+        400
+      );
+    }
+  }
+  const buffer = input.buffer;
+  if (!buffer || !buffer.length) {
+    throw protocolError('E2EE_VALIDATION_ERROR', 'an attachment needs its bytes', 400);
+  }
+  const seals = Array.isArray(input.sealedKeys) ? input.sealedKeys : [];
+  await checkSeals(group, seals);
+
+  const stored = await uploads.store({
+    uploaderId: userId,
+    channelId: group.kind === 'channel' ? input.conversationId : null,
+    conversationId: group.kind === 'dm' ? input.conversationId : null,
+    buffer,
+    originalName: STORED_FILENAME,
+  });
+  if (stored.error) {
+    throw protocolError(stored.error, stored.message, Codes[stored.error] || 400);
+  }
+
+  try {
+    const attachment = await register(userId, {
+      id: stored.id,
+      conversationId: input.conversationId,
+      filename: input.filename || 'attachment',
+      mime: input.mime || 'application/octet-stream',
+      size: stored.size,
+      sealedKeys: seals,
+    });
+    return Object.assign({}, attachment, { url: stored.url, size: stored.size });
+  } catch (e) {
+    // A file with no sealed key is a file nobody can open. The bytes are
+    // taken back out rather than left behind.
+    await uploads.removeFiles([{
+      id: stored.id,
+      channel_id: group.kind === 'channel' ? input.conversationId : null,
+      dm_conversation_id: group.kind === 'dm' ? input.conversationId : null,
+    }]);
+    throw e;
+  }
 }
 
 /**
@@ -93,4 +186,4 @@ async function get(userId, attachmentId) {
   };
 }
 
-module.exports = { register, get };
+module.exports = { register, store, get };

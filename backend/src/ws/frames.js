@@ -22,6 +22,7 @@ const threads = require('../services/threads');
 const replies = require('../services/replies');
 const embeds = require('../services/embeds');
 const webhooks = require('../services/webhooks');
+const e2ee = require('../services/e2ee');
 const { nextSeq } = require('../routes/messages');
 const { EVENTS } = require('./events.js');
 
@@ -74,8 +75,13 @@ module.exports = function createFrames({ rooms, registry }) {
     // the HTTP path would reject.
     if (rawContent.length > MAX_CONTENT) return;
 
+    // A message in an encrypted conversation is an envelope, not text. The socket
+    // applies the same rule the REST post does, so the socket cannot be the one way to
+    // write a message the HTTP path would refuse.
+    const carriesEnvelopes = data.envelopes !== undefined && data.envelopes !== null;
+
     const ids = uploads.sanitizeIds(data.attachments);
-    if (!rawContent && !ids.length) return;
+    if (!rawContent && !ids.length && !carriesEnvelopes) return;
 
     const ch = await visibleChannel(ws.channelId, user.id);
     if (!ch) return;
@@ -96,9 +102,30 @@ module.exports = function createFrames({ rooms, registry }) {
       if (t && t.timeout_expires_at && new Date(t.timeout_expires_at).getTime() > Date.now()) return;
     } catch { /* fail open to the permission gate above */ }
 
+    // Whether this conversation is encrypted is the status service's answer. In an
+    // encrypted conversation the body has to be an envelope, and a body the server
+    // cannot validate is refused with nothing stored - the same answer the HTTP post
+    // gives, refused the same way.
+    let accepted;
+    try {
+      accepted = await e2ee.acceptMessageBody(user.id, ch.id, {
+        content: rawContent,
+        envelopes: data.envelopes,
+      });
+    } catch {
+      return;
+    }
+
     const msg = {
       id: uuid(), channel_id: ch.id, server_id: ch.server_id,
-      author_id: user.id, user: user.username, content: rawContent, created_at: now(),
+      author_id: user.id, user: user.username,
+      // The text of a message that is not encrypted, and nothing at all for
+      // one that is: the client reads the envelope.
+      content: accepted.content,
+      encrypted: accepted.encrypted,
+      envelopes: accepted.envelopes,
+      encryption: accepted.encryption,
+      created_at: now(),
       edited_at: null, thread_root_id: threadRootId,
     };
 
@@ -112,7 +139,7 @@ module.exports = function createFrames({ rooms, registry }) {
         await db.run(
           'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq, thread_root_id)'
           + ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at, seq, threadRootId]
+          [msg.id, msg.channel_id, msg.author_id, accepted.stored, msg.created_at, seq, threadRootId]
         );
         msg.seq = seq;
         inserted = true;
@@ -130,8 +157,8 @@ module.exports = function createFrames({ rooms, registry }) {
     rooms.broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE, ...msg });
 
     // Same after-the-fact work as the REST post, so a message submitted over the socket
-    // behaves identically.
-    if (data.suppressEmbeds !== true && /https?:\/\//i.test(rawContent)) {
+    // behaves identically. An encrypted message has no text for any of it to work on.
+    if (!accepted.encrypted && data.suppressEmbeds !== true && /https?:\/\//i.test(rawContent)) {
       embeds.queue({ kind: 'channel', messageId: msg.id }, rawContent).then((cards) => {
         if (!cards.length) return;
         rooms.broadcast(ch.server_id, ch.id, {
@@ -143,7 +170,9 @@ module.exports = function createFrames({ rooms, registry }) {
 
     webhooks.emit(ch.server_id, 'message.created', {
       serverId: ch.server_id, channelId: ch.id,
-      message: { id: msg.id, authorId: user.id, content: rawContent },
+      message: accepted.encrypted
+        ? { id: msg.id, authorId: user.id, encrypted: true }
+        : { id: msg.id, authorId: user.id, content: rawContent },
     }).catch(() => {});
 
     // Same reply notification the REST post sends, so a reply behaves the same however

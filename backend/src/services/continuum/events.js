@@ -29,10 +29,19 @@
 //                 events.
 //   reaction    - the reaction the event is about. Only on reaction events.
 //   membership  - the member the event is about. Only on membership events.
+//   decision    - the owner's answer about a message a member wrote on
+//                 another instance: taken, or refused, and why.
 //
 // The `origin` section is the part that matters for authority: it says which
 // instance speaks, and the receiving instance checks the signature against
 // the key it recorded for exactly that instance before it reads any of it.
+//
+// The origin section also says which instance *owns* each of the ids it
+// carries. The community is owned by the instance that hosts it, the message
+// by the instance it was written on, and the thread root by the instance that
+// holds it - and those are not always the same instance. Without that, a
+// receiver cannot tell a message the owner wrote from one a member wrote on
+// another instance, and the two are governed by different rules.
 
 const KINDS = {
   'community.published': { sections: ['origin', 'community'], subject: 'community' },
@@ -47,7 +56,20 @@ const KINDS = {
   'reaction.removed': { sections: ['origin', 'community', 'channel', 'reaction'], subject: 'reaction' },
   'membership.joined': { sections: ['origin', 'community', 'membership'], subject: 'membership' },
   'membership.left': { sections: ['origin', 'community', 'membership'], subject: 'membership' },
+  // The owner's answer about a message a member wrote on another instance.
+  // The decision travels even when the community has been closed: it carries
+  // no content of the community, and a writer left without an answer would
+  // have no way of knowing that their message was refused.
+  'message.accepted': { sections: ['origin', 'decision'], subject: 'decision' },
+  'message.refused': { sections: ['origin', 'decision'], subject: 'decision' },
+  // The owner changed a member's standing: muted, removed, or restored.
+  'membership.updated': { sections: ['origin', 'community', 'membership'], subject: 'membership' },
 };
+
+// The actor of an event that the instance itself causes rather than a person:
+// the owner accepting or refusing a message, for instance. It has its own
+// sequence counter, so the protocol's own events never overtake a member's.
+const PROTOCOL_ACTOR = 'continuum';
 
 // How far an event's timestamp may be from the receiver's clock. An event
 // that claims to have happened more than an hour ago, or to happen in the
@@ -121,7 +143,44 @@ function validatePayload(kind, payload) {
   if (isSubjectKind(kind, 'membership')) {
     if (!payload.membership.user_id) return { ok: false, reason: 'payload.membership.user_id is missing' };
   }
+  if (isSubjectKind(kind, 'decision')) {
+    const decision = payload.decision.decision;
+    if (decision !== 'accepted' && decision !== 'refused') {
+      return { ok: false, reason: 'payload.decision.decision is not a known decision' };
+    }
+    // A refusal has to say why: the writer is told, and "no" without a
+    // reason is not an answer they can act on.
+    if (decision === 'refused' && !payload.decision.reason) {
+      return { ok: false, reason: 'payload.decision.reason is missing' };
+    }
+  }
   return { ok: true };
+}
+
+// Which way does an event travel?
+//
+// 'forward' - the speaker owns the community, and the message is one of its
+//             own, published to the peers that read it.
+// 'return'  - the speaker is a member elsewhere, and the message is one it
+//             wrote in a community the receiver owns. The receiver is the
+//             authority here and applies its own rules.
+// 'foreign' - the event claims a community that neither the speaker nor the
+//             receiver owns. The protocol does not carry that: an event
+//             received from a peer is not relayed onwards, so a community
+//             owned by a third instance has no business here.
+//
+// The claim is a field rather than an inference, but a receiver that meets an
+// event without one falls back to what it can check for itself: a message
+// about a community it owns is a return-direction message whatever the sender
+// says, and a message about a community it does not own is a forward one.
+function directionOf(origin, receiverInstanceId, ownsCommunity) {
+  const owner = origin.community_owner_id;
+  if (!owner) {
+    return ownsCommunity ? 'return' : 'forward';
+  }
+  if (owner === origin.instance_id) return 'forward';
+  if (owner === receiverInstanceId) return 'return';
+  return 'foreign';
 }
 
 // The origin block every event carries.
@@ -139,6 +198,14 @@ function originBlock(fields) {
     channel_origin_id: fields.channel_origin_id == null ? null : String(fields.channel_origin_id),
     message_origin_id: fields.message_origin_id == null ? null : String(fields.message_origin_id),
     thread_root_origin_id: fields.thread_root_origin_id == null ? null : String(fields.thread_root_origin_id),
+    // Which instance each of those ids belongs to. The owner of the
+    // community is the instance that hosts it; the owner of the message is
+    // the instance the message was written on; the owner of the thread root
+    // is the instance that holds it. A receiver needs these to know whose
+    // message it is holding and whose rules apply to it.
+    community_owner_id: fields.community_owner_id == null ? null : String(fields.community_owner_id),
+    message_owner_id: fields.message_owner_id == null ? null : String(fields.message_owner_id),
+    thread_root_owner_id: fields.thread_root_owner_id == null ? null : String(fields.thread_root_owner_id),
     occurred_at: String(fields.occurred_at || ''),
     seq: Number.isFinite(fields.seq) ? fields.seq : null,
   };
@@ -158,6 +225,7 @@ function channelDescriptor(channel, isPublic) {
 
 module.exports = {
   KINDS,
+  PROTOCOL_ACTOR,
   isKnownKind,
   sectionsFor,
   isSubjectKind,
@@ -165,4 +233,5 @@ module.exports = {
   validatePayload,
   originBlock,
   channelDescriptor,
+  directionOf,
 };

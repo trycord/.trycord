@@ -19,9 +19,16 @@
 //
 // Every answer is { ok: true } or { ok: false, reason }, and the reason is
 // what the operator is told when they ask why something was not relayed.
+//
+// The same questions are asked in the other direction - of a message a member
+// of a federated community wrote here, arriving at the instance that owns the
+// community - and they are asked here too. The origin is the authority over
+// its community, so the origin's rules are the ones that decide; a rule that
+// guarded only the outbound direction would not be a rule.
 
 const db = require('../../db');
 const permissions = require('../permissions');
+const store = require('./store');
 
 // The community's baseline role is what an ordinary member holds: every
 // member is given it when they join, and it is the only role the system
@@ -172,6 +179,113 @@ async function federableChannels(serverId) {
   return exposed;
 }
 
+// ---- the return direction ---------------------------------------------------
+
+// The origin's answer to a message a member of its community wrote on
+// another instance.
+//
+// The same questions as the outbound direction, asked about the receiver's
+// own community:
+//
+//   1. Is the community still federated? A community that has been made
+//      private takes no messages from anywhere, and certainly not from a
+//      member writing on a mirror of it.
+//   2. May the members of the community post in this channel? A restricted
+//      channel takes no messages, and a member who may not post there does
+//      not post there by writing to a federated copy of it.
+//   3. Is the writer a member of this community here, and may they write?
+//      A member of a federated community holds the community's baseline role
+//      - joining grants nothing else - so the question is the one the
+//      channel rule already asks, asked about the member rather than about
+//      the sender of a local message.
+//   4. Has the owner muted or removed them?
+//
+// A member who may not post in the origin's channel does not post there by
+// writing on a federated mirror: the answer is the origin's, and the origin
+// is the only one who may give it.
+async function mayAcceptRemoteMessage({ serverId, channelId, originInstanceId, originUserId }) {
+  const channel = await channelMayFederate(serverId, channelId);
+  if (!channel.ok) return channel;
+  if (!originInstanceId || !originUserId) {
+    return { ok: false, reason: 'the event does not say who wrote it' };
+  }
+  const member = await store.findRelayMembership(originInstanceId, serverId, originUserId);
+  if (!member) return { ok: false, reason: 'the writer is not a member of this community' };
+  if (member.state === 'removed') {
+    return { ok: false, reason: 'the member was removed from this community' };
+  }
+  if (member.state === 'muted') {
+    return { ok: false, reason: 'the member is muted in this community' };
+  }
+  if (member.state !== 'joined') {
+    return { ok: false, reason: 'the writer is not a member of this community' };
+  }
+  return { ok: true, community: channel.community, channel: channel.channel };
+}
+
+// The writer's side of the same question.
+//
+// What this instance knows: the peer is trusted, the community is one the
+// peer federates and has not withdrawn, the channel is one the peer exposes,
+// and the writer has joined the community here.
+//
+// What this instance cannot know is whether the member may post in that
+// channel over there: the owner decides that, and its answer arrives later
+// as an acceptance or a refusal. So the check here is about what may be
+// *sent*, and the owner's rules are applied on arrival.
+//
+// A removal is a special case: a message the writer has taken back has to
+// be able to leave whatever the writer's standing is by now, or a member
+// who leaves the community could never take their words back.
+async function mayPublishRemoteMessage({
+  originInstanceId, originCommunityId, originChannelId, userId, removal,
+}) {
+  if (!originInstanceId) return { ok: false, reason: 'no instance to send it to' };
+  const peer = await db.get('SELECT id, trust_status FROM continuum_instances WHERE id = ?', [String(originInstanceId)]);
+  if (!peer) return { ok: false, reason: 'that instance is not known here' };
+  if (peer.trust_status !== 'trusted') {
+    return { ok: false, reason: 'that instance is not trusted' };
+  }
+  const community = await store.findCommunity(originInstanceId, originCommunityId);
+  if (!community) return { ok: false, reason: 'that community is not known here' };
+  if (community.state === 'revoked') {
+    return { ok: false, reason: 'that community is no longer federated here' };
+  }
+  const exposed = store.channelsOf(community).some((channel) => String(channel.id) === String(originChannelId));
+  if (!exposed) {
+    return { ok: false, reason: 'that channel is not one the community exposes' };
+  }
+  if (!removal) {
+    const membership = await store.findMembership(userId, originInstanceId, originCommunityId);
+    if (!membership || membership.state !== 'joined') {
+      return { ok: false, reason: 'you have not joined that community' };
+    }
+  }
+  return { ok: true, community, channelId: String(originChannelId) };
+}
+
+// The owner's answer about a message travels even when the community has
+// been closed.
+//
+// The decision carries no content of the community - not its name, not its
+// channels - and the writer is entitled to know whether their message was
+// taken. What it does need is a community that exists here (there is no
+// decision to make about a community that is not) and a peer that is trusted
+// (nothing is federated to a peer that is not).
+async function mayPublishDecision({ serverId, destinationInstanceId }) {
+  const community = await db.get('SELECT id FROM servers WHERE id = ?', [serverId]);
+  if (!community) return { ok: false, reason: 'the community does not exist' };
+  const peer = await db.get(
+    'SELECT id, trust_status FROM continuum_instances WHERE id = ?',
+    [String(destinationInstanceId)]
+  );
+  if (!peer) return { ok: false, reason: 'that instance is not known here' };
+  if (peer.trust_status !== 'trusted') {
+    return { ok: false, reason: 'that instance is not trusted' };
+  }
+  return { ok: true };
+}
+
 module.exports = {
   memberPermissions,
   communityMayFederate,
@@ -181,4 +295,7 @@ module.exports = {
   mayFederateReaction,
   encryptedContent,
   federableChannels,
+  mayAcceptRemoteMessage,
+  mayPublishRemoteMessage,
+  mayPublishDecision,
 };

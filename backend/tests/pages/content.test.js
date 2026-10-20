@@ -66,10 +66,9 @@ test('the content model', async (t) => {
     assert.match(refusal([{ type: 'paragraph' }]), /a paragraph needs text/);
     assert.match(refusal([{ type: 'heading', level: 2, text: '   ' }]), /a heading needs text/);
     assert.match(refusal([{ type: 'list', items: [] }]), /a list needs at least one item/);
-    assert.match(refusal([{ type: 'note', text: 'x', kind: 'warn' }]), /a note needs text/);
+    assert.match(refusal([{ type: 'note', text: '   ', kind: 'warn' }]), /a note needs text/);
     assert.match(refusal([{ type: 'link', text: 'x', href: 'javascript:alert(1)' }]), /link targets must be/);
     assert.match(refusal([{ type: 'image', src: '/a.png' }]), /an image needs alt text/);
-    assert.match(refusal([{ type: 'image', src: '/a.png', alt: 'A' }]), /an image needs alt text/);
     assert.match(refusal([{ type: 'quote' }]), /a quotation needs text/);
     assert.match(refusal([{ type: 'code' }]), /a code block needs text/);
     assert.match(refusal([{ type: 'table', headers: [], rows: [] }]), /a table needs at least one column/);
@@ -130,6 +129,14 @@ test('the content model', async (t) => {
     const ok = Array.from({ length: content.MAX_COLUMNS }, (unused, i) => 'Column ' + i);
     const blocks = content.normalise([{ type: 'table', headers: ok, rows: [ok.map(() => 'x')] }]);
     assert.equal(blocks[0].headers.length, content.MAX_COLUMNS);
+  });
+
+  await t.test('a table with too many rows is refused', () => {
+    const rows = Array.from({ length: content.MAX_ROWS + 1 }, () => ['x']);
+    assert.match(
+      refusal([{ type: 'table', headers: ['A'], rows }]),
+      new RegExp('a table may have at most ' + content.MAX_ROWS + ' rows')
+    );
   });
 
   await t.test('a code block is escaped and cannot break out of the element', () => {

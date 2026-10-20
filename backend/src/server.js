@@ -541,6 +541,10 @@ async function boot(options = {}) {
   app.use('/api/appeals', require('./routes/appeals'));
   app.use('/api/account', require('./routes/accountDeletion'));
   app.use('/api/admin', require('./routes/admin'));
+  // The provider catalogue: what each subsystem can be configured to use, which
+  // one is in force, and why the others are not. The console renders this and
+  // nothing else, so a provider cannot be offered that a service would refuse.
+  app.use('/api/admin/providers', require('./routes/providers'));
   app.use('/api/admin/pages', require('./routes/adminPages'));
   app.use('/api/admin/settings', require('./routes/settings'));
   app.use('/api/admin/database', require('./routes/database'));

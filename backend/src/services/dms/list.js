@@ -12,6 +12,7 @@
 // things that each need three related values". It is worth being able to point at.
 
 const db = require('../../db');
+const bodies = require('../e2ee/bodies');
 const { publicPeer, visibleConversation, shape } = require('./conversation');
 const { history } = require('./history');
 
@@ -60,6 +61,10 @@ async function listMine(userId) {
 
   const out = memberships.map((m) => {
     const last = (m.last_id && lasts[String(m.last_id)]) || null;
+    // The preview of the last message in the list. An encrypted message is
+    // an envelope: the list shows that it is one and no more, because the
+    // server has nothing else to show.
+    const preview = last ? bodies.readStored(last.content) : null;
     return shape(
       {
         id: m.conversation_id,
@@ -71,7 +76,9 @@ async function listMine(userId) {
       publicPeer((m.peer_id && peers[String(m.peer_id)]) || null),
       last ? {
         id: last.id,
-        content: last.content,
+        content: preview.content,
+        encrypted: preview.encrypted,
+        envelopes: preview.envelopes,
         createdAt: last.created_at,
         editedAt: last.edited_at || null,
         authorId: last.author_id,

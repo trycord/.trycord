@@ -42,18 +42,15 @@ async function conversationState(conversationId, userId) {
   const epochs = await group.deviceEpochs(conversationId);
 
   const memberDevices = [];
-  for (const memberId of found.userIds) {
-    const list = await devices.liveDevicesOf(memberId);
-    for (const device of list) {
-      const held = epochs[device.id] || 0;
-      memberDevices.push({
-        deviceId: device.id,
-        userId: device.user_id,
-        label: device.label,
-        hasKey: epoch > 0 && held >= epoch,
-        epoch: held,
-      });
-    }
+  for (const device of await devices.liveDevicesOfUsers(found.userIds)) {
+    const held = epochs[device.id] || 0;
+    memberDevices.push({
+      deviceId: device.id,
+      userId: device.user_id,
+      label: device.label,
+      hasKey: epoch > 0 && held >= epoch,
+      epoch: held,
+    });
   }
 
   const missing = memberDevices.filter((d) => !d.hasKey).map((d) => d.deviceId);
@@ -64,13 +61,22 @@ async function conversationState(conversationId, userId) {
   const mine = memberDevices.filter((d) => d.userId === userId);
   const mineBehind = mine.filter((d) => !d.hasKey);
 
+  // The devices the key was sealed to, at the epoch that is current. When
+  // they are not the devices of the present membership, somebody came or
+  // went since the key was published, and the key has to be published again:
+  // a member who left still holds the key they were given, and only a new
+  // epoch takes it away from them.
+  const sealed = epoch ? await group.sealedDevices(conversationId, epoch) : [];
+  const membershipChanged = epoch > 0
+    && !membership.sameMembers(sealed, memberDevices.map((d) => d.deviceId));
+
   let state;
   if (!epoch || holders.length === 0) {
     // No key has been published, or nobody holds it: the conversation is
     // not encrypted for anyone, and saying otherwise would be a lie.
     state = NOT_ENCRYPTED;
   } else if (missing.length === 0) {
-    state = ENCRYPTED;
+    state = membershipChanged ? KEY_CHANGED : ENCRYPTED;
   } else if (mineBehind.length) {
     // The caller's own devices are the ones that have not caught up with
     // the current key: the key changed and they have not rekeyed yet.
@@ -91,6 +97,32 @@ async function conversationState(conversationId, userId) {
     holderCount: holders.length,
     deviceCount: memberDevices.length,
   };
+}
+
+/**
+ * Whether a conversation is encrypted, for a write that has to know.
+ *
+ * The full answer - which devices hold the key, which are missing it, and
+ * which are behind it - is `conversationState`. A message write only needs
+ * the state itself, and a conversation with no key published cannot be
+ * encrypted for anybody, so the per-device work is not done for it.
+ *
+ * @param {string} conversationId
+ * @param {string} userId the caller
+ * @returns {Promise<{state: string, encrypted: boolean, epoch: number}>}
+ */
+async function encryptionSummary(conversationId, userId) {
+  const epoch = await group.currentEpoch(conversationId);
+  if (!epoch) {
+    const found = await membership.members(conversationId);
+    if (!found) throw protocolError('E2EE_NOT_FOUND', 'no such conversation', 404);
+    if (!found.userIds.includes(userId)) {
+      throw protocolError('E2EE_FORBIDDEN', 'you are not in this conversation', 403);
+    }
+    return { state: NOT_ENCRYPTED, encrypted: false, epoch: 0 };
+  }
+  const state = await conversationState(conversationId, userId);
+  return { state: state.state, encrypted: state.encrypted, epoch: state.epoch };
 }
 
 /**
@@ -146,5 +178,6 @@ module.exports = {
   MIXED,
   KEY_CHANGED,
   conversationState,
+  encryptionSummary,
   safetyNumber,
 };

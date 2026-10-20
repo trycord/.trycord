@@ -72,6 +72,8 @@ function toPublic(row) {
     title: row.title,
     // The description of the page, read from the body that is in force. The
     // body is the authority, so the metadata and the page cannot disagree.
+    // The column holds a copy of the same answer for a reader that wants it
+    // without parsing the body.
     description: content.descriptionOf(inForce),
     legal: !!row.legal,
     status: row.status,
@@ -145,7 +147,9 @@ async function saveDraft({ route, title, body, actorId }) {
   const rev = await nextRevision(row.id);
   // The description follows the body in force: while the page is published
   // that is the published body, so a draft that changes the standfirst does
-  // not change what the page is described as until it is published.
+  // not change what the page is described as until it is published. The
+  // column is a copy of that answer for a reader that wants it without
+  // parsing the body; the body stays the authority.
   const staysPublished = row.status === 'PUBLISHED';
   const description = content.descriptionOf(staysPublished ? parse(row.published_body) : blocks);
   await db.transaction(async (t) => {
@@ -287,9 +291,9 @@ async function restore({ route, revision, actorId }) {
 // answered with markup would be deciding it for everybody.
 async function compareRevisions({ route, from, to }) {
   const row = await ensureRow(route);
-  const fromRevision = Number(from);
-  const toRevision = Number(to);
-  if (!Number.isInteger(fromRevision) || !Number.isInteger(toRevision)) {
+  const fromRevision = revisionNumber(from);
+  const toRevision = revisionNumber(to);
+  if (fromRevision === null || toRevision === null) {
     bad('a comparison needs two revision numbers', 'VALIDATION_ERROR');
   }
   const older = await db.get(
