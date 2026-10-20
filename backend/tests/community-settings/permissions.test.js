@@ -75,6 +75,11 @@ test('a member may not give a role to somebody', async (t) => {
   const { instance, owner, member, serverId } = await community();
   t.after(async () => { await instance.stop(); });
 
+  const made = await owner.post('/api/servers/' + serverId + '/roles', {
+    name: 'Moderator', permissions: ['KICK_MEMBERS'],
+  });
+  assert.equal(made.status, 200, JSON.stringify(made.data));
+
   const roles = await owner.get('/api/servers/' + serverId + '/roles');
   assert.equal(roles.status, 200, JSON.stringify(roles.data));
   const role = (roles.data || []).find((entry) => !entry.is_default);

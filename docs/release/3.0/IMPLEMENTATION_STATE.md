@@ -50,6 +50,35 @@ The mobile module is served at both `/app/mobile/` (under the application
 mount) and `/mobile/` (at the origin root), and each serves its own `<base>`
 so its relative asset URLs resolve against the right tree.
 
+## The Cloudflare deployment
+
+The public site and the web client are also deployed to Cloudflare, from a
+separate repository (`.trycord-cloudflare`) that holds **only the
+deployment**: the Wrangler config, the Worker, and the built `dist/` tree.
+The build fetches the product source at a pinned ref, so there is exactly one
+copy of the source and the deployment cannot drift into carrying a stale
+fork of it.
+
+| | |
+|---|---|
+| Repository | `github.com/trycord/.trycord-cloudflare`, branch `main` |
+| Built from | `trycord/.trycord` at `release/3.0.0` (4c73f20 and later) |
+| Tree | 450 files, `verify-dist.js` 61 checks, `verify-worker.mjs` every route |
+| Pushed | yes — `main` at `ed47ab0` |
+| Deployed | **not from this machine** — `npx wrangler deploy` needs Cloudflare credentials, and this host has none |
+
+**The deploy is the one step left.** The tree is built, verified and
+committed; the command that publishes it is `npx wrangler deploy` from a
+machine with the credentials.
+
+**A page cannot 404 by being forgotten.** The worker used to answer a public
+page only if it was named in a hand-written map of thirteen routes, and the
+site has twenty-five — so twelve pages 404ed on Cloudflare while they worked
+on the origin, and the register page's "Use another instance" link went to
+one of them. The map is no longer a requirement: a path that is not a file
+may still be a page, and the worker asks for the file. The verifier reads
+the list of pages from the tree rather than from a list of its own.
+
 ## The verification suite
 
 The repository shipped without an automated suite. It has one now, and it is

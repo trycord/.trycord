@@ -157,6 +157,22 @@ evidence the gate asks for does not exist.
 page, the community directory, the legal content, the demo's honesty, the
 incident timeline, and the well-formedness of every page.
 
+**The instance directory was missing and is now there.** The register page's
+"Use another instance" link went to `/instances`, and the public site had no
+such page: the site offered communities and the demo, and the directory had
+never been written. It is now a page — the instances this one knows about,
+each entry a pointer rather than a verdict — and it is in the navigation, in
+the footer and in the sitemap.
+
+**And the deployment could not reach a page the origin could.** The
+Cloudflare worker answered a public page only if it was named in a
+hand-written map of thirteen routes, and the site has twenty-five: twelve
+pages 404ed on Cloudflare while they worked on the origin, and two hosts
+disagreed about the same tree. The map is no longer a requirement — a path
+that is not a file may still be a page, and the worker asks for the file — and
+the verifier reads the list of pages from the tree rather than from a list of
+its own, so a page cannot 404 by being forgotten.
+
 The hybrid editor has one model and two modes, and the editor's validation is
 proved to agree with the server's by running both validators over the same
 forty blocks and comparing the verdicts.
@@ -195,6 +211,8 @@ They are listed below.
 ## The blockers
 
 | Blocker | Why it cannot be closed here | What it needs |
+|---|---|---|
+| **The Cloudflare deployment is not published** | `npx wrangler deploy` needs Cloudflare credentials, and this host has none. The tree is built, verified (61 checks) and committed and pushed to `main` | One command from a machine with the credentials |
 |---|---|---|
 | **No independent cryptographic review of the E2EE protocol** | A third party has to do it. The implementation is from-scratch and by the same people who wrote it | A reviewer looking at the key schedule, the ratchet state machine, the skipped-key bounds and the recovery flow. **Until then the product is not advertised as end-to-end encrypted** |
 | **The native client was never compiled** | No JDK, Gradle, Android SDK, Xcode or macOS | A machine with the toolchain, and the build and on-device evidence the gate asks for |
