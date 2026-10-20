@@ -163,21 +163,4 @@ module.exports = (engine) => [
   // permission create entries; anyone in the community can read them. Each
   // entry links back to the source message it was distilled from, preserving
   // provenance.
-  `CREATE TABLE IF NOT EXISTS community_memory_entries (
-      id            VARCHAR(64) PRIMARY KEY,
-      server_id     VARCHAR(64) NOT NULL,
-      channel_id    VARCHAR(64),
-      title         VARCHAR(255) NOT NULL,
-      body          TEXT NOT NULL,
-      author_id     VARCHAR(64) NOT NULL,
-      source_message_id VARCHAR(64),
-      revision_count INTEGER NOT NULL DEFAULT 1,
-      status        VARCHAR(16) NOT NULL DEFAULT 'published',
-      created_at    VARCHAR(64) NOT NULL,
-      updated_at    VARCHAR(64) NOT NULL,
-      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
-      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE SET NULL,
-      FOREIGN KEY (author_id) REFERENCES users(id),
-      FOREIGN KEY (source_message_id) REFERENCES messages(id) ON DELETE SET NULL
-    )${engine}`,
 ];

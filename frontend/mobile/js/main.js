@@ -15,6 +15,7 @@ import {
   markConversationRead,
 } from '../../packages/store.js';
 import { installLinkHandler, installPopStateHandler, BASE, setBase, mountFromModuleUrl } from '../../packages/nav.js';
+import { loadLocale } from '../../packages/locale.js';
 import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../../packages/realtime.js';
 import { bind } from '../../packages/registry.js';
 import { readOverride, siblingMount } from '../../packages/chooser.js';
@@ -117,6 +118,11 @@ async function boot() {
     State.user = null;
   }
   setSession(State.user ? 'in' : 'out');
+
+  // The locale the instance answers in, and the strings it answers with. A
+  // reader who is signed in gets their own preference here. An instance that
+  // cannot answer leaves the interface in its built-in language.
+  try { await loadLocale(); } catch { /* the built-in language stands */ }
 
   if (State.user) {
     await Promise.allSettled([refreshServers(), refreshDms(), refreshFriends(), refreshNotifications()]);

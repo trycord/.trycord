@@ -190,6 +190,9 @@ const RULE = /^-{3,}\s*$/;
 const BULLET = /^[-*]\s+(.*)$/;
 const ORDERED = /^\d+[.)]\s+(.*)$/;
 const IMAGE = /^!\[((?:\\.|[^\]\\])*)\]\(((?:\\.|[^)\\])*)\)(?:\s+"([^"]*)")?\s*$/;
+// A source that holds a parenthesis cannot be told from the frame of the
+// image, so it is read to the last parenthesis rather than refused.
+const IMAGE_LOOSE = /^!\[((?:\\.|[^\]\\])*)\]\((.*)\)(?:\s+"([^"]*)")?\s*$/;
 const FENCE = /^(`{3,})\s*(.*)$/;
 const TABLE_ROW = /^\|.*$/;
 const CAPTION = /^:\s+(.*)$/;
@@ -424,7 +427,7 @@ export function sourceToBlocks(text) {
       continue;
     }
 
-    const image = IMAGE.exec(trimmed);
+    const image = IMAGE.exec(trimmed) || IMAGE_LOOSE.exec(trimmed);
     if (image) {
       flush();
       const block = readImage(image, number, errors);

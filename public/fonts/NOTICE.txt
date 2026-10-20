@@ -1,0 +1,24 @@
+Copyright 2019 The Manrope Project Authors (https://github.com/sharanda/manrope)
+Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+
+Both fonts in this directory are licensed under the SIL Open Font License,
+Version 1.1. The licence text is in OFL.txt beside this notice, and it applies
+to both families.
+
+The copyright notice above travels with the fonts because the licence requires
+it: a copy of the font that is redistributed has to carry the notice of the
+copyright holder and the licence. One notice naming both families satisfies
+that for both, and the licence text itself is the same one.
+
+  manrope-latin-wght-normal.woff2        Manrope, latin subset
+  manrope-latin-ext-wght-normal.woff2     Manrope, latin-ext subset
+  jetbrains-mono-latin-wght-normal.woff2  JetBrains Mono, latin subset
+
+Manrope is the interface face. JetBrains Mono is the monospace face, used for
+code, identifiers and the places where a fixed measure matters.
+
+Neither font is sold on its own, and neither is modified: the files here are
+the upstream releases, subset to the ranges the interface needs. The subsets
+were produced with the upstream tools, and the licence permits subsetting and
+redistribution as long as the font is not sold by itself and the notice and
+the licence travel with it.

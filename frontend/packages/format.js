@@ -1,5 +1,10 @@
 // Presentation helpers. No module here reads state or touches the network: they
 // turn a value the server sent into the string a person reads.
+//
+// The dates and numbers are written the way the reader's locale writes them,
+// so a pack that changes the language changes the way a date reads too.
+
+import locale from './locale.js';
 
 const UNITS = [
   ['year', 31536000000],
@@ -39,7 +44,7 @@ export function shortDate(value) {
   const opts = d.getFullYear() === now.getFullYear()
     ? { month: 'short', day: 'numeric' }
     : { year: 'numeric', month: 'short', day: 'numeric' };
-  return d.toLocaleDateString(undefined, opts);
+  return locale.formatDate(d, opts);
 }
 
 export function joinedLabel(value) {
@@ -49,13 +54,13 @@ export function joinedLabel(value) {
   const opts = d.getFullYear() === now.getFullYear()
     ? { month: 'long', day: 'numeric' }
     : { month: 'long', year: 'numeric' };
-  return d.toLocaleDateString(undefined, opts);
+  return locale.formatDate(d, opts);
 }
 
 export function timeOfDay(value) {
   const d = toDate(value);
   if (!d) return '';
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return locale.formatTime(d);
 }
 
 // The label above a run of messages: Today, Yesterday, or a date.
@@ -65,16 +70,16 @@ export function dayLabel(value) {
   const now = new Date();
   const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const days = Math.round((startOf(now) - startOf(d)) / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
+  if (days === 0) return locale.t('date.today', 'Today');
+  if (days === 1) return locale.t('date.yesterday', 'Yesterday');
+  if (days < 7) return locale.formatDate(d, { weekday: 'long' });
   return shortDate(d);
 }
 
 export function fullTimestamp(value) {
   const d = toDate(value);
   if (!d) return '';
-  return d.toLocaleString(undefined, {
+  return locale.formatDateTime(d, {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
     hour: 'numeric', minute: '2-digit',
   });
@@ -91,10 +96,14 @@ export function sameRun(a, b, windowMs) {
 
 export function fileSize(bytes) {
   const n = Number(bytes) || 0;
-  if (n < 1024) return n + ' B';
-  if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
-  if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + ' MB';
-  return (n / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  if (n < 1024) return locale.formatNumber(n) + ' B';
+  if (n < 1024 * 1024) {
+    return locale.formatNumber(Number((n / 1024).toFixed(n < 10240 ? 1 : 0)), { maximumFractionDigits: 1 }) + ' KB';
+  }
+  if (n < 1024 * 1024 * 1024) {
+    return locale.formatNumber(Number((n / (1024 * 1024)).toFixed(1)), { maximumFractionDigits: 1 }) + ' MB';
+  }
+  return locale.formatNumber(Number((n / (1024 * 1024 * 1024)).toFixed(2)), { maximumFractionDigits: 2 }) + ' GB';
 }
 
 export function initials(name) {

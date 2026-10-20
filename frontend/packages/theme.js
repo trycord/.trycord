@@ -53,6 +53,10 @@ export const CUSTOM_TOKEN_DEFS = [
   { key: 'txt', css: '--c-txt', label: 'Text' },
 ];
 
+// The tokens a theme package may set. The same four the custom palette uses,
+// so an imported theme is measured against the same shell.
+export const TOKEN_KEYS = CUSTOM_TOKEN_DEFS.map((def) => def.key);
+
 export function getTheme(id) {
   return THEMES.find((theme) => theme.id === id) || null;
 }
@@ -186,9 +190,161 @@ function emit(value) {
 
 try { watchSystemTheme(); } catch { /* no window */ }
 
+// ---- theme packages ----------------------------------------------------------
+//
+// A theme package is a set of values, not code. The schema is versioned: a
+// package that declares a version this build does not know is refused, and
+// the message names that version. The same rule the server keeps, so a
+// package is refused here before it is sent rather than after.
+//
+// A package may only carry the declared fields. A field that is not one of
+// them is turned away, which is what keeps a theme a set of values.
+
+export const KNOWN_SCHEMA_VERSIONS = [1];
+
+export const PACKAGE_FIELDS = ['schemaVersion', 'name', 'version', 'compatibility', 'tokens'];
+
+const COLOUR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const FUNCTIONAL_COLOUR = /^(?:rgb|rgba|hsl|hsla)\(\s*[0-9a-zA-Z.,%/\s-]*\)$/;
+const VERSION_SHAPE = /^\d+(\.\d+){0,2}([-+][A-Za-z0-9.-]+)?$/;
+
+// Is this a colour a theme may set? A colour and nothing else: no url(), no
+// expression(), no statement terminator.
+export function isColour(value) {
+  if (typeof value !== 'string') return false;
+  const text = value.trim();
+  if (!text) return false;
+  if (COLOUR.test(text)) return true;
+  return FUNCTIONAL_COLOUR.test(text);
+}
+
+/**
+ * Check a theme package.
+ *
+ * Every problem is reported, not just the first one.
+ *
+ * @param {object} raw
+ * @returns {{ theme: object|null, problems: string[] }}
+ */
+export function validateThemePackage(raw) {
+  const problems = [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { theme: null, problems: ['a theme package has to be an object'] };
+  }
+
+  for (const field of Object.keys(raw)) {
+    if (!PACKAGE_FIELDS.includes(field)) {
+      problems.push('"' + field + '" is not a field a theme package may carry');
+    }
+  }
+
+  const schemaVersion = Number(raw.schemaVersion);
+  if (!Number.isInteger(schemaVersion) || !KNOWN_SCHEMA_VERSIONS.includes(schemaVersion)) {
+    problems.push(
+      'theme schema version ' + JSON.stringify(raw.schemaVersion)
+      + ' is not known to this build (known: ' + KNOWN_SCHEMA_VERSIONS.join(', ') + ')'
+    );
+  }
+
+  const name = String(raw.name == null ? '' : raw.name).trim();
+  if (!name) problems.push('a theme needs a name');
+
+  const version = String(raw.version == null ? '' : raw.version).trim();
+  if (!VERSION_SHAPE.test(version)) problems.push('"' + version + '" is not a version');
+
+  const compatibility = raw.compatibility === undefined ? {} : raw.compatibility;
+  if (!compatibility || typeof compatibility !== 'object' || Array.isArray(compatibility)) {
+    problems.push('compatibility has to be an object');
+  } else {
+    const wanted = compatibility.minSchemaVersion;
+    if (wanted !== undefined) {
+      const min = Number(wanted);
+      if (!Number.isInteger(min)) {
+        problems.push('compatibility.minSchemaVersion has to be a whole number');
+      } else if (!KNOWN_SCHEMA_VERSIONS.includes(min)) {
+        problems.push(
+          'theme schema version ' + min + ' is not known to this build (known: '
+          + KNOWN_SCHEMA_VERSIONS.join(', ') + ')'
+        );
+      } else if (min > schemaVersion) {
+        problems.push('this theme needs schema version ' + min + ', which is newer than the package declares');
+      }
+    }
+  }
+
+  const tokens = raw.tokens;
+  if (!tokens || typeof tokens !== 'object' || Array.isArray(tokens)) {
+    problems.push('a theme needs a set of tokens');
+  } else {
+    for (const key of Object.keys(tokens)) {
+      if (!TOKEN_KEYS.includes(key)) {
+        problems.push('"' + key + '" is not a token a theme may set');
+        continue;
+      }
+      if (!isColour(tokens[key])) {
+        problems.push('the token "' + key + '" is not a colour');
+      }
+    }
+  }
+
+  if (problems.length) return { theme: null, problems };
+
+  return {
+    theme: {
+      schemaVersion,
+      name: name.slice(0, 128),
+      version,
+      compatibility: { minSchemaVersion: compatibility.minSchemaVersion === undefined
+        ? schemaVersion
+        : Number(compatibility.minSchemaVersion) },
+      tokens: Object.fromEntries(TOKEN_KEYS
+        .filter((key) => tokens[key] !== undefined)
+        .map((key) => [key, String(tokens[key]).trim()])),
+    },
+    problems: [],
+  };
+}
+
+/**
+ * What a package would change, seen before it is applied.
+ *
+ * The diff is against the palette in force now, so the reader sees the
+ * colours that move rather than a list of colours they may already know.
+ *
+ * @param {object} raw     the package
+ * @param {object} current the tokens in force
+ * @returns {{ ok: boolean, problems: string[], changes: object[], theme: object|null }}
+ */
+export function previewThemePackage(raw, current) {
+  const checked = validateThemePackage(raw);
+  if (checked.problems.length) {
+    return { ok: false, problems: checked.problems, changes: [], theme: null };
+  }
+  const from = Object.assign({}, DEFAULT_CUSTOM_TOKENS, current || {});
+  const changes = [];
+  for (const def of CUSTOM_TOKEN_DEFS) {
+    const next = checked.theme.tokens[def.key];
+    if (next === undefined) continue;
+    const before = from[def.key] || '';
+    if (before.toLowerCase() === next.toLowerCase()) continue;
+    changes.push({ key: def.key, label: def.label, from: before, to: next });
+  }
+  return { ok: true, problems: [], changes, theme: checked.theme };
+}
+
+// Install a theme package's tokens here, through the same measured rule as a
+// hand-authored palette: a theme that breaks the shell is refused and the
+// previous theme is restored.
+export function applyThemePackage(tokens) {
+  return applyCustomTheme({ tokens });
+}
+
 export default {
   currentTheme, resolvedTheme, resolveTheme, setTheme, applyTheme,
   onThemeChange, watchSystemTheme, applyCustomTheme, applyCustomPalette,
   clearCustomInline, savePalette, loadPalette,
   DEFAULT_THEME, THEMES, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS,
+  KNOWN_SCHEMA_VERSIONS, PACKAGE_FIELDS, isColour, validateThemePackage,
+  previewThemePackage, applyThemePackage,
 };
+

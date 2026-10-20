@@ -64,6 +64,9 @@ const E2EE_EVENTS = {
 const CONTINUUM_EVENTS = {
   RELAY_MESSAGE: 'continuum:relay-message',
   RELAY_REACTION: 'continuum:relay-reaction',
+  // The state of a message this account wrote into a community that lives on
+  // another instance: accepted, refused with the reason, or taken back.
+  RELAY_OUTGOING: 'continuum:relay-outgoing',
 };
 
 // Every event name, for the checks that need to know the whole vocabulary.

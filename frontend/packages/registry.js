@@ -53,6 +53,30 @@ export const PAGES = [
     nav: { label: 'Menu', short: 'Menu', icon: 'menu', mobile: true, tabOrder: 5 },
   }),
 
+  // ---- what the reader keeps, and what happened to the instance.
+  //
+  // These are the reader's own destinations: the search that carries the
+  // filters, the collections they save into, the reports they have filed
+  // about other instances, and the timeline of what has happened here.
+  p('search', '/search', {
+    layout: 'plain',
+    nav: { label: 'Search', short: 'Search', icon: 'search', global: true },
+  }),
+  p('collections', '/collections', {
+    layout: 'plain',
+    nav: { label: 'Collections', short: 'Collections', icon: 'folder', global: true },
+  }),
+  p('federation', '/federation', {
+    layout: 'plain',
+    nav: { label: 'Federation reports', short: 'Federation', icon: 'share' },
+  }),
+  // The incident timeline is for everybody, including readers who are not
+  // signed in: a status page is for the people who are affected by something.
+  p('status', '/status', {
+    access: 'public', layout: 'plain',
+    nav: { label: 'Service status', short: 'Status', icon: 'activity', global: true },
+  }),
+
   // ---- the community tree. /c/:slug is the current spelling and /server/:id the
   // legacy one; both resolve here and the shell only ever sees the id form.
   p('community', '/c/:slug', { layout: 'channel', sidebar: 'community', hidden: true }),
@@ -101,14 +125,20 @@ export const PAGES = [
     blurb: 'Colours, how much you see at once, and animation',
     tabs: ['appearance'],
   }),
-  p('settings.backend', '/settings/backend', {
+  p('settings.language', '/settings/language', {
     layout: 'settings', scope: 'account', group: 'Preferences', order: 2,
+    label: 'Language', icon: 'globe',
+    blurb: 'The language this account reads in, and how dates are written',
+    tabs: ['language'],
+  }),
+  p('settings.backend', '/settings/backend', {
+    layout: 'settings', scope: 'account', group: 'Preferences', order: 3,
     label: 'Connection', icon: 'server',
     blurb: 'Which server this client talks to',
     tabs: ['backend'],
   }),
   p('settings.updates', '/settings/updates', {
-    layout: 'settings', scope: 'account', group: 'Preferences', order: 3,
+    layout: 'settings', scope: 'account', group: 'Preferences', order: 4,
     label: 'Updates', icon: 'sparkle',
     blurb: 'What this build is and what changed',
     tabs: ['updates'],
@@ -184,6 +214,16 @@ export const PAGES = [
     layout: 'admin', scope: 'admin', group: 'Instance', order: 6,
     label: 'Continuum', icon: 'share', tabs: ['continuum'],
     blurb: 'Federation with compatible Trycord instances',
+  }),
+  p('admin.incidents', '/admin/incidents', {
+    layout: 'admin', scope: 'admin', group: 'Instance', order: 8,
+    label: 'Incidents', icon: 'alert', tabs: ['incidents'],
+    blurb: 'What has happened to this instance, and what is being done about it',
+  }),
+  p('admin.federation', '/admin/federation', {
+    layout: 'admin', scope: 'admin', group: 'Moderation', order: 7,
+    label: 'Federation reports', icon: 'flag', tabs: ['federation'],
+    blurb: 'Reports about activity on this instance, sent by other instances',
   }),
 
   // ---- community settings sections. No path: each is addressed relative to

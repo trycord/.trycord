@@ -20,6 +20,8 @@ import {
 } from './overlays.js';
 import { copyText } from './clipboard.js';
 import { embedCard, imagesOf, kindOf } from './embeds.js';
+import { templatePicker, expandInDraft } from './templates.js';
+import { saveToCollection } from './collections.js';
 
 const QUICK_REACTIONS = ['👍', '❤️', '🔥', '🎉', '👀', '😅'];
 const CHAT_EMOJI = ['😀', '😂', '🙂', '😍', '🥳', '👍', '🙏', '🔥', '💯', '🎉', '🤝', '👋'];
@@ -273,6 +275,15 @@ const messageMenu = (m, self, cfg, composer, openThread, del, live) => {
         onSelect: () => {
           Promise.resolve(cfg.pin(m.id, !m.pinned)).catch((error) => errorToast(error));
         },
+      });
+    }
+    // A collection belongs to a community, so the message can only be saved
+    // into one when the conversation is in one.
+    if (live && cfg.serverId) {
+      items.push({ separator: true });
+      items.push({
+        label: 'Save to a collection', icon: 'folder',
+        onSelect: () => saveToCollection(cfg.serverId, { itemType: 'message', itemId: m.id }),
       });
     }
     if (mine && cfg.unreactFrom) {
@@ -657,6 +668,9 @@ export function conversationSurface(config) {
   const attachBtn = el('button', {
     class: 'iconbtn', type: 'button', 'aria-label': 'Attach a file',
   }, icon('paperclip', { size: 16 }));
+  const templateBtn = el('button', {
+    class: 'iconbtn', type: 'button', 'aria-label': 'Insert a template',
+  }, icon('zap', { size: 16 }));
 
   const form = el('form', {
     class: 'composer',
@@ -666,7 +680,7 @@ export function conversationSurface(config) {
     },
   },
     contextBanner,
-    el('div', { class: 'composer-row' }, attachBtn, textarea, emojiBtn, sendBtn),
+    el('div', { class: 'composer-row' }, attachBtn, textarea, templateBtn, emojiBtn, sendBtn),
     errorLine,
     fileInput);
 
@@ -809,9 +823,25 @@ export function conversationSurface(config) {
       submit();
     }
   });
-  textarea.addEventListener('input', () => {
+  const resize = () => {
     textarea.style.height = 'auto';
     textarea.style.height = Math.min(textarea.scrollHeight, 300) + 'px';
+  };
+  // A shortcut is expanded when the reader has finished the word. The
+  // templates are read once, so this costs nothing per keystroke.
+  let expanding = false;
+  textarea.addEventListener('input', () => {
+    resize();
+    if (expanding) return;
+    expanding = true;
+    expandInDraft(textarea.value).then((expanded) => {
+      if (!expanded) return;
+      textarea.value = expanded.text;
+      const at = textarea.value.length;
+      textarea.setSelectionRange(at, at);
+      resize();
+    }).catch(() => { /* a template that cannot be read is not expanded */ })
+      .finally(() => { expanding = false; });
   });
   sendBtn.addEventListener('click', (event) => {
     event.preventDefault();
@@ -832,6 +862,18 @@ export function conversationSurface(config) {
           textarea.focus();
         },
       })),
+    });
+  });
+  templateBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    templatePicker((template) => {
+      const body = String((template && template.body) || '');
+      const at = textarea.selectionStart === null ? textarea.value.length : textarea.selectionStart;
+      textarea.value = textarea.value.slice(0, at) + body + textarea.value.slice(at);
+      const next = at + body.length;
+      textarea.setSelectionRange(next, next);
+      textarea.focus();
+      resize();
     });
   });
   const pickFile = () => {

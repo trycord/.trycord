@@ -235,6 +235,14 @@ async function eraseAccount({ userId, actorId }) {
     await db.run('DELETE FROM e2ee_sessions WHERE user_id = ?', [userId]);
   } catch { /* an instance without encryption has nothing to remove */ }
 
+  // The reader's own working material: their saved searches, their search
+  // history, their templates and their collections. The erasure removes the
+  // account; the material that belongs to it goes with it, rather than
+  // waiting for the hourly sweep to notice.
+  try {
+    await require('./reader-data').purgeReaderData(userId);
+  } catch { /* an instance without the reader's material has nothing to remove */ }
+
   // Messages stay, attributed to the anonymised account. Removing them would
   // delete other people's conversations; the author reference becomes a
   // placeholder that resolves to nobody.

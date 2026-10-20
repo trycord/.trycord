@@ -343,7 +343,7 @@ router.post('/api/continuum/moderation/members/:instanceId/:userId', auth, rateL
 
 // The feed's own state: when it last ran, what it did, and how far behind it
 // is. A feed that is further behind than the bound is not quiet about it.
-router.get('/api/continuum/feed', auth, async (req, res, next) => {
+router.get('/api/continuum/feed', adminGuard, async (req, res, next) => {
   try {
     if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
     res.json(await continuum.feedStatus());

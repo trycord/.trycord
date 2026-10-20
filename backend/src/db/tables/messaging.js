@@ -5,7 +5,6 @@
 // because they began as a simpler version of the same idea.
 
 module.exports = (engine) => [
-
   `CREATE TABLE IF NOT EXISTS messages (
          id         VARCHAR(64) PRIMARY KEY,
          channel_id VARCHAR(64) NOT NULL,
@@ -43,50 +42,6 @@ module.exports = (engine) => [
       author_id   VARCHAR(64) NOT NULL,
       created_at  VARCHAR(64) NOT NULL,
       PRIMARY KEY (message_id, word)
-    )${engine}`,
-
-  `CREATE TABLE IF NOT EXISTS message_embeds (
-      id          VARCHAR(64) PRIMARY KEY,
-      message_id  VARCHAR(64),
-      dm_conversation_id VARCHAR(64),
-      dm_message_id      VARCHAR(64),
-      url         VARCHAR(512) NOT NULL,
-      site_name   VARCHAR(255),
-      title       VARCHAR(512),
-      description TEXT,
-      image_url   VARCHAR(512),
-      video_url   VARCHAR(512),
-      kind        VARCHAR(32),
-      status      VARCHAR(32) NOT NULL DEFAULT 'pending',
-      created_at  VARCHAR(64) NOT NULL,
-      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
-      FOREIGN KEY (dm_conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
-      FOREIGN KEY (dm_message_id) REFERENCES dm_messages(id) ON DELETE CASCADE
-    )${engine}`,
-
-  `CREATE TABLE IF NOT EXISTS attachments (
-      id          VARCHAR(64) PRIMARY KEY,
-      message_id  VARCHAR(64),
-      -- Nullable, and carrying a conversation instead of a channel for a direct
-      -- message. It was NOT NULL with a foreign key to channels, which made an
-      -- attachment in a DM impossible to represent at all: there is no channel
-      -- row to point at. Relaxing it changes nothing for existing rows, and a
-      -- NULL foreign key satisfies the constraint in both engines - so a channel
-      -- attachment and a direct one live in one table rather than two.
-      channel_id  VARCHAR(64),
-      dm_conversation_id VARCHAR(64),
-      dm_message_id      VARCHAR(64),
-      uploader_id VARCHAR(64) NOT NULL,
-      filename    VARCHAR(255) NOT NULL,
-      mime        VARCHAR(64) NOT NULL,
-      size        INTEGER NOT NULL DEFAULT 0,
-      url         VARCHAR(512) NOT NULL,
-      created_at  VARCHAR(64) NOT NULL,
-      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
-      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
-      FOREIGN KEY (dm_conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
-      FOREIGN KEY (dm_message_id) REFERENCES dm_messages(id) ON DELETE CASCADE,
-      FOREIGN KEY (uploader_id) REFERENCES users(id)
     )${engine}`,
 
   `CREATE TABLE IF NOT EXISTS pinned_messages (
@@ -144,6 +99,77 @@ module.exports = (engine) => [
          FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
          FOREIGN KEY (author_id) REFERENCES users(id)
        )${engine}`,
+
+  `CREATE TABLE IF NOT EXISTS message_embeds (
+      id          VARCHAR(64) PRIMARY KEY,
+      message_id  VARCHAR(64),
+      dm_conversation_id VARCHAR(64),
+      dm_message_id      VARCHAR(64),
+      url         VARCHAR(512) NOT NULL,
+      site_name   VARCHAR(255),
+      title       VARCHAR(512),
+      description TEXT,
+      image_url   VARCHAR(512),
+      video_url   VARCHAR(512),
+      kind        VARCHAR(32),
+      status      VARCHAR(32) NOT NULL DEFAULT 'pending',
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_message_id) REFERENCES dm_messages(id) ON DELETE CASCADE
+    )${engine}`,
+
+  `CREATE TABLE IF NOT EXISTS attachments (
+      id          VARCHAR(64) PRIMARY KEY,
+      message_id  VARCHAR(64),
+      -- Nullable, and carrying a conversation instead of a channel for a direct
+      -- message. It was NOT NULL with a foreign key to channels, which made an
+      -- attachment in a DM impossible to represent at all: there is no channel
+      -- row to point at. Relaxing it changes nothing for existing rows, and a
+      -- NULL foreign key satisfies the constraint in both engines - so a channel
+      -- attachment and a direct one live in one table rather than two.
+      channel_id  VARCHAR(64),
+      dm_conversation_id VARCHAR(64),
+      dm_message_id      VARCHAR(64),
+      uploader_id VARCHAR(64) NOT NULL,
+      filename    VARCHAR(255) NOT NULL,
+      mime        VARCHAR(64) NOT NULL,
+      size        INTEGER NOT NULL DEFAULT 0,
+      url         VARCHAR(512) NOT NULL,
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (dm_message_id) REFERENCES dm_messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (uploader_id) REFERENCES users(id)
+    )${engine}`,
+
+  // The community's curated knowledge entries.
+  //
+  // This table lives in the messaging group rather than the communities one
+  // because of a foreign key: it points at `messages(id)`, and MySQL checks a
+  // referenced table when the referencing one is created. The communities group
+  // is declared first - `channels` and `servers` are needed before messages -
+  // so a table that points at `messages` cannot be created there. On SQLite the
+  // check does not happen at DDL time, which is why a fresh MySQL database
+  // failed with errno 150 while every SQLite instance was fine.
+  `CREATE TABLE IF NOT EXISTS community_memory_entries (
+      id            VARCHAR(64) PRIMARY KEY,
+      server_id     VARCHAR(64) NOT NULL,
+      channel_id    VARCHAR(64),
+      title         VARCHAR(255) NOT NULL,
+      body          TEXT NOT NULL,
+      author_id     VARCHAR(64) NOT NULL,
+      source_message_id VARCHAR(64),
+      revision_count INTEGER NOT NULL DEFAULT 1,
+      status        VARCHAR(16) NOT NULL DEFAULT 'published',
+      created_at    VARCHAR(64) NOT NULL,
+      updated_at    VARCHAR(64) NOT NULL,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
+      FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE SET NULL,
+      FOREIGN KEY (author_id) REFERENCES users(id),
+      FOREIGN KEY (source_message_id) REFERENCES messages(id) ON DELETE SET NULL
+    )${engine}`,
 
   `CREATE TABLE IF NOT EXISTS webhooks (
       id          VARCHAR(64) PRIMARY KEY,

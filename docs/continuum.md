@@ -384,7 +384,7 @@ is not quiet about it.
 | `DELETE /api/continuum/moderation/messages/:instanceId/:messageId` | signed in, per community | take one of those messages back |
 | `GET /api/continuum/moderation/members` | signed in, per community | the members of this instance's communities who live elsewhere |
 | `POST /api/continuum/moderation/members/:instanceId/:userId` | signed in, per community | mute, remove or restore one of them |
-| `GET /api/continuum/feed` | signed in | the change feed's state: when it last ran and how far behind it is |
+| `GET /api/continuum/feed` | platform admin | the change feed's state: when it last ran and how far behind it is |
 | `GET /api/continuum/relay/messages` | platform admin | everything that arrived from another instance |
 | `GET /api/continuum/relay/memberships` | platform admin | the members of this instance's communities who live elsewhere |
 

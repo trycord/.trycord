@@ -16,6 +16,8 @@ import {
 } from './adminInfra.js';
 import { adminPageEditor } from './adminPages.js';
 import { adminConfiguration } from './adminCfg.js';
+import { adminIncidents } from './adminIncidents.js';
+import { adminFederation } from './adminFederation.js';
 import { scopeNav } from '../../packages/registry.js';
 import { icon } from '../../packages/icons.js';
 import { el } from '../../packages/dom.js';
@@ -36,6 +38,8 @@ const LAYOUTS = new Map([
   ['admin.database', () => adminDatabase()],
   ['admin.continuum', () => adminContinuum()],
   ['admin.diagnostics', () => adminDiagnostics()],
+  ['admin.incidents', () => adminIncidents()],
+  ['admin.federation', () => adminFederation()],
 ]);
 
 // Same rail as the settings studio, one scope over; the registry owns the

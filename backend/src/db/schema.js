@@ -336,6 +336,33 @@ const INDEXES = [
   // The topics a reader follows. The unique key covers the lookup by topic;
   // this one covers the listing by channel.
   'CREATE INDEX idx_forum_subscriptions_channel ON forum_subscriptions(channel_id, user_id)',
+
+  // The reader's own working material.
+  'CREATE INDEX idx_saved_searches_user ON saved_searches(user_id)',
+  'CREATE INDEX idx_search_history_user ON search_history(user_id, created_at)',
+  'CREATE INDEX idx_channel_read_cursors_channel ON channel_read_cursors(channel_id)',
+  'CREATE INDEX idx_message_templates_user ON message_templates(user_id)',
+  'CREATE INDEX idx_saved_collections_owner ON saved_collections(user_id)',
+  'CREATE INDEX idx_saved_collections_community ON saved_collections(server_id, visibility)',
+  'CREATE INDEX idx_saved_collection_items_collection ON saved_collection_items(collection_id)',
+
+  // Localisation packs and theme packages.
+  'CREATE INDEX idx_localisation_packs_locale ON localisation_packs(locale, review_state)',
+  'CREATE INDEX idx_localisation_packs_scope ON localisation_packs(server_id, locale)',
+  'CREATE INDEX idx_theme_packages_scope ON theme_packages(scope, server_id)',
+  'CREATE INDEX idx_theme_activations_scope ON theme_activations(scope, server_id, activated_at)',
+
+  // The incident timeline and the cross-instance reports.
+  'CREATE INDEX idx_incidents_started ON incidents(started_at)',
+  'CREATE INDEX idx_cross_instance_reports_direction ON cross_instance_reports(direction, created_at)',
+  'CREATE INDEX idx_cross_instance_reports_target ON cross_instance_reports(target_instance_id, status)',
+
+  // The federation relay. The moderation surface and the member list query
+  // these by community, and the writer's own messages by author.
+  'CREATE INDEX idx_continuum_relay_outgoing_author ON continuum_relay_outgoing(author_id, created_at)',
+  'CREATE INDEX idx_continuum_relay_outgoing_community ON continuum_relay_outgoing(origin_instance_id, origin_community_id)',
+  'CREATE INDEX idx_continuum_relay_messages_community ON continuum_relay_messages(origin_community_id)',
+  'CREATE INDEX idx_continuum_relay_memberships_community ON continuum_relay_memberships(origin_community_id)',
   // Backs ORDER BY created_at DESC scans that are not scoped to one
   // channel (the /api/activity feed). Write overhead is one narrow index.
   'CREATE INDEX idx_messages_created ON messages(created_at)',

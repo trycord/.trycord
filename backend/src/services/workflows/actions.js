@@ -17,6 +17,10 @@
 const db = require('../../db');
 const { now, uuid } = require('../../util');
 const extensionStore = require('../extensions/store');
+// The refusal to write in the clear into an encrypted conversation. It is the
+// bots service's, because the bots service posts into the same table and has
+// the same problem, and two copies of the rule would eventually disagree.
+const { refuseIfEncrypted } = require('../bots');
 
 // The other services are required where they are used rather than at the top.
 // The action catalogue is loaded by the engine, which is loaded by the
@@ -59,9 +63,16 @@ async function nextSeq(channelId) {
  * resolves to the message the first attempt wrote instead of posting a
  * second time. The unique index on (channel_id, client_nonce) is what makes
  * that true rather than merely likely.
+ *
+ * A workflow writes **in the clear**, and it cannot write into a conversation
+ * that is encrypted. The workflow holds no conversation key and cannot
+ * produce an envelope, so a plaintext message there would be the one message
+ * the members cannot read — and the server, which the conversation was closed
+ * to, could read it. The run is recorded as failed with the reason, which is
+ * the honest outcome.
  */
 async function insertMessage({ channel, authorId, content, nonce }) {
-  for (let attempt = 0; attempt < 5; attempt++) {
+  await refuseIfEncrypted(channel.id);  for (let attempt = 0; attempt < 5; attempt++) {
     const seq = await nextSeq(channel.id);
     const id = uuid();
     try {
