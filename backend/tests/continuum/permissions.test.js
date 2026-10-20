@@ -99,43 +99,41 @@ test('the relay rules', async (t) => {
   });
 
   await t.test('a sender who may not post produces no event', async () => {
-    // The message is written in a private community, so the relay has never
-    // seen it: what is tested is the decision to publish it now.
-    const community = await admin.post('/api/servers', { name: 'Member Community' });
+    const community = await admin.post('/api/servers', { name: 'Member Community', isPublic: true });
     assert.equal(community.status, 200, JSON.stringify(community.data));
     const invite = await admin.post('/api/servers/' + community.data.serverId + '/invites', { maxUses: 5 });
     const joined = await member.post('/api/invites/' + invite.data.code + '/join', {});
     assert.equal(joined.status, 200, JSON.stringify(joined.data));
 
-    const posted = await member.post('/api/channels/' + community.data.channelId + '/messages', {
-      content: 'a member may post this',
-    });
-    assert.equal(posted.status, 200, JSON.stringify(posted.data));
-
-    // The community becomes public, and the member's permission is taken
-    // away afterwards. The message was written while it was theirs; whether
-    // it may still leave is decided now, and the answer is the same one the
-    // send path would give.
-    const opened = await admin.patch('/api/servers/' + community.data.serverId, { isPublic: true });
-    assert.equal(opened.status, 200, JSON.stringify(opened.data));
+    // The member's permission is taken away, and then the message is
+    // written: the author may not post, so the message does not federate.
     await db.run('DELETE FROM member_roles WHERE server_id = ? AND user_id = ?', [
       community.data.serverId, member.user.id,
     ]);
 
+    const messageId = 'a-message-by-someone-who-may-not-post';
+    await db.run(
+      'INSERT INTO messages (id, channel_id, author_id, content, created_at) VALUES (?, ?, ?, ?, ?)',
+      [
+        messageId, community.data.channelId, member.user.id,
+        'a member may post this', new Date().toISOString(),
+      ]
+    );
+
     const result = await continuum.publishEvent('message.posted', {
       serverId: community.data.serverId,
       channelId: community.data.channelId,
-      messageId: posted.data.id,
-      authorId: posted.data.author_id,
+      messageId,
+      authorId: member.user.id,
       content: 'a member may post this',
-    }, { actorId: posted.data.author_id });
+    }, { actorId: member.user.id });
 
     assert.equal(result.ok, false, 'a sender who may not post produces no event');
     assert.match(result.reason, /author cannot post/);
 
     const rows = await outbox();
     assert.equal(
-      rows.filter((row) => JSON.parse(row.payload).origin.message_origin_id === posted.data.id).length,
+      rows.filter((row) => JSON.parse(row.payload).origin.message_origin_id === messageId).length,
       0,
       'the message is not in the outbox'
     );

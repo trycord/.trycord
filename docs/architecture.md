@@ -39,11 +39,20 @@ The eleven questions worth being able to answer without searching.
 | API calls | `frontend/packages/api.js`. One `request()`, no per-feature clients. |
 | Message state | `frontend/js/ui/chat.js` - the conversation renderer shared by channels and DMs: the feed, message rows and the typing line, torn down on the way out. `frontend/packages/api.js` and `frontend/packages/realtime.js` carry what it reads. |
 | Community context | `frontend/packages/store.js` - `currentServerId` and the community tree, with `frontend/packages/realtime.js` keeping it fresh. |
-| Data model | `db/tables/` - one module per concern: identity, communities, messaging, social, moderation, instance. |
-| Schema migrations | `db/schema.js` - the ALTER and MODIFY lists that bring an existing database up to date, the declared indexes, the backfills. |
+| Data model | `db/tables/` - one module per concern: identity, e2ee, communities, messaging, social, moderation, instance, pages, continuum, developer, extensions, workspace, forums. |
+| Schema migrations | `db/schema.js` - the idempotent baseline that creates the tables and the indexes, and `db/migrations.js` - the versioned ledger: what has been applied, what failed, and the refusal of a database a newer build wrote to. |
 | Database access | `db/index.js`, which is the only module that speaks SQL dialect. |
 | Notification preferences, quiet hours, sessions | `services/prefs.js`, `services/wellbeing.js`, `services/sessions.js` - each its own module, not three more things inside `services/privacy.js`. |
 | Instance configuration | `services/settings.js` - the schema, the stored values and the precedence (stored, then environment, then default) - with `db/config.js` for the deployment facts a running process cannot change. The administrator console edits the stored layer; the environment stays the floor, documented in `backend/.env.example`. |
+| Which provider a subsystem uses | `services/providers/registry.js` - one catalogue describing every subsystem's providers, their settings, their secrets, their validation and their health. The console renders it; the services are the authority. |
+| The version of the build | `src/version.js` - the one place the release version is written down, read from the package manifest. The API, the instance endpoint and the health check all report it. |
+| End-to-end encryption | `services/e2ee/` - the device identity, the prekeys, the X3DH handshake, the Double Ratchet, the group keys, the sealed ratchet state and the recovery. The server holds public keys, sealed blobs and cleartext counters, and nothing else. |
+| Federation | `services/continuum.js` and `services/continuum/` - the instance identity, the signed envelope, the durable outbox, the inbox, the relay rules, the change feed and the remote-community registry. |
+| The developer platform | `services/developer/` and `services/apiKeys.js` - the versioned surface under `/api/v1`, the scope catalogue, the credentials and the versioned event envelope. |
+| Extensions and workflows | `services/extensions/` and `services/workflows/` - the registry, the capability grants, the sandbox, the workflow engine and its execution history. |
+| The collaboration workspace | `services/workspace/` - spaces, community documents, boards, events and polls. |
+| Forums | `services/forums.js` - a channel of type `forum`, over the thread model that is already there. |
+| The service map | `docs/services.md` - where every subsystem lives, what boundary it has, and what an operator has to run. |
 | Self-hosting | `docs/selfhosting.md`. No product code requires Trycord's own infrastructure: the client defaults to it but every value is overridable, and a client served by a backend is repointed at that backend. |
 
 ## Architecture
@@ -173,20 +182,41 @@ on every boot meant a restart of the API began a twenty-second storm of processe
 a machine that was already too warm. On a host this size, a suite that proves the
 product works is worth less than a product that is not fighting its own diagnostics.
 
-What remains are the things that are cheap and always true:
+**A suite is back, and it is a different kind of suite.** The old one proved the
+product by driving it the way a person does: rendering every route in a DOM,
+walking the socket, starting a browser. The new one proves it by **talking to a
+real instance** — the same instance shape, the same routes, the same database, a
+temporary file and a free port — over HTTP, and asserting what came back.
 
 | Command | What it covers |
 |---|---|
 | `cd backend && npm start` | the application itself: the API, the web client and the public site |
-| `cd backend && npm run migrate` | the schema, applied to the configured database |
+| `cd backend && npm test` | the whole suite: the unit, integration, journey and protocol tests |
+| `cd backend && npm run migrate` | the schema and the versioned migrations, applied to the configured database |
+| `cd backend && npm run migrate -- --status` | what the database has had applied, and what is pending, without changing anything |
 | `cd backend && npm run db:backup` | a read-only dump of the live database, verified against what the server reports |
 | `cd backend && npm run db:restore <file>` | verifies a dump, and restores it when told to |
 | `cd backend && npm run css` | rebuilds the stylesheets from the layer sources |
+| `cd .. && node --test frontend/tests/` | the client's own tests: the module boundary, the renderer table, the class coverage, the editor, the gates |
+| `cd .. && node --test public/tests/` | the public site's tests: the link checker, the API resolver, the legal content |
+| `node native/scripts/check-native.mjs` | the native client's internal consistency: every import resolves, every JSON parses |
 
-Verification is now something a person does against a running instance rather than a
-command that runs on a schedule: sign in, post, reload and watch the socket deliver.
-The federation path is exercised the same way - two instances, separate databases,
-separate keys - because that is what it is for.
+The whole backend suite runs in about half a minute. The cost is kept down by
+what the suite does **not** do: it never starts a browser, and it never renders
+a route to find out whether a route renders. It asks the server what it answers
+and checks the answer.
+
+**What that changes about the claim.** A green suite says the product answers
+correctly. It does not say the product looks right — that needs a browser, and
+there is no browser in the environment this was built in. The client is
+verified by driving it in Node against a stub DOM, and the two things that
+matter most about it — the account contracts and the recovery contracts — are
+verified against a real running instance over HTTP. The rest is a statement
+about structure and behaviour, not about pixels.
+
+The federation path is exercised the same way, and that is what it is for: two
+instances, separate databases, separate keys, separate ports, talking over real
+HTTP.
 
 ## The client: pages and navigation
 

@@ -723,6 +723,45 @@ test('a member writes in a federated community, and the owner sees it and can ac
     assert.equal(trail[0].server_id, communityId);
   });
 
+  await t.test('an edit a member makes here reaches the owner', async () => {
+    const written = await write('a word that will be changed');
+    await waitFor(async () => {
+      const list = await moderation();
+      return list.find((m) => m.origin_message_id === written.id) || null;
+    }, { message: 'the message to reach the owner' });
+
+    const edited = await bob.patch('/api/continuum/outgoing/' + written.id, {
+      content: 'a word that has been changed',
+    });
+    assert.equal(edited.status, 200, JSON.stringify(edited.data));
+    assert.equal(edited.data.content, 'a word that has been changed');
+
+    const changed = await waitFor(async () => {
+      const list = await moderation();
+      const found = list.find((m) => m.origin_message_id === written.id);
+      return found && found.content === 'a word that has been changed' ? found : null;
+    }, { message: 'the edit to reach the owner' });
+    assert.ok(changed.edited_at, 'the owner sees that it was an edit');
+  });
+
+  await t.test('a message a member takes back reaches the owner', async () => {
+    const written = await write('a word that will be taken back');
+    await waitFor(async () => {
+      const list = await moderation();
+      return list.find((m) => m.origin_message_id === written.id) || null;
+    }, { message: 'the message to reach the owner' });
+
+    const removed = await bob.delete('/api/continuum/outgoing/' + written.id);
+    assert.equal(removed.status, 200, JSON.stringify(removed.data));
+
+    const gone = await waitFor(async () => {
+      const list = await moderation();
+      const found = list.find((m) => m.origin_message_id === written.id);
+      return found && found.deleted ? found : null;
+    }, { message: 'the taking back to reach the owner' });
+    assert.equal(gone.content, null, 'the message does not outlive it');
+  });
+
   await t.test('a channel the members may not post in refuses the message', async () => {
     // The owner closes the channel to its own members. A member who may not
     // post there does not post there by writing to a federated copy of it.
