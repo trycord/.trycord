@@ -61,6 +61,11 @@
   --head-h: 54px;
   --composer-max: 300px;
   --content-max: 1040px;
+  /* A working surface is not a reading column. A studio - the workspace, the
+     settings console, anything with two panes side by side - uses the width
+     it is given, up to a point: a workspace squeezed into the width of an
+     article is a workspace nobody can work in. */
+  --workspace-max: 1760px;
 
   /* The readable floor. */
   --text-xs: 0.75rem;

@@ -124,7 +124,7 @@ export function pollsDetail(ctx) {
     }),
     card({ label: 'The result', glyph: 'activity', body: outcome, flush: true }),
     card({ label: 'Who voted', glyph: 'users', body: voters, flush: true }),
-  ]);
+  ], { wide: true });
 
   // The actions the reader may use on this poll. The server refuses a poll
   // that is not open, so a closed poll is not offered a close.

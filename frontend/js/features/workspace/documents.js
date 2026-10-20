@@ -134,7 +134,7 @@ export function documentsDetail(ctx) {
       body: links,
       flush: true,
     }),
-  ]);
+  ], { wide: true });
 
   // -- reading -----------------------------------------------------------------
 

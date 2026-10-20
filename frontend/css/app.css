@@ -64,6 +64,11 @@
   --head-h: 54px;
   --composer-max: 300px;
   --content-max: 1040px;
+  /* A working surface is not a reading column. A studio - the workspace, the
+     settings console, anything with two panes side by side - uses the width
+     it is given, up to a point: a workspace squeezed into the width of an
+     article is a workspace nobody can work in. */
+  --workspace-max: 1760px;
 
   /* The readable floor. */
   --text-xs: 0.75rem;
@@ -1198,7 +1203,12 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
  * On a desk the column is a column. On a narrow window it draws over the stage
  * instead, opened from the command bar and closed by the backdrop or Escape;
  * the inspector does the same. The line matches the media query in shell.js. */
-@media (max-width: 1080px) {
+/* The width below which the place column draws over the stage. It is the
+   same number as NARROW_WIDTH in frontend/js/shell.js, and the check in
+   frontend/tests/layout.test.js says so - a threshold in one place and not
+   the other is a sidebar that is visible in one half of the application and
+   not the other. */
+@media (max-width: 860px) {
   .cmdbar-nav { display: inline-grid; }
   .context {
     position: absolute; top: var(--cmdbar-h); bottom: 0; left: var(--rail-w); z-index: var(--z-nav);
@@ -1239,6 +1249,11 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 /* -- layout ----------------------------------------------------------------- */
 
 .fold { display: flex; flex-direction: column; gap: var(--space-6); max-width: var(--content-max); width: 100%; }
+/* A working surface. It uses the width it is given, because a workspace with
+   a list and an editor beside it is not a reading column - and a reading
+   column's width in the middle of a wide screen is what made the workspace
+   look compressed. */
+.fold--wide { max-width: none; }
 .fold--tight { gap: var(--space-3); }
 .fold--airy { gap: var(--space-8); }
 
@@ -1282,16 +1297,28 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  /* The head wraps. A title long enough to crowd the tools used to push them
+     out of the card, and the card clips its overflow, so the button was
+     simply gone - and the note beside it was drawn on top of the title. */
+  flex-wrap: wrap;
   padding: 12px 16px;
   border-bottom: 1px solid var(--line);
 }
 
-.cardhead-glyph { color: var(--text-3); display: grid; place-items: center; }
-.cardhead-label { margin: 0; font-size: var(--fs-body); font-weight: var(--weight-bold); letter-spacing: var(--tracking-tight); }
-.cardhead-note { margin-left: auto; font-size: var(--fs-micro); color: var(--text-3); text-align: right; }
-.cardhead-tools { display: flex; align-items: center; gap: var(--space-2); }
-.cardhead-note:not(:last-child) { margin-left: auto; }
-.cardhead-tools { flex: none; }
+.cardhead-glyph { color: var(--text-3); display: grid; place-items: center; flex: none; }
+/* The label may shrink, so a long title truncates instead of pushing the
+   tools out of the card. The title is a heading, so the whole of it is in
+   the accessibility tree even when it is drawn short. */
+.cardhead-label {
+  margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-body); font-weight: var(--weight-bold); letter-spacing: var(--tracking-tight);
+}
+.cardhead-note {
+  margin-left: auto; min-width: 0; font-size: var(--fs-micro); color: var(--text-3); text-align: right;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cardhead-tools { display: flex; align-items: center; gap: var(--space-2); flex: none; margin-left: auto; }
+.cardhead-note + .cardhead-tools { margin-left: 0; }
 
 .cardbody { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
 .cardbody--tight { padding: var(--space-3) var(--space-4); }
@@ -2147,7 +2174,10 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
   gap: var(--space-6);
   align-items: start;
-  max-width: var(--content-max);
+  /* A studio is a working surface, not an article: it is allowed to be wide.
+     The reading width is for the things a person reads, and a workspace with
+     a list and an editor beside it is not one of them. */
+  max-width: var(--workspace-max);
   width: 100%;
 }
 .studionav {
@@ -2191,7 +2221,7 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .studionav-link--active { background: var(--selected); color: var(--brand); font-weight: var(--weight-strong); }
 .studionav-link svg { flex: none; opacity: 0.85; }
 .studionav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.studio-stage { min-width: 0; }
+.studio-stage { min-width: 0; max-width: none; }
 
 /* -- stats ------------------------------------------------------------------- */
 
@@ -2562,10 +2592,15 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 
 .collection-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  /* The list is a panel of a sensible width and the thing beside it takes
+     the rest. Proportional columns gave the list two fifths of the screen -
+     a list of document titles two fifths of the screen wide, with the editor
+     squeezed into what was left. */
+  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
   gap: var(--space-5);
   align-items: start;
 }
+.collection-layout > * { min-width: 0; }
 @media (max-width: 1000px) {
   .collection-layout { grid-template-columns: minmax(0, 1fr); }
 }

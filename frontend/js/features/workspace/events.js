@@ -123,7 +123,7 @@ export function eventsDetail(ctx) {
       body: fold([head, rsvp], { tight: true }),
     }),
     card({ label: 'Attendance', glyph: 'users', body: fold([counts, people], { tight: true }), flush: true }),
-  ]);
+  ], { wide: true });
 
   const paintHead = () => {
     const zone = event.timezone || 'UTC';

@@ -421,7 +421,12 @@
  * On a desk the column is a column. On a narrow window it draws over the stage
  * instead, opened from the command bar and closed by the backdrop or Escape;
  * the inspector does the same. The line matches the media query in shell.js. */
-@media (max-width: 1080px) {
+/* The width below which the place column draws over the stage. It is the
+   same number as NARROW_WIDTH in frontend/js/shell.js, and the check in
+   frontend/tests/layout.test.js says so - a threshold in one place and not
+   the other is a sidebar that is visible in one half of the application and
+   not the other. */
+@media (max-width: 860px) {
   .cmdbar-nav { display: inline-grid; }
   .context {
     position: absolute; top: var(--cmdbar-h); bottom: 0; left: var(--rail-w); z-index: var(--z-nav);

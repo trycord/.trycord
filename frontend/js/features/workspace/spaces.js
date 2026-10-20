@@ -158,7 +158,7 @@ export function spacesDetail(ctx) {
             onClick: () => openReferencePicker(serverId, spaceId, load),
           }, icon('plus', { size: 14 }), 'Add a reference'))
         : null,
-    ]),
+    ], { wide: true }),
     onMount: load,
     cleanup() {},
   };
