@@ -75,7 +75,32 @@ async function save(patch, onDone) {
   if (onDone) onDone();
 }
 
+// A setting another interface owns.
+//
+// The value is shown, because a reader of this page wants to know what is in
+// force. It is not editable, because another page is where it is changed, and
+// two editors for one value is how a setting ends up saying one thing and
+// behaving like another. The link says where.
+function ownedRow(setting) {
+  return el('div', { class: 'settings-item settings-item--owned' },
+    el('div', { class: 'settings-item-main' },
+      el('p', { class: 'settings-item-label' }, setting.label,
+        el('span', { class: 'chip chip--quiet' },
+          'changed in ' + (setting.canonicalLabel || 'another page'))),
+      el('p', { class: 'settings-note' }, setting.description || ''),
+      el('p', { class: 'settings-note' },
+        'The value in force: ' + (setting.value === null || setting.value === undefined || setting.value === ''
+          ? 'not set'
+          : String(setting.value)))),
+    el('div', { class: 'settings-item-actions' },
+      el('a', {
+        class: 'btn btn--default btn--sm',
+        href: setting.canonicalRoute || '#',
+      }, 'Open ' + (setting.canonicalLabel || 'the page that changes it'))));
+}
+
 function settingRow(setting, onDone) {
+  if (setting.canonical) return ownedRow(setting);
   const note = el('p', { class: 'settings-note' }, setting.description || '');
   const control = settingField(setting, (patch) => save(patch, onDone));
   return el('div', { class: 'settings-item' + (setting.pendingRestart ? ' settings-item--pending' : '') },
