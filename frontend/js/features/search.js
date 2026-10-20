@@ -92,6 +92,10 @@ function filterBar(state, onChange) {
     },
     el('button', {
       class: 'filter-suggestion-button', type: 'button',
+      'aria-label': 'Use the filter ' + entry.key + (entry.value ? ':' + entry.value : ''),
+      // The field keeps the focus while a suggestion is being chosen, so the
+      // list is not taken away before the click lands on it.
+      onMousedown: (event) => { event.preventDefault(); },
       onClick: () => {
         field.value = entry.key + ':' + (entry.value || '');
         field.focus();

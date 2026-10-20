@@ -20,7 +20,7 @@ import {
 } from '../../../packages/search.js';
 import { empty, loading, failure, iconButton } from '../components.js';
 import { screen, section, actions, primaryButton, notice } from './util.js';
-import { sheet, toast } from '../ui.js';
+import { sheet, toast, confirm } from '../ui.js';
 import { relativeTime } from '../../../packages/format.js';
 
 const DEBOUNCE_MS = 260;
@@ -250,6 +250,13 @@ export function renderSearch(ctx) {
           el('span', { class: 'm-row__sub truncate' }, entry.query)),
           el('span', { class: 'm-row__actions' },
             iconButton('trash', 'Remove the saved search ' + entry.name, async () => {
+              const sure = await confirm({
+                title: 'Remove this saved search?',
+                text: entry.name + ' goes, and the search it names with it.',
+                confirmLabel: 'Remove',
+                danger: true,
+              });
+              if (!sure) return;
               try {
                 await removeSaved(entry.id);
                 toast('Saved search removed.', { type: 'success' });
@@ -349,6 +356,13 @@ export function renderSearch(ctx) {
   const clearButton = el('button', {
     class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
     onClick: async () => {
+      const sure = await confirm({
+        title: 'Clear the search history?',
+        text: 'Every query you have run is forgotten. The searches you saved stay.',
+        confirmLabel: 'Clear',
+        danger: true,
+      });
+      if (!sure) return;
       try {
         await clearHistory();
         toast('Search history cleared.', { type: 'success' });

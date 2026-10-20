@@ -19,7 +19,7 @@ import { toast, confirm, sheet } from '../ui.js';
 import theme, { currentTheme, setTheme, THEMES } from '../../../packages/theme.js';
 import locale from '../../../packages/locale.js';
 import { relativeTime } from '../../../packages/format.js';
-import { screen } from './util.js';
+import { screen, notice, primaryButton, ghostButton } from './util.js';
 
 // What each density means on a phone.
 const DENSITY_HINT = {

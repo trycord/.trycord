@@ -59,6 +59,7 @@ function itemRow(entry, collectionId, canEdit, onChanged) {
     node.querySelector('.cardrow-title').replaceChildren(el('a', {
       class: 'collection-link', href: entry.itemRef,
       target: '_blank', rel: 'noreferrer noopener',
+      'aria-label': title,
     }, title));
   }
   return node;
@@ -117,10 +118,15 @@ export function renderCollections(ctx) {
               class: 'btn btn--default btn--sm', type: 'button',
               onClick: () => renameCollection(found),
             }, 'Rename'),
-            el('button', {
-              class: 'btn btn--default btn--sm', type: 'button',
-              onClick: () => changeVisibility(found),
-            }, found.visibility === 'community' ? 'Make private' : 'Share with the community'),
+            found.visibility === 'community'
+              ? el('button', {
+                class: 'btn btn--default btn--sm', type: 'button',
+                onClick: () => changeVisibility(found),
+              }, 'Make private')
+              : el('button', {
+                class: 'btn btn--default btn--sm', type: 'button',
+                onClick: () => changeVisibility(found),
+              }, 'Share with the community'),
             el('button', {
               class: 'btn btn--danger btn--sm', type: 'button',
               onClick: () => deleteCollection(found),

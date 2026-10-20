@@ -17,7 +17,7 @@
 // member who left - and still holds the key they were given - is only cut
 // off when the epoch moves.
 
-import { randomBytes, b64, unb64 } from './bytes.js';
+import { randomBytes, unb64 } from './bytes.js';
 import { seal, open } from './sealing.js';
 import { canonical, GROUP_SEAL_INFO } from './protocol.js';
 
@@ -120,4 +120,3 @@ export async function keyForDevice(deps, options) {
   return { key, epoch: answer.epoch };
 }
 
-export { b64 };
