@@ -26,7 +26,7 @@ import { relativeTime } from '../../../packages/format.js';
 import {
   RSVP_STATUSES, RSVP_LABELS, ATTENDANCE_VISIBILITY_LABELS,
   PRIORITY_LABELS, STATUS_LABELS, POLL_SCORING_LABELS,
-  mayManageStructure, mayWriteDocuments, mayPost, mayActOn,
+  mayManageStructure, mayWriteDocuments, mayPost, mayActOn, paramId,
   formatInstant, readerZone, attendanceCounts, attendanceRows, bordaPoints,
   instantInZone,
 } from '../../../packages/workspace.js';
@@ -147,7 +147,7 @@ export function renderSpaces(ctx) {
 
 export function renderSpace(ctx) {
   const serverId = ctx.serverId;
-  const spaceId = ctx.params.spaceId;
+  const spaceId = paramId(ctx.params, 'space');
   const canManage = mayManageStructure(serverId);
   const host = el('div', { class: 'm-stack' });
   const node = screen(host);
@@ -254,7 +254,7 @@ export function renderDocuments(ctx) {
 
 export function renderDocument(ctx) {
   const serverId = ctx.serverId;
-  const documentId = ctx.params.documentId;
+  const documentId = paramId(ctx.params, 'document');
   const canWrite = mayWriteDocuments(serverId);
   const canComment = mayPost(serverId);
 
@@ -590,7 +590,7 @@ export function renderBoards(ctx) {
 
 export function renderBoard(ctx) {
   const serverId = ctx.serverId;
-  const boardId = ctx.params.boardId;
+  const boardId = paramId(ctx.params, 'board');
   const host = el('div', { class: 'm-stack' });
   const node = screen(host);
 
@@ -639,8 +639,8 @@ export function renderBoard(ctx) {
 
 export function renderCard(ctx) {
   const serverId = ctx.serverId;
-  const boardId = ctx.params.boardId;
-  const cardId = ctx.params.cardId;
+  const boardId = paramId(ctx.params, 'board');
+  const cardId = paramId(ctx.params, 'card');
   const host = el('div', { class: 'm-stack' });
   const node = screen(host);
 
@@ -731,7 +731,7 @@ export function renderEvents(ctx) {
 
 export function renderEvent(ctx) {
   const serverId = ctx.serverId;
-  const eventId = ctx.params.eventId;
+  const eventId = paramId(ctx.params, 'event');
   const canPost = mayPost(serverId);
   const me = State.user && State.user.id;
 
@@ -878,7 +878,7 @@ export function renderPolls(ctx) {
 
 export function renderPoll(ctx) {
   const serverId = ctx.serverId;
-  const pollId = ctx.params.pollId;
+  const pollId = paramId(ctx.params, 'poll');
   const canPost = mayPost(serverId);
   const me = State.user && State.user.id;
 

@@ -76,8 +76,7 @@ export function overviewSection(ctx) {
     });
     name.addEventListener('input', () => { form.set('name', name.value); refreshDirty(); });
     description.addEventListener('input', () => { form.set('description', description.value); refreshDirty(); });
-    form.set('name', community.name || '');
-    form.set('description', community.description || '');
+    form.load({ name: community.name || '', description: community.description || '' });
 
     const identityReport = reporter();
     const saveIdentity = async () => {
@@ -111,9 +110,11 @@ export function overviewSection(ctx) {
     const federatedToggle = switchControl(federated, (on) => {
       form.set('federated', on); refreshDirty();
     }, 'Federated with other instances');
-    form.set('isPublic', !!community.is_public);
-    form.set('isDiscoverable', !!community.is_discoverable);
-    form.set('federated', federated);
+    form.load({
+      isPublic: !!community.is_public,
+      isDiscoverable: !!community.is_discoverable,
+      federated,
+    });
 
     const reachReport = reporter();
     const saveReach = async () => {
@@ -158,8 +159,10 @@ export function overviewSection(ctx) {
       form.set('welcomeEnabled', on); refreshDirty();
     }, 'Show the welcome message');
     welcome.value = settingsText.welcomeContent || '';
-    form.set('welcomeContent', settingsText.welcomeContent || '');
-    form.set('welcomeEnabled', !!settingsText.welcomeEnabled);
+    form.load({
+      welcomeContent: settingsText.welcomeContent || '',
+      welcomeEnabled: !!settingsText.welcomeEnabled,
+    });
     welcome.addEventListener('input', () => { form.set('welcomeContent', welcome.value); refreshDirty(); });
 
     const welcomeReport = reporter();
@@ -188,7 +191,7 @@ export function overviewSection(ctx) {
       placeholder: 'The rules people agree to here',
     });
     guidelines.value = settingsText.guidelines || '';
-    form.set('guidelines', settingsText.guidelines || '');
+    form.load({ guidelines: settingsText.guidelines || '' });
     guidelines.addEventListener('input', () => { form.set('guidelines', guidelines.value); refreshDirty(); });
 
     const guidelinesReport = reporter();
@@ -225,8 +228,10 @@ export function overviewSection(ctx) {
     const interactionDocument = readDocument(settingsText.interactionSettings);
     notifications.value = notificationDocument.text;
     interactions.value = interactionDocument.text;
-    form.set('notificationDefaults', notificationDocument.text);
-    form.set('interactionSettings', interactionDocument.text);
+    form.load({
+      notificationDefaults: notificationDocument.text,
+      interactionSettings: interactionDocument.text,
+    });
     notifications.addEventListener('input', () => {
       form.set('notificationDefaults', notifications.value); refreshDirty();
     });

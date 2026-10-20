@@ -168,7 +168,16 @@ export function communityContext() {
   };
 }
 
+// The overlays that are open.
+//
+// The document is cleared first, so a dialog left open by an earlier check
+// is not mistaken for one this check raised.
+export function openOverlays() {
+  document.body.replaceChildren();
+  return [];
+}
+
 export default {
   installFetch, communityRoutes, callsTo, find, byText, buttonByText, buttons, inputs, type,
-  communityContext,
+  communityContext, openOverlays,
 };

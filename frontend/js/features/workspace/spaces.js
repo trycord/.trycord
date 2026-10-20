@@ -23,7 +23,7 @@ import Api from '../../../packages/api.js';
 import { State, channelsOf, refreshServerTree, isOwner } from '../../../packages/store.js';
 import { path } from '../../../packages/nav.js';
 import {
-  Workspace, SPACE_ITEM_LABELS, mayManageStructure,
+  Workspace, SPACE_ITEM_LABELS, mayManageStructure, paramId,
   spaceRoute, documentRoute, boardRoute,
 } from '../../../packages/workspace.js';
 
@@ -78,7 +78,7 @@ export function spacesList(ctx) {
 
 export function spacesDetail(ctx) {
   const serverId = ctx.serverId;
-  const spaceId = ctx.params.spaceId;
+  const spaceId = paramId(ctx.params, 'space');
   const canManage = mayManageStructure(serverId);
 
   if (!spaceId) {
