@@ -227,7 +227,21 @@ export async function readRow(row, conversationId) {
       unreadable: true,
     });
   }
-  const read = await open.readMessage(row, conversationId);
+  let read = null;
+  try {
+    read = await open.readMessage(row, conversationId);
+  } catch (error) {
+    // A row that cannot be parsed is a row that cannot be read. It is said
+    // so, rather than allowed to throw out of a render and take the
+    // conversation with it.
+    read = {
+      content: null,
+      encrypted: true,
+      unreadable: true,
+      reason: 'This message could not be opened on this device'
+        + (error && error.message ? ' (' + error.message + ')' : ''),
+    };
+  }
   return Object.assign({}, row, {
     content: read.unreadable ? read.reason : (read.content || ''),
     encrypted: read.encrypted,
@@ -257,6 +271,32 @@ export async function turnOn(conversationId) {
   await conversationState(conversationId);
   toast('This conversation is now encrypted');
   return published;
+}
+
+/**
+ * Upload a file into a conversation.
+ *
+ * An encrypted conversation takes encrypted files: the server refuses a
+ * message that carries a file it cannot read, so a file uploaded in the clear
+ * would leave the message unsent. The file is encrypted here, its key is
+ * sealed to each member device, and the server is handed the ciphertext and
+ * the seals - which it cannot open.
+ *
+ * A conversation that is not encrypted is uploaded the ordinary way.
+ */
+export async function upload(conversationId, file, post) {
+  const open = await ready();
+  if (!open) return post(file);
+  const answer = await open.conversationState(conversationId);
+  if (!answer || answer.state !== 'encrypted') return post(file);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const out = await open.uploadFile({
+    conversationId,
+    filename: file.name || 'attachment',
+    mime: file.type || 'application/octet-stream',
+    bytes,
+  });
+  return { id: out.id };
 }
 
 /**

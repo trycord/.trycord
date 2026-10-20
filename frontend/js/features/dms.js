@@ -150,7 +150,11 @@ export function renderDmConversation(ctx) {
     send: (payload) => encrypted.send(conversationId, payload, (body) => Api.sendDm(conversationId, body)),
     // The backend has always accepted an attachment on a direct message; the
     // composer simply never offered one.
-    upload: (file, onProgress) => Api.uploadDmAttachment(conversationId, file, onProgress),
+    upload: (file, onProgress) => encrypted.upload(
+      conversationId,
+      file,
+      (plainFile) => Api.uploadDmAttachment(conversationId, plainFile, onProgress),
+    ).then((out) => { if (onProgress) onProgress(1); return out; }),
     edit: (messageId, content) => Api.updateDm(conversationId, messageId, { content }),
     del: (messageId) => Api.deleteDm(conversationId, messageId),
     reactTo: (messageId, emoji) => Api.reactDm(conversationId, messageId, emoji),
@@ -241,13 +245,16 @@ export function renderDmConversation(ctx) {
   };
 
   const unsubs = [
-    on(EVENTS.DM_MESSAGE, (event) => {
+    // The row is opened before it is shown. An encrypted message arrives as
+    // an envelope with no text, and the text is in the envelope - so a row
+    // that is drawn as it arrives is an empty bubble.
+    on(EVENTS.DM_MESSAGE, async (event) => {
       if (String(event.conversationId) !== String(conversationId)) return;
-      surface.api.created(event);
+      surface.api.created(await encrypted.readRow(event, conversationId));
     }),
-    on(EVENTS.DM_MESSAGE_UPDATED, (event) => {
+    on(EVENTS.DM_MESSAGE_UPDATED, async (event) => {
       if (String(event.conversationId) !== String(conversationId)) return;
-      surface.api.updated(event);
+      surface.api.updated(await encrypted.readRow(event, conversationId));
     }),
     on(EVENTS.DM_MESSAGE_EMBEDS, (event) => {
       if (String(event.conversationId) !== String(conversationId)) return;

@@ -150,6 +150,12 @@ async function boot() {
 
   try {
     await loadSession();
+    // The device is registered as soon as the reader is signed in. A device
+    // that has never registered cannot hold a conversation key, so a
+    // conversation would sit in `mixed` rather than `encrypted` and every
+    // message in it would stay in the clear. A failure here is not fatal: the
+    // reader can still talk, and the encryption page says what went wrong.
+    encrypted.ready().catch(() => { /* the encryption page reports it */ });
   } catch {
     // A network failure is not a signed-out reader, but the login screen is the
     // only honest page to show until the instance answers again.

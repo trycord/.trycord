@@ -18,7 +18,14 @@ router.use(auth);
 
 router.get('/', async (req, res, next) => {
   try {
-    res.json(await servers.mine(req.user.id));
+    const list = await servers.mine(req.user.id);
+    // The federation flag is not part of the community list the service
+    // builds, so it is read here and attached to the answer: a community that
+    // has withdrawn from federation is one the client has to be able to say
+    // so rather than to guess at.
+    const flags = await federationFlags(list.map((row) => row.id));
+    for (const row of list) row.federated = flags.get(String(row.id)) !== false;
+    res.json(list);
   } catch (e) { next(e); }
 });
 
@@ -59,17 +66,56 @@ router.post('/join/:code', auth.requireVerified, rateLimit({ windowMs: 60000, ma
 router.get('/:id', resolveServer, requireMember, async (req, res, next) => {
   try {
     // req.access already holds this request's computed permission set.
-    res.json(await servers.detail(req.server.id, req.user.id, req.access && req.access.permissions));
+    const detail = await servers.detail(req.server.id, req.user.id, req.access && req.access.permissions);
+    const flags = await federationFlags([req.server.id]);
+    res.json(Object.assign(detail || {}, { federated: flags.get(String(req.server.id)) !== false }));
   } catch (e) { next(e); }
 });
 
+// The federation flag of the given communities.
+//
+// One query for the whole list: it is one column, and the answer is needed
+// for every community the client is holding. A community that is missing from
+// the answer is federated, because that is what a community is unless it has
+// said otherwise.
+async function federationFlags(serverIds) {
+  const ids = (serverIds || []).filter(Boolean);
+  if (!ids.length) return new Map();
+  const rows = await db.all(
+    'SELECT id, federated FROM servers WHERE id IN (' + ids.map(() => '?').join(',') + ')',
+    ids
+  );
+  const out = new Map();
+  for (const row of rows) out.set(String(row.id), !!row.federated);
+  return out;
+}
+
 router.patch('/:id', resolveServer, auth.requireVerified, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
   try {
-    const { name, description, isPublic, isDiscoverable } = req.body || {};
-    await servers.update(req.server.id, { name, description, isPublic, isDiscoverable });
+    const { name, description, isPublic, isDiscoverable, federated } = req.body || {};
+    if (federated !== undefined && typeof federated !== 'boolean') {
+      return fail(res, 'VALIDATION_ERROR', 'federated must be a boolean');
+    }
+    // The identity fields are the service's to write, because the name also
+    // decides the community's address. The federation flag is a column of
+    // its own and is written here, so that turning federation off does not
+    // have to touch anything else about the community.
+    const patch = {};
+    if (name !== undefined) patch.name = name;
+    if (description !== undefined) patch.description = description;
+    if (isPublic !== undefined) patch.isPublic = isPublic;
+    if (isDiscoverable !== undefined) patch.isDiscoverable = isDiscoverable;
+    if (Object.keys(patch).length) await servers.update(req.server.id, patch);
+    if (federated !== undefined) {
+      await db.run('UPDATE servers SET federated = ? WHERE id = ?', [federated ? 1 : 0, req.server.id]);
+    }
+    if (!Object.keys(patch).length && federated === undefined) {
+      return fail(res, 'VALIDATION_ERROR', 'Nothing to update');
+    }
     const detail = await servers.detail(req.server.id, req.user.id, req.access && req.access.permissions);
+    const flags = await federationFlags([req.server.id]);
     events.emit(req.server.id, 'server_updated', { server: { id: detail.id, name: detail.name } });
-    res.json(detail);
+    res.json(Object.assign(detail, { federated: flags.get(String(req.server.id)) !== false }));
   } catch (e) { serviceError(res, e); }
 });
 

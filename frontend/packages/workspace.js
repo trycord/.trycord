@@ -232,6 +232,58 @@ export function readerZone() {
   }
 }
 
+// The parts of an instant, as a named zone reads them.
+function zoneParts(date, timeZone) {
+  const options = {
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  };
+  if (timeZone) options.timeZone = timeZone;
+  const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);
+  const out = {};
+  for (const part of parts) out[part.type] = part.value;
+  // Some builds of the runtime write midnight as the twenty-fourth hour.
+  if (out.hour === '24') out.hour = '00';
+  return out;
+}
+
+// The wall-clock time of an instant in a named zone, in the form a date field
+// takes. The zone is the one the moment was written in, so the field shows the
+// time somebody actually wrote rather than the time it happens to be here.
+export function toZoneInput(value, timeZone) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = zoneParts(date, timeZone);
+  return parts.year + '-' + parts.month + '-' + parts.day + 'T' + parts.hour + ':' + parts.minute;
+}
+
+// The instant a wall-clock time in a named zone means.
+//
+// A due date is a moment everybody agrees on, so the time somebody typed is
+// read in the zone they wrote it in rather than in the zone the browser
+// happens to be in.
+export function instantInZone(value, timeZone) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  const asUtc = new Date(text.length === 16 ? text + ':00' : text);
+  if (Number.isNaN(asUtc.getTime())) return null;
+  const zone = timeZone || 'UTC';
+  const offset = (at) => {
+    const parts = zoneParts(at, zone);
+    const wall = Date.UTC(
+      Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+      Number(parts.hour), Number(parts.minute), Number(parts.second),
+    );
+    return wall - at.getTime();
+  };
+  const first = offset(asUtc);
+  let stamp = new Date(asUtc.getTime() - first);
+  const second = offset(stamp);
+  if (second !== first) stamp = new Date(asUtc.getTime() - second);
+  return stamp.toISOString();
+}
+
 // -- an event's attendance -----------------------------------------------------
 
 // The counts, whatever the names are withheld. The counts are public even when
@@ -431,6 +483,7 @@ export default {
   workspaceRoute, surfaceRoute, spaceRoute, documentRoute, boardRoute, cardRoute,
   eventRoute, pollRoute,
   mayManageStructure, mayWriteDocuments, mayPost, mayModerate, mayActOn,
-  formatInstant, readerZone, attendanceCounts, attendanceRows,
+  formatInstant, readerZone, toZoneInput, instantInZone,
+  attendanceCounts, attendanceRows,
   bordaPoints, preferByPosition,
 };

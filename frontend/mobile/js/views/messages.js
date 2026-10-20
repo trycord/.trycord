@@ -588,8 +588,12 @@ export function renderConversation(ctx, scope) {
   }, async (draft) => {
     const ids = [];
     for (const file of draft.files) {
-      const upload = isDm ? Api.uploadDmAttachment(scope.id, file) : Api.uploadAttachment(scope.id, file);
-      const out = await upload.promise;
+      const out = await encrypted.upload(scope.id, file, (plainFile) => {
+        const upload = isDm
+          ? Api.uploadDmAttachment(scope.id, plainFile)
+          : Api.uploadAttachment(scope.id, plainFile);
+        return upload.promise;
+      });
       const attachment = out && out.attachment ? out.attachment : out;
       if (attachment && attachment.id) ids.push(attachment.id);
     }
@@ -608,13 +612,17 @@ export function renderConversation(ctx, scope) {
   function subscribe() {
     offs.push(realtime.on('open', catchUp));
     if (isDm) {
-      offs.push(realtime.on(EVENTS.DM_MESSAGE, (frame) => {
+      offs.push(realtime.on(EVENTS.DM_MESSAGE, async (frame) => {
         if (String(frame.conversationId) !== String(scope.id)) return;
-        upsert(normalizeMessage(Object.assign({}, frame, { conversationId: scope.id })));
+        const opened = await encrypted.readRow(
+          Object.assign({}, frame, { conversationId: scope.id }), scope.id);
+        upsert(normalizeMessage(opened));
       }));
-      offs.push(realtime.on(EVENTS.DM_MESSAGE_UPDATED, (frame) => {
+      offs.push(realtime.on(EVENTS.DM_MESSAGE_UPDATED, async (frame) => {
         if (String(frame.conversationId) !== String(scope.id)) return;
-        upsert(normalizeMessage(Object.assign({}, frame, { conversationId: scope.id })));
+        const opened = await encrypted.readRow(
+          Object.assign({}, frame, { conversationId: scope.id }), scope.id);
+        upsert(normalizeMessage(opened));
       }));
       offs.push(realtime.on(EVENTS.DM_MESSAGE_DELETED, (frame) => { if (String(frame.conversationId) === String(scope.id)) remove(frame.id); }));
       offs.push(realtime.on(EVENTS.DM_MESSAGE_EMBEDS, (frame) => {
@@ -624,14 +632,15 @@ export function renderConversation(ctx, scope) {
       }));
       return;
     }
-    offs.push(realtime.on(EVENTS.MESSAGE, (frame) => {
+    offs.push(realtime.on(EVENTS.MESSAGE, async (frame) => {
       if (String(frame.channel_id) !== String(scope.id)) return;
-      upsert(normalizeMessage(frame));
+      upsert(normalizeMessage(await encrypted.readRow(frame, scope.id)));
     }));
-    offs.push(realtime.on(EVENTS.MESSAGE_UPDATED, (frame) => {
+    offs.push(realtime.on(EVENTS.MESSAGE_UPDATED, async (frame) => {
       if (String(frame.channel_id) !== String(scope.id)) return;
-      const known = find(frame.id);
-      if (known) upsert(Object.assign({}, known, frame));
+      const opened = await encrypted.readRow(frame, scope.id);
+      const known = find(opened.id);
+      if (known) upsert(Object.assign({}, known, normalizeMessage(opened)));
     }));
     offs.push(realtime.on(EVENTS.MESSAGE_DELETED, (frame) => { if (String(frame.channel_id) === String(scope.id)) remove(frame.id); }));
     offs.push(realtime.on(EVENTS.MESSAGE_REACTION, (frame) => {

@@ -9,6 +9,9 @@
 //
 //   1. Is the community public? A private community produces no outbound
 //      event at all, and is never listed in the discovery document.
+//      A community that has withdrawn from federation is answered the same
+//      way: it stays public and readable, but it produces no outbound event
+//      and it is not listed either.
 //   2. May the members of that community post in this channel? A channel
 //      whose permissions deny the community's members - a staff-only channel -
 //      produces no outbound event, whatever the sender may do in it.
@@ -76,14 +79,22 @@ async function memberPermissions(serverId, channelId) {
 // A private community is never federated. Not its messages, not its channel
 // list, not its name: it produces no outbound event of any kind, and the
 // discovery document does not mention it.
+//
+// A community may also withdraw from federation while staying public. It is
+// still readable, and it is still listed on Discover, but nothing is relayed
+// from it and other instances are not offered it. That is a switch the
+// community's own operator holds, and this is the one place that decides
+// what it means: every publication path asks this question, so there is no
+// second answer to it anywhere.
 async function communityMayFederate(serverId) {
   if (!serverId) return { ok: false, reason: 'no community' };
   const community = await db.get(
-    'SELECT id, is_public FROM servers WHERE id = ?',
+    'SELECT id, is_public, federated FROM servers WHERE id = ?',
     [serverId]
   );
   if (!community) return { ok: false, reason: 'the community does not exist' };
   if (!community.is_public) return { ok: false, reason: 'the community is private' };
+  if (!community.federated) return { ok: false, reason: 'the community has withdrawn from federation' };
   return { ok: true, community };
 }
 

@@ -17,9 +17,6 @@ function present(node, options) {
   document.body.appendChild(scrim);
   document.body.appendChild(node);
 
-  // Pulling a sheet down past the threshold dismisses it.
-  attachSheetDismiss(node, layer.close);
-
   const layer = {
     node,
     scrim,
@@ -37,6 +34,11 @@ function present(node, options) {
     },
   };
   stack.push(layer);
+
+  // Pulling a sheet down past the threshold dismisses it. The layer has to
+  // exist first: the gesture is the layer's own close, and a layer that is
+  // still being declared cannot be reached.
+  attachSheetDismiss(node, layer.close);
 
   scrim.addEventListener('click', () => layer.close());
   // Opening on the next frame lets the transition run from the off-screen position.

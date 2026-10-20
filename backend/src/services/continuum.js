@@ -308,6 +308,11 @@ async function setTrust(instanceId, trustStatus) {
 // ones, and only the channels the members may post in. A peer reads this
 // document to learn what can be federated with, and an operator reads it to
 // see what this instance exposes.
+//
+// A community that has withdrawn from federation is not among them, and not
+// among the channels it exposes: the rules decide, and the rules are asked
+// for every community in the list. So a community that is turned off leaves
+// this document without anything else having to know about it.
 async function discovery() {
   return {
     instance_id: identity.getInstanceId(),

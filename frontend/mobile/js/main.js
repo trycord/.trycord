@@ -118,6 +118,9 @@ async function boot() {
 
   try {
     await loadSession();
+    // The device is registered as soon as the reader is signed in: a device
+    // that has never registered cannot hold a conversation key.
+    encrypted.ready().catch(() => { /* the encryption page reports it */ });
   } catch {
     // A network failure is not a signed-out reader, but sign-in is the only honest
     // screen to show until the instance answers again.

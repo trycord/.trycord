@@ -295,8 +295,16 @@ router.get('/workflows/:workflowId/runs', auth, wrap(async (req, res) => {
   const workflow = await workflows.get(req.params.workflowId);
   if (!workflow) return fail(res, 'NOT_FOUND', 'that workflow does not exist');
   const admin = await isAdmin(req.user.id);
-  if (!admin && workflow.ownerId !== req.user.id && workflow.source !== 'extension') {
-    return fail(res, 'PERMISSION_DENIED', 'that workflow is not yours');
+  // The run history is the owner's business and the administrator's, and it is
+  // the same rule the single-run route already applies.
+  //
+  // An extension's workflow *definition* may be read by anybody - that is the
+  // design - but its history is not: a run records the event that woke it,
+  // and the payload of a message event carries the message. Leaving this open
+  // would make every message in a community with an extension installed
+  // readable by any signed-in account.
+  if (!admin && workflow.ownerId !== req.user.id) {
+    return fail(res, 'PERMISSION_DENIED', 'that run history is not yours');
   }
   res.json({ runs: await workflows.history(req.params.workflowId, req.query.limit) });
 }));

@@ -182,4 +182,24 @@ module.exports = (engine) => [
       updated_at    VARCHAR(64),
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
+
+  // Which media provider carries each live voice session.
+  //
+  // A call does not change provider halfway through: the session it started
+  // on is the session it finishes on. This row is what says so, and it is what
+  // lets a room that is already running keep its provider while the instance
+  // is configured to use another one.
+  //
+  // The row is per participant rather than per channel, because the two are
+  // not the same length of time: the last person to leave ends the call, and
+  // the next join starts a new one on whichever provider is then in force.
+  `CREATE TABLE IF NOT EXISTS voice_provider_sessions (
+      id          VARCHAR(64) PRIMARY KEY,
+      channel_id  VARCHAR(64) NOT NULL,
+      user_id     VARCHAR(64) NOT NULL,
+      provider    VARCHAR(32) NOT NULL,
+      joined_at   VARCHAR(64) NOT NULL,
+      left_at     VARCHAR(64),
+      UNIQUE (channel_id, user_id)
+    )${engine}`,
 ];

@@ -64,7 +64,7 @@ async function webhookDeliveries(req, res) {
 }
 
 async function webhookHealth(req, res) {
-  const report = await health.webhookHealth(req.params.webhookId);
+  const report = await health.webhookHealth(req.params.webhookId, req.server.id);
   if (!report) return fail(res, 'NOT_FOUND', 'webhook not found');
   res.json(report);
 }

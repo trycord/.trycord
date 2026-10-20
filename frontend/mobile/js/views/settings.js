@@ -20,6 +20,7 @@ import theme, { currentTheme, setTheme, THEMES } from '../../../packages/theme.j
 import locale from '../../../packages/locale.js';
 import { relativeTime } from '../../../packages/format.js';
 import { screen, notice, primaryButton, ghostButton } from './util.js';
+import { encryptionBody } from './encryption.js';
 
 // What each density means on a phone.
 const DENSITY_HINT = {
@@ -885,6 +886,7 @@ export function renderSettings(ctx) {
     'settings.security': securityBody,
     'settings.privacy': privacyBody,
     'settings.notifications': notificationsBody,
+    'settings.encryption': encryptionBody,
     'settings.appearance': appearanceBody,
     'settings.language': languageBody,
     'settings.backend': backendBody,

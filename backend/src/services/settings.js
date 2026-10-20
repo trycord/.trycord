@@ -148,8 +148,8 @@ const SCHEMA = [
   {
     key: 'voice.provider', env: 'VOICE_VIDEO_PROVIDER', type: 'string', default: 'mesh',
     category: 'voice', label: 'Media server provider',
-    description: 'mesh is this instance\'s own media path: peers connect to each other over WebRTC and the server carries the signalling, so nothing about a call leaves the host. It suits small rooms; media flows browser-to-browser and scales as the square of the room size. The hosted SFU this build used to offer is not offered here: a self-hosted instance should not have to send its voice to somebody else\'s server.',
-    allowed: ['mesh'], live: true, consequential: true,
+    description: 'The path a call takes. Mesh: this instance\'s own peer-to-peer path - the media travels between the participants and the server carries the signalling, so a call does not leave the host. Cloudflare Realtime: the media is carried by Cloudflare\'s SFU. Third-party SFU: a media server the operator runs. Each provider keeps its own settings, so switching between them does not erase what was saved for the other one.',
+    allowed: ['mesh', 'cloudflare', 'sfu'], live: true, consequential: true,
   },
   {
     key: 'search.provider', env: 'SEARCH_PROVIDER', type: 'string', default: 'in-house',
@@ -200,42 +200,137 @@ const SCHEMA = [
     allowed: ['in-house'], live: false,
   },
   {
-    key: 'voice.maxParticipants', env: 'VOICE_VIDEO_MAX_PARTICIPANTS', type: 'integer', default: 25,
-    category: 'voice', label: 'Participants per channel',
-    description: 'Enforced before a session is created, so a full channel refuses rather than dropping someone.',
-    min: 1, max: 200, live: true,
-  },
-  {
     key: 'voice.screenSharing', env: 'VOICE_VIDEO_SCREEN_SHARING', type: 'boolean', default: true,
     category: 'voice', label: 'Allow screen sharing',
     description: 'Cannot be on while voice itself is off.',
     live: true,
   },
   {
-    key: 'voice.stunUrls', env: 'VOICE_VIDEO_STUN_URLS', type: 'list', default: [],
-    category: 'voice', label: 'STUN servers',
-    description: 'Comma-separated. At least one STUN server or a TURN URL is required when voice is on.',
+    key: 'voice.stageChannels', env: 'VOICE_VIDEO_STAGE_CHANNELS', type: 'boolean', default: true,
+    category: 'voice', label: 'Allow stage channels',
+    description: 'A stage is a voice channel where an audience listens and a moderator brings speakers up.',
     live: true,
-    showIf: { key: 'voice.provider', value: 'cloudflare' },
   },
-  // The media server credential and the TURN relay. These used to be environment-only,
-  // read once at startup, which meant an operator who had already set up the instance
-  // still had to edit a file on the server and restart to turn voice on. They are read
-  // from the store at call time now, so the console is enough. The two credentials
-  // (voice.sfuAppSecret, voice.turnCredential) are declared in SECRETS below.
+
+  // ---- the media providers.
+  //
+  // Each provider owns its own settings, so choosing a different one cannot
+  // erase what was saved for the one before it. The group is deliberately kept
+  // apart from the shared settings above: the console shows the provider first
+  // and then only that provider's fields.
+  //
+  // These entries live in a category the catalogue does not publish, because
+  // the Voice and video console renders them per provider - a flat list of
+  // three providers' settings would say nothing about which one is in force.
+  {
+    key: 'voice.mesh.maxParticipants', env: 'VOICE_VIDEO_MESH_MAX_PARTICIPANTS', type: 'integer', default: 6,
+    category: 'voice-media', label: 'Participants per mesh room',
+    description: 'The media travels between every participant, so the room is small. Six keeps the CPU and the bandwidth of a small host predictable.',
+    min: 1, max: 200, live: true,
+  },
+  {
+    key: 'voice.mesh.stunUrls', env: 'VOICE_VIDEO_MESH_STUN_URLS', type: 'list', default: [],
+    category: 'voice-media', label: 'STUN servers for the mesh',
+    description: 'Comma-separated. Leave empty to use the STUN server this instance runs itself.',
+    live: true,
+  },
+  {
+    key: 'voice.mesh.turnUrl', env: 'VOICE_VIDEO_MESH_TURN_URL', type: 'string', default: '',
+    category: 'voice-media', label: 'TURN server for the mesh',
+    description: 'Relays media for a peer that cannot be reached directly. Leave empty to use the relay this instance runs itself.',
+    live: true,
+  },
+  {
+    key: 'voice.mesh.turnUsername', env: 'VOICE_VIDEO_MESH_TURN_USERNAME', type: 'string', default: '',
+    category: 'voice-media', label: 'TURN username for the mesh',
+    description: 'For a static TURN credential. Leave blank to use the short-lived credential this instance mints.',
+    live: true,
+  },
+  {
+    key: 'voice.cloudflare.appId', env: 'VOICE_VIDEO_CLOUDFLARE_APP_ID', type: 'string', default: '',
+    category: 'voice-media', label: 'Cloudflare application id',
+    description: 'From the Cloudflare Realtime dashboard. Required when the Cloudflare provider is the one in force.',
+    live: true,
+  },
+  {
+    key: 'voice.cloudflare.endpoint', env: 'VOICE_VIDEO_CLOUDFLARE_ENDPOINT', type: 'string', default: 'https://rtc.live.cloudflare.com/v1',
+    category: 'voice-media', label: 'Cloudflare Realtime endpoint',
+    description: 'Where the media sessions are created. Change it only for a self-hosted Realtime deployment.',
+    live: true,
+  },
+  {
+    key: 'voice.cloudflare.maxParticipants', env: 'VOICE_VIDEO_CLOUDFLARE_MAX_PARTICIPANTS', type: 'integer', default: 25,
+    category: 'voice-media', label: 'Participants per channel (Cloudflare)',
+    description: 'Enforced before a session is created, so a full channel refuses rather than dropping someone.',
+    min: 1, max: 200, live: true,
+  },
+  {
+    key: 'voice.sfu.endpoint', env: 'VOICE_VIDEO_SFU_ENDPOINT', type: 'string', default: '',
+    category: 'voice-media', label: 'Third-party SFU endpoint',
+    description: 'The base URL of a media server that speaks the documented session API. Required when the third-party provider is the one in force.',
+    live: true,
+  },
+  {
+    key: 'voice.sfu.stunUrls', env: 'VOICE_VIDEO_SFU_STUN_URLS', type: 'list', default: [],
+    category: 'voice-media', label: 'STUN servers for the third-party SFU',
+    description: 'Comma-separated. The SFU sends its own candidates; these are for the browser\'s own.',
+    live: true,
+  },
+  {
+    key: 'voice.sfu.turnUrl', env: 'VOICE_VIDEO_SFU_TURN_URL', type: 'string', default: '',
+    category: 'voice-media', label: 'TURN server for the third-party SFU',
+    description: 'Relays media for a peer that cannot be reached directly.',
+    live: true,
+  },
+  {
+    key: 'voice.sfu.turnUsername', env: 'VOICE_VIDEO_SFU_TURN_USERNAME', type: 'string', default: '',
+    category: 'voice-media', label: 'TURN username for the third-party SFU',
+    description: 'For a static TURN credential. Leave blank if the media server mints short-lived ones.',
+    live: true,
+  },
+  {
+    key: 'voice.sfu.maxParticipants', env: 'VOICE_VIDEO_SFU_MAX_PARTICIPANTS', type: 'integer', default: 25,
+    category: 'voice-media', label: 'Participants per channel (third-party SFU)',
+    description: 'Enforced before a session is created, so a full channel refuses rather than dropping someone.',
+    min: 1, max: 200, live: true,
+  },
+
+  // ---- the settings the grouped ones replace.
+  //
+  // These are the keys the previous release used. They still work: a value
+  // saved here is the value the matching new key takes, until the operator
+  // saves that provider's configuration and the new key takes over. They are
+  // not published in the catalogue, because the console edits the new keys and
+  // an operator should not be shown two fields for one value.
+  {
+    key: 'voice.maxParticipants', env: 'VOICE_VIDEO_MAX_PARTICIPANTS', type: 'integer', default: 25,
+    category: 'voice-legacy', label: 'Participants per channel (superseded)',
+    description: 'Replaced by the limit of the provider in force. Still read when that provider has no limit of its own.',
+    min: 1, max: 200, live: true,
+  },
+  {
+    key: 'voice.stunUrls', env: 'VOICE_VIDEO_STUN_URLS', type: 'list', default: [],
+    category: 'voice-legacy', label: 'STUN servers (superseded)',
+    description: 'Replaced by the mesh\'s own STUN servers, because the mesh was the only path that could run.',
+    live: true,
+  },
   {
     key: 'voice.sfuAppId', env: 'VOICE_VIDEO_SFU_APP_ID', type: 'string', default: '',
-    category: 'voice', label: 'Media server app ID',
-    description: 'From the Cloudflare Realtime SFU dashboard. Required when voice is on and provider is Cloudflare.',
+    category: 'voice-legacy', label: 'Media server app id (superseded)',
+    description: 'Replaced by the Cloudflare application id.',
     live: true,
-    showIf: { key: 'voice.provider', value: 'cloudflare' },
   },
   {
     key: 'voice.turnUrl', env: 'VOICE_VIDEO_TURN_URL', type: 'string', default: '',
-    category: 'voice', label: 'TURN server URL',
-    description: 'Relays media for clients behind a symmetric NAT or a UDP-blocking firewall. A STUN server alone is often not enough.',
+    category: 'voice-legacy', label: 'TURN server URL (superseded)',
+    description: 'Replaced by the mesh\'s own TURN server.',
     live: true,
-    showIf: { key: 'voice.provider', value: 'cloudflare' },
+  },
+  {
+    key: 'voice.turnUsername', env: 'VOICE_VIDEO_TURN_USERNAME', type: 'string', default: '',
+    category: 'voice-legacy', label: 'TURN username (superseded)',
+    description: 'Replaced by the mesh\'s own TURN username.',
+    live: true,
   },
   {
     key: 'continuum.enabled', env: 'CONTINUUM_ENABLED', type: 'boolean', default: false,
@@ -245,15 +340,8 @@ const SCHEMA = [
   },
   {
     key: 'voice.turnUsername', env: 'VOICE_VIDEO_TURN_USERNAME', type: 'string', default: '',
-    category: 'voice', label: 'TURN username',
-    description: 'For a static TURN credential. Leave blank if the provider mints short-lived ones.',
-    live: true,
-    showIf: { key: 'voice.provider', value: 'cloudflare' },
-  },
-  {
-    key: 'voice.stageChannels', env: 'VOICE_VIDEO_STAGE_CHANNELS', type: 'boolean', default: true,
-    category: 'voice', label: 'Allow stage channels',
-    description: 'A stage is a voice channel where an audience listens and a moderator brings speakers up.',
+    category: 'voice-legacy', label: 'TURN username (superseded)',
+    description: 'Replaced by the mesh\'s own TURN username.',
     live: true,
   },
 
@@ -553,6 +641,10 @@ const SECRETS = new Set([
   'storage.s3SecretKey',
   'voice.sfuAppSecret',
   'voice.turnCredential',
+  'voice.mesh.turnCredential',
+  'voice.cloudflare.appSecret',
+  'voice.sfu.token',
+  'voice.sfu.turnCredential',
 ]);
 
 // Settings that cannot be changed from the dashboard at all, with the reason. Listed
@@ -609,14 +701,38 @@ const SECRET_META = {
   },
   'voice.sfuAppSecret': {
     env: 'VOICE_VIDEO_SFU_APP_SECRET',
-    label: 'Media server app secret',
-    category: 'voice',
-    description: 'Issued with the app ID and used to create media sessions. Stored encrypted and never shown again.',
+    label: 'Media server app secret (superseded)',
+    category: 'voice-legacy',
+    description: 'Replaced by the Cloudflare application secret. Stored encrypted and never shown again.',
   },
   'voice.turnCredential': {
     env: 'VOICE_VIDEO_TURN_CREDENTIAL',
-    label: 'TURN credential',
-    category: 'voice',
+    label: 'TURN credential (superseded)',
+    category: 'voice-legacy',
+    description: 'Replaced by the mesh\'s own TURN credential. Stored encrypted and never shown again.',
+  },
+  'voice.mesh.turnCredential': {
+    env: 'VOICE_VIDEO_MESH_TURN_CREDENTIAL',
+    label: 'TURN credential for the mesh',
+    category: 'voice-media',
+    description: 'The password half of a static TURN credential. Leave blank to use the short-lived credential this instance mints. Stored encrypted and never shown again.',
+  },
+  'voice.cloudflare.appSecret': {
+    env: 'VOICE_VIDEO_CLOUDFLARE_APP_SECRET',
+    label: 'Cloudflare application secret',
+    category: 'voice-media',
+    description: 'Issued with the application id and used to create media sessions. Stored encrypted and never shown again.',
+  },
+  'voice.sfu.token': {
+    env: 'VOICE_VIDEO_SFU_TOKEN',
+    label: 'Third-party SFU token',
+    category: 'voice-media',
+    description: 'The bearer token the media server expects. Stored encrypted and never shown again.',
+  },
+  'voice.sfu.turnCredential': {
+    env: 'VOICE_VIDEO_SFU_TURN_CREDENTIAL',
+    label: 'TURN credential for the third-party SFU',
+    category: 'voice-media',
     description: 'The password half of a static TURN credential. Stored encrypted and never shown again.',
   },
 };
@@ -659,6 +775,15 @@ const CATEGORIES = [
   { id: 'retention', label: 'Retention and cleanup' },
   { id: 'deployment', label: 'Server and deployment' },
 ];
+
+// The voice settings that are not published here.
+//
+// 'voice-media' holds the settings each media provider owns, and 'voice-legacy'
+// holds the settings the grouped ones replaced. Neither category is listed
+// above, so neither appears in this catalogue: the Voice and video console
+// renders the providers one at a time, and the older keys are read as a
+// fallback rather than shown as a second field for the same value. The keys
+// are still real settings - they are saved, validated and read like any other.
 
 // The live values, and where each came from. Loaded at boot, re-read after a save.
 const store = {
@@ -898,6 +1023,15 @@ async function save(entries, adminId) {
   const screenSharing = entries['voice.screenSharing'];
   const voiceEnabled = store.values['voice.enabled'];
 
+  // The provider a save would leave in force. A save may be changing it, so
+  // the pending value is read before the stored one.
+  const providerAfter = () => {
+    const pending = entries['voice.provider'];
+    const chosen = pending === undefined ? store.values['voice.provider'] : pending;
+    const id = String(chosen || 'mesh').trim().toLowerCase();
+    return ['mesh', 'cloudflare', 'sfu'].indexOf(id) === -1 ? 'mesh' : id;
+  };
+
   for (const [key, raw] of Object.entries(entries)) {
     const entry = BY_KEY.get(key);
     if (!entry) { problems.push(key + ': unknown setting'); continue; }
@@ -912,10 +1046,13 @@ async function save(entries, adminId) {
         continue;
       }
       if (raw === null || raw === undefined) {
-        // Clearing the credential voice depends on while it is on would leave a live
+        // Clearing the credential the provider in force depends on would leave a live
         // capability with no way to create a session. Refused here, so the fix is to turn
-        // voice off first rather than to discover it at the next join.
-        if (key === 'voice.sfuAppSecret' && store.values['voice.enabled'] === true) {
+        // voice off first rather than to discover it at the next join. The credential of
+        // a provider that is not in force can be cleared: nothing depends on it now.
+        const voiceConfig = require('./voice/config');
+        if (store.values['voice.enabled'] === true
+          && voiceConfig.isRequiredSecret(providerAfter(), key)) {
           problems.push(key + ': cannot be cleared while voice and video is on');
           continue;
         }
@@ -955,31 +1092,30 @@ async function save(entries, adminId) {
     const w = pending(key);
     return w ? w.value : store.values[key];
   };
-  const secretAfter = (key) => {
-    const w = pending(key);
-    if (w) return !!w.value;
-    if (store.sources[key] === 'environment') return true;
-    return !!secretValues[key];
-  };
   const voiceOnAfter = after('voice.enabled') === true;
+  const voiceWasOn = store.values['voice.enabled'] === true;
   const voiceProviderAfter = String(after('voice.provider') || 'mesh');
-  if (voiceOnAfter) {
-    // ICE is not a provider preference: without a STUN or a TURN address the
-    // peers cannot find each other across a NAT, and a call that cannot connect
-    // is worse than a refusal. This applies to every provider, which is why it
-    // used to be inside one provider's branch and quietly did nothing for the
-    // others.
-    const stun = after('voice.stunUrls');
-    const turnUrl = String(after('voice.turnUrl') || '');
-    const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turnUrl;
-    if (!hasIce) {
-      problems.push('voice.stunUrls: at least one STUN server or a TURN URL is required when voice is on');
-    }
-    // The hosted SFU's own credentials, when that provider is the one in force.
-    if (voiceProviderAfter === 'cloudflare') {
-      const appId = String(after('voice.sfuAppId') || '');
-      if (!appId) problems.push('voice.sfuAppId: required when voice and video is on with the Cloudflare provider');
-      if (!secretAfter('voice.sfuAppSecret')) problems.push('voice.sfuAppSecret: required when voice and video is on with the Cloudflare provider');
+  if (voiceOnAfter && !voiceWasOn) {
+    // Turning voice on needs the infrastructure the provider in force will use.
+    // The check runs after the batch is validated so a single save can set the
+    // switch and the credentials together, and it reads the pending values first,
+    // falling back to what is already stored. Without it a save would report
+    // success, the dashboard would show a green tick, and the first join would be
+    // the first sign that nothing worked.
+    //
+    // The requirements are the provider's own: a mesh needs no SFU credential,
+    // and the Cloudflare path needs an application id and a secret.
+    //
+    // A provider that is changed while voice is already on is not held to the
+    // same rule: the operator may be moving to a path they are about to
+    // configure, and a call that starts on a provider that is not ready is
+    // refused at the session with a list of what is missing.
+    const overlay = {};
+    for (const w of writes) overlay[w.key] = w.value;
+    const voiceConfig = require('./voice/config');
+    for (const problem of voiceConfig.missing(voiceProviderAfter, overlay)) {
+      problems.push(problem + ' (required when voice and video is on with the '
+        + voiceProviderAfter + ' provider)');
     }
     if (problems.length) return { ok: false, problems };
   }
@@ -1049,6 +1185,10 @@ async function save(entries, adminId) {
   // that were in force a moment ago.
   try { require('./mail').invalidate(); } catch { /* the mail service is optional at boot */ }
 
+  // What the voice providers answered about themselves is no longer true: a
+  // changed endpoint or a rotated credential changes what a check would find.
+  try { require('./voice/diagnostics').invalidate(); } catch { /* the voice service is optional at boot */ }
+
   notePending(writes);
   return { ok: true, changed: Object.keys(before), pendingRestart: Array.from(store.pendingRestart) };
 }
@@ -1107,6 +1247,7 @@ async function reset(key, adminId) {
   await load(true);
   try { require('../features').reload(); } catch { /* refused by reload, which is correct */ }
   try { require('./mail').invalidate(); } catch { /* the mail service is optional at boot */ }
+  try { require('./voice/diagnostics').invalidate(); } catch { /* the voice service is optional at boot */ }
   return { ok: true, key, source: store.sources[key] };
 }
 

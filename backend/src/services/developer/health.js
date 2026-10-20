@@ -49,11 +49,19 @@ async function keyHealth(key, { minutes = 60 } = {}) {
 /**
  * The health of one webhook, from its delivery log.
  *
+ * The webhook is looked up in the community the caller named: a manager of one
+ * community has no business reading the delivery log of another one's
+ * webhook, and the delivery log says what was delivered and what the endpoint
+ * answered.
+ *
  * @param {string} webhookId
+ * @param {string} serverId the community the webhook has to belong to
  * @returns {Promise<object|null>}
  */
-async function webhookHealth(webhookId) {
-  const hook = await db.get('SELECT * FROM webhooks WHERE id = ?', [webhookId]);
+async function webhookHealth(webhookId, serverId) {
+  const hook = await db.get(
+    'SELECT * FROM webhooks WHERE id = ? AND server_id = ?', [webhookId, String(serverId)]
+  );
   if (!hook) return null;
   const rows = await db.all(
     'SELECT id, event_type, status, status_code, error, created_at FROM webhook_deliveries'

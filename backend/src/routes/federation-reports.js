@@ -44,12 +44,13 @@ router.get('/mine', auth, rateLimit(30), async (req, res, next) => {
 });
 
 // One report of this reader's own.
+//
+// The report is the reporter's: an id that names somebody else's report is
+// not found, so the answer does not say that the id exists. The direction
+// check is in the service, next to the reporter filter.
 router.get('/mine/:id', auth, rateLimit(30), async (req, res, next) => {
   try {
-    const report = await reports.get(req.params.id);
-    if (report.direction !== 'outbound') {
-      return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'no such report' } });
-    }
+    const report = await reports.get(req.params.id, { reporterId: req.user.id });
     res.json(report);
   } catch (e) { serviceError(res, e); }
 });
