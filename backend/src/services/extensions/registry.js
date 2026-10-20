@@ -76,19 +76,64 @@ function readLocalDirectory(dir) {
   return documents;
 }
 
+/**
+ * Fetch a registry document from an address the operator configured.
+ *
+ * The address is the operator's own, so a mirror on a private network is a
+ * legitimate choice - and the guard has to allow it without becoming a way
+ * into the instance's own network. The rules:
+ *
+ *   - the address is checked with the same guard every other outbound fetch
+ *     in the product uses, so credentials in the URL, a scheme that is not
+ *     http(s), the cloud metadata host and a name that resolves into a
+ *     private range are all refused;
+ *   - a redirect is followed **one hop at a time and each hop is checked
+ *     again**, because a redirect to a forbidden address is the easiest way
+ *     past a check on the address the operator typed;
+ *   - the operator can opt into a private mirror with
+ *     `TRYCORD_REGISTRY_ALLOW_PRIVATE=on`, the same way the federation's
+ *     private peers are opted into.
+ */
 async function readRemote(url) {
-  const response = await fetch(url, {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    headers: { accept: 'application/json', 'user-agent': 'Trycord-Registry/1.0' },
-  });
-  if (!response.ok) throw new Error('the registry answered ' + response.status);
-  const text = await response.text();
-  if (text.length > MAX_DOCUMENT_BYTES) throw new Error('the registry document is too large');
-  const parsed = JSON.parse(text);
-  if (Array.isArray(parsed)) return parsed;
-  if (parsed && Array.isArray(parsed.extensions)) return parsed.extensions;
-  throw new Error('the registry document is not a list of packages');
+  const privateAllowed = /^(1|on|yes|true)$/i.test(
+    String(process.env.TRYCORD_REGISTRY_ALLOW_PRIVATE || '').trim());
+
+  let target = url;
+  for (let hop = 0; hop <= 3; hop++) {
+    const guard = require('../netguard');
+    const checked = guard.validateOrigin(target, {
+      allowLocalhost: privateAllowed,
+      allowInsecure: privateAllowed,
+    });
+    const host = new URL(checked).hostname;
+    if (await guard.resolvesToPrivate(host, { allowLocalhost: privateAllowed })) {
+      throw new Error('the registry address resolves to a private network');
+    }
+
+    const response = await fetch(checked, {
+      // Each hop is checked above, so the redirect is followed rather than
+      // refused - but only after the new address has been through the guard.
+      redirect: 'manual',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: { accept: 'application/json', 'user-agent': 'Trycord-Registry/1.0' },
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) throw new Error('the registry redirected with no address');
+      target = new URL(location, checked).toString();
+      continue;
+    }
+
+    if (!response.ok) throw new Error('the registry answered ' + response.status);
+    const text = await response.text();
+    if (text.length > MAX_DOCUMENT_BYTES) throw new Error('the registry document is too large');
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.extensions)) return parsed.extensions;
+    throw new Error('the registry document is not a list of packages');
+  }
+  throw new Error('the registry redirected too many times');
 }
 
 // ---- normalisation --------------------------------------------------------

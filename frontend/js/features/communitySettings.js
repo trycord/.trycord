@@ -1,109 +1,99 @@
 // The community settings studio.
 //
-// These are the sections only the setting surface needs: identity, appearance,
-// channels, moderation, ownership, analytics and integrations. The access
-// sections (members, roles, invites, categories) are real pages of their own in
-// community.js and are reached from that module's registry, so one set of
-// renderers exists rather than two that disagree.
+// A console rather than a page: a rail of the sections on the left, the
+// section itself on the right. The sections are the ones the registry
+// promises, and the four access sections - members, roles, invites and
+// categories - are the community's own pages, drawn by community.js and
+// composed here, so there is one implementation of each rather than two that
+// disagree about what a role is.
+//
+// What the console can reach is written down once, in the shared catalogue
+// (packages/communitySettings.js): the sections, the routes that configure a
+// community, and the calls the platform's API module does not carry. That
+// catalogue is what the parity check reads, so a route the server offers and
+// the console does not reach is a route nobody can reach.
+//
+// The rail is the console's own navigation, and it is the place where the
+// unsaved-changes warning happens: leaving a section with something typed
+// into it asks first.
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import Api from '../../packages/api.js';
-import {
-  State, nameOf, refreshServer, refreshServerTree, refreshServerMembers, isOwner, serverById,
-  isMuted,
-} from '../../packages/store.js';
-import { navigate } from '../../packages/nav.js';
+import { path, navigate } from '../../packages/nav.js';
+import { confirmDialog } from '../ui/overlays.js';
+import { head, card, row, blank, fault, fold, facts } from '../ui/page.js';
 import { switchControl, fieldRow, bannerNode, channelIcon, serverMark } from '../ui/primitives.js';
-import { head, card, row, blank, fault, fold, facts, hold } from '../ui/page.js';
-import { errorToast, toast, confirmDialog } from '../ui/overlays.js';
+import { errorToast, toast } from '../ui/overlays.js';
 import { copyText } from '../ui/clipboard.js';
+import {
+  State, nameOf, refreshServer, refreshServerTree, refreshServerMembers, isOwner,
+} from '../../packages/store.js';
+import { communitySectionGroups } from '../../packages/communitySettings.js';
 import {
   openChannelDialog, renameChannel, deleteChannel, channelMenuItems,
   reorderChannels, orderAfterDrop, attachDragOrder,
 } from '../community/manage.js';
+import { overviewSection } from './communitySettings/overview.js';
+import { moderationSection } from './communitySettings/moderation.js';
+import { integrationsSection } from './communitySettings/integrations.js';
+import { voiceSection } from './communitySettings/voice.js';
+import {
+  membersSection, rolesSection, invitesSection, categoriesSection,
+} from './communitySettings/access.js';
 
-const isOwnerOf = isOwner;
+// -- the rail -----------------------------------------------------------------
 
-// -- identity -------------------------------------------------------------------
-
-function overviewSection(ctx) {
-  const serverId = ctx.serverId;
-  const server = serverById(serverId) || State.serverDetail.get(serverId)
-    || { name: 'Community', description: '' };
-
-  const name = el('input', {
-    class: 'input', type: 'text', value: server.name || '',
-    'aria-label': 'Community name',
-  });
-  const description = el('input', {
-    class: 'input', type: 'text', value: server.description || '',
-    'aria-label': 'What the community is about',
-    placeholder: 'One sentence on what this place is for',
-  });
-  const guidelines = el('textarea', {
-    class: 'input', rows: '4', 'aria-label': 'Community guidelines',
-    placeholder: 'The rules people agree to here',
-  });
-  const status = el('p', { class: 'form-error', role: 'status' });
-
-  // This instance has no endpoint that reads the community settings back, so
-  // the guidelines cannot be shown as they stand. An empty field that is saved
-  // unchanged would therefore wipe the rules the community has, so the field
-  // is only written once it has actually been edited.
-  let guidelinesEdited = false;
-  guidelines.addEventListener('input', () => { guidelinesEdited = true; });
-
-  const saveIdentity = async () => {
-    try {
-      await Api.updateServer(serverId, { name: name.value.trim(), description: description.value.trim() });
-      status.textContent = 'Identity saved';
-    } catch (e) { errorToast(e); }
-  };
-  const saveGuidelines = async () => {
-    if (!guidelinesEdited) {
-      status.textContent = 'The guidelines are unchanged, so nothing was written.';
-      return;
+// The rail of sections.
+//
+// A section with unsaved changes is left only after the reader is asked: the
+// link is an ordinary link, so it can be opened in a new tab and copied, but
+// a click that would throw the typing away is a click that asks first.
+function studioRail(serverId, activeId, isDirty) {
+  const rail = el('nav', { class: 'studionav', 'aria-label': 'Community settings' });
+  for (const group of communitySectionGroups()) {
+    rail.appendChild(el('p', { class: 'studionav-group' }, group.group));
+    for (const section of group.items) {
+      const href = path('/server/' + serverId + '/settings/' + section.id);
+      const link = el('a', {
+        class: 'studionav-link' + (section.id === activeId ? ' studionav-link--active' : ''),
+        href,
+        'aria-current': section.id === activeId ? 'page' : null,
+      },
+      icon(section.icon, { size: 16 }),
+      el('span', { class: 'studionav-label' }, section.label));
+      link.addEventListener('click', (event) => {
+        if (section.id === activeId) return;
+        if (!isDirty || !isDirty()) return;
+        event.preventDefault();
+        confirmDialog({
+          title: 'Leave with unsaved changes?',
+          body: 'What you have typed here has not been saved. Leaving now loses it.',
+          confirmLabel: 'Leave anyway',
+          danger: true,
+        }).then((yes) => { if (yes) navigate('/server/' + serverId + '/settings/' + section.id); });
+      });
+      rail.appendChild(link);
     }
-    try {
-      await Api.updateServerSettings(serverId, { guidelines: guidelines.value });
-      guidelinesEdited = false;
-      status.textContent = 'Guidelines saved';
-    } catch (e) { errorToast(e); }
-  };
+  }
+  return rail;
+}
 
+// A section, inside the console.
+//
+// The section keeps its own lifecycle - { node, onMount, cleanup } - and may
+// also say whether it is dirty. The rail is drawn around it, never instead of
+// it.
+function studioSection(ctx, sectionId, build) {
+  const view = build(ctx);
+  const node = view && view.node ? view.node : view;
+  const framed = el('div', { class: 'studio' },
+    studioRail(ctx.serverId, sectionId, view && view.isDirty),
+    el('div', { class: 'studio-stage' }, node));
   return {
-    node: fold([
-      head({
-        kicker: 'Community',
-        title: 'Community settings',
-        lede: 'The face and the welcome of this place.',
-        actions: null,
-      }),
-      card({
-        label: 'Identity', glyph: 'grid',
-        body: fold([
-          name,
-          description,
-          el('button', {
-            class: 'btn btn--primary btn--sm', type: 'button', onClick: saveIdentity,
-          }, 'Save identity'),
-        ]),
-      }),
-      card({
-        label: 'Guidelines', glyph: 'book',
-        body: fold([
-          guidelines,
-          el('p', { class: 'form-note' },
-            'This instance cannot show the rules as they stand, so write them out again to change them.'),
-          el('button', {
-            class: 'btn btn--default btn--sm', type: 'button', onClick: saveGuidelines,
-          }, 'Save guidelines'),
-          status,
-        ]),
-      }),
-    ]),
-    onMount: null,
+    node: framed,
+    onMount: view && view.onMount,
+    cleanup: view && view.cleanup,
+    isDirty: view && view.isDirty,
   };
 }
 
@@ -165,18 +155,6 @@ function imageField(server, kind, label) {
 function appearanceSection(ctx) {
   const serverId = ctx.serverId;
   const server = serverById(serverId) || State.serverDetail.get(serverId) || {};
-  const publicToggle = switchControl(!!server.is_public, async (on) => {
-    try {
-      await Api.updateServer(serverId, { isPublic: on });
-      toast(on ? 'The community is public' : 'The community is private again');
-    } catch (e) { errorToast(e); }
-  }, 'Public');
-  const discoverToggle = switchControl(!!server.is_discoverable, async (on) => {
-    try {
-      await Api.updateServer(serverId, { isDiscoverable: on });
-      toast(on ? 'Listed on Discover' : 'Removed from Discover');
-    } catch (e) { errorToast(e); }
-  }, 'Discoverable');
 
   return {
     node: fold([
@@ -190,20 +168,13 @@ function appearanceSection(ctx) {
         label: 'House', glyph: 'image',
         body: fold([imageField(server, 'icon', 'Icon'), imageField(server, 'banner', 'Banner')]),
       }),
-      card({
-        label: 'Reach', glyph: 'compass',
-        rows: [
-          fieldRow('Public', 'Anyone with the address can read it.', publicToggle),
-          fieldRow('Discoverable', 'Listed on Discover.', discoverToggle),
-        ],
-      }),
     ]),
     onMount: null,
   };
 }
 
 // -- channels -------------------------------------------------------------------
-//
+
 // The channel list. Every action here is the shared one from
 // community/manage.js - the same dialogs the tree uses, the same deletes, the
 // same reordering - so the two surfaces cannot disagree about what a channel
@@ -292,66 +263,11 @@ function channelsSection(ctx) {
   };
 }
 
-// -- moderation -------------------------------------------------------------------
-
-function paintBans(serverId, body) {
-  return Api.bans(serverId).then((bans) => {
-    const rows = Array.isArray(bans) ? bans : (bans && bans.items) || [];
-    if (!rows.length) {
-      body.replaceChildren(blank({
-        glyph: 'ban',
-        title: 'Nobody is banned',
-        text: 'Lifting starts at banning; nobody to lift yet.',
-      }));
-      return;
-    }
-    body.replaceChildren(...rows.map((ban) => row({
-      lead: el('span', { class: 'role-dot' }, icon('ban', { size: 15 })),
-      title: ban.displayName || ban.username || 'Someone',
-      sub: ban.reason || 'No reason given',
-      side: el('button', {
-        class: 'btn btn--ghost btn--sm', type: 'button',
-        'aria-label': 'Lift the ban on ' + (ban.username || 'this person'),
-        onClick: async () => {
-          try {
-            await Api.unbanMember(serverId, ban.userId || ban.user_id || ban.id);
-            paintBans(serverId, body);
-          } catch (e) { errorToast(e); }
-        },
-      }, 'Lift'),
-    })));
-  });
-}
-
-function moderationSection(ctx) {
-  const serverId = ctx.serverId;
-  const body = el('div', { class: 'rowlist' });
-
-  return {
-    node: fold([
-      head({
-        kicker: 'Community',
-        title: 'Moderation',
-        lede: 'Who is kept out, and why.',
-        actions: null,
-      }),
-      card({ label: 'Bans', glyph: 'ban', body, flush: true }),
-    ]),
-    onMount: async () => {
-      try {
-        await paintBans(serverId, body);
-      } catch (e) {
-        body.replaceChildren(fold([fault(e, null)]));
-      }
-    },
-  };
-}
-
 // -- ownership ---------------------------------------------------------------------
 
 function ownershipSection(ctx) {
   const serverId = ctx.serverId;
-  const owner = isOwnerOf(serverId);
+  const owner = isOwner(serverId);
   if (!owner) return null;
   const pick = el('select', { class: 'input', 'aria-label': 'Who takes over' },
     el('option', { value: '' }, 'Choose a member'));
@@ -466,81 +382,28 @@ function analyticsSection(ctx) {
   };
 }
 
-// -- integrations ---------------------------------------------------------------------
-
-function integrationsSection(ctx) {
-  const serverId = ctx.serverId;
-  const body = el('div', { class: 'rowlist' });
-
-  const paint = (hooks) => {
-    if (!(hooks || []).length) {
-      body.replaceChildren(blank({
-        glyph: 'rocket',
-        title: 'No webhooks',
-        text: 'A webhook is an address another program can post messages through.',
-      }));
-      return;
-    }
-    body.replaceChildren(...hooks.map((hook) => row({
-      lead: el('span', { class: 'role-dot' }, icon('zap', { size: 15 })),
-      title: hook.name || 'Webhook',
-      sub: hook.channel ? '#' + hook.channel.name : hook.channelId || '',
-      side: el('button', {
-        class: 'btn btn--danger btn--sm', type: 'button',
-        'aria-label': 'Delete the webhook ' + (hook.name || ''),
-        onClick: async () => {
-          try {
-            await Api.deleteWebhook(serverId, hook.id);
-            load();
-          } catch (e) { errorToast(e); }
-        },
-      }, 'Delete'),
-    })));
-  };
-
-  const load = async () => {
-    try {
-      const res = await Api.webhooks(serverId);
-      paint(res.webhooks || []);
-    } catch (e) {
-      body.replaceChildren(fold([fault(e, null)]));
-    }
-  };
-
-  return {
-    node: fold([
-      head({
-        kicker: 'Community',
-        title: 'Integrations',
-        lede: 'How other software talks to this place.',
-        actions: el('button', {
-          class: 'btn btn--default btn--sm', type: 'button',
-          onClick: async () => {
-            try {
-              await Api.createWebhook(serverId, { name: 'New webhook' });
-              load();
-            } catch (e) { errorToast(e); }
-          },
-        }, icon('plus', { size: 14 }), 'New webhook'),
-      }),
-      card({ label: 'Webhooks', glyph: 'rocket', body, flush: true }),
-    ]),
-    onMount: load,
-  };
-}
-
 // -- the registry -----------------------------------------------------------------------
 
+// The sections the console offers.
+//
+// Each one is drawn inside the rail, and each one is a page of its own: the
+// address /server/:id/settings/<section> opens it directly.
 export function communitySettingsSections() {
   const registry = new Map([
     ['overview', overviewSection],
     ['appearance', appearanceSection],
     ['channels', channelsSection],
+    ['categories', categoriesSection],
+    ['members', membersSection],
+    ['roles', rolesSection],
+    ['invites', invitesSection],
     ['moderation', moderationSection],
+    ['voice', voiceSection],
     ['ownership', ownershipSection],
     ['analytics', analyticsSection],
     ['integrations', integrationsSection],
   ]);
+
   // The ownership section needs someone signed in and holding the community;
   // without the key it answers with nothing rather than an unusable page.
   const original = registry.get('ownership');
@@ -565,5 +428,12 @@ export function communitySettingsSections() {
     }
     return owned;
   });
-  return registry;
+
+  // Everything is drawn inside the console, so the rail is around each section
+  // rather than beside one of them.
+  const wrapped = new Map();
+  for (const [id, build] of registry.entries()) {
+    wrapped.set(id, (ctx) => studioSection(ctx, id, build));
+  }
+  return wrapped;
 }

@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installPhoneStub, find, buttonWithText } from './helpers.js';
+import { installPhoneStub, resetPhone, find, buttonWithText, lastDialog } from './helpers.js';
 import { fakeClient } from './fake-client.js';
 import { waitFor } from '../helpers/dom-stub.js';
 
