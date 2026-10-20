@@ -19,18 +19,19 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
+import Api from '../../packages/api.js';
 import { path, navigate } from '../../packages/nav.js';
-import { confirmDialog } from '../ui/overlays.js';
+import { confirmDialog, errorToast, toast } from '../ui/overlays.js';
 import { head, card, row, blank, fault, fold, facts } from '../ui/page.js';
-import { switchControl, fieldRow, bannerNode, channelIcon, serverMark } from '../ui/primitives.js';
-import { errorToast, toast } from '../ui/overlays.js';
+import { bannerNode, channelIcon, serverMark } from '../ui/primitives.js';
 import { copyText } from '../ui/clipboard.js';
 import {
   State, nameOf, refreshServer, refreshServerTree, refreshServerMembers, isOwner,
+  can, isMuted,
 } from '../../packages/store.js';
 import { communitySectionGroups } from '../../packages/communitySettings.js';
 import {
-  openChannelDialog, renameChannel, deleteChannel, channelMenuItems,
+  openChannelDialog, renameChannel, deleteChannel, channelMenuItems, toggleMute,
   reorderChannels, orderAfterDrop, attachDragOrder,
 } from '../community/manage.js';
 import { overviewSection } from './communitySettings/overview.js';
@@ -211,7 +212,7 @@ function channelsSection(ctx) {
           canManageChannels: canManage,
           muted: isMuted(channel.id),
           onCopyTopic: () => copyText(channel.topic || '', 'Topic copied.'),
-          onToggleMute: () => toggleMute(serverId, channel),
+          onToggleMute: () => toggleMute(channel),
         }),
         side: canManage ? el('span', { class: 'rowtools' },
           el('button', {

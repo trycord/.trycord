@@ -36,8 +36,8 @@ rather than read.
 | S3-05 | The developer API reported a webhook's health across communities | Broken object-level authorisation | Medium | Fixed |
 | S3-06 | Two workflow actions ignored the owner's standing in the community | Broken object-level authorisation | Medium | Fixed |
 | S3-07 | The sandbox declared an output limit and a call limit it did not apply | Resource limit not enforced | Low | Fixed |
-| S3-08 | Any signed-in account could drain a device's one-time prekeys | Availability / cryptographic downgrade | Low | Outstanding |
-| S3-09 | The extension registry mirror is fetched without the network guard | SSRF (operator-configured) | Low | Outstanding |
+| S3-08 | Any signed-in account could drain a device's one-time prekeys | Availability / cryptographic downgrade | Low | Fixed |
+| S3-09 | The extension registry mirror is fetched without the network guard | SSRF (operator-configured) | Low | Fixed |
 
 ---
 
@@ -783,46 +783,59 @@ not break out of it.
 
 ---
 
-## 5. Outstanding
+## 5. The two findings this review could not close, now closed
 
-Two findings could not be fixed within this review's scope. Neither is a
-judgement call about the fix itself; both need a file or a decision that
-belongs to somebody else.
+Neither was a judgement call about the fix. Both needed a file or a decision
+that belonged to somebody else, and both have been done since.
 
-### S3-08 — the one-time prekey exhaustion
+### S3-08 — the one-time prekey exhaustion — **Fixed**
 
-- **File:** `backend/src/services/e2ee/prekeys.js`, function `fetchBundle`
-  (line 211), reached by `GET /api/e2ee/prekeys/:deviceId`
-  (`backend/src/routes/e2ee.js:131`).
-- **The change I would make:** keep the consumption as it is, and count the
-  bundles one caller has taken from one device. Refuse a caller that has
-  taken more than a small number from the same device in a short window, so
-  a batch of 30 cannot be drained in 30 requests. The count has to live
-  somewhere: `backend/src/db/schema.js` is not in this review's scope, so the
-  table, or an existing table's column, has to be added by its owner. If no
-  new table can be added, the fallback is a per-route limiter keyed on
-  `deviceId` in `backend/src/middleware/ratelimit.js`, which is coarser but
-  needs no schema.
-- **What I checked first:** the route is rate limited already
-  (`backend/src/routes/e2ee.js:135`, 120 a minute for the `prekeys` bucket),
-  so the rate is bounded; the total is not.
+The fallback this review named is the one that was taken: a per-route limiter
+keyed on the device being fetched, which needs no schema.
 
-### S3-09 — the extension registry mirror and the network guard
+- `backend/src/middleware/ratelimit.js` grew a `keyBy` option. A bucket can
+  be named by the request as well as by the route, so the thing being spent
+  is part of the key while the caller's identity stays in it.
+- `backend/src/routes/e2ee.js` applies it to
+  `GET /api/e2ee/prekeys/:deviceId`: the route keeps its own ceiling of 120
+  a minute, and a device may be fetched ten times a minute by a given
+  caller. One reader cannot spend another's pool, and one reader cannot empty
+  a device's pool in a burst.
+- The limit is on the *request*, so a fetch that the protocol refuses is
+  still counted: the cost is in the prekey the server handed out, and the
+  server hands it out before it can know whether the caller may use it.
+- `backend/tests/security-3.0/prekey-drain.test.js` proves it. The devices
+  in the test are real ones — the test client holds the keys and signs the
+  bundle, exactly as a browser would — because a bundle that does not verify
+  is refused by the protocol and would never reach the limit.
 
-- **Files:** `backend/src/services/extensions/registry.js`, function
-  `readRemote` (line 79).
-- **The change I would make:** validate the host against the keep-out list and
-  the address it resolves to, with `netguard.validateOrigin` and
-  `netguard.resolvesToPrivate`, exactly as `services/continuum/guard.js` does
-  for a federation peer; and refuse to follow a redirect that lands somewhere
-  the guard forbids (`redirect: 'manual'`, re-validate the `Location`). The
-  question the fix needs answered is whether a mirror on a private network is
-  a legitimate setup — it often is — which is the question
-  `CONTINUUM_ALLOW_LOCALHOST` answers for federation
-  (`backend/src/services/continuum/guard.js:16`).
-  `backend/src/services/netguard.js` is outside this review's scope, so I have
-  not written the change; the call site is one line and the guard already
-  exports everything it needs.
+  The test was run against the unfixed route: the first subtest fails, the
+  other two pass; against the fixed route, all three pass. The other two
+  passing against the unfixed route is the point of them: they are there to
+  prove the limit is per device and per reader, and a fix that refused
+  everything would have failed them.
+
+### S3-09 — the extension registry mirror and the network guard — **Fixed**
+
+- `backend/src/services/extensions/registry.js`, function `readRemote`, now
+  checks every address it fetches with `netguard.validateOrigin` and
+  `netguard.resolvesToPrivate` — the same guard every other outbound fetch
+  in the product uses, so credentials in the URL, a scheme that is not
+  http(s), the cloud metadata host and a name that resolves into a private
+  range are all refused.
+- A redirect is followed **one hop at a time and each hop is checked again**
+  (`redirect: 'manual'`, then the `Location` is validated before it is
+  fetched). A redirect to a forbidden address is the easiest way past a check
+  on the address the operator typed, so the check is applied to the address
+  that is actually fetched.
+- The question this review raised — whether a mirror on a private network is
+  a legitimate setup — is answered the way the federation answers it: the
+  operator says so. `TRYCORD_REGISTRY_ALLOW_PRIVATE=on` permits a private
+  mirror, and without it a private address is refused.
+
+The variable is documented in `backend/.env.example`, and the environment
+template test asserts in both directions that every variable the code reads
+is named and that every variable the template names is read.
 
 ---
 

@@ -195,12 +195,13 @@ function consentSheet(packageId, onInstalled) {
   return layer;
 }
 
-function registrySection(host, reload) {
+async function registrySection(host, reload) {
   const list = el('div', { class: 'm-list' });
   clear(host);
   host.appendChild(loading('Reading the registry'));
 
-  readRegistry(false).then((answer) => {
+  try {
+    const answer = await readRegistry(false);
     const registry = (answer && answer.registry) || {};
     const entries = Array.isArray(registry.extensions) ? registry.extensions : [];
     clear(host);
@@ -241,10 +242,10 @@ function registrySection(host, reload) {
         el('span', { class: 'm-chip' }, asked.length + ' capabilit' + (asked.length === 1 ? 'y' : 'ies')))));
     }
     host.appendChild(section('What is on offer', list));
-  }).catch((error) => {
+  } catch (error) {
     clear(host);
     host.appendChild(failure(error, () => registrySection(host, reload)));
-  });
+  }
 }
 
 // -- what is installed -----------------------------------------------------------
@@ -412,10 +413,11 @@ function installedSheet(extension, onDone) {
   return layer;
 }
 
-function installedSection(host, reload) {
+async function installedSection(host, reload) {
   clear(host);
   host.appendChild(loading('Reading the installed extensions'));
-  readInstalled().then((answer) => {
+  try {
+    const answer = await readInstalled();
     const extensions = (answer && answer.extensions) || [];
     clear(host);
     if (!extensions.length) {
@@ -442,10 +444,10 @@ function installedSection(host, reload) {
         el('span', { class: 'm-chip' }, extension.state || 'installed'))));
     }
     host.appendChild(section('Installed on this instance', list));
-  }).catch((error) => {
+  } catch (error) {
     clear(host);
     host.appendChild(failure(error, () => installedSection(host, reload)));
-  });
+  }
 }
 
 // -- the policy -------------------------------------------------------------------
@@ -455,10 +457,11 @@ const TRUSTED_WARNING = 'A trusted package brings its own code and runs it insid
   + 'It is not a permission that can be taken back: the code is already running. '
   + 'Only allow packages you would trust with the server itself.';
 
-function policySection(host) {
+async function policySection(host) {
   clear(host);
   host.appendChild(loading('Reading the policy'));
-  readPolicy().then((answer) => {
+  try {
+    const answer = await readPolicy();
     const policy = (answer && answer.policy) || {};
     clear(host);
 
@@ -582,10 +585,10 @@ function policySection(host) {
         text: TRUSTED_WARNING,
       }) : null,
       el('div', { class: 'm-list' }, trusted))));
-  }).catch((error) => {
+  } catch (error) {
     clear(host);
     host.appendChild(failure(error, () => policySection(host)));
-  });
+  }
 }
 
 // -- the workflows -----------------------------------------------------------------
@@ -850,10 +853,11 @@ function workflowSheet(workflow, onDone) {
   return layer;
 }
 
-function workflowsSection(host, reload) {
+async function workflowsSection(host, reload) {
   clear(host);
   host.appendChild(loading('Reading the workflows'));
-  readWorkflows().then((answer) => {
+  try {
+    const answer = await readWorkflows();
     const workflows = (answer && answer.workflows) || [];
     clear(host);
     if (!workflows.length) {
@@ -878,10 +882,10 @@ function workflowsSection(host, reload) {
         el('span', { class: 'm-chip' }, workflow.state || 'unknown'))));
     }
     host.appendChild(section('The workflows here', list));
-  }).catch((error) => {
+  } catch (error) {
     clear(host);
     host.appendChild(failure(error, () => workflowsSection(host, reload)));
-  });
+  }
 }
 
 // -- the screen -------------------------------------------------------------------
@@ -913,13 +917,13 @@ export function renderExtensions(ctx) {
     }
   }
 
-  function show(id) {
+  async function show(id) {
     current = id;
     paintStrip();
-    if (id === 'registry') registrySection(host, () => show('registry'));
-    else if (id === 'installed') installedSection(host, () => show('installed'));
-    else if (id === 'policy') policySection(host);
-    else workflowsSection(host, () => show('workflows'));
+    if (id === 'registry') await registrySection(host, () => show('registry'));
+    else if (id === 'installed') await installedSection(host, () => show('installed'));
+    else if (id === 'policy') await policySection(host);
+    else await workflowsSection(host, () => show('workflows'));
   }
 
   const node = screen(
@@ -936,7 +940,7 @@ export function renderExtensions(ctx) {
     head: { title: 'Extensions' },
     onMount: async () => {
       paintStrip();
-      show(current);
+      await show(current);
     },
   };
 }

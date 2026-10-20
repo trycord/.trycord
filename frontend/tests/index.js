@@ -19,3 +19,6 @@ for (const name of fs.readdirSync(here).sort()) {
 // The encryption checks live in a directory of their own, so the runner is
 // pointed at it: the directory is not a module the runner can search.
 await import(path.join(here, 'e2ee', 'index.js'));
+
+// The federation checks live in a directory of their own, for the same reason.
+await import(path.join(here, 'federation', 'index.js'));

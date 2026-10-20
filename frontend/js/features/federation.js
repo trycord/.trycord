@@ -485,6 +485,9 @@ export function renderFederation(ctx) {
   function outgoingRow(message) {
     const decision = decisionOf(message);
     const community = remoteNames.get(message.origin_instance_id + '|' + message.origin_community_id);
+    // A message that was taken back is gone: there is nothing left to edit and
+    // nothing left to take back.
+    const gone = !!(message.deleted || message.state === 'deleted');
     return row({
       class: 'federation-row',
       lead: el('span', { class: 'federation-glyph' }, icon('send', { size: 15 })),
@@ -495,12 +498,12 @@ export function renderFederation(ctx) {
       meta: message.created_at ? relativeTime(message.created_at) : '',
       side: [
         el('span', { class: 'badge' + decision.tone }, decision.label),
-        el('button', {
+        gone ? null : el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
           'aria-label': 'Edit the message you wrote in this community',
           onClick: () => editOutgoing(message),
         }, 'Edit'),
-        el('button', {
+        gone ? null : el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
           'aria-label': 'Take back the message you wrote in this community',
           onClick: () => takeBackOutgoing(message),
@@ -559,7 +562,8 @@ export function renderFederation(ctx) {
       danger: true,
       onConfirm: () => continuum.deleteOutgoing(message.id),
       onAnswer: () => {
-        toast('The message was taken back, and the owner was told.');
+        toast('The message was taken back here. The owner of that community is told, '
+          + 'so the copy over there goes too.');
         paintOutgoing();
       },
     });

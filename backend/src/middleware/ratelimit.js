@@ -38,11 +38,31 @@ function keyFor(req, bucket) {
   return `${bucket || req.baseUrl || ''}|${user}|${ip}`;
 }
 
-function rateLimit({ windowMs = 60000, max = 60, key } = {}) {
+// A bucket named by the request rather than by the route.
+//
+// Some routes are cheap for one caller and expensive for another: a peer
+// prekey bundle is a public key the caller is entitled to, but every fetch
+// consumes a one-time prekey, so a caller that fetches in a loop empties a
+// device's pool and forces it onto the reusable fallback. Keying the bucket by
+// the thing being fetched is what stops that, and the per-caller identity
+// stays in the key so one reader cannot spend another's pool either.
+function keyByFor(req, keyBy, fallback) {
+  if (typeof keyBy !== 'function') return fallback;
+  let named = null;
+  try {
+    named = String(keyBy(req) || '').trim();
+  } catch {
+    named = null;
+  }
+  if (!named) return fallback;
+  return `${fallback}|${named}`;
+}
+
+function rateLimit({ windowMs = 60000, max = 60, key, keyBy } = {}) {
   const limit = maxFor(max);
   return (req, res, next) => {
     const nowMs = Date.now();
-    const bucket = keyFor(req, key);
+    const bucket = keyByFor(req, keyBy, keyFor(req, key));
     let entry = buckets.get(bucket);
     if (!entry || nowMs - entry.start >= windowMs) {
       entry = { start: nowMs, count: 0 };

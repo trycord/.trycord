@@ -178,16 +178,20 @@ function referenceRow(serverId, item, index, list, space, canManage, load) {
     link: href ? true : null,
     side: canManage
       ? el('span', { class: 'rowtools' },
-        iconButton('chevron-up', {
-          label: 'Move ' + label + ' up',
-          class: 'icon-btn--sm',
-          onClick: () => move(serverId, space, list, index, -1, load),
-        }),
-        iconButton('chevron-down', {
-          label: 'Move ' + label + ' down',
-          class: 'icon-btn--sm',
-          onClick: () => move(serverId, space, list, index, 1, load),
-        }),
+        index > 0
+          ? iconButton('chevron-up', {
+            label: 'Move ' + label + ' up',
+            class: 'icon-btn--sm',
+            onClick: () => move(serverId, space, list, index, -1, load),
+          })
+          : null,
+        index < list.length - 1
+          ? iconButton('chevron-down', {
+            label: 'Move ' + label + ' down',
+            class: 'icon-btn--sm',
+            onClick: () => move(serverId, space, list, index, 1, load),
+          })
+          : null,
         el('button', {
           class: 'btn btn--danger btn--sm', type: 'button',
           'aria-label': 'Remove ' + label + ' from the space',

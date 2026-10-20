@@ -210,6 +210,21 @@ function actionSheet(options) {
     placeholder: 'Why',
   });
   const note = el('p', { class: 'm-form-error' });
+  const confirm = el('button', {
+    class: 'm-btn m-btn--block' + (opts.danger ? ' m-btn--danger' : ' m-btn--primary'),
+    type: 'button',
+    onClick: async () => {
+      confirm.disabled = true;
+      try {
+        const answer = await opts.onConfirm(reason.value.trim());
+        layer.close();
+        if (opts.onAnswer) opts.onAnswer(answer);
+      } catch (error) {
+        note.textContent = (error && error.message) || 'The server refused that.';
+        confirm.disabled = false;
+      }
+    },
+  }, opts.confirmLabel || 'Do it');
 
   const layer = sheet({
     title: opts.title,
@@ -219,21 +234,7 @@ function actionSheet(options) {
         el('span', { class: 'm-field__label' }, 'Why (it goes into the audit trail)'),
         reason),
       note),
-    footer: el('button', {
-      class: 'm-btn m-btn--block' + (opts.danger ? ' m-btn--danger' : ' m-btn--primary'),
-      type: 'button',
-      onClick: async (event) => {
-        event.currentTarget.disabled = true;
-        try {
-          const answer = await opts.onConfirm(reason.value.trim());
-          layer.close();
-          if (opts.onAnswer) opts.onAnswer(answer);
-        } catch (error) {
-          note.textContent = (error && error.message) || 'The server refused that.';
-          event.currentTarget.disabled = false;
-        }
-      },
-    }, opts.confirmLabel || 'Do it'),
+    footer: confirm,
   });
   return layer;
 }
@@ -462,6 +463,9 @@ export function renderFederation(ctx) {
   // about it, and what can still be done to it.
   function openOutgoing(message, community) {
     const decision = decisionOf(message);
+    // A message that was taken back is gone: there is nothing left to edit and
+    // nothing left to take back.
+    const gone = !!(message.deleted || message.state === 'deleted');
     const body = el('div', { class: 'm-stack' },
       el('p', { class: 'm-lede' }, String(message.content || '').trim()
         || 'This message was taken back.'),
@@ -475,7 +479,7 @@ export function renderFederation(ctx) {
     const layer = sheet({
       title: community || 'A community on another instance',
       body,
-      footer: actions([
+      footer: gone ? null : actions([
         el('button', {
           class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
           onClick: () => { layer.close(); editOutgoing(message); },
@@ -494,6 +498,26 @@ export function renderFederation(ctx) {
       class: 'm-input', rows: '4', 'aria-label': 'The message you wrote',
     }, message.content || '');
     const note = el('p', { class: 'm-form-error' });
+    const save = el('button', {
+      class: 'm-btn m-btn--block m-btn--primary', type: 'button',
+      onClick: async () => {
+        const text = content.value.trim();
+        if (!text) {
+          note.textContent = 'A message cannot be empty.';
+          return;
+        }
+        save.disabled = true;
+        try {
+          await continuum.editOutgoing(message.id, text);
+          layer.close();
+          toast('The change was sent to the instance that owns the community.', { type: 'success' });
+          paintOutgoing();
+        } catch (error) {
+          note.textContent = (error && error.message) || 'The change was not accepted.';
+          save.disabled = false;
+        }
+      },
+    }, 'Save the change');
 
     const layer = sheet({
       title: 'Edit your message',
@@ -502,26 +526,7 @@ export function renderFederation(ctx) {
         el('label', { class: 'm-field' },
           el('span', { class: 'm-field__label' }, 'Message'), content),
         note),
-      footer: el('button', {
-        class: 'm-btn m-btn--block m-btn--primary', type: 'button',
-        onClick: async (event) => {
-          const text = content.value.trim();
-          if (!text) {
-            note.textContent = 'A message cannot be empty.';
-            return;
-          }
-          event.currentTarget.disabled = true;
-          try {
-            await continuum.editOutgoing(message.id, text);
-            layer.close();
-            toast('The change was sent to the instance that owns the community.', { type: 'success' });
-            paintOutgoing();
-          } catch (error) {
-            note.textContent = (error && error.message) || 'The change was not accepted.';
-            event.currentTarget.disabled = false;
-          }
-        },
-      }, 'Save the change'),
+      footer: save,
     });
     return layer;
   }
@@ -535,7 +540,8 @@ export function renderFederation(ctx) {
       danger: true,
       onConfirm: () => continuum.deleteOutgoing(message.id),
       onAnswer: () => {
-        toast('The message was taken back, and the owner was told.', { type: 'success' });
+        toast('The message was taken back here. The owner of that community is told, '
+          + 'so the copy over there goes too.', { type: 'success' });
         paintOutgoing();
       },
     });

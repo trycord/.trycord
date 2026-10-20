@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installPhoneStub, fieldWithLabel, formFor } from './helpers.js';
+import { installPhoneStub, resetPhone, fieldWithLabel, formFor } from './helpers.js';
 import { fakeClient } from './fake-client.js';
 import { waitFor } from '../helpers/dom-stub.js';
 
@@ -18,6 +18,7 @@ const { encryptionBody } = await import('../../mobile/js/views/encryption.js');
 
 test('the safety number with a peer, on a phone', async (t) => {
   await t.test('the screen shows the number', async () => {
+    resetPhone();
     const client = fakeClient();
     const node = encryptionBody({ client: async () => client });
 
@@ -35,6 +36,7 @@ test('the safety number with a peer, on a phone', async (t) => {
   });
 
   await t.test('a change is flagged', async () => {
+    resetPhone();
     const client = fakeClient();
     const node = encryptionBody({ client: async () => client });
 
@@ -67,6 +69,7 @@ test('the safety number with a peer, on a phone', async (t) => {
   });
 
   await t.test('a number that has not changed is not flagged', async () => {
+    resetPhone();
     const client = fakeClient();
     const node = encryptionBody({ client: async () => client });
 

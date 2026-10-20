@@ -33,6 +33,18 @@ router.use(auth);
 // recovered, and those budgets are unrelated, so each route names its own
 // bucket. The router-level limit is the backstop underneath them.
 const limited = (bucket, max) => rateLimit({ windowMs: 60000, max, key: 'e2ee:' + bucket });
+
+// A limit whose bucket is named by the request as well as by the route.
+//
+// A route that spends something the server holds - a one-time prekey, for
+// instance - has to be limited by the thing being spent, or one caller can
+// empty a pool that belongs to everybody.
+const limitedBy = (bucket, max, nameOf) => rateLimit({
+  windowMs: 60000,
+  max,
+  key: 'e2ee:' + bucket,
+  keyBy: (req) => nameOf(req),
+});
 router.use(rateLimit({ windowMs: 60000, max: 300, key: 'e2ee' }));
 
 /**
@@ -128,9 +140,19 @@ router.post('/prekeys', limited('prekeys', 60), route(async (req, res) => {
 // The response carries a signature over the bundle and over the one-time
 // prekey in it. The client checks both before it uses anything, which is
 // what stops the server from passing off a bundle of its own making.
-router.get('/prekeys/:deviceId', limited('prekeys', 120), route(async (req, res) => {
-  res.json({ bundle: await e2ee.fetchPrekeyBundle(req.params.deviceId) });
-}));
+//
+// Every fetch consumes a one-time prekey, so a caller that fetches in a loop
+// empties a device's pool and forces it onto the reusable fallback - which is
+// a downgrade of the protection the prekeys exist to provide. The bucket is
+// therefore keyed by the device being fetched as well as by the caller: one
+// reader cannot spend another's pool, and one reader cannot spend a device's
+// pool in a burst.
+router.get('/prekeys/:deviceId',
+  limited('prekeys', 120),
+  limitedBy('prekey-device', 10, (req) => req.params.deviceId),
+  route(async (req, res) => {
+    res.json({ bundle: await e2ee.fetchPrekeyBundle(req.params.deviceId) });
+  }));
 
 // POST /api/e2ee/prekeys/claim - claim the one-time prekey a session used.
 //

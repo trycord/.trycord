@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installPhoneStub, fieldWithLabel, formFor, order, positionOf } from './helpers.js';
+import { installPhoneStub, resetPhone, fieldWithLabel, formFor, order, positionOf } from './helpers.js';
 import { fakeClient } from './fake-client.js';
 import { waitFor } from '../helpers/dom-stub.js';
 
@@ -17,10 +17,15 @@ const { encryptionBody } = await import('../../mobile/js/views/encryption.js');
 const { createDevice } = await import('../../packages/e2ee/index.js');
 const { State } = await import('../../packages/store.js');
 
-State.user = { id: 'u1', username: 'reader' };
-
 test('recovering a lost device on a phone', async (t) => {
+  // The recovery is an account's: the screen reads who the account is, and the
+  // checks in this directory share one process, so the account is put back
+  // afterwards.
+  t.beforeEach(() => { State.user = { id: 'u1', username: 'reader' }; });
+  t.afterEach(() => { State.user = null; });
+
   await t.test('the screen says what recovering does before it asks for anything', async () => {
+    resetPhone();
     const client = fakeClient();
     const node = encryptionBody({ client: async () => client });
 
@@ -35,6 +40,7 @@ test('recovering a lost device on a phone', async (t) => {
   });
 
   await t.test('recovering registers a new device rather than restoring the old one', async () => {
+    resetPhone();
     const lost = await createDevice({ userId: 'u1', label: 'The lost phone', recoveryKey: 'the-old-recovery-key' });
     const material = { keys: lost.privateKeys(), sessions: {}, deviceId: lost.id };
     const client = fakeClient({ material });
@@ -71,6 +77,7 @@ test('recovering a lost device on a phone', async (t) => {
   });
 
   await t.test('the recovery key is not left in the field', async () => {
+    resetPhone();
     const lost = await createDevice({ userId: 'u1', label: 'The lost phone', recoveryKey: 'the-old-recovery-key' });
     const material = { keys: lost.privateKeys(), sessions: {}, deviceId: lost.id };
     const client = fakeClient({ material });
