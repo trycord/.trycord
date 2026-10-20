@@ -25,6 +25,10 @@ import {
 import {
   renderSupport, renderLegal, renderInvite, renderServerCreate, renderNotFound,
 } from './plain.js';
+import { renderSearch } from './search.js';
+import { renderCollections } from './collections.js';
+import { renderFederation } from './federation.js';
+import { renderStatus } from './status.js';
 
 const auth = (ctx) => renderAuth(ctx.page, ctx.params);
 

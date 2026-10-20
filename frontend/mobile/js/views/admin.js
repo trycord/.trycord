@@ -1535,6 +1535,8 @@ export function renderAdmin(ctx) {
     'admin.database': databaseBody,
     'admin.continuum': continuumBody,
     'admin.diagnostics': diagnosticsBody,
+    'admin.incidents': incidentsBody,
+    'admin.federation': federationBody,
   };
   const active = bodies[initial] ? initial : 'admin';
 
