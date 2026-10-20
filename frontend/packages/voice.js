@@ -135,3 +135,46 @@ export function saveBody(values) {
   for (const [key, value] of Object.entries(values)) body[key] = value;
   return body;
 }
+
+// The settings the server asks to be confirmed.
+//
+// Two of them are consequential: the provider, which decides where every
+// call's media travels, and voice itself, which changes what every member of
+// the instance may do. The server refuses a save of one of them that does
+// not say the person was asked - and the console that asks is the one that
+// has to say so.
+//
+// The console did not, so **every one of these saves was refused**. Choosing
+// a provider said "the path a call takes need confirmation" and the
+// provider did not change; turning voice on said the same thing. The list
+// is here so that the console and the server cannot disagree about which
+// settings are the ones that need a person.
+export const CONFIRMED_SETTINGS = ['voice.enabled', 'voice.provider'];
+
+// Whether a save has to carry the confirmation.
+export function needsConfirmation(values) {
+  return Object.keys(values || {}).some((key) => CONFIRMED_SETTINGS.indexOf(key) !== -1);
+}
+
+// The body of a save that the console has decided about.
+//
+// The flag says the console has asked the person, or that the click itself
+// was the answer. It is sent only for the settings that need it, so the
+// server's refusal still means something to every other client: a script
+// that writes a consequential setting has to say so explicitly, and the
+// instance's own console is the one that knows it did.
+export function confirmedBody(values) {
+  const body = saveBody(values);
+  if (needsConfirmation(values)) body.__confirm = true;
+  return body;
+}
+
+// The refusal the server answers a save that needs a confirmation with.
+//
+// The console shows it as an error, because it is one: something asked for
+// a change the console did not mean to make.
+export function needsConfirmationError(error) {
+  const code = error && error.code;
+  const message = String((error && error.message) || '');
+  return code === 'CONFIRMATION_REQUIRED' || message.indexOf('need confirmation') !== -1;
+}

@@ -63,14 +63,28 @@ const ENV_HOST_TYPE = String(process.env.SERVER_HOST_TYPE || '').trim().toLowerC
 const isLoopbackHost = (h) => h === '127.0.0.1' || h === '::1' || h === '[::1]' || h === 'localhost' || /^127\./.test(h);
 
 function instanceConfig() {
+  const publicUrl = (process.env.TRYCORD_PUBLIC_URL || '').trim();
+  const globalUrl = (process.env.GLOBAL_TRYCORD_URL || '').trim();
   return {
     instanceId: (process.env.TRYCORD_INSTANCE_ID || 'local').trim() || 'local',
     name: (process.env.TRYCORD_NAME || 'Trycord').trim() || 'Trycord',
-    publicUrl: (process.env.TRYCORD_PUBLIC_URL || '').trim(),
-    globalUrl: (process.env.GLOBAL_TRYCORD_URL || '').trim(),
+    publicUrl,
+    globalUrl,
     clientOrigins: String(process.env.CLIENT_ORIGIN || '')
       .split(',')
       .map((s) => s.trim().replace(/\/+$/, ''))
+      .filter(Boolean),
+    // The origins the instance is itself published at.
+    //
+    // A request from the instance's own site carries that site's origin, and
+    // it arrived on that origin, so there is no cross-origin question to ask
+    // about it. The instance answers these whatever the allowlist says, and
+    // says so at boot, so an operator does not add the instance's own address
+    // to the allowlist to quieten a warning about the instance's own address.
+    ownOrigins: [publicUrl, globalUrl]
+      .map((url) => {
+        try { return url ? new URL(url).origin : null; } catch { return null; }
+      })
       .filter(Boolean),
   };
 }
@@ -157,7 +171,11 @@ function reportListen(listen, inst) {
           console.warn('[warn] nginx mode: TRYCORD_PUBLIC_URL includes a port. The public origin should be the bare site URL (e.g. https://trycord.dev), not an upstream port.');
         }
         if (inst.clientOrigins.length && !inst.clientOrigins.includes(pub.origin)) {
-          console.warn('[warn] nginx mode: CLIENT_ORIGIN does not include the public origin (' + pub.origin + '), so CORS may be misconfigured.');
+          // The public origin is answered whether or not it is in the
+          // allowlist, so this is not a fault. It is worth saying, because an
+          // operator who serves the client from a *different* address than
+          // the public URL has to put that address in the allowlist.
+          console.log('[info] nginx mode: the public origin (' + pub.origin + ') is answered automatically. Any other address that serves the client has to be in CLIENT_ORIGIN.');
         }
       } catch { /* publicUrl invalid; other paths handle it */ }
     }
@@ -267,7 +285,10 @@ async function boot(options = {}) {
     app.set('trust proxy', 'loopback');
     console.log('[info] TRUST_PROXY=1: trusting X-Forwarded-* from loopback only');
   }
-  app.use(cors(corsOptions(inst.clientOrigins)));
+  app.use(cors(corsOptions(inst.clientOrigins, inst.ownOrigins)));
+  if (inst.ownOrigins.length) {
+    console.log('[info] the instance answers its own origin: ' + inst.ownOrigins.join(', '));
+  }
   if (inst.clientOrigins.length) {
     console.log('[info] CORS allowlist: ' + inst.clientOrigins.join(', '));
   } else {

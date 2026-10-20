@@ -1083,15 +1083,21 @@ async function save(entries, adminId, options) {
     // that is where a person goes to make sense of them. A write that
     // arrives here for one of them is refused, and the refusal says where it
     // belongs - so a second editor cannot become a second answer.
+    //
+    // The general route accepts every setting, including the voice ones.
+    // That is not a second editor: the value is one row, and the console
+    // that *offers* the control is the voice console - the general page
+    // shows the voice settings read-only and says where they are changed.
+    //
+    // The general route cannot narrow what it accepts, because it is an
+    // existing public API: a client written before the consolidation - an
+    // older bundle still in a browser's cache, the native app - writes the
+    // voice settings here, and refusing them broke the voice console for
+    // every one of those clients at once. A new route may be narrow; an
+    // old one may not become narrow.
     const owner = canonicalInterface(key);
-    if (writer) {
-      if (owner !== writer) {
-        problems.push(key + ': not changed in ' + CANONICAL_INTERFACES[writer].label);
-        continue;
-      }
-    } else if (owner) {
-      const interface = CANONICAL_INTERFACES[owner];
-      problems.push(key + ': changed in ' + interface.label + ', not here');
+    if (writer && owner !== writer) {
+      problems.push(key + ': not changed in ' + CANONICAL_INTERFACES[writer].label);
       continue;
     }
 
@@ -1293,16 +1299,14 @@ async function reset(key, adminId, options) {
 
   // A setting another console owns is not reset from here either: a reset is
   // a change, and it is changed where it is changed.
+  //
+  // The general route is the exception, for the same reason it accepts a
+  // write for every setting: it is an existing public API, and narrowing it
+  // breaks the clients that were written against it.
   const writer = options && options.owner ? String(options.owner) : null;
   const owner = canonicalInterface(key);
-  if (writer) {
-    if (owner !== writer) {
-      const e = new Error(key + ': not changed in ' + CANONICAL_INTERFACES[writer].label);
-      e.code = 'LOCKED';
-      throw e;
-    }
-  } else if (owner) {
-    const e = new Error(key + ': changed in ' + CANONICAL_INTERFACES[owner].label + ', not here');
+  if (writer && owner !== writer) {
+    const e = new Error(key + ': not changed in ' + CANONICAL_INTERFACES[writer].label);
     e.code = 'LOCKED';
     throw e;
   }

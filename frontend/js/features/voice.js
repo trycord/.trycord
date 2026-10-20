@@ -19,7 +19,7 @@ import { switchControl } from '../ui/primitives.js';
 import { head, card, memo, fold, hold, fault } from '../ui/page.js';
 import { errorToast, toast, confirmDialog } from '../ui/overlays.js';
 import {
-  SHARED_CONTROLS, providerLabel, stateOf, sourceLabel, fieldValue, saveBody,
+  SHARED_CONTROLS, providerLabel, stateOf, sourceLabel, fieldValue, confirmedBody,
 } from '../../packages/voice.js';
 
 const PROVIDERS_PATH = '/api/voice/providers';
@@ -38,7 +38,7 @@ async function readProviders() {
 }
 
 async function saveSettings(values) {
-  return request('PUT', SETTINGS_PATH, { body: saveBody(values) });
+  return request('PUT', SETTINGS_PATH, { body: confirmedBody(values) });
 }
 
 async function checkProvider(providerId) {
@@ -400,6 +400,20 @@ export function adminVoice() {
         'aria-label': 'Use the ' + provider.label + ' provider',
         onClick: async () => {
           if (provider.inForce) return;
+          // Choosing the provider is a consequential change: it decides
+          // where the media of every call on this instance travels, and it
+          // has to be said yes to rather than clicked past.
+          const yes = await confirmDialog({
+            title: 'Use the ' + provider.label + ' provider?',
+            body: provider.inForce
+              ? ''
+              : 'Every call on this instance will take this path. '
+                + (provider.missing && provider.missing.length
+                  ? 'It is not ready yet: ' + provider.missing.join('; ') + '.'
+                  : 'It is ready.'),
+            confirmLabel: 'Use ' + provider.label,
+          });
+          if (!yes) return;
           try {
             await saveSettings({ 'voice.provider': provider.id });
             toast('The ' + provider.label + ' provider is in force');

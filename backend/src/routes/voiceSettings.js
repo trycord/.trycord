@@ -56,6 +56,10 @@ router.put('/', rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req, res) =
 
   // A consequential setting - one that locks people out or opens registration - is the
   // one that needs saying yes to rather than clicking save.
+  //
+  // This is the console that owns the voice settings, so this is where the
+  // person is asked about the ones that change what every member of the
+  // instance may do - and the console sends the flag when it has asked.
   const consequential = keys.filter((k) => {
     const entry = settings.SCHEMA.find((s) => s.key === k);
     return entry && entry.consequential;

@@ -51,18 +51,40 @@ test('one setting, one console', async (t) => {
     assert.equal(entry.value, 4);
   });
 
-  await t.test('the general page refuses a voice setting, and says where it is changed', async () => {
+  await t.test('the general page still writes a voice setting', async () => {
+    // The general route is an existing public API, so it does not narrow what
+    // it accepts: a client written before the voice console had its own path
+    // writes the voice settings here, and refusing them broke the voice
+    // console for every one of those clients at once.
+    //
+    // It is not a second editor. The value is one row, and the console that
+    // *offers* the control is the voice console - the general page shows the
+    // voice settings read-only and says where they are changed.
     const res = await owner.put('/api/admin/settings', { 'voice.mesh.maxParticipants': 9 });
-    assert.equal(res.status, 400, 'the general page wrote a voice setting');
-    assert.match(String(res.data.error && res.data.error.message),
-      /changed in Voice and video/,
-      'the refusal does not say where the setting is changed: '
-      + JSON.stringify(res.data));
+    assert.equal(res.status, 200,
+      'the general route refused a write that worked before: ' + JSON.stringify(res.data));
 
-    // And nothing was changed.
     const catalogue = await owner.get('/api/admin/voice/settings');
     const entry = catalogue.data.settings.find((s) => s.key === 'voice.mesh.maxParticipants');
-    assert.equal(entry.value, 4, 'the refused write changed the value anyway');
+    assert.equal(entry.value, 9, 'the write did not take');
+  });
+
+  await t.test('the general page still writes a consequential voice setting', async () => {
+    // The provider is consequential: it decides where every call's media
+    // travels. The console that owns it is where a person is asked, so a
+    // write that arrives at the general route does not have to carry the
+    // confirmation the voice console's own route demands.
+    const res = await owner.put('/api/admin/settings', { 'voice.provider': 'mesh' });
+    assert.equal(res.status, 200,
+      'the general route refused a consequential voice setting: ' + JSON.stringify(res.data));
+  });
+
+  await t.test('the general page still asks about its own consequential settings', async () => {
+    // The guard is not weakened where it belongs: a setting the general page
+    // owns is still confirmed by the person.
+    const res = await owner.put('/api/admin/settings', { 'registration.enabled': false });
+    assert.equal(res.status, 400, 'a consequential general setting was changed without a confirmation');
+    assert.equal(res.data.error.code, 'CONFIRMATION_REQUIRED');
   });
 
   await t.test('the general page shows the voice settings read-only, with a link', async () => {
@@ -113,10 +135,18 @@ test('one setting, one console', async (t) => {
     assert.equal(voice.status, 403, 'a member changed the voice configuration');
   });
 
-  await t.test('a consequential voice setting still asks to be confirmed', async () => {
+  await t.test('a consequential voice setting asks to be confirmed', async () => {
+    // The voice console's own route asks, because this is the console that
+    // owns the setting and the place a person is asked about it.
     const res = await owner.put('/api/admin/voice/settings', { 'voice.enabled': false });
     assert.equal(res.status, 400, 'a consequential change was made without a confirmation');
     assert.equal(res.data.error.code, 'CONFIRMATION_REQUIRED');
+
+    // And with the confirmation, it is applied.
+    const confirmed = await owner.put('/api/admin/voice/settings', {
+      __confirm: true, 'voice.enabled': false,
+    });
+    assert.equal(confirmed.status, 200, JSON.stringify(confirmed.data));
   });
 
   await t.test('the voice console holds every voice setting', () => {
@@ -198,13 +228,18 @@ test('the extension API version is not the application version', async (t) => {
       'the refusal does not say what is wrong: ' + report.reason);
   });
 
-  await t.test('a package built against a newer surface of this generation is refused', () => {
+  await t.test('a package built against a surface this instance has not reached is refused', () => {
+    // The rule is never narrower than the one it replaced, so the newest
+    // surface this instance's family has reached counts as one it has. A
+    // version beyond that is a package asking for something this instance
+    // cannot know about.
     const packages = require(path.join(ROOT, 'src', 'services', 'extensions', 'packages'));
     const version = require(path.join(ROOT, 'src', 'version'));
-    const parts = version.EXTENSION_API_VERSION.split('.');
+    const application = version.VERSION.split('.').slice(0, 2).join('.');
+    const parts = application.split('.');
     const newer = parts[0] + '.' + (Number(parts[1]) + 1);
     const report = packages.compatibilityReport({ api: newer });
-    assert.equal(report.ok, false, 'a package from a newer surface was accepted');
+    assert.equal(report.ok, false, 'a package from an unreached surface was accepted');
     assert.match(report.reason, /newer/,
       'the refusal does not say what is wrong: ' + report.reason);
   });

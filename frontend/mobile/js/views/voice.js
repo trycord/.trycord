@@ -14,7 +14,9 @@ import { request } from '../../../packages/api.js';
 import { toast, confirm } from '../ui.js';
 import { loading, failure, chip } from '../components.js';
 import { section, field, textInput, actions, primaryButton, ghostButton, notice } from './util.js';
-import { SHARED_CONTROLS, stateOf, providerLabel, sourceLabel } from '../../../packages/voice.js';
+import {
+  SHARED_CONTROLS, stateOf, providerLabel, sourceLabel, confirmedBody,
+} from '../../../packages/voice.js';
 
 const PROVIDERS_PATH = '/api/voice/providers';
 // The voice console's own settings.
@@ -30,7 +32,7 @@ async function readProviders() {
 }
 
 async function saveSettings(values) {
-  return request('PUT', SETTINGS_PATH, { body: values });
+  return request('PUT', SETTINGS_PATH, { body: confirmedBody(values) });
 }
 
 async function checkProvider(providerId) {
@@ -64,6 +66,18 @@ function providerChoice(report, onChanged) {
       type: 'button', role: 'radio', 'aria-checked': String(active),
       onClick: async () => {
         if (active) return;
+        // Choosing the provider is a consequential change: it decides where
+        // the media of every call on this instance travels, and it has to be
+        // said yes to rather than tapped past.
+        const yes = await confirm({
+          title: 'Use the ' + provider.label + ' provider?',
+          text: 'Every call on this instance will take this path. '
+            + (provider.missing && provider.missing.length
+              ? 'It is not ready yet: ' + provider.missing.join('; ') + '.'
+              : 'It is ready.'),
+          confirmLabel: 'Use ' + provider.label,
+        });
+        if (!yes) return;
         try {
           await saveSettings({ 'voice.provider': provider.id });
           toast('The ' + provider.label + ' provider is in force');
