@@ -41,6 +41,11 @@ export const RENDERERS = {
   friends: (ctx) => renderFriends(ctx),
   menu: () => renderMenu(),
   profile: (ctx) => renderProfile(ctx),
+  // What the reader keeps, and what happened to the instance.
+  search: (ctx) => renderSearch(ctx),
+  collections: (ctx) => renderCollections(ctx),
+  federation: (ctx) => renderFederation(ctx),
+  status: (ctx) => renderStatus(ctx),
   community: (ctx) => renderCommunityHome(ctx),
   'community.legacy': (ctx) => renderCommunityHome(ctx),
   'community.channel': (ctx) => renderChannel(ctx),

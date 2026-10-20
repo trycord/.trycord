@@ -82,6 +82,7 @@ export const RENDERERS = {
   'settings.privacy': (ctx) => renderSettings(ctx),
   'settings.notifications': (ctx) => renderSettings(ctx),
   'settings.appearance': (ctx) => renderSettings(ctx),
+  'settings.language': (ctx) => renderSettings(ctx),
   'settings.backend': (ctx) => renderSettings(ctx),
   'settings.updates': (ctx) => renderSettings(ctx),
 
@@ -99,6 +100,8 @@ export const RENDERERS = {
   'admin.database': (ctx) => renderAdmin(ctx),
   'admin.continuum': (ctx) => renderAdmin(ctx),
   'admin.diagnostics': (ctx) => renderAdmin(ctx),
+  'admin.incidents': (ctx) => renderAdmin(ctx),
+  'admin.federation': (ctx) => renderAdmin(ctx),
 
   login: gates,
   register: gates,
