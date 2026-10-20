@@ -63,11 +63,6 @@ export function lastDialog(root) {
   return found[found.length - 1] || null;
 }
 
-/** The form the screen drew, or null. */
-export function formOf(root) {
-  return find(root, (node) => node.tagName === 'FORM')[0] || null;
-}
-
 /** The form that holds a given field, or null. */
 export function formFor(root, field) {
   return find(root, (node) => node.tagName === 'FORM' && node.contains(field))[0] || null;
@@ -93,5 +88,5 @@ export function positionOf(root, pattern) {
 
 export default {
   installPhoneStub, resetPhone, order, find, buttonWithText, buttonWithLabel, lastDialog,
-  formOf, formFor, fieldWithLabel, positionOf,
+  formFor, fieldWithLabel, positionOf,
 };

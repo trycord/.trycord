@@ -27,7 +27,7 @@ import { bannerNode, channelIcon, serverMark } from '../ui/primitives.js';
 import { copyText } from '../ui/clipboard.js';
 import {
   State, nameOf, refreshServer, refreshServerTree, refreshServerMembers, isOwner,
-  can, isMuted,
+  can, isMuted, serverById,
 } from '../../packages/store.js';
 import { communitySectionGroups } from '../../packages/communitySettings.js';
 import {
