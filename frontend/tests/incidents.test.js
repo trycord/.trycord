@@ -34,10 +34,6 @@ function classed(word) {
   };
 }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 const INCIDENT = {
   id: 'i1',
   kind: 'incident',
@@ -124,7 +120,6 @@ test('a reader sees what the operator wrote', async () => {
 
   const view = renderStatus({ page: { id: 'status' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
-  await wait(20);
 
   const text = view.node.textContent || '';
   assert.match(text, /Messages are slow to arrive/, 'the incident was not shown');
@@ -142,7 +137,6 @@ test('an instance with nothing recorded says so', async () => {
 
   const view = renderStatus({ page: { id: 'status' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
-  await wait(20);
 
   const text = view.node.textContent || '';
   assert.match(text, /No incidents have been recorded/);
@@ -161,7 +155,6 @@ test('an instance that publishes no status page says that', async () => {
 
   const view = renderStatus({ page: { id: 'status' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
-  await wait(20);
 
   assert.match(view.node.textContent || '', /publishes no status page/);
 });

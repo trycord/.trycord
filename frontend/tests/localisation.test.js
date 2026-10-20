@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installDomStub, installFetchStub } from './helpers/dom-stub.js';
+import { installDomStub, installFetchStub, waitFor } from './helpers/dom-stub.js';
 
 installDomStub();
 
@@ -35,10 +35,6 @@ function classed(word) {
   };
 }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 const CATALOGUE = {
   locale: 'fr',
   source: 'reader',
@@ -59,7 +55,6 @@ test('the preference is kept by the server and the catalogue comes back', async 
   });
 
   await locale.setPreference('fr');
-  await wait(20);
 
   const put = calls.find((call) => call.url.indexOf('/api/localisation/preference') !== -1
     && call.options.method === 'PUT');
@@ -78,7 +73,6 @@ test('the formatting follows the locale', async () => {
     'http://localhost/api/localisation/preference': { json: { locale: 'fr' } },
   });
   await locale.loadLocale();
-  await wait(10);
 
   const written = locale.formatDate(new Date('2026-01-15T12:00:00Z'), {
     year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
@@ -98,7 +92,6 @@ test('the day labels come from the pack', async () => {
     'http://localhost/api/localisation/preference': { json: { locale: 'fr' } },
   });
   await locale.loadLocale();
-  await wait(10);
 
   assert.equal(dayLabel(new Date()), "Aujourd'hui");
   assert.equal(dayLabel(new Date(Date.now() - 86400000)), 'Hier');
@@ -115,14 +108,17 @@ test('the language page offers the languages the instance has', async () => {
 
   const view = languageView();
   await view.onMount();
-  await wait(20);
+
+  const rows = await waitFor(() => {
+    const found = find(view.node, classed('language-row'));
+    return found.length ? found : null;
+  });
+  assert.ok(rows, 'the languages were not offered');
+  assert.equal(rows.length, 2, 'the wrong number of languages was offered');
 
   const text = view.node.textContent || '';
   assert.match(text, /fr/, 'the language was not offered');
   assert.match(text, /The instance default/, 'the instance default was not offered');
-
-  const rows = find(view.node, classed('language-row'));
-  assert.equal(rows.length, 2, 'the wrong number of languages was offered');
   assert.ok(calls.some((call) => call.url.indexOf('/api/localisation/locales') !== -1),
     'the languages were never read');
 });

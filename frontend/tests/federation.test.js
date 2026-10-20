@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installDomStub, installFetchStub } from './helpers/dom-stub.js';
+import { installDomStub, installFetchStub, waitFor } from './helpers/dom-stub.js';
 
 installDomStub();
 
@@ -31,10 +31,6 @@ function classed(word) {
     const value = node.getAttribute && node.getAttribute('class');
     return !!value && value.split(/\s+/).indexOf(word) !== -1;
   };
-}
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // The disclosure, as the server writes it.
@@ -70,9 +66,12 @@ test('the reporter is told what crossed and what did not', async () => {
 
   const view = renderFederation({ page: { id: 'federation' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
-  await wait(20);
 
-  const text = view.node.textContent || '';
+  const text = await waitFor(() => {
+    const drawn = view.node.textContent || '';
+    return drawn.indexOf('What crosses with a report') !== -1 ? drawn : null;
+  });
+  assert.ok(text, 'the reporter was not told what crosses');
   for (const line of DISCLOSURE.shared) {
     assert.ok(text.indexOf(line) !== -1, 'the reporter was not told what crosses: ' + line);
   }
@@ -101,9 +100,12 @@ test('the report itself is listed for the reader who filed it', async () => {
 
   const view = renderFederation({ page: { id: 'federation' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
-  await wait(20);
 
-  assert.match(view.node.textContent || '', /This message breaks the rules of the community/);
+  const drawn = await waitFor(() => {
+    const text = view.node.textContent || '';
+    return text.indexOf('This message breaks the rules of the community') !== -1 ? text : null;
+  });
+  assert.ok(drawn, 'the report was not listed');
 });
 
 test('a report carries a reference and a reason, and nothing else', async () => {
@@ -136,34 +138,35 @@ test('a report carries a reference and a reason, and nothing else', async () => 
 
   const view = renderFederation({ page: { id: 'federation' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
-  await wait(20);
 
   // The community on the other instance, and what was relayed into it.
-  const followed = find(view.node, classed('federation-row'))[0];
+  const followed = await waitFor(() => find(view.node, classed('federation-row'))[0]);
   assert.ok(followed, 'the communities on other instances were not listed');
   followed.click();
-  await wait(30);
 
-  const relayed = find(document.body, classed('dialog'))[0];
+  const relayed = await waitFor(() => find(document.body, classed('dialog'))
+    .filter((node) => String(node.textContent).indexOf('a message that arrived here') !== -1)[0]);
   assert.ok(relayed, 'the relayed messages were not shown');
-  assert.match(relayed.textContent || '', /a message that arrived here/);
 
   const report = find(relayed, (node) => node.tagName === 'BUTTON'
     && String(node.textContent).indexOf('Report') !== -1)[0];
   assert.ok(report, 'there is no way to report a relayed message');
   report.click();
-  await wait(20);
 
-  const dialogs = find(document.body, classed('dialog'));
-  const reportDialog = dialogs[dialogs.length - 1];
-  const reason = find(reportDialog, (node) => node.tagName === 'INPUT')[0];
+  const form = await waitFor(() => {
+    const dialogs = find(document.body, classed('dialog'));
+    const reportDialog = dialogs[dialogs.length - 1];
+    if (!reportDialog || String(reportDialog.textContent).indexOf('Report to the other instance') === -1) return null;
+    return find(reportDialog, (node) => node.tagName === 'FORM')[0];
+  });
+  assert.ok(form, 'the report dialog did not open');
+  const dialog = form.parentNode;
+  const reason = find(dialog, (node) => node.tagName === 'INPUT')[0];
   reason.value = 'This message breaks the rules of the community';
-  const form = find(reportDialog, (node) => node.tagName === 'FORM')[0];
   form.submit();
-  await wait(40);
 
-  const posted = calls.find((call) => call.url.indexOf('/api/federation-reports') !== -1
-    && call.options.method === 'POST');
+  const posted = await waitFor(() => calls.find((call) => call.url.indexOf('/api/federation-reports') !== -1
+    && call.options.method === 'POST'));
   assert.ok(posted, 'the report was never filed');
   assert.equal(posted.body.targetInstanceId, 'peer-1');
   assert.equal(posted.body.communityId, 'comm-1');
@@ -191,9 +194,11 @@ test('the instance reads the reports that arrived here', async () => {
 
   const view = adminFederation();
   await view.onMount();
-  await wait(20);
 
-  const text = view.node.textContent || '';
-  assert.match(text, /A message here breaks the rules/);
+  const text = await waitFor(() => {
+    const drawn = view.node.textContent || '';
+    return drawn.indexOf('A message here breaks the rules') !== -1 ? drawn : null;
+  });
+  assert.ok(text, 'the reports that arrived were not listed');
   assert.match(text, /actionable/);
 });

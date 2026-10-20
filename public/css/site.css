@@ -985,6 +985,24 @@ table.plain th, table.plain td { text-align: left; padding: var(--space-2) var(-
 table.plain th { color: var(--color-text-primary); }
 table.plain td { color: var(--color-text-secondary); }
 
+/* The licence table. The dependency list is the one thing on this page that
+   people actually read to find out what they are shipping. */
+.licence-table { width: 100%; border-collapse: collapse; margin: var(--space-4) 0; font-size: var(--text-sm); }
+.licence-table th, .licence-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+.licence-table thead th {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+.licence-table tbody th { color: var(--color-text-primary); font-weight: var(--weight-medium); }
+.licence-table tbody td { color: var(--color-text-secondary); font-family: var(--font-mono); }
+
 .status-panel {
   margin-top: var(--space-5);
   padding: var(--space-6);
