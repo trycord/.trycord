@@ -145,6 +145,24 @@ router.get('/registry/:packageId', auth, wrap(async (req, res) => {
 }));
 
 // The extensions this instance has installed.
+// GET /api/extensions/capabilities - the capability catalogue.
+//
+// The vocabulary of what an extension or a workflow may be allowed to do.
+//
+// It is published because a client cannot invent it: the descriptions live
+// here, in the same place the permission is enforced, so a screen that
+// described a capability from its own copy would eventually describe it
+// wrongly. A grant picker that cannot see the catalogue has to ask an
+// administrator to type a name they may not know, and the server refuses
+// the name it does not know with a reason that is less useful than a list.
+//
+// The list is public to a signed-in account, because knowing what a thing
+// may ask for is not the same as being allowed to ask for it. Every grant
+// is still checked at the point of use.
+router.get('/capabilities', auth, wrap(async (req, res) => {
+  res.json({ capabilities: extensions.capabilities.catalogue() });
+}));
+
 router.get('/installed', adminGuard, wrap(async (req, res) => {
   res.json({ extensions: await extensions.installed() });
 }));

@@ -39,6 +39,16 @@ export function readPackage(packageId) {
 
 // -- the installed extensions ------------------------------------------------
 
+// The capability catalogue: what an extension or a workflow may be allowed to
+// do, and what each one means.
+//
+// It is read from the server rather than written here, because the
+// descriptions live in the same place the permission is enforced. A client
+// copy of the vocabulary would eventually describe a capability wrongly.
+export function readCapabilityCatalogue() {
+  return request('GET', ROOT + '/capabilities');
+}
+
 export function readInstalled() {
   return request('GET', ROOT + '/installed');
 }
