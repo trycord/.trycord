@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installPhoneStub, find } from './helpers.js';
+import { installPhoneStub, resetPhone, find } from './helpers.js';
 import { fakeClient } from './fake-client.js';
 import { waitFor } from '../helpers/dom-stub.js';
 
@@ -19,6 +19,7 @@ const { encryptionBody } = await import('../../mobile/js/views/encryption.js');
 
 test('the encryption screen on a phone', async (t) => {
   await t.test('it lists this device and the account\'s devices', async () => {
+    resetPhone();
     const client = fakeClient({
       devices: [
         { id: 'device-this-phone', label: 'This phone', keyFingerprint: 'a1b2', recoveryEnabled: true },
@@ -42,6 +43,7 @@ test('the encryption screen on a phone', async (t) => {
   });
 
   await t.test('it says when this phone has no device yet', async () => {
+    resetPhone();
     const client = fakeClient({ device: null });
     const node = encryptionBody({ client: async () => client });
     assert.ok(await waitFor(() => /no device yet/.test(node.textContent)));
@@ -50,14 +52,15 @@ test('the encryption screen on a phone', async (t) => {
   });
 
   await t.test('the screen keeps the rules it says it keeps', async () => {
+    resetPhone();
     const client = fakeClient({ devices: [{ id: 'device-old-laptop', label: 'The old laptop' }] });
     const node = encryptionBody({ client: async () => client });
-    const drawn = await waitFor(() => /The old laptop/.test(node.textContent) && /never again/i.test(node.textContent));
+    const drawn = await waitFor(() => /The old laptop/.test(node.textContent) && /shown once/i.test(node.textContent));
     assert.ok(drawn, 'the screen did not draw its rules: ' + node.textContent);
     const text = node.textContent;
     assert.match(text, /private keys stay on this phone/i, 'the screen says the private keys stay here');
     assert.match(text, /cannot open/i, 'the screen says the server cannot open the sealed blob');
-    assert.match(text, /never again/i, 'the screen says the recovery key is shown once');
+    assert.match(text, /shown once/i, 'the screen says the recovery key is shown once');
     assert.match(text, /registers a new device/i, 'the screen says recovering registers a new device');
   });
 });

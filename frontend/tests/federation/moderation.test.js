@@ -15,6 +15,7 @@ installDomStub();
 
 const { setToken } = await import('../../packages/api.js');
 const { renderFederation } = await import('../../js/features/federation.js');
+const { adminFederation } = await import('../../js/features/adminFederation.js');
 
 const COMMUNITY = { id: 'c1', name: 'The Lantern', is_owner: true, permissions: ['*'] };
 
@@ -200,4 +201,23 @@ test('a reader who may moderate nothing is offered no moderation controls', asyn
     'the members of a community were offered to a reader');
   assert.ok(!calls.find((call) => call.url.indexOf('/api/continuum/moderation/') !== -1),
     'the reader was asked for the moderation surface');
+});
+
+test('the instance administrator moderates every community of the instance', async () => {
+  setToken('admin-a');
+  installFetchStub({
+    'http://localhost/api/federation-reports?limit=100': { json: [] },
+    'http://localhost/api/admin/servers?limit=100': { json: [{ id: 'c1', name: 'The Lantern' }] },
+    'http://localhost/api/continuum/moderation/messages': { json: [RELAYED] },
+    'http://localhost/api/continuum/moderation/members': { json: [MEMBER] },
+  });
+
+  const view = adminFederation();
+  await view.onMount();
+
+  const text = view.node.textContent;
+  assert.match(text, /a message a member of The Lantern wrote on another instance/,
+    'the message was not listed');
+  assert.match(text, /The Lantern/, 'the community was not named');
+  assert.match(text, /Sam Elsewhere/, 'the member was not listed');
 });

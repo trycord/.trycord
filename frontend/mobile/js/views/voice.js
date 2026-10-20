@@ -48,7 +48,7 @@ function switchControl(initial, onChange, label) {
 }
 
 // The provider in force, and the other two.
-function providerSection(report, onChanged) {
+function providerChoice(report, onChanged) {
   const list = el('div', { class: 'm-list', role: 'radiogroup', 'aria-label': 'Media provider' });
 
   for (const provider of report.providers) {

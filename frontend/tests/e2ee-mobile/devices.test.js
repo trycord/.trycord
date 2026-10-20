@@ -17,6 +17,7 @@ const { encryptionBody } = await import('../../mobile/js/views/encryption.js');
 
 test('revoking a device on a phone', async (t) => {
   await t.test('the screen says what revoking means', async () => {
+    resetPhone();
     const client = fakeClient({
       devices: [
         { id: 'device-this-phone', label: 'This phone' },
@@ -32,6 +33,7 @@ test('revoking a device on a phone', async (t) => {
   });
 
   await t.test('a device can be revoked, and the sheet asks first', async () => {
+    resetPhone();
     const client = fakeClient({
       devices: [
         { id: 'device-this-phone', label: 'This phone' },
@@ -46,7 +48,7 @@ test('revoking a device on a phone', async (t) => {
     assert.ok(revoke, 'the other device cannot be revoked from the screen');
     revoke.click();
 
-    const sheetNode = await waitFor(() => document.body.querySelector('[role="alertdialog"]'));
+    const sheetNode = await waitFor(() => lastDialog(document.body));
     assert.ok(sheetNode, 'the screen did not ask before revoking');
     assert.match(sheetNode.textContent, /stops being able to read/i);
     assert.match(sheetNode.textContent, /rekey/i);
@@ -62,6 +64,7 @@ test('revoking a device on a phone', async (t) => {
   });
 
   await t.test('this phone cannot revoke itself', async () => {
+    resetPhone();
     const client = fakeClient({
       devices: [
         { id: 'device-this-phone', label: 'This phone' },

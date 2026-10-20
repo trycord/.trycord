@@ -314,7 +314,13 @@ export function createFormState(initial) {
       return Object.keys(current).filter((field) => !sameValue(current[field], original[field]));
     },
     isDirty() { return this.dirtyFields().length > 0; },
-    commit() { Object.assign(original, current); },
+    // The fields that were written are the ones that are no longer unsaved.
+    // The others keep their state: a save of the identity does not make the
+    // guidelines look saved.
+    commit(fields) {
+      const list = Array.isArray(fields) ? fields : Object.keys(current);
+      for (const field of list) original[field] = current[field];
+    },
   };
 }
 

@@ -65,7 +65,7 @@ export function adminFederation() {
     moderation.replaceChildren(hold('Reading what the members of this instance wrote elsewhere'));
     try {
       const [servers, messages, members] = await Promise.all([
-        Api.adminServers({ limit: '500' }),
+        Api.adminServers({ limit: '100' }),
         continuum.moderationMessages(),
         continuum.moderationMembers(),
       ]);
