@@ -17,6 +17,7 @@ const db = require('../../db');
 const { now, uuid } = require('../../clock');
 const { Codes } = require('../../errors');
 const { protocolError } = require('./envelope');
+const protocol = require('./protocol');
 const membership = require('./membership');
 const devices = require('./devices');
 const uploads = require('../uploads');
@@ -186,4 +187,18 @@ async function get(userId, attachmentId) {
   };
 }
 
-module.exports = { register, store, get };
+/**
+ * The associated data an attachment key seal is bound to.
+ *
+ * The client seals and opens with exactly these bytes, so a seal cannot be
+ * moved to another attachment or to another conversation and opened there.
+ */
+function sealAad(conversationId, attachmentId) {
+  return protocol.canonical(
+    ['context', protocol.ATTACHMENT_SEAL_INFO],
+    ['conversation', conversationId],
+    ['attachment', attachmentId]
+  );
+}
+
+module.exports = { register, store, get, sealAad };

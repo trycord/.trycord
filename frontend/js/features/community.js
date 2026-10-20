@@ -19,6 +19,10 @@ import { avatar } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
 import { conversationSurface, asMessage, messageRow, copyText } from '../ui/chat.js';
 import { memberList } from '../ui/members.js';
+import {
+  openCategoryDialog, createChannel, renameCategory, deleteCategory,
+  categoryMenuItems, reorderCategories, orderAfterDrop, attachDragOrder,
+} from '../community/manage.js';
 import { communitySettingsSections } from './communitySettings.js';
 import { renderVoiceRoom } from '../voice/room.js';
 import { errorToast, toast, confirmDialog, openDialog } from '../ui/overlays.js';
@@ -463,7 +467,9 @@ export function renderCategories(ctx) {
 
   const read = () => {
     const tree = State.serverTree.get(serverId) || { categories: [], channels: [] };
-    if (!(tree.categories || []).length) {
+    const categories = (tree.categories || []).slice()
+      .sort((a, b) => (a.position || 0) - (b.position || 0));
+    if (!categories.length) {
       body.replaceChildren(blank({
         glyph: 'layers',
         title: 'No categories',
@@ -471,26 +477,41 @@ export function renderCategories(ctx) {
       }));
       return;
     }
-    body.replaceChildren(...(tree.categories || []).map((category) => {
+    body.replaceChildren(...categories.map((category) => {
       const count = (tree.channels || []).filter((channel) =>
         channel.category_id === category.id || channel.categoryId === category.id).length;
-      return row({
+      const node = row({
+        class: 'category-row',
+        link: true,
         lead: el('span', { class: 'role-dot' }, icon('layers', { size: 15 })),
         title: category.name,
         sub: count + ' channel' + (count === 1 ? '' : 's'),
+        menu: () => categoryMenuItems(serverId, category, {
+          canManageChannels: canManage,
+          onCreateChannel: () => createChannel(serverId, category.id),
+        }),
         side: canManage ? el('span', { class: 'rowtools' },
           el('button', {
             class: 'btn btn--ghost btn--sm', type: 'button',
             'aria-label': 'Rename the ' + category.name + ' category',
-            onClick: async () => {
-              try {
-                await Api.updateCategory(serverId, category.id, { name: category.name });
-                await refreshServerTree(serverId, { force: true });
-                read();
-              } catch (e) { errorToast(e); }
-            },
-          }, icon('edit', { size: 14 }))) : null,
+            onClick: (event) => { event.stopPropagation(); renameCategory(serverId, category); },
+          }, icon('edit', { size: 14 })),
+          el('button', {
+            class: 'btn btn--danger btn--sm', type: 'button',
+            'aria-label': 'Delete the ' + category.name + ' category',
+            onClick: (event) => { event.stopPropagation(); deleteCategory(serverId, category); },
+          }, 'Delete')) : null,
       });
+      if (canManage) {
+        attachDragOrder(node, {
+          id: category.id,
+          onDrop: (movedId, targetId) => {
+            const order = orderAfterDrop(categories, movedId, targetId);
+            if (order) reorderCategories(serverId, order);
+          },
+        });
+      }
+      return node;
     }));
   };
 
@@ -501,16 +522,10 @@ export function renderCategories(ctx) {
       head({
         kicker: server.name,
         title: 'Categories',
-        lede: 'The order of the column.',
+        lede: 'The order of the column. Drag a category onto another to move it.',
         actions: canManage ? el('button', {
           class: 'btn btn--default btn--sm', type: 'button',
-          onClick: async () => {
-            try {
-              await Api.createCategory(serverId, { name: 'New category' });
-              await refreshServerTree(serverId, { force: true });
-              read();
-            } catch (e) { errorToast(e); }
-          },
+          onClick: () => openCategoryDialog(serverId, { onDone: read }),
         }, icon('plus', { size: 14 }), 'New category') : null,
       }),
       card({ label: 'Categories', glyph: 'layers', body, flush: true }),

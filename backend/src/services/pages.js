@@ -333,6 +333,15 @@ function revisionMeta(row) {
   };
 }
 
+// A revision number, or null when the caller did not name one. Only digits:
+// a revision number that is not a number is a malformed request rather than
+// revision zero.
+function revisionNumber(raw) {
+  const text = String(raw == null ? '' : raw).trim();
+  if (!/^\d+$/.test(text)) return null;
+  return Number(text);
+}
+
 // The rendered body a visitor should see, or null when the page has never been
 // published and the file on disk should be served instead.
 async function publishedHtml(route) {
