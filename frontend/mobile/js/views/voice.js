@@ -11,7 +11,7 @@
 
 import { el } from '../../../packages/dom.js';
 import { request } from '../../../packages/api.js';
-import { toast } from '../ui.js';
+import { toast, confirm } from '../ui.js';
 import { loading, failure, chip } from '../components.js';
 import { section, field, textInput, actions, primaryButton, ghostButton, notice } from './util.js';
 import { SHARED_CONTROLS, stateOf, providerLabel, sourceLabel } from '../../../packages/voice.js';
@@ -93,6 +93,23 @@ function sharedSection(report, onChanged) {
         el('span', { class: 'm-row__sub' }, control.description)),
       el('span', { class: 'm-row__actions' },
         switchControl(current, async (on) => {
+          // Turning voice on is asked for. It changes what this instance
+          // offers every member, and the provider has to be able to carry a
+          // call. Turning it off is immediate: that is the safe direction,
+          // and asking about it would only be friction.
+          if (on && control.key === 'voice.enabled') {
+            const yes = await confirm({
+              title: 'Turn voice on?',
+              text: 'Every member of this instance will be able to join a voice channel. '
+                + 'The ' + providerLabel(report.active) + ' provider has to be able to carry a call, '
+                + 'so check that it answers before you rely on it.',
+              confirmLabel: 'Turn voice on',
+            });
+            if (!yes) {
+              if (onChanged) onChanged();
+              return;
+            }
+          }
           try {
             await saveSettings({ [control.key]: on });
             onChanged();
