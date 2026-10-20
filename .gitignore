@@ -22,9 +22,14 @@ node_modules/
 /backend/uploads/
 
 # build output
-release/
-release-fresh/
-dist/
+# Anchored, for the same reason `uploads/` is anchored above: an unanchored
+# `release/` also matched `docs/release/` - the release record set, which is
+# the evidence of what was done and what was not - so every one of those
+# documents was silently missing from every clone. A directory name is not a
+# safe ignore pattern when anything else shares it.
+/release/
+/release-fresh/
+/dist/
 trycord-desktop/client/
 # Staged from frontend/assets by scripts/copy-client.js on every build.
 trycord-desktop/build/icon.png
