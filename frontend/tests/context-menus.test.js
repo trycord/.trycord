@@ -28,9 +28,21 @@ const { attachLongPress } = await import('../mobile/js/ui.js');
 
 function find(node, predicate, found = []) {
   if (!node) return found;
+  if (Array.isArray(node)) {
+    for (const entry of node) find(entry, predicate, found);
+    return found;
+  }
   if (node.tagName && predicate(node)) found.push(node);
   for (const child of node.children || []) find(child, predicate, found);
   return found;
+}
+
+// A node whose class attribute carries the given word.
+function classed(word) {
+  return (node) => {
+    const value = node.getAttribute && node.getAttribute('class');
+    return !!value && value.split(/\s+/).indexOf(word) !== -1;
+  };
 }
 
 function tick() {
@@ -78,7 +90,7 @@ function seedCommunity() {
 test('a channel in the community tree carries the channel menu', async () => {
   seedCommunity();
   const parts = buildContext('community', { serverId: SERVER_ID }, null);
-  const links = find(parts.body, (n) => n.getAttribute && n.getAttribute('class') === 'nav-item nav-item--channel');
+  const links = find(parts.body, classed('nav-item--channel'));
   assert.ok(links.length >= 2, 'the tree drew no channels');
 
   const menu = await raise(links[0]);
@@ -92,7 +104,7 @@ test('a channel in the community tree carries the channel menu', async () => {
 test('the category heading in the community tree carries the category menu', async () => {
   seedCommunity();
   const parts = buildContext('community', { serverId: SERVER_ID }, null);
-  const headings = find(parts.body, (n) => n.getAttribute && n.getAttribute('class') === 'nav-label');
+  const headings = find(parts.body, classed('nav-label'));
   assert.ok(headings.length >= 1, 'the tree drew no category heading');
 
   const menu = await raise(headings[0]);
@@ -122,7 +134,7 @@ test('a member row carries the person menu', async () => {
   });
   const roster = memberList(SERVER_ID);
   await roster.load();
-  const rows = find(roster.node, (n) => n.getAttribute && n.getAttribute('class') === 'cardrow member-row');
+  const rows = find(roster.node, classed('member-row'));
   assert.equal(rows.length, 1, 'the roster drew no member');
 
   const menu = await raise(rows[0]);
@@ -142,7 +154,7 @@ test('a conversation in the DM list carries the person menu', async () => {
     updatedAt: '2024-01-01T00:00:00.000Z',
   }];
   const view = renderDms();
-  const rows = find(view.node, (n) => n.getAttribute && n.getAttribute('class') === 'cardrow');
+  const rows = find(view.node, classed('cardrow'));
   assert.ok(rows.length >= 1, 'the DM list drew no conversation');
 
   const menu = await raise(rows[0]);

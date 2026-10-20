@@ -70,13 +70,25 @@ async function markLive(sourceKind, sourceId, { fingerprint, kind, eventId }) {
   );
 }
 
+// Record that a row was decided against.
+//
+// An upsert rather than an insert: a row can be refused more than once - a
+// peer that is not trusted yet, and trusted a moment later - and the second
+// refusal is the same decision, not a second row that collides with the
+// first.
 async function markWithheld(sourceKind, sourceId, fingerprint) {
   const stamp = now();
-  await db.run(
-    'INSERT INTO continuum_publications '
-    + '(source_kind, source_id, fingerprint, state, published_at, updated_at) '
-    + 'VALUES (?, ?, ?, ?, ?, ?)',
-    [sourceKind, String(sourceId), fingerprint, 'withheld', stamp, stamp]
+  await db.upsert(
+    'continuum_publications',
+    ['source_kind', 'source_id', 'fingerprint', 'state', 'published_at', 'updated_at'],
+    [sourceKind, String(sourceId), fingerprint, 'withheld', stamp, stamp],
+    ['source_kind', 'source_id'],
+    {
+      fingerprint: db.newRef('fingerprint'),
+      state: db.newRef('state'),
+      published_at: db.newRef('published_at'),
+      updated_at: db.newRef('updated_at'),
+    }
   );
 }
 

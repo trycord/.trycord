@@ -34,12 +34,15 @@ function headIdentity(node, actions) {
   );
 }
 
-function group(label, nodes, action) {
+function group(label, nodes, action, labelNode) {
   if (!nodes.length && !action) return null;
   return el('div', { class: 'nav-group' },
     label
       ? el('div', { class: 'nav-head' },
-        el('div', { class: 'nav-label' }, label),
+        // The heading may be a node of the caller's own - a category's heading
+        // carries the category's menu and can be dragged, and a heading that is
+        // not the one on screen is a heading that cannot be acted on.
+        labelNode || el('div', { class: 'nav-label' }, label),
         action || null)
       : null,
     nodes);
@@ -276,7 +279,7 @@ function communityContext(serverId) {
       });
     }
 
-    sections.push(group(category.name, (byCategory.get(category.id) || []).map(channelItem), add));
+    sections.push(group(category.name, (byCategory.get(category.id) || []).map(channelItem), add, heading));
     byCategory.delete(category.id);
   }
   const loose = byCategory.get('') || [];

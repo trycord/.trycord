@@ -71,18 +71,6 @@ async function setFeedCursor(name, cursor) {
   );
 }
 
-// Publish one thing, and record it as withheld when the rules say it may not
-// leave. A withheld row stays withheld: what was not federable when it was
-// written is not federated later.
-async function publishOrWithhold(publish, kind, input, opts) {
-  const result = await publish(kind, input, opts);
-  if (result && result.ok) return result;
-  if (result && result.withhold && result.source) {
-    await ledger.markWithheld(result.source.kind, result.source.id, result.source.fingerprint);
-  }
-  return result;
-}
-
 // ---- new rows -------------------------------------------------------------
 
 async function scanCommunities(publish) {
@@ -93,7 +81,7 @@ async function scanCommunities(publish) {
     ['community']
   );
   for (const row of rows) {
-    await publishOrWithhold(publish, 'community.published', { serverId: row.id });
+    await publish('community.published', { serverId: row.id });
   }
   return rows.length >= BATCH;
 }
@@ -107,7 +95,7 @@ async function scanChannels(publish) {
     ['channel']
   );
   for (const row of rows) {
-    await publishOrWithhold(publish, 'channel.published', {
+    await publish('channel.published', {
       serverId: row.server_id,
       channelId: row.id,
     });
@@ -125,7 +113,7 @@ async function scanMessages(publish) {
     ['message']
   );
   for (const row of rows) {
-    await publishOrWithhold(publish, 'message.posted', {
+    await publish('message.posted', {
       serverId: row.server_id,
       channelId: row.channel_id,
       messageId: row.id,
@@ -156,7 +144,7 @@ async function scanReactions(publish) {
     ['reaction']
   );
   for (const row of rows) {
-    await publishOrWithhold(publish, 'reaction.added', {
+    await publish('reaction.added', {
       serverId: row.server_id,
       channelId: row.channel_id,
       messageId: row.message_id,
@@ -183,7 +171,7 @@ async function scanOutgoing(publish) {
   for (const row of rows) {
     const outgoing = await store.findOutgoing(row.id);
     if (!outgoing || outgoing.deleted_at) continue;
-    await publishOrWithhold(publish, 'message.posted', relay.outgoingInput(outgoing));
+    await publish('message.posted', relay.outgoingInput(outgoing));
   }
   return rows.length >= BATCH;
 }
@@ -246,7 +234,7 @@ async function sweepSource(publish, sourceKind) {
       const kind = DELETE_KIND[sourceKind];
       if (kind) {
         const input = relay.deletionInput(sourceKind, row.source_id, ledger.contextOf(row));
-        if (input) await publishOrWithhold(publish, kind, input);
+        if (input) await publish(kind, input);
       }
       await ledger.markDeleted(sourceKind, row.source_id);
       continue;
@@ -262,7 +250,7 @@ async function sweepSource(publish, sourceKind) {
     if (!settled(local)) continue;
     const input = await relay.updateInput(sourceKind, local);
     if (!input) continue;
-    await publishOrWithhold(publish, kind, input);
+    await publish(kind, input);
   }
 
   const last = rows[rows.length - 1];
@@ -330,7 +318,7 @@ async function writeStatus(pass) {
 async function run(publish) {
   const counted = { published: 0, withheld: 0, duplicates: 0, swept: 0, truncated: false };
   const record = async (kind, input, opts) => {
-    const result = await publishOrWithhold(publish, kind, input, opts);
+    const result = await publish(kind, input, opts);
     if (result && result.ok) counted.published += 1;
     else if (result && result.duplicate) counted.duplicates += 1;
     else if (result && result.withhold) counted.withheld += 1;
