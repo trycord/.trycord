@@ -528,7 +528,7 @@ const SCHEMA = [
     min: 0, max: 64, live: false,
   },
   {
-    key: 'cpu.concurrent_jobs', env: 'TRYCORD_CONCURRENT_JOBS', type: 'integer', default: 4,
+    key: 'cpu.concurrent_jobs', env: 'JOBS_CONCURRENT_JOBS', type: 'integer', default: 4,
     category: 'limits', label: 'Concurrent jobs per type',
     description: 'Maximum jobs of the same type running at once, so one expensive job type cannot starve the rest. Applied when the process next starts.',
     min: 1, max: 100, live: false,

@@ -131,9 +131,12 @@ async function store(userId, input) {
   if (buffer.length > uploads.MAX_SIZE) {
     throw protocolError('E2EE_VALIDATION_ERROR', 'the attachment is too large', 400);
   }
-  const id = String(input.id || uuid());
+  const id = String(input.id || '').trim();
   if (!ID.test(id)) {
-    throw protocolError('E2EE_VALIDATION_ERROR', 'the attachment id is not an id', 400);
+    // The id is not the server's to choose: the key is sealed to the
+    // attachment, so the client has to know which attachment it is sealing
+    // for before it uploads.
+    throw protocolError('E2EE_VALIDATION_ERROR', 'the attachment needs an id: the key is sealed to it', 400);
   }
   const seals = Array.isArray(input.sealedKeys) ? input.sealedKeys : [];
   await checkSeals(group, seals);

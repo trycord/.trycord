@@ -468,7 +468,6 @@ async function removePack(id) {
 }
 
 module.exports = {
-  SOURCE_STRINGS, KNOWN_FORMAT_VERSIONS,
   validatePack, installPack, get, listPacks, effectivePacks, removePack, reviewPack,
-  negotiate, matchAcceptLanguage, stringsFor, preferenceOf, setPreference, placeholders,
+  negotiate, stringsFor, preferenceOf, setPreference,
 };

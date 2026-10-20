@@ -101,4 +101,4 @@ async function remove(userId, id) {
   return { ok: true, id };
 }
 
-module.exports = { record, list, clear, remove, trim, limit };
+module.exports = { record, list, clear, remove };

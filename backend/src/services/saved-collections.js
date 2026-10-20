@@ -292,5 +292,5 @@ async function removeItem(userId, id, itemId) {
 }
 
 module.exports = {
-  listForUser, get, items, create, update, remove, addItem, removeItem, isMember,
+  listForUser, get, items, create, update, remove, addItem, removeItem,
 };

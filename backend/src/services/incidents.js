@@ -167,4 +167,4 @@ async function status(options) {
   };
 }
 
-module.exports = { KINDS, STATUSES, create, update, get, list, status };
+module.exports = { create, update, get, list, status };

@@ -19,46 +19,37 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import Api from '../../packages/api.js';
-import TrycordConfig from '../../packages/config.js';
+import Api, { request } from '../../packages/api.js';
 import { State } from '../../packages/store.js';
 import { head, card, row, blank, fault, fold, facts, hold, memo } from '../ui/page.js';
 import { errorToast, toast, confirmDialog, openDialog, openMenu } from '../ui/overlays.js';
 import { iconButton } from '../ui/primitives.js';
 import {
-  sourceToBlocks, blocksToSource, blockErrors, linkProblem,
+  sourceToBlocks, blocksToSource, blockErrors, linkProblem, imageProblem,
+  languageProblem, LIMITS,
 } from './pageSource.js';
 
 // -- reusable blocks ----------------------------------------------------------
 //
-// A reusable block is one that can stand in more than one page. The server
-// stores a page as a list of blocks and has no library of its own, so the
-// library lives in this browser: the blocks are expanded into the page when
-// they are inserted, and the page stores what any page stores.
+// A reusable block is one that can stand in more than one page: the contact
+// details at the foot of every policy, the standard note about moderation.
+//
+// The library is on the server. A block that lives in one browser cannot be
+// shared with the person at the next desk, and a block that two administrators
+// of the same instance cannot both use is not a shared block.
+//
+// A page holds the content of a block rather than a reference to it. Inserting
+// a block copies its blocks into the page, so a later change to the library
+// cannot change a page that has already been published and read.
+//
+// These four calls are not in the shared API surface, so they are made here.
 
-function snippetKey() {
-  let origin = 'local';
-  try { origin = new URL(TrycordConfig.backendUrl()).origin; } catch { /* keep the raw address */ }
-  return 'trycord.pages.snippets.' + origin;
-}
+const libraryPath = '/api/admin/pages/blocks';
 
-function readSnippets() {
-  try {
-    const raw = localStorage.getItem(snippetKey());
-    const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeSnippets(list) {
-  try { localStorage.setItem(snippetKey(), JSON.stringify(list)); } catch { /* storage is off */ }
-}
-
-function newSnippetId() {
-  return 'snippet-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-}
+const libraryList = () => request('GET', libraryPath);
+const libraryWrite = (body) => request('POST', libraryPath, { body });
+const libraryRename = (id, body) => request('PUT', libraryPath + '/' + encodeURIComponent(id), { body });
+const libraryRemove = (id) => request('DELETE', libraryPath + '/' + encodeURIComponent(id));
 
 // -- the preview --------------------------------------------------------------
 //
@@ -85,37 +76,12 @@ function renderServerHtml(host, html) {
   host.replaceChildren(...Array.from(root.childNodes));
 }
 
-// -- the diff -----------------------------------------------------------------
+// -- the comparison -----------------------------------------------------------
 //
-// Which lines of the source changed, so a draft can be compared with what is
-// published. The revision list the server keeps carries no body, so the
-// comparison that can be made honestly is between the two bodies the server
-// does hold: the working draft and the published page.
-
-function diffLines(before, after) {
-  const a = String(before || '').split('\n');
-  const b = String(after || '').split('\n');
-  const table = [];
-  for (let i = 0; i <= a.length; i++) table.push(new Array(b.length + 1).fill(0));
-  for (let i = a.length - 1; i >= 0; i--) {
-    for (let j = b.length - 1; j >= 0; j--) {
-      table[i][j] = a[i] === b[j]
-        ? table[i + 1][j + 1] + 1
-        : Math.max(table[i + 1][j], table[i][j + 1]);
-    }
-  }
-  const out = [];
-  let i = 0;
-  let j = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) { out.push({ kind: 'same', text: a[i] }); i++; j++; }
-    else if (table[i + 1][j] >= table[i][j + 1]) { out.push({ kind: 'removed', text: a[i] }); i++; }
-    else { out.push({ kind: 'added', text: b[j] }); j++; }
-  }
-  while (i < a.length) { out.push({ kind: 'removed', text: a[i] }); i++; }
-  while (j < b.length) { out.push({ kind: 'added', text: b[j] }); j++; }
-  return out;
-}
+// What changed between two revisions. The server keeps the body of every
+// revision and answers what was added, what was removed and what was
+// rewritten, because how two revisions are shown is the client's decision and
+// a server that answered with markup would be deciding it for everybody.
 
 // -- the editor ---------------------------------------------------------------
 
@@ -127,6 +93,10 @@ const BLOCK_LABELS = {
   note: 'Note',
   link: 'Link',
   rule: 'Rule',
+  image: 'Image',
+  quote: 'Quotation',
+  code: 'Code',
+  table: 'Table',
 };
 
 export function adminPageEditor() {
@@ -317,6 +287,10 @@ export function adminPageEditor() {
       { label: 'List', icon: 'list', onSelect: () => insertBlock({ type: 'list', ordered: false, items: [''] }, at) },
       { label: 'Note', icon: 'alert', onSelect: () => insertBlock({ type: 'note', kind: 'info', text: '' }, at) },
       { label: 'Link', icon: 'link', onSelect: () => insertBlock({ type: 'link', text: '', href: '' }, at) },
+      { label: 'Image', icon: 'image', onSelect: () => insertBlock({ type: 'image', src: '', alt: '' }, at) },
+      { label: 'Quotation', icon: 'chat', onSelect: () => insertBlock({ type: 'quote', text: '' }, at) },
+      { label: 'Code', icon: 'code', onSelect: () => insertBlock({ type: 'code', text: '' }, at) },
+      { label: 'Table', icon: 'grid', onSelect: () => insertBlock({ type: 'table', headers: [''], rows: [['']] }, at) },
       { label: 'Rule', icon: 'slash', onSelect: () => insertBlock({ type: 'rule' }, at) },
     ];
     openMenu({ anchor: event.currentTarget, items });

@@ -66,6 +66,10 @@ function isoPlusMs(ms) {
 // Default concurrency per job kind: how many jobs of the same type run at once.
 // Read from the configuration centre (cpu.concurrent_jobs), falling back to 4.
 // Applied when the process next starts.
+//
+// The environment variable is JOBS_CONCURRENT_JOBS, beside JOBS_WORKERS. The
+// older name, TRYCORD_CONCURRENT_JOBS, is still read so a deployment that
+// set it keeps the value it set; it is the second choice, not the first.
 function defaultConcurrency() {
   try {
     const settings = require('./services/settings');
@@ -74,8 +78,10 @@ function defaultConcurrency() {
       if (Number.isFinite(saved) && saved > 0) return Math.floor(saved);
     }
   } catch { /* store not loaded yet */ }
-  const fromEnv = Number(process.env.TRYCORD_CONCURRENT_JOBS);
+  const fromEnv = Number(process.env.JOBS_CONCURRENT_JOBS);
   if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv);
+  const legacy = Number(process.env.TRYCORD_CONCURRENT_JOBS);
+  if (Number.isFinite(legacy) && legacy > 0) return Math.floor(legacy);
   return 4;
 }
 

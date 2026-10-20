@@ -159,9 +159,4 @@ function describe(filters) {
   return out;
 }
 
-// Is this key a filter this build knows?
-function isFilter(key) {
-  return Object.prototype.hasOwnProperty.call(FILTERS, String(key || '').toLowerCase());
-}
-
-module.exports = { parse, describe, isFilter, parseDate, tokenize, FILTERS, FILTER_KEYS };
+module.exports = { parse, describe };
