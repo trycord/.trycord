@@ -564,15 +564,22 @@ async function processInboundEvent(payload) {
 async function announceRelayed(result) {
   if (!result || !result.applied) return;
   if (result.subject === 'message' || result.subject === 'reaction') {
-    const followers = await inbound.localFollowers(result.originInstanceId, result.originCommunityId);
-    const type = result.subject === 'message' ? 'continuum:relay-message' : 'continuum:relay-reaction';
-    for (const userId of followers) {
-      realtime.emitTo(userId, type, {
-        origin_instance_id: result.originInstanceId,
-        origin_community_id: result.originCommunityId,
-        origin_message_id: result.originMessageId || null,
-        relayed: true,
-      });
+    // The followers of a remote community are the local accounts that read
+    // it. A message in a community this instance owns is not a relayed
+    // message for them: it is nobody's message here, and it is in the
+    // moderation surface rather than in the channel.
+    const owned = await db.get('SELECT id FROM servers WHERE id = ?', [result.originCommunityId]);
+    if (!owned) {
+      const followers = await inbound.localFollowers(result.originInstanceId, result.originCommunityId);
+      const type = result.subject === 'message' ? 'continuum:relay-message' : 'continuum:relay-reaction';
+      for (const userId of followers) {
+        realtime.emitTo(userId, type, {
+          origin_instance_id: result.originInstanceId,
+          origin_community_id: result.originCommunityId,
+          origin_message_id: result.originMessageId || null,
+          relayed: true,
+        });
+      }
     }
   }
   if (result.authorId) {

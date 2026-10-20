@@ -73,7 +73,11 @@ function makeElement(doc, tagName) {
     attributes: {},
     children: [],
     parentNode: null,
-    style: {},
+    style: {
+      setProperty(name, value) { this[name] = value; },
+      getPropertyValue(name) { return this[name] === undefined ? '' : this[name]; },
+      removeProperty(name) { delete this[name]; },
+    },
     textContent: '',
     value: '',
     checked: false,
@@ -248,6 +252,10 @@ export function installDomStub() {
     setItem: (key, value) => { storage.set(key, String(value)); },
     removeItem: (key) => { storage.delete(key); },
     clear: () => { storage.clear(); },
+    // The DOM's own way of asking what is stored, so a check can look without
+    // reaching into the stub's innards.
+    get length() { return storage.size; },
+    key: (index) => Array.from(storage.keys())[index] || null,
   };
 
   const media = { matches: false, addEventListener() {}, removeEventListener() {} };

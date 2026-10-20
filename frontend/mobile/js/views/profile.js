@@ -6,13 +6,13 @@
 
 import { el } from '../../../packages/dom.js';
 import { avatar, loading, failure } from '../components.js';
-import { State, normalizeUser, nameOf } from '../../../packages/store.js';
+import { normalizeUser, nameOf } from '../../../packages/store.js';
 import { navigate } from '../../../packages/nav.js';
-import { toast, confirm } from '../ui.js';
 import { joinedLabel } from '../../../packages/format.js';
 import { mediaUrl } from '../../../packages/media.js';
 import Api from '../../../packages/api.js';
 import { screen, section, notice, stat } from './util.js';
+import { personActions } from '../person.js';
 
 function presenceText(presence) {
   const value = presence || 'offline';
@@ -81,79 +81,24 @@ export function renderProfile(ctx) {
     return frag;
   }
 
+  // The actions on this person are the shared ones - the same list every other
+  // surface offers for the same person - so the profile cannot disagree with
+  // the rest of the application about what can be done with them.
   function paintActions(actions, user, profile) {
-    const relation = profile.relation || 'none';
-    if (relation === 'friend') {
-      actions.append(
-        el('button', { class: 'm-btn m-btn--primary', type: 'button', onClick: () => message(user) }, 'Message'),
-        el('button', { class: 'm-btn m-btn--ghost', type: 'button', onClick: () => removeFriend(user) }, 'Remove friend'));
-    } else if (relation === 'pending-out') {
-      actions.append(el('button', { class: 'm-btn m-btn--ghost', type: 'button', onClick: () => cancelRequest() }, 'Cancel request'));
-    } else if (relation === 'pending-in') {
-      actions.append(
-        el('button', { class: 'm-btn m-btn--primary', type: 'button', onClick: () => acceptRequest() }, 'Accept'),
-        el('button', { class: 'm-btn m-btn--ghost', type: 'button', onClick: () => declineRequest() }, 'Decline'));
-    } else if (relation === 'self') {
-      actions.appendChild(el('button', { class: 'm-btn m-btn--ghost', type: 'button', onClick: () => navigate('/settings') }, 'Account settings'));
-    } else {
-      actions.appendChild(el('button', { class: 'm-btn m-btn--primary', type: 'button', onClick: () => addFriend(user) }, 'Add friend'));
-    }
-    if (State.user && State.user.id !== user.id) {
-      actions.appendChild(el('button', {
-        class: 'm-btn ' + (profile.blockedByViewer ? 'm-btn--ghost' : 'm-btn--danger'),
-        type: 'button',
-        onClick: () => (profile.blockedByViewer ? unblock(user) : block(user)),
-      }, profile.blockedByViewer ? 'Unblock' : 'Block'));
-    }
-  }
-
-  async function message(user) {
-    try { const dm = await Api.createDm(user.id); navigate('/dms/' + dm.id); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function addFriend(user) {
-    try { await Api.sendFriendRequest(user.id); toast('Request sent.', { type: 'success' }); navigate(currentRoute()); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function findRequest() {
-    const page = await Api.friendRequests();
-    const incoming = page.incoming || [];
-    const outgoing = page.outgoing || [];
-    return incoming[0] || outgoing[0] || null;
-  }
-
-  async function acceptRequest() {
-    try { const r = await findRequest(); if (!r) return; await Api.acceptFriendRequest(r.id); toast('You are friends now.', { type: 'success' }); navigate(currentRoute()); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function declineRequest() {
-    try { const r = await findRequest(); if (!r) return; await Api.declineFriendRequest(r.id); navigate(currentRoute()); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function cancelRequest() {
-    try { const r = await findRequest(); if (!r) return; await Api.cancelFriendRequest(r.id); navigate(currentRoute()); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function removeFriend(user) {
-    const sure = await confirm({ title: 'Remove ' + nameOf(user) + '?', text: 'You can add them again later.', confirmLabel: 'Remove', danger: true });
-    if (!sure) return;
-    try { await Api.removeFriend(user.id); toast('Removed.', { type: 'success' }); navigate(currentRoute()); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function block(user) {
-    try { await Api.blockUser(user.id, ''); toast('Blocked.', { type: 'success' }); navigate(currentRoute()); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function unblock(user) {
-    try { await Api.unblockUser(user.id); toast('Unblocked.', { type: 'success' }); navigate(currentRoute()); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
+    personActions(user, {
+      relation: profile.relation,
+      blocked: !!profile.blockedByViewer,
+      onChanged: () => navigate(currentRoute()),
+    }).then((items) => {
+      for (const item of items) {
+        if (item.separator || item.header) continue;
+        actions.appendChild(el('button', {
+          class: 'm-btn ' + (item.danger ? 'm-btn--danger' : (item.icon === 'message' ? 'm-btn--primary' : 'm-btn--ghost')),
+          type: 'button',
+          onClick: () => { if (item.onSelect) item.onSelect(); },
+        }, item.label));
+      }
+    });
   }
 
   return { node, head: { lead: 'back', title: 'Profile' }, onMount: load };
