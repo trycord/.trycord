@@ -24,6 +24,7 @@ import {
   categoryMenuItems, reorderCategories, orderAfterDrop, attachDragOrder,
 } from '../community/manage.js';
 import { communitySettingsSections } from './communitySettings.js';
+import { roleDot, roleColourField, memberRoleDot, roleChips } from '../../packages/roles.js';
 import { renderVoiceRoom } from '../voice/room.js';
 import { errorToast, toast, openDialog } from '../ui/overlays.js';
 
@@ -400,7 +401,7 @@ export function renderRoles(ctx) {
       return;
     }
     body.replaceChildren(...roles.map((role) => row({
-      lead: el('span', { class: 'role-dot' }),
+      lead: roleDot(role),
       title: role.name,
       sub: role.permissions && role.permissions.length
         ? role.permissions.map((permission) => permission).slice(0, 3).join(', ')
@@ -673,12 +674,21 @@ function roleEditor(serverId, role, refresh) {
     'aria-label': 'Role name',
     placeholder: 'A name the members will read',
   });
+  // The colour of the role. It is a display hint the community chooses, and
+  // it is saved with the role through the same call that saves the name.
+  const colour = roleColourField({ role });
   const save = async (event) => {
     event.preventDefault();
     if (!name.value.trim()) { name.focus(); return; }
+    const chosen = colour.read();
+    if (chosen === undefined) {
+      // The value in the field is not a colour. The field says so; the save
+      // does not go ahead with something the server would refuse.
+      return;
+    }
     try {
-      if (role) await Api.updateRole(serverId, role.id, { name: name.value.trim() });
-      else await Api.createRole(serverId, { name: name.value.trim() });
+      if (role) await Api.updateRole(serverId, role.id, { name: name.value.trim(), color: chosen });
+      else await Api.createRole(serverId, { name: name.value.trim(), color: chosen });
       close();
       await refreshServerRoles(serverId);
       refresh();
@@ -689,6 +699,7 @@ function roleEditor(serverId, role, refresh) {
     title: role ? 'Edit ' + role.name : 'New role',
     body: el('form', { onSubmit: save, class: 'fold' },
       name,
+      colour.node,
       el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save')),
   });
   name.focus();

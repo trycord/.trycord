@@ -41,6 +41,53 @@ function sources() {
 }
 
 /**
+ * The source with its comments blanked out.
+ *
+ * The audit reads the source as text, and a comment is not code: an
+ * apostrophe in a comment - "the server's contract" - reads as the start of
+ * a string, and every bracket after it is then counted against the wrong
+ * state. The audit reported a button with no name that has a name, and
+ * pointed at the wrong line, because of a word in a comment.
+ *
+ * The comment is replaced with spaces rather than removed, so the offsets
+ * and the line numbers stay exactly what they were. A commented-out control
+ * is not checked either, which is right: it is not rendered.
+ */
+function maskComments(source) {
+  let out = '';
+  let inString = null;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (inString) {
+      out += ch;
+      if (ch === '\\') { out += source[i + 1] || ''; i += 1; continue; }
+      if (ch === inString) inString = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') { inString = ch; out += ch; continue; }
+    if (ch === '/' && source[i + 1] === '/') {
+      while (i < source.length && source[i] !== '\n') { out += ' '; i += 1; }
+      out += '\n';
+      i -= 1;
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      out += '  ';
+      i += 1;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) {
+        out += source[i] === '\n' ? '\n' : ' ';
+        i += 1;
+      }
+      out += '  ';
+      i += 1;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/**
  * The text of a call, from its opening parenthesis to the one that closes it.
  */
 function callAt(source, openIndex) {
@@ -133,7 +180,11 @@ test('accessibility of the client', async (t) => {
   await t.test('every button and link can be named', () => {
     const problems = [];
     for (const file of files) {
-      const source = fs.readFileSync(file, 'utf8');
+      // The comments are blanked out first: the audit reads the source as
+      // text, and an apostrophe in a comment is read as a string that never
+      // ends. The line numbers are unaffected - a comment is replaced with
+      // spaces, so every offset is the one it was.
+      const source = maskComments(fs.readFileSync(file, 'utf8'));
       const re = /\bel\('(button|a)',\s*\{/g;
       let m;
       while ((m = re.exec(source)) !== null) {
@@ -154,7 +205,11 @@ test('accessibility of the client', async (t) => {
     // have text after it.
     const problems = [];
     for (const file of files) {
-      const source = fs.readFileSync(file, 'utf8');
+      // The comments are blanked out first: the audit reads the source as
+      // text, and an apostrophe in a comment is read as a string that never
+      // ends. The line numbers are unaffected - a comment is replaced with
+      // spaces, so every offset is the one it was.
+      const source = maskComments(fs.readFileSync(file, 'utf8'));
       const re = /el\('(button|a)',\s*\{/g;
       let m;
       while ((m = re.exec(source)) !== null) {
@@ -181,7 +236,11 @@ test('accessibility of the client', async (t) => {
     // are the ones that carry the keyboard behaviour themselves.
     const problems = [];
     for (const file of files) {
-      const source = fs.readFileSync(file, 'utf8');
+      // The comments are blanked out first: the audit reads the source as
+      // text, and an apostrophe in a comment is read as a string that never
+      // ends. The line numbers are unaffected - a comment is replaced with
+      // spaces, so every offset is the one it was.
+      const source = maskComments(fs.readFileSync(file, 'utf8'));
       const re = /el\('(div|span|li|p|section|article)',\s*\{([^}]*)\}/g;
       let m;
       while ((m = re.exec(source)) !== null) {

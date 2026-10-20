@@ -13,6 +13,7 @@
 //   VERSION          the application release (3.0.0)
 //   API_VERSION      the version of the HTTP contract (1)
 //   PROTOCOL_VERSION the native federation protocol (trycord-continuum/1.0)
+//   EXTENSION_API_VERSION the version of the extension surface (3.0)
 //
 // A client that speaks an older API or protocol version is told so by the
 // instance endpoint rather than discovering it through a confusing failure.
@@ -34,6 +35,25 @@ const API_VERSION = 1;
 // revision, and two instances negotiate on it before exchanging anything.
 const PROTOCOL_VERSION = 'trycord-continuum/1.0';
 
+// The extension surface version.
+//
+// This is **not** the application version, and it is not derived from it.
+// The two change for different reasons and on different schedules: an
+// application release may add features, fix faults or change the interface it
+// offers, none of which changes what an extension may ask the host to do.
+//
+// Deriving it from the application version broke every installed extension
+// at the first release that was numbered differently from the one the
+// extensions were written against: a package that targets extension API 3.0
+// was refused by a 3.6 release with "this instance implements 3.6", and the
+// extensions were fine.
+//
+// So it is written down here, and it is changed by hand, and only when the
+// extension surface itself changes: a new capability, a changed event, a
+// changed host API. An extension built against 3.0 keeps working across
+// every application release until that surface changes.
+const EXTENSION_API_VERSION = '3.0';
+
 const NAME = manifest.name === 'backend' ? 'Trycord' : manifest.name;
 
-module.exports = { VERSION, API_VERSION, PROTOCOL_VERSION, NAME };
+module.exports = { VERSION, API_VERSION, PROTOCOL_VERSION, EXTENSION_API_VERSION, NAME };

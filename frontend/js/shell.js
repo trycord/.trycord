@@ -20,7 +20,10 @@ import { State, nameOf, on as onStore } from '../packages/store.js';
 import { path, currentRoute, navigate, BASE } from '../packages/nav.js';
 import { openMenu, attachContextMenu, isOverlayOpen, isMenuOpen, closeTopOverlay } from './ui/overlays.js';
 import { buildContext, serverMenuItems } from './shell/context.js';
-import { buildFrame, attachColumnResize, brandMark } from './shell/frame.js';
+import {
+  buildFrame, attachColumnResize, brandMark,
+  narrowWindow, NARROW_WIDTH as FRAME_NARROW_WIDTH,
+} from './shell/frame.js';
 import { createInspector } from './shell/inspector.js';
 import { openPalette, shortcutLabel } from './shell/palette.js';
 import {
@@ -141,14 +144,15 @@ export function mountShell() {
 // column. They are checked against each other, because a threshold in one
 // place and not the other is a sidebar that is visible in one half of the
 // application and not the other.
-export const NARROW_WIDTH = 860;
+// The width below which the place column is a panel over the stage rather
+// than a column beside it. It is one number, and the frame owns it, because
+// the frame's button and the stylesheet's media query both depend on it.
+export const NARROW_WIDTH = FRAME_NARROW_WIDTH;
 
 function narrow() {
-  try {
-    return window.matchMedia('(max-width: ' + NARROW_WIDTH + 'px)').matches;
-  } catch {
-    return false;
-  }
+  // The same question the stylesheet asks, in one place, so the button and
+  // the media query cannot disagree about it.
+  return narrowWindow();
 }
 
 function syncNavMode() {

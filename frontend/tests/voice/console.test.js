@@ -104,7 +104,7 @@ test('the voice console', async () => {
   await test('a provider shows only its own fields, plus the shared ones', async () => {
     installFetchStub({
       'http://localhost/api/voice/providers': { json: REPORT },
-      'http://localhost/api/admin/settings': { json: { ok: true, changed: [] } },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
     });
 
     const view = adminVoice();
@@ -138,7 +138,7 @@ test('the voice console', async () => {
   await test('a credential is masked, and can be replaced and cleared', async () => {
     const calls = installFetchStub({
       'http://localhost/api/voice/providers': { json: REPORT },
-      'http://localhost/api/admin/settings': { json: { ok: true, changed: [] } },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
     });
 
     const view = adminVoice();
@@ -158,13 +158,13 @@ test('the voice console', async () => {
     byLabel(view.node, 'Replace TURN credential for the mesh').click();
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    const saved = calls.filter((call) => call.url.indexOf('/api/admin/settings') !== -1);
+    const saved = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1);
     assert.ok(saved.length, 'the replacement was saved');
     const body = saved[saved.length - 1].body;
     assert.equal(body['voice.mesh.turnCredential'], 'a-new-credential');
 
     // Clearing it is a deliberate act, and it is confirmed before it happens.
-    const before = calls.filter((call) => call.url.indexOf('/api/admin/settings') !== -1).length;
+    const before = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1).length;
     byLabel(view.node, 'Clear TURN credential for the mesh').click();
     await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -175,7 +175,7 @@ test('the voice console', async () => {
     buttons[0].click();
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    const after = calls.filter((call) => call.url.indexOf('/api/admin/settings') !== -1);
+    const after = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1);
     assert.ok(after.length > before, 'the clear was saved');
     assert.equal(after[after.length - 1].body['voice.mesh.turnCredential'], null,
       'the clear is written as an explicit removal');
@@ -184,7 +184,7 @@ test('the voice console', async () => {
   await test('the result of a connectivity check is shown', async () => {
     const calls = installFetchStub({
       'http://localhost/api/voice/providers': { json: REPORT },
-      'http://localhost/api/admin/settings': { json: { ok: true, changed: [] } },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
       'http://localhost/api/voice/providers/mesh/check': {
         json: { provider: 'mesh', ok: false, detail: 'Nothing answered a binding request.', checkedAt: 2, missing: [] },
       },
@@ -213,7 +213,7 @@ test('the voice console', async () => {
   await test('a provider that is not ready says what is missing', async () => {
     installFetchStub({
       'http://localhost/api/voice/providers': { json: REPORT },
-      'http://localhost/api/admin/settings': { json: { ok: true, changed: [] } },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
     });
 
     const view = adminVoice();

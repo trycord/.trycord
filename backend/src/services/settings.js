@@ -59,6 +59,7 @@ const VOICE_OWNED = [
   'voice.cloudflare.maxParticipants',
   'voice.sfu.endpoint', 'voice.sfu.stunUrls', 'voice.sfu.turnUrl',
   'voice.sfu.turnUsername', 'voice.sfu.turnCredential', 'voice.sfu.maxParticipants',
+  'voice.sfu.token',
 ];
 
 // The interface that owns a setting, or null when the general Configuration
@@ -373,12 +374,6 @@ const SCHEMA = [
     category: 'continuum', label: 'Community Continuum',
     description: 'Federate with compatible Trycord instances. While on, trusted peers receive signed events from this one and this instance accepts events from instances an administrator added.',
     live: true, consequential: true,
-  },
-  {
-    key: 'voice.turnUsername', env: 'VOICE_VIDEO_TURN_USERNAME', type: 'string', default: '',
-    category: 'voice-legacy', label: 'TURN username (superseded)',
-    description: 'Replaced by the mesh\'s own TURN username.',
-    live: true,
   },
 
   // Read at call time by services/mail, so these are live.
@@ -1048,11 +1043,21 @@ function upsertSetting(t, key, value, adminId) {
 // the write only lands if the stored value has not moved since. Two administrators
 // editing the same setting from two browsers get the second one refused with the keys
 // in conflict, rather than whichever write happened to be issued last silently winning.
-async function save(entries, adminId) {
+async function save(entries, adminId, options) {
   await load();
   const before = {};
   const problems = [];
   const writes = [];
+
+  // Which console is writing.
+  //
+  // The console that owns a setting is where it is changed. A write that
+  // arrives from anywhere else is refused, and the refusal says where it
+  // belongs, so a second editor cannot become a second answer.
+  //
+  // When an owner is named, only the settings that owner owns are accepted:
+  // the voice console is not a second place to change the instance name.
+  const writer = options && options.owner ? String(options.owner) : null;
 
   // The cross-setting rules resolve before anything is written, because a rule that is
   // checked while writing would leave the earlier keys applied and the later ones not.
@@ -1079,7 +1084,12 @@ async function save(entries, adminId) {
     // arrives here for one of them is refused, and the refusal says where it
     // belongs - so a second editor cannot become a second answer.
     const owner = canonicalInterface(key);
-    if (owner) {
+    if (writer) {
+      if (owner !== writer) {
+        problems.push(key + ': not changed in ' + CANONICAL_INTERFACES[writer].label);
+        continue;
+      }
+    } else if (owner) {
       const interface = CANONICAL_INTERFACES[owner];
       problems.push(key + ': changed in ' + interface.label + ', not here');
       continue;
@@ -1271,12 +1281,28 @@ function status() {
 //
 // A secret the deployment owns cannot be reset here - there is nothing of the instance's
 // to remove - and that is the only case that refuses.
-async function reset(key, adminId) {
+async function reset(key, adminId, options) {
   await load();
   const entry = BY_KEY.get(key);
   if (!entry) { const e = new Error('unknown setting ' + key); e.code = 'NOT_FOUND'; throw e; }
   if (SECRETS.has(key) && store.sources[key] === 'environment') {
     const e = new Error('that secret is set by the deployment environment and cannot be reset here');
+    e.code = 'LOCKED';
+    throw e;
+  }
+
+  // A setting another console owns is not reset from here either: a reset is
+  // a change, and it is changed where it is changed.
+  const writer = options && options.owner ? String(options.owner) : null;
+  const owner = canonicalInterface(key);
+  if (writer) {
+    if (owner !== writer) {
+      const e = new Error(key + ': not changed in ' + CANONICAL_INTERFACES[writer].label);
+      e.code = 'LOCKED';
+      throw e;
+    }
+  } else if (owner) {
+    const e = new Error(key + ': changed in ' + CANONICAL_INTERFACES[owner].label + ', not here');
     e.code = 'LOCKED';
     throw e;
   }
@@ -1322,13 +1348,14 @@ function serialise(value) {
 // be decrypted is reported separately: an instance whose JWT_SECRET was rotated has
 // secrets it can no longer read, and that has to be visible rather than showing up as
 // an unexplained delivery failure.
-function catalogue(secretState) {
-  const state = secretState || secretValues;
-  return CATEGORIES.map((cat) => ({
-    id: cat.id,
-    label: cat.label,
-    settings: SCHEMA.filter((s) => s.category === cat.id).map((s) => {
-      const base = {
+// One setting, as the console that shows it needs it: the value, where it
+// came from, whether it is locked, and which console owns it.
+//
+// The general catalogue and the voice console show the same setting in the
+// same words, so the shape is written once here.
+function describeSetting(s, state) {
+  {
+    const base = {
         key: s.key,
         env: s.env || null,
         label: s.label,
@@ -1364,29 +1391,54 @@ function catalogue(secretState) {
           ? CANONICAL_INTERFACES[canonicalInterface(s.key)].route
           : null,
       };
-      if (!SECRETS.has(s.key)) return base;
-      const stored = state[s.key];
-      return {
-        key: s.key,
-        env: s.env || null,
-        label: s.label,
-        description: s.description,
-        type: 'secret',
-        set: !!stored,
-        readable: stored ? secrets.readable('mail:' + s.key, stored) : null,
-        source: store.sources[s.key],
-        live: !!s.live,
-        restartRequired: !s.live,
-        pendingRestart: store.pendingRestart.has(s.key),
-        consequential: !!s.consequential,
-        showIf: s.showIf || null,
-        locked: store.sources[s.key] === 'environment',
-        lockedReason: store.sources[s.key] === 'environment'
-          ? 'Set by the deployment environment (' + s.env + '). Rotate it there.'
-          : null,
-      };
-    }),
+    if (!SECRETS.has(s.key)) return base;
+    const stored = state[s.key];
+    return {
+      key: s.key,
+      env: s.env || null,
+      label: s.label,
+      description: s.description,
+      type: 'secret',
+      set: !!stored,
+      readable: stored ? secrets.readable('mail:' + s.key, stored) : null,
+      source: store.sources[s.key],
+      live: !!s.live,
+      restartRequired: !s.live,
+      pendingRestart: store.pendingRestart.has(s.key),
+      consequential: !!s.consequential,
+      showIf: s.showIf || null,
+      locked: store.sources[s.key] === 'environment',
+      lockedReason: store.sources[s.key] === 'environment'
+        ? 'Set by the deployment environment (' + s.env + '). Rotate it there.'
+        : null,
+    };
+  }
+}
+
+// The catalogue the Configuration page renders: the categories it publishes,
+// in order.
+function catalogue(secretState) {
+  const state = secretState || secretValues;
+  return CATEGORIES.map((cat) => ({
+    id: cat.id,
+    label: cat.label,
+    settings: SCHEMA.filter((s) => s.category === cat.id).map((s) => describeSetting(s, state)),
   })).filter((c) => c.settings.length);
+}
+
+// The settings one console owns, whatever category they are in.
+//
+// The general catalogue publishes the categories the Configuration page
+// shows. The voice console owns settings that are deliberately not published
+// there - the provider's own fields, and the older keys they replaced - so
+// it asks for its settings by key rather than by category. Without this the
+// provider settings were in no catalogue at all, and a console that asked
+// for them by category never saw them.
+function ownedSettings(owner, secretState) {
+  const state = secretState || secretValues;
+  return SCHEMA
+    .filter((s) => canonicalInterface(s.key) === owner)
+    .map((s) => describeSetting(s, state));
 }
 
 // The stored, still-encrypted value of a secret, or null. This is the only way a
@@ -1442,7 +1494,7 @@ module.exports = {
   canonicalInterface,
   CANONICAL_INTERFACES,
   VOICE_OWNED,
-  SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY,
+  SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY, ownedSettings,
   load, get, read, source, save, reset, catalogue, validate, serialise, isLoaded, status,
   secretStored, secretValue,
 };

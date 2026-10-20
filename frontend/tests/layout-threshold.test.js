@@ -24,16 +24,33 @@ function read(relative) {
 }
 
 test('the narrow-window threshold is the same number in the script and the stylesheet', () => {
-  const script = read('js/shell.js');
+  // The threshold is declared once, in the file that owns it.
+  //
+  // The frame owns it: the nav toggle's behaviour depends on it, and the
+  // shell imports the frame, so the number cannot live in the shell without
+  // the two importing each other. The check therefore looks for the
+  // declaration wherever it is, and then insists there is exactly one of it.
+  const sources = {
+    'js/shell.js': read('js/shell.js'),
+    'js/shell/frame.js': read('js/shell/frame.js'),
+  };
   const styles = read('css/shell.css');
 
-  const declared = /export const NARROW_WIDTH = (\d+);/.exec(script);
-  assert.ok(declared, 'the script does not declare the threshold it uses');
-  const width = Number(declared[1]);
+  const declarations = [];
+  for (const [file, source] of Object.entries(sources)) {
+    const found = [...source.matchAll(/export const NARROW_WIDTH = (\d+);/g)];
+    for (const match of found) declarations.push({ file, width: Number(match[1]) });
+  }
+  assert.equal(declarations.length, 1,
+    'the threshold is declared more than once, or not at all: '
+    + declarations.map((d) => d.file + ':' + d.width).join(', '));
+  const width = declarations[0].width;
 
   // The script asks the question with that number.
-  assert.match(script, new RegExp("'\\(max-width: ' \\+ NARROW_WIDTH \\+ 'px\\)'"),
-    'the script does not ask the question with the number it declares');
+  const asking = Object.entries(sources).filter(([, source]) =>
+    new RegExp("'\\(max-width: ' \\+ NARROW_WIDTH \\+ 'px\\)'").test(source));
+  assert.equal(asking.length, 1,
+    'the question is asked in ' + asking.length + ' places; it is asked once');
 
   // The stylesheet draws the line with the same number.
   const queries = [...styles.matchAll(/@media \(max-width: (\d+)px\)/g)].map((m) => Number(m[1]));
@@ -48,8 +65,10 @@ test('the narrow-window threshold is the same number in the script and the style
 });
 
 test('the threshold leaves a stage a conversation can be read in', () => {
-  const script = read('js/shell.js');
-  const width = Number(/export const NARROW_WIDTH = (\d+);/.exec(script)[1]);
+  const script = read('js/shell/frame.js') + read('js/shell.js');
+  const declared = /export const NARROW_WIDTH = (\d+);/.exec(script);
+  assert.ok(declared, 'the script does not declare the threshold it uses');
+  const width = Number(declared[1]);
 
   // The rail, the column and a readable stage have to fit. These are the
   // widths the token layer declares, so the check is against the real

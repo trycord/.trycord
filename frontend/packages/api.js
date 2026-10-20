@@ -532,6 +532,11 @@ const Api = {
   updateInstanceSettings: (body) => request('PUT', '/api/admin/settings', { body }),
   resetInstanceSetting: (key) => request('DELETE', '/api/admin/settings/' + encodeURIComponent(key)),
   instanceSettingsStatus: () => request('GET', '/api/admin/settings/status'),
+  // The voice console's own settings. The general route refuses the voice
+  // settings, so this is the path that actually writes them.
+  voiceSettings: () => request('GET', '/api/admin/voice/settings'),
+  updateVoiceSettings: (body) => request('PUT', '/api/admin/voice/settings', { body }),
+  resetVoiceSetting: (key) => request('DELETE', '/api/admin/voice/settings/' + encodeURIComponent(key)),
   adminPages: () => request('GET', '/api/admin/pages'),
   adminBackups: () => request('GET', '/api/admin/database/backups'),
   adminTakeBackup: () => request('POST', '/api/admin/database/backup', { body: {} }),

@@ -549,6 +549,10 @@ async function boot(options = {}) {
   // nothing else, so a provider cannot be offered that a service would refuse.
   app.use('/api/admin/providers', require('./routes/providers'));
   app.use('/api/admin/pages', require('./routes/adminPages'));
+  // The voice console's own settings, before the general settings route: the
+  // voice settings are changed here and nowhere else, and the general route
+  // refuses them. It is mounted first so that nothing else can answer for it.
+  app.use('/api/admin/voice/settings', require('./routes/voiceSettings'));
   app.use('/api/admin/settings', require('./routes/settings'));
   app.use('/api/admin/database', require('./routes/database'));
   app.use('/api/admin/diagnostics', require('./routes/diagnostics'));

@@ -17,7 +17,13 @@ import { section, field, textInput, actions, primaryButton, ghostButton, notice 
 import { SHARED_CONTROLS, stateOf, providerLabel, sourceLabel } from '../../../packages/voice.js';
 
 const PROVIDERS_PATH = '/api/voice/providers';
-const SETTINGS_PATH = '/api/admin/settings';
+// The voice console's own settings.
+//
+// The voice settings are changed here and nowhere else. The general
+// Configuration page shows them read-only and says where they are changed,
+// and a write that arrives there for one of them is refused - so this is the
+// path that actually works.
+const SETTINGS_PATH = '/api/admin/voice/settings';
 
 async function readProviders() {
   return request('GET', PROVIDERS_PATH);

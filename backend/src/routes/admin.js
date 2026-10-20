@@ -20,6 +20,20 @@ const router = express.Router();
 router.use(adminGuard);
 router.use(rateLimit({ windowMs: 60000, max: 300 }));
 
+// An enforcement action, in the vocabulary the request used.
+//
+// The request names the action `actionType` - that is what the console sends
+// and what the service reads - but the service answers with `type`. A caller
+// that posts `actionType` and reads `actionType` back would read nothing, and
+// that is exactly the drift that made these actions unusable in the first
+// place. So the answer carries both names: `actionType` is the one the
+// contract speaks, and `type` stays for the callers that already read it.
+function actionResponse(action) {
+  if (!action || typeof action !== 'object') return action;
+  if (!action.actionType && action.type) action.actionType = action.type;
+  return action;
+}
+
 // --- overview ---
 
 router.get('/overview', async (req, res, next) => {
@@ -99,7 +113,7 @@ router.post('/users/:id/enforce', async (req, res, next) => {
     const action = await enforcement.applyUserAction(req.user.id, target.id, req.body || {});
     // Live sockets for a freshly enforced account are cut off now.
     gateway.disconnectUser(target.id, 'this account is under a moderation action');
-    res.json(action);
+    res.json(actionResponse(action));
   } catch (e) { serviceError(res, e); }
 });
 
@@ -107,7 +121,7 @@ router.post('/users/:id/lift', async (req, res, next) => {
   try {
     const target = await db.get('SELECT id FROM users WHERE id = ?', [req.params.id]);
     if (!target) return fail(res, 'NOT_FOUND', 'user not found');
-    res.json(await enforcement.liftUserEnforcement(req.user.id, target.id, (req.body || {}).reason));
+    res.json(actionResponse(await enforcement.liftUserEnforcement(req.user.id, target.id, (req.body || {}).reason)));
   } catch (e) { serviceError(res, e); }
 });
 
@@ -155,7 +169,7 @@ router.post('/servers/:id/suspend', async (req, res, next) => {
     const target = await db.get('SELECT id FROM servers WHERE id = ?', [req.params.id]);
     if (!target) return fail(res, 'NOT_FOUND', 'server not found');
     const input = Object.assign({}, req.body || {}, { actionType: 'SERVER_SUSPENSION' });
-    res.json(await enforcement.applyServerAction(req.user.id, target.id, input));
+    res.json(actionResponse(await enforcement.applyServerAction(req.user.id, target.id, input)));
   } catch (e) { serviceError(res, e); }
 });
 
@@ -163,7 +177,7 @@ router.post('/servers/:id/lift', async (req, res, next) => {
   try {
     const target = await db.get('SELECT id FROM servers WHERE id = ?', [req.params.id]);
     if (!target) return fail(res, 'NOT_FOUND', 'server not found');
-    res.json(await enforcement.liftServerEnforcement(req.user.id, target.id, (req.body || {}).reason));
+    res.json(actionResponse(await enforcement.liftServerEnforcement(req.user.id, target.id, (req.body || {}).reason)));
   } catch (e) { serviceError(res, e); }
 });
 

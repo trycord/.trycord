@@ -12,12 +12,16 @@
 
 const capabilities = require('./capabilities');
 const workflowTriggers = require('../workflows/triggers');
-const { VERSION } = require('../../version');
+const { VERSION, EXTENSION_API_VERSION } = require('../../version');
 
-// The extension API version this build implements. A package declares the
-// version it targets; the major and minor of the application release is what
-// the extension surface changes with.
-const EXTENSION_API = VERSION.split('.').slice(0, 2).join('.');
+// The extension API version this build implements.
+//
+// It is a contract of its own, written down in src/version.js and changed by
+// hand when the extension surface changes - never derived from the
+// application release. A package declares the surface it was built against,
+// and a package built against an older surface of the same generation is
+// still welcome here, because this build implements that surface too.
+const EXTENSION_API = EXTENSION_API_VERSION;
 
 const REVIEW_STATUSES = ['unreviewed', 'in-review', 'approved', 'rejected'];
 
@@ -121,6 +125,12 @@ function satisfies(version, range) {
  * The package names the extension API version it targets and the range of
  * application versions it runs on. A package built for another API generation
  * is refused rather than installed and left to fail at its first step.
+ *
+ * The extension API is a contract of its own, so it is compared as one: a
+ * package built against an older surface of the **same** generation is
+ * accepted, because this build implements that surface as well, and a package
+ * built against a newer surface is refused, because this build cannot know
+ * what that surface asks of it.
  */
 function compatibilityReport(declared) {
   const compat = declared && typeof declared === 'object' ? declared : {};
@@ -129,10 +139,17 @@ function compatibilityReport(declared) {
   const maxInstance = compat.maxInstance ? String(compat.maxInstance).trim() : null;
 
   if (!api) return { ok: false, reason: 'the package does not declare which extension API version it targets' };
-  if (api !== EXTENSION_API) {
+  if (!sameGeneration(api, EXTENSION_API)) {
     return {
       ok: false,
       reason: 'the package targets extension API ' + api + ' and this instance implements ' + EXTENSION_API,
+    };
+  }
+  if (compareApiVersions(api, EXTENSION_API) > 0) {
+    return {
+      ok: false,
+      reason: 'the package targets extension API ' + api + ', which is newer than the '
+        + EXTENSION_API + ' this instance implements',
     };
   }
   if (minInstance && compareVersions(VERSION, minInstance) < 0) {
@@ -142,6 +159,37 @@ function compatibilityReport(declared) {
     return { ok: false, reason: 'the package supports Trycord up to ' + maxInstance + ', and this is ' + VERSION };
   }
   return { ok: true, api, minInstance, maxInstance };
+}
+
+// The extension API version is written the way a package author writes it -
+// "3.0", sometimes "3.0.1" - so it is parsed on its own terms rather than
+// through the strict semver parser the application versions use.
+function parseApiVersion(value) {
+  const m = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/.exec(String(value || '').trim());
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2] || 0), Number(m[3] || 0)];
+}
+
+/** Compare two extension API versions. -1, 0 or 1. */
+function compareApiVersions(a, b) {
+  const pa = parseApiVersion(a);
+  const pb = parseApiVersion(b);
+  if (!pa || !pb) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+// Whether two versions belong to the same generation: the same major.
+//
+// A generation is a break in the extension surface. Within a generation the
+// surface only grows, so an older package still fits.
+function sameGeneration(a, b) {
+  const pa = parseApiVersion(a);
+  const pb = parseApiVersion(b);
+  if (!pa || !pb) return false;
+  return pa[0] === pb[0];
 }
 
 /**
