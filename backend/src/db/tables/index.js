@@ -28,6 +28,7 @@ const continuum = require('./continuum');
 const developer = require('./developer');
 const extensions = require('./extensions');
 const workspace = require('./workspace');
+const onboarding = require('./onboarding');
 const forums = require('./forums');
 
 // e2ee sits next to identity because every table in it points at users(id)
@@ -44,7 +45,7 @@ const forums = require('./forums');
 // them yet.
 const GROUPS = [
   identity, e2ee, communities, messaging, social, moderation, instance, pages, continuum,
-  developer, extensions, workspace, forums,
+  developer, extensions, workspace, forums, onboarding,
 ];
 
 module.exports = (engine) => GROUPS.flatMap((group) => group(engine));

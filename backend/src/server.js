@@ -497,6 +497,9 @@ async function boot(options = {}) {
   app.use('/api/servers/:serverId/roles', require('./routes/roles'));
   app.use('/api/servers/:serverId/invites', inviteRoutes.managed);
   app.use('/api/servers/:serverId/communityMemory', require('./routes/communityMemory'));
+  // Community onboarding: the welcome, the rules, the questions, and the
+  // answers a member gives.
+  app.use('/api/servers/:serverId/onboarding', require('./routes/communityOnboarding'));
   app.use('/api/channels/:channelId/messages', require('./routes/messages'));
   // Forums. A forum is a channel of type 'forum': its root messages are
   // topics, its replies are the discussion under each, and the thread model
