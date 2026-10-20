@@ -127,7 +127,8 @@
 
 /* Density. The attribute lives on <html> and is written by js/prefs.js; the
  * default block is cozy, and the two other arrangements change measurements
- * rather than type, so a row is still a row. */
+ * rather than type, so a row is still a row. The rail's width is part of the
+ * arrangement: a dense workspace gives the communities less room. */
 :root,
 :root[data-density="cozy"] {
   --row-h: 44px;
@@ -136,6 +137,7 @@
   --msg-gap: 15px;
   --panel-pad: 16px;
   --section-gap: 24px;
+  --rail-w: 68px;
 }
 :root[data-density="compact"] {
   --row-h: 36px;
@@ -144,6 +146,7 @@
   --msg-gap: 10px;
   --panel-pad: 12px;
   --section-gap: 18px;
+  --rail-w: 54px;
 }
 :root[data-density="comfortable"] {
   --row-h: 52px;
@@ -152,6 +155,7 @@
   --msg-gap: 20px;
   --panel-pad: 20px;
   --section-gap: 32px;
+  --rail-w: 82px;
 }
 
 /* Ember - the default dark palette. Charcoal from the canonical library, the
@@ -1638,16 +1642,108 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 }
 .m-mark.m-mark--sm { width: 28px; height: 28px; font-size: var(--fs-meta); border-radius: var(--tc-radius-sm); }
 
-/* An embed: a link the message carries, drawn as its own panel. */
+/* -- link previews -----------------------------------------------------------
+ * A preview is a card: a picture or a player when the page had one, and the
+ * page's own words when it did not. The site is named by a tile of its first
+ * letter rather than by a favicon - a favicon is a request to an arbitrary
+ * host on behalf of every reader who opens the channel. */
 .m-embed {
   margin: 4px 0;
   padding: 10px 12px;
   border-left: 2px solid var(--m-brand-line);
   background: var(--panel-2);
   border-radius: 0 var(--tc-radius-md) var(--tc-radius-md) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.m-embed--plain {
+  display: block;
+  padding: 6px 0;
+  background: none;
+  border-left: 0;
+  color: var(--m-brand);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.m-embed__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.m-embed__site { display: flex; align-items: center; gap: 7px; color: var(--text-3); font-size: var(--fs-micro); }
+.m-embed__tile {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--tc-radius-sm);
+  background: var(--panel-3);
+  color: var(--text-2);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  text-transform: uppercase;
 }
 .m-embed__title { font-size: var(--fs-body); font-weight: var(--weight-medium); color: var(--text-1); }
 .m-embed__text { font-size: var(--fs-sm); color: var(--text-2); margin-top: 2px; }
+.m-embed__host { font-size: var(--fs-micro); color: var(--text-3); }
+.m-embed__original { align-self: flex-start; font-size: var(--fs-micro); color: var(--m-brand); }
+.m-embed__media {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: var(--tc-radius-md);
+  overflow: hidden;
+}
+.m-embed__image { display: block; max-width: 100%; max-height: 300px; object-fit: contain; }
+.m-embed__video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--tc-radius-md);
+  background: var(--panel-3);
+}
+.m-embed-row { display: flex; flex-direction: column; gap: 6px; }
+
+/* The image opened from a message, read large in a sheet. */
+.m-lightbox { display: flex; flex-direction: column; gap: 8px; }
+.m-lightbox__image {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: var(--tc-radius-md);
+  background: var(--panel-3);
+}
+.m-lightbox__bar { display: flex; align-items: center; gap: 10px; }
+.m-lightbox__caption {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-lightbox__count { color: var(--text-3); font-size: var(--fs-micro); }
+.m-lightbox__nav { display: flex; gap: 6px; }
+
+/* -- a person ---------------------------------------------------------------- */
+.m-person { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; }
+.m-person__name { font-size: var(--fs-lg); font-weight: var(--weight-strong); color: var(--text-1); }
+.m-person__handle { font-size: var(--fs-sm); color: var(--text-3); }
+.m-person__status { font-size: var(--fs-sm); color: var(--text-2); }
+
+/* -- the roster ---------------------------------------------------------------
+ * The presence is written twice - as the dot on the face and as the word
+ * beside the name - because a dot is a colour and a colour is not a sentence
+ * for a reader who cannot see it. */
+.m-member-presence { font-size: var(--fs-micro); color: var(--text-3); }
+.m-member-presence[data-presence="online"] { color: var(--m-success); }
+.m-member-presence[data-presence="idle"] { color: var(--m-warning); }
+.m-member-presence[data-presence="dnd"] { color: var(--m-danger); }
+.m-row--member { min-height: 56px; }
+.m-row--channel, .m-row--category { min-height: 52px; }
+.m-input--search { margin-bottom: 8px; }
 
 /* ---- attachments and media ------------------------------------------------ */
 

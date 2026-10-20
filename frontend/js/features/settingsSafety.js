@@ -6,6 +6,7 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { nameOf } from '../../packages/store.js';
+import { navigate } from '../../packages/nav.js';
 import { avatar, switchControl, setSwitch, fieldRow } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold } from '../ui/page.js';
 import { errorToast, toast } from '../ui/overlays.js';
@@ -63,6 +64,13 @@ export function privacyView() {
     try {
       const blocks = await Api.blocks();
       const rows = Array.isArray(blocks) ? blocks : (blocks && blocks.items) || [];
+      const unblock = async (blocked) => {
+        try {
+          await Api.unblockUser(blocked.id);
+          toast('Unblocked');
+          paintBlocks();
+        } catch (e) { errorToast(e); }
+      };
       blocksList.replaceChildren(...(rows.length ? rows.map((blocked) => row({
         lead: avatar(blocked, { size: 'sm', rounded: true }),
         title: nameOf(blocked) || blocked.username || 'Someone',
@@ -70,14 +78,16 @@ export function privacyView() {
         side: el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
           'aria-label': 'Unblock ' + (blocked.username || 'this person'),
-          onClick: async () => {
-            try {
-              await Api.unblockUser(blocked.id);
-              toast('Unblocked');
-              paintBlocks();
-            } catch (e) { errorToast(e); }
-          },
+          onClick: () => unblock(blocked),
         }, 'Unblock'),
+        // The same two things, raised by a right-click on the row.
+        menu: () => [
+          { label: 'Unblock', icon: 'check', onSelect: () => unblock(blocked) },
+          {
+            label: 'Open the profile', icon: 'user',
+            onSelect: () => navigate('/users/' + blocked.id),
+          },
+        ],
       })) : [blank({
         glyph: 'ban', title: 'Nobody blocked',
         text: 'Blocking starts on a person, in their profile.',

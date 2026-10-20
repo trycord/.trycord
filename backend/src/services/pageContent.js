@@ -207,8 +207,10 @@ function normaliseBlock(raw) {
       return attribution ? { type, text, attribution } : { type, text };
     }
     case 'code': {
-      const text = str(raw.text, MAX_CODE, 'code text').trim();
-      if (!text) fail('a code block needs text');
+      // The text of a code block keeps its indentation, because indentation
+      // is what code means. It still has to hold something.
+      const text = str(raw.text, MAX_CODE, 'code text');
+      if (!text.trim()) fail('a code block needs text');
       const language = safeLanguage(raw.language);
       return language ? { type, text, language } : { type, text };
     }

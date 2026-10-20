@@ -375,11 +375,16 @@ async function publishEvent(kind, payload, opts = {}) {
   // The outbox row. The envelope is signed when the event is delivered: the
   // signature covers the payload and the moment of delivery, so a row that
   // has been waiting in the outbox is signed with the time it actually left.
+  //
+  // The row carries the actor of the event - whoever caused it - because the
+  // delivery path keeps one actor's events in order, and an event whose
+  // actor is not recorded cannot be ordered against the others.
   const id = uuid();
+  const actorId = opts.actorId || (prepared.payload.origin && prepared.payload.origin.actor_id) || null;
   await db.run(
     'INSERT INTO continuum_events (id, kind, actor_id, target_id, payload, status, attempts, max_attempts, backoff_ms, run_after, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
-      id, prepared.kind, opts.actorId || null, opts.targetId || null, JSON.stringify(prepared.payload),
+      id, prepared.kind, actorId, opts.targetId || null, JSON.stringify(prepared.payload),
       'pending', 0, maxAttempts(), retryBaseMs(), now(), now(), now(),
     ]
   );

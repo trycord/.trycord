@@ -25,10 +25,12 @@ const FEDERATION_ENV = {
  *
  * @param {string} instanceId  the instance's own id, unique to this run
  * @param {object} [env]       extra environment
+ * @param {object} [options]   { jobs: false } to leave the background jobs
+ *                             alone, for a test that drives the feed itself
  */
-async function startFederatedInstance(instanceId, env) {
+async function startFederatedInstance(instanceId, env, options) {
   const instance = await startInstance({
-    jobs: true,
+    jobs: !(options && options.jobs === false),
     env: Object.assign(
       {},
       FEDERATION_ENV,
@@ -53,6 +55,7 @@ async function startFederatedInstance(instanceId, env) {
     store: require('../../src/services/continuum/store'),
     inbound: require('../../src/services/continuum/inbound'),
     feed: require('../../src/services/continuum/feed'),
+    events: require('../../src/services/continuum/events'),
   };
   return instance;
 }

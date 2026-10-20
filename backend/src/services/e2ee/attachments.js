@@ -21,6 +21,7 @@ const protocol = require('./protocol');
 const membership = require('./membership');
 const devices = require('./devices');
 const uploads = require('../uploads');
+const storage = require('../storage');
 
 // The name the ciphertext is stored under. The server does not know what the
 // attachment is, so it does not get a name that says: the file is opaque
@@ -30,6 +31,10 @@ const STORED_FILENAME = 'attachment.enc';
 // The fields a client must never send. An attachment key is sealed to the
 // member devices; there is no field in this subsystem that holds one.
 const KEY_FIELDS = ['key', 'attachmentKey', 'fileKey', 'secret'];
+
+// An attachment id is used in an object key and in a row id, so it has to be
+// one of the shapes the storage service accepts.
+const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
 /**
  * Check the seals of an attachment.
@@ -94,14 +99,18 @@ async function register(userId, input) {
  * Store an encrypted attachment: the ciphertext, and the key sealed to each
  * member device.
  *
- * The bytes go through the ordinary attachment storage, so the file is
- * served, counted and deleted the way every other attachment is. What is
- * stored is the ciphertext: the client encrypted the file before it
+ * The id is the client's, because the key is sealed to the attachment and
+ * the client has to know which attachment it is sealing for before it
+ * uploads. The bytes go through the storage service under that id, and the
+ * ordinary attachment record is written beside them, so the file is served,
+ * counted and deleted the way every other attachment is.
+ *
+ * What is stored is the ciphertext: the client encrypted the file before it
  * uploaded it, and the server cannot tell the difference - which is exactly
  * what an end-to-end encrypted attachment is.
  *
  * @param {string} userId
- * @param {object} input { conversationId, filename, mime, buffer, sealedKeys }
+ * @param {object} input { id, conversationId, filename, mime, buffer, sealedKeys }
  */
 async function store(userId, input) {
   const group = await membership.requireMembership(input.conversationId, userId);
@@ -118,38 +127,59 @@ async function store(userId, input) {
   if (!buffer || !buffer.length) {
     throw protocolError('E2EE_VALIDATION_ERROR', 'an attachment needs its bytes', 400);
   }
+  if (buffer.length > uploads.MAX_SIZE) {
+    throw protocolError('E2EE_VALIDATION_ERROR', 'the attachment is too large', 400);
+  }
+  const id = String(input.id || uuid());
+  if (!ID.test(id)) {
+    throw protocolError('E2EE_VALIDATION_ERROR', 'the attachment id is not an id', 400);
+  }
   const seals = Array.isArray(input.sealedKeys) ? input.sealedKeys : [];
   await checkSeals(group, seals);
 
-  const stored = await uploads.store({
-    uploaderId: userId,
-    channelId: group.kind === 'channel' ? input.conversationId : null,
-    conversationId: group.kind === 'dm' ? input.conversationId : null,
-    buffer,
-    originalName: STORED_FILENAME,
-  });
-  if (stored.error) {
-    throw protocolError(stored.error, stored.message, Codes[stored.error] || 400);
+  // The account's quota, counted the way the ordinary upload path counts it.
+  const usage = await uploads.quota(userId);
+  if (usage.used + buffer.length > usage.limit) {
+    throw protocolError(
+      'QUOTA_EXCEEDED',
+      'Storage quota reached; delete an attachment or ask a moderator to raise your limit',
+      Codes.QUOTA_EXCEEDED
+    );
+  }
+
+  const scope = group.kind === 'channel' ? input.conversationId : 'dm-' + input.conversationId;
+  const key = storage.key.messageMedia(scope, id);
+  await storage.put(key, buffer, uploads.UNKNOWN_MIME);
+  try {
+    await db.run(
+      `INSERT INTO attachments (id, message_id, channel_id, dm_conversation_id, uploader_id, filename, mime, size, url, created_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, group.kind === 'channel' ? input.conversationId : null,
+        group.kind === 'dm' ? input.conversationId : null,
+        userId, STORED_FILENAME, uploads.UNKNOWN_MIME, buffer.length,
+        '/api/attachments/' + id, now()]
+    );
+  } catch (e) {
+    // An object with no row is an object nobody can ever delete.
+    await storage.delete(key).catch(() => {});
+    throw e;
   }
 
   try {
     const attachment = await register(userId, {
-      id: stored.id,
+      id,
       conversationId: input.conversationId,
       filename: input.filename || 'attachment',
-      mime: input.mime || 'application/octet-stream',
-      size: stored.size,
+      mime: input.mime || uploads.UNKNOWN_MIME,
+      size: buffer.length,
       sealedKeys: seals,
     });
-    return Object.assign({}, attachment, { url: stored.url, size: stored.size });
+    return Object.assign({}, attachment, { url: '/api/attachments/' + id });
   } catch (e) {
-    // A file with no sealed key is a file nobody can open. The bytes are
-    // taken back out rather than left behind.
-    await uploads.removeFiles([{
-      id: stored.id,
-      channel_id: group.kind === 'channel' ? input.conversationId : null,
-      dm_conversation_id: group.kind === 'dm' ? input.conversationId : null,
-    }]);
+    // A file with no sealed key is a file nobody can open. The bytes and the
+    // row are taken back out rather than left behind.
+    await db.run('DELETE FROM attachments WHERE id = ?', [id]);
+    await storage.delete(key).catch(() => {});
     throw e;
   }
 }

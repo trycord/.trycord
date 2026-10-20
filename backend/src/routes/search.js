@@ -18,6 +18,9 @@ const settings = require('../services/settings');
 const searchFilters = require('../services/search-filters');
 const savedSearches = require('../services/saved-searches');
 const searchHistory = require('../services/search-history');
+// The erasure sweep. Loading it registers the background job that takes a
+// reader's own rows away when their account is erased.
+require('../services/reader-data');
 const { now } = require('../util');
 
 const router = express.Router();

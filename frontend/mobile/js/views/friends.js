@@ -9,7 +9,8 @@ import { icon } from '../../../packages/icons.js';
 import { avatar, empty, loading, failure } from '../components.js';
 import { State, nameOf, normalizeUser, refreshFriends } from '../../../packages/store.js';
 import { path, navigate } from '../../../packages/nav.js';
-import { menu, confirm, toast } from '../ui.js';
+import { menu, confirm, toast, attachLongPress } from '../ui.js';
+import { personActions } from '../person.js';
 import Api from '../../../packages/api.js';
 import { screen, section, notice } from './util.js';
 
@@ -90,23 +91,22 @@ export function renderFriends(ctx) {
 
   function friendRow(friend) {
     const presence = State.presence.get(friend.id) || 'offline';
-    return el('button', { class: 'm-row', type: 'button', onClick: () => openFriend(friend) },
+    const node = el('button', { class: 'm-row', type: 'button', onClick: () => openFriend(friend) },
       el('span', { class: 'm-row__lead' }, avatar(friend, { size: 'md', presence: true, decorative: true })),
       el('span', { class: 'm-row__body' },
         el('span', { class: 'm-row__title truncate' }, nameOf(friend)),
         el('span', { class: 'm-row__sub truncate' }, friend.statusText || '@' + friend.username)),
       el('span', { class: 'm-row__chevron' }, icon('more', { size: 18 })));
+    // A long press on a person raises that person's actions.
+    attachLongPress(node, () => personActions(friend, { onChanged: paint }), { title: nameOf(friend) });
+    return node;
   }
 
+  // The person's own actions - the same list every other surface shows for
+  // that person.
   function openFriend(friend) {
-    menu({
-      title: nameOf(friend),
-      items: [
-        { label: 'Send a message', icon: 'message', onSelect: () => openConversation(friend) },
-        { label: 'View profile', icon: 'user', onSelect: () => navigate('/users/' + friend.id) },
-        { separator: true },
-        { label: 'Remove friend', icon: 'trash', danger: true, onSelect: () => removeFriend(friend) },
-      ],
+    personActions(friend, { onChanged: paint }).then((items) => {
+      if (items.length) menu({ title: nameOf(friend), items });
     });
   }
 
@@ -218,22 +218,6 @@ export function renderFriends(ctx) {
 
   async function cancel(request) {
     try { await Api.cancelFriendRequest(request.id); await refreshFriends(); paint(); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function removeFriend(friend) {
-    const sure = await confirm({ title: 'Remove ' + nameOf(friend) + '?', text: 'They stay in your direct messages.', confirmLabel: 'Remove', danger: true });
-    if (!sure) return;
-    try {
-      await Api.removeFriend(friend.id);
-      await refreshFriends();
-      paint();
-      toast('Removed.', { type: 'success' });
-    } catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function openConversation(friend) {
-    try { const dm = await Api.createDm(friend.id); navigate('/dms/' + dm.id); }
     catch (error) { toast(error.message, { type: 'danger' }); }
   }
 

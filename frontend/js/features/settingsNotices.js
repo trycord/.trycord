@@ -43,19 +43,24 @@ export function notificationsView() {
   const paintMuted = () => {
     refreshMutes().then(() => {
       const muted = Array.from(State.mutedChannels || []);
+      const unmute = async (channelId) => {
+        try {
+          await Api.unmuteChannel(channelId);
+          paintMuted();
+        } catch (e) { errorToast(e); }
+      };
       mutedList.replaceChildren(...(muted.length ? muted.map((channelId) => row({
         lead: el('span', { class: 'role-dot' }, icon('volume-off', { size: 15 })),
         title: channelLabel(channelId),
         side: el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
           'aria-label': 'Unmute this channel',
-          onClick: async () => {
-            try {
-              await Api.unmuteChannel(channelId);
-              paintMuted();
-            } catch (e) { errorToast(e); }
-          },
+          onClick: () => unmute(channelId),
         }, 'Unmute'),
+        // The same thing, raised by a right-click on the row.
+        menu: () => [
+          { label: 'Unmute', icon: 'bell', onSelect: () => unmute(channelId) },
+        ],
       })) : [blank({
         glyph: 'volume-off', title: 'Nothing muted',
         text: 'Right-click a channel in the column to give it a rest.',

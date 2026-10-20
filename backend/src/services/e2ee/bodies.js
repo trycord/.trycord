@@ -23,6 +23,7 @@
 
 'use strict';
 
+const db = require('../../db');
 const { protocolError, validate } = require('./envelope');
 const status = require('./status');
 const devices = require('./devices');
@@ -244,6 +245,36 @@ async function validateEnvelopes(conversationId, userId, envelopes) {
 }
 
 /**
+ * Every attachment of a message in an encrypted conversation has to have
+ * its key sealed to the member devices.
+ *
+ * The server cannot tell an encrypted file from a plain one: it stores
+ * bytes, and the bytes are whatever the client uploaded. What it can check
+ * is that the client sealed the key for the file it is attaching. A message
+ * that carries a file nobody sealed is a file the members cannot open, and
+ * in a conversation where everything else is readable it is the one thing
+ * that leaks in the clear.
+ */
+async function checkAttachments(conversationId, attachmentIds) {
+  if (!attachmentIds || !attachmentIds.length) return;
+  const rows = await db.all(
+    'SELECT id FROM e2ee_attachments WHERE conversation_id = ? AND id IN ('
+    + attachmentIds.map(() => '?').join(',') + ')',
+    [conversationId].concat(attachmentIds)
+  );
+  const sealed = new Set(rows.map((r) => String(r.id)));
+  for (const id of attachmentIds) {
+    if (!sealed.has(String(id))) {
+      throw protocolError(
+        'E2EE_VALIDATION_ERROR',
+        'the attachment has no sealed key: an encrypted conversation takes encrypted files',
+        400
+      );
+    }
+  }
+}
+
+/**
  * Check a message body against the conversation it is going into.
  *
  * The answer comes from the status service: whether a conversation is
@@ -263,7 +294,7 @@ async function validateEnvelopes(conversationId, userId, envelopes) {
  *
  * @param {string} conversationId
  * @param {string} userId the sender
- * @param {object} body { content, envelopes }
+ * @param {object} body { content, envelopes, attachmentIds }
  * @returns {Promise<{encrypted: boolean, stored: string, content: string|null,
  *   envelopes: object[]|null, encryption: object}>}
  */
@@ -280,6 +311,7 @@ async function accept(conversationId, userId, body) {
       );
     }
     await validateEnvelopes(conversationId, userId, envelopes);
+    await checkAttachments(conversationId, body ? body.attachmentIds : null);
     return {
       encrypted: true,
       stored: encode(envelopes),
@@ -320,5 +352,6 @@ module.exports = {
   applyToRow,
   readEnvelopes,
   validateEnvelopes,
+  checkAttachments,
   accept,
 };

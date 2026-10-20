@@ -11,24 +11,23 @@ import { icon } from '../../../packages/icons.js';
 import { avatar, serverMark, empty, loading, failure } from '../components.js';
 import {
   State, normalizeUser, nameOf, refreshServer, refreshServerTree,
-  refreshServerMembers, refreshServerRoles, refreshMutes, isMuted, channelsOf, categoriesOf, can, isOwner, serverById,
+  refreshServerRoles, refreshServerMembers, isMuted, channelsOf, categoriesOf,
+  can, isOwner, serverById, presenceOf, refreshPresence,
 } from '../../../packages/store.js';
 import { path, navigate, BASE } from '../../../packages/nav.js';
 import { setOverride, siblingMount } from '../../../packages/chooser.js';
-import { menu, sheet, confirm, toast } from '../ui.js';
+import { menu, sheet, confirm, toast, attachLongPress } from '../ui.js';
+import { personActions, openPerson } from '../person.js';
+import {
+  iconFor, openChannelEditor, deleteChannel, openCategoryEditor, deleteCategory,
+  channelActions, categoryActions, attachChannelMenu, canManageChannels,
+} from '../manage.js';
+import { copyText } from '../clipboard.js';
 import { relativeTime } from '../../../packages/format.js';
 import { mediaUrl } from '../../../packages/media.js';
 import Api from '../../../packages/api.js';
 import { screen, notice, stat } from './util.js';
 import { renderConversation } from './messages.js';
-
-function iconFor(channel) {
-  const type = String((channel && channel.type) || '').toLowerCase();
-  if (type === 'voice' || type === 'stage') return 'volume';
-  if (type === 'announcement') return 'bell';
-  if (type === 'forum') return 'list';
-  return 'hash';
-}
 
 export function isVoiceType(type) {
   const clean = String(type || '').toLowerCase();
@@ -42,20 +41,6 @@ function membersOf(serverId) {
 
 function sortedChannels(serverId) {
   return channelsOf(serverId).slice().sort((a, b) => (a.position || 0) - (b.position || 0));
-}
-
-function copyText(value) {
-  const text = String(value || '');
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => toast('Copied.', { type: 'success' })).catch(() => toast(text, { type: 'info' }));
-    return;
-  }
-  const area = el('textarea', { class: 'visually-hidden' }, text);
-  document.body.appendChild(area);
-  area.select();
-  try { document.execCommand('copy'); } catch { /* nothing to do */ }
-  area.remove();
-  toast(text, { type: 'info' });
 }
 
 function selectControl(options) {
@@ -85,7 +70,7 @@ function channelMenu(serverId) {
   for (const category of categories) {
     const list = byCategory.get(category.id) || [];
     if (!list.length) continue;
-    items.push({ label: category.name, heading: true });
+    items.push({ header: category.name });
     for (const channel of list) items.push(channelItem(serverId, channel));
   }
   if (loose.length) {
@@ -119,39 +104,22 @@ function channelItem(serverId, channel) {
 // The actions of the channel the reader is inside. Muting and the link live
 // here rather than buried in the channel jump list, because they act on the
 // channel at hand; the list itself stays a list and marks muted channels.
+// The actions on the channel the reader is inside. They are the shared ones -
+// muting, the link, and the management the permission list allows - so the
+// channel screen and the channel list cannot disagree.
 function channelActionsSheet(serverId, channel) {
   const route = '/server/' + serverId + '/channel/' + channel.id;
-  const muted = isMuted(channel.id);
-  const items = [
-    {
-      label: muted ? 'Unmute channel' : 'Mute channel',
-      icon: muted ? 'bell' : 'volume-off',
-      onSelect: async () => {
-        try {
-          if (muted) await Api.unmuteChannel(channel.id);
-          else await Api.muteChannel(channel.id);
-          refreshMutes().catch(() => {});
-          toast(muted ? 'Unmuted.' : 'Muted.', { type: 'success' });
-        } catch (error) {
-          toast((error && error.message) || 'That did not go through.', { type: 'danger' });
-        }
-      },
-    },
-    { label: 'Copy link', icon: 'link', onSelect: () => copyText(origin() + path(route)) },
-  ];
+  const items = channelActions(serverId, channel, null);
   if (can(serverId, 'MANAGE_MESSAGES')) {
+    items.push({ separator: true });
     items.push({ label: 'Pins', icon: 'pin', onSelect: () => navigate(route + '/pins') });
   }
   menu({ title: '#' + (channel.name || 'channel'), items });
 }
 
-function origin() {
-  try { return window.location.origin || ''; } catch { return ''; }
-}
-
 function communityMenu(serverId) {
   const items = [];
-  items.push({ label: 'Channels', heading: true });
+  items.push({ header: 'Channels' });
   for (const item of channelMenu(serverId)) items.push(item);
   items.push({ separator: true });
   items.push({ label: 'Members', icon: 'users', onSelect: () => navigate('/server/' + serverId + '/members') });
@@ -285,34 +253,54 @@ export function renderChannelPins(ctx) {
 
 // -- members -----------------------------------------------------------------
 
+// The moderation the community's permission list allows. The person sheet
+// knows nothing about communities, so the community adds its own entries.
+function memberActions(serverId, item, user, reload) {
+  const items = [];
+  if (can(serverId, 'MANAGE_ROLES') && !item.is_owner) {
+    items.push({ label: 'Edit roles', icon: 'shield', onSelect: () => openMemberRoles(serverId, item, user, reload) });
+  }
+  if (can(serverId, 'TIMEOUT_MEMBERS') && !item.is_owner) {
+    items.push({ label: 'Timeout', icon: 'clock', onSelect: () => openTimeout(serverId, user, reload) });
+  }
+  if (can(serverId, 'KICK_MEMBERS') && !item.is_owner) {
+    items.push({ label: 'Kick', icon: 'logout', danger: true, onSelect: () => kickMember(serverId, user, reload) });
+  }
+  if (can(serverId, 'BAN_MEMBERS') && !item.is_owner) {
+    items.push({ label: 'Ban', icon: 'ban', danger: true, onSelect: () => banMember(serverId, user, reload) });
+  }
+  return items;
+}
+
+// One member, drawn. The presence is written twice - as the dot on the face and
+// as the word beside the name - because a dot is a colour and a colour is not
+// a sentence for a reader who cannot see it.
 function memberRow(serverId, item, reload) {
   const user = normalizeUser(item);
   const roles = (item.roles || []).map((r) => (typeof r === 'string' ? r : r.name)).filter(Boolean);
-  const controls = el('span', { class: 'm-row__actions' });
-  const canRole = can(serverId, 'MANAGE_ROLES') && !item.is_owner;
-  const canModerate = !item.is_owner && (can(serverId, 'KICK_MEMBERS') || can(serverId, 'BAN_MEMBERS'));
-  if (canRole || canModerate) {
-    controls.appendChild(el('button', {
-      class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', 'aria-label': 'Manage ' + nameOf(user),
-      onClick: () => memberMenu(serverId, item, user, reload),
-    }, 'Manage'));
-  }
-  return el('div', { class: 'm-row' },
+  const status = presenceOf(user.id);
+  const node = el('button', {
+    class: 'm-row m-row--member', type: 'button',
+    onClick: () => openPerson(user, { extra: memberActions(serverId, item, user, reload) }),
+  },
     el('span', { class: 'm-row__lead' }, avatar(user, { size: 'md', presence: true, decorative: true })),
     el('span', { class: 'm-row__body' },
       el('span', { class: 'm-row__title truncate' }, nameOf(user)),
-      el('span', { class: 'm-row__sub truncate' }, '@' + (user.username || '') + (roles.length ? ' \u00b7 ' + roles.join(', ') : (item.is_owner ? ' \u00b7 Owner' : '')))),
-    controls);
+      el('span', { class: 'm-row__sub truncate' }, '@' + (user.username || '')
+        + (roles.length ? ' \u00b7 ' + roles.join(', ') : (item.is_owner ? ' \u00b7 Owner' : '')))),
+    el('span', { class: 'm-row__trailing' },
+      el('span', { class: 'm-member-presence', dataset: { presence: status } }, PRESENCE_LABEL[status] || 'Offline')));
+  attachLongPress(node, () => personActions(user, { extra: memberActions(serverId, item, user, reload) }),
+    { title: nameOf(user) });
+  return node;
 }
 
-function memberMenu(serverId, item, user, reload) {
-  const items = [];
-  if (can(serverId, 'MANAGE_ROLES')) items.push({ label: 'Edit roles', icon: 'shield', onSelect: () => openMemberRoles(serverId, item, user, reload) });
-  if (can(serverId, 'BAN_MEMBERS')) items.push({ label: 'Timeout', icon: 'clock', onSelect: () => openTimeout(serverId, user, reload) });
-  if (can(serverId, 'KICK_MEMBERS')) items.push({ label: 'Kick', icon: 'log-out', danger: true, onSelect: () => kickMember(serverId, user, reload) });
-  if (can(serverId, 'BAN_MEMBERS')) items.push({ label: 'Ban', icon: 'ban', danger: true, onSelect: () => banMember(serverId, user, reload) });
-  menu({ title: nameOf(user), items });
-}
+const PRESENCE_LABEL = {
+  online: 'Online',
+  idle: 'Idle',
+  dnd: 'Do not disturb',
+  offline: 'Offline',
+};
 
 function openTimeout(serverId, user, reload) {
   const minutes = el('input', { class: 'm-input', type: 'number', min: '0', max: '10080', value: '60', 'aria-label': 'Minutes' });
@@ -400,30 +388,106 @@ export function renderCategoriesPage(ctx) {
   return categoriesScreen(ctx.serverId);
 }
 
+// The roster, on a phone. It pages, it searches, and it says who is here.
+//
+// The server answers with { items, total, hasMore }, so a large community is
+// a first page and a button rather than a truncated list that claims to be the
+// whole thing. The search is the server's own.
 function membersScreen(serverId, title, sub) {
   const host = el('div', { class: 'm-stack' });
   const node = screen(el('div', { class: 'm-hero m-hero--quiet' },
     el('h1', { class: 'm-hero__title' }, title), el('div', { class: 'm-hero__sub' }, sub)), host);
 
+  const search = el('input', {
+    class: 'm-input m-input--search', type: 'search',
+    placeholder: 'Search members', 'aria-label': 'Search the members of this community',
+    autocomplete: 'off', spellcheck: 'false',
+  });
+  const list = el('div', { class: 'm-list' });
+  const note = el('div', { class: 'm-section__note' });
+  const more = el('div', { class: 'm-actions' });
+
+  const items = [];
+  let total = 0;
+  let hasMore = false;
+  let query = '';
+  let loading = false;
+
+  function paint() {
+    list.replaceChildren();
+    for (const item of items) list.appendChild(memberRow(serverId, item, load));
+    note.textContent = total ? items.length + ' of ' + total : String(items.length);
+    more.replaceChildren(hasMore
+      ? el('button', { class: 'm-btn m-btn--block m-btn--ghost', type: 'button', onClick: () => loadMore() }, 'Load more members')
+      : null);
+  }
+
+  async function fetchPage(offset) {
+    const params = { limit: 50 };
+    if (offset) params.offset = offset;
+    if (query) params.q = query;
+    const page = await Api.serverMembers(serverId, params);
+    return {
+      items: (page && page.items) || [],
+      total: (page && page.total) || 0,
+      hasMore: !!(page && page.hasMore),
+    };
+  }
+
   async function load() {
-    host.replaceChildren(loading('Loading members'));
+    loading = true;
+    list.replaceChildren(loading('Reading the roster'));
+    more.replaceChildren();
     try {
-      await refreshServerMembers(serverId, { limit: 100 });
-      const items = membersOf(serverId);
-      host.replaceChildren();
-      if (!items.length) {
-        host.appendChild(empty({ icon: 'users', title: 'No members yet', text: 'Invite people to this community.' }));
-        return;
-      }
-      const list = el('div', { class: 'm-list' });
-      for (const item of items) list.appendChild(memberRow(serverId, item, load));
-      host.appendChild(el('section', { class: 'm-section' },
-        el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Members'), el('div', { class: 'm-section__note' }, String(items.length))), list));
+      const page = await fetchPage(0);
+      items.length = 0;
+      for (const item of page.items) items.push(item);
+      total = page.total;
+      hasMore = page.hasMore;
+      paint();
+      refreshPresence(items.map((item) => item.id)).catch(() => {});
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      list.replaceChildren(failure(error, load));
+    } finally {
+      loading = false;
     }
   }
 
+  async function loadMore() {
+    if (loading || !hasMore) return;
+    loading = true;
+    more.replaceChildren(el('div', { class: 'm-loading' }, 'Reading more'));
+    try {
+      const page = await fetchPage(items.length);
+      for (const item of page.items) {
+        if (!items.some((known) => String(known.id) === String(item.id))) items.push(item);
+      }
+      total = page.total;
+      hasMore = page.hasMore;
+      paint();
+      refreshPresence(page.items.map((item) => item.id)).catch(() => {});
+    } catch (error) {
+      more.replaceChildren(failure(error, loadMore));
+    } finally {
+      loading = false;
+    }
+  }
+
+  let timer = null;
+  search.addEventListener('input', () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      query = search.value.trim();
+      load();
+    }, 240);
+  });
+
+  const section = el('section', { class: 'm-section' },
+    el('div', { class: 'm-section__head' },
+      el('div', { class: 'm-section__title' }, 'Members'), note),
+    search, list, more);
+
+  host.appendChild(section);
   return { node, head: { lead: 'back', title }, onMount: load };
 }
 
@@ -622,14 +686,17 @@ function categoriesScreen(serverId) {
       }
       const list = el('div', { class: 'm-list' });
       for (const category of categories) {
-        list.appendChild(el('div', { class: 'm-row' },
+        const row = el('button', {
+          class: 'm-row m-row--category', type: 'button',
+          onClick: () => openCategoryEditor(serverId, category, load),
+        },
           el('span', { class: 'm-row__lead' }, icon('layers', { size: 17 })),
           el('span', { class: 'm-row__body' },
             el('span', { class: 'm-row__title' }, category.name),
-            el('span', { class: 'm-row__sub' }, category.count + (category.count === 1 ? ' channel' : ' channels'))),
-          el('span', { class: 'm-row__actions' },
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => openCategoryEditor(serverId, category, load) }, 'Rename'),
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => deleteCategory(serverId, category, load) }, 'Delete'))));
+            el('span', { class: 'm-row__sub' }, category.count + (category.count === 1 ? ' channel' : ' channels'))));
+        // A long press on a category raises the actions that belong to it.
+        attachLongPress(row, () => categoryActions(serverId, category, load), { title: category.name });
+        list.appendChild(row);
       }
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Categories'), newButton), list));
@@ -641,38 +708,10 @@ function categoriesScreen(serverId) {
   return { node, head: { lead: 'back', title: 'Categories' }, onMount: load };
 }
 
-function openCategoryEditor(serverId, category, reload) {
-  const name = el('input', { class: 'm-input', type: 'text', value: category ? category.name : '', placeholder: 'Category name', maxlength: '60', 'aria-label': 'Category name' });
-  const layer = sheet({
-    title: category ? 'Rename category' : 'New category',
-    body: name,
-    footer: el('button', {
-      class: 'm-btn m-btn--block m-btn--primary', type: 'button',
-      onClick: async (event) => {
-        event.currentTarget.disabled = true;
-        try {
-          const value = name.value.trim();
-          if (!value) { toast('Give the category a name.', { type: 'info' }); event.currentTarget.disabled = false; return; }
-          if (category) await Api.updateCategory(serverId, category.id, { name: value });
-          else await Api.createCategory(serverId, { name: value });
-          layer.close();
-          toast(category ? 'Category saved.' : 'Category created.', { type: 'success' });
-          reload();
-        } catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
-      },
-    }, category ? 'Save' : 'Create'),
-  });
-}
-
-async function deleteCategory(serverId, category, reload) {
-  const sure = await confirm({ title: 'Delete "' + category.name + '"?', text: 'Its channels are not deleted, just ungrouped.', confirmLabel: 'Delete', danger: true });
-  if (!sure) return;
-  try { await Api.deleteCategory(serverId, category.id); toast('Category deleted.', { type: 'success' }); reload(); }
-  catch (error) { toast(error.message, { type: 'danger' }); }
-}
-
 // -- channels ----------------------------------------------------------------
 
+// The channel list. Every action here is the shared one from mobile/manage.js,
+// so the settings section and the community's own list cannot disagree.
 function channelsSection(serverId) {
   const host = el('div', { class: 'm-stack' });
   const newButton = el('button', {
@@ -683,7 +722,7 @@ function channelsSection(serverId) {
   async function load() {
     host.replaceChildren(loading('Loading channels'));
     try {
-      await refreshServerTree(serverId);
+      await refreshServerTree(serverId, { force: true });
       const channels = sortedSiblings(serverId);
       host.replaceChildren();
       if (!channels.length) {
@@ -692,14 +731,17 @@ function channelsSection(serverId) {
       }
       const list = el('div', { class: 'm-list' });
       for (const channel of channels) {
-        list.appendChild(el('div', { class: 'm-row' },
+        const row = el('button', {
+          class: 'm-row m-row--channel', type: 'button',
+          onClick: () => navigate('/server/' + serverId + '/channel/' + channel.id),
+        },
           el('span', { class: 'm-row__lead' }, icon(iconFor(channel), { size: 17 })),
           el('span', { class: 'm-row__body' },
             el('span', { class: 'm-row__title truncate' }, channel.name),
-            channel.topic ? el('span', { class: 'm-row__sub truncate' }, channel.topic) : null),
-          el('span', { class: 'm-row__actions' },
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => openChannelEditor(serverId, channel, load) }, 'Edit'),
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => deleteChannel(serverId, channel, load) }, 'Delete'))));
+            channel.topic ? el('span', { class: 'm-row__sub truncate' }, channel.topic) : null));
+        // A long press on a channel raises the actions that belong to it.
+        attachChannelMenu(row, serverId, channel, load);
+        list.appendChild(row);
       }
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Channels'), newButton), list));
@@ -709,52 +751,6 @@ function channelsSection(serverId) {
   }
 
   return { node: host, load };
-}
-
-function openChannelEditor(serverId, channel, reload) {
-  const editing = !!channel;
-  const current = String((channel && channel.type) || 'text').toLowerCase();
-  const name = el('input', { class: 'm-input', type: 'text', value: channel ? channel.name : '', placeholder: 'channel-name', maxlength: '60', 'aria-label': 'Channel name' });
-  const topic = el('input', { class: 'm-input', type: 'text', value: channel ? (channel.topic || '') : '', placeholder: 'Topic', maxlength: '200', 'aria-label': 'Channel topic' });
-  const type = selectControl({
-    label: 'Channel type', value: current,
-    choices: [{ value: 'text', label: 'Text channel' }, { value: 'announcement', label: 'Announcement channel' }, { value: 'voice', label: 'Voice channel' }, { value: 'stage', label: 'Stage channel' }],
-  });
-  const category = selectControl({
-    label: 'Category', value: (channel && channel.category_id) || '',
-    choices: [{ value: '', label: 'No category' }].concat(categoriesOf(serverId).map((c) => ({ value: c.id, label: c.name }))),
-  });
-  const layer = sheet({
-    title: channel ? 'Edit channel' : 'New channel',
-    body: el('div', { class: 'm-stack' },
-      el('label', { class: 'm-field' }, el('span', { class: 'm-field__label' }, 'Name'), name),
-      el('label', { class: 'm-field' }, el('span', { class: 'm-field__label' }, 'Type'), type),
-      el('label', { class: 'm-field' }, el('span', { class: 'm-field__label' }, 'Topic'), topic),
-      channel ? null : el('label', { class: 'm-field' }, el('span', { class: 'm-field__label' }, 'Category'), category)),
-    footer: el('button', {
-      class: 'm-btn m-btn--block m-btn--primary', type: 'button',
-      onClick: async (event) => {
-        event.currentTarget.disabled = true;
-        try {
-          const payload = { name: name.value.trim(), topic: topic.value };
-          payload.categoryId = channel ? channel.category_id : (category.value || null);
-          if (!channel || type.value !== current) payload.type = type.value;
-          if (channel) await Api.updateChannel(serverId, channel.id, payload);
-          else await Api.createChannel(serverId, payload);
-          layer.close();
-          toast(channel ? 'Channel saved.' : 'Channel created.', { type: 'success' });
-          reload();
-        } catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
-      },
-    }, channel ? 'Save' : 'Create'),
-  });
-}
-
-async function deleteChannel(serverId, channel, reload) {
-  const sure = await confirm({ title: 'Delete #' + channel.name + '?', text: 'Its messages go with it. This cannot be undone.', confirmLabel: 'Delete', danger: true });
-  if (!sure) return;
-  try { await Api.deleteChannel(serverId, channel.id); toast('Channel deleted.', { type: 'success' }); reload(); }
-  catch (error) { toast(error.message, { type: 'danger' }); }
 }
 
 // -- settings sections -------------------------------------------------------
