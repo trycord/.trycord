@@ -275,6 +275,19 @@ definitions the server uses, 17 scopes, scoped keys with rotation and overlap,
 bot applications, the versioned event envelope, and eight documents in
 `docs/api/`.
 
+**An application can listen, not only post.** An application that can post
+and cannot hear anything is a mail-merge, not a bot. The gateway is what an
+application holds open to receive the events of its community: the same
+envelope the webhooks are handed, from the same dispatch, so a bot and a
+webhook cannot see different events.
+
+The token never rides in a URL — a URL ends up in access logs, proxy logs and
+referrer headers. The bot asks for a ticket over HTTP with its token in the
+header, and the ticket, good for one connection and for a minute, is what
+goes into the socket's address. An application hears only the events it
+asked for, and only the events of its own community, and an application that
+is disabled or whose token is revoked is disconnected at once.
+
 ## 3.19 Extensions and registry — Partial
 
 The lifecycle, the capability grants, the audit trail and the registry are
