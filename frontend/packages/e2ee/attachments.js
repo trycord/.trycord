@@ -119,7 +119,7 @@ export async function upload(deps, options) {
   form.append('mime', options.mime || 'application/octet-stream');
   form.append('sealedKeys', JSON.stringify(seals));
   await deps.api.uploadAttachment(form);
-  return { id, key, iv, seals };
+  return { id, key, seals };
 }
 
 /**

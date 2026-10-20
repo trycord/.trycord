@@ -20,6 +20,7 @@ import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../packages/
 import { bind } from '../packages/registry.js';
 import { RENDERERS } from './features/index.js';
 import { mountVoiceDock } from './voice/dock.js';
+import * as encrypted from './ui/encrypted.js';
 import { setLocalUserId, leave as voiceLeave } from './voice/session.js';
 import { run } from './router.js';
 
@@ -100,6 +101,11 @@ function wireSignOut() {
   onStore('signed-out', () => {
     voiceLeave().catch(() => { /* there was nothing to leave */ });
     realtime.disconnect();
+    // The encryption client is dropped with the session. The device's keys stay
+    // on the device - a device is an identity and does not change because
+    // somebody signed out - but the open client belongs to the account that
+    // is no longer here.
+    encrypted.reset();
     setSession('out');
   });
   // The attribute is how a document says whether it is signed in - the checks and

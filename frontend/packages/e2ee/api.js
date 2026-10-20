@@ -59,6 +59,11 @@ export function createE2eeApi(transport) {
 
     registerAttachment: (body) => json('POST', '/api/e2ee/attachments', body),
     attachment: (attachmentId) => request('GET', '/api/e2ee/attachments/' + at(attachmentId)),
+    // The ciphertext of an attachment, as it was stored.
+    attachmentBytes: async (attachmentId) => {
+      const out = await request('GET', '/api/attachments/' + at(attachmentId), { raw: true });
+      return new Uint8Array(out.buffer);
+    },
     // The ciphertext of a file, with the key sealed to the member devices.
     // The id is the client's, because the key is sealed to the attachment
     // before the file is uploaded.

@@ -17,6 +17,7 @@ import {
 import { installLinkHandler, installPopStateHandler, BASE, setBase, mountFromModuleUrl } from '../../packages/nav.js';
 import { loadLocale } from '../../packages/locale.js';
 import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../../packages/realtime.js';
+import * as encrypted from './encrypted.js';
 import { bind } from '../../packages/registry.js';
 import { readOverride, siblingMount } from '../../packages/chooser.js';
 import { RENDERERS } from './views/index.js';
@@ -91,6 +92,11 @@ function wireSignOut() {
   // This only keeps the document and the gateway consistent with the new state.
   onStore('signed-out', () => {
     realtime.disconnect();
+    // The encryption client is dropped with the session. The device's keys stay
+    // on the device - a device is an identity and does not change because
+    // somebody signed out - but the open client belongs to the account that
+    // is no longer here.
+    encrypted.reset();
     setSession('out');
   });
   onStore('user', () => { setSession('in'); });

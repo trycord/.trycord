@@ -43,11 +43,23 @@ export function deviceLabel() {
   return platform ? 'This ' + platform + ' browser' : 'This browser';
 }
 
-/** The store's namespace: one set of keys per instance. */
+/**
+ * The store's namespace: one set of keys per instance **and per account**.
+ *
+ * Per instance, because the private keys of one instance are not the private
+ * keys of another and a reader who moves between instances must not carry one
+ * instance's keys to the other.
+ *
+ * Per account, because a device is an identity. Two people sharing a browser
+ * must not present the first one's device to the second one's account: the
+ * safety number they compare would then be a number the second person never
+ * saw, and the device would be a key the first person still holds.
+ */
 function namespace() {
   let origin = TrycordConfig.backendUrl();
   try { origin = new URL(origin).origin; } catch { /* keep the raw address */ }
-  return String(origin).replace(/[^a-z0-9]+/gi, '-').slice(0, 48);
+  const account = State.user && State.user.id ? '-' + String(State.user.id).slice(0, 12) : '';
+  return String(origin).replace(/[^a-z0-9]+/gi, '-').slice(0, 40) + account;
 }
 
 /** Tell whoever is listening that something changed. */
@@ -183,9 +195,38 @@ export async function send(conversationId, payload, post) {
  * The row comes back with the text the client opened, or with the reason it
  * could not be opened. An encrypted row's own content is never used: the
  * server holds no text for one.
+ *
+ * A row that is not encrypted needs no device, so nothing is registered for
+ * it. A row that is encrypted needs one, and the device is registered if it
+ * is not already - a reader who opens an encrypted conversation has to have a
+ * device for the conversation to have been encrypted in the first place.
  */
 export async function readRow(row, conversationId) {
-  const open = await client();
+  if (!row || !row.encrypted) {
+    return Object.assign({}, row, {
+      content: row && row.content ? String(row.content) : '',
+      encrypted: false,
+      unreadable: false,
+    });
+  }
+  let open = null;
+  try {
+    open = await ready();
+  } catch (error) {
+    return Object.assign({}, row, {
+      content: 'This message cannot be read on this device: '
+        + (error && error.message ? error.message : 'the device could not be opened'),
+      encrypted: true,
+      unreadable: true,
+    });
+  }
+  if (!open) {
+    return Object.assign({}, row, {
+      content: 'This message cannot be read on this device: there is no device on this browser.',
+      encrypted: true,
+      unreadable: true,
+    });
+  }
   const read = await open.readMessage(row, conversationId);
   return Object.assign({}, row, {
     content: read.unreadable ? read.reason : (read.content || ''),
@@ -245,7 +286,7 @@ export function badge(answer) {
   if (!text) return null;
   const encrypted = answer.state === 'encrypted';
   return el('span', {
-    class: 'e2ee-badge' + (encrypted ? ' e2ee-badge--on' : ' e2ee-badge--off'),
+    class: 'badge ' + (encrypted ? 'badge--success' : 'badge--warning'),
     title: text,
   }, icon(encrypted ? 'lock' : 'unlock', { size: 13 }), el('span', {}, text));
 }
@@ -256,7 +297,7 @@ export function badge(answer) {
 export function unreadableNode(reason) {
   return el('p', { class: 'msg-text msg-text--unreadable' },
     icon('lock', { size: 13 }),
-    el('span', {}, reason || 'This message cannot be read on this device.'));
+    el('span', { class: 'msg-edited' }, reason || 'This message cannot be read on this device.'));
 }
 
 export { errorToast };
