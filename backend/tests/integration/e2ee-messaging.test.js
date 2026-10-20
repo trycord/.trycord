@@ -461,7 +461,7 @@ test('a message in an encrypted conversation', async (t) => {
     // A plaintext key is refused rather than quietly ignored.
     await assert.rejects(
       () => e2ee.storeEncryptedAttachment(alice.user.id, {
-        id: attachmentId + '-two',
+        id: require('node:crypto').randomUUID(),
         conversationId: encryptedId,
         filename: 'secret.txt',
         buffer: ciphertext,
@@ -470,5 +470,29 @@ test('a message in an encrypted conversation', async (t) => {
       }),
       (e) => e.code === 'E2EE_VALIDATION_ERROR'
     );
+  });
+
+  await t.test('a message in an encrypted conversation cannot carry a file nobody sealed', async () => {
+    // The conversation is mixed now, so it takes text. The rule about the
+    // files is checked against the encrypted conversation itself: a file
+    // whose key was never sealed is a file the members cannot open.
+    const rekeyed = await alice.post('/api/e2ee/conversations/' + encryptedId + '/key', {
+      deviceId: aliceDevice.deviceId,
+      epoch: 3,
+      sealedKeys: [sealFor(encryptedId, aliceDevice, 3), sealFor(encryptedId, bobDevice, 3)],
+    });
+    assert.equal(rekeyed.status, 201, JSON.stringify(rekeyed.data));
+    const state = await alice.get('/api/e2ee/conversations/' + encryptedId + '/state');
+    assert.equal(state.data.state, 'encrypted');
+
+    const before = await db.get('SELECT COUNT(*) AS n FROM dm_messages');
+    const res = await alice.post('/api/dms/' + encryptedId + '/messages', {
+      envelopes: [first.envelope],
+      attachmentIds: [require('node:crypto').randomUUID()],
+    });
+    assert.equal(res.status, 400, JSON.stringify(res.data));
+    assert.equal(res.data.error.code, 'E2EE_VALIDATION_ERROR');
+    const after = await db.get('SELECT COUNT(*) AS n FROM dm_messages');
+    assert.equal(after.n, before.n, 'nothing was stored');
   });
 });
