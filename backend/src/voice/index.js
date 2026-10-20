@@ -116,25 +116,11 @@ function describeConfiguration() {
  * reads, so the two processes cannot publish different addresses.
  */
 function publishedAddress() {
-  const fromEnvironment = String(process.env.TRYCORD_PUBLIC_URL || '').trim();
-  const candidates = [fromEnvironment];
-  try {
-    const stored = settings.read('instance.publicUrl', '');
-    if (stored) candidates.push(String(stored));
-  } catch {
-    // The settings are not loaded yet; the environment is the fallback.
-  }
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    try {
-      const host = new URL(candidate).hostname;
-      if (host) return host;
-    } catch {
-      // Not an address; try the next one.
-    }
-  }
-  const named = String(process.env.TRYCORD_TURN_HOST || '').trim();
-  if (named && named !== '0.0.0.0' && named !== '::' && named !== '[::]') return named;
+  // The voice configuration already knows the address: it is the one the
+  // clients are given, and it is the one the API publishes in its ICE
+  // configuration. Reading it from anywhere else would let the two disagree -
+  // and they did: the process reported the instance's own address while the
+  // API was publishing the voice one.
   return voiceConfig.inHouseRelay().advertised;
 }
 
