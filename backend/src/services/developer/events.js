@@ -19,6 +19,7 @@
 // own.
 
 const db = require('../../db');
+const gateway = require('./gateway');
 const { now, uuid } = require('../../util');
 const { EVENTS, sign } = require('../webhooks');
 const { assertPublicHost } = require('../netguard');
@@ -164,28 +165,42 @@ async function deliver(hook, envelope, type, id) {
  */
 async function dispatch({ communityId, type, instance, channelId, actor, data }) {
   if (!communityId || !isEventType(type)) return [];
+
+  // The envelope is built once, and the same envelope goes to the webhooks
+  // and to the applications holding the gateway open. A bot and a webhook
+  // cannot see different events.
+  const id = uuid();
+  const envelope = buildEnvelope({
+    type,
+    id,
+    instance,
+    communityId,
+    channelId,
+    actor,
+    data,
+  });
+
+  const out = [];
+
+  // The applications that are connected and asked for this event.
+  //
+  // This is the half of a bot that a webhook cannot be: a bot that holds the
+  // gateway open hears the event as it happens, without an HTTP request to a
+  // third party in between.
+  const delivered = gateway.deliver(envelope, communityId, type);
+  if (delivered) {
+    out.push({ id, status: 'delivered', transport: 'gateway', recipients: delivered });
+  }
+
   const subscriptions = await db.all(
     'SELECT * FROM developer_subscriptions WHERE community_id = ?',
     [communityId]
   );
-  const out = [];
   for (const subscription of subscriptions) {
     const types = readEvents(subscription.events);
     if (types.indexOf(type) === -1) continue;
     const hook = await db.get('SELECT * FROM webhooks WHERE id = ?', [subscription.webhook_id]);
     if (!hook || !hook.active) continue;
-    // The delivery id is the envelope's id: a receiver that logs the body and
-    // the delivery header can tell they are about the same delivery.
-    const id = uuid();
-    const envelope = buildEnvelope({
-      type,
-      id,
-      instance,
-      communityId,
-      channelId,
-      actor,
-      data,
-    });
     out.push(await deliver(hook, envelope, type, id));
   }
   return out;

@@ -12,12 +12,14 @@ const surface = require('./surface');
 const keys = require('./keys');
 const applications = require('./applications');
 const webhooks = require('./webhooks');
+const gateway = require('./gateway');
 
 const definitions = [
   ...surface.definitions,
   ...keys.definitions,
   ...applications.definitions,
   ...webhooks.definitions,
+  ...gateway.definitions,
 ];
 
 module.exports = definitions;

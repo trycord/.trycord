@@ -53,6 +53,10 @@ const readCommands = (serverId, applicationId) => request('GET', V1 + '/communit
 const putCommand = (serverId, applicationId, body) => request('PUT', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/commands', { body });
 const deleteCommand = (serverId, applicationId, commandId) => request('DELETE', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/commands/' + pathId(commandId));
 
+// The gateway: the socket an application holds open to receive events.
+const readGateway = (serverId, applicationId) => request('GET', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/gateway');
+const issueGatewayTicket = (serverId, applicationId) => request('POST', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/gateway-ticket', { body: {} });
+
 // -- the shared pieces ---------------------------------------------------------
 
 // A secret, shown once.
@@ -517,6 +521,67 @@ function openCommands(serverId, application, onDone) {
 }
 
 // What an application is doing, and whether it is working.
+// The gateway of one application.
+//
+// An application that can post and cannot hear anything is a mail-merge, not
+// a bot. This is where an operator sees whether the application is connected
+// to the gateway, which events it has asked for, and how to connect a bot
+// that is not.
+function openApplicationGateway(serverId, application) {
+  const body = el('div', { class: 'fold' });
+  const dialog = openDialog({
+    title: application.name + ' and the gateway',
+    sub: 'The socket an application holds open to receive the events of this community.',
+    body,
+  });
+
+  const paint = (state) => {
+    const answer = state || {};
+    const gateway = answer.application || {};
+    body.replaceChildren(el('div', { class: 'fold fold--tight' },
+      facts([
+        { value: gateway.connected ? 'Connected' : 'Not connected', label: 'The gateway' },
+        { value: gateway.sockets || 0, label: 'Sockets open' },
+        { value: (gateway.events || []).length, label: 'Events it asked for' },
+      ]),
+      el('p', { class: 'form-note' },
+        'A bot asks for a ticket, opens the socket with it, and says which '
+        + 'events it wants. The ticket is good for one connection and for a '
+        + 'minute; the token itself never rides in a URL.'),
+      el('div', { class: 'actionline' },
+        el('button', {
+          class: 'btn btn--default btn--sm', type: 'button',
+          onClick: () => {
+            issueGatewayTicket(serverId, application.id).then((ticket) => {
+              openDialog({
+                title: 'A ticket for the gateway',
+                sub: 'Good for one connection, for a minute.',
+                body: el('div', { class: 'fold' },
+                  el('p', { class: 'form-note' },
+                    'Give this to the bot, and it opens the socket with it.'),
+                  el('code', { class: 'mono keyblock' }, ticket.ticket)),
+              });
+            }).catch((error) => errorToast(error));
+          },
+        }, 'Issue a ticket'),
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          onClick: () => readGateway(serverId, application.id).then(paint).catch((error) => {
+            body.replaceChildren(fault(error, null));
+          }),
+        }, 'Check again')),
+      el('p', { class: 'form-note' },
+        'The events it asked for: '
+        + ((gateway.events || []).join(', ') || 'none yet - a bot subscribes once it is connected'))));
+  };
+
+  body.replaceChildren(hold('Reading the gateway'));
+  readGateway(serverId, application.id).then(paint).catch((error) => {
+    body.replaceChildren(fault(error, null));
+  });
+  return dialog;
+}
+
 function openApplicationHealth(serverId, application) {
   const body = el('div', { class: 'fold' });
   const dialog = openDialog({
@@ -680,6 +745,11 @@ function applicationsSection() {
           'aria-label': 'See the commands of ' + application.name,
           onClick: () => openCommands(serverId, application, paint),
         }, 'Commands'),
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'See the gateway of ' + application.name,
+          onClick: () => openApplicationGateway(serverId, application),
+        }, 'Gateway'),
         application.status === 'active' ? el('button', {
           class: 'btn btn--default btn--sm', type: 'button',
           'aria-label': 'Issue a new token for ' + application.name,
