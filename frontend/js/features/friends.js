@@ -16,6 +16,7 @@ import {
 import { path, navigate } from '../../packages/nav.js';
 import { avatar } from '../ui/primitives.js';
 import { card, row, blank, fault, fold, head } from '../ui/page.js';
+import { personSheetEntries, personContextMenu } from '../ui/person.js';
 import { errorToast, toast } from '../ui/overlays.js';
 
 function friendTile(person) {
@@ -39,7 +40,7 @@ function friendTile(person) {
       onClick: (event) => { event.preventDefault(); navigate('/users/' + person.id); },
     }, icon('user', { size: 15 })));
 
-  return el('a', {
+  const tile = el('a', {
     class: 'friendtile', href: path('/users/' + person.id),
     'aria-label': 'Open ' + nameOf(person),
   },
@@ -53,6 +54,10 @@ function friendTile(person) {
   ),
   actions,
   );
+  // A face is a person, and a person can be asked for things: the tile carries
+  // that person's menu on a right-click.
+  personContextMenu(tile, person);
+  return tile;
 }
 
 function requestCardTile(entry, onChange) {
@@ -136,12 +141,16 @@ export function renderFriends() {
         sub: person.statusText || 'New to you',
         href: path('/users/' + person.id),
         link: true,
+        // A search result is a person: the row carries that person's menu.
+        menu: () => personSheetEntries(person),
         side: known
           ? el('span', { class: 'chip chip--quiet' }, 'Friends')
           : el('button', {
             class: 'btn btn--default btn--sm', type: 'button',
             'aria-label': 'Send a friend request to ' + (nameOf(person) || person.username),
-            onClick: async () => {
+            onClick: async (event) => {
+              event.preventDefault();
+              event.stopPropagation();
               try {
                 await Api.sendFriendRequest(person.id);
                 toast('Request sent to ' + (nameOf(person) || person.username));

@@ -229,6 +229,127 @@ router.get('/api/continuum/memberships', auth, async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
+// ---- writing in a community that lives elsewhere ----------------------------
+
+// Write a message in a channel of a community that lives on another instance.
+//
+// The message travels to the instance that owns the community, and the owner
+// answers: taken, or refused with the reason. The answer is told to the
+// writer, who sees it on the message they wrote.
+//
+// Joining is what makes this possible: a member of a federated community
+// may write in it, and writing grants them nothing over it.
+router.post(
+  '/api/continuum/communities/:instanceId/:communityId/channels/:channelId/messages',
+  auth,
+  rateLimit({ windowMs: 60000, max: 30 }),
+  async (req, res, next) => {
+    try {
+      if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+      const message = await continuum.writeRemoteMessage(
+        req.user,
+        req.params.instanceId,
+        req.params.communityId,
+        req.params.channelId,
+        req.body || {}
+      );
+      res.status(201).json(message);
+    } catch (e) { serviceError(res, e); }
+  }
+);
+
+// The messages this account has written into communities that live
+// elsewhere, with what the owners said about them.
+router.get('/api/continuum/outgoing', auth, async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+    res.json(await continuum.listOutgoingMessages(req.user.id, {
+      originInstanceId: req.query.instance_id,
+      originCommunityId: req.query.community_id,
+    }));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Edit a message this account wrote in a community that lives elsewhere.
+router.patch('/api/continuum/outgoing/:messageId', auth, rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+    res.json(await continuum.editRemoteMessage(req.user, req.params.messageId, req.body || {}));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Take back a message this account wrote in a community that lives
+// elsewhere.
+router.delete('/api/continuum/outgoing/:messageId', auth, async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+    res.json(await continuum.deleteRemoteMessage(req.user, req.params.messageId));
+  } catch (e) { serviceError(res, e); }
+});
+
+// ---- moderation of what members of these communities wrote elsewhere ---------
+
+// The moderation surface: the messages members of this instance's
+// communities wrote on other instances.
+//
+// Who may see it is decided per community: a community moderator may see
+// the messages of their own community, and a platform administrator may see
+// all of them.
+router.get('/api/continuum/moderation/messages', auth, async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+    res.json(await continuum.listModerationMessages(req.user, {
+      communityId: req.query.community_id,
+      limit: req.query.limit,
+    }));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Take back a message a member wrote on another instance. The instance that
+// wrote it is told, so the copy over there goes too.
+router.delete('/api/continuum/moderation/messages/:instanceId/:messageId', auth, async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+    res.json(await continuum.removeModerationMessage(
+      req.user, req.params.instanceId, req.params.messageId, req.body || {}
+    ));
+  } catch (e) { serviceError(res, e); }
+});
+
+// The members of this instance's communities who live on another instance,
+// with what this instance has decided about them.
+router.get('/api/continuum/moderation/members', auth, async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+    res.json(await continuum.listModerationMembers(req.user, {
+      communityId: req.query.community_id,
+      limit: req.query.limit,
+    }));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Mute, remove or restore a member of one of this instance's communities who
+// lives on another instance.
+router.post('/api/continuum/moderation/members/:instanceId/:userId', auth, rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+    res.json(await continuum.restrictRelayMember(
+      req.user, req.params.instanceId, req.params.userId, req.body || {}
+    ));
+  } catch (e) { serviceError(res, e); }
+});
+
+// ---- the change feed --------------------------------------------------------
+
+// The feed's own state: when it last ran, what it did, and how far behind it
+// is. A feed that is further behind than the bound is not quiet about it.
+router.get('/api/continuum/feed', auth, async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
+    res.json(await continuum.feedStatus());
+  } catch (e) { serviceError(res, e); }
+});
+
 // ---- the relay store -------------------------------------------------------
 
 // Everything that arrived from another instance: the relayed messages and the

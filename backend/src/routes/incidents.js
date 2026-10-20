@@ -18,7 +18,7 @@ const incidents = require('../services/incidents');
 const router = express.Router();
 
 // The timeline.
-router.get('/', rateLimit(60), async (req, res, next) => {
+router.get('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     if (!settings.read('incidents.statusPageEnabled', true)) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'the status page is not published' } });
@@ -28,7 +28,7 @@ router.get('/', rateLimit(60), async (req, res, next) => {
 });
 
 // The status page's own answer.
-router.get('/status', rateLimit(60), async (req, res, next) => {
+router.get('/status', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     if (!settings.read('incidents.statusPageEnabled', true)) {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'the status page is not published' } });
@@ -38,14 +38,14 @@ router.get('/status', rateLimit(60), async (req, res, next) => {
 });
 
 // One incident, and what was written in it.
-router.get('/:id', rateLimit(60), async (req, res, next) => {
+router.get('/:id', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json(await incidents.get(req.params.id));
   } catch (e) { serviceError(res, e); }
 });
 
 // Post an incident.
-router.post('/', adminGuard, rateLimit(20), async (req, res, next) => {
+router.post('/', adminGuard, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     res.status(201).json(await incidents.create(Object.assign({}, req.body || {}, {
       actorId: req.user.id,
@@ -55,7 +55,7 @@ router.post('/', adminGuard, rateLimit(20), async (req, res, next) => {
 
 // Move an incident on: it is being looked at, the cause is known, it is
 // being watched, or it is over.
-router.patch('/:id', adminGuard, rateLimit(20), async (req, res, next) => {
+router.patch('/:id', adminGuard, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     res.json(await incidents.update(req.params.id, req.body || {}));
   } catch (e) { serviceError(res, e); }

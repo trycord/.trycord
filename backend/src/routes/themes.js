@@ -53,7 +53,7 @@ router.get('/:id/export', async (req, res, next) => {
 // With a serverId it is a community's theme and the community's staff may
 // install it; without one it is the instance's theme and only a system
 // administrator may install it.
-router.post('/import', auth, rateLimit(20), async (req, res, next) => {
+router.post('/import', auth, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const body = req.body || {};
     const serverId = body.serverId ? String(body.serverId) : null;
@@ -79,7 +79,7 @@ router.post('/import', auth, rateLimit(20), async (req, res, next) => {
 });
 
 // Go back to the theme that was in force before the last change.
-router.post('/rollback', auth, rateLimit(20), async (req, res, next) => {
+router.post('/rollback', auth, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const body = req.body || {};
     const serverId = body.serverId ? String(body.serverId) : null;
