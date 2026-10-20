@@ -66,7 +66,7 @@ function checkShape(envelope) {
 //
 // A refusal is not silence: the writer is told, here and now, because a
 // message that vanishes without a word is worse than one that is refused.
-async function applyReturnMessage(event, origin, payload, publish) {
+async function applyReturnMessage(event, kind, origin, payload, publish) {
   const serverId = origin.community_origin_id;
   const channelId = origin.channel_origin_id;
   const originInstanceId = origin.instance_id;
@@ -265,7 +265,7 @@ async function apply(event, options = {}) {
       };
     }
     if (direction === 'return') {
-      return applyReturnMessage(event, origin, payload, publish);
+      return applyReturnMessage(event, kind, origin, payload, publish);
     }
 
     // The message this instance owns, taken back at its owner.

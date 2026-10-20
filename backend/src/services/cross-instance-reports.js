@@ -29,6 +29,7 @@ const identity = require('./continuum/identity');
 const REASON_MAX = 255;
 const DESCRIPTION_MAX = 2000;
 const CONTENT_TYPES = ['message', 'user', 'attachment', 'channel', 'community'];
+const DELIVERY_TIMEOUT_MS = 10000;
 
 // What a report carries, and what it does not.
 //
