@@ -135,6 +135,16 @@ async function settle() {
   await new Promise((resolve) => setTimeout(resolve, 20));
 }
 
+// Wait for something the editor draws when the server has answered, so a
+// check does not depend on how busy the machine is.
+async function waitFor(ready) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (ready()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  return false;
+}
+
 test('the editor lists the pages and opens the first one', async () => {
   const { editor, calls } = await openEditor();
   const names = byText(editor.node, 'Terms of Service');
@@ -539,6 +549,9 @@ test('two revisions can be compared, and the server says what changed', async ()
   });
   const compare = buttonNamed(editor.node, 'Compare revisions');
   assert.ok(compare, 'there is no comparison');
+  // The history is read from the server, and the comparison is between two
+  // of the revisions it holds.
+  assert.ok(await waitFor(() => byText(editor.node, 'Revision 2').length > 0), 'the history never arrived');
   compare.click();
   await settle();
 
@@ -547,7 +560,10 @@ test('two revisions can be compared, and the server says what changed', async ()
   ));
   assert.ok(asked, 'the server was not asked what changed');
 
-  const dialog = find(document.body, (node) => node.getAttribute && node.getAttribute('role') === 'dialog')[0];
+  const dialog = find(document.body, (node) => (
+    node.getAttribute && node.getAttribute('role') === 'dialog'
+    && String(node.textContent || '').indexOf('Compare two revisions') !== -1
+  ))[0];
   assert.ok(dialog, 'there is no report');
   assert.ok(byText(dialog, '1 added').length > 0, 'the report does not say what was added');
   assert.ok(byText(dialog, '![A picture](/uploads/picture.png)').length > 0, 'the block that was added is not shown');

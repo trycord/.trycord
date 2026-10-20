@@ -19,6 +19,7 @@ import realtime, { EVENTS } from '../../../packages/realtime.js';
 import { navigate, path } from '../../../packages/nav.js';
 import Api from '../../../packages/api.js';
 import { empty } from '../components.js';
+import { templateSheet, collectionSheet, expandInDraft } from '../saved.js';
 
 const QUICK = ['\u{1F44D}', '\u{1F525}', '\u{1F389}', '\u{1F602}', '\u{1F440}', '\u{2705}'];
 
@@ -237,11 +238,25 @@ function createComposer(scope, submit) {
     replyBar, staged, fileInput, input,
     el('div', { class: 'm-composer__bar' },
       el('button', { class: 'm-iconbtn', type: 'button', title: 'Attach a file', 'aria-label': 'Attach a file', onClick: () => fileInput.click() }, icon('paperclip', { size: 20 })),
+      el('button', { class: 'm-iconbtn', type: 'button', title: 'Insert a template', 'aria-label': 'Insert a template', onClick: () => openTemplates() }, icon('zap', { size: 20 })),
       el('span', { class: 'm-spacer' }),
       el('button', { class: 'm-composer__send', type: 'submit', 'aria-label': 'Send' }, icon('send', { size: 20 }))));
 
   const files = [];
   let replyTo = null;
+  let expanding = false;
+
+  // The template picker: the reader's own templates, and the way one of them
+  // is put into the draft.
+  function openTemplates() {
+    templateSheet((entry) => {
+      const body = String((entry && entry.body) || '');
+      const at = input.selectionStart === null ? input.value.length : input.selectionStart;
+      input.value = input.value.slice(0, at) + body + input.value.slice(at);
+      input.setSelectionRange(at + body.length, at + body.length);
+      input.focus();
+    });
+  }
 
   function updateStaged() {
     clear(staged);
@@ -261,6 +276,16 @@ function createComposer(scope, submit) {
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 140) + 'px';
     if (scope.onTyping) scope.onTyping();
+    // A shortcut is expanded when the reader has finished the word. The
+    // templates are read once, so this costs nothing per keystroke.
+    if (expanding) return;
+    expanding = true;
+    expandInDraft(input.value).then((expanded) => {
+      if (!expanded) return;
+      input.value = expanded.text;
+      input.setSelectionRange(input.value.length, input.value.length);
+    }).catch(() => { /* a template that cannot be read is not expanded */ })
+      .finally(() => { expanding = false; });
   });
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
@@ -522,6 +547,9 @@ export function renderConversation(ctx, scope) {
       if (!isDm && scope.serverId) {
         items.push({ separator: true });
         items.push({ label: message.pinned ? 'Unpin' : 'Pin', icon: 'pin', onSelect: () => togglePin(message) });
+        // A collection belongs to a community, so a message can only be saved
+        // into one when the conversation is in one.
+        items.push({ label: 'Save to a collection', icon: 'folder', onSelect: () => collectionSheet(scope.serverId, { itemType: 'message', itemId: message.id }) });
       }
       if (mine) {
         items.push({ separator: true });
