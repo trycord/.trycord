@@ -435,16 +435,6 @@ function typeOf(name) {
   return 'string';
 }
 
-// The settings a provider owns, for the console and for the save path.
-function keysOf(providerId) {
-  const group = groupOf(providerId);
-  if (!group) return { settings: [], secrets: [] };
-  return {
-    settings: group.settings.map((name) => group.prefix + name),
-    secrets: group.secrets.map((name) => group.prefix + name),
-  };
-}
-
 // Whether a secret belongs to a provider, and is one it cannot do without.
 function isRequiredSecret(providerId, key) {
   const provider = String(providerId || '').trim().toLowerCase();
@@ -469,7 +459,6 @@ module.exports = {
   limit,
   iceServers,
   inHouseRelay,
-  keysOf,
   isRequiredSecret,
   typeOf,
 };

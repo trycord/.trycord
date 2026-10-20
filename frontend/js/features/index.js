@@ -9,6 +9,8 @@
 import { renderHome } from './home.js';
 import { renderInbox } from './inbox.js';
 import { renderMenu } from './everything.js';
+import { renderExtensions } from './extensions.js';
+import { renderDeveloper } from './developer.js';
 import { renderAuth } from './auth.js';
 import {
   renderSupport, renderLegal, renderInvite, renderServerCreate, renderNotFound,
@@ -19,6 +21,7 @@ import { renderDiscover } from './discover.js';
 import { renderInstances } from './instances.js';
 import { renderProfile } from './profile.js';
 import { renderCommunity, renderChannelView, renderMembers, renderRoles, renderInvites, renderCategories } from './community.js';
+import { renderWorkspace } from './workspace.js';
 import { renderSettings } from './settings.js';
 import { renderAdmin } from './admin.js';
 import { renderSearch } from './search.js';
@@ -32,6 +35,8 @@ export const RENDERERS = {
   home: () => renderHome(),
   notifications: () => renderInbox(),
   menu: () => renderMenu(),
+  extensions: (ctx) => renderExtensions(ctx),
+  developer: (ctx) => renderDeveloper(ctx),
   support: () => renderSupport(),
   legal: (ctx) => renderLegal(ctx),
   invite: (ctx) => renderInvite(ctx),
@@ -58,6 +63,18 @@ export const RENDERERS = {
   'community.roles': (ctx) => renderRoles(ctx),
   'community.invites': (ctx) => renderInvites(ctx),
   'community.categories': (ctx) => renderCategories(ctx),
+  'community.workspace': (ctx) => renderWorkspace(ctx),
+  'community.workspace.spaces': (ctx) => renderWorkspace(ctx),
+  'community.workspace.space': (ctx) => renderWorkspace(ctx),
+  'community.workspace.documents': (ctx) => renderWorkspace(ctx),
+  'community.workspace.document': (ctx) => renderWorkspace(ctx),
+  'community.workspace.boards': (ctx) => renderWorkspace(ctx),
+  'community.workspace.board': (ctx) => renderWorkspace(ctx),
+  'community.workspace.card': (ctx) => renderWorkspace(ctx),
+  'community.workspace.events': (ctx) => renderWorkspace(ctx),
+  'community.workspace.event': (ctx) => renderWorkspace(ctx),
+  'community.workspace.polls': (ctx) => renderWorkspace(ctx),
+  'community.workspace.poll': (ctx) => renderWorkspace(ctx),
   'community.new': () => renderServerCreate(),
 
   // The community settings addresses resolve to the pages above through the

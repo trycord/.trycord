@@ -37,7 +37,7 @@ test('revoking a device on a phone', async (t) => {
     const client = fakeClient({
       devices: [
         { id: 'device-this-phone', label: 'This phone' },
-        { id: 'device-old-laptop', label: 'The old laptop' },
+        { id: 'device-old-laptop', label: 'The old laptop', keyFingerprint: 'c3d4e5f6' },
       ],
     });
     const node = encryptionBody({ client: async () => client });
@@ -52,6 +52,7 @@ test('revoking a device on a phone', async (t) => {
     assert.ok(sheetNode, 'the screen did not ask before revoking');
     assert.match(sheetNode.textContent, /stops being able to read/i);
     assert.match(sheetNode.textContent, /rekey/i);
+    assert.match(sheetNode.textContent, /C3D4E5F6/, 'the sheet does not show which device it is about');
 
     const yes = buttonWithText(sheetNode, 'Revoke');
     assert.ok(yes, 'the sheet has no way to confirm');

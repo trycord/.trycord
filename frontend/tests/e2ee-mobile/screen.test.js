@@ -63,4 +63,17 @@ test('the encryption screen on a phone', async (t) => {
     assert.match(text, /shown once/i, 'the screen says the recovery key is shown once');
     assert.match(text, /registers a new device/i, 'the screen says recovering registers a new device');
   });
+
+  await t.test('the phone draws it in its settings', async () => {
+    resetPhone();
+    const { renderSettings } = await import('../../mobile/js/views/settings.js');
+    const { pageById } = await import('../../packages/registry.js');
+    const page = pageById('settings.encryption');
+    assert.ok(page, 'the page is not in the registry');
+
+    const view = renderSettings({ page, params: {}, rest: [] });
+    view.onMount();
+    assert.ok(await waitFor(() => /This device/.test(view.node.textContent)),
+      'the settings screen did not draw the encryption screen');
+  });
 });

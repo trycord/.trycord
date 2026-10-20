@@ -300,6 +300,17 @@ function communityContext(serverId) {
       }, icon('plus', { size: 14 }), 'Create the first channel')));
   }
 
+  // The workspace: the community's own spaces, documents, boards, events and
+  // polls. It is a place rather than a channel, so it sits at the end of the
+  // column under its own heading.
+  const workspaceRoute = '/server/' + serverId + '/workspace';
+  sections.push(el('div', { class: 'nav-label' }, 'Workspace'));
+  sections.push(el('a', {
+    class: 'nav-item nav-item--channel' + (here.startsWith(workspaceRoute) ? ' is-active' : ''),
+    href: path(workspaceRoute),
+    'aria-current': here.startsWith(workspaceRoute) ? 'page' : null,
+  }, icon('layers', { size: 16 }), el('span', { class: 'truncate' }, 'Open the workspace')));
+
   // The two things a manager creates most, at the end of the column.
   if (managesChannels) {
     sections.push(el('div', { class: 'context-actions-row' },
@@ -328,6 +339,7 @@ function openCommunityMenu(event, serverId, server) {
     { label: 'Invite people', icon: 'mail', onSelect: () => navigate('/server/' + serverId + '/settings/invites') },
     { label: 'Members', icon: 'users', onSelect: () => navigate('/server/' + serverId + '/members') },
     { separator: true },
+    { label: 'Workspace', icon: 'layers', onSelect: () => navigate('/server/' + serverId + '/workspace') },
     { label: 'Community settings', icon: 'settings', onSelect: () => navigate('/server/' + serverId + '/settings') },
     { label: 'Leave community', icon: 'logout', danger: true, onSelect: () => leaveCommunity(serverId, server) },
   ];

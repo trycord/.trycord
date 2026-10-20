@@ -228,19 +228,10 @@ function inHouseState() {
   };
 }
 
-function stopInHouse() {
-  if (!inHouse) return;
-  if (inHouse.socket) {
-    try { inHouse.socket.close(); } catch { /* already closed */ }
-  }
-  inHouse = null;
-}
-
 module.exports = {
   parseIceUrl,
   probeAddress,
   ensureInHouse,
   inHouseState,
-  stopInHouse,
   DEFAULT_TIMEOUT_MS,
 };

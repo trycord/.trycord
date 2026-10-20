@@ -102,6 +102,39 @@ test('the mesh', async (t) => {
     assert.match(refused.data.error.message, /2 participants/);
   });
 
+  await t.test('the relay credential is handed to the session that owns it', async () => {
+    const relay = await startRelay();
+    const { instance, owner, member } = await voiceInstance({
+      env: { TRYCORD_TURN_HOST: '127.0.0.1', TRYCORD_TURN_PORT: String(relay.port) },
+    });
+    t.after(async () => { relay.close(); await instance.stop(); });
+
+    const { channelId, joinCode } = await voiceChannel(owner);
+    await joinCommunity(member, joinCode);
+
+    const joined = await member.post('/api/voice/channels/' + channelId + '/join', {});
+    assert.equal(joined.status, 201, JSON.stringify(joined.data));
+
+    const credentials = await member.post('/api/voice/credentials', {
+      sessionId: joined.data.sessionId,
+    });
+    assert.equal(credentials.status, 200, JSON.stringify(credentials.data));
+    const relay_ = (credentials.data.iceServers || []).find((entry) => String(entry.urls).indexOf('turn:') === 0);
+    assert.ok(relay_, 'the relay is offered: ' + JSON.stringify(credentials.data.iceServers));
+    assert.ok(relay_.username, 'the relay credential carries a username');
+    assert.ok(relay_.credential, 'the relay credential carries a credential');
+
+    // The in-house secret is not in it: what travels is something derived.
+    assert.ok(relay_.credential.indexOf('change-me-in-production') === -1,
+      'the in-house secret itself is not handed out');
+
+    // And it is not handed to somebody else either.
+    const stranger = await owner.post('/api/voice/credentials', {
+      sessionId: joined.data.sessionId,
+    });
+    assert.equal(stranger.status, 404, JSON.stringify(stranger.data));
+  });
+
   await t.test('the mesh asks for no SFU credentials at all', async () => {
     const { instance, owner } = await voiceInstance();
     t.after(() => instance.stop());

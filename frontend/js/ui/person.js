@@ -178,6 +178,8 @@ export async function personSheetEntries(raw, options) {
   if (isSelf(user)) {
     items.push({ label: 'Your profile', icon: 'user', onSelect: () => navigate('/users/' + user.id) });
     items.push({ label: 'Account settings', icon: 'settings', onSelect: () => navigate('/settings') });
+    items.push({ label: 'Extensions', icon: 'grid', onSelect: () => navigate('/extensions') });
+    items.push({ label: 'Developer', icon: 'code', onSelect: () => navigate('/developer') });
   } else {
     items.push({ label: 'View profile', icon: 'user', onSelect: () => navigate('/users/' + user.id) });
     items.push({ label: 'Open a channel', icon: 'message', onSelect: () => openChannel(user) });

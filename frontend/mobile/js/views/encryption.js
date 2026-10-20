@@ -187,7 +187,14 @@ export function encryptionBody(options) {
       toast('This phone is registered', { type: 'success' });
       await paintThisDevice();
       await paintDevices();
-      await paintBackup();
+      // A new device has a recovery key nobody has seen. This is the one
+      // moment the screen shows it.
+      const device = client.device;
+      if (device && device.recoveryKey && !recoveryKeyShown(device.id)) {
+        await showRecoveryKey(device);
+      } else {
+        await paintBackup();
+      }
     } catch (error) {
       toast(error && error.message ? error.message : 'This phone could not be registered.', { type: 'danger' });
     }
@@ -240,6 +247,11 @@ export function encryptionBody(options) {
     const yes = await confirm({
       title: 'Revoke ' + name + '?',
       text: 'It stops being able to read this account\'s conversations, and the other devices have to rekey what they shared with it. It has to register again to come back.',
+      body: device.keyFingerprint
+        ? el('div', { class: 'm-stack' },
+          el('p', { class: 'm-lede' }, 'Check that this is the device you mean:'),
+          el('code', { class: 'm-code' }, fingerprintBlocks(device.keyFingerprint)))
+        : null,
       confirmLabel: 'Revoke',
       danger: true,
     });
@@ -506,7 +518,7 @@ export function encryptionBody(options) {
         'Revoking a device stops it reading anything new. The other devices have to rekey what they shared with '
         + 'it, and it has to register again to come back.')), { note: 'Every device registered to this account' }),
     section('Safety number', paintSafety(), { note: 'Compare this with the person you are talking to' }),
-    section('Key backup', backupBox, { note: 'Getting a lost device back' }),
+    section('Key backup', backupBox, { note: 'What the server holds for this account' }),
     section('Recovery', paintRecovery(), { note: 'Getting a lost device back' }),
   );
 

@@ -33,8 +33,6 @@ const relay = require('./relay');
 //
 // The session id is what the participant row holds and what the client sends
 // back, so the server never has to be asked who a session belongs to.
-const SFU_SESSION_PATH = '/sessions';
-
 function stripTrailingSlash(url) {
   return String(url || '').replace(/\/+$/, '');
 }
@@ -233,4 +231,4 @@ async function check(providerId, overlay) {
   }
 }
 
-module.exports = { PROVIDERS, SFU_SESSION_PATH, find, describe, check };
+module.exports = { PROVIDERS, find, describe, check };

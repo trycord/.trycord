@@ -122,6 +122,7 @@ function communityMenu(serverId) {
   items.push({ header: 'Channels' });
   for (const item of channelMenu(serverId)) items.push(item);
   items.push({ separator: true });
+  items.push({ label: 'Workspace', icon: 'layers', onSelect: () => navigate('/server/' + serverId + '/workspace') });
   items.push({ label: 'Members', icon: 'users', onSelect: () => navigate('/server/' + serverId + '/members') });
   if (can(serverId, 'MANAGE_ROLES') || isOwner(serverId)) {
     items.push({ label: 'Roles', icon: 'shield', onSelect: () => navigate('/server/' + serverId + '/roles') });

@@ -279,10 +279,11 @@ function keySheet(key, onDone) {
   return layer;
 }
 
-function keysSection(host, reload) {
+async function keysSection(host, reload) {
   clear(host);
   host.appendChild(loading('Reading the keys'));
-  readKeys().then((answer) => {
+  try {
+    const answer = await readKeys();
     const keys = (answer && answer.keys) || [];
     clear(host);
     if (!keys.length) {
@@ -290,7 +291,11 @@ function keysSection(host, reload) {
         icon: 'key',
         title: 'No keys yet',
         text: 'An integration that speaks for you needs a key. Make one, and give it only the scopes it needs.',
-        action: primaryButton('Create a key', () => createKeySheet(reload)),
+        action: el('button', {
+          class: 'm-btn m-btn--primary', type: 'button',
+          'aria-label': 'Create an API key',
+          onClick: () => createKeySheet(reload),
+        }, 'Create a key'),
       }));
       return;
     }
@@ -316,10 +321,10 @@ function keysSection(host, reload) {
         onClick: () => createKeySheet(reload),
       }, 'Create a key'),
     }));
-  }).catch((error) => {
+  } catch (error) {
     clear(host);
     host.appendChild(failure(error, () => keysSection(host, reload)));
-  });
+  }
 }
 
 // -- the applications -------------------------------------------------------------
@@ -557,7 +562,7 @@ function applicationSheet(serverId, application, onDone) {
   return layer;
 }
 
-function applicationsSection(host, reload) {
+async function applicationsSection(host, reload) {
   clear(host);
   host.appendChild(loading('Reading the applications'));
   const communities = State.servers.filter((server) => {
@@ -576,12 +581,14 @@ function applicationsSection(host, reload) {
   const pickerControl = select({
     choices: communities.map((server) => ({ value: server.id, label: server.name })),
   });
+  pickerControl.value = communities[0].id;
   const list = el('div', { class: 'm-list' });
 
-  function paint() {
+  async function paint() {
     clear(list);
     list.appendChild(loading('Reading the applications'));
-    readApplications(pickerControl.value).then((answer) => {
+    try {
+      const answer = await readApplications(pickerControl.value);
       const applications = (answer && answer.applications) || [];
       clear(list);
       if (!applications.length) {
@@ -601,10 +608,10 @@ function applicationsSection(host, reload) {
         el('span', { class: 'm-row__side' },
           el('span', { class: 'm-chip' }, application.status || 'unknown'))));
       }
-    }).catch((error) => {
+    } catch (error) {
       clear(list);
       list.appendChild(failure(error, paint));
-    });
+    }
   }
 
   pickerControl.addEventListener('change', paint);
@@ -618,7 +625,7 @@ function applicationsSection(host, reload) {
       onClick: () => createApplicationSheet(pickerControl.value, paint),
     }, 'Create an application'),
   }));
-  paint();
+  await paint();
 }
 
 // -- the screen -------------------------------------------------------------------
@@ -646,11 +653,11 @@ export function renderDeveloper(ctx) {
     }
   }
 
-  function show(id) {
+  async function show(id) {
     current = id;
     paintStrip();
-    if (id === 'keys') keysSection(host, () => show('keys'));
-    else applicationsSection(host, () => show('applications'));
+    if (id === 'keys') await keysSection(host, () => show('keys'));
+    else await applicationsSection(host, () => show('applications'));
   }
 
   const node = screen(
@@ -670,7 +677,7 @@ export function renderDeveloper(ctx) {
         try { await refreshServers(); } catch { /* the note below says what is missing */ }
       }
       paintStrip();
-      show(current);
+      await show(current);
     },
   };
 }

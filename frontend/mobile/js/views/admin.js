@@ -1486,7 +1486,7 @@ function federationBody() {
   const answer = el('div', { class: 'm-stack' });
 
   function say(title, text, tone) {
-    answer.replaceChildren(notice({ tone: tone || 'info', title, text }));
+    answer.replaceChildren(notice({ tone: tone || 'info', role: 'status', title, text }));
   }
 
   async function paint() {

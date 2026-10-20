@@ -191,6 +191,8 @@ export async function personActions(raw, options) {
   if (self) {
     items.push({ label: 'Your profile', icon: 'user', onSelect: () => navigate('/users/' + user.id) });
     items.push({ label: 'Account settings', icon: 'settings', onSelect: () => navigate('/settings') });
+    items.push({ label: 'Extensions', icon: 'grid', onSelect: () => navigate('/extensions') });
+    items.push({ label: 'Developer', icon: 'code', onSelect: () => navigate('/developer') });
   } else {
     items.push({ label: 'View profile', icon: 'user', onSelect: () => navigate('/users/' + user.id) });
     items.push({ label: 'Open a chat', icon: 'message', onSelect: () => openChat(user) });
