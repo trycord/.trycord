@@ -53,13 +53,26 @@ function parse(body) {
   }
 }
 
+// The body a visitor is served: the published one while the page is
+// published, the draft one otherwise. A page that has been taken down has a
+// published body still in the row, and that body is no longer what the page
+// says - so the status decides, not the presence of the column.
+function effectiveBody(row, draft) {
+  if (row && row.status === 'PUBLISHED') return parse(row.published_body);
+  return draft || [];
+}
+
 function toPublic(row) {
   if (!row) return null;
   const draft = parse(row.draft_body);
   const published = parse(row.published_body);
+  const inForce = effectiveBody(row, draft);
   return {
     route: row.route,
     title: row.title,
+    // The description of the page, read from the body that is in force. The
+    // body is the authority, so the metadata and the page cannot disagree.
+    description: content.descriptionOf(inForce),
     legal: !!row.legal,
     status: row.status,
     hasDraft: draft.length > 0,
@@ -68,7 +81,7 @@ function toPublic(row) {
     published: published,
     // Shown in the console so an operator can see, without opening the page,
     // which parts of their policy are still the shipped template.
-    outstandingFields: content.operatorFields(published.length ? published : draft),
+    outstandingFields: content.operatorFields(inForce),
     draftAuthor: row.draft_author,
     draftAt: row.draft_at,
     publishedAuthor: row.published_author,
@@ -83,6 +96,7 @@ function placeholder(p) {
   return {
     route: p.route,
     title: p.title,
+    description: '',
     legal: p.legal,
     status: 'UNTOUCHED',
     hasDraft: false,
@@ -129,11 +143,16 @@ async function saveDraft({ route, title, body, actorId }) {
   const pageTitle = String(title || row.title).trim().slice(0, 128) || row.title;
   const ts = now();
   const rev = await nextRevision(row.id);
+  // The description follows the body in force: while the page is published
+  // that is the published body, so a draft that changes the standfirst does
+  // not change what the page is described as until it is published.
+  const staysPublished = row.status === 'PUBLISHED';
+  const description = content.descriptionOf(staysPublished ? parse(row.published_body) : blocks);
   await db.transaction(async (t) => {
     await t.run(
-      'UPDATE pages SET title = ?, draft_body = ?, draft_author = ?, draft_at = ?, status = ? WHERE id = ?',
-      [pageTitle, JSON.stringify(blocks), actorId, ts,
-        row.status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT', row.id]
+      'UPDATE pages SET title = ?, description = ?, draft_body = ?, draft_author = ?, draft_at = ?, status = ? WHERE id = ?',
+      [pageTitle, description, JSON.stringify(blocks), actorId, ts,
+        staysPublished ? 'PUBLISHED' : 'DRAFT', row.id]
     );
     await t.run(
       'INSERT INTO page_revisions (id, page_id, revision, body, title, state, author_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -161,10 +180,11 @@ async function publish({ route, actorId, confirm }) {
 
   const ts = now();
   const rev = await nextRevision(row.id);
+  const description = content.descriptionOf(draft);
   await db.transaction(async (t) => {
     await t.run(
-      'UPDATE pages SET status = ?, published_body = ?, published_author = ?, published_at = ? WHERE id = ?',
-      ['PUBLISHED', row.draft_body, actorId, ts, row.id]
+      'UPDATE pages SET status = ?, description = ?, published_body = ?, published_author = ?, published_at = ? WHERE id = ?',
+      ['PUBLISHED', description, row.draft_body, actorId, ts, row.id]
     );
     await t.run(
       'INSERT INTO page_revisions (id, page_id, revision, body, title, state, author_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -178,9 +198,31 @@ async function publish({ route, actorId, confirm }) {
 async function unpublish({ route, actorId }) {
   const row = await ensureRow(route);
   if (row.status !== 'PUBLISHED') bad('this page is not published', 'CONFLICT');
-  await db.run('UPDATE pages SET status = ? WHERE id = ?', ['DRAFT', row.id]);
+  // The page falls back to its draft, so the description follows it there.
+  const description = content.descriptionOf(parse(row.draft_body));
+  await db.run(
+    'UPDATE pages SET status = ?, description = ? WHERE id = ?',
+    ['DRAFT', description, row.id]
+  );
   await enforcement.audit(actorId, 'PAGE_UNPUBLISHED', 'page', row.route, null);
   return get(route);
+}
+
+// The revision numbers that are in force: the one that was published, and the
+// one that is the current draft. A page has at most one of each, and the list
+// says which they are so an operator does not have to work it out from the
+// dates.
+async function currentRevisions(pageId) {
+  const row = await db.get(
+    'SELECT MAX(CASE WHEN state = \'PUBLISHED\' THEN revision END) AS published,'
+    + ' MAX(CASE WHEN state = \'DRAFT\' THEN revision END) AS draft'
+    + ' FROM page_revisions WHERE page_id = ?',
+    [pageId]
+  );
+  return {
+    published: row && row.published != null ? Number(row.published) : null,
+    draft: row && row.draft != null ? Number(row.draft) : null,
+  };
 }
 
 async function revisions({ route, limit } = {}) {
@@ -190,11 +232,25 @@ async function revisions({ route, limit } = {}) {
   // be compared against another revision is a list of dates. It is a list of
   // whole documents, so it is bounded by the cap above rather than by the
   // size of one document.
-  return db.all(
+  const rows = await db.all(
     'SELECT r.id, r.revision, r.title, r.state, r.author_id, r.created_at, r.body'
     + ' FROM page_revisions r WHERE r.page_id = ? ORDER BY r.revision DESC LIMIT ' + cap,
     [row.id]
   );
+  const current = await currentRevisions(row.id);
+  return rows.map((r) => ({
+    id: r.id,
+    revision: Number(r.revision),
+    title: r.title,
+    state: r.state,
+    authorId: r.author_id,
+    createdAt: r.created_at,
+    body: parse(r.body),
+    // Which one is the page as it is published, and which one is the draft
+    // being worked on now.
+    isPublished: current.published != null && Number(r.revision) === current.published,
+    isDraft: current.draft != null && Number(r.revision) === current.draft,
+  }));
 }
 
 // Restoring writes the old body back as the current draft and records a new
@@ -205,10 +261,14 @@ async function restore({ route, revision, actorId }) {
   if (!rev) notFound();
   const ts = now();
   const next = await nextRevision(row.id);
+  // The description follows the body in force, the same way it does when a
+  // draft is saved: a published page is still described by what it publishes.
+  const staysPublished = row.status === 'PUBLISHED';
+  const description = content.descriptionOf(staysPublished ? parse(row.published_body) : parse(rev.body));
   await db.transaction(async (t) => {
     await t.run(
-      'UPDATE pages SET draft_body = ?, draft_author = ?, draft_at = ?, status = ? WHERE id = ?',
-      [rev.body, actorId, ts, row.status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT', row.id]
+      'UPDATE pages SET description = ?, draft_body = ?, draft_author = ?, draft_at = ?, status = ? WHERE id = ?',
+      [description, rev.body, actorId, ts, staysPublished ? 'PUBLISHED' : 'DRAFT', row.id]
     );
     await t.run(
       'INSERT INTO page_revisions (id, page_id, revision, body, title, state, author_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
@@ -217,6 +277,56 @@ async function restore({ route, revision, actorId }) {
   });
   await enforcement.audit(actorId, 'PAGE_REVISION_RESTORED', 'page', row.route, null);
   return get(route);
+}
+
+// What changed between two revisions.
+//
+// The comparison is a report about the content: which blocks were added, which
+// were removed and which were rewritten. It is not a rendered diff, because
+// how two revisions are shown is the client's decision, and a server that
+// answered with markup would be deciding it for everybody.
+async function compareRevisions({ route, from, to }) {
+  const row = await ensureRow(route);
+  const fromRevision = Number(from);
+  const toRevision = Number(to);
+  if (!Number.isInteger(fromRevision) || !Number.isInteger(toRevision)) {
+    bad('a comparison needs two revision numbers', 'VALIDATION_ERROR');
+  }
+  const older = await db.get(
+    'SELECT * FROM page_revisions WHERE page_id = ? AND revision = ?', [row.id, fromRevision]
+  );
+  const newer = await db.get(
+    'SELECT * FROM page_revisions WHERE page_id = ? AND revision = ?', [row.id, toRevision]
+  );
+  if (!older) notFound();
+  if (!newer) notFound();
+  const report = content.compare(parse(older.body), parse(newer.body));
+  return {
+    route: row.route,
+    from: revisionMeta(older),
+    to: revisionMeta(newer),
+    titleChanged: older.title !== newer.title,
+    added: report.added,
+    removed: report.removed,
+    changed: report.changed,
+    unchanged: report.unchanged,
+    summary: {
+      added: report.added.length,
+      removed: report.removed.length,
+      changed: report.changed.length,
+      unchanged: report.unchanged,
+    },
+  };
+}
+
+function revisionMeta(row) {
+  return {
+    revision: Number(row.revision),
+    title: row.title,
+    state: row.state,
+    authorId: row.author_id,
+    createdAt: row.created_at,
+  };
 }
 
 // The rendered body a visitor should see, or null when the page has never been
@@ -239,5 +349,6 @@ module.exports = {
   unpublish,
   revisions,
   restore,
+  compareRevisions,
   publishedHtml,
 };

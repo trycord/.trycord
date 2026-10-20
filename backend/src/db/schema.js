@@ -332,6 +332,10 @@ const INDEXES = [
   'CREATE INDEX idx_workflow_runs_workflow ON workflow_runs(workflow_id, created_at)',
   'CREATE INDEX idx_workflow_runs_created ON workflow_runs(created_at)',
   'CREATE INDEX idx_workflow_run_steps_run ON workflow_run_steps(run_id, step_index)',
+
+  // The topics a reader follows. The unique key covers the lookup by topic;
+  // this one covers the listing by channel.
+  'CREATE INDEX idx_forum_subscriptions_channel ON forum_subscriptions(channel_id, user_id)',
   // Backs ORDER BY created_at DESC scans that are not scoped to one
   // channel (the /api/activity feed). Write overhead is one narrow index.
   'CREATE INDEX idx_messages_created ON messages(created_at)',

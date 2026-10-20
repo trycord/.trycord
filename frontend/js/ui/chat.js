@@ -15,8 +15,11 @@ import { avatar, spinner } from './primitives.js';
 import { State, nameOf } from '../../packages/store.js';
 import { blank } from './page.js';
 import {
-  openMenu, openContextMenu, openDialog, confirmDialog, errorToast, toast,
+  openMenu, openContextMenu, openDialog, confirmDialog, errorToast,
+  attachContextMenu,
 } from './overlays.js';
+import { copyText } from './clipboard.js';
+import { embedCard, imagesOf, kindOf } from './embeds.js';
 
 const QUICK_REACTIONS = ['👍', '❤️', '🔥', '🎉', '👀', '😅'];
 const CHAT_EMOJI = ['😀', '😂', '🙂', '😍', '🥳', '👍', '🙏', '🔥', '💯', '🎉', '🤝', '👋'];
@@ -83,23 +86,7 @@ function humanSize(bytes) {
   return (u === 0 ? Math.round(v) : v.toFixed(1)) + ' ' + units[u];
 }
 
-export async function copyText(text, what) {
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-    } else {
-      const area = document.createElement('textarea');
-      area.value = text;
-      area.style.position = 'fixed';
-      area.style.opacity = '0';
-      document.body.appendChild(area);
-      area.select();
-      document.execCommand('copy');
-      area.remove();
-    }
-    toast((what || 'Link') + ' copied');
-  } catch { /* a refused clipboard stays quiet; the reader can select by hand */ }
-}
+export { copyText };
 
 // -- pieces of one row ----------------------------------------------------------
 
@@ -157,31 +144,49 @@ function inlineContent(m) {
   return nodes;
 }
 
+// A file the message carries. It is a link, so it opens where it is; the menu
+// it carries offers the things a file can be asked for - its address, its name,
+// and a copy of either.
 function attachmentNode(a) {
   const url = a.url || a.objectUrl || '';
-  const nice = a.name || 'Attachment';
-  if (a.contentType && String(a.contentType).startsWith('image/') && url) {
-    return el('img', {
-      class: 'msg-image', src: url, alt: nice, loading: 'lazy', title: nice,
-    });
-  }
-  return el('a', { class: 'msg-file', href: url, target: '_blank', rel: 'noreferrer' },
-    el('span', { class: 'msg-file-glyph' }, icon('download', { size: 15 })),
-    el('span', { class: 'msg-file-name' }, nice),
-    a.size ? el('span', { class: 'msg-file-size' }, humanSize(a.size)) : null);
+  const nice = a.name || a.filename || 'Attachment';
+  const isImage = a.contentType && String(a.contentType).startsWith('image/');
+  const node = isImage
+    ? el('a', { class: 'msg-file msg-file--image', href: url, target: '_blank', rel: 'noreferrer' },
+      el('img', { class: 'msg-image', src: url, alt: nice, loading: 'lazy', title: nice }))
+    : el('a', { class: 'msg-file', href: url, target: '_blank', rel: 'noreferrer' },
+      el('span', { class: 'msg-file-glyph' }, icon('download', { size: 15 })),
+      el('span', { class: 'msg-file-name' }, nice),
+      a.size ? el('span', { class: 'msg-file-size' }, humanSize(a.size)) : null);
+  attachContextMenu(node, () => attachmentMenuItems(a, url, nice));
+  return node;
 }
 
-function embedNode(c) {
-  const url = c.url || '';
-  const host = (() => {
-    try { return url ? new URL(url).hostname : ''; } catch { return ''; }
-  })();
-  return el('a', { class: 'msg-embed', href: url || null, target: '_blank', rel: 'noreferrer' },
-    c.image ? el('img', { class: 'msg-embed-image', src: c.image, alt: '', loading: 'lazy' }) : null,
-    el('span', { class: 'msg-embed-main' },
-      host ? el('span', { class: 'msg-embed-host' }, host) : null,
-      el('span', { class: 'msg-embed-title' }, c.title || url || 'Link'),
-      c.description ? el('span', { class: 'msg-embed-text' }, c.description) : null));
+// The menu a file offers. Every entry acts on the file and nothing else.
+export function attachmentMenuItems(att, url, nice) {
+  const items = [];
+  if (url) {
+    items.push({
+      label: 'Open the file', icon: 'external',
+      onSelect: () => { window.open(url, '_blank', 'noopener,noreferrer'); },
+    });
+    items.push({ label: 'Copy the address', icon: 'link', onSelect: () => copyText(url, 'File address') });
+  }
+  items.push({ label: 'Copy the name', icon: 'copy', onSelect: () => copyText(nice, 'File name') });
+  return items;
+}
+
+// The previews of one message, drawn as cards. The images of the message are
+// collected first so the lightbox can move between them.
+function embedRow(cards) {
+  const list = cards || [];
+  const images = imagesOf(list);
+  let seen = 0;
+  return el('div', { class: 'msg-embeds' }, list.map((card) => {
+    let index = 0;
+    if (kindOf(card) === 'image') { index = seen; seen += 1; }
+    return embedCard(card, { images, index });
+  }));
 }
 
 function reactionChip(entry, toggle, live) {
@@ -354,7 +359,7 @@ export function buildMessageRow(deps) {
         el('span', {}, 'replies to ',
           el('span', { class: 'msg-replying-name' }, replyAuthor || 'an earlier message'))) : null,
       m.attachments.length ? el('div', { class: 'msg-attachments' }, m.attachments.map(attachmentNode)) : null,
-      m.embeds.length ? el('div', { class: 'msg-embeds' }, m.embeds.map(embedNode)) : null,
+      m.embeds.length ? embedRow(m.embeds) : null,
       m.reactions.length ? el('div', { class: 'msg-reactions' },
         m.reactions.map((entry) => reactionChip(entry, (emoji, wasMine, share) => {
           void share;

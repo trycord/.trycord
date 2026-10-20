@@ -330,9 +330,6 @@
 /* The non-image attachment row's leading glyph column. */
 .msg-file-glyph { display: grid; place-items: center; flex: none; color: var(--text-3); }
 
-/* An embed card's text column beside its optional image. */
-.msg-embed-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-
 /* The emoji face of a reaction chip: sized to the chip, not the author text. */
 .msg-reaction-emoji { line-height: 1; font-size: var(--fs-sm); }
 
@@ -392,24 +389,97 @@
   max-width: 100%;
 }
 .msg-file:hover { background: var(--hover); }
+.msg-file--image { padding: 0; border: 0; background: none; display: block; max-width: 100%; }
+.msg-file--image:hover { background: none; }
 .msg-file-name { font-weight: 600; overflow-wrap: anywhere; }
 .msg-file-size { color: var(--text-3); font-size: var(--fs-xs); }
 
 .msg-embeds { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
-.msg-embed {
-  display: flex; gap: 10px; align-items: stretch;
+
+/* -- link previews -----------------------------------------------------------
+ * A preview is a card: a picture or a player when the page had one, and the
+ * page's own words when it did not. The site is named by a tile of its first
+ * letter rather than by a favicon - a favicon is a request to an arbitrary
+ * host on behalf of every reader who opens the channel. */
+.embed-card {
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 520px;
   border: 1px solid var(--line-2); border-left: 3px solid var(--brand);
   border-radius: var(--radius-md); padding: 10px; background: var(--panel-2);
-  color: var(--text-1); text-decoration: none; max-width: 520px;
 }
-.msg-embed:hover { border-color: var(--line-3); }
-.msg-embed-host { display: block; font-size: var(--fs-xs); color: var(--text-3); }
-.msg-embed-title { display: block; font-weight: 600; }
-.msg-embed-text {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; color: var(--text-2); font-size: var(--fs-sm);
+.embed-card:hover { border-color: var(--line-3); }
+.embed-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.embed-site { display: flex; align-items: center; gap: 7px; margin: 0; }
+.embed-tile {
+  display: grid; place-items: center;
+  width: 20px; height: 20px; flex: none;
+  border-radius: var(--radius-sm);
+  background: var(--panel-3); color: var(--text-2);
+  font-size: var(--fs-xs); font-weight: var(--weight-bold); text-transform: uppercase;
 }
-.msg-embed-image { width: 96px; height: 96px; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--line-2); }
+.embed-site-name {
+  font-size: var(--fs-xs); color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.embed-title {
+  display: block; color: var(--text-1); font-weight: 600; text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.embed-title:hover { color: var(--brand); }
+.embed-text {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; margin: 0; color: var(--text-2); font-size: var(--fs-sm);
+}
+.embed-host { margin: 0; font-size: var(--fs-xs); color: var(--text-3); }
+.embed-original {
+  align-self: flex-start; margin-top: 2px;
+  font-size: var(--fs-xs); color: var(--brand); text-decoration: none;
+}
+.embed-original:hover { text-decoration: underline; }
+.embed-media {
+  display: block; padding: 0; border: 0; background: none; cursor: zoom-in;
+  border-radius: var(--radius-md); overflow: hidden; max-width: 100%;
+}
+.embed-media:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.embed-image {
+  display: block; max-width: min(420px, 100%); max-height: 320px;
+  object-fit: contain; border-radius: var(--radius-md); border: 1px solid var(--line-2);
+}
+.embed-video {
+  display: block; width: 100%; max-width: 480px; aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md); border: 1px solid var(--line-2); background: var(--panel-3);
+}
+/* A preview the server could not describe is the link and nothing else. */
+.embed-plain {
+  align-self: flex-start; margin-top: 4px;
+  color: var(--brand); font-size: var(--fs-sm); overflow-wrap: anywhere;
+}
+
+/* -- the lightbox ------------------------------------------------------------
+ * An image opened from a message, read large, with the other images of the
+ * message a keypress away. */
+.dialog--lightbox { max-width: min(1100px, 94vw); width: 94vw; background: transparent; }
+.dialog--lightbox .dialog-body { padding: 0; }
+.lightbox { display: flex; flex-direction: column; gap: 8px; }
+.lightbox-image {
+  display: block; max-width: 100%; max-height: 74vh; margin: 0 auto;
+  object-fit: contain; border-radius: var(--radius-md); background: var(--panel-3);
+}
+.lightbox-bar { display: flex; align-items: center; gap: 10px; }
+.lightbox-caption {
+  flex: 1; min-width: 0; margin: 0; color: var(--text-2); font-size: var(--fs-sm);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lightbox-count { color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.lightbox-close, .lightbox-nav {
+  display: grid; place-items: center; width: 36px; height: 36px; flex: none;
+  border: 1px solid var(--line-2); border-radius: var(--radius-md);
+  background: var(--panel-2); color: var(--text-2);
+}
+.lightbox-close:hover, .lightbox-nav:hover { background: var(--hover); color: var(--text-1); }
+.lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); }
+.lightbox-nav--prev { left: 8px; }
+.lightbox-nav--next { right: 8px; }
 
 .msg-reactions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .msg-reaction {
