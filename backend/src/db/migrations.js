@@ -142,6 +142,42 @@ const MIGRATIONS = [
       }
     },
   },
+  {
+    version: 3,
+    name: '3.0.0 community onboarding',
+    // The tables the community onboarding needs.
+    //
+    // They are created by the baseline schema pass as well, because the
+    // baseline is idempotent and a fresh database should have them without
+    // running anything else. This migration is for the database that already
+    // existed: the baseline's CREATE TABLE IF NOT EXISTS is a no-op there, so
+    // the tables have to be created by a statement that knows the difference.
+    //
+    // Not transactional: MySQL commits DDL implicitly, so a transaction
+    // around it would promise an atomicity the engine does not give. Every
+    // statement is "create if not there", so re-running is safe.
+    transactional: false,
+    async up(conn) {
+      const tables = require('./tables');
+      // The engine suffix is the dialect's: MySQL wants it and SQLite would
+      // refuse it. The baseline schema works the same way.
+      const engine = conn.dialect === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+      for (const statement of tables(engine)) {
+        if (/community_onboarding/.test(statement)) await conn.exec(statement);
+      }
+    },
+    async verify(conn) {
+      for (const name of [
+        'community_onboarding',
+        'community_onboarding_questions',
+        'community_onboarding_answers',
+      ]) {
+        if (!(await tableExists(conn, name))) {
+          throw new Error('the onboarding table is missing: ' + name);
+        }
+      }
+    },
+  },
 ];
 
 // The version this build knows about.
