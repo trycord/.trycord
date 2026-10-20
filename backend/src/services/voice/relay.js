@@ -220,7 +220,10 @@ async function ensureInHouse() {
   }
 
   starting = (async () => {
-    const host = String(process.env.TRYCORD_TURN_HOST || '0.0.0.0').trim();
+    // The relay listens on the loopback unless the operator names an address.
+  // It is a service of this instance, and it does not need to be on every
+  // interface.
+  const host = String(process.env.TRYCORD_TURN_HOST || '127.0.0.1').trim();
     const port = Number(process.env.TRYCORD_TURN_PORT || 3478);
     const realm = String(process.env.TRYCORD_TURN_REALM || 'trycord-turn');
     const listenPort = Number.isFinite(port) && port > 0 ? port : 3478;

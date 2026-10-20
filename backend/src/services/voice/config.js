@@ -220,6 +220,15 @@ function advertisedHost(host) {
   const plain = String(host || '').trim();
   if (plain && plain !== '0.0.0.0' && plain !== '::' && plain !== '[::]') return plain;
 
+  // The voice stack has an address of its own, and it is the one the clients
+  // are given.
+  //
+  // The relay listens on this host. Unless the operator has named an address
+  // that a client elsewhere can reach, the address it is published at is the
+  // one it is listening on - and that is the local one. A relay published at
+  // a wildcard is published at nothing, and a relay published at the site's
+  // address is published at a proxy that does not carry the UDP a TURN service
+  // needs.
   const voiceUrl = String(
     process.env.TRYCORD_VOICE_PUBLIC_URL || settings.read('voice.publicUrl', '') || '',
   ).trim();
@@ -227,11 +236,12 @@ function advertisedHost(host) {
     try { return new URL(voiceUrl).hostname; } catch { /* not a usable address */ }
   }
 
-  const publicUrl = String(settings.read('instance.publicUrl', '') || '').trim();
-  if (publicUrl) {
-    try { return new URL(publicUrl).hostname; } catch { /* not a usable address */ }
-  }
-  return plain;
+  const named = String(process.env.TRYCORD_TURN_HOST || '').trim();
+  if (named && named !== '0.0.0.0' && named !== '::' && named !== '[::]') return named;
+
+  // Nothing named: the relay is on this host, and the address it is published
+  // at is this host.
+  return '127.0.0.1';
 }
 
 // The ICE servers one provider hands to a client.

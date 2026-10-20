@@ -32,6 +32,42 @@ const secrets = require('./secrets');
 // except through catalogue(), which reports presence only.
 const secretValues = {};
 
+// The interfaces that own settings.
+//
+// A setting has one authoritative editor. Where a setting is changed somewhere
+// other than the general Configuration page - in the voice console, say - the
+// general page shows the value that is in force and a link to where it is
+// changed, and a write that arrives from the general page is refused.
+//
+// The rule is the Instance Admin's: the console that owns a setting is where it
+// is changed. Two editors for one value is how an instance ends up with a
+// setting that says one thing and behaves like another.
+const CANONICAL_INTERFACES = {
+  'admin.voice': { id: 'admin.voice', label: 'Voice and video', route: '/admin/voice' },
+};
+
+// The settings the voice console owns. Every one of them, because the voice
+// console is where a person goes to make sense of the voice settings: the
+// provider, the credentials, the participants, the relay.
+const VOICE_OWNED = [
+  'voice.enabled', 'voice.provider', 'voice.screenSharing', 'voice.stageChannels',
+  'voice.maxParticipants', 'voice.stunUrls', 'voice.turnUrl', 'voice.turnUsername',
+  'voice.turnCredential', 'voice.sfuAppId', 'voice.sfuAppSecret',
+  'voice.mesh.maxParticipants', 'voice.mesh.stunUrls', 'voice.mesh.turnUrl',
+  'voice.mesh.turnUsername', 'voice.mesh.turnCredential',
+  'voice.cloudflare.appId', 'voice.cloudflare.appSecret', 'voice.cloudflare.endpoint',
+  'voice.cloudflare.maxParticipants',
+  'voice.sfu.endpoint', 'voice.sfu.stunUrls', 'voice.sfu.turnUrl',
+  'voice.sfu.turnUsername', 'voice.sfu.turnCredential', 'voice.sfu.maxParticipants',
+];
+
+// The interface that owns a setting, or null when the general Configuration
+// page is where it is changed.
+function canonicalInterface(key) {
+  if (VOICE_OWNED.indexOf(String(key || '')) !== -1) return 'admin.voice';
+  return null;
+}
+
 // The catalogue. Only settings the application genuinely reads appear here - an entry
 // that changed nothing would be a decorative control, which is worse than no control.
 //
@@ -1036,6 +1072,19 @@ async function save(entries, adminId) {
     const entry = BY_KEY.get(key);
     if (!entry) { problems.push(key + ': unknown setting'); continue; }
 
+    // A setting another interface owns is not written from here.
+    //
+    // The voice console is where the voice settings are changed, because
+    // that is where a person goes to make sense of them. A write that
+    // arrives here for one of them is refused, and the refusal says where it
+    // belongs - so a second editor cannot become a second answer.
+    const owner = canonicalInterface(key);
+    if (owner) {
+      const interface = CANONICAL_INTERFACES[owner];
+      problems.push(key + ': changed in ' + interface.label + ', not here');
+      continue;
+    }
+
     // A secret is stored encrypted and is never read back into the value map. An
     // empty write means "leave it alone", because the dashboard renders these as an
     // empty field and a save that wiped the credential would break delivery for
@@ -1304,6 +1353,16 @@ function catalogue(secretState) {
         // deployment owns, and the deployment-managed list, are read-only here.
         locked: false,
         lockedReason: null,
+        // The interface that owns this setting. When it is not this page, the
+        // page shows the value in force and a link to where it is changed, and
+        // a write from here is refused.
+        canonical: canonicalInterface(s.key),
+        canonicalLabel: canonicalInterface(s.key)
+          ? CANONICAL_INTERFACES[canonicalInterface(s.key)].label
+          : null,
+        canonicalRoute: canonicalInterface(s.key)
+          ? CANONICAL_INTERFACES[canonicalInterface(s.key)].route
+          : null,
       };
       if (!SECRETS.has(s.key)) return base;
       const stored = state[s.key];
@@ -1380,6 +1439,9 @@ function read(key, fallback) {
 }
 
 module.exports = {
+  canonicalInterface,
+  CANONICAL_INTERFACES,
+  VOICE_OWNED,
   SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY,
   load, get, read, source, save, reset, catalogue, validate, serialise, isLoaded, status,
   secretStored, secretValue,

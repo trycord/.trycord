@@ -156,7 +156,10 @@ function indexOfBuf(haystack, needle) {
 
 function cfg() {
   return {
-    host:   process.env.TRYCORD_TURN_HOST   || '0.0.0.0',
+    // The relay is a service of this instance. It listens on the loopback
+    // unless the operator says otherwise, because a service that is only for
+    // this instance has no business being on every interface.
+    host:   process.env.TRYCORD_TURN_HOST   || '127.0.0.1',
     port:   Number(process.env.TRYCORD_TURN_PORT) || 3478,
     realm:  process.env.TRYCORD_TURN_REALM   || 'trycord-turn',
     secret: sharedSecret(),
@@ -622,7 +625,7 @@ let server = null;
 let activeSweeper = null;
 
 function startServer(config) {
-  const host = (config && config.host) || '0.0.0.0';
+  const host = (config && config.host) || '127.0.0.1';
   const port = (config && config.port) || 3478;
 
   // The socket is kept, so that stopServer() can close it.

@@ -77,7 +77,9 @@ let shuttingDown = false;
  * work.
  */
 function describeConfiguration() {
-  const listenHost = String(process.env.TRYCORD_TURN_HOST || '0.0.0.0').trim();
+  // The relay is a service of this instance: it listens on the loopback
+  // unless the operator names an address.
+  const listenHost = String(process.env.TRYCORD_TURN_HOST || '127.0.0.1').trim();
   const listenPort = Number(process.env.TRYCORD_TURN_PORT || 3478);
   // The published address. The instance knows its own public address, and
   // that is the address the clients are given - "0.0.0.0" is a wildcard and
