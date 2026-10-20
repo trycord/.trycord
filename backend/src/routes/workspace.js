@@ -443,7 +443,11 @@ router.patch('/polls/:pollId', requireMember,
     if (String(poll.createdBy) !== String(req.user.id) && !isContentManager(req)) {
       return fail(res, 'PERMISSION_DENIED', 'only the author or a moderator can edit this poll');
     }
-    const out = await polls.update(req.server.id, req.params.pollId, req.body || {});
+    // The service is told who is asking, so that it can check the rule itself
+    // rather than trusting the route to have checked it. The route's check is
+    // the first line of defence and the service's is the second; a caller
+    // that is not this route gets the same answer.
+    const out = await polls.update(req.server.id, req.params.pollId, req.user.id, req.body || {});
     events.emit(req.server.id, 'workspace_poll_updated', { pollId: out.id });
     res.json(out);
   }));
