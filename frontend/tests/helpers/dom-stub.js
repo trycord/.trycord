@@ -74,7 +74,6 @@ function makeElement(doc, tagName) {
     children: [],
     parentNode: null,
     style: {},
-    dataset: {},
     textContent: '',
     value: '',
     checked: false,
@@ -108,6 +107,22 @@ function makeElement(doc, tagName) {
   node.getAttribute = (name) => (name in node.attributes ? node.attributes[name] : null);
   node.removeAttribute = (name) => { delete node.attributes[name]; };
   node.hasAttribute = (name) => name in node.attributes;
+  // dataset is the DOM's view of the data-* attributes, so writing to it has to
+  // be seen as an attribute: a stylesheet and a check both read it that way.
+  const datasetValues = {};
+  node.dataset = new Proxy(datasetValues, {
+    get(target, prop) { return target[prop]; },
+    set(target, prop, value) {
+      target[prop] = value;
+      node.setAttribute('data-' + String(prop).replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()), value);
+      return true;
+    },
+    deleteProperty(target, prop) {
+      delete target[prop];
+      node.removeAttribute('data-' + String(prop).replace(/[A-Z]/g, (c) => '-' + c.toLowerCase()));
+      return true;
+    },
+  });
   // The DOM name for the class attribute, which the client reads and writes.
   Object.defineProperty(node, 'className', {
     get() { return node.getAttribute('class') || ''; },

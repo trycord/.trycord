@@ -362,6 +362,15 @@ async function publishEvent(kind, payload, opts = {}) {
     return { ok: false, reason: 'the event could not be prepared: ' + (e && e.message) };
   }
   if (!prepared.ok) {
+    // A row that the rules decided against is recorded as decided against.
+    // What was not federable when it was written is not federated later, and
+    // the ledger is where that is kept - whether the refusal came from the
+    // change feed or from a publication asked for directly.
+    if (prepared.withhold && prepared.source) {
+      await ledger.markWithheld(
+        prepared.source.kind, prepared.source.id, prepared.source.fingerprint
+      );
+    }
     return {
       ok: false,
       reason: prepared.reason,

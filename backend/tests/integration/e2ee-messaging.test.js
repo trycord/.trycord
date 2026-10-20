@@ -304,12 +304,6 @@ test('a message in an encrypted conversation', async (t) => {
 
     const aliceSocket = await openSocket(instance, alice, channelId);
     const bobSocket = await openSocket(instance, bob, channelId);
-    t.after(() => {
-      // Terminated rather than closed: the close handshake waits for the
-      // server, and the run must not be held open by a socket.
-      aliceSocket.socket.terminate();
-      bobSocket.socket.terminate();
-    });
 
     // The socket carries the envelope, and the store holds the envelope.
     aliceSocket.socket.send(JSON.stringify({ type: 'msg', envelopes: [channelSent.envelope] }));
@@ -339,6 +333,11 @@ test('a message in an encrypted conversation', async (t) => {
     await new Promise((resolve) => setTimeout(resolve, 300));
     const after = await db.get('SELECT COUNT(*) AS n FROM messages');
     assert.equal(after.n, before.n, 'the socket stored nothing the REST path would refuse');
+
+    // Terminated rather than closed: the close handshake waits for the
+    // server, and the run must not be held open by a socket.
+    aliceSocket.socket.terminate();
+    bobSocket.socket.terminate();
   });
 
   await t.test('a member leaving an encrypted conversation moves the epoch', async () => {

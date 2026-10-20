@@ -339,7 +339,7 @@ test('the relay rules, in the direction a member writes in', async (t) => {
       userId: member.user.id,
     });
     assert.equal(gate.ok, false, 'a channel the owner does not expose is not a target');
-    assert.match(gate.reason, /does not expose/);
+    assert.match(gate.reason, /community exposes/);
   });
 
   await t.test('a writer who has not joined may not write', async () => {

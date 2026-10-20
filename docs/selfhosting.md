@@ -95,6 +95,74 @@ docker compose up -d
 
 Your volumes are untouched.
 
+#### What the upgrade does to your database
+
+The schema is applied at every start, and every statement in it is
+idempotent — "create it if it is not there", "add the column if it is
+missing" — so an upgrade cannot leave a half-created table.
+
+On top of that, the versioned migrations run. Each one is recorded in a
+`schema_migrations` table with the name, the time and how long it took, and
+a migration is never applied twice. If one fails, the ones after it do not
+run, and the failure is recorded with its reason.
+
+```bash
+docker compose exec backend npm run migrate -- --status
+```
+
+That reports what this build knows, what the database has had applied, and
+what is pending — without changing anything. To apply:
+
+```bash
+docker compose exec backend npm run migrate
+```
+
+**Take a backup first.** The command says so, and it means it:
+
+```bash
+docker compose exec backend npm run db:backup
+```
+
+If a migration has failed and you have fixed the cause, retry it with
+`-- --retry`. And if the database was migrated by a **newer** build than the
+one you are running, the boot stops with a message naming the version — a
+rollback needs the matching build, and moving the data sideways is worse than
+not starting.
+
+A schema change in 3.0 is additive: new tables and new columns. Nothing was
+renamed, dropped or retyped, so an older build ignores the new tables and
+your data does not need to move.
+
+#### The dashboard as a separate service
+
+By default the administrative console is served by the main process at
+`/admin`, and nothing else changes. To run it as its own service on its own
+origin:
+
+```bash
+DASHBOARD_MODE=separate
+DASHBOARD_API_URL=https://api.your-host
+DASHBOARD_URL=https://dashboard.your-host
+DASHBOARD_ORIGIN=https://dashboard.your-host
+CLIENT_ORIGIN=https://dashboard.your-host,https://api.your-host
+```
+
+Then run the service:
+
+```bash
+cd backend
+node src/dashboard/separate.js
+```
+
+It serves the same client tree and talks to your API over HTTP, the way a
+browser does. **It holds no database connection, runs no job worker and owns
+no socket** — it is a presentation surface, not a second backend, and the
+test asserts it. `DASHBOARD_MODE` with any other value stops the boot with a
+message naming the variable and the two values it accepts.
+
+See `docs/dashboard.md` for the full contract and `docs/services.md` for
+where everything else lives.
+
 ### Using MySQL instead of SQLite
 
 SQLite is a single file and is genuinely fine for small and mid-size
@@ -237,7 +305,6 @@ leave it unset — the value defaults to it.
 ```
 VOICE_VIDEO_PROVIDER=mesh
 ```
-
 Trycord's own backend is the authority on who is a user, which community they
 belong to, and whether they may speak. It holds the room state, issues the
 signalling ticket, and relays the offers, answers and ICE candidates between
@@ -571,6 +638,44 @@ works the same on local disk and in an S3-compatible bucket.
 
 ---
 
+## The provider registry
+
+Every subsystem that can be configured to use more than one implementation is
+described in one catalogue, and the administrative console renders that
+catalogue and nothing else. So a provider the console offers is a provider
+the service will accept, and a setting the console shows is a setting that
+exists.
+
+```bash
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  https://api.your-host/api/admin/providers
+```
+
+It answers, for every subsystem — storage, mail, search, notifications,
+voice, STUN/TURN, push, the extension registry — the providers that exist,
+which one is in force, and what state it is in:
+
+| State | What it means |
+|---|---|
+| `disabled` | The subsystem is switched off, deliberately |
+| `configured` | The settings are filled in, but this provider is not the one in force |
+| `active` | It is in force and its configuration is complete |
+| `degraded` | It is running, and something is wrong |
+| `failed` | Its configuration is incomplete — the problems are listed |
+
+A single provider can be checked for real:
+
+```bash
+curl -fsS -X POST -H "Authorization: Bearer $TOKEN" \
+  https://api.your-host/api/admin/providers/storage/s3/check
+```
+
+A check touches the network, because that is the only way to know whether a
+thing works. It runs when you press the button and never on a request path.
+
+**A secret is never returned.** The catalogue says a secret is set or that it
+is not; it never says what it is.
+
 ## Verification
 
 Whichever method you used, confirm the whole stack:
@@ -586,6 +691,19 @@ Then in a browser: sign in, open a community, send a message, and confirm it
 appears in a second signed-in window. A message that only appears after a
 reload means the WebSocket is not connecting — check the proxy
 `Upgrade`/`Connection` headers and `proxy_read_timeout`.
+
+To check the whole thing from the outside, the repository ships a suite that
+starts an instance of its own against a temporary database and exercises the
+journeys:
+
+```bash
+cd backend
+npm test
+```
+
+It runs in about half a minute and never touches the instance you are
+serving: the database is a temporary file, the port is free, and the signing
+secret is the run's own.
 
 ## Troubleshooting
 
@@ -605,6 +723,11 @@ reload means the WebSocket is not connecting — check the proxy
 | Desktop app cannot connect | `trycord://app` is missing from `CLIENT_ORIGIN`; add it and restart |
 | A subdomain is rejected but the apex works | `*.` covers one label only, never the apex — list both |
 | `Unknown column 'seq' in 'where clause'` at startup | The database predates the canonical-ordering migration; it is applied automatically on the next start. Do not add the column by hand. |
+| `this database has been migrated to version N, which is newer than this build knows about` | A newer build wrote to the database and this is an older one. Deploy the matching build, or restore a backup taken before that migration. Do not "migrate it back" — there is no backwards migration |
+| `migration N failed and has not been resolved` | A migration failed and the ones after it are blocked. The failure and its reason are in `schema_migrations`. Fix the cause, then `npm run migrate -- --retry` |
+| The console offers a provider the service refuses | It should not be possible — the console renders the provider catalogue and the service reads the same one. If it happens, the catalogue and the service have drifted, which is a bug worth reporting |
+| The dashboard console is on the wrong origin | `DASHBOARD_MODE=separate` needs `DASHBOARD_URL` to be the origin the console is actually served from, and that origin in `CLIENT_ORIGIN` |
+| The dashboard service answers 404 for everything | It is a presentation surface: it serves the client tree and the API's own routes are on the API. Point `DASHBOARD_API_URL` at the API |
 
 ## Voice and media
 
