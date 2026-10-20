@@ -12,7 +12,9 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 // The federation checks live in a directory of their own: the directory is not
-// a module the runner can search, so it is pointed at directly.
+// a module the runner can search, so it is pointed at directly. They are
+// pointed at before the checks beside them, so that one broken import cannot
+// take them down with it.
 await import(path.join(here, 'federation', 'index.js'));
 
 for (const name of fs.readdirSync(here).sort()) {

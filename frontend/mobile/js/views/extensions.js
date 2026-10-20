@@ -473,6 +473,7 @@ async function policySection(host) {
       ],
       value: policy.registryMode,
     });
+    modeControl.value = String(policy.registryMode || 'builtin');
     const urlControl = textInput({
       value: policy.registryUrl || '',
       placeholder: 'https://example.org/registry.json',
