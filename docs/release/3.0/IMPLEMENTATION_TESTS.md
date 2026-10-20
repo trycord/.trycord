@@ -23,7 +23,7 @@ directory form works there too.
 
 | Command | Result |
 |---|---|
-| `cd backend && node --test "tests/**/*.test.js"` | **636 tests, 636 pass, 0 fail** |
+| `cd backend && node --test "tests/**/*.test.js"` | **697 tests, 697 pass, 0 fail** |
 | `cd backend && node --test "tests/e2ee/*.test.js"` | 64 tests, 64 pass |
 | `cd backend && node --test "tests/continuum/*.test.js"` | 53 tests, 53 pass — the relay, in **both** directions between two independently running instances |
 | `cd backend && node --test "tests/workspace/*.test.js"` | 40 tests, 40 pass |
@@ -39,7 +39,7 @@ directory form works there too.
 | `cd backend && node --test "tests/personal/*.test.js"` | 17 tests, 17 pass |
 | `cd backend && node --test "tests/voice/*.test.js"` | 25 tests, 25 pass — the three media providers |
 | `cd backend && node --test "tests/security-3.0/*.test.js"` | 34 tests, 34 pass — the review's nine findings, one regression file each |
-| `cd backend && node --test "tests/integration/*.test.js"` | 147 tests, 147 pass |
+| `cd backend && node --test "tests/integration/*.test.js"` | 146 tests, 146 pass |
 | `cd backend && node --test tests/integration/auth.test.js` | 13 tests, 13 pass |
 | `cd backend && node --test tests/integration/community.test.js` | 19 tests, 19 pass |
 | `cd backend && node --test tests/integration/migrations.test.js` | 10 tests, 10 pass |
@@ -52,7 +52,7 @@ directory form works there too.
 | `cd backend && node --test tests/integration/providers.test.js` | 13 tests, 13 pass |
 | `cd backend && node --test tests/integration/module-graph.test.js` | 5 tests, 5 pass — every route and service module loads |
 | `cd backend && node --test tests/integration/schema-parity.test.js` | 5 tests, 5 pass — the SQLite and MySQL change lists say the same thing |
-| `cd frontend && node --test "tests/**/*.test.js"` | **473 tests, 473 pass** — including the accessibility audit, the community-settings parity check and every console |
+| `cd frontend && node --test "tests/**/*.test.js"` | **496 tests, 496 pass** — including the accessibility audit, the community-settings parity check and every console |
 | `cd frontend && node --test tests/` | 473 tests, 473 pass — the same checks in one process, which is how the documented command runs them |
 | `cd public && node --test "tests/**/*.test.js"` | 57 tests, 57 pass — the instance directory is one of the pages they check |
 | `node native/scripts/check-native.mjs` | 6 JSON files parsed, 91 source files scanned, 290 relative imports resolved, 0 problems |
