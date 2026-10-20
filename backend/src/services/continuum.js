@@ -843,7 +843,19 @@ async function syncPeerCommunities(instanceId) {
 }
 
 // The relayed messages of one remote community.
-async function listRelayedMessages(originInstanceId, originCommunityId, limit) {
+//
+// Who may read them is a question, and it is answered before the list is
+// built rather than after. A community of this instance is read by its
+// members; a community of another instance is read by the people who follow
+// it. An account that follows nothing and belongs to nothing must not be
+// able to name an instance and a community and read what was said in it.
+async function listRelayedMessages(originInstanceId, originCommunityId, limit, readerId) {
+  if (readerId && !(await store.canReadRelayMessages(readerId, originInstanceId, originCommunityId))) {
+    const e = new Error('you do not follow that community');
+    e.code = 'PERMISSION_DENIED';
+    e.status = 403;
+    throw e;
+  }
   return store.listRelayMessages(originInstanceId, originCommunityId, { limit });
 }
 

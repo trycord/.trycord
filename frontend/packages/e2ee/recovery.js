@@ -132,7 +132,7 @@ export async function recover(deps, options) {
     options.sourceDeviceId,
     options.newDevice.id,
   )));
-  const body = options.newDevice.registrationBody({ sealedPrivateKey: options.sealedPrivateKey });
+  const body = await options.newDevice.registrationBody({ sealedPrivateKey: options.sealedPrivateKey });
   return deps.api.recoverDevice({
     sourceDeviceId: options.sourceDeviceId,
     recoveryProof: proof,

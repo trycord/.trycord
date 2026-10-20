@@ -126,6 +126,14 @@ test('a community relays between two instances', async (t) => {
     assert.ok(listed, 'the discovery document lists the community this instance federates');
     assert.ok(listed.channels.some((c) => c.id === channelId));
 
+    // The reader on the other side follows the community, the way a member
+    // would before reading anything in it. Without that the messages are not
+    // theirs to read: a community of another instance is read by the people
+    // who follow it, not by anybody on this instance who happens to know its
+    // address.
+    const followed = await adminB.post('/api/continuum/communities/instance-a/' + communityId + '/join');
+    assert.equal(followed.status, 200, JSON.stringify(followed.data));
+
     // A member of the community, so that what is posted is posted by
     // somebody who is allowed to post it.
     const invite = await adminA.post('/api/servers/' + communityId + '/invites', { maxUses: 5 });
@@ -140,6 +148,23 @@ test('a community relays between two instances', async (t) => {
       !mine.data.some((s) => s.id === communityId),
       'the remote community is not a community of the receiving instance'
     );
+  });
+
+  await t.test('an account that does not follow the community cannot read it', async () => {
+    // The addresses are not a secret: the discovery document publishes them,
+    // and the peer knows them. So the rule has to be about the reader, not
+    // about whether they can name the community.
+    const stranger = await registerUser(b, 'stranger');
+    const res = await stranger.get(
+      '/api/continuum/communities/instance-a/' + communityId + '/messages');
+    assert.equal(res.status, 403, 'the messages are not readable from outside: ' + JSON.stringify(res.data));
+    assert.equal(res.data.error.code, 'PERMISSION_DENIED');
+
+    // And the same account on the other instance's own community list is
+    // still refused: the rule is about the community, not the account.
+    const own = await stranger.get('/api/continuum/moderation/messages?community_id=' + communityId);
+    assert.ok(own.status === 403 || own.status === 404,
+      'the moderation surface refuses it too: ' + own.status);
   });
 
   await t.test('a message arrives as a relayed message', async () => {

@@ -151,6 +151,40 @@ async function findMembership(userId, originInstanceId, originCommunityId) {
   );
 }
 
+// Whether a reader may see the relayed messages of one community.
+//
+// Two populations land in the relay store, and they have different owners:
+//
+//   - On the instance that **owns** the community, the relayed messages are
+//     what remote members wrote into it. There the community id is a local
+//     one, and the reader has to be a member of it.
+//   - On an instance that **follows** the community, the relayed messages are
+//     what the owner published. There the community id is the owner's, and the
+//     reader has to follow it.
+//
+// Without this check, any signed-in account that knows an instance id and a
+// community id could read the messages of a community it has nothing to do
+// with - which is exactly what the relay rules are for.
+async function canReadRelayMessages(userId, originInstanceId, originCommunityId) {
+  const communityId = String(originCommunityId);
+  const instanceId = String(originInstanceId);
+
+  // A community of this instance: the reader has to be a member of it.
+  const local = await db.get('SELECT id FROM servers WHERE id = ?', [communityId]);
+  if (local) {
+    const member = await db.get(
+      'SELECT 1 AS ok FROM server_members WHERE user_id = ? AND server_id = ?',
+      [String(userId), communityId]
+    );
+    return !!member;
+  }
+
+  // A community of another instance: the reader has to follow it, and the
+  // follow has to be in force.
+  const followed = await findMembership(userId, instanceId, communityId);
+  return !!(followed && followed.state === 'joined');
+}
+
 // ---- relayed messages -----------------------------------------------------
 
 // Store a message that arrived from another instance. Applying the same
@@ -540,6 +574,7 @@ module.exports = {
   upsertMembership,
   listMemberships,
   findMembership,
+  canReadRelayMessages,
   upsertRelayMessage,
   findRelayMessage,
   listRelayMessages,

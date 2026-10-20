@@ -86,7 +86,7 @@ export class E2eeClient {
   /** Register the device with the server. */
   async register() {
     const sealed = await ensureSealedPrivateKey(this.device);
-    await this.api.registerDevice(this.device.registrationBody({ sealedPrivateKey: sealed }));
+    await this.api.registerDevice(await this.device.registrationBody({ sealedPrivateKey: sealed }));
     this.device.registered = true;
     await saveDevice(this.store, this.device);
     return this.device;
@@ -120,10 +120,16 @@ export class E2eeClient {
 
   /**
    * What the server says about a conversation's encryption.
+   *
+   * The route answers with the state itself: the conversation, its state, the
+   * epoch, and the devices that are in it and which of them hold the key.
    */
   async conversationState(conversationId) {
     const answer = await this.api.conversationState(conversationId);
-    return answer && answer.state ? answer.state : answer;
+    if (!answer) return null;
+    if (Array.isArray(answer.memberDevices)) return answer;
+    if (answer.state && typeof answer.state === 'object') return answer.state;
+    return answer;
   }
 
   /**
@@ -207,14 +213,103 @@ export class E2eeClient {
   }
 
   /**
+   * What a message in this conversation becomes.
+   *
+   * The server's answer decides, and nothing else does. An encrypted
+   * conversation takes envelopes; a conversation that is not encrypted takes
+   * text; a conversation that is mixed or has changed key takes text, and
+   * says so, because one of the devices in it cannot read what is sent.
+   *
+   * The preparation is separate from the sending so that the reader can be
+   * asked before anything goes out, and so that the message is encrypted
+   * once: preparing it twice would advance the ratchet twice for one
+   * message.
+   *
+   * @param {object} payload { content, replyToId, attachmentIds }
+   */
+  async prepareMessage(conversationId, payload) {
+    const state = await this.conversationState(conversationId);
+    const decision = decide(state);
+    const body = {
+      replyToId: payload.replyToId,
+      attachmentIds: payload.attachmentIds,
+    };
+    if (decision.mode === 'encrypted') {
+      const envelopes = await this.encryptMessage({
+        conversationId,
+        text: payload.content,
+        memberDevices: (state && state.memberDevices) || [],
+      });
+      return {
+        mode: 'encrypted',
+        warn: null,
+        state: decision.state,
+        body: Object.assign({}, body, { envelopes }),
+      };
+    }
+    return {
+      mode: 'text',
+      warn: decision.warn,
+      state: decision.state,
+      body: Object.assign({}, body, { content: payload.content }),
+    };
+  }
+
+  /**
+   * Post a prepared message.
+   *
+   * A preparation that carries a warning is refused until the reader has
+   * acknowledged it: the client does not send in the clear over a
+   * conversation it has just told the reader is not fully encrypted.
+   *
+   * There is no retry. A server that refuses the body is reported, and the
+   * message stays unsent - a client that quietly sent the same message in
+   * the clear would be the failure this whole subsystem exists to prevent.
+   *
+   * @param {object} prepared the result of prepareMessage
+   * @param {function} send posts the body and answers with the message
+   * @param {object} options { acknowledged, onWarning }
+   */
+  async sendPrepared(prepared, send, options = {}) {
+    if (prepared.warn && !options.acknowledged) {
+      const error = new Error(prepared.warn);
+      error.name = 'E2eeWarningError';
+      error.code = 'E2EE_NOT_ACKNOWLEDGED';
+      error.warn = prepared.warn;
+      throw error;
+    }
+    const sent = await send(prepared.body);
+    const pushed = await this.pushStates();
+    for (const failure of pushed.failed) {
+      if (options.onWarning) options.onWarning(failure);
+      else if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[trycord] the message was sent, but the session state was not stored', failure);
+      }
+    }
+    return sent;
+  }
+
+  /**
    * Push the state of the sessions that have moved on.
+   *
+   * Every session is attempted, and the failures are reported rather than
+   * swallowed: the message has been sent, and a state that was not stored is
+   * worth saying out loud.
    */
   async pushStates() {
-    const sessions = await this.manager.listSessions();
+    const sessions = this.manager ? await this.manager.listSessions() : [];
+    const failed = [];
+    let pushed = 0;
     for (const session of sessions) {
-      await this.manager.pushState(session);
+      try {
+        const before = session.pushedCounter;
+        await this.manager.pushState(session);
+        if (session.pushedCounter !== before) pushed += 1;
+      } catch (error) {
+        failed.push(error);
+      }
     }
-    return sessions.length;
+    return { pushed, failed };
   }
 
   /**

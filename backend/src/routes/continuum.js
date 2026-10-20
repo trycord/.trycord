@@ -196,7 +196,12 @@ router.get('/api/continuum/communities', adminGuard, async (req, res, next) => {
 router.get('/api/continuum/communities/:instanceId/:communityId/messages', auth, async (req, res, next) => {
   try {
     if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
-    res.json(await continuum.listRelayedMessages(req.params.instanceId, req.params.communityId, req.query.limit));
+    // The reader's own standing decides: a member of a community of this
+    // instance, or somebody who follows a community of another one. An
+    // account that follows nothing and belongs to nothing must not be able to
+    // name an instance and a community and read what was said in it.
+    res.json(await continuum.listRelayedMessages(
+      req.params.instanceId, req.params.communityId, req.query.limit, req.user.id));
   } catch (e) { serviceError(res, e); }
 });
 
