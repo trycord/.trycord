@@ -13,7 +13,7 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import locale from '../../packages/locale.js';
-import { head, card, row, blank, fault, fold, facts } from '../ui/page.js';
+import { head, card, row, fault, fold, facts } from '../ui/page.js';
 import { toast, errorToast } from '../ui/overlays.js';
 
 const SOURCE_LABEL = {

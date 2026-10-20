@@ -155,6 +155,46 @@ export async function sealPrivateMaterial(keySet, recoveryKey, options = {}) {
 }
 
 /**
+ * Seal a private half under a recovery key.
+ *
+ * The one-time prekeys are sealed this way: the device keeps the private half
+ * and the server keeps a sealed copy, so a device that has lost its store can
+ * still open a session that used one of its prekeys.
+ */
+export async function sealPrivateBytes(bytes, recoveryKey, options = {}) {
+  const salt = options.salt ? unb64(options.salt) : randomBytes(RECOVERY_SALT_BYTES);
+  const iterations = Number(options.iterations) || RECOVERY_PBKDF2_ITERATIONS;
+  const wrappingKey = await deriveWrappingKey(recoveryKey, salt, iterations);
+  const iv = randomBytes(GCM_IV_BYTES);
+  const sealed = await encrypt(wrappingKey, iv, bytes, utf8(RECOVERY_WRAP_INFO));
+  return {
+    salt: b64Key(salt),
+    iterations,
+    iv: b64Key(sealed.iv),
+    ciphertext: b64Key(sealed.ciphertext),
+    tag: b64Key(sealed.tag),
+  };
+}
+
+/**
+ * Open a sealed private half.
+ *
+ * Throws when the recovery key is wrong: the tag does not verify, and that is
+ * the answer.
+ */
+export async function openPrivateBytes(sealed, recoveryKey) {
+  const wrappingKey = await deriveWrappingKey(recoveryKey, unb64(sealed.salt), sealed.iterations);
+  const plaintext = await decrypt(
+    wrappingKey,
+    unb64(sealed.iv),
+    unb64(sealed.ciphertext),
+    unb64(sealed.tag),
+    utf8(RECOVERY_WRAP_INFO),
+  );
+  return new Uint8Array(plaintext);
+}
+
+/**
  * Open a sealed private key material blob.
  *
  * Throws when the recovery key is wrong: the GCM tag does not verify, and

@@ -19,7 +19,7 @@ import {
   listSaved, saveSearch, removeSaved, listHistory, clearHistory, removeHistoryEntry,
 } from '../../../packages/search.js';
 import { empty, loading, failure, iconButton } from '../components.js';
-import { screen, section, actions, primaryButton, ghostButton, notice } from './util.js';
+import { screen, section, actions, primaryButton, notice } from './util.js';
 import { sheet, toast } from '../ui.js';
 import { relativeTime } from '../../../packages/format.js';
 
@@ -112,7 +112,16 @@ function filterSheet(state, onApplied) {
 
 export function renderSearch(ctx) {
   const initial = (ctx.query && ctx.query.get('q')) || '';
-  const state = stateFrom(initial);
+  // A query the server would refuse is refused here too, with the same
+  // words, rather than opening a screen that cannot be drawn.
+  let state = { terms: '', filters: {} };
+  let problem = null;
+  try {
+    state = stateFrom(initial);
+  } catch (error) {
+    problem = error.message;
+    state = { terms: initial, filters: {} };
+  }
 
   const input = el('input', {
     class: 'm-input', type: 'search', placeholder: 'Search messages',
@@ -166,6 +175,10 @@ export function renderSearch(ctx) {
     const query = queryText();
     if (query.length < MIN_LENGTH) {
       clear(results);
+      if (problem) {
+        results.appendChild(notice({ tone: 'danger', title: 'That query was refused', text: problem }));
+        return;
+      }
       results.appendChild(empty({
         icon: 'search',
         title: 'Type to search',

@@ -23,7 +23,6 @@ import {
 import { empty, loading, failure, iconButton } from '../components.js';
 import { screen, section, actions, primaryButton, ghostButton } from './util.js';
 import { sheet, confirm, toast } from '../ui.js';
-import { relativeTime } from '../../../packages/format.js';
 
 const ITEM_GLYPH = { message: 'message', file: 'file', link: 'link' };
 
