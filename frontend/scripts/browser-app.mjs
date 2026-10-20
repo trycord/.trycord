@@ -81,11 +81,11 @@ const ANSWERS = {
       ],
     },
   },
+  // The shape the instance answers with: the person, not a wrapper.
   'GET /api/me': {
-    user: {
-      id: 'u1', username: 'ada', displayName: 'Ada', isAdmin: true,
-      avatarUrl: null, bannerUrl: null, bio: '', statusText: '',
-    },
+    id: 'u1', username: 'ada', displayName: 'Ada', isAdmin: true,
+    avatarUrl: null, bannerUrl: null, bio: '', statusText: '',
+    email: null, emailVerified: false, verificationRequired: false,
   },
   'GET /api/servers': [
     {
@@ -95,6 +95,12 @@ const ANSWERS = {
       createdAt: '2026-01-01T00:00:00.000Z',
     },
   ],
+  'GET /api/servers/s1': {
+    id: 's1', name: 'The Community', description: 'A place to talk.',
+    iconUrl: null, bannerUrl: null, memberCount: 12, isPublic: true,
+    isDiscoverable: true, ownerId: 'u1', permissions: ['*'], is_owner: true,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
   'GET /api/servers/s1/channels': {
     channels: [
       { id: 'c1', name: 'general', type: 'text', position: 1, categoryId: null, topic: '' },
@@ -104,8 +110,15 @@ const ANSWERS = {
     categories: [{ id: 'cat1', name: 'Text Channels', position: 1 }],
   },
   'GET /api/servers/s1/members': {
-    items: [{ id: 'u1', username: 'ada', displayName: 'Ada', nickname: null, roles: [], joinedAt: '2026-01-01T00:00:00.000Z' }],
-    total: 1, hasMore: false,
+    items: [
+      { id: 'u1', username: 'ada', displayName: 'Ada', nickname: null,
+        roles: [{ id: 'r1', name: 'Maintainer', color: '#ff8a24' }],
+        joinedAt: '2026-01-01T00:00:00.000Z' },
+      { id: 'u2', username: 'grace', displayName: 'Grace', nickname: null,
+        roles: [{ id: 'r2', name: 'Member', color: null }],
+        joinedAt: '2026-01-04T00:00:00.000Z' },
+    ],
+    total: 2, hasMore: false,
   },
   'GET /api/servers/s1/settings': {
     welcomeContent: 'Welcome.', welcomeEnabled: true, guidelines: 'Be kind.',
@@ -145,11 +158,42 @@ const STUB = `
   // back to the default one - and the stub answers the configuration with
   // an empty address, which is the same key. Both are set, so the reader is
   // signed in whichever the client ends up talking to.
+  //
+  // A document off disk has no storage of its own: every file is its own
+  // origin, and the browser keeps nothing for it. So the harness keeps the
+  // values in memory, under the same names the client uses, and the real
+  // storage is used where there is one.
+  var store = {};
+  var realStorage = true;
+  try {
+    var probe = '__trycord_probe__';
+    window.localStorage.setItem(probe, '1');
+    if (window.localStorage.getItem(probe) !== '1') throw new Error('the storage did not keep it');
+    window.localStorage.removeItem(probe);
+  } catch (e) {
+    realStorage = false;
+    try {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        value: {
+          get length() { return Object.keys(store).length; },
+          key: function (i) { return Object.keys(store)[i] || null; },
+          getItem: function (k) { return Object.prototype.hasOwnProperty.call(store, k) ? store[k] : null; },
+          setItem: function (k, v) { store[k] = String(v); },
+          removeItem: function (k) { delete store[k]; },
+          clear: function () { store = {}; },
+        },
+      });
+    } catch (inner) {
+      // The shim would not install either, so the reader stays signed out.
+    }
+  }
+  void realStorage;
   try {
     window.localStorage.setItem('trycord.token.', 'harness-token');
     window.localStorage.setItem('trycord.token.https://api.trycord.dev', 'harness-token');
     window.localStorage.setItem('trycord.token.http://localhost:9971', 'harness-token');
-  } catch (e) { /* storage is off; the client will be signed out */ }
+  } catch (e) { /* the client will be signed out */ }
   window.fetch = function (input, options) {
     var url = String(input);
     var method = String((options && options.method) || 'GET').toUpperCase();
@@ -163,14 +207,35 @@ const STUB = `
       });
     }
     // A route the harness knows about.
+    //
+    // The path is matched against the address, not anywhere inside it: the
+    // answer for "/api/servers" is not the answer for
+    // "/api/servers/s1/members", and matching it loosely meant the roster
+    // was drawn from the list of communities.
     var answer = answers[method + ' ' + url];
     if (answer === undefined) {
+      // The path, without the address it was fetched from.
+      //
+      // Written without a regular expression: this source is a template
+      // literal, and the backslashes in an escaped slash are eaten by it -
+      // which broke the whole stub, and the harness quietly talked to the
+      // real instance instead of the answers below.
+      var scheme = url.indexOf('://');
+      var path = scheme === -1 ? url : url.slice(url.indexOf('/', scheme + 3));
+      var best = null;
       for (var key in answers) {
         var parts = key.split(' ');
-        if (parts[0] === method && url.indexOf(parts[1]) !== -1) { answer = answers[key]; break; }
+        if (parts[0] !== method) continue;
+        var wanted = parts[1];
+        if (path !== wanted && path.indexOf(wanted + '?') !== 0
+          && path.indexOf(wanted + '/') !== 0) continue;
+        if (!best || wanted.length > best.length) best = wanted;
       }
+      if (best) answer = answers[method + ' ' + best];
     }
     if (answer === undefined) answer = {};
+    window.__calls = window.__calls || [];
+    window.__calls.push(method + ' ' + url);
     var body = JSON.stringify(answer);
     return Promise.resolve({
       ok: true, status: 200, statusText: 'OK',
@@ -351,7 +416,11 @@ try {
   const page = new Page(socket);
   await page.send('Page.enable');
   await page.send('Runtime.enable');
-  await page.send('Page.addScriptToEvaluateOnNewDocument', { source: STUB });
+  const stubRegistration = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: STUB });
+  if (!stubRegistration || !stubRegistration.identifier) {
+    throw new Error('the browser would not take the stub, so the harness would '
+      + 'be talking to the real instance instead of the answers');
+  }
 
   const document = writeHarnessDocument();
 
@@ -419,23 +488,39 @@ try {
           appChildren: (document.getElementById('app') || {}).childNodes ? document.getElementById('app').childNodes.length : -1,
           appHtml: (document.getElementById('app') || {}).innerHTML ? document.getElementById('app').innerHTML.slice(0, 200) : null,
           scripts: Array.from(document.querySelectorAll('script')).map(function (n) { return n.src || '(inline)'; }),
+          calls: (window.__calls || []).slice(0, 40),
+          title: String(document.title || ''),
+          probe: String(window.__probe || '(no probe)'),
+          stubRan: typeof window.__trycordErrors !== 'undefined',
+          storage: (function () {
+            try {
+              var out = [];
+              for (var i = 0; i < localStorage.length; i++) {
+                var k = localStorage.key(i);
+                out.push(k + '=' + String(localStorage.getItem(k)).slice(0, 20));
+              }
+              return out.join(', ');
+            } catch (e) { return 'storage is off: ' + e.message; }
+          })(),
         };
       `);
 
       const entry = { width, route, ...measured };
       report.push(entry);
 
+      if (measured.calls && measured.calls.length) {
+      }
       const faults = [];
       for (const error of measured.errors || []) faults.push(error);
       if (measured.overflow > 2) {
         faults.push('the page scrolls sideways by ' + measured.overflow + ' pixels');
       }
       // The place column belongs to the pages that have one. A page with a
-      // layout of its own - the profile, the sign-in - draws what it draws,
-      // and asking it for a column it does not have is asking for a fault
-      // that is not one.
+      // layout of its own - the profile, the settings, the sign-in - draws
+      // what it draws, and asking it for a column it does not have is asking
+      // for a fault that is not one.
       const layout = layoutOf(route);
-      const hasColumn = layout !== 'plain' && layout !== 'profile';
+      const hasColumn = ['plain', 'profile', 'settings'].indexOf(layout) === -1;
       if (width >= 1024 && hasColumn && measured.hasContext && measured.columnBox && !measured.columnBox.shown) {
         faults.push('the place column is not shown at ' + width + ' pixels');
       }
@@ -454,6 +539,8 @@ try {
         console.log('  FAIL  ' + width + 'px ' + route);
         for (const fault of faults) console.log('          ' + fault);
       } else {
+        if (measured.calls && measured.calls.length) {
+          }
         console.log('  ok    ' + width + 'px ' + route
           + '  regions=' + measured.regions
           + ' column=' + (measured.columnBox ? measured.columnBox.w + 'px' : 'none')
@@ -541,11 +628,14 @@ if (MOBILE) {
           overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           controls: controls.length,
           text: String(document.body.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 90),
+          calls: (window.__calls || []).slice(0, 40),
           appChildren: (document.getElementById('app') || {}).childNodes
             ? document.getElementById('app').childNodes.length : -1,
         };
       `);
 
+      if (measured.calls && measured.calls.length) {
+      }
       const faults = [];
       for (const error of measured.errors || []) faults.push(error);
       if (measured.overflow > 2) {
@@ -565,6 +655,8 @@ if (MOBILE) {
         + ' controls=' + measured.controls
         + ' small=' + (measured.small || []).length
         + ' | ' + (measured.text || ''));
+      if (measured.calls && measured.calls.length) {
+      }
     }
   }
 }
