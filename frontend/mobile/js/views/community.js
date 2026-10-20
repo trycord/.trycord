@@ -28,6 +28,7 @@ import { mediaUrl } from '../../../packages/media.js';
 import Api from '../../../packages/api.js';
 import { screen, notice, stat } from './util.js';
 import { renderConversation } from './messages.js';
+import { voiceSection } from './communityVoice.js';
 
 export function isVoiceType(type) {
   const clean = String(type || '').toLowerCase();
@@ -765,6 +766,7 @@ const SETTINGS_SECTIONS = [
   ['roles', 'Roles', 'shield'],
   ['invites', 'Invites', 'mail'],
   ['moderation', 'Moderation', 'flag'],
+  ['voice', 'Voice and video', 'mic'],
   ['integrations', 'Integrations', 'rocket'],
   ['analytics', 'Analytics', 'chart'],
   ['ownership', 'Ownership', 'crown'],
@@ -823,6 +825,7 @@ export function renderCommunitySettings(ctx) {
       roles: () => sectionWrap(rolesScreen(serverId), 'Roles'),
       invites: () => sectionWrap(invitesScreen(serverId), 'Invites'),
       moderation: () => moderationSection(serverId),
+      voice: () => voiceSection(serverId),
       integrations: () => integrationsSection(serverId),
       analytics: () => analyticsSection(serverId),
       ownership: () => ownershipSection(serverId),

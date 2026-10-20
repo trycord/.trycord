@@ -160,6 +160,9 @@ The address comes from the deployment:
 | `TRYCORD_TURN_REALM` | The realm used for the credential. |
 | `TRYCORD_TURN_SECRET` | The secret the credential is derived from. |
 
+How long the connectivity probe waits for an answer is
+`TRYCORD_VOICE_PROBE_TIMEOUT_MS`, two and a half seconds by default.
+
 The credential is derived from the secret and is minted for one session and one
 caller. **The secret itself never leaves the process**: it is not in the
 capability answer, not in a diagnostic, and not in a log. A client asks
@@ -224,6 +227,14 @@ the two agree with each other and not with the verifier.
 - **The permission checks, the participant limit and the screen-sharing rule
   are the same for every provider.** They are asked of Trycord's own data before
   a session is created.
+- **The instance starts with a voice configuration that cannot work.** It says
+  so in the log, the console shows what is missing, and a session is refused
+  with the same list. An operator who has pointed the instance at a provider
+  they have not finished configuring has to be able to come in and finish it.
+
+The provider a session is carried on is remembered in `voice_provider_sessions`,
+one row per participant. That is what makes "the call finishes on the provider
+it started on" a fact rather than a hope.
 
 ---
 

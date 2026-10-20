@@ -205,7 +205,7 @@ async function commandsDialog(serverId, app) {
           glyph: 'slash',
           title: 'It answers nothing yet',
           text: 'A command is a word the application answers with a message.',
-        })]),
+        })])),
         problem,
         el('button', {
           class: 'btn btn--default btn--sm', type: 'button',

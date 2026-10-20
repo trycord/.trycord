@@ -89,6 +89,7 @@ export const RENDERERS = {
   'community.settings.roles': (ctx) => renderCommunity(ctx),
   'community.settings.invites': (ctx) => renderCommunity(ctx),
   'community.settings.moderation': (ctx) => renderCommunity(ctx),
+  'community.settings.voice': (ctx) => renderCommunity(ctx),
   'community.settings.ownership': (ctx) => renderCommunity(ctx),
   'community.settings.analytics': (ctx) => renderCommunity(ctx),
   'community.settings.integrations': (ctx) => renderCommunity(ctx),

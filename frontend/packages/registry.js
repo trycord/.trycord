@@ -302,6 +302,7 @@ export const PAGES = [
     ['roles', 'Roles', 'shield', 'What each role may manage'],
     ['invites', 'Invites', 'mail', 'Codes and their uses'],
     ['moderation', 'Moderation', 'flag', 'Reports and enforcement'],
+    ['voice', 'Voice and video', 'mic', 'The voice channels of this community'],
     ['ownership', 'Ownership', 'crown', 'Transfer or take over'],
     ['analytics', 'Analytics', 'chart', 'Activity, channels, members'],
     ['integrations', 'Integrations', 'rocket', 'Webhooks and apps'],
@@ -335,6 +336,7 @@ function groupForCommunitySetting(id) {
   if (id === 'channels' || id === 'categories') return 'Structure';
   if (id === 'members' || id === 'roles' || id === 'invites') return 'Access';
   if (id === 'moderation' || id === 'ownership') return 'Safety';
+  if (id === 'voice') return 'Structure';
   return 'Reach';
 }
 

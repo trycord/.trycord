@@ -207,7 +207,7 @@ function build() {
 
       // Only one provider is in force. The others keep their own settings, so
       // choosing a different one does not erase what was saved for this one.
-      provider: provider,
+      provider,
       // The participant limit of the provider in force. The limit is shared in
       // meaning and per-provider in value: each provider holds its own.
       maxParticipants: providerConfig ? providerConfig.maxParticipants : 25,
