@@ -29,6 +29,30 @@ reviewer; the two that needed a file the review did not own — the prekey
 pool and the registry's fetch — were closed afterwards and are now proven by
 `backend/tests/security-3.0/`.
 
+**What the voice work changed.** The instance's own STUN and TURN service had
+never answered a single packet: the encoder that writes a mapped address used
+a constant that was never defined, the packet handler caught the resulting
+error and threw it away, and every message type in the switch was an
+identifier that did not exist. The service bound its port, received every
+request and answered nothing - and the diagnostics reported the port as open,
+which is exactly what a firewall problem looks like. The credentials could not
+have verified either: the issuer produced an HMAC and the checker looked for
+the shared secret itself. It is now checked against the standard's own
+vectors - RFC 5769 publishes a request and the HMAC it must carry, and the
+implementation reproduces it exactly.
+
+The voice subsystem is a process of its own now - `trycord-voice` in the pm2
+ecosystem - holding the service, its lifecycle, its health and its
+diagnostics. The API asks it whether the service is up before it starts a
+relay of its own, so the two never compete for the port.
+
+**What the document work changed.** The editor refused a Terms of Service
+document with "a heading is written with two or three #" - against a document
+whose headings used a single hash. A single hash is the most ordinary heading
+there is; the source mode accepted two and three and refused one, and the
+server turned anything that was not two or three into two, so the source and
+the stored document disagreed about what the writer had typed.
+
 **What the community settings audit changed.** The settings were reduced
 because a form was built, wired and never put on the page. The console has
 twelve sections now, each of which draws something — and that is now a test,
