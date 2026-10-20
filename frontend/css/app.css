@@ -2467,6 +2467,7 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   border: 1px solid var(--line-2); border-radius: var(--radius-md);
   background: var(--raised); box-shadow: var(--shadow-2);
 }
+.filter-suggestion { list-style: none; }
 .filter-suggestion-button {
   display: grid; grid-template-columns: auto auto 1fr; gap: var(--space-2);
   align-items: baseline; width: 100%; text-align: left;
@@ -2495,6 +2496,7 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .collection-list, .collection-detail { display: flex; flex-direction: column; }
 .collection-row { cursor: pointer; }
 .collection-item-glyph { display: inline-flex; color: var(--text-3); }
+.collection-item { align-items: start; }
 .collection-link { color: var(--brand); }
 .collection-head {
   display: flex; align-items: start; justify-content: space-between;

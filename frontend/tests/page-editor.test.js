@@ -53,8 +53,24 @@ const RICH = Object.assign({}, PAGE, {
 });
 
 const REVISIONS = [
-  { revision: 2, title: 'Terms of Service', state: 'DRAFT', authorId: 'admin', createdAt: '2026-10-02T09:00:00.000Z', body: RICH.draft, isDraft: true },
-  { revision: 1, title: 'Terms of Service', state: 'PUBLISHED', authorId: 'admin', createdAt: '2026-10-01T10:00:00.000Z', body: PAGE.draft, isPublished: true },
+  {
+    revision: 2,
+    title: 'Terms of Service',
+    state: 'DRAFT',
+    authorId: 'admin',
+    createdAt: '2026-10-02T09:00:00.000Z',
+    body: RICH.draft,
+    isDraft: true,
+  },
+  {
+    revision: 1,
+    title: 'Terms of Service',
+    state: 'PUBLISHED',
+    authorId: 'admin',
+    createdAt: '2026-10-01T10:00:00.000Z',
+    body: PAGE.draft,
+    isPublished: true,
+  },
 ];
 
 const COMPARISON = {
