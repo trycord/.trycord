@@ -125,8 +125,30 @@ export function mountShell() {
 
 // The column is a column on a desk and an overlay on a narrow window. The mode
 // is a viewport fact, and the expanded/collapsed choice survives it.
+// The width below which the place column draws over the stage.
+//
+// It is a layout constraint, not a device label: the communities rail, the
+// column and a stage a conversation can be read in need about 860 pixels
+// between them. Above that the column is a column; below it, it is a panel
+// that opens over the stage.
+//
+// It was 1080, which is a laptop screen and not a phone screen - and a
+// browser at 125% or 150% zoom turns an ordinary 1366-pixel laptop into
+// something narrower than that, so the sidebar disappeared for a reader who
+// had done nothing except make the text bigger.
+//
+// The stylesheet has the same number, in the media query that hides the
+// column. They are checked against each other, because a threshold in one
+// place and not the other is a sidebar that is visible in one half of the
+// application and not the other.
+export const NARROW_WIDTH = 860;
+
 function narrow() {
-  try { return window.matchMedia('(max-width: 1080px)').matches; } catch { return false; }
+  try {
+    return window.matchMedia('(max-width: ' + NARROW_WIDTH + 'px)').matches;
+  } catch {
+    return false;
+  }
 }
 
 function syncNavMode() {

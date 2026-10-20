@@ -124,10 +124,22 @@ export function facts(items) {
 
 // -- layout -------------------------------------------------------------------
 
+// A stack of things.
+//
+// By default it is a reading column: one measure of text, capped, so a long
+// article is readable and a chat transcript is not a line a mile wide.
+//
+// `wide` says the opposite: this is a working surface, it is allowed to use
+// the width it is given. The workspace's list and its editor are two working
+// surfaces side by side, and capping them at the width of an article is what
+// made a wide screen look like a narrow one with a lot of space around it.
 export function fold(children, options) {
   const opts = options || {};
   return el('div', {
-    class: 'fold' + (opts.tight ? ' fold--tight' : '') + (opts.airy ? ' fold--airy' : ''),
+    class: 'fold'
+      + (opts.tight ? ' fold--tight' : '')
+      + (opts.airy ? ' fold--airy' : '')
+      + (opts.wide ? ' fold--wide' : ''),
   }, children);
 }
 

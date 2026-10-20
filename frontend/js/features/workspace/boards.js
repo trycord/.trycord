@@ -128,7 +128,7 @@ function boardView(ctx, boardId) {
         : null,
       body: fold([head, lanes], { tight: true }),
     }),
-  ]);
+  ], { wide: true });
 
   const paintHead = () => {
     head.replaceChildren(
@@ -242,7 +242,7 @@ function cardView(ctx, boardId, cardId) {
     card({ label: 'Links', glyph: 'link', body: links, flush: true }),
     card({ label: 'Milestones', glyph: 'flag', body: milestones, flush: true }),
     card({ label: 'Activity', glyph: 'activity', body: activity, flush: true }),
-  ]);
+  ], { wide: true });
 
   // A write that was written against an older version is refused, and the
   // answer says which version the card is at now.
