@@ -10,7 +10,14 @@ import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub, waitFor } from '../helpers/dom-stub.js';
 
-installDomStub();
+// The document is installed once for the module, because the modules beside
+// this one read it as they load, and again for every check: a check that
+// draws a dialog must not find the dialog of the check before it.
+//
+// The first install is guarded. Two files in one run would otherwise replace
+// the document under a check that is already running, and the check would be
+// looking at a document that is no longer there.
+if (!globalThis.document) installDomStub();
 
 const { State } = await import('../../packages/store.js');
 const { renderDeveloper } = await import('../../js/features/developer.js');
@@ -127,6 +134,7 @@ function baseRoutes(extra) {
 // -- the tests --------------------------------------------------------------------
 
 test('a key is created and the secret is shown once', async () => {
+  installDomStub();
   const calls = installFetchStub(baseRoutes({
     [V1 + '/keys']: (body, all) => {
       if (body) return { json: { key: KEY, secret: SECRET } };
@@ -175,6 +183,7 @@ test('a key is created and the secret is shown once', async () => {
 });
 
 test('the list afterwards does not carry the secret', async () => {
+  installDomStub();
   const calls = installFetchStub(baseRoutes({
     [V1 + '/keys']: (body) => {
       if (body) return { json: { key: KEY, secret: SECRET } };
@@ -211,6 +220,7 @@ test('the list afterwards does not carry the secret', async () => {
 });
 
 test('a rotation produces a new secret and says when the old one stops', async () => {
+  installDomStub();
   const calls = installFetchStub(baseRoutes({
     [V1 + '/keys/k_abc/rotate']: {
       json: {
@@ -247,6 +257,7 @@ test('a rotation produces a new secret and says when the old one stops', async (
 });
 
 test('a revocation stops the key', async () => {
+  installDomStub();
   const calls = installFetchStub(baseRoutes({
     [V1 + '/keys/k_abc/revoke']: { json: { key: Object.assign({}, KEY, { status: 'revoked' }) } },
   }));
@@ -274,6 +285,7 @@ test('a revocation stops the key', async () => {
 });
 
 test('an application is not a person, and its token is shown once', async () => {
+  installDomStub();
   State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
   const calls = installFetchStub(baseRoutes({
     [V1 + '/communities/s1/applications']: (body) => {
@@ -319,6 +331,7 @@ test('an application is not a person, and its token is shown once', async () => 
 });
 
 test('the applications of a community the reader does not manage are not offered', async () => {
+  installDomStub();
   State.servers = [{ id: 's1', name: 'A community', permissions: ['messages:read'], is_owner: false }];
   installFetchStub(baseRoutes());
 
@@ -332,6 +345,7 @@ test('the applications of a community the reader does not manage are not offered
 });
 
 test('the keys a reader holds are listed with their scopes and never their secret', async () => {
+  installDomStub();
   const calls = installFetchStub(baseRoutes({
     [V1 + '/keys']: { json: { keys: [KEY] } },
   }));

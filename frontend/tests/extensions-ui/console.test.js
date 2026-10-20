@@ -11,7 +11,14 @@ import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub, waitFor } from '../helpers/dom-stub.js';
 
-installDomStub();
+// The document is installed once for the module, because the modules beside
+// this one read it as they load, and again for every check: a check that
+// draws a dialog must not find the dialog of the check before it.
+//
+// The first install is guarded. Two files in one run would otherwise replace
+// the document under a check that is already running, and the check would be
+// looking at a document that is no longer there.
+if (!globalThis.document) installDomStub();
 
 const { State } = await import('../../packages/store.js');
 const { renderExtensions } = await import('../../js/features/extensions.js');
@@ -166,6 +173,7 @@ function registryRoutes(extra) {
 // -- the tests --------------------------------------------------------------------
 
 test('the registry lists what is on offer', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(registryRoutes());
 
@@ -181,6 +189,7 @@ test('the registry lists what is on offer', async () => {
 });
 
 test('the consent screen shows what the package asks for', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   installFetchStub(registryRoutes());
 
@@ -207,6 +216,7 @@ test('the consent screen shows what the package asks for', async () => {
 });
 
 test('an install is not sent without a grant list', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(registryRoutes({
     [BASE + '/install']: { json: { extension: INSTALLED, granted: ['messages.read'], refused: [] } },
@@ -216,7 +226,11 @@ test('an install is not sent without a grant list', async () => {
   await view.onMount();
   byLabel(view.node, 'Install Quiet Notes')[0].click();
 
-  const dialog = await waitFor(() => dialogWith('Install ' + PACKAGE.id));
+  const dialog = await waitFor(() => {
+    const found = dialogWith('Install ' + PACKAGE.id);
+    if (!found) return null;
+    return /Messages · Read/.test(String(found.textContent || '')) ? found : null;
+  });
   const send = findAll(dialog, classed('btn--primary'))[0];
   assert.ok(send, 'the consent screen has no way to install');
   assert.equal(send.disabled, true, 'the install is offered before the consent is answered');
@@ -241,6 +255,7 @@ test('an install is not sent without a grant list', async () => {
 });
 
 test('a capability that is not granted is not offered', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   installFetchStub(registryRoutes({
     [BASE + '/installed']: { json: { extensions: [INSTALLED] } },
@@ -264,6 +279,7 @@ test('a capability that is not granted is not offered', async () => {
 });
 
 test('a revoked capability stops the extension', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(registryRoutes({
     [BASE + '/installed']: { json: { extensions: [INSTALLED] } },
@@ -293,6 +309,7 @@ test('a revoked capability stops the extension', async () => {
 });
 
 test('the policy is read and saved', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(registryRoutes({
     [BASE + '/policy']: {
@@ -328,6 +345,7 @@ test('the policy is read and saved', async () => {
 });
 
 test('the dangerous switch says what it does, and asks before it is turned on', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(registryRoutes({
     [BASE + '/policy']: {
@@ -371,6 +389,7 @@ test('the dangerous switch says what it does, and asks before it is turned on', 
 });
 
 test('a workflow runs', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(registryRoutes({
     [BASE + '/workflows']: { json: { workflows: [WORKFLOW] } },
@@ -393,6 +412,7 @@ test('a workflow runs', async () => {
 });
 
 test('a dry run does nothing and says what it would have done', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(registryRoutes({
     [BASE + '/workflows']: { json: { workflows: [WORKFLOW] } },
@@ -439,6 +459,7 @@ test('a dry run does nothing and says what it would have done', async () => {
 });
 
 test('a run that is waiting can be approved', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   const waiting = Object.assign({}, RUN, { status: 'awaiting_approval', reason: 'waiting for an approval' });
   const calls = installFetchStub(registryRoutes({
@@ -472,6 +493,7 @@ test('a run that is waiting can be approved', async () => {
 });
 
 test('the history shows the reason a step failed', async () => {
+  installDomStub();
   State.user = { id: 'u1', isAdmin: true };
   installFetchStub(registryRoutes({
     [BASE + '/workflows']: { json: { workflows: [WORKFLOW] } },
@@ -499,6 +521,7 @@ test('the history shows the reason a step failed', async () => {
 });
 
 test('the controls an account may not use are not offered', async () => {
+  installDomStub();
   State.user = { id: 'u2', isAdmin: false };
   installFetchStub(registryRoutes({
     [BASE + '/workflows']: { json: { workflows: [] } },
