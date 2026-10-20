@@ -23,7 +23,7 @@ directory form works there too.
 
 | Command | Result |
 |---|---|
-| `cd backend && node --test "tests/**/*.test.js"` | **625 tests, 625 pass, 0 fail** |
+| `cd backend && node --test "tests/**/*.test.js"` | **636 tests, 636 pass, 0 fail** |
 | `cd backend && node --test "tests/e2ee/*.test.js"` | 64 tests, 64 pass |
 | `cd backend && node --test "tests/continuum/*.test.js"` | 53 tests, 53 pass — the relay, in **both** directions between two independently running instances |
 | `cd backend && node --test "tests/workspace/*.test.js"` | 40 tests, 40 pass |
@@ -39,7 +39,7 @@ directory form works there too.
 | `cd backend && node --test "tests/personal/*.test.js"` | 17 tests, 17 pass |
 | `cd backend && node --test "tests/voice/*.test.js"` | 25 tests, 25 pass — the three media providers |
 | `cd backend && node --test "tests/security-3.0/*.test.js"` | 34 tests, 34 pass — the review's nine findings, one regression file each |
-| `cd backend && node --test "tests/integration/*.test.js"` | 141 tests, 141 pass |
+| `cd backend && node --test "tests/integration/*.test.js"` | 147 tests, 147 pass |
 | `cd backend && node --test tests/integration/auth.test.js` | 13 tests, 13 pass |
 | `cd backend && node --test tests/integration/community.test.js` | 19 tests, 19 pass |
 | `cd backend && node --test tests/integration/migrations.test.js` | 10 tests, 10 pass |
