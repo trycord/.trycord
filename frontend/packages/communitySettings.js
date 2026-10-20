@@ -6,17 +6,16 @@
 //      Both clients show the same sections, in the same order, under the same
 //      headings, because the catalogue is written once.
 //
-//   2. The catalogue of the routes that configure a community. Every route
-//      the server offers for changing a community is named here with the
-//      method, the address and the surface that reaches it. This is the
-//      index the parity check reads: a route that is added to the server and
-//      not to this catalogue is a route nobody can reach, and the check says
-//      so.
+//   2. The catalogue of the routes that configure a community: every address
+//      the server offers for changing a community, with the method, the call
+//      that performs it and the surface that reaches it. This is the index
+//      the parity check reads. A route added to the server and not to this
+//      catalogue is a route nobody can reach, and the check says so.
 //
-//   3. The calls themselves, for the routes that the platform's own API
-//      module does not carry. They go through the same request() everything
-//      else uses, so the authorisation, the error shape and the failover
-//      are decided in one place.
+//   3. The calls for the routes the platform's API module does not carry.
+//      They go through the same request() everything else uses, so the
+//      authorisation, the error shape and the failover are decided in one
+//      place.
 //
 // The module holds no view and no element: it is rules, and both clients
 // draw their own.
@@ -28,8 +27,8 @@ import { request } from './api.js';
 // The sections of the console, in the order they are shown.
 //
 // `group` is the heading a section sits under, and `icon` is one of the
-// icons the platform carries. The address of a section is
-// /server/:id/settings/<id>, so a section is reached by its id.
+// icons the platform carries. A section is reached at
+// /server/:id/settings/<id>.
 export const COMMUNITY_SECTIONS = [
   {
     id: 'overview', label: 'Overview', icon: 'grid', group: 'This community',
@@ -85,7 +84,7 @@ export function communitySection(id) {
   return COMMUNITY_SECTIONS.find((section) => section.id === id) || null;
 }
 
-// The sections in the order they are shown, grouped as the console groups them.
+// The sections as the console groups them.
 export function communitySectionGroups() {
   const groups = new Map();
   for (const section of COMMUNITY_SECTIONS) {
@@ -98,45 +97,60 @@ export function communitySectionGroups() {
 
 // -- the routes ---------------------------------------------------------------
 
-// Every route that configures a community.
+// Every route that configures a community, and every route the console reads.
 //
 // `call` is the name of the client function that performs it: either a method
-// of the platform's API module (Api.updateChannel) or one of the calls below
+// of the platform's API module (updateServer) or one of the calls below
 // (communityApi.rotateWebhookSecret). `surfaces` names the places that reach
 // it: a section of this console, or another page of the client.
 //
-// The three routes that are deliberately not here are the ones that are not
-// about configuring a community: creating one (POST /api/servers), joining it
-// by its permanent code (POST /api/servers/join/:code) and leaving it
-// (POST /api/servers/:id/leave). Those are the community's lifecycle rather
-// than its configuration, and each of them has a page of its own.
+// The routes that are deliberately absent are the ones that are not about a
+// community's configuration: creating one, joining it by its permanent code
+// and leaving it are its lifecycle, and each has a page of its own. The
+// parity check carries the same list, and says so there.
 export const COMMUNITY_ROUTES = [
-  { id: 'servers.identity', method: 'PATCH', path: '/api/servers/:id', call: 'updateIdentity', surfaces: ['overview'] },
-  { id: 'servers.settings', method: 'PATCH', path: '/api/servers/:id/settings', call: 'updateSettings', surfaces: ['overview'] },
+  // The community itself.
+  { id: 'servers.read', method: 'GET', path: '/api/servers/:id', call: 'server', surfaces: ['overview'] },
+  { id: 'servers.identity', method: 'PATCH', path: '/api/servers/:id', call: 'updateServer', surfaces: ['overview'] },
+  { id: 'servers.settingsRead', method: 'GET', path: '/api/servers/:id/settings', call: 'readSettings', surfaces: ['overview'] },
+  { id: 'servers.settingsWrite', method: 'PATCH', path: '/api/servers/:id/settings', call: 'updateServerSettings', surfaces: ['overview'] },
   { id: 'servers.icon', method: 'POST', path: '/api/servers/:id/icon', call: 'setServerImage', surfaces: ['appearance'] },
   { id: 'servers.iconRemove', method: 'DELETE', path: '/api/servers/:id/icon', call: 'removeServerImage', surfaces: ['appearance'] },
   { id: 'servers.banner', method: 'POST', path: '/api/servers/:id/banner', call: 'setServerImage', surfaces: ['appearance'] },
   { id: 'servers.bannerRemove', method: 'DELETE', path: '/api/servers/:id/banner', call: 'removeServerImage', surfaces: ['appearance'] },
-  { id: 'servers.transfer', method: 'POST', path: '/api/servers/:id/transfer', call: 'transferServer', surfaces: ['ownership'] },
   { id: 'servers.remove', method: 'DELETE', path: '/api/servers/:id', call: 'deleteServer', surfaces: ['ownership'] },
+  { id: 'servers.transfer', method: 'POST', path: '/api/servers/:id/transfer', call: 'transferServer', surfaces: ['ownership'] },
+
+  // The people of the community.
+  { id: 'servers.members', method: 'GET', path: '/api/servers/:id/members', call: 'serverMembers', surfaces: ['members', 'moderation'] },
+  { id: 'servers.nickname', method: 'PATCH', path: '/api/servers/:id/members/:userId/nickname', call: 'setNickname', surfaces: ['moderation', 'members'] },
   { id: 'servers.kick', method: 'POST', path: '/api/servers/:id/kick', call: 'kickMember', surfaces: ['moderation'] },
   { id: 'servers.ban', method: 'POST', path: '/api/servers/:id/ban', call: 'banMember', surfaces: ['moderation'] },
   { id: 'servers.unban', method: 'POST', path: '/api/servers/:id/unban', call: 'unbanMember', surfaces: ['moderation'] },
+  { id: 'servers.bans', method: 'GET', path: '/api/servers/:id/bans', call: 'bans', surfaces: ['moderation'] },
   { id: 'servers.timeout', method: 'POST', path: '/api/servers/:id/timeout', call: 'timeoutMember', surfaces: ['moderation'] },
-  { id: 'servers.nickname', method: 'PATCH', path: '/api/servers/:id/members/:userId/nickname', call: 'setNickname', surfaces: ['moderation', 'members'] },
 
+  // The channels.
+  { id: 'channels.read', method: 'GET', path: '/api/servers/:serverId/channels', call: 'channels', surfaces: ['channels', 'categories'] },
   { id: 'channels.create', method: 'POST', path: '/api/servers/:serverId/channels', call: 'createChannel', surfaces: ['channels'] },
   { id: 'channels.update', method: 'PATCH', path: '/api/servers/:serverId/channels/:channelId', call: 'updateChannel', surfaces: ['channels'] },
   { id: 'channels.reorder', method: 'POST', path: '/api/servers/:serverId/channels/reorder', call: 'reorderChannels', surfaces: ['channels'] },
   { id: 'channels.remove', method: 'DELETE', path: '/api/servers/:serverId/channels/:channelId', call: 'deleteChannel', surfaces: ['channels'] },
-  { id: 'channels.overrides', method: 'PUT', path: '/api/servers/:serverId/channels/:channelId/overrides/:permission', call: 'setChannelOverride', surfaces: ['roles', 'channels'] },
+  { id: 'channels.overridesRead', method: 'GET', path: '/api/servers/:serverId/channels/:channelId/overrides', call: 'channelOverrides', surfaces: ['roles', 'channels'] },
+  { id: 'channels.overridesWrite', method: 'PUT', path: '/api/servers/:serverId/channels/:channelId/overrides/:permission', call: 'setChannelOverride', surfaces: ['roles', 'channels'] },
 
+  // The categories.
+  { id: 'categories.read', method: 'GET', path: '/api/servers/:serverId/categories', call: 'categories', surfaces: ['categories'] },
   { id: 'categories.create', method: 'POST', path: '/api/servers/:serverId/categories', call: 'createCategory', surfaces: ['categories'] },
   { id: 'categories.update', method: 'PATCH', path: '/api/servers/:serverId/categories/:categoryId', call: 'updateCategory', surfaces: ['categories'] },
   { id: 'categories.reorder', method: 'POST', path: '/api/servers/:serverId/categories/reorder', call: 'reorderCategories', surfaces: ['categories'] },
   { id: 'categories.remove', method: 'DELETE', path: '/api/servers/:serverId/categories/:categoryId', call: 'deleteCategory', surfaces: ['categories'] },
-  { id: 'categories.overrides', method: 'PUT', path: '/api/servers/:serverId/categories/:categoryId/overrides/:permission', call: 'setCategoryOverride', surfaces: ['categories', 'roles'] },
+  { id: 'categories.overridesRead', method: 'GET', path: '/api/servers/:serverId/categories/:categoryId/overrides', call: 'categoryOverrides', surfaces: ['categories', 'roles'] },
+  { id: 'categories.overridesWrite', method: 'PUT', path: '/api/servers/:serverId/categories/:categoryId/overrides/:permission', call: 'setCategoryOverride', surfaces: ['categories', 'roles'] },
 
+  // The roles.
+  { id: 'roles.read', method: 'GET', path: '/api/servers/:serverId/roles', call: 'roles', surfaces: ['roles'] },
+  { id: 'roles.permissions', method: 'GET', path: '/api/servers/:serverId/roles/permissions', call: 'rolePermissions', surfaces: ['roles'] },
   { id: 'roles.create', method: 'POST', path: '/api/servers/:serverId/roles', call: 'createRole', surfaces: ['roles'] },
   { id: 'roles.update', method: 'PATCH', path: '/api/servers/:serverId/roles/:roleId', call: 'updateRole', surfaces: ['roles'] },
   { id: 'roles.reorder', method: 'POST', path: '/api/servers/:serverId/roles/reorder', call: 'reorderRoles', surfaces: ['roles'] },
@@ -144,19 +158,30 @@ export const COMMUNITY_ROUTES = [
   { id: 'roles.assign', method: 'POST', path: '/api/servers/:serverId/roles/:roleId/assign', call: 'assignRole', surfaces: ['roles'] },
   { id: 'roles.unassign', method: 'DELETE', path: '/api/servers/:serverId/roles/:roleId/assign/:userId', call: 'unassignRole', surfaces: ['roles'] },
 
+  // The invites.
+  { id: 'invites.read', method: 'GET', path: '/api/servers/:serverId/invites', call: 'invites', surfaces: ['invites'] },
   { id: 'invites.create', method: 'POST', path: '/api/servers/:serverId/invites', call: 'createInvite', surfaces: ['invites'] },
   { id: 'invites.remove', method: 'DELETE', path: '/api/servers/:serverId/invites/:inviteId', call: 'deleteInvite', surfaces: ['invites'] },
 
+  // The webhooks.
+  { id: 'webhooks.read', method: 'GET', path: '/api/servers/:serverId/webhooks', call: 'webhooks', surfaces: ['integrations'] },
   { id: 'webhooks.create', method: 'POST', path: '/api/servers/:serverId/webhooks', call: 'createWebhook', surfaces: ['integrations'] },
   { id: 'webhooks.update', method: 'PATCH', path: '/api/servers/:serverId/webhooks/:webhookId', call: 'updateWebhook', surfaces: ['integrations'] },
   { id: 'webhooks.rotate', method: 'POST', path: '/api/servers/:serverId/webhooks/:webhookId/rotate-secret', call: 'rotateWebhookSecret', surfaces: ['integrations'] },
+  { id: 'webhooks.deliveries', method: 'GET', path: '/api/servers/:serverId/webhooks/:webhookId/deliveries', call: 'webhookDeliveries', surfaces: ['integrations'] },
   { id: 'webhooks.remove', method: 'DELETE', path: '/api/servers/:serverId/webhooks/:webhookId', call: 'deleteWebhook', surfaces: ['integrations'] },
 
+  // The bot applications and the commands they answer.
+  { id: 'apps.read', method: 'GET', path: '/api/servers/:serverId/apps', call: 'apps', surfaces: ['integrations'] },
   { id: 'apps.create', method: 'POST', path: '/api/servers/:serverId/apps', call: 'createApp', surfaces: ['integrations'] },
   { id: 'apps.update', method: 'PATCH', path: '/api/servers/:serverId/apps/:appId', call: 'updateApp', surfaces: ['integrations'] },
   { id: 'apps.remove', method: 'DELETE', path: '/api/servers/:serverId/apps/:appId', call: 'deleteApp', surfaces: ['integrations'] },
-  { id: 'apps.commands', method: 'PUT', path: '/api/servers/:serverId/apps/:appId/commands', call: 'setAppCommand', surfaces: ['integrations'] },
+  { id: 'apps.commandsRead', method: 'GET', path: '/api/servers/:serverId/apps/:appId/commands', call: 'appCommands', surfaces: ['integrations'] },
+  { id: 'apps.commandsWrite', method: 'PUT', path: '/api/servers/:serverId/apps/:appId/commands', call: 'setAppCommand', surfaces: ['integrations'] },
   { id: 'apps.commandRemove', method: 'DELETE', path: '/api/servers/:serverId/apps/:appId/commands/:commandId', call: 'deleteAppCommand', surfaces: ['integrations'] },
+
+  // What the community did.
+  { id: 'analytics.read', method: 'GET', path: '/api/servers/:serverId/analytics', call: 'analytics', surfaces: ['analytics'] },
 ];
 
 const ROUTE_BY_ID = new Map(COMMUNITY_ROUTES.map((route) => [route.id, route]));
@@ -187,15 +212,7 @@ export const communityApi = {
   //
   // Without this the interface cannot show the guidelines as they are: a box
   // that cannot be read is a box that is written blind.
-  readSettings: (serverId) => request('GET', communityRouteUrl('servers.settings', { id: serverId })),
-
-  // The identity of the community: its name, its description, whether it is
-  // public, whether it is listed, and whether it is federated.
-  updateIdentity: (serverId, patch) => request('PATCH', communityRouteUrl('servers.identity', { id: serverId }), { body: patch }),
-
-  // The settings the community keeps: the welcome, the guidelines, the
-  // notification defaults and the interaction settings.
-  updateSettings: (serverId, patch) => request('PATCH', communityRouteUrl('servers.settings', { id: serverId }), { body: patch }),
+  readSettings: (serverId) => request('GET', communityRouteUrl('servers.settingsRead', { id: serverId })),
 
   // A member's name in this community.
   setNickname: (serverId, userId, nickname) => request(
@@ -208,56 +225,47 @@ export const communityApi = {
   // category. Three states: inherit, allow, deny.
   channelOverrides: (serverId, channelId) => request(
     'GET',
-    communityRouteUrl('channels.overrides', { serverId, channelId, permission: '' })
-      .replace(/\/overrides\/$/, '/overrides'),
+    communityRouteUrl('channels.overridesRead', { serverId, channelId }),
   ),
   setChannelOverride: (serverId, channelId, permission, effect) => request(
     'PUT',
-    communityRouteUrl('channels.overrides', { serverId, channelId, permission }),
+    communityRouteUrl('channels.overridesWrite', { serverId, channelId, permission }),
     { body: { effect } },
   ),
   categoryOverrides: (serverId, categoryId) => request(
     'GET',
-    communityRouteUrl('categories.overrides', { serverId, categoryId, permission: '' })
-      .replace(/\/overrides\/$/, '/overrides'),
+    communityRouteUrl('categories.overridesRead', { serverId, categoryId }),
   ),
   setCategoryOverride: (serverId, categoryId, permission, effect) => request(
     'PUT',
-    communityRouteUrl('categories.overrides', { serverId, categoryId, permission }),
+    communityRouteUrl('categories.overridesWrite', { serverId, categoryId, permission }),
     { body: { effect } },
   ),
 
   // What each webhook delivered, and what the endpoint answered.
   webhookDeliveries: (serverId, webhookId) => request(
     'GET',
-    communityRouteUrl('webhooks.update', { serverId, webhookId }).replace(/\/webhooks\/[^/]+$/, '/webhooks/' + encodeURIComponent(webhookId) + '/deliveries'),
+    communityRouteUrl('webhooks.deliveries', { serverId, webhookId }),
   ),
 
   // The bot applications of the community.
-  apps: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/apps'),
-  createApp: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/apps', { body }),
+  apps: (serverId) => request('GET', communityRouteUrl('apps.read', { serverId })),
+  createApp: (serverId, body) => request('POST', communityRouteUrl('apps.create', { serverId }), { body }),
   updateApp: (serverId, appId, body) => request(
     'PATCH',
-    '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId),
+    communityRouteUrl('apps.update', { serverId, appId }),
     { body },
   ),
-  removeApp: (serverId, appId) => request(
-    'DELETE',
-    '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId),
-  ),
-  appCommands: (serverId, appId) => request(
-    'GET',
-    '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId) + '/commands',
-  ),
+  deleteApp: (serverId, appId) => request('DELETE', communityRouteUrl('apps.remove', { serverId, appId })),
+  appCommands: (serverId, appId) => request('GET', communityRouteUrl('apps.commandsRead', { serverId, appId })),
   setAppCommand: (serverId, appId, body) => request(
     'PUT',
-    '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId) + '/commands',
+    communityRouteUrl('apps.commandsWrite', { serverId, appId }),
     { body },
   ),
-  removeAppCommand: (serverId, appId, commandId) => request(
+  deleteAppCommand: (serverId, appId, commandId) => request(
     'DELETE',
-    '/api/servers/' + encodeURIComponent(serverId) + '/apps/' + encodeURIComponent(appId)
-      + '/commands/' + encodeURIComponent(commandId),
+    communityRouteUrl('apps.commandRemove', { serverId, appId, commandId }),
   ),
 };
 
@@ -325,7 +333,7 @@ export function readDocument(raw) {
       return { ok: false, text, value: null, reason: 'A settings document has to be an object.' };
     }
     return { ok: true, text, value, empty: false };
-  } catch (error) {
+  } catch {
     return {
       ok: false,
       text,
@@ -337,7 +345,8 @@ export function readDocument(raw) {
 
 // The document as it would be written, pretty-printed when it can be.
 export function writeDocument(document) {
-  if (!document || document.ok === false) return document ? document.text : '';
+  if (!document) return '';
+  if (document.ok === false) return document.text;
   if (document.empty) return '';
   try { return JSON.stringify(document.value, null, 2); } catch { return document.text; }
 }

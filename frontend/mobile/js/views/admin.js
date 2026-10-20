@@ -1479,6 +1479,14 @@ function federationBody() {
   const host = el('div', { class: 'm-stack' });
   const list = el('div', { class: 'm-list' });
   const moderation = el('div', { class: 'm-stack' });
+  // What the server answered the last time. It lives here rather than in the
+  // surface, so that re-reading the surface after an action does not take the
+  // answer with it.
+  const answer = el('div', { class: 'm-stack' });
+
+  function say(title, text, tone) {
+    answer.replaceChildren(notice({ tone: tone || 'info', title, text }));
+  }
 
   async function paint() {
     clear(list);
@@ -1532,6 +1540,8 @@ function federationBody() {
         members: Array.isArray(members) ? members : [],
         names,
         refresh: paintModeration,
+        answer,
+        say,
       }));
     } catch (error) {
       clear(moderation);
