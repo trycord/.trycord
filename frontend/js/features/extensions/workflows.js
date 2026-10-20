@@ -16,13 +16,36 @@ import { formatDateTime } from '../../../packages/locale.js';
 import { card, row, blank, fault, fold, facts, hold, memo } from '../../ui/page.js';
 import { confirmDialog, openDialog, errorToast, toast } from '../../ui/overlays.js';
 import {
-  approveRun, dryRunWorkflow, grantWorkflowCapability, pauseWorkflow, readRun,
-  readWorkflow, readWorkflowRuns, readWorkflows, resumeWorkflow, revokeWorkflowCapability,
-  runWorkflow,
+  approveRun, dryRunWorkflow, grantWorkflowCapability, pauseWorkflow, readCapabilityCatalogue,
+  readRun, readWorkflow, readWorkflowRuns, readWorkflows, resumeWorkflow,
+  revokeWorkflowCapability, runWorkflow,
 } from './api.js';
 import {
   capabilityChip, capabilityLabel, grantedSet, isOperator, runStateChip, workflowStateChip,
 } from './parts.js';
+
+// The capability catalogue, read once.
+//
+// The server holds the list and the descriptions, because that is where the
+// permission is enforced. It is read once and remembered, and a failure to
+// read it leaves the picker offering only the capabilities the workflow's
+// own steps have asked for - which is enough to be useful and never wrong.
+let catalogueEntries = null;
+let catalogueAsked = false;
+
+async function catalogue() {
+  if (catalogueEntries) return catalogueEntries;
+  if (catalogueAsked) return [];
+  catalogueAsked = true;
+  try {
+    const answer = await readCapabilityCatalogue();
+    const list = (answer && answer.capabilities) || [];
+    catalogueEntries = list.filter((entry) => entry && entry.id);
+  } catch {
+    catalogueEntries = [];
+  }
+  return catalogueEntries;
+}
 
 // What wakes a workflow.
 export function triggerLabel(trigger) {
@@ -194,21 +217,30 @@ export function workflowsSection() {
     }
 
     if (isOperator()) {
-      const listId = 'workflow-capabilities-' + workflow.id;
-      const name = el('input', {
-        class: 'input', type: 'text', list: listId,
+      // The picker is a list of what this instance knows, not a name an
+      // administrator has to remember. The catalogue is read from the server,
+      // because the descriptions live where the permission is enforced, and
+      // the steps of this workflow are offered first - those are the ones
+      // it will actually be refused without.
+      const wanted = el('option', { value: '' }, 'Choose a capability');
+      for (const capability of observed) {
+        wanted.appendChild(el('option', { value: capability }, capabilityLabel(capability)));
+      }
+      const known = el('select', {
+        class: 'input', name: 'capability',
         'aria-label': 'The capability to grant to ' + workflow.name,
-        placeholder: 'messages.read',
-      });
-      const choices = el('datalist', { id: listId },
-        ...observed.map((capability) => el('option', { value: capability })));
+      }, [wanted]);
+      const note = el('p', { class: 'form-note' },
+        'The capabilities this instance knows. The ones this workflow has asked '
+        + 'for are first: it will be refused the others until it holds them.');
+
       const give = el('button', {
         class: 'btn btn--default btn--sm', type: 'button',
         'aria-label': 'Grant a capability to ' + workflow.name,
         onClick: async () => {
-          const capability = name.value.trim();
+          const capability = String(known.value || '').trim();
           if (!capability) {
-            toast('Name the capability to grant.', { type: 'error' });
+            toast('Choose the capability to grant.', { type: 'error' });
             return;
           }
           give.disabled = true;
@@ -219,13 +251,19 @@ export function workflowsSection() {
           } catch (error) { errorToast(error); } finally { give.disabled = false; }
         },
       }, 'Grant it');
-      blocks.push(el('div', { class: 'form-stack' },
-        el('p', { class: 'form-note' },
-          'Grant another capability. The server knows which capabilities this instance has, '
-          + 'and refuses one it does not know.'),
-        name,
-        choices,
-        give));
+      blocks.push(el('div', { class: 'form-stack' }, [note, known, give]));
+
+      // The rest of the catalogue, for a capability the steps have not asked
+      // for yet. It is read once and offered, with what each one means.
+      catalogue().then((entries) => {
+        if (!entries.length) return;
+        const rest = entries.filter((entry) => observed.indexOf(entry.id) === -1);
+        if (!rest.length) return;
+        for (const entry of rest) {
+          known.appendChild(el('option', { value: entry.id },
+            entry.label + ' — ' + entry.description));
+        }
+      }).catch(() => { /* the list the steps asked for is still offered */ });
     }
     return el('div', { class: 'fold fold--tight' }, blocks);
   }
