@@ -237,10 +237,13 @@ async function deliver(reportId) {
   envelope.signature = continuum.signEvent(envelope);
 
   let body;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
   try {
     const response = await fetch(origin + '/api/federation-reports/inbound', {
       method: 'POST',
       redirect: 'error',
+      signal: controller.signal,
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(envelope),
     });
@@ -260,6 +263,8 @@ async function deliver(reportId) {
       ['FAILED', reason, envelope.id, reportId]
     );
     return { delivered: false, reason };
+  } finally {
+    clearTimeout(timer);
   }
 
   await db.run(

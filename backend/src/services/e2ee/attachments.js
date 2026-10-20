@@ -32,9 +32,10 @@ const STORED_FILENAME = 'attachment.enc';
 // member devices; there is no field in this subsystem that holds one.
 const KEY_FIELDS = ['key', 'attachmentKey', 'fileKey', 'secret'];
 
-// An attachment id is used in an object key and in a row id, so it has to be
-// one of the shapes the storage service accepts.
-const ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+// An attachment id is used in an object key and in a row id, and it has to
+// be one the message path will accept as an attachment of a message: the
+// uuid shape every generated id in this codebase has.
+const ID = /^[a-f0-9-]{1,64}$/i;
 
 /**
  * Check the seals of an attachment.

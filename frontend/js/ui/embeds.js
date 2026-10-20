@@ -130,7 +130,10 @@ export function openLightbox(images, startIndex) {
     paint();
   }
 
-  body.addEventListener('keydown', (event) => {
+  // The arrows are this module's business; the dialog underneath owns Escape
+  // and the focus trap. The listener sits on the dialog, so it hears the keys
+  // wherever the focus happens to be inside it.
+  dialog.element.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowLeft') { event.preventDefault(); step(-1); }
     else if (event.key === 'ArrowRight') { event.preventDefault(); step(1); }
   });
