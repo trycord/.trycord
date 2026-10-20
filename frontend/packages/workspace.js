@@ -481,6 +481,10 @@ export const Workspace = {
   polls: (serverId) => request('GET', root(serverId) + '/polls'),
   poll: (serverId, pollId) => request('GET', root(serverId) + '/polls/' + encodeURIComponent(pollId)),
   createPoll: (serverId, body) => request('POST', root(serverId) + '/polls', { body }),
+  // A poll may be edited while it is open and nobody has answered it. The
+  // server refuses the other cases, with the reason.
+  updatePoll: (serverId, pollId, body) => request('PATCH',
+    root(serverId) + '/polls/' + encodeURIComponent(pollId), { body }),
   votePoll: (serverId, pollId, choices) =>
     request('POST', root(serverId) + '/polls/' + encodeURIComponent(pollId) + '/vote', { body: { choices } }),
   pollResults: (serverId, pollId, recount) =>

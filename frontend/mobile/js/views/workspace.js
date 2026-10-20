@@ -1366,7 +1366,14 @@ function openEventEditor(serverId) {
 }
 
 // A poll, made.
-function openPollEditor(serverId) {
+// A poll, made or edited.
+//
+// The poll being edited is the third argument; without one this is a new poll.
+// The phone's editor takes two options, the desk's takes as many as the
+// reader adds: the two are different shapes of the same thing, and the server
+// is the one that says how many are needed.
+function openPollEditor(serverId, onChanged, poll) {
+  const editing = poll || null;
   const question = textInput({ label: 'The question' });
   const first = textInput({ label: 'Option 1' });
   const second = textInput({ label: 'Option 2' });
@@ -1376,8 +1383,15 @@ function openPollEditor(serverId) {
   });
   const error = el('p', { class: 'm-form-error', hidden: true });
 
+  if (editing) {
+    question.value = editing.question || '';
+    first.value = (editing.options && editing.options[0] && editing.options[0].label) || '';
+    second.value = (editing.options && editing.options[1] && editing.options[1].label) || '';
+    scoring.value = editing.scoring || 'plurality';
+  }
+
   const layer = sheet({
-    title: 'New poll',
+    title: editing ? 'Edit the poll' : 'New poll',
     body: el('div', { class: 'm-stack' },
       field({ label: 'Question', control: question }),
       field({ label: 'Option 1', control: first }),
@@ -1385,7 +1399,7 @@ function openPollEditor(serverId) {
       field({ label: 'Scoring', control: scoring }),
       error),
     footer: actions([
-      primaryButton('Create', async () => {
+      primaryButton(editing ? 'Save' : 'Create', async () => {
         error.hidden = true;
         const options = [first.value.trim(), second.value.trim()].filter(Boolean);
         if (!question.value.trim() || options.length < 2) {
@@ -1394,16 +1408,20 @@ function openPollEditor(serverId) {
           return;
         }
         try {
-          await Workspace.createPoll(serverId, {
-            question: question.value.trim(),
-            options,
-            scoring: scoring.value,
-          });
-          toast('The poll is made');
+          const body = { question: question.value.trim(), options, scoring: scoring.value };
+          if (editing) {
+            await Workspace.updatePoll(serverId, editing.id, body);
+            toast('The poll is saved');
+          } else {
+            await Workspace.createPoll(serverId, body);
+            toast('The poll is made');
+          }
           layer.close();
+          if (onChanged) await onChanged();
         } catch (err) {
           error.hidden = false;
-          error.textContent = (err && err.message) || 'The poll could not be made.';
+          error.textContent = (err && err.message)
+            || (editing ? 'The poll could not be saved.' : 'The poll could not be made.');
         }
       }, { block: true }),
     ]),

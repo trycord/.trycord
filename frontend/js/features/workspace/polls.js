@@ -137,6 +137,16 @@ export function pollsDetail(ctx) {
       }, icon('plus', { size: 14 }), 'New poll'));
     }
     if (poll && poll.status !== 'closed' && mayActOn(serverId, poll.createdBy, me)) {
+      // The server refuses to edit a poll that has answers, so the action is
+      // offered only while the poll is one somebody could still change. The
+      // server's answer is the rule; this only avoids offering what it will
+      // refuse.
+      if (!poll.hasAnswers) {
+        tools.push(el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          onClick: () => openPollEditor(serverId, load, poll),
+        }, icon('edit', { size: 14 }), 'Edit it'));
+      }
       tools.push(el('button', {
         class: 'btn btn--ghost btn--sm', type: 'button',
         onClick: () => close(),
@@ -410,14 +420,20 @@ export function pollsDetail(ctx) {
 //
 // The options are the question's answers; a poll needs at least two of them,
 // and the server refuses anything it does not recognise.
-function openPollEditor(serverId, onDone) {
+function openPollEditor(serverId, onDone, poll) {
+  // The poll being edited, or nothing for a new one.
+  //
+  // The editor used to name a poll that was not in scope - the title said
+  // "Edit the poll" against a variable that did not exist - and every click
+  // on "New poll" threw a ReferenceError before the dialog was ever shown.
+  const editing = poll || null;
   const question = el('input', {
     class: 'input', type: 'text', maxlength: '500', 'aria-label': 'The question',
   });
   const options = el('div', { class: 'fold fold--tight' });
   const scoring = el('select', { class: 'select', 'aria-label': 'How the answers are counted' },
     ...POLL_SCORINGS.map((value) => el('option', {
-      value, selected: value === 'plurality',
+      value, selected: value === (editing ? editing.scoring : 'plurality'),
     }, POLL_SCORING_LABELS[value])));
   const multiple = el('input', {
     type: 'checkbox', 'aria-label': 'More than one answer may be chosen',
@@ -427,7 +443,14 @@ function openPollEditor(serverId, onDone) {
   });
   const error = el('p', { class: 'form-error', hidden: true });
 
-  const answers = [];
+  // The poll as it stands, when a poll is being edited.
+  const answers = (editing && Array.isArray(editing.options) ? editing.options : [])
+    .map((option) => ({ value: option.label || '' }));
+  if (editing) {
+    question.value = editing.question || '';
+    multiple.checked = !!editing.allowsMultiple;
+    anonymous.checked = !!editing.isAnonymous;
+  }
   const paintAnswers = () => {
     options.replaceChildren(...answers.map((answer, index) => {
       const field = el('input', {
@@ -446,11 +469,11 @@ function openPollEditor(serverId, onDone) {
       onClick: () => { answers.push({ value: '' }); paintAnswers(); },
     }, icon('plus', { size: 14 }), 'Add an option'));
   };
-  answers.push({ value: '' }, { value: '' });
+  if (!answers.length) answers.push({ value: '' }, { value: '' });
   paintAnswers();
 
   const dialog = openDialog({
-    title: poll ? 'Edit the poll' : 'New poll',
+    title: editing ? 'Edit the poll' : 'New poll',
     wide: true,
     body: el('form', {
       class: 'fold',
@@ -465,19 +488,26 @@ function openPollEditor(serverId, onDone) {
           return;
         }
         try {
-          await Workspace.createPoll(serverId, {
+          const body = {
             question: question.value.trim(),
             options: labels,
             scoring: scoring.value,
             allowsMultiple: multiple.checked,
             isAnonymous: anonymous.checked,
-          });
-          toast('The poll is made');
+          };
+          if (editing) {
+            await Workspace.updatePoll(serverId, editing.id, body);
+            toast('The poll is saved');
+          } else {
+            await Workspace.createPoll(serverId, body);
+            toast('The poll is made');
+          }
           dialog.close();
           if (onDone) await onDone();
         } catch (err) {
           error.hidden = false;
-          error.textContent = (err && err.message) || 'The poll could not be made.';
+          error.textContent = (err && err.message)
+            || (editing ? 'The poll could not be saved.' : 'The poll could not be made.');
         }
       },
     },
@@ -487,7 +517,8 @@ function openPollEditor(serverId, onDone) {
     el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Several answers'), multiple),
     el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Anonymous'), anonymous),
     error,
-    el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Create')),
+    el('button', { class: 'btn btn--primary btn--sm', type: 'submit' },
+      editing ? 'Save' : 'Create')),
   });
   question.focus();
 }

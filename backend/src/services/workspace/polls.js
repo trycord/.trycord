@@ -26,6 +26,7 @@ const db = require('../../db');
 const { now, uuid } = require('../../util');
 const { fail, required, optionalInstant, positiveInt, oneOf } = require('./common');
 const roles = require('../roles');
+const permissions = require('../permissions');
 
 const SCORINGS = ['plurality', 'ranked'];
 const ELIGIBILITIES = ['members', 'role'];
@@ -52,6 +53,10 @@ function shapePoll(row) {
     createdBy: row.created_by,
     createdAt: row.created_at,
     closedAt: row.closed_at || null,
+    // Whether anybody has answered it. A poll with answers cannot be edited:
+    // the ballots were given for the options as they stand. The client uses
+    // this to avoid offering an edit the server would refuse.
+    hasAnswers: Number(row.answer_count || 0) > 0,
   };
 }
 
@@ -59,8 +64,21 @@ function shapeOption(row) {
   return { id: row.id, pollId: row.poll_id, position: Number(row.position || 0), label: row.label };
 }
 
+// The count of the answers a poll has, so the shape can say whether it may
+// still be edited.
+//
+// A poll with answers cannot be edited: the ballots were given for the
+// options as they stand. The count is carried in the query rather than
+// asked for separately, because a list of polls would otherwise be one
+// query per poll.
+const ANSWER_COUNT = '(SELECT COUNT(*) FROM poll_votes WHERE poll_id = p.id)'
+  + ' + (SELECT COUNT(*) FROM poll_ballots WHERE poll_id = p.id)';
+
 async function pollOf(serverId, pollId) {
-  const row = await db.get('SELECT * FROM polls WHERE id = ? AND server_id = ?', [pollId, serverId]);
+  const row = await db.get(
+    'SELECT p.*, ' + ANSWER_COUNT + ' AS answer_count FROM polls p WHERE p.id = ? AND p.server_id = ?',
+    [pollId, serverId],
+  );
   if (!row) fail('NOT_FOUND', 'poll not found');
   return row;
 }
@@ -76,7 +94,11 @@ async function get(serverId, pollId) {
 }
 
 async function list(serverId) {
-  const rows = await db.all('SELECT * FROM polls WHERE server_id = ? ORDER BY created_at DESC, id DESC', [serverId]);
+  const rows = await db.all(
+    'SELECT p.*, ' + ANSWER_COUNT + ' AS answer_count FROM polls p'
+    + ' WHERE p.server_id = ? ORDER BY p.created_at DESC, p.id DESC',
+    [serverId],
+  );
   return rows.map(shapePoll);
 }
 
@@ -164,7 +186,12 @@ async function hasAnswers(pollId) {
 // The fields the body does not carry are left as they are. This is a partial
 // change, not a replacement: a body with only a question changes the question
 // and nothing else.
-async function update(serverId, pollId, input) {
+//
+// Who may edit it is the author's job and a moderator's, the same rule the
+// close uses. The rule belongs here rather than only in the route, because a
+// service that can be called from anywhere has to carry it itself: the route
+// is one caller and the next one would not be.
+async function update(serverId, pollId, actorId, input) {
   const poll = await pollOf(serverId, pollId);
   if (poll.status === 'closed') {
     fail('CONFLICT', 'a closed poll cannot be edited: its result is on record');
@@ -193,6 +220,17 @@ async function update(serverId, pollId, input) {
 
   const allowsMultiple = booleanField(input.allowsMultiple, poll.allows_multiple, 'allowsMultiple');
   const isAnonymous = booleanField(input.isAnonymous, poll.is_anonymous, 'isAnonymous');
+
+  // The author, or somebody who manages the content of this community. The
+  // owner is the author of everything they made, so they are included.
+  const author = String(poll.createdBy || '') === String(actorId || '');
+  const owner = await db.get('SELECT owner_id FROM servers WHERE id = ?', [serverId]);
+  const isOwner = !!(owner && String(owner.owner_id) === String(actorId || ''));
+  const moderates = author || isOwner
+    || await permissions.hasPermission(actorId, serverId, 'MANAGE_MESSAGES');
+  if (!moderates) {
+    fail('PERMISSION_DENIED', 'only the author or a moderator can edit this poll');
+  }
 
   const optionCount = labels ? labels.length : await optionTotal(poll.id);
   let maxChoices = 1;
