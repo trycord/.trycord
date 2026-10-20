@@ -23,7 +23,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import Api, { request } from '../../packages/api.js';
+import Api from '../../packages/api.js';
 import { head, card, row, blank, fault, fold, hold, memo } from '../ui/page.js';
 import { openDialog, toast } from '../ui/overlays.js';
 import { relativeTime } from '../../packages/format.js';
@@ -31,38 +31,20 @@ import { disclosurePanel, reportDialog } from '../ui/federation.js';
 
 // ---- the Continuum calls this surface makes ---------------------------------
 //
-// The moderation and outgoing routes are not in the shared API client yet, so
-// they are named here, once. Every one of them goes through the same
-// request() as the rest of the client, so the authorisation, the error shape
-// and the failover rules are the ones every other screen obeys.
-
-function withQuery(params) {
-  const search = new URLSearchParams();
-  for (const key of Object.keys(params || {})) {
-    const value = params[key];
-    if (value === undefined || value === null || value === '') continue;
-    search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? '?' + query : '';
-}
+// They are the shared client's methods, so the authorisation, the error shape
+// and the failover rules are the ones every other screen obeys. The names
+// here are the short ones this surface reads best with.
 
 export const continuum = {
-  outgoing: () => request('GET', '/api/continuum/outgoing'),
-  editOutgoing: (id, content) => request('PATCH',
-    '/api/continuum/outgoing/' + encodeURIComponent(id), { body: { content } }),
-  deleteOutgoing: (id) => request('DELETE',
-    '/api/continuum/outgoing/' + encodeURIComponent(id)),
-  moderationMessages: (communityId) => request('GET',
-    '/api/continuum/moderation/messages' + withQuery({ community_id: communityId })),
-  removeModerationMessage: (instanceId, messageId, reason) => request('DELETE',
-    '/api/continuum/moderation/messages/' + encodeURIComponent(instanceId) + '/'
-    + encodeURIComponent(messageId), { body: { reason } }),
-  moderationMembers: (communityId) => request('GET',
-    '/api/continuum/moderation/members' + withQuery({ community_id: communityId })),
-  restrictMember: (instanceId, userId, body) => request('POST',
-    '/api/continuum/moderation/members/' + encodeURIComponent(instanceId) + '/'
-    + encodeURIComponent(userId), { body }),
+  outgoing: () => Api.continuumOutgoing(),
+  editOutgoing: (id, content) => Api.continuumEditOutgoing(id, content),
+  deleteOutgoing: (id) => Api.continuumDeleteOutgoing(id),
+  moderationMessages: (communityId) => Api.continuumModerationMessages(communityId),
+  removeModerationMessage: (instanceId, messageId, reason) =>
+    Api.continuumRemoveModerationMessage(instanceId, messageId, reason),
+  moderationMembers: (communityId) => Api.continuumModerationMembers(communityId),
+  restrictMember: (instanceId, userId, body) =>
+    Api.continuumRestrictMember(instanceId, userId, body),
 };
 
 // ---- shared vocabulary -------------------------------------------------------

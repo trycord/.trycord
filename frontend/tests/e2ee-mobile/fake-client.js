@@ -98,9 +98,4 @@ export function fakeClient(options) {
   return client;
 }
 
-/** The calls a client was asked for, by name. */
-export function callsTo(client, method) {
-  return client.calls.filter((call) => call.method === method);
-}
-
-export default { fakeClient, fakeDevice, callsTo };
+export default { fakeClient, fakeDevice };

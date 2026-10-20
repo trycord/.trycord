@@ -711,6 +711,31 @@ const Api = {
   continuumInbox: () => request('GET', '/api/continuum/inbox'),
   continuumProbe: (origin) => request('GET', '/api/continuum/probe?origin=' + encodeURIComponent(origin)),
 
+  // What this account wrote into communities that live elsewhere, and what
+  // the owner of those communities decided about it.
+  continuumOutgoing: () => request('GET', '/api/continuum/outgoing'),
+  continuumEditOutgoing: (id, content) =>
+    request('PATCH', '/api/continuum/outgoing/' + encodeURIComponent(id), { body: { content } }),
+  continuumDeleteOutgoing: (id) =>
+    request('DELETE', '/api/continuum/outgoing/' + encodeURIComponent(id)),
+
+  // What the members of a community wrote on other instances, and the four
+  // decisions an owner of that community may make about it. The community is
+  // optional: with no community, the answer is every community of the
+  // instance, which is the platform administrator's view.
+  continuumModerationMessages: (communityId) =>
+    request('GET', '/api/continuum/moderation/messages'
+      + (communityId ? '?community_id=' + encodeURIComponent(communityId) : '')),
+  continuumRemoveModerationMessage: (instanceId, messageId, reason) =>
+    request('DELETE', '/api/continuum/moderation/messages/'
+      + encodeURIComponent(instanceId) + '/' + encodeURIComponent(messageId), { body: { reason } }),
+  continuumModerationMembers: (communityId) =>
+    request('GET', '/api/continuum/moderation/members'
+      + (communityId ? '?community_id=' + encodeURIComponent(communityId) : '')),
+  continuumRestrictMember: (instanceId, userId, body) =>
+    request('POST', '/api/continuum/moderation/members/'
+      + encodeURIComponent(instanceId) + '/' + encodeURIComponent(userId), { body }),
+
   // ---- instance discovery ----
   // The list of instances this one knows about. Public on purpose: it is a
   // listing of public instances and carries nothing private.
