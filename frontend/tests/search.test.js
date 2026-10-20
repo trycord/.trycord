@@ -37,10 +37,6 @@ function classed(word) {
   };
 }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 test('every filter is read the way the server reads it', () => {
   const parsed = parseQuery('release notes from:ada in:general before:2026-01-01 after:2025-12-01 has:file type:image is:unread');
   assert.deepEqual(parsed.terms, ['release', 'notes']);

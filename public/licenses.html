@@ -164,9 +164,40 @@
             home-made versions of the parts that are hard to get right:
             password hashing, token signing, TLS-terminating proxies, database
             drivers, mail transport and the HTTP stack itself. Each dependency
-            carries its own licence, and those licences are listed in the
-            package manifests in the repository, together with the versions
-            actually installed.
+            carries its own licence.
+          </p>
+          <p>
+            These are the direct dependencies of the server, with the licence
+            each one carries. Every one of them is compatible with the MIT
+            licence this project uses, and there is no copyleft anywhere in the
+            tree.
+          </p>
+          <table class="licence-table">
+            <caption class="sr-only">The server's direct dependencies and their licences</caption>
+            <thead>
+              <tr><th scope="col">Package</th><th scope="col">Licence</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">express</th><td>MIT</td></tr>
+              <tr><th scope="row">ws</th><td>MIT</td></tr>
+              <tr><th scope="row">bcrypt</th><td>MIT</td></tr>
+              <tr><th scope="row">jsonwebtoken</th><td>MIT</td></tr>
+              <tr><th scope="row">cors</th><td>MIT</td></tr>
+              <tr><th scope="row">multer</th><td>MIT</td></tr>
+              <tr><th scope="row">mysql2</th><td>MIT</td></tr>
+              <tr><th scope="row">better-sqlite3</th><td>MIT</td></tr>
+              <tr><th scope="row">nodemailer</th><td>MIT-0</td></tr>
+              <tr><th scope="row">dotenv</th><td>BSD-2-Clause</td></tr>
+            </tbody>
+          </table>
+          <p>
+            The client carries one vendored library: <code>@noble/curves</code>
+            (MIT), which supplies the elliptic-curve arithmetic its
+            end-to-end encryption needs. It is vendored into the client
+            rather than fetched from a content delivery network, because the
+            client is served by the instance and must not depend on somebody
+            else's host for the arithmetic its privacy rests on. Its licence
+            text is in <code>frontend/packages/vendor/LICENSE.noble-curves</code>.
           </p>
           <p>
             None of the core functionality requires a third-party account or a

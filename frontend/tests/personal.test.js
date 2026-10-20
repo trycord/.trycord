@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installDomStub, installFetchStub } from './helpers/dom-stub.js';
+import { installDomStub, installFetchStub, waitFor } from './helpers/dom-stub.js';
 
 installDomStub();
 
@@ -34,10 +34,6 @@ function classed(word) {
     const value = node.getAttribute && node.getAttribute('class');
     return !!value && value.split(/\s+/).indexOf(word) !== -1;
   };
-}
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 const TEMPLATES = [
@@ -89,10 +85,12 @@ test('the picker lists the reader\'s own templates', async () => {
   });
 
   const dialog = templatePicker(() => {});
-  await wait(30);
 
-  const text = dialog.element.textContent || '';
-  assert.match(text, /Greeting/, 'the templates were not listed');
+  const text = await waitFor(() => {
+    const drawn = dialog.element.textContent || '';
+    return drawn.indexOf('Greeting') !== -1 ? drawn : null;
+  });
+  assert.ok(text, 'the templates were not listed');
   assert.match(text, /Sign-off/);
   assert.match(text, /!greet/, 'the shortcut was not shown');
 
@@ -112,10 +110,12 @@ test('a private collection is not another reader\'s, and a shared one is', async
   State.user = { id: 'reader-a' };
   const mine = renderCollections({ page: { id: 'collections' }, query: new URLSearchParams(), params: {}, rest: [] });
   await mine.onMount();
-  await wait(20);
 
-  const myText = mine.node.textContent || '';
-  assert.match(myText, /Reading for later/, 'the owner did not see their own collection');
+  const myText = await waitFor(() => {
+    const drawn = mine.node.textContent || '';
+    return drawn.indexOf('Reading for later') !== -1 ? drawn : null;
+  });
+  assert.ok(myText, 'the owner did not see their own collection');
   assert.match(myText, /Everyone's links/, 'the owner did not see the shared collection');
 
   // A member of the community sees the shared one and not the private one.
@@ -123,10 +123,12 @@ test('a private collection is not another reader\'s, and a shared one is', async
   State.user = { id: 'reader-b' };
   const theirs = renderCollections({ page: { id: 'collections' }, query: new URLSearchParams(), params: {}, rest: [] });
   await theirs.onMount();
-  await wait(20);
 
-  const theirText = theirs.node.textContent || '';
-  assert.match(theirText, /Everyone's links/, 'a member of the community did not see the shared collection');
+  const theirText = await waitFor(() => {
+    const drawn = theirs.node.textContent || '';
+    return drawn.indexOf("Everyone's links") !== -1 ? drawn : null;
+  });
+  assert.ok(theirText, 'a member of the community did not see the shared collection');
   assert.equal(theirText.indexOf('Reading for later'), -1,
     'a private collection was shown to a reader who is not its owner');
 });
@@ -143,9 +145,12 @@ test('only the owner is offered the controls that change a collection', async ()
   State.user = { id: 'reader-b' };
   const page = renderCollections({ page: { id: 'collections' }, query: new URLSearchParams(), params: {}, rest: [] });
   await page.onMount();
-  await wait(20);
 
-  const text = page.node.textContent || '';
+  const text = await waitFor(() => {
+    const drawn = page.node.textContent || '';
+    return drawn.indexOf("Everyone's links") !== -1 ? drawn : null;
+  });
+  assert.ok(text, 'the shared collection was not listed');
   assert.equal(text.indexOf('Rename'), -1, 'a reader who is not the owner was offered a rename');
   assert.equal(text.indexOf('Delete'), -1, 'a reader who is not the owner was offered a delete');
   assert.equal(text.indexOf('Add a link'), -1, 'a reader who is not the owner was offered to add to it');

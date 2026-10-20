@@ -34,10 +34,6 @@ function classed(word) {
   };
 }
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 // A shell that measures. The rule is that a theme that breaks the shell is
 // refused, and a shell that measures nothing is a shell that broke.
 function withShell() {
