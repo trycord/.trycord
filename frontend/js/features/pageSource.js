@@ -8,6 +8,7 @@
 //
 // The source is Markdown-flavoured, and deliberately small:
 //
+//   # heading                a heading, level one
 //   ## heading               a heading, level two
 //   ### heading              a heading, level three
 //   ! standfirst             the lead under the title
@@ -180,7 +181,11 @@ function longestRun(text, character) {
 
 // -- source to blocks ---------------------------------------------------------
 
-const HEADING = /^(#{2,3})\s+(.*)$/;
+// A heading is one, two or three hashes. A single hash is the most ordinary
+// heading there is - it is what a person writes, and a document that used it
+// was refused with "a heading is written with two or three #", which accused
+// the writer of using two or three when they had used one.
+const HEADING = /^(#{1,3})\s+(.*)$/;
 const LEAD = /^!\s+(.*)$/;
 const QUOTE = /^>\s?(.*)$/;
 const ATTRIBUTION = /^--\s(.*)$/;
@@ -460,7 +465,7 @@ export function sourceToBlocks(text) {
 
     if (/^#/.test(trimmed) && !HEADING.test(trimmed)) {
       flush();
-      errors.push({ line: number, message: 'a heading is written with two or three #' });
+      errors.push({ line: number, message: 'a heading is written with one, two or three #' });
       continue;
     }
 
@@ -472,7 +477,7 @@ export function sourceToBlocks(text) {
         errors.push({ line: number, message: 'a heading needs text' });
         continue;
       }
-      blocks.push({ type: 'heading', level: heading[1].length === 3 ? 3 : 2, text: inlineToBBCode(text) });
+      blocks.push({ type: 'heading', level: heading[1].length, text: inlineToBBCode(text) });
       continue;
     }
 
@@ -569,7 +574,8 @@ export function blockToSource(block) {
   if (!block || !block.type) return '';
   switch (block.type) {
     case 'heading':
-      return (block.level === 3 ? '### ' : '## ') + bbcodeToInline(block.text || '');
+      return (block.level === 1 ? '# ' : (block.level === 3 ? '### ' : '## '))
+        + bbcodeToInline(block.text || '');
     case 'lead':
       return '! ' + bbcodeToInline(block.text || '');
     case 'paragraph':

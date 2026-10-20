@@ -200,7 +200,9 @@ function toBBCode(blocks) {
   const out = [];
   for (const b of blocks) {
     switch (b.type) {
-      case 'heading': out.push('[size=' + (b.level === 3 ? 4 : 6) + ']' + (b.text || '') + '[/size]'); break;
+      // A heading is a size: level one the largest, level three the
+      // smallest. The BBCode sizes are 1 (smallest) to 7 (largest).
+      case 'heading': out.push('[size=' + (b.level === 3 ? 4 : (b.level === 1 ? 7 : 6)) + ']' + (b.text || '') + '[/size]'); break;
       case 'lead': out.push('[i]' + (b.text || '') + '[/i]'); break;
       case 'paragraph': out.push(b.text || ''); break;
       case 'note': out.push('[quote]' + (b.text || '') + '[/quote]'); break;
