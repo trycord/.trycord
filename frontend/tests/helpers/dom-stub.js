@@ -242,6 +242,7 @@ export function installDomStub() {
   doc.getElementById = () => null;
   doc.querySelector = (selector) => doc.body.querySelector(selector);
   doc.querySelectorAll = (selector) => doc.body.querySelectorAll(selector);
+  doc.contains = (node) => doc.body.contains(node);
   doc.addEventListener = () => {};
   doc.removeEventListener = () => {};
   doc.title = '';

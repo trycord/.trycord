@@ -11,7 +11,7 @@
 const db = require('../../db');
 const { now } = require('../../util');
 const uploads = require('../uploads');
-const bodies = require('../e2ee/bodies');
+const e2ee = require('../e2ee');
 const { visibleConversation } = require('./conversation');
 const { assertLength } = require('./limits');
 
@@ -37,7 +37,7 @@ async function edit(userId, conversationId, messageId, body, username) {
 
   // Whether this conversation is encrypted is the status service's answer, and
   // a body it cannot validate is refused with nothing stored.
-  const accepted = await bodies.accept(conversationId, userId, {
+  const accepted = await e2ee.acceptMessageBody(userId, conversationId, {
     content: text,
     envelopes: input.envelopes,
   });

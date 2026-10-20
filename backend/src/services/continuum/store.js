@@ -558,5 +558,6 @@ module.exports = {
   findOutgoing,
   listOutgoing,
   updateOutgoing,
+  deleteOutgoing,
   shapeOutgoing,
 };

@@ -14,7 +14,7 @@ const db = require('../../db');
 const uploads = require('../uploads');
 const threads = require('../threads');
 const embeds = require('../embeds');
-const bodies = require('../e2ee/bodies');
+const e2ee = require('../e2ee');
 const { visibleConversation } = require('./conversation');
 
 // Next canonical position within a conversation. The unique index on
@@ -85,7 +85,7 @@ async function history(userId, conversationId, { before = null, after = null, li
   return rows.map((m) => {
     // A message in an encrypted conversation is an envelope, and the row
     // says so: the ciphertext is never handed back as if it were the text.
-    const stored = bodies.readStored(m.content);
+    const stored = e2ee.readMessageBody(m.content);
     return {
       id: m.id,
       seq: m.seq === null || m.seq === undefined ? null : Number(m.seq),

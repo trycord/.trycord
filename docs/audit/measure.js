@@ -12,7 +12,13 @@
 //   node docs/audit/measure.js [messages]
 //
 // The instance is SQLite on the machine this runs on, which is not a
-// production profile: the numbers are a floor, not a ceiling.
+// production profile: the numbers are a floor, not a ceiling. To measure the
+// production profile instead, point it at a MySQL server:
+//
+//   TRYCORD_MEASURE_DB=mysql TRYCORD_MEASURE_DB_HOST=127.0.0.1 \
+//   TRYCORD_MEASURE_DB_PORT=3306 TRYCORD_MEASURE_DB_NAME=trycord_perf \
+//   TRYCORD_MEASURE_DB_USER=perf TRYCORD_MEASURE_DB_PASSWORD=perf \
+//   node docs/audit/measure.js 300
 
 'use strict';
 
@@ -22,6 +28,20 @@ const { startRouted, registerUser, createCommunity, postMessage } = require(
 );
 
 const MESSAGES = Number(process.argv[2] || 300);
+
+// The database the measurement runs against. SQLite by default; MySQL when
+// the environment says so.
+function databaseEnv() {
+  if (String(process.env.TRYCORD_MEASURE_DB || '').toLowerCase() !== 'mysql') return {};
+  return {
+    DB_CLIENT: 'mysql',
+    DB_HOST: process.env.TRYCORD_MEASURE_DB_HOST || '127.0.0.1',
+    DB_PORT: process.env.TRYCORD_MEASURE_DB_PORT || '3306',
+    DB_NAME: process.env.TRYCORD_MEASURE_DB_NAME || 'trycord_perf',
+    DB_USER: process.env.TRYCORD_MEASURE_DB_USER || 'perf',
+    DB_PASSWORD: process.env.TRYCORD_MEASURE_DB_PASSWORD || '',
+  };
+}
 
 function median(values) {
   const sorted = values.slice().sort((a, b) => a - b);
@@ -72,7 +92,9 @@ async function measure(label, runs, fn) {
 }
 
 (async () => {
-  const ws = await startRouted({ jobs: false });
+  const env = databaseEnv();
+  const ws = await startRouted({ jobs: false, env });
+  console.log('database: ' + (env.DB_CLIENT || 'sqlite'));
   const owner = await registerUser(ws, 'owner');
   const community = await createCommunity(ws, owner, 'Bench');
   const channelId = community.channelId;

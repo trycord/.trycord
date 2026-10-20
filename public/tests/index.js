@@ -15,3 +15,4 @@ require('./directory.test.js');
 require('./legal.test.js');
 require('./demo.test.js');
 require('./site.test.js');
+require('./incidents.test.js');

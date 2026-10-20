@@ -111,6 +111,10 @@ async function applyReturnMessage(event, origin, payload, publish) {
   // It is kept as a relayed message: the origin's author, the origin's
   // timestamps, the origin's ids. It is not a local message - it grants
   // nothing here and it is nobody's - and it is the owner's to moderate.
+  //
+  // A deletion is the same message taken back: the copy here goes, so that
+  // it does not outlive the original.
+  const deletion = kind === 'message.deleted';
   await store.upsertRelayMessage({
     originInstanceId,
     originMessageId: messageId,
@@ -119,14 +123,17 @@ async function applyReturnMessage(event, origin, payload, publish) {
     authorOriginId: authorId,
     authorUsername: origin.author_username,
     authorDisplayName: origin.author_display_name,
-    content: payload.message.content,
+    content: deletion ? null : payload.message.content,
     createdAt: payload.message.created_at || origin.occurred_at,
     editedAt: payload.message.edited_at || null,
+    deletedAt: deletion ? (origin.occurred_at || now()) : null,
     threadRootId: origin.thread_root_origin_id || null,
     eventId: event.event_id,
   });
 
-  if (publish) {
+  // The owner answers about a message, but not about a message that is
+  // gone: there is nothing left to accept.
+  if (publish && !deletion) {
     await publish('message.accepted', {
       sourceKind: 'decision',
       decision: 'accepted',

@@ -9,7 +9,7 @@ import { icon } from '../../../packages/icons.js';
 import { avatar, empty, loading, failure } from '../components.js';
 import { State, nameOf, normalizeUser, refreshFriends } from '../../../packages/store.js';
 import { path, navigate } from '../../../packages/nav.js';
-import { menu, confirm, toast, attachLongPress } from '../ui.js';
+import { menu, toast, attachLongPress } from '../ui.js';
 import { personActions } from '../person.js';
 import Api from '../../../packages/api.js';
 import { screen, section, notice } from './util.js';

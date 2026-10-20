@@ -19,7 +19,7 @@ import { brandMark } from './frame.js';
 import { personContextMenu } from '../ui/person.js';
 import Api from '../../packages/api.js';
 import {
-  openChannelDialog, openCategoryDialog, createChannel, moveChannel, toggleMute,
+  openCategoryDialog, createChannel, moveChannel, toggleMute,
   channelMenuItems, categoryMenuItems, reorderChannels, reorderCategories,
   orderAfterDrop, attachDragOrder, attachDropTarget,
 } from '../community/manage.js';

@@ -13,7 +13,7 @@ import { icon } from '../../../packages/icons.js';
 import { avatar, serverMark, empty, loading, failure } from '../components.js';
 import { path, navigate } from '../../../packages/nav.js';
 import { scopeNav } from '../../../packages/registry.js';
-import { toast, menu, sheet, confirm } from '../ui.js';
+import { toast, menu, sheet, confirm, attachLongPress } from '../ui.js';
 import { relativeTime } from '../../../packages/format.js';
 import Api from '../../../packages/api.js';
 import { screen, notice, stat, primaryButton, ghostButton } from './util.js';
@@ -122,7 +122,7 @@ function usersBody() {
 
   function rowFor(user) {
     const name = user.display_name || user.displayName || user.username;
-    return el('div', { class: 'm-row' },
+    const row = el('div', { class: 'm-row' },
       el('span', { class: 'm-row__lead' }, avatar({ id: user.id, username: user.username, displayName: name }, { size: 'md', decorative: true })),
       el('span', { class: 'm-row__body' },
         el('span', { class: 'm-row__title truncate' }, name),
@@ -131,16 +131,24 @@ function usersBody() {
         class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
         onClick: () => menuFor(user),
       }, 'Actions')));
+    // A long press on the account raises the same actions.
+    attachLongPress(row, () => userActions(user), { title: name });
+    return row;
+  }
+
+  // The actions on an account, one list, raised either way.
+  function userActions(user) {
+    return [
+      { label: 'Suspend', icon: 'clock', onSelect: () => promptEnforce(user, 'USER_SUSPENSION') },
+      { label: 'Ban', icon: 'ban', danger: true, onSelect: () => promptEnforce(user, 'USER_BAN') },
+      { label: 'Lift enforcement', icon: 'check', onSelect: () => promptLift(user) },
+    ];
   }
 
   function menuFor(user) {
     menu({
       title: user.display_name || user.username,
-      items: [
-        { label: 'Suspend', icon: 'clock', onSelect: () => promptEnforce(user, 'USER_SUSPENSION') },
-        { label: 'Ban', icon: 'ban', danger: true, onSelect: () => promptEnforce(user, 'USER_BAN') },
-        { label: 'Lift enforcement', icon: 'check', onSelect: () => promptLift(user) },
-      ],
+      items: userActions(user),
     });
   }
 
@@ -279,7 +287,7 @@ function reportsBody() {
 
   function rowFor(report) {
     const reason = report.reason || report.description || '(no reason)';
-    return el('div', { class: 'm-row' },
+    const row = el('div', { class: 'm-row' },
       el('span', { class: 'm-row__lead' }, icon('flag', { size: 17 })),
       el('span', { class: 'm-row__body' },
         el('span', { class: 'm-row__title truncate' }, reason),
@@ -287,6 +295,12 @@ function reportsBody() {
       el('span', { class: 'm-row__actions' },
         el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => update(report.id, 'RESOLVED') }, 'Resolve'),
         el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => update(report.id, 'DISMISSED') }, 'Dismiss')));
+    // A long press on the report raises the same two decisions.
+    attachLongPress(row, () => [
+      { label: 'Resolve the report', icon: 'check', onSelect: () => update(report.id, 'RESOLVED') },
+      { label: 'Dismiss the report', icon: 'x', onSelect: () => update(report.id, 'DISMISSED') },
+    ], { title: reason });
+    return row;
   }
 
   async function update(id, status) {

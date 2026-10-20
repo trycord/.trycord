@@ -187,6 +187,23 @@ async function acceptMessageBody(userId, conversationId, body) {
   return bodies.accept(conversationId, userId, body);
 }
 
+/**
+ * What a stored message body holds.
+ *
+ * A stored body is either an envelope or text, and this says which.
+ */
+function readMessageBody(text) {
+  return bodies.readStored(text);
+}
+
+/**
+ * Mark a stored message row: an envelope row says it is one, and carries no
+ * text.
+ */
+function shapeMessage(row) {
+  return bodies.applyToRow(row);
+}
+
 /** Record an encrypted attachment and its sealed key material. */
 async function registerAttachment(userId, input) {
   return attachments.register(userId, input);
@@ -254,6 +271,8 @@ module.exports = {
   conversationState,
   conversationEncryption,
   acceptMessageBody,
+  readMessageBody,
+  shapeMessage,
   registerAttachment,
   storeEncryptedAttachment,
   attachment,

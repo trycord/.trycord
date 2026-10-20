@@ -10,9 +10,9 @@
 // server refuses the operation regardless - but a control that cannot work
 // should not be offered in the first place.
 
-import { el, clear } from '../../packages/dom.js';
+import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { State, can, isOwner, isMuted, refreshMutes, refreshServerTree, channelsOf, categoriesOf } from '../../packages/store.js';
+import { can, isOwner, isMuted, refreshMutes, refreshServerTree, channelsOf, categoriesOf } from '../../packages/store.js';
 import { navigate, path } from '../../packages/nav.js';
 import Api from '../../packages/api.js';
 import { sheet, confirm, toast, menu, attachLongPress } from './ui.js';
