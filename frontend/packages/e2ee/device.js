@@ -118,8 +118,9 @@ export class Device {
       if (this.recoveryKey) {
         // The sealed private half goes to the server with the bundle, so a
         // device that has lost its store can still open a session that used
-        // one of these prekeys. The server cannot open it.
-        entry.sealedPrivateKey = await sealPrivateBytes(pair.privateKey, this.recoveryKey);
+        // one of these prekeys. The server cannot open it, and it travels as
+        // text: the server keeps it in a text column.
+        entry.sealedPrivateKey = JSON.stringify(await sealPrivateBytes(pair.privateKey, this.recoveryKey));
       }
       out.push(entry);
     }
@@ -132,7 +133,7 @@ export class Device {
   }
 
   /** The body that registers the device with the server. */
-  registrationBody(options = {}) {
+  async registrationBody(options = {}) {
     const pubs = this.publicKeys();
     const body = {
       id: this.id,
@@ -140,10 +141,9 @@ export class Device {
       identityKey: pubs.identityKey,
       identityDhKey: pubs.identityDhKey,
       signedPreKey: pubs.signedPreKey,
-      keyFingerprint: '',
+      keyFingerprint: await this.fingerprint(),
       signature: this.bundleSignature(),
     };
-    body.keyFingerprint = this.fingerprint();
     if (options.sealedPrivateKey) {
       body.wrappedPrivateKey = JSON.stringify(options.sealedPrivateKey);
       body.recoverySalt = options.sealedPrivateKey.salt;

@@ -24,6 +24,17 @@ router.post('/', auth, rateLimit({ windowMs: 60000, max: 10 }), async (req, res,
   } catch (e) { serviceError(res, e); }
 });
 
+// What a report carries, and what it does not.
+//
+// The reporter is asked before they file, not after. Without this the only
+// answer is the one that arrives with a report somebody has already filed,
+// which is no answer at the moment the decision is made.
+router.get('/disclosure', auth, rateLimit(30), async (req, res, next) => {
+  try {
+    res.json(reports.disclosure());
+  } catch (e) { serviceError(res, e); }
+});
+
 // The reports this reader filed, and what was shared with each of them.
 router.get('/mine', auth, rateLimit(30), async (req, res, next) => {
   try {

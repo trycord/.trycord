@@ -312,7 +312,7 @@ export class SessionManager {
         409,
       );
     }
-    return openPrivateBytes(sealed, this.device.recoveryKey);
+    return openPrivateBytes(JSON.parse(sealed), this.device.recoveryKey);
   }
 
   /**
