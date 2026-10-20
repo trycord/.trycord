@@ -22,6 +22,7 @@ import { renderInstances } from './instances.js';
 import { renderProfile } from './profile.js';
 import { renderCommunity, renderChannelView, renderMembers, renderRoles, renderInvites, renderCategories } from './community.js';
 import { renderWorkspace } from './workspace.js';
+import { onboardingView as renderOnboarding } from './onboarding.js';
 import { renderSettings } from './settings.js';
 import { renderAdmin } from './admin.js';
 import { renderSearch } from './search.js';
@@ -81,6 +82,7 @@ export const RENDERERS = {
   // registry's router; these bindings exist so an address typed as a settings
   // page never answers with a fault.
   'community.settings': (ctx) => renderCommunity(ctx),
+  'community.onboarding': (ctx) => renderOnboarding(ctx),
   'community.settings.overview': (ctx) => renderCommunity(ctx),
   'community.settings.appearance': (ctx) => renderCommunity(ctx),
   'community.settings.channels': (ctx) => renderCommunity(ctx),

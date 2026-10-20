@@ -32,6 +32,7 @@ import {
   COMMUNITY_SECTIONS, communityApi, createFormState, readDocument, maskSecret,
 } from '../../../packages/communitySettings.js';
 import { voiceSection } from './communityVoice.js';
+import { onboardingSection } from './onboardingSettings.js';
 import {
   renderMembersPage, renderRolesPage, renderInvitesPage, renderCategoriesPage,
 } from './community.js';
@@ -1162,6 +1163,7 @@ function builders(serverId) {
     invites: () => ({ node: renderInvitesPage({ serverId }).node, load: null }),
     moderation: () => moderationSection(serverId),
     voice: () => voiceSection(serverId),
+    onboarding: () => onboardingSection(serverId),
     ownership: () => ownershipSection(serverId),
     analytics: () => analyticsSection(serverId),
     integrations: () => integrationsSection(serverId),

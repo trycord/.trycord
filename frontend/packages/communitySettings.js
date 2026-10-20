@@ -67,6 +67,10 @@ export const COMMUNITY_SECTIONS = [
     blurb: 'The voice channels of this community',
   },
   {
+    id: 'onboarding', label: 'Onboarding', icon: 'help', group: 'This community',
+    blurb: 'What a member is shown when they arrive',
+  },
+  {
     id: 'ownership', label: 'Ownership', icon: 'crown', group: 'Safety',
     blurb: 'Hand the community on, or end it',
   },
