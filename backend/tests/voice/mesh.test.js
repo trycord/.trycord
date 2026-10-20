@@ -60,9 +60,16 @@ test('the mesh', async (t) => {
   });
 
   await t.test('a relay that does not answer stops a session', async () => {
-    const port = await closedPort();
+    // The address is one this host cannot bind, so the relay does not start
+    // and nothing answers the binding request.
+    //
+    // The test used to point the relay at a port nothing was listening on,
+    // and the relay bound that port itself - and then answered nothing,
+    // because the STUN server had never worked. The refusal it asserted was
+    // the refusal of a broken server, not of an absent one. Now the server
+    // answers, so the address has to be one it cannot be reached on.
     const { instance, owner, member } = await voiceInstance({
-      env: { TRYCORD_TURN_HOST: '127.0.0.1', TRYCORD_TURN_PORT: String(port) },
+      env: { TRYCORD_TURN_HOST: '203.0.113.1', TRYCORD_TURN_PORT: '3478' },
     });
     t.after(() => instance.stop());
 

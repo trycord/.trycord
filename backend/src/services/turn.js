@@ -301,20 +301,31 @@ function readUsername(username) {
 // this server rather than replaying a request it captured earlier.
 const nonces = new Map();
 
-function issueNonce(address) {
+// The key a nonce is filed under.
+//
+// The address *and the port*: a nonce is a conversation with one client, and
+// two clients behind one address - two browsers behind one router, two
+// sockets in one process - are two conversations. Keyed by the address alone,
+// the second client's challenge replaced the first client's nonce, and the
+// first client was then refused for a nonce it had been given correctly.
+function clientKey(rinfo) {
+  return rinfo.address + ':' + rinfo.port;
+}
+
+function issueNonce(key) {
   const nonce = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
-  for (const [key, entry] of nonces) {
-    if (now > entry.expiresAt) nonces.delete(key);
+  for (const [existing, entry] of nonces) {
+    if (now > entry.expiresAt) nonces.delete(existing);
   }
-  nonces.set(address, { nonce, expiresAt: now + 60 * 1000 });
+  nonces.set(key, { nonce, expiresAt: now + 60 * 1000 });
   return nonce;
 }
 
-function nonceFor(address) {
-  const entry = nonces.get(address);
+function nonceFor(key) {
+  const entry = nonces.get(key);
   if (!entry) return null;
-  if (Date.now() > entry.expiresAt) { nonces.delete(address); return null; }
+  if (Date.now() > entry.expiresAt) { nonces.delete(key); return null; }
   return entry.nonce;
 }
 
@@ -339,7 +350,7 @@ function verifyAuth(parsed, rinfo) {
   const nonce = nonceBuf.value.toString('utf8').replace(/\0+$/, '');
 
   // The nonce this server issued, to this client.
-  const expectedNonce = nonceFor(rinfo.address);
+  const expectedNonce = nonceFor(clientKey(rinfo));
   if (!expectedNonce || nonce !== expectedNonce) return null;
 
   // The credential must be one of ours and must not have expired.
@@ -350,13 +361,22 @@ function verifyAuth(parsed, rinfo) {
   const key = crypto.createHash('md5')
     .update(`${username}:${realmStr}:${passwordFor(username)}`, 'utf8').digest();
 
-  // Canonical message: everything up to (but not including) the
-  // MESSAGE-INTEGRITY attribute, with its length field reset.
-  const miOffset = indexOfBuf(parsed.raw, integrity.value);
-  if (miOffset < 20) return null;
-  const canonical = Buffer.alloc(miOffset);
-  parsed.raw.copy(canonical, 0, 0, miOffset);
-  canonical.writeUInt16BE(miOffset - 20, 2);
+  // The canonical message.
+  //
+  // RFC 5389 section 15.4: the HMAC is over the message up to (but not
+  // including) the MESSAGE-INTEGRITY attribute itself, with the header as it
+  // stands. The header's length field is the whole message's length - it
+  // counts the MESSAGE-INTEGRITY attribute too - so the bytes are simply the
+  // first part of the packet, unchanged.
+  //
+  // The rule used to be different: the input ran to the *value* of the
+  // attribute, so it included the attribute's own header, and the length
+  // field was rewritten to exclude the attribute altogether. Every client
+  // that followed the standard was refused.
+  const valueOffset = indexOfBuf(parsed.raw, integrity.value);
+  const headerOffset = valueOffset - 4;
+  if (headerOffset < 20) return null;
+  const canonical = parsed.raw.slice(0, headerOffset);
   const expected = crypto.createHmac('sha1', key).update(canonical).digest();
   if (expected.length !== integrity.value.length) return null;
   let diff = 0;
@@ -371,7 +391,7 @@ function verifyAuth(parsed, rinfo) {
 // the number (1). The nonce is remembered for this client, because the
 // request that follows has to carry it back.
 function sendAuthChallenge(socket, parsed, rinfo) {
-  const nonce = issueNonce(rinfo.address);
+  const nonce = issueNonce(clientKey(rinfo));
   const errBuf = Buffer.from([0, 0, 4, 1]);
   const body = Buffer.concat([
     buildAttr(ATTR.REALM, Buffer.from(defaultRealm(), 'utf8')),
@@ -379,7 +399,7 @@ function sendAuthChallenge(socket, parsed, rinfo) {
     buildAttr(ATTR.ERROR_CODE, errBuf),
   ]);
   const header = Buffer.alloc(20);
-  header.writeUInt16BE(parsed.type | 0x0100, 0);
+  header.writeUInt16BE(parsed.type | 0x0110, 0);
   header.writeUInt16BE(body.length, 2);
   header.writeUInt32BE(STUN_MAGIC, 4);
   parsed.txId.copy(header, 8);
@@ -394,7 +414,9 @@ function sendError(socket, parsed, txId, code, rinfo) {
   errBuf[3] = code % 100;
   const body = Buffer.concat([buildAttr(ATTR.ERROR_CODE, errBuf)]);
   const header = Buffer.alloc(20);
-  header.writeUInt16BE(parsed.type | 0x0100, 0);
+  // An error response, not a success one: the class is 11 in the top two
+  // bits of the message type, which is the method with 0x0110 set.
+  header.writeUInt16BE(parsed.type | 0x0110, 0);
   header.writeUInt16BE(body.length, 2);
   header.writeUInt32BE(STUN_MAGIC, 4);
   parsed.txId.copy(header, 8);
@@ -602,6 +624,18 @@ let activeSweeper = null;
 function startServer(config) {
   const host = (config && config.host) || '0.0.0.0';
   const port = (config && config.port) || 3478;
+
+  // The socket is kept, so that stopServer() can close it.
+  //
+  // It was not kept: the function returned the socket and never recorded it,
+  // so stopServer() closed nothing. The service kept its port open after it
+  // had been told to stop, and a process that had started it could not exit.
+  // That is what a test that starts the service and stops it found.
+  if (server) {
+    try { server.close(); } catch { /* already closed */ }
+    server = null;
+  }
+
   const socket = dgram.createSocket('udp4');
   socket.on('message', (buf, rinfo) => {
     // A packet that cannot be handled is logged, not swallowed. The silent
@@ -627,12 +661,15 @@ function startServer(config) {
   const sweeper = setInterval(cleanupAllocations, 30000);
   sweeper.unref();
   activeSweeper = sweeper;
+  server = socket;
   return socket;
 }
 
 function stopServer() {
   try { server && server.close(); } catch {}
   server = null;
+  // The socket that was open is closed above; the handle is cleared so a
+  // second stop does not try to close it again.
   if (activeSweeper) { clearInterval(activeSweeper); activeSweeper = null; }
   for (const a of allocations.values()) try { a.relaySocket.close(); } catch {}
   allocations.clear();

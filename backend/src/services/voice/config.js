@@ -200,9 +200,33 @@ function inHouseRelay() {
   };
 }
 
+// The address the voice stack is published at.
+//
+// It is not always the address the site is published at.
+//
+// A site is usually served through a proxy, and a proxy that terminates TLS
+// carries HTTP - not the arbitrary UDP a STUN or TURN service needs. An
+// instance whose site is behind one is therefore publishing its relay at an
+// address nobody can reach it on: the requests go to the proxy, and the
+// proxy does not carry them to the instance.
+//
+// So the voice stack has an address of its own, and it is the one the relay
+// is published at. The operator gives it a hostname that points straight at
+// the instance - DNS only, not proxied - and the relay is reachable there.
+//
+// The order is the voice address, then the instance's own public address,
+// then whatever the operator named.
 function advertisedHost(host) {
   const plain = String(host || '').trim();
   if (plain && plain !== '0.0.0.0' && plain !== '::' && plain !== '[::]') return plain;
+
+  const voiceUrl = String(
+    process.env.TRYCORD_VOICE_PUBLIC_URL || settings.read('voice.publicUrl', '') || '',
+  ).trim();
+  if (voiceUrl) {
+    try { return new URL(voiceUrl).hostname; } catch { /* not a usable address */ }
+  }
+
   const publicUrl = String(settings.read('instance.publicUrl', '') || '').trim();
   if (publicUrl) {
     try { return new URL(publicUrl).hostname; } catch { /* not a usable address */ }

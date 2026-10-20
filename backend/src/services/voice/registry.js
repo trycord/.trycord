@@ -155,13 +155,28 @@ async function checkMesh(cfg) {
   };
 }
 
-// A relay listening on every interface cannot be reached by name. The address
-// the peers are given has to be one they can use.
+// The address the peers are given.
+//
+// The relay listens on every interface, and every interface is not an address
+// a client can reach. What matters is the address the *clients* are given,
+// which is the published one - the instance's public address, or the one the
+// operator named.
+//
+// The note used to report the *listen* address, so an instance whose relay
+// listened on 0.0.0.0 and published api.trycord.dev was told it advertised
+// 0.0.0.0 and that no client could reach it - while the clients were in fact
+// being given api.trycord.dev. The diagnosis sent an operator to set a
+// variable that was already right.
 function wildcardNote(inHouse) {
   if (!inHouse) return '';
-  const host = String(inHouse.host || '');
-  if (host && host !== '0.0.0.0' && host !== '::' && host !== '[::]') return '';
-  return ' The relay is advertised as ' + (host || '0.0.0.0')
+  const listen = String(inHouse.host || '');
+  if (listen && listen !== '0.0.0.0' && listen !== '::' && listen !== '[::]') return '';
+  const advertised = String(config.inHouseRelay().advertised || '');
+  if (advertised && advertised !== '0.0.0.0' && advertised !== '::' && advertised !== '[::]') {
+    return ' The relay listens on every interface and is published as '
+      + advertised + ', which is the address the clients are given.';
+  }
+  return ' The relay is published as ' + (advertised || listen || '0.0.0.0')
     + ', which no client can reach: set TRYCORD_TURN_HOST to an address clients can use, '
     + 'or give the instance a public URL.';
 }
@@ -205,7 +220,56 @@ function describe(providerId, overlay) {
     label: provider.label,
     summary: provider.summary,
     note: provider.note,
+    // The instance's own networking stack, for the console.
+    //
+    // It is in the report rather than in a separate call, because an operator
+    // looking at the mesh wants to know the state of the relay in the same
+    // place as the state of the provider - and the two are the same question
+    // for the mesh: the mesh is the instance's own relay.
+    stack: stackState(),
   });
+}
+
+// The instance's own STUN and TURN stack.
+//
+// Three things, and they are different things:
+//
+//   the process    the voice process is running;
+//   the service    the service answers a binding request here;
+//   the published  the published address answers from here.
+//
+// The third is the one an operator has to act on, and it is the one that was
+// being reported wrongly: the note used to name the listen address, so an
+// instance that listened on 0.0.0.0 and published a real address was told
+// it published 0.0.0.0.
+function stackState() {
+  const inHouse = relay.inHouseState();
+  const advertised = config.inHouseRelay().advertised;
+  const listenPort = config.inHouseRelay().port;
+  return {
+    managed: inHouse ? (inHouse.managed || 'this process') : 'not started',
+    running: !!(inHouse && inHouse.running),
+    listenHost: inHouse ? inHouse.host : String(process.env.TRYCORD_TURN_HOST || '0.0.0.0'),
+    listenPort,
+    advertised,
+    // The address the clients are given, and whether it is one they can
+    // reach.
+    publishedIsLocal: advertised === '127.0.0.1' || advertised === 'localhost',
+    // The relay port range, so an operator knows which ports to open.
+    relayPorts: relayPortRange(),
+    secretSet: !!String(process.env.TRYCORD_TURN_SECRET || '').trim(),
+  };
+}
+
+// The range the relay takes its ports from.
+function relayPortRange() {
+  const from = Number(process.env.TRYCORD_TURN_RELAY_MIN || 0);
+  const to = Number(process.env.TRYCORD_TURN_RELAY_MAX || 0);
+  if (Number.isFinite(from) && Number.isFinite(to) && from > 0 && to >= from) {
+    return { from, to };
+  }
+  const base = Number(process.env.TRYCORD_TURN_PORT || 3478) || 3478;
+  return { from: base + 1, to: base + 100 };
 }
 
 // The provider's own health, checked for real.

@@ -118,15 +118,20 @@ function client() {
     if (resolver) { waiting.delete(key); resolver(parsed); }
   });
   function request(type, body, txId) {
-    const id = txId || crypto.randomBytes(12);
+    // The body may be a buffer, or the pair a request with credentials is
+    // built as: the bytes and the transaction id they were built with, which
+    // the answer has to carry back.
+    const built = (body && body.body) ? body : { body, txId: txId || null };
+    const id = built.txId || crypto.randomBytes(12);
+    const bytes = built.body;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         waiting.delete(id.toString('hex'));
         reject(new Error('the server did not answer'));
       }, 3000);
       waiting.set(id.toString('hex'), (parsed) => { clearTimeout(timer); resolve(parsed); });
-      socket.send(Buffer.concat([header(type, id, body.length), body]), 0,
-        20 + body.length, serverPort, '127.0.0.1');
+      socket.send(Buffer.concat([header(type, id, bytes.length), bytes]), 0,
+        20 + bytes.length, serverPort, '127.0.0.1');
     });
   }
   function listen() {
@@ -184,8 +189,8 @@ test('the instance refuses an allocate without credentials, and offers a challen
   assert.ok(answer.attrs.get(ATTR.REALM), 'the refusal carried no realm');
   const code = answer.attrs.get(ATTR.ERROR_CODE);
   assert.ok(code, 'the refusal carried no error code');
-  assert.equal(code.readUInt16BE(2) * 100 + code.readUInt16BE(3), 401,
-    'the refusal was not "unauthorized"');
+  // The error code is four bytes: two reserved, the class, the number.
+  assert.equal(code[2] * 100 + code[3], 401, 'the refusal was not "unauthorized"');
 });
 
 test('a credential the instance issued is accepted, and a forged one is not', async (t) => {
@@ -202,8 +207,16 @@ test('a credential the instance issued is accepted, and a forged one is not', as
   const realm = challenge.attrs.get(ATTR.REALM).toString('utf8');
 
   // A credential with the wrong password must be refused.
+  //
+  // It is sent from a second socket, because a nonce belongs to the client it
+  // was issued to: a refusal issues a new one, so a forged attempt from the
+  // same socket would have invalidated the good request's nonce and proved
+  // nothing.
+  const other = client();
+  await other.listen();
+  t.after(() => other.socket.close());
   const forged = buildAllocate(issued.username, realm, nonce, 'not-the-password');
-  const refused = await c.request(TYPE.ALLOCATE_REQUEST, forged);
+  const refused = await other.request(TYPE.ALLOCATE_REQUEST, forged);
   assert.equal(refused.type, TYPE.ALLOCATE_ERROR,
     'a credential with the wrong password was accepted');
 
@@ -290,16 +303,18 @@ function buildAllocate(username, realm, nonce, password, omitNonce) {
   const key = crypto.createHash('md5')
     .update(`${username}:${realm}:${password}`, 'utf8').digest();
 
-  // The canonical message is the header with the length of everything up to
-  // (but not including) the message integrity, followed by that body.
+  // The canonical message is the message up to (but not including) the
+  // MESSAGE-INTEGRITY attribute, with the header as it stands - and the
+  // header's length field counts the message integrity attribute itself.
+  const txId = crypto.randomBytes(12);
   const canonicalLength = body.length + 24;
   const canonical = Buffer.concat([
-    header(TYPE.ALLOCATE_REQUEST, crypto.randomBytes(12), canonicalLength),
+    header(TYPE.ALLOCATE_REQUEST, txId, canonicalLength),
     body,
   ]);
-  // The header's transaction id has to be the one the request carries, so
-  // the message is rebuilt with the request's own id.
-  const withId = Buffer.concat([canonical]);
-  const integrity = crypto.createHmac('sha1', key).update(withId).digest();
-  return Buffer.concat([body, attribute(ATTR.MESSAGE_INTEGRITY, integrity)]);
+  const integrity = crypto.createHmac('sha1', key).update(canonical).digest();
+  return {
+    body: Buffer.concat([body, attribute(ATTR.MESSAGE_INTEGRITY, integrity)]),
+    txId,
+  };
 }

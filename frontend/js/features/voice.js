@@ -171,6 +171,28 @@ function sharedSection(report, onSaved) {
         el('p', { class: 'settings-note' }, control.description)),
       el('div', { class: 'settings-item-control' },
         switchControl(!!current, async (on) => {
+          // Turning voice on is asked for. It changes what this instance
+          // offers every member, and the provider has to be able to carry a
+          // call: a switch that turns voice on for a provider that cannot
+          // answer leaves every member with a room they cannot join.
+          //
+          // Turning it off is immediate. That is the safe direction, and
+          // asking about it would only be friction.
+          if (on && control.key === 'voice.enabled') {
+            const yes = await confirmDialog({
+              title: 'Turn voice on?',
+              body: 'Every member of this instance will be able to join a voice channel. '
+                + 'The ' + providerLabel(report.active) + ' provider has to be able to carry a call, '
+                + 'so check that it answers before you rely on it.',
+              confirmLabel: 'Turn voice on',
+            });
+            if (!yes) {
+              // The switch is put back where it was: the reader changed their
+              // mind, and the control must not show a state that is not true.
+              if (onSaved) onSaved();
+              return;
+            }
+          }
           try {
             await saveSettings({ [control.key]: on });
             toast(control.label + (on ? ' on' : ' off'));
@@ -227,6 +249,69 @@ function providerSection(provider, onSaved) {
     body: el('div', { class: 'fold' },
       memo({ tone: 'info', title: provider.label, text: provider.note }),
       rows),
+  });
+}
+
+// The instance's own STUN and TURN stack.
+//
+// It is a section of its own because it is a different thing from a provider:
+// the providers are what an operator chooses between, and the stack is what
+// the instance runs itself. The mesh provider *is* this stack, so an operator
+// looking at the mesh needs to see it here.
+//
+// What is shown is the three states that are genuinely different - the
+// process, the service, and the published address - because a report that
+// said only "running" would be true in the three cases where it matters most
+// to say more.
+function stackSection(report) {
+  const stack = report.stack;
+  if (!stack) return null;
+
+  const row = (label, value, note) => el('div', { class: 'settings-item' },
+    el('div', { class: 'settings-item-main' },
+      el('p', { class: 'settings-item-label' }, label),
+      note ? el('p', { class: 'settings-note' }, note) : null),
+    el('div', { class: 'settings-item-control' },
+      el('span', { class: 'chip ' + (value.ok ? 'chip--on' : 'chip--quiet') },
+        value.text)));
+
+  const rows = [
+    row('The voice process', {
+      ok: true,
+      text: stack.running ? 'Running' : 'Not running',
+    }, 'The STUN and TURN service runs in a process of its own, so it can be '
+      + 'restarted without the application going down. This instance: '
+      + stack.managed + '.'),
+    row('The service', {
+      ok: stack.running,
+      text: stack.running ? 'Listening' : 'Not listening',
+    }, 'It listens on ' + stack.listenHost + ':' + stack.listenPort + '.'),
+    row('The published address', {
+      ok: !stack.publishedIsLocal,
+      text: stack.advertised,
+    }, 'The address the clients are given. It has to point straight at this '
+      + 'instance: a proxy that terminates TLS carries HTTP and not the '
+      + 'arbitrary UDP a STUN or TURN service needs, so a relayed address '
+      + 'published through one cannot be reached.'),
+    row('The relay ports', {
+      ok: true,
+      text: stack.relayPorts.from + '-' + stack.relayPorts.to,
+    }, 'The ports a relayed call may use. They have to be open to the internet '
+      + 'along with ' + stack.listenPort + '.'),
+    row('The credential secret', {
+      ok: stack.secretSet,
+      text: stack.secretSet ? 'Set' : 'Not set',
+    }, stack.secretSet
+      ? 'The credentials this instance issues are signed with it, and it never '
+        + 'leaves the server.'
+      : 'Without it the credentials are good only until the instance restarts. '
+        + 'Set TRYCORD_TURN_SECRET.'),
+  ];
+
+  return card({
+    label: 'The STUN and TURN stack',
+    glyph: 'server',
+    body: el('div', { class: 'fold' }, rows),
   });
 }
 
@@ -334,6 +419,7 @@ export function adminVoice() {
       }),
       sharedSection(report, refresh),
       providerSection(inForce, refresh),
+      stackSection(report),
       diagnosticsSection(report, lastCheck, (answer) => {
         lastCheck = answer;
         paint();
