@@ -1,29 +1,341 @@
-// The reader's cross-instance reports.
+// The reader's cross-instance reports, and the owner's side of the same data.
 //
 // A report about something on another instance carries a reference and a
 // reason, and nothing else. What crosses and what does not is written down by
 // the server, and this screen shows that text rather than a paraphrase of it.
 //
-// Two lists: the reports this account has filed, and the communities on other
-// instances this account follows - where the relayed messages are, and where a
-// report can be filed about one of them.
+// Four lists, all of them about the same thing - what travels between
+// instances:
+//
+//   - the reports this account has filed;
+//   - the communities on other instances this account follows, and what was
+//     relayed into them;
+//   - what this account wrote in those communities, and what their owners
+//     decided about it;
+//   - and, for the owner of a community of this instance, what its members
+//     wrote on other instances, with the four decisions the owner has.
+//
+// The moderation surface belongs to the owner of a community of this
+// instance. It is offered only where the server says this account may
+// moderate, so a reader who may moderate nothing is offered nothing - and
+// the server refuses the action anyway, because the screen's gate is the
+// server's answer rather than the client's own rule.
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import Api from '../../packages/api.js';
-import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
-import { openDialog } from '../ui/overlays.js';
+import Api, { request } from '../../packages/api.js';
+import { head, card, row, blank, fault, fold, hold, memo } from '../ui/page.js';
+import { openDialog, toast } from '../ui/overlays.js';
 import { relativeTime } from '../../packages/format.js';
 import { disclosurePanel, reportDialog } from '../ui/federation.js';
+
+// ---- the Continuum calls this surface makes ---------------------------------
+//
+// The moderation and outgoing routes are not in the shared API client yet, so
+// they are named here, once. Every one of them goes through the same
+// request() as the rest of the client, so the authorisation, the error shape
+// and the failover rules are the ones every other screen obeys.
+
+function withQuery(params) {
+  const search = new URLSearchParams();
+  for (const key of Object.keys(params || {})) {
+    const value = params[key];
+    if (value === undefined || value === null || value === '') continue;
+    search.set(key, String(value));
+  }
+  const query = search.toString();
+  return query ? '?' + query : '';
+}
+
+export const continuum = {
+  outgoing: () => request('GET', '/api/continuum/outgoing'),
+  editOutgoing: (id, content) => request('PATCH',
+    '/api/continuum/outgoing/' + encodeURIComponent(id), { body: { content } }),
+  deleteOutgoing: (id) => request('DELETE',
+    '/api/continuum/outgoing/' + encodeURIComponent(id)),
+  moderationMessages: (communityId) => request('GET',
+    '/api/continuum/moderation/messages' + withQuery({ community_id: communityId })),
+  removeModerationMessage: (instanceId, messageId, reason) => request('DELETE',
+    '/api/continuum/moderation/messages/' + encodeURIComponent(instanceId) + '/'
+    + encodeURIComponent(messageId), { body: { reason } }),
+  moderationMembers: (communityId) => request('GET',
+    '/api/continuum/moderation/members' + withQuery({ community_id: communityId })),
+  restrictMember: (instanceId, userId, body) => request('POST',
+    '/api/continuum/moderation/members/' + encodeURIComponent(instanceId) + '/'
+    + encodeURIComponent(userId), { body }),
+};
+
+// ---- shared vocabulary -------------------------------------------------------
+
+// What a member of one of this instance's communities stands in, as the relay
+// store keeps it.
+const MEMBER_STATE = {
+  joined: { label: 'a member', tone: '' },
+  muted: { label: 'muted', tone: ' badge--warning' },
+  removed: { label: 'removed', tone: ' badge--danger' },
+};
+
+// The three decisions the owner has about a member who lives elsewhere.
+const MEMBER_ACTIONS = [
+  {
+    action: 'mute',
+    label: 'Mute',
+    done: 'Muted',
+    what: 'They cannot write in this community from here on. Their instance is told, '
+      + 'so they find out before their next message rather than one message at a time.',
+    state: 'is muted here',
+  },
+  {
+    action: 'remove',
+    label: 'Remove',
+    done: 'Removed',
+    what: 'They are removed from this community, here and on their own instance.',
+    state: 'is removed here',
+  },
+  {
+    action: 'restore',
+    label: 'Restore',
+    done: 'Restored',
+    what: 'They are put back into this community and may write in it again.',
+    state: 'is back in the community',
+  },
+];
+
+// The owner's decision about a message this account wrote elsewhere. The
+// writer is never left wondering where a message went: every state says what
+// the owner decided, and a refusal carries the reason the owner gave.
+function decisionOf(message) {
+  const state = String((message && message.state) || 'pending');
+  if (state === 'accepted') {
+    return { label: 'accepted', tone: ' badge--success', sub: 'The owner of that community accepted it.' };
+  }
+  if (state === 'refused') {
+    const reason = message.reason ? ' ' + message.reason : '';
+    return { label: 'refused', tone: ' badge--danger', sub: 'The owner of that community refused it:' + reason };
+  }
+  if (state === 'deleted') {
+    return { label: 'taken back', tone: '', sub: 'The owner of that community took it back.' };
+  }
+  return { label: 'waiting', tone: '', sub: 'The owner of that community has not answered yet.' };
+}
+
+function authorName(message) {
+  return (message && (message.author_display_name || message.author_username)) || 'Someone';
+}
+
+// Federation switched off is not a failure: the instance says so, and the
+// screen says it back rather than showing a broken page.
+function federationOff(error) {
+  return !!(error && error.status === 404);
+}
+
+// ---- the dialog every action shares ------------------------------------------
+//
+// A destructive action says what it will do before it does it, takes the
+// reason that goes into the audit trail, and reports what the server
+// answered - including the answer that the other instance was not told.
+
+function askAction(options) {
+  const opts = options || {};
+  const reason = el('input', {
+    class: 'input', type: 'text',
+    'aria-label': 'Why (it goes into the audit trail)',
+  });
+  const note = el('p', { class: 'form-note', role: 'status', 'aria-live': 'polite' });
+  const submit = el('button', {
+    class: 'btn ' + (opts.danger ? 'btn--danger' : 'btn--primary') + ' btn--sm',
+    type: 'submit',
+  }, opts.confirmLabel || 'Do it');
+
+  const dialog = openDialog({
+    title: opts.title,
+    sub: opts.what,
+    body: el('form', {
+      class: 'form-stack',
+      onSubmit: async (event) => {
+        event.preventDefault();
+        submit.disabled = true;
+        try {
+          const answer = await opts.onConfirm(reason.value.trim());
+          dialog.close();
+          if (opts.onAnswer) opts.onAnswer(answer);
+        } catch (error) {
+          note.textContent = (error && error.message) || 'The server refused that.';
+          submit.disabled = false;
+        }
+      },
+    },
+      el('label', { class: 'field' },
+        el('span', { class: 'field-label' }, 'Why (it goes into the audit trail)'),
+        reason),
+      note,
+      submit),
+  });
+  reason.focus();
+  return dialog;
+}
+
+// ---- the owner's moderation surface ------------------------------------------
+//
+// Shared with the admin console's federation section, which is the same
+// surface for the person who runs the instance: what the members of this
+// instance's communities wrote on other instances, and the four decisions
+// about it.
+
+export function moderationSurface(options) {
+  const opts = options || {};
+  const messages = Array.isArray(opts.messages) ? opts.messages : [];
+  const members = Array.isArray(opts.members) ? opts.members : [];
+  const names = opts.names && typeof opts.names === 'object' ? opts.names : {};
+  const refresh = typeof opts.refresh === 'function' ? opts.refresh : async () => {};
+  const say = typeof opts.say === 'function' ? opts.say : () => {};
+
+  function takeBack(message) {
+    askAction({
+      title: 'Take this message back?',
+      what: 'The message leaves this community, and ' + message.origin_instance_id
+        + ' is told, so the copy over there goes too.',
+      confirmLabel: 'Take it back',
+      danger: true,
+      onConfirm: (reason) => continuum.removeModerationMessage(
+        message.origin_instance_id, message.origin_message_id, reason),
+      onAnswer: (result) => {
+        if (result && result.relayed) {
+          say('Taken back', 'The message is gone from here, and ' + message.origin_instance_id
+            + ' was told, so the copy there goes too.', 'success');
+        } else {
+          say('Taken back here', 'The message is gone from here, but ' + message.origin_instance_id
+            + ' was not told' + ((result && result.reason) ? ': ' + result.reason : '.'), 'warning');
+        }
+        refresh();
+      },
+    });
+  }
+
+  function decide(member, action) {
+    askAction({
+      title: action.label + ' ' + (member.display_name || member.username || 'this member') + '?',
+      what: action.what,
+      confirmLabel: action.label,
+      danger: action.action === 'remove',
+      onConfirm: (reason) => continuum.restrictMember(
+        member.origin_instance_id,
+        member.origin_user_id,
+        {
+          community_id: member.origin_community_id,
+          action: action.action,
+          reason: reason || undefined,
+        }),
+      onAnswer: (result) => {
+        const name = member.display_name || member.username || 'This member';
+        if (result && result.relayed) {
+          say(action.done, name + ' ' + action.state
+            + ', and ' + member.origin_instance_id + ' was told.', 'success');
+        } else {
+          say(action.done, name + ' ' + action.state
+            + ', but ' + member.origin_instance_id + ' was not told'
+            + ((result && result.reason) ? ': ' + result.reason : '.'), 'warning');
+        }
+        refresh();
+      },
+    });
+  }
+
+  function messageRow(message) {
+    const community = names[message.origin_community_id];
+    return row({
+      class: 'federation-row',
+      lead: el('span', { class: 'federation-glyph' }, icon('message', { size: 15 })),
+      title: String(message.content || '').replace(/\s+/g, ' ').trim()
+        || '(a message that was taken back)',
+      sub: authorName(message) + ' · written on ' + message.origin_instance_id
+        + (community ? ' · in ' + community : ''),
+      meta: message.created_at ? relativeTime(message.created_at) : '',
+      side: message.deleted
+        ? el('span', { class: 'badge' }, 'taken back')
+        : el('button', {
+          class: 'btn btn--default btn--sm', type: 'button',
+          'aria-label': 'Take back the message ' + authorName(message) + ' wrote on '
+            + message.origin_instance_id,
+          onClick: () => takeBack(message),
+        }, 'Take back'),
+    });
+  }
+
+  function memberRow(member) {
+    const community = names[member.origin_community_id];
+    const state = MEMBER_STATE[String(member.state || 'joined')] || MEMBER_STATE.joined;
+    const name = member.display_name || member.username || 'Someone';
+    return row({
+      class: 'federation-row',
+      lead: el('span', { class: 'federation-glyph' }, icon('user', { size: 15 })),
+      title: name,
+      sub: 'lives on ' + member.origin_instance_id
+        + (community ? ' · in ' + community : ''),
+      meta: member.updated_at ? relativeTime(member.updated_at) : '',
+      side: [
+        el('span', { class: 'badge' + state.tone }, state.label),
+        ...MEMBER_ACTIONS.map((action) => el('button', {
+          class: 'btn btn--default btn--sm', type: 'button',
+          'aria-label': action.label + ' ' + name + ', who lives on ' + member.origin_instance_id,
+          onClick: () => decide(member, action),
+        }, action.label)),
+      ],
+    });
+  }
+
+  const messageList = el('div', { class: 'rowlist' },
+    ...(messages.length ? messages.map(messageRow) : [blank({
+      glyph: 'message',
+      title: 'Nothing has been written elsewhere',
+      text: 'When a member of one of your communities writes on another instance, it is listed here.',
+    })]));
+
+  const memberList = el('div', { class: 'rowlist' },
+    ...(members.length ? members.map(memberRow) : [blank({
+      glyph: 'users',
+      title: 'No members live on another instance',
+      text: 'When a member of one of your communities lives on another instance, they are listed here.',
+    })]));
+
+  return el('div', { class: 'fold' },
+    card({
+      label: 'What members wrote elsewhere', glyph: 'message',
+      note: 'the copy over there goes too when you take it back',
+      flush: true, body: messageList,
+    }),
+    card({
+      label: 'Members who live on another instance', glyph: 'users',
+      flush: true, body: memberList,
+    }),
+  );
+}
+
+// ---- the page ----------------------------------------------------------------
 
 export function renderFederation(ctx) {
   const filed = el('div', { class: 'rowlist' });
   const followed = el('div', { class: 'rowlist' });
   const disclosure = el('div', { class: 'disclosure-holder' });
+  const outgoing = el('div', { class: 'rowlist' });
+  const moderation = el('div', { class: 'fold' });
+  // What the server answered the last time. It lives here rather than in the
+  // surface, so that re-reading the surface after an action does not take the
+  // answer with it.
+  const answer = el('div', { class: 'memo-list' });
+
+  function say(title, text, tone) {
+    answer.replaceChildren(memo({ tone: tone || 'info', role: 'status', title, text }));
+  }
 
   // The disclosure the server told us about, kept so the next report can show
   // it before it is sent rather than only after.
   let known = null;
+
+  // The remote communities this account follows, by the ids they have on the
+  // instance they live on. The writer's view names the community a message
+  // was written in.
+  const remoteNames = new Map();
 
   function showDisclosure(answer) {
     const found = answer && answer.disclosure;
@@ -55,10 +367,15 @@ export function renderFederation(ctx) {
   }
 
   async function paintFollowed() {
-    followed.replaceChildren(hold('Reading the communities you follow'));
     try {
       const rows = await Api.continuumMemberships();
       const memberships = Array.isArray(rows) ? rows : [];
+      remoteNames.clear();
+      for (const entry of memberships) {
+        const name = entry.community && entry.community.name;
+        if (!name) continue;
+        remoteNames.set(entry.origin_instance_id + '|' + entry.origin_community_id, name);
+      }
       if (!memberships.length) {
         followed.replaceChildren(blank({
           glyph: 'share',
@@ -134,11 +451,184 @@ export function renderFederation(ctx) {
       });
   }
 
+  // ---- the writer's view -----------------------------------------------------
+
+  // What this account wrote into a community that lives on another instance,
+  // and what the owner of that community decided about it.
+  async function paintOutgoing() {
+    try {
+      const rows = await continuum.outgoing();
+      const messages = Array.isArray(rows) ? rows : [];
+      if (!messages.length) {
+        outgoing.replaceChildren(blank({
+          glyph: 'send',
+          title: 'Nothing written elsewhere yet',
+          text: 'When you write in a community that lives on another instance, it is listed here '
+            + 'with the answer its owner gave.',
+        }));
+        return;
+      }
+      outgoing.replaceChildren(...messages.map((message) => outgoingRow(message)));
+    } catch (error) {
+      if (federationOff(error)) {
+        outgoing.replaceChildren(blank({
+          glyph: 'share',
+          title: 'Nothing to show',
+          text: 'Federation is not enabled on this instance.',
+        }));
+        return;
+      }
+      outgoing.replaceChildren(fault(error, paintOutgoing));
+    }
+  }
+
+  function outgoingRow(message) {
+    const decision = decisionOf(message);
+    const community = remoteNames.get(message.origin_instance_id + '|' + message.origin_community_id);
+    return row({
+      class: 'federation-row',
+      lead: el('span', { class: 'federation-glyph' }, icon('send', { size: 15 })),
+      title: String(message.content || '').replace(/\s+/g, ' ').trim()
+        || '(a message that was taken back)',
+      sub: (community ? 'in ' + community + ' · ' : 'in a community on another instance · ')
+        + decision.sub,
+      meta: message.created_at ? relativeTime(message.created_at) : '',
+      side: [
+        el('span', { class: 'badge' + decision.tone }, decision.label),
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Edit the message you wrote in this community',
+          onClick: () => editOutgoing(message),
+        }, 'Edit'),
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Take back the message you wrote in this community',
+          onClick: () => takeBackOutgoing(message),
+        }, 'Take back'),
+      ],
+    });
+  }
+
+  function editOutgoing(message) {
+    const content = el('textarea', {
+      class: 'textarea', rows: '4', 'aria-label': 'The message you wrote',
+    }, message.content || '');
+    const note = el('p', { class: 'form-note', role: 'status', 'aria-live': 'polite' });
+    const submit = el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save the change');
+
+    const dialog = openDialog({
+      title: 'Edit your message',
+      sub: 'The change is published to the instance that owns the community.',
+      body: el('form', {
+        class: 'form-stack',
+        onSubmit: async (event) => {
+          event.preventDefault();
+          const text = content.value.trim();
+          if (!text) {
+            note.textContent = 'A message cannot be empty.';
+            return;
+          }
+          submit.disabled = true;
+          try {
+            await continuum.editOutgoing(message.id, text);
+            dialog.close();
+            toast('The change was sent to the instance that owns the community.');
+            paintOutgoing();
+          } catch (error) {
+            note.textContent = (error && error.message) || 'The change was not accepted.';
+            submit.disabled = false;
+          }
+        },
+      },
+        el('label', { class: 'field' },
+          el('span', { class: 'field-label' }, 'Message'),
+          content),
+        note,
+        submit),
+    });
+    content.focus();
+    return dialog;
+  }
+
+  function takeBackOutgoing(message) {
+    askAction({
+      title: 'Take this message back?',
+      what: 'The message is deleted here, and the instance that owns the community is told, '
+        + 'so the copy over there goes too.',
+      confirmLabel: 'Take it back',
+      danger: true,
+      onConfirm: () => continuum.deleteOutgoing(message.id),
+      onAnswer: () => {
+        toast('The message was taken back, and the owner was told.');
+        paintOutgoing();
+      },
+    });
+  }
+
+  // ---- the owner's surface ---------------------------------------------------
+
+  // May this account moderate in this community? The server said so: the
+  // community list it hands out carries the caller's own permissions.
+  function mayModerate(server) {
+    if (!server) return false;
+    if (server.is_owner) return true;
+    const permissions = Array.isArray(server.permissions) ? server.permissions : [];
+    return permissions.indexOf('*') !== -1 || permissions.indexOf('MANAGE_MESSAGES') !== -1;
+  }
+
+  async function paintModeration() {
+    moderation.replaceChildren(hold('Reading what your communities wrote elsewhere'));
+    try {
+      const mine = await Api.servers();
+      const communities = (Array.isArray(mine) ? mine : []).filter(mayModerate);
+      // A reader who may moderate nothing is offered nothing: no list, no
+      // controls, no trace that the surface exists.
+      if (!communities.length) {
+        moderation.replaceChildren();
+        return;
+      }
+      const names = {};
+      for (const community of communities) names[community.id] = community.name;
+
+      const messages = [];
+      const members = [];
+      const failures = [];
+      for (const community of communities) {
+        try {
+          const rows = await continuum.moderationMessages(community.id);
+          if (Array.isArray(rows)) messages.push(...rows);
+          const people = await continuum.moderationMembers(community.id);
+          if (Array.isArray(people)) members.push(...people);
+        } catch (error) {
+          failures.push(error);
+        }
+      }
+
+      moderation.replaceChildren(answer, moderationSurface({
+        messages, members, names, refresh: paintModeration, say,
+      }));
+      if (failures.length) {
+        if (federationOff(failures[0])) {
+          moderation.replaceChildren(blank({
+            glyph: 'share',
+            title: 'Nothing to show',
+            text: 'Federation is not enabled on this instance.',
+          }));
+          return;
+        }
+        moderation.insertBefore(fault(failures[0], paintModeration), moderation.firstChild);
+      }
+    } catch (error) {
+      moderation.replaceChildren(fault(error, paintModeration));
+    }
+  }
+
   const node = fold([
     head({
       kicker: 'Federation',
-      title: 'Reports about other instances',
-      lede: 'What you have asked another instance to look at.',
+      title: 'Across instances',
+      lede: 'What you have asked other instances to look at, what you have written in '
+        + 'their communities, and what the members of your own communities wrote in theirs.',
     }),
     card({
       label: 'Reports you have filed', glyph: 'flag', flush: true, body: filed,
@@ -151,6 +641,12 @@ export function renderFederation(ctx) {
     card({
       label: 'Communities on other instances', glyph: 'share', flush: true, body: followed,
     }),
+    card({
+      label: 'What you wrote in communities on other instances', glyph: 'send',
+      note: 'with the answer their owners gave',
+      flush: true, body: outgoing,
+    }),
+    moderation,
   ]);
 
   return {
@@ -158,9 +654,11 @@ export function renderFederation(ctx) {
     onMount: async () => {
       await paintFiled();
       await paintFollowed();
+      await paintOutgoing();
+      await paintModeration();
     },
     cleanup() {},
   };
 }
 
-export default { renderFederation };
+export default { renderFederation, moderationSurface, continuum };

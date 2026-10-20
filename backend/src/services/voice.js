@@ -2,10 +2,15 @@
 //
 // This module owns every decision about who may speak: whether the instance has voice at
 // all, whether this user is a member, whether they hold the permission, whether the
-// channel is full, and whether they are banned. The provider underneath is a transport
-// detail - it creates a session and moves an SDP offer - and it is deliberately inline
-// rather than behind an interface, because there is exactly one server-backed provider
-// and nothing consumes the seam polymorphically.
+// channel is full, and whether they are banned. It also carries the Cloudflare
+// transport - the calls that create a session on the SFU, move an SDP offer and close
+// a track.
+//
+// The choice between the media providers is not made here. It is made in
+// services/voice/adapters.js, which asks this module for the Cloudflare
+// operations and services/voice-mesh.js for the mesh ones. Keeping the choice
+// in one place is what lets an instance switch provider without a running call
+// changing under it.
 //
 // A room is per-channel and outlives any one participant. A session is per-endpoint and
 // belongs to the provider. The two are not the same thing, and the mapping between them
@@ -15,9 +20,7 @@ const db = require('../db');
 const { now, uuid } = require('../util');
 const features = require('../features');
 const permissions = require('./permissions');
-
-const SFU_BASE = 'https://rtc.live.cloudflare.com/v1';
-const PROVIDER = 'cloudflare';
+const voiceConfig = require('./voice/config');
 
 class SfuError extends Error {
   constructor(status, code, description) {
@@ -28,39 +31,35 @@ class SfuError extends Error {
   }
 }
 
-// Provider credentials, read at call time and never returned by any route.
+// The Cloudflare credentials, read at call time and never returned by any route.
 //
 // They used to be a module-level constant read from process.env once, which meant a
 // credential saved in the configuration centre was ignored until the process restarted.
-// Reading them from the feature snapshot - which is rebuilt whenever settings are saved -
+// Reading them from the configuration - which is rebuilt whenever settings are saved -
 // makes the console authoritative, and keeps the secret out of a long-lived constant.
 function credentials() {
-  const v = features.current.voiceVideo;
+  const cfg = voiceConfig.configuration('cloudflare');
   return {
-    appId: String(v.sfuAppId || ''),
-    appSecret: String(v.sfuAppSecret || ''),
+    appId: cfg.appId,
+    appSecret: cfg.resolved.appSecret.value,
+    endpoint: String(cfg.endpoint || '').replace(/\/+$/, ''),
   };
 }
 
-const iceServers = () => {
-  const v = features.current.voiceVideo;
-  const out = v.stun.map((urls) => ({ urls }));
-  if (v.turn.url) {
-    // The URL and username are what a client needs to open a connection. The credential
-    // is the one this instance was configured with, and it never appears in the
-    // capability response - that response carries the ICE list with this field absent.
-    out.push({ urls: v.turn.url, username: v.turn.username, credential: v.turn.credential });
-  }
-  return out;
+const iceServers = (userId) => {
+  // The ICE list belongs to the provider in force: the mesh is reached through
+  // the instance's own relay, and the SFU carries the media itself.
+  return voiceConfig.iceServers(voiceConfig.selected(), { credentials: true, userId });
 };
 
 // One authenticated call to the media server. The App Secret is sent here and nowhere
 // else; a browser never sees it.
 async function sfu(method, path, body) {
-  const res = await fetch(SFU_BASE + path, {
+  const creds = credentials();
+  const res = await fetch(creds.endpoint + path, {
     method,
     headers: {
-      Authorization: 'Bearer ' + credentials().appSecret,
+      Authorization: 'Bearer ' + creds.appSecret,
       'Content-Type': 'application/json',
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -97,32 +96,33 @@ async function available() {
   if (!f.voiceVideo.enabled) {
     return { available: false, reason: 'disabled', detail: 'Voice and video are off on this instance.' };
   }
-  // In-house mesh needs no upstream subscription. It is always "available" whenever
-  // voice is enabled and at least one ICE server is configured (a network requirement,
-  // not a third-party one - a free STUN server is the default).
-  if (f.voiceVideo.provider === 'mesh') {
-    const stun = Array.isArray(f.voiceVideo.stun) ? f.voiceVideo.stun : [];
-    if (!stun.length && !f.voiceVideo.turn.url) {
-      return { available: false, reason: 'unreachable', detail: 'No STUN/TURN configured for mesh.', problems: ['voice.stunUrls'] };
-    }
-    return { available: true, reason: 'ready', detail: '', provider: 'mesh' };
-  }
-  const health = features.healthOf(f);
-  if (!health.available) return health;
 
-  try {
-    // Creating a session is the cheapest authenticated call the provider offers, so it
-    // doubles as the credential check.
-    await sfu('POST', `/apps/${credentials().appId}/sessions/new`, {});
-    return { available: true, reason: 'ready', detail: '' };
-  } catch (e) {
+  const provider = voiceConfig.selected();
+  const missing = voiceConfig.missing(provider);
+  if (missing.length) {
+    return {
+      available: false,
+      reason: 'misconfigured',
+      detail: 'Voice and video is on, but the ' + provider + ' provider is not ready.',
+      problems: missing,
+      provider,
+    };
+  }
+
+  // The provider's own check, cached: this is asked by every client that
+  // opens the application, and the answer is the same for all of them.
+  const diagnostics = require('./voice/diagnostics');
+  const check = await diagnostics.runCheck(provider);
+  if (!check.ok) {
     return {
       available: false,
       reason: 'unreachable',
-      detail: 'The media server could not be reached, or it refused the credentials.',
-      problems: [e.message],
+      detail: check.detail || 'The media path did not answer.',
+      problems: [check.detail].filter(Boolean),
+      provider,
     };
   }
+  return { available: true, reason: 'ready', detail: '', provider };
 }
 
 // The permission question, asked of Trycord's own data rather than of the provider.
@@ -130,7 +130,11 @@ async function available() {
 // CONNECT lets a user enter a voice channel; SPEAK lets them publish audio; VIDEO is the
 // same for a camera; STREAM is the same for screen sharing, and the master flag has to
 // permit it as well.
-async function authorizeVoice(channelId, userId, { screen = false, video = false } = {}) {
+//
+// The participant limit is the one of the provider that will carry the session. A room
+// that is already running keeps the provider it started on, and that provider's limit
+// is the one that applies to it.
+async function authorizeVoice(channelId, userId, { screen = false, video = false, maxParticipants = null } = {}) {
   const f = features.current;
   if (!f.voiceVideo.enabled) return { ok: false, ...disabled() };
 
@@ -178,7 +182,7 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
   const inRoom = room
     ? await db.get('SELECT COUNT(*) AS n FROM voice_participants WHERE room_id = ? AND left_at IS NULL', [room.id])
     : { n: 0 };
-  const limit = f.voiceVideo.maxParticipants;
+  const limit = maxParticipants || voiceConfig.limit(voiceConfig.selected());
 
   if (inRoom.n >= limit) {
     return {
@@ -214,43 +218,101 @@ async function liveSession(channelId, userId) {
   );
 }
 
-async function join(channelId, userId) {
-  const verdict = await authorizeVoice(channelId, userId);
-  if (!verdict.ok) throw verdict;
-
+// The participant row, and the row that says which provider carries it.
+//
+// The two are written together because they answer one question: who is in
+// this channel, and what is carrying them.
+async function recordParticipant({ channelId, userId, roomId, sessionId, provider }) {
   const existing = await liveSession(channelId, userId);
+  let participantId = existing ? existing.id : uuid();
+
   if (existing) {
-    return { sessionId: existing.session_id, roomId: existing.room_id, rejoined: true };
+    await db.run(
+      'UPDATE voice_participants SET room_id = ?, session_id = ?, joined_at = ?, left_at = NULL WHERE id = ?',
+      [roomId, sessionId, now(), participantId]
+    );
+  } else {
+    await db.run(
+      `INSERT INTO voice_participants (id, room_id, channel_id, user_id, session_id, joined_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [participantId, roomId, channelId, userId, sessionId, now()]
+    );
   }
 
-  const roomId = await ensureRoom(channelId, verdict.channel.server_id);
-  const created = await sfu('POST', `/apps/${credentials().appId}/sessions/new`, {});
-
-  const id = uuid();
-  await db.run(
-    `INSERT INTO voice_participants (id, room_id, channel_id, user_id, session_id, joined_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, roomId, channelId, userId, created.sessionId, now()]
-  );
-
-  return {
-    participantId: id,
-    roomId,
-    sessionId: created.sessionId,
-    iceServers: iceServers(),
-    joined: true,
-  };
+  await recordProviderSession(channelId, userId, provider);
+  return participantId;
 }
 
-// Leaving is a local fact first and a provider call second: a user whose socket dies is
-// gone from Trycord's view immediately, and the media server is told when it can be.
-async function leave(channelId, userId) {
-  const row = await liveSession(channelId, userId);
-  if (!row) return { ok: true };
+// Which provider carries each live session.
+//
+// A call does not change provider halfway through: the session it started on
+// is the session it finishes on. This is the row that remembers it, and it is
+// what lets a room that is already running keep its provider while the
+// instance is configured to use another one.
+async function recordProviderSession(channelId, userId, provider) {
+  const existing = await db.get(
+    'SELECT id FROM voice_provider_sessions WHERE channel_id = ? AND user_id = ?',
+    [channelId, userId]
+  );
+  if (existing) {
+    await db.run(
+      'UPDATE voice_provider_sessions SET provider = ?, joined_at = ?, left_at = NULL WHERE id = ?',
+      [provider, now(), existing.id]
+    );
+    return existing.id;
+  }
+  const id = uuid();
+  await db.run(
+    `INSERT INTO voice_provider_sessions (id, channel_id, user_id, provider, joined_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [id, channelId, userId, provider, now()]
+  );
+  return id;
+}
 
-  await db.run('UPDATE voice_participants SET left_at = ? WHERE id = ?', [now(), row.id]);
-  await endSession(row.session_id);
-  return { ok: true };
+// The provider carrying the call in this channel, or null when nobody is in one.
+async function providerOfRoom(channelId) {
+  const row = await db.get(
+    `SELECT provider FROM voice_provider_sessions
+      WHERE channel_id = ? AND left_at IS NULL ORDER BY joined_at DESC LIMIT 1`,
+    [channelId]
+  );
+  return row ? row.provider : null;
+}
+
+// The participant is gone: from the roster, and from the provider's count.
+async function endParticipant(channelId, userId) {
+  const row = await liveSession(channelId, userId);
+  await db.run(
+    'UPDATE voice_participants SET left_at = ? WHERE channel_id = ? AND user_id = ? AND left_at IS NULL',
+    [now(), channelId, userId]
+  );
+  await db.run(
+    'UPDATE voice_provider_sessions SET left_at = ? WHERE channel_id = ? AND user_id = ? AND left_at IS NULL',
+    [now(), channelId, userId]
+  );
+  return row;
+}
+
+// The rows a previous run of the process left behind.
+//
+// The mesh keeps its rooms in memory, so a restart empties them; the database
+// would otherwise still say the room is full and refuse every join.
+async function clearStaleParticipants(channelId) {
+  await db.run(
+    'UPDATE voice_participants SET left_at = ? WHERE channel_id = ? AND left_at IS NULL',
+    [now(), channelId]
+  );
+  await db.run(
+    'UPDATE voice_provider_sessions SET left_at = ? WHERE channel_id = ? AND left_at IS NULL',
+    [now(), channelId]
+  );
+}
+
+// A session on the Cloudflare SFU.
+async function createSession() {
+  const created = await sfu('POST', `/apps/${credentials().appId}/sessions/new`, {});
+  return created && created.sessionId ? created.sessionId : null;
 }
 
 // The provider has no "delete session" call: a session ends by closing its tracks, and
@@ -384,6 +446,9 @@ async function setSelfState(channelId, userId, { muted, deafened }) {
 // A moderator forcing a participant's state, or disconnecting them. Permission is checked
 // here rather than in the route, so a second entry point cannot become the one that
 // forgot.
+//
+// The disconnect is recorded here and carried out by the caller, which is the one
+// that knows which provider is carrying the session.
 async function moderate(channelId, actorId, targetUserId, { mute, deafen, disconnect }) {
   const ch = await db.get('SELECT server_id FROM channels WHERE id = ?', [channelId]);
   if (!ch) throw { code: 'NOT_FOUND', message: 'Channel not found', status: 404 };
@@ -400,9 +465,13 @@ async function moderate(channelId, actorId, targetUserId, { mute, deafen, discon
   );
   if (!target) throw { code: 'NOT_FOUND', message: 'That person is not in this channel.', status: 404 };
 
+  let sessionId = target.session_id;
   if (disconnect) {
     await db.run('UPDATE voice_participants SET left_at = ? WHERE id = ?', [now(), target.id]);
-    await endSession(target.session_id);
+    await db.run(
+      'UPDATE voice_provider_sessions SET left_at = ? WHERE channel_id = ? AND user_id = ? AND left_at IS NULL',
+      [now(), channelId, targetUserId]
+    );
   } else {
     const sets = [];
     const params = [];
@@ -420,7 +489,7 @@ async function moderate(channelId, actorId, targetUserId, { mute, deafen, discon
     [uuid(), actorId, disconnect ? 'voice_disconnect' : 'voice_moderate', targetUserId, now()]
   );
 
-  return { ok: true };
+  return { ok: true, disconnected: !!disconnect, sessionId };
 }
 
 // A stage channel's speaker list is separate from its audience: an audience member can
@@ -439,9 +508,14 @@ async function requestSpeak(channelId, userId) {
 
 module.exports = {
   available, authorizeVoice,
-  join, leave, participants, setSelfState, moderate, requestSpeak,
-  // The transport calls a route needs in order to relay SDP. Each one requires a session
-  // the caller already proved belongs to them.
-  negotiate, answer, publishScreenShare, sessionState, closeTrack,
+  participants, setSelfState, moderate, requestSpeak,
+  // The roster and the bookkeeping a session needs. The provider that carries a
+  // session is remembered beside it, so a call finishes on the provider it
+  // started on.
+  ensureRoom, liveSession, recordParticipant, endParticipant, clearStaleParticipants,
+  providerOfRoom, recordProviderSession,
+  // The Cloudflare transport. The other providers have their own; the caller
+  // chooses between them.
+  createSession, endSession, negotiate, answer, publishScreenShare, sessionState, closeTrack,
   iceServers,
 };

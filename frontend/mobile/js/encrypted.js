@@ -174,7 +174,20 @@ export async function send(conversationId, payload, post) {
  */
 export async function readRow(row, conversationId) {
   const open = await client();
-  const read = await open.readMessage(row, conversationId);
+  let read = null;
+  try {
+    read = await open.readMessage(row, conversationId);
+  } catch (error) {
+    // A row that cannot be parsed is a row that cannot be read. It is said
+    // so, rather than allowed to throw out of a render.
+    read = {
+      content: null,
+      encrypted: true,
+      unreadable: true,
+      reason: 'This message could not be opened on this device'
+        + (error && error.message ? ' (' + error.message + ')' : ''),
+    };
+  }
   return Object.assign({}, row, {
     content: read.unreadable ? read.reason : (read.content || ''),
     encrypted: read.encrypted,
@@ -197,6 +210,22 @@ export async function turnOn(conversationId) {
   await conversationState(conversationId);
   toast('This conversation is now encrypted');
   return published;
+}
+
+/** Upload an encrypted file, or the ordinary file when the conversation is plain. */
+export async function upload(conversationId, file, post) {
+  const open = await ready();
+  if (!open) return post(file);
+  const answer = await open.conversationState(conversationId);
+  if (!answer || answer.state !== 'encrypted') return post(file);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const out = await open.uploadFile({
+    conversationId,
+    filename: file.name || 'attachment',
+    mime: file.type || 'application/octet-stream',
+    bytes,
+  });
+  return { id: out.id };
 }
 
 /** A line about the state of a conversation, in words. */

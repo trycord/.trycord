@@ -119,6 +119,12 @@ export const PAGES = [
     blurb: 'Which channels stay quiet, and what you are told about',
     tabs: ['notifications'],
   }),
+  p('settings.encryption', '/settings/encryption', {
+    layout: 'settings', scope: 'account', group: 'Safety', order: 4,
+    label: 'Encryption', icon: 'lock',
+    blurb: 'The devices this account reads and writes with, and the keys that hold them together',
+    tabs: ['encryption'],
+  }),
   p('settings.appearance', '/settings/appearance', {
     layout: 'settings', scope: 'account', group: 'Preferences', order: 1,
     label: 'Appearance', icon: 'image',

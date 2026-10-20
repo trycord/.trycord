@@ -133,7 +133,8 @@ export function openConsent(packageId, options) {
       consent = capabilityConsent(pkg);
       body.replaceChildren(
         el('div', { class: 'fold fold--tight' },
-          el('p', { class: 'lede' }, pkg.description || 'The package gave no description.'),
+          el('p', { class: 'lede' }, pkg.name || pkg.id),
+          el('p', { class: 'form-note' }, pkg.description || 'The package gave no description.'),
           el('div', { class: 'chips' }, reviewChip(pkg.reviewStatus), signatureChip(pkg.signature),
             pkg.trusted ? el('span', { class: 'chip chip--warn' }, 'runs code on the server') : null),
           manifestFacts(pkg),
@@ -154,6 +155,9 @@ export function openConsent(packageId, options) {
   }
 
   install.addEventListener('click', async () => {
+    // An install that was not answered is not sent. The button is disabled
+    // until it is, and this is the second lock on the same door.
+    if (install.disabled) return;
     install.disabled = true;
     status.textContent = '';
     try {

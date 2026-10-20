@@ -67,11 +67,12 @@ function url(name) {
 //
 // The first-party mesh is the one an instance is expected to run: the server
 // carries the signalling and the peers carry the media, so a call does not
-// leave the host. The hosted SFU is still read, because a deployment that has
-// it configured should not lose voice on upgrade - but it is not offered as a
-// choice, and the boot says plainly that it is not the supported path.
-const PROVIDERS = ['cloudflare', 'mesh'];
-const SUPPORTED_PROVIDERS = ['mesh'];
+// leave the host. The hosted SFU and the operator's own SFU are read as well,
+// because a deployment that has one of them configured should not lose voice
+// on upgrade - each keeps its own settings, so switching between them does
+// not erase what was saved for the other one.
+const PROVIDERS = ['mesh', 'cloudflare', 'sfu'];
+const SUPPORTED_PROVIDERS = PROVIDERS;
 
 // Settings the configuration centre owns. Each of these has a row in
 // services/settings.js, and that module already implements the precedence this
@@ -93,13 +94,8 @@ const FROM_SETTINGS = {
   WS_HEARTBEAT_MS: 'messaging.heartbeatMs',
   VOICE_VIDEO_ENABLED: 'voice.enabled',
   VOICE_VIDEO_PROVIDER: 'voice.provider',
-  VOICE_VIDEO_MAX_PARTICIPANTS: 'voice.maxParticipants',
   VOICE_VIDEO_SCREEN_SHARING: 'voice.screenSharing',
   VOICE_VIDEO_STAGE_CHANNELS: 'voice.stageChannels',
-  VOICE_VIDEO_STUN_URLS: 'voice.stunUrls',
-  VOICE_VIDEO_SFU_APP_ID: 'voice.sfuAppId',
-  VOICE_VIDEO_TURN_URL: 'voice.turnUrl',
-  VOICE_VIDEO_TURN_USERNAME: 'voice.turnUsername',
   FILE_UPLOADS_ENABLED: 'features.uploads',
   BOTS_ENABLED: 'features.bots',
   WEBHOOKS_ENABLED: 'features.webhooks',
@@ -145,27 +141,9 @@ function providerName() {
   }
   if (SUPPORTED_PROVIDERS.indexOf(raw) === -1) {
     console.warn('[warn] voice and video is configured for the "' + raw + '" provider, which this build does not support.'
-      + ' The in-house mesh is the supported path; set voice.provider to mesh in the admin configuration.');
+      + ' Set voice.provider to one of ' + SUPPORTED_PROVIDERS.join(', ') + ' in the admin configuration.');
   }
   return raw;
-}
-
-// A credential, read through the settings store so one saved in the configuration centre
-// takes effect, falling back to the environment for an install that was configured there.
-//
-// This is the only place outside the mail service that asks the store for a secret, and it
-// exists because voice and video is itself a provider: the value has to reach
-// services/voice.js without passing through the capability response. The snapshot it lands
-// in is internal - `capabilities()` and `healthOf()` both whitelist the fields they expose.
-function secretOf(key, envName) {
-  try {
-    const settings = require('./services/settings');
-    if (settings.isLoaded()) {
-      const stored = settings.secretValue(key);
-      if (stored) return String(stored);
-    }
-  } catch { /* not loaded yet: fall through to the environment */ }
-  return text(envName, '');
 }
 
 function build() {
@@ -194,8 +172,12 @@ function build() {
   const screenSharing = valueOf('VOICE_VIDEO_SCREEN_SHARING', true);
   const stageChannels = flag('VOICE_VIDEO_STAGE_CHANNELS', true);
   const stageChannelsOn = !!valueOf('VOICE_VIDEO_STAGE_CHANNELS', stageChannels.value);
-  const stun = valueOf('VOICE_VIDEO_STUN_URLS', []);
-  const maxParticipants = valueOf('VOICE_VIDEO_MAX_PARTICIPANTS', 25);
+  const provider = providerName();
+  // The configuration of the provider in force, and the participant limit that
+  // provider enforces. Both come from the voice configuration module, which
+  // resolves the provider's own settings and the older keys they replace.
+  const voiceConfig = require('./services/voice/config');
+  const providerConfig = voiceConfig.publicConfiguration(provider);
   const maxPayload = valueOf('WS_MAX_PAYLOAD', 204800);
   const heartbeatMs = valueOf('WS_HEARTBEAT_MS', 30000);
   const maxUploadBytes = valueOf('MAX_UPLOAD_BYTES', 8388608);
@@ -223,23 +205,15 @@ function build() {
       screenSharing: !!voice && !!screenSharing,
       stageChannels: !!voice && stageChannelsOn,
 
-      // Only one provider is implemented. An operator who sets anything else gets a
-      // startup error naming what is supported, rather than a runtime failure at the
-      // first join.
-      provider: providerName(),
-      maxParticipants: Math.min(Math.max(Number(maxParticipants) || 25, 1), 200),
-
-      // The provider credential and the ICE servers. `sfuAppSecret` is a secret: it must
-      // never be added to `capabilities()`, and services/voice.js reads it at call time so
-      // a rotation in the console applies without a restart.
-      sfuAppId: String(valueOf('VOICE_VIDEO_SFU_APP_ID', '') || ''),
-      sfuAppSecret: secretOf('voice.sfuAppSecret', 'VOICE_VIDEO_SFU_APP_SECRET'),
-      stun: Array.isArray(stun) ? stun : [],
-      turn: {
-        url: String(valueOf('VOICE_VIDEO_TURN_URL', '') || ''),
-        username: String(valueOf('VOICE_VIDEO_TURN_USERNAME', '') || ''),
-        credential: secretOf('voice.turnCredential', 'VOICE_VIDEO_TURN_CREDENTIAL'),
-      },
+      // Only one provider is in force. The others keep their own settings, so
+      // choosing a different one does not erase what was saved for this one.
+      provider: provider,
+      // The participant limit of the provider in force. The limit is shared in
+      // meaning and per-provider in value: each provider holds its own.
+      maxParticipants: providerConfig ? providerConfig.maxParticipants : 25,
+      // The configuration of the provider in force. It carries no secret: a
+      // credential is reported as set or not set, never as its value.
+      providerConfig: providerConfig,
     },
 
     realtime: {
@@ -252,9 +226,14 @@ function build() {
 // Secrets, which never leave the process. The capability response below is built from
 // everything else.
 function secretsOf(features) {
+  const voiceConfig = require('./services/voice/config');
+  const cfg = voiceConfig.configuration(features.voiceVideo.provider);
+  if (!cfg) return {};
   return {
-    turnCredential: features.voiceVideo.turn.credential,
-    turnUsername: features.voiceVideo.turn.username,
+    turnUsername: cfg.turnUsername,
+    // The TURN credential of the provider in force. It is read by the code that
+    // authenticates with it and by nothing else.
+    turnCredential: cfg.resolved.turnCredential ? cfg.resolved.turnCredential.value : '',
   };
 }
 
@@ -277,6 +256,9 @@ function capabilities(features) {
       screenSharing: features.voiceVideo.screenSharing,
       stageChannels: features.voiceVideo.stageChannels,
       maxParticipants: features.voiceVideo.maxParticipants,
+      // Which path a call takes. The client has to know: the mesh is
+      // peer-to-peer and the SFU paths are not.
+      provider: features.voiceVideo.provider,
       // A client needs the ICE servers to open a connection at all. The TURN URL is
       // therefore public - that is what it is for - but its credential is minted
       // per-session by the backend and never appears here.
@@ -286,23 +268,14 @@ function capabilities(features) {
 }
 
 // The ICE server list a client is handed, credentials stripped.
+//
+// The list belongs to the provider in force: the mesh is reached through the
+// instance's own relay, and the SFU carries the media itself.
 function iceServers(features) {
   const v = features.voiceVideo;
   if (!v.enabled) return [];
-
-  const out = [];
-  for (const u of v.stun) {
-    out.push({ urls: u });
-  }
-  // The TURN URL is here because a client needs it to open a connection. The credential is
-  // deliberately absent: the capability response is fetched by every client, including
-  // ones that are not signed in, and a credential in it would be standing TURN access for
-  // anyone. POST /api/voice/credentials hands it over to a session that belongs to the
-  // caller.
-  if (v.turn.url) {
-    out.push({ urls: v.turn.url });
-  }
-  return out;
+  const voiceConfig = require('./services/voice/config');
+  return voiceConfig.iceServers(v.provider);
 }
 
 // Is this feature usable, or is it configured but broken?
@@ -310,30 +283,23 @@ function iceServers(features) {
 // A flag that is on with no infrastructure is not usable, and a client that cannot tell
 // the difference shows a join button that does nothing. The diagnostics are for the
 // operator; the reason code is for both.
+//
+// The question is asked of the provider in force: each one has its own
+// requirements, and a mesh with no SFU credentials is not a broken mesh.
 function healthOf(features) {
   const v = features.voiceVideo;
   if (!v.enabled) {
     return { available: false, reason: 'disabled', detail: 'Voice and video are off on this instance' };
   }
 
-  const problems = [];
-  if (v.stun.length === 0 && !v.turn.url) {
-    problems.push('no STUN or TURN server is configured');
-  }
-  if (v.provider !== 'mesh') {
-    if (!v.sfuAppId) {
-      problems.push('the media server app ID is not set');
-    }
-    if (!v.sfuAppSecret) {
-      problems.push('the media server app secret is not set');
-    }
-  }
+  const voiceConfig = require('./services/voice/config');
+  const problems = voiceConfig.missing(v.provider);
 
   if (problems.length) {
     return {
       available: false,
       reason: 'misconfigured',
-      detail: 'Voice and video is on, but its infrastructure is incomplete',
+      detail: 'Voice and video is on, but the provider in force is not ready',
       problems,
     };
   }
@@ -348,9 +314,21 @@ let features = null;
 // Without this, saving a flag in the configuration centre updates the database and
 // nothing else: features.current keeps answering from the build it made at boot,
 // which is exactly the "the toggle moved and the application did not" failure.
+//
+// A reload does not refuse the way a boot does. An administrator may leave the
+// instance in a configuration that cannot carry a call - a provider that is
+// selected and not yet filled in - and the refusal belongs where a session is
+// created, where it can say what is missing. The build is still replaced, so the
+// instance answers with the configuration that was actually saved.
 function reload() {
   features = null;
-  return load();
+  try {
+    return load();
+  } catch (error) {
+    features = build();
+    console.warn('[warn] ' + (error && error.message ? error.message : 'the configuration could not be applied'));
+    return features;
+  }
 }
 
 function load() {

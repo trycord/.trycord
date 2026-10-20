@@ -17,6 +17,7 @@ import { toast, menu, sheet, confirm, attachLongPress } from '../ui.js';
 import { relativeTime } from '../../../packages/format.js';
 import Api from '../../../packages/api.js';
 import { screen, notice, stat, primaryButton, ghostButton } from './util.js';
+import { continuum, moderationSurface } from './federation.js';
 
 function field(label, control, note) {
   return el('label', { class: 'm-field' },
@@ -1468,10 +1469,16 @@ function incidentsBody() {
 }
 
 // -- federation reports -------------------------------------------------------
+//
+// The reports other instances sent about this one, and the other half of the
+// relay: what the members of this instance's communities wrote on other
+// instances. That is the owner's to moderate, and the platform administrator
+// moderates every community of the instance, so it is drawn here in full.
 
 function federationBody() {
   const host = el('div', { class: 'm-stack' });
   const list = el('div', { class: 'm-list' });
+  const moderation = el('div', { class: 'm-stack' });
 
   async function paint() {
     clear(list);
@@ -1504,13 +1511,52 @@ function federationBody() {
     }
   }
 
+  // What the members of this instance's communities wrote on other instances.
+  //
+  // The whole instance is in scope here: the platform administrator moderates
+  // every community of it, so the relay is read without naming a community.
+  async function paintModeration() {
+    clear(moderation);
+    moderation.appendChild(loading('Reading what the members of this instance wrote elsewhere'));
+    try {
+      const [servers, messages, members] = await Promise.all([
+        Api.adminServers({ limit: '100' }),
+        continuum.moderationMessages(),
+        continuum.moderationMembers(),
+      ]);
+      const names = {};
+      for (const server of Array.isArray(servers) ? servers : []) names[server.id] = server.name;
+      clear(moderation);
+      moderation.appendChild(moderationSurface({
+        messages: Array.isArray(messages) ? messages : [],
+        members: Array.isArray(members) ? members : [],
+        names,
+        refresh: paintModeration,
+      }));
+    } catch (error) {
+      clear(moderation);
+      // Federation switched off is not a failure: the instance says so.
+      if (error && error.status === 404) {
+        moderation.appendChild(empty({
+          icon: 'share',
+          title: 'Nothing to show',
+          text: 'Federation is not enabled on this instance.',
+        }));
+        return;
+      }
+      moderation.appendChild(failure(error, paintModeration));
+    }
+  }
+
   host.append(
     group('Reports received', list),
+    moderation,
     group('What a report carries', el('p', { class: 'm-lede' },
       'A reference and a reason. The content stays where it was written, and nothing '
       + 'about the person who reported it crosses either.')));
 
   paint();
+  paintModeration();
   return host;
 }
 

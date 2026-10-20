@@ -90,9 +90,49 @@ export function renderChannelView(ctx) {
               class: 'btn btn--ghost btn--sm',
               href: path('/server/' + serverId + '/channel/' + channelId + '/pins'),
             }, icon('pin', { size: 14 }), 'Pins')
-            : null),
+            : null,
+        // Whether this conversation is encrypted, and the way to make it so.
+        //
+        // The key is **not** published automatically. The server refuses text
+        // in a conversation it reports as encrypted, so a client that
+        // published a key for every conversation it opened would break the
+        // ordinary path for anybody whose encryption could not be set up. It is
+        // a decision the reader takes, and the button says what it does.
+        encryptionControl(serverId, channelId)),
     });
   };
+
+  // The encryption control for a conversation: the state, and the way to turn
+  // it on. Repaints the head when the state changes.
+  function encryptionControl(serverId, channelId) {
+    const holder = el('span', { class: 'pagehead-actions' });
+    const paint = () => {
+      const answer = encrypted.knownState(channelId);
+      const mark = encrypted.badge(answer);
+      const button = el('button', {
+        class: 'btn btn--ghost btn--sm',
+        type: 'button',
+        'aria-label': 'Encryption: ' + mark.text,
+        title: mark.text,
+        onClick: async () => {
+          try {
+            await encrypted.turnOn(channelId);
+          } catch (error) {
+            errorToast(error);
+          }
+          paint();
+        },
+      }, icon('lock', { size: 14 }), mark.text);
+      holder.replaceChildren(button);
+    };
+    paint();
+    // The state arrives from the server, so the control waits for it rather
+    // than showing "not encrypted" before it knows.
+    encrypted.conversationState(channelId)
+      .then(paint)
+      .catch(() => { /* the button still works; the state is unknown */ });
+    return holder;
+  }
 
   if (!channel) {
     return {
@@ -179,7 +219,11 @@ export function renderChannelView(ctx) {
       return out;
     },
     threadOf: (messageId) => Api.thread('channel', channelId, messageId),
-    upload: (file, onProgress) => Api.uploadAttachment(channelId, file, onProgress),
+    upload: (file, onProgress) => encrypted.upload(
+      channelId,
+      file,
+      (plainFile) => Api.uploadAttachment(channelId, plainFile, onProgress),
+    ).then((out) => { if (onProgress) onProgress(1); return out; }),
     copyHref: () => path('/server/' + serverId + '/channel/' + channelId),
     emptyHint: { title: 'This channel is quiet', text: 'The first message starts it.' },
   });
@@ -250,13 +294,16 @@ export function renderChannelView(ctx) {
   };
 
   const unsubs = [
-    on(EVENTS.MESSAGE, (event) => {
+    // The row is opened before it is shown. An encrypted message arrives as
+    // an envelope with no text, and the text is in the envelope - so a row
+    // that is drawn as it arrives is an empty bubble.
+    on(EVENTS.MESSAGE, async (event) => {
       if (String(event.channel_id || event.channelId) !== String(channelId)) return;
-      surface.api.created(event);
+      surface.api.created(await encrypted.readRow(event, channelId));
     }),
-    on(EVENTS.MESSAGE_UPDATED, (event) => {
+    on(EVENTS.MESSAGE_UPDATED, async (event) => {
       if (String(event.channel_id || event.channelId) !== String(channelId)) return;
-      surface.api.updated(event);
+      surface.api.updated(await encrypted.readRow(event, channelId));
     }),
     on(EVENTS.MESSAGE_DELETED, (event) => {
       if (String(event.channel_id || event.channelId) !== String(channelId)) return;

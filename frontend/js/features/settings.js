@@ -12,6 +12,7 @@ import { privacyView } from './settingsSafety.js';
 import { notificationsView } from './settingsNotices.js';
 import { appearanceView, backendView, updatesView } from './settingsClient.js';
 import { languageView } from './settingsLanguage.js';
+import { encryptionView } from './encryption.js';
 import { scopeNav } from '../../packages/registry.js';
 import { icon } from '../../packages/icons.js';
 import { el } from '../../packages/dom.js';
@@ -22,6 +23,7 @@ const LAYOUTS = new Map([
   ['settings.security', () => securityView()],
   ['settings.privacy', () => privacyView()],
   ['settings.notifications', () => notificationsView()],
+  ['settings.encryption', () => encryptionView()],
   ['settings.appearance', () => appearanceView()],
   ['settings.language', () => languageView()],
   ['settings.backend', () => backendView()],

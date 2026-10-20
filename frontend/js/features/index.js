@@ -81,6 +81,7 @@ export const RENDERERS = {
   'settings.security': (ctx) => renderSettings(ctx),
   'settings.privacy': (ctx) => renderSettings(ctx),
   'settings.notifications': (ctx) => renderSettings(ctx),
+  'settings.encryption': (ctx) => renderSettings(ctx),
   'settings.appearance': (ctx) => renderSettings(ctx),
   'settings.language': (ctx) => renderSettings(ctx),
   'settings.backend': (ctx) => renderSettings(ctx),

@@ -100,6 +100,17 @@ function sourceFingerprint(sourceKind, row) {
     return fingerprint([row.name, row.topic, row.type, row.position, row.category_id]);
   }
   if (sourceKind === 'community') {
+    // The federation flag is deliberately not part of this hash.
+    //
+    // The hash says what was published about the community. The flag is not
+    // that: it is a local decision about whether anything leaves this
+    // instance at all, and the rules answer it (rules.communityMayFederate).
+    //
+    // Leaving it out is also what makes the switch reversible. A row the
+    // rules refused is recorded in the ledger as withheld, and a withheld row
+    // is withheld for good - so a flag that entered this hash would make the
+    // first withdrawal permanent: the community could never be published
+    // again, not even after the operator turned federation back on.
     return fingerprint([row.name, row.description, row.icon_url, row.banner_url, row.is_public]);
   }
   // An outgoing message changes when its words change or when it is edited;

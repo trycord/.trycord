@@ -15,6 +15,14 @@ module.exports = (engine) => [
       join_code       VARCHAR(64) UNIQUE NOT NULL,
       is_public       INTEGER NOT NULL DEFAULT 0,
       is_discoverable INTEGER NOT NULL DEFAULT 1,
+      -- Federation: whether this community is relayed to other instances at
+      -- all. A community that existed before this column was federated, so
+      -- the default is 1 and nothing changes for an existing community: an
+      -- operator gains a control, and the community they already run keeps
+      -- the behaviour it had. The column is a local publishing decision, not
+      -- a description of the community, so it is not part of what is
+      -- published about it (see services/continuum/relay.js).
+      federated       INTEGER NOT NULL DEFAULT 1,
       -- Community identity media, served from the authenticated media route
       -- like a user avatar. Nullable: most communities never set one.
       icon_url        VARCHAR(512),

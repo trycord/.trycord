@@ -59,17 +59,6 @@ export function bundleFor(device) {
   };
 }
 
-/** The bundle the server hands out with a one-time prekey in it. */
-export function bundleWithPrekey(device) {
-  const bundle = bundleFor(device);
-  const shaped = asServerDevice(device);
-  // The server's own helper signs the prekey and keeps the private half on
-  // the device it made, so the responder can find it again.
-  bundle.oneTimePreKey = server.client.oneTimePreKeys(shaped, 1)[0];
-  bundle.shaped = shaped;
-  return bundle;
-}
-
 /**
  * The initiator's half of an agreement, from the client's side.
  *

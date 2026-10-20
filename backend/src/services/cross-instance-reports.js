@@ -370,14 +370,22 @@ async function listInbound(options) {
 }
 
 // One report, by id.
-async function get(id) {
+//
+// The reporter is a filter, not a hint: a report is the reporter's own, and
+// an id that belongs to somebody else is not found rather than forbidden -
+// the answer must not say that the id exists. The filter applies to the
+// outbound direction only, because the inbound direction has no reporter
+// here: those reports are the moderation queue's business.
+async function get(id, options = {}) {
+  const reporterId = options.reporterId ? String(options.reporterId) : null;
   const row = await db.get(
     'SELECT id, direction, origin_instance_id AS originInstanceId,'
     + ' target_instance_id AS targetInstanceId, community_id AS communityId,'
     + ' channel_id AS channelId, content_id AS contentId, content_type AS contentType,'
     + ' reason, status, actionable, disclosure, delivery_error AS deliveryError,'
-    + ' created_at AS createdAt, received_at AS receivedAt FROM cross_instance_reports WHERE id = ?',
-    [id]
+    + ' created_at AS createdAt, received_at AS receivedAt FROM cross_instance_reports'
+    + ' WHERE id = ?' + (reporterId ? ' AND direction = ? AND reporter_id = ?' : ''),
+    reporterId ? [id, 'outbound', reporterId] : [id]
   );
   if (!row) notFound();
   try { row.disclosure = JSON.parse(row.disclosure); } catch { row.disclosure = null; }

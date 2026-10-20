@@ -114,18 +114,56 @@ async function resolveChannel(params) {
   throw actionError('this action needs a channel or a community');
 }
 
-// The workflow acts as its owner, and the owner has to be allowed to post
-// there. An account that is not a member of the community is refused, and so
-// is one the instance has suspended: a workflow is not a way around either.
-async function assertMayPost(ctx, channel) {
+// The workflow acts as its owner, and the owner has to have a standing in the
+// community it acts on. An account that is not a member of the community is
+// refused, and so is one that is not a platform administrator: a workflow is
+// not a way around either.
+async function assertMemberOfCommunity(ctx, serverId) {
   const member = await db.get(
     'SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ?',
-    [ctx.ownerId, channel.server_id]
+    [ctx.ownerId, serverId]
   );
   if (member) return;
   const enforcement = require('../enforcement');
   if (await enforcement.isPlatformAdmin(ctx.ownerId)) return;
   throw actionError('the workflow owner is not a member of that community');
+}
+
+async function assertMayPost(ctx, channel) {
+  await assertMemberOfCommunity(ctx, channel.server_id);
+}
+
+// The owner has to be allowed to administer roles in the community before a
+// workflow may hand one out. The capability says "manage membership"; it does
+// not say "become the owner of the community".
+async function assertMayAdministerRoles(ctx, serverId) {
+  await assertMemberOfCommunity(ctx, serverId);
+  const permissions = require('../permissions');
+  const allowed = await permissions.hasPermission(ctx.ownerId, serverId, 'MANAGE_ROLES');
+  if (!allowed) {
+    throw actionError('the workflow owner may not administer roles in that community');
+  }
+}
+
+// The owner may only hand out authority they hold.
+//
+// This is the rule the interactive role routes already apply: a moderator
+// with a narrow grant who creates a role carrying MANAGE_SERVER - or the
+// literal '*' - promotes themselves in one step. The owner of the community
+// holds '*' and is unrestricted; everybody else may only build from what they
+// already have.
+async function assertDelegable(ctx, serverId, raw) {
+  const permissions = require('../permissions');
+  const held = await permissions.effectivePermissions(ctx.ownerId, serverId);
+  if (held.has('*')) return;
+  let granted = [];
+  try { granted = JSON.parse(raw || '[]'); } catch { granted = []; }
+  const forbidden = granted.filter((p) => p === '*' || !held.has(p));
+  if (forbidden.length) {
+    throw actionError(
+      'the workflow owner may not grant permissions they do not hold: ' + forbidden.join(', ')
+    );
+  }
 }
 
 // ---- the actions ----------------------------------------------------------
@@ -180,14 +218,7 @@ const ACTIONS = {
     description: 'Read the most recent messages in a channel.',
     async run(params, ctx) {
       const channel = await resolveChannel(params);
-      const member = await db.get(
-        'SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ?',
-        [ctx.ownerId, channel.server_id]
-      );
-      const enforcement = require('../enforcement');
-      if (!member && !(await enforcement.isPlatformAdmin(ctx.ownerId))) {
-        throw actionError('the workflow owner is not a member of that community');
-      }
+      await assertMemberOfCommunity(ctx, channel.server_id);
       const limit = Math.min(Math.max(Number(params.limit) || 10, 1), MAX_HISTORY);
       const rows = await db.all(
         'SELECT id, author_id, content, created_at FROM messages WHERE channel_id = ? ORDER BY seq DESC LIMIT ' + limit,
@@ -222,6 +253,7 @@ const ACTIONS = {
     description: 'Count the members of a community.',
     async run(params, ctx) {
       const serverId = requiredString(params, 'serverId', 64);
+      await assertMemberOfCommunity(ctx, serverId);
       const row = await db.get('SELECT COUNT(*) AS n FROM server_members WHERE server_id = ?', [serverId]);
       return { serverId, count: row ? Number(row.n) : 0 };
     },
@@ -234,13 +266,21 @@ const ACTIONS = {
       const serverId = requiredString(params, 'serverId', 64);
       const userId = requiredString(params, 'userId', 64);
       const roleId = requiredString(params, 'roleId', 64);
+      // Handing out a role is handing out authority, so the owner has to be
+      // allowed to do it there, and may only hand out what they hold. The
+      // capability alone does not say either: it says the workflow may manage
+      // membership, not that it may make anybody an administrator.
+      await assertMayAdministerRoles(ctx, serverId);
       const member = await db.get(
         'SELECT 1 FROM server_members WHERE user_id = ? AND server_id = ?',
         [userId, serverId]
       );
       if (!member) throw actionError('that person is not a member of the community');
-      const role = await db.get('SELECT id FROM roles WHERE id = ? AND server_id = ?', [roleId, serverId]);
+      const role = await db.get(
+        'SELECT id, permissions FROM roles WHERE id = ? AND server_id = ?', [roleId, serverId]
+      );
       if (!role) throw actionError('that role does not exist in the community');
+      await assertDelegable(ctx, serverId, role.permissions);
       await db.run(
         'INSERT INTO member_roles (server_id, user_id, role_id) VALUES (?, ?, ?)',
         [serverId, userId, roleId]
@@ -259,6 +299,7 @@ const ACTIONS = {
       const serverId = requiredString(params, 'serverId', 64);
       const eventType = requiredString(params, 'eventType', 64);
       const payload = params.payload && typeof params.payload === 'object' ? params.payload : {};
+      await assertMemberOfCommunity(ctx, serverId);
       const deliveries = await require('../webhooks').emit(serverId, eventType, payload);
       return { serverId, eventType, deliveries: deliveries.length };
     },

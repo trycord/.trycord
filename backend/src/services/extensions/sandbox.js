@@ -21,6 +21,11 @@
 //     A function from the outer realm carries the outer Function constructor
 //     with it, and that one is not restricted - so handing the context an
 //     outer function would undo the code-generation rule.
+//   * No host object is ever handed across. A timer is the case that matters:
+//     Node's timer handle is a host object, and its constructor's constructor
+//     is the outer Function, so the context is given a number and the handle
+//     stays on this side. The callback is called with no receiver for the
+//     same reason.
 //   * Values cross the boundary as strings only, in both directions, and are
 //     parsed on the far side. An object from the outer realm would carry the
 //     outer realm's constructors with it.
@@ -29,7 +34,10 @@
 //     and reported rather than left to consume the instance.
 //   * The number of calls the extension may make is bounded, and the bound is
 //     enforced on this side of the boundary, where the extension cannot reach
-//     it.
+//     it. The action catalogue enforces the same bound where the capability
+//     is checked; both are in force.
+//   * The size of the extension's output is bounded, and the bound is applied
+//     before the output leaves the worker.
 //
 // What is NOT enforced, and cannot be with Node's own vm: this is not a
 // hardened jail. Node does not provide a security boundary between a vm
@@ -69,6 +77,37 @@ const context = vm.createContext(Object.create(null), {
 
 let nextCallId = 0;
 const waiting = new Map();
+
+// The timers the context has asked for.
+//
+// Nothing the host owns may reach the context, and Node's timer handle is a
+// host object: it carries the host realm's constructors, and
+// handle.constructor.constructor is the outer Function - the very thing the
+// context's code-generation rule exists to withhold. So the host keeps the
+// handle and the context is given a number.
+//
+// The callback is invoked the same way: Node calls a timer callback with the
+// handle as its receiver, so a callback written as a plain function would see
+// the handle as its own 'this' and reach the host through it. The callback is
+// therefore called with no receiver, which leaves 'this' to the callback's
+// own strictness and its own realm - the context's.
+let nextTimerId = 0;
+const timers = new Map();
+
+function setTimer(fn, delay) {
+  const id = ++nextTimerId;
+  const handle = setTimeout(() => { Reflect.apply(fn, undefined, []); }, delay);
+  timers.set(id, handle);
+  return id;
+}
+
+function clearTimer(id) {
+  const key = Number(id);
+  const handle = timers.get(key);
+  if (!handle) return;
+  timers.delete(key);
+  clearTimeout(handle);
+}
 
 // Relays one call to the host. The host answers with a JSON string, which is
 // parsed inside the context, so the value the extension receives belongs to
@@ -121,7 +160,7 @@ const install = vm.runInContext(
   '})',
   context
 );
-install(relay, setTimeout, clearTimeout, workerData.maxDelayMs);
+install(relay, setTimer, clearTimer, workerData.maxDelayMs);
 
 // The package's source is the body of an async function: it may await, and
 // its return value is the run's output.
@@ -150,6 +189,17 @@ const wrapped = '(async () => {' + String(workerData.code) + '\\n})()';
     const result = value && typeof value.then === 'function' ? await value : value;
     let output = null;
     try { output = JSON.stringify(result === undefined ? null : result); } catch (e) { output = null; }
+    // The size of the output is bounded here rather than on the host, so a
+    // large result is never even copied across the thread boundary.
+    const bytes = output === null ? 0 : Buffer.byteLength(String(output), 'utf8');
+    if (bytes > workerData.outputBytes) {
+      parentPort.postMessage({
+        type: 'done',
+        ok: false,
+        error: 'the extension returned ' + bytes + ' bytes, which is more than the ' + workerData.outputBytes + ' bytes it may return',
+      });
+      return;
+    }
     parentPort.postMessage({ type: 'done', ok: true, output: output === undefined ? null : output });
   } catch (e) {
     parentPort.postMessage({ type: 'done', ok: false, error: String((e && e.message) || e) });
@@ -164,7 +214,7 @@ const wrapped = '(async () => {' + String(workerData.code) + '\\n})()';
  * @param {string} options.code      the entry point source
  * @param {function} options.host    (method, args) => Promise<any>; the only
  *                                   way the extension reaches the instance
- * @param {object} [options.limits]  { timeoutMs, memoryMb, callBudget }
+ * @param {object} [options.limits]  { timeoutMs, memoryMb, callBudget, outputBytes }
  * @returns {Promise<object>} { ok, output, error, calls, durationMs, timedOut }
  */
 function run(options) {
@@ -204,6 +254,7 @@ function run(options) {
           code,
           timeoutMs: limits.timeoutMs,
           maxDelayMs: 60000,
+          outputBytes: Math.max(256, Number(limits.outputBytes) || DEFAULT_LIMITS.outputBytes),
         },
         resourceLimits: {
           maxOldGenerationSizeMb: Math.max(16, Number(limits.memoryMb) || DEFAULT_LIMITS.memoryMb),
@@ -227,6 +278,19 @@ function run(options) {
       if (!message || typeof message !== 'object') return;
       if (message.type === 'call') {
         calls += 1;
+        // The call budget, enforced here as well as where the action is
+        // checked. The action catalogue is the authority - it is where the
+        // capability is checked - but a bound that only one of the two sides
+        // knows about is a bound that one of them can forget.
+        if (calls > limits.callBudget) {
+          worker.postMessage({
+            type: 'result',
+            id: message.id,
+            ok: false,
+            error: 'the run used its whole budget of ' + limits.callBudget + ' calls',
+          });
+          return;
+        }
         let payload = null;
         try {
           payload = JSON.parse(message.payload);
