@@ -1625,3 +1625,58 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-auth__legal { align-items: flex-start; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
 .m-auth__legal a { color: var(--m-brand); text-decoration: underline; }
 .m-auth__legal-version { color: var(--text-3); font-size: var(--fs-micro); }
+
+/* ---- search filters, the incident timeline and the report disclosure ------- */
+
+/* The filter bar on a phone: the chips that are in force, and the button that
+ * opens the sheet where a new one is written. */
+.m-filter-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.m-filter-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.m-filter-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 6px 4px 10px; border-radius: var(--tc-radius-pill);
+  background: var(--m-brand-soft); border: 1px solid var(--m-brand-line);
+  color: var(--m-brand); font-size: var(--fs-micro);
+}
+.m-filter-chip-text { font-family: var(--tc-font-mono); }
+.m-filter-chip-remove {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0;
+  border: 0; border-radius: 50%;
+  background: transparent; color: inherit; cursor: pointer;
+}
+.m-filter-chip-remove:focus-visible { outline: 2px solid var(--tc-brand-focus); outline-offset: 1px; }
+
+/* The incident timeline: what an operator wrote, and nothing else. */
+.m-incident {
+  display: grid; gap: 4px;
+  padding: 14px; border: 1px solid var(--line);
+  border-left: 3px solid var(--m-brand-line);
+  border-radius: var(--tc-radius-md); background: var(--panel-2);
+}
+.m-incident__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.m-incident__status {
+  padding: 2px 9px; border-radius: var(--tc-radius-pill);
+  background: var(--panel-3); color: var(--text-2);
+  font-size: var(--fs-micro); font-weight: var(--weight-strong);
+}
+.m-incident__time { color: var(--text-3); font-size: var(--fs-micro); }
+.m-incident__title { font-weight: var(--weight-strong); color: var(--text-1); }
+.m-incident__summary { margin: 0; color: var(--text-2); line-height: 1.6; }
+.m-incident__body { margin: 0; color: var(--text-3); line-height: 1.6; }
+
+/* What a cross-instance report carries, in the server's own words. */
+.m-disclosure {
+  display: grid; gap: 6px;
+  padding: 12px; border: 1px solid var(--line-2);
+  border-radius: var(--tc-radius-md); background: var(--panel-2);
+}
+.m-disclosure__title { font-weight: var(--weight-strong); color: var(--text-1); font-size: var(--fs-sm); }
+.m-disclosure__list {
+  margin: 0; padding-left: 18px; color: var(--text-2);
+  font-size: var(--fs-sm); line-height: 1.6;
+}
