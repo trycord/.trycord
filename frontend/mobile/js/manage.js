@@ -181,9 +181,12 @@ export function openChannelEditor(serverId, channel, reload) {
 }
 
 export async function deleteChannel(serverId, channel, reload) {
+  const last = channelList(serverId).length <= 1;
   const sure = await confirm({
     title: 'Delete #' + channel.name + '?',
-    text: 'Its messages go with it. This cannot be undone.',
+    text: last
+      ? 'It is the only channel here, and a community must keep one.'
+      : 'Its messages go with it. This cannot be undone.',
     confirmLabel: 'Delete',
     danger: true,
   });

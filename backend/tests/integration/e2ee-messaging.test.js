@@ -426,7 +426,7 @@ test('a message in an encrypted conversation', async (t) => {
     const ciphertext = Buffer.concat([sealed.iv, sealed.ciphertext, sealed.tag]);
 
     // The attachment id is the client's, so the seal can be bound to it.
-    const attachmentId = 'attachment-' + Date.now();
+    const attachmentId = require('node:crypto').randomUUID();
     const seal = client.sealAttachmentKey(
       encryptedId, attachmentId, fileKey, client.publicKeys(bobDevice).identityDhKey
     );

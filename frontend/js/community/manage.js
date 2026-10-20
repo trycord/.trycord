@@ -22,10 +22,13 @@ import Api from '../../packages/api.js';
 //
 // `announcement` and `forum` exist in older rows as icons only - a channel of
 // those types behaves exactly like a text channel - so they are not offered
-// here. Offering one would promise a behaviour that is not there.
+// here. Offering one would promise a behaviour that is not there. `stage` is
+// a voice channel the audience cannot speak in, and the server honours it, so
+// it is offered.
 const CHANNEL_TYPES = [
   { value: 'text', label: 'Text' },
   { value: 'voice', label: 'Voice' },
+  { value: 'stage', label: 'Stage' },
 ];
 
 function categoriesOf(serverId) {
@@ -184,9 +187,13 @@ export async function renameCategory(serverId, category) {
  * for rather than assumed.
  */
 export async function deleteChannel(serverId, channel) {
+  const tree = State.serverTree.get(serverId) || { channels: [] };
+  const last = (tree.channels || []).length <= 1;
   const sure = await confirmDialog({
     title: 'Delete ' + channel.name + '?',
-    body: 'The messages in it are deleted with it. This cannot be undone.',
+    body: last
+      ? 'It is the only channel here, and a community must keep one. Delete it and the community ends.'
+      : 'The messages in it are deleted with it. This cannot be undone.',
     confirmLabel: 'Delete channel',
     danger: true,
   });
