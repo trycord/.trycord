@@ -83,9 +83,16 @@ router.put('/', rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req, res) =
 
   // A consequential setting - one that locks people out or opens registration - is the
   // one that needs saying yes to rather than clicking save.
+  //
+  // A setting another console owns is not this page's to ask about: the
+  // console that owns it is where a person is asked, and it shows the new
+  // value the moment it changes. So a write that arrives here for one of
+  // those - from a client written before that console had its own path - is
+  // accepted rather than refused, and the value is one row either way.
   const consequential = keys.filter((k) => {
     const entry = settings.SCHEMA.find((s) => s.key === k);
-    return entry && entry.consequential;
+    if (!entry || !entry.consequential) return false;
+    return !settings.canonicalInterface(k);
   });
   if (consequential.length && body.__confirm !== true) {
     return fail(res, 'CONFIRMATION_REQUIRED',

@@ -90,10 +90,23 @@ function warnRefusedOrigin(origin, clientOrigins) {
   console.warn('[warn] refused origin ' + origin + ' (not matched by CLIENT_ORIGIN)');
 }
 
-function corsOptions(clientOrigins) {
+// The origins the instance answers.
+//
+// `clientOrigins` is the operator's allowlist. `ownOrigins` is the address
+// the instance itself is published at - the instance's own origin, and the
+// origin of the global directory it belongs to.
+//
+// The instance's own origin is always answered, and it is not a
+// cross-origin question in the first place: a request from the instance's
+// own site carries that site's origin, and it arrived on that origin.
+// Refusing it meant the instance sent no Access-Control-Allow-Origin header
+// to its own site and logged a warning about itself at every boot.
+function corsOptions(clientOrigins, ownOrigins) {
+  const own = (ownOrigins || []).filter(Boolean);
   return {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true); // curl, same-origin navigations, health probes
+      if (own.some((p) => originCovers(p, origin))) return cb(null, true);
       if (clientOrigins.length) {
         if (clientOrigins.some((p) => originCovers(p, origin))) return cb(null, true);
         warnRefusedOrigin(origin, clientOrigins);

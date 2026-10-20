@@ -210,6 +210,48 @@ test('the voice console', async () => {
     assert.match(said, /Nothing answered a binding request/, 'the detail is shown: ' + said);
   });
 
+  await test('choosing a provider is confirmed, and the save says so', async () => {
+    // The provider is a consequential setting: it decides where the media of
+    // every call travels, and the server refuses a save that does not say
+    // the person was asked.
+    //
+    // The console did not ask and did not say so, so **every provider change
+    // was refused** and the provider could not be changed at all.
+    const calls = installFetchStub({
+      'http://localhost/api/voice/providers': { json: REPORT },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
+    });
+
+    const view = adminVoice();
+    await view.onMount();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const button = byLabel(view.node, 'Use the Cloudflare Realtime provider');
+    assert.ok(button, 'the other providers are offered');
+    button.click();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // The person is asked first.
+    const dialog = document.body.querySelector('.dialog');
+    assert.ok(dialog, 'choosing a provider asks first');
+    assert.match(text(dialog), /Cloudflare Realtime/,
+      'the question names the provider: ' + text(dialog));
+
+    // The person says yes.
+    const buttons = find(dialog, (node) => node.tagName === 'BUTTON' && text(node).indexOf('Use Cloudflare') !== -1);
+    assert.ok(buttons.length, 'the dialog offers the change');
+    buttons[0].click();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // And the save carries the confirmation.
+    const saved = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1);
+    assert.ok(saved.length, 'the provider was saved');
+    const body = saved[saved.length - 1].body;
+    assert.equal(body['voice.provider'], 'cloudflare');
+    assert.equal(body.__confirm, true,
+      'the save does not carry the confirmation, so the server refuses it');
+  });
+
   await test('a provider that is not ready says what is missing', async () => {
     installFetchStub({
       'http://localhost/api/voice/providers': { json: REPORT },

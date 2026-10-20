@@ -131,6 +131,14 @@ function satisfies(version, range) {
  * accepted, because this build implements that surface as well, and a package
  * built against a newer surface is refused, because this build cannot know
  * what that surface asks of it.
+ *
+ * The newest surface this instance's family has reached counts as a surface
+ * it has. Before the extension API was given a version of its own, a package
+ * declared the application version it was built for, so the packages that
+ * installed on a 3.6 instance declared "3.6" - and refusing those would
+ * have uninstalled the extensions people had. The rule is therefore never
+ * narrower than the one it replaced: it accepts everything that used to be
+ * accepted, and everything that used to be refused is still refused.
  */
 function compatibilityReport(declared) {
   const compat = declared && typeof declared === 'object' ? declared : {};
@@ -145,11 +153,11 @@ function compatibilityReport(declared) {
       reason: 'the package targets extension API ' + api + ' and this instance implements ' + EXTENSION_API,
     };
   }
-  if (compareApiVersions(api, EXTENSION_API) > 0) {
+  if (compareApiVersions(api, newestSurface()) > 0) {
     return {
       ok: false,
       reason: 'the package targets extension API ' + api + ', which is newer than the '
-        + EXTENSION_API + ' this instance implements',
+        + newestSurface() + ' this instance reaches',
     };
   }
   if (minInstance && compareVersions(VERSION, minInstance) < 0) {
@@ -159,6 +167,25 @@ function compatibilityReport(declared) {
     return { ok: false, reason: 'the package supports Trycord up to ' + maxInstance + ', and this is ' + VERSION };
   }
   return { ok: true, api, minInstance, maxInstance };
+}
+
+// The newest extension surface this instance's family has reached.
+//
+// The surface this build implements is one thing; the newest version of the
+// application is another, and a package that declared the application
+// version it was built for - which is what every package did, while the
+// extension API version was the application version - is still a package of
+// this generation.
+//
+// The answer is the later of the two: the surface, and the application
+// version's own major and minor. It is never lower than the surface, so the
+// rule can only ever accept more than it used to.
+function newestSurface() {
+  const surface = parseApiVersion(EXTENSION_API);
+  const application = parseApiVersion(VERSION);
+  if (!surface) return EXTENSION_API;
+  if (!application) return EXTENSION_API;
+  return compareApiVersions(VERSION, EXTENSION_API) > 0 ? VERSION.split('.').slice(0, 2).join('.') : EXTENSION_API;
 }
 
 // The extension API version is written the way a package author writes it -
