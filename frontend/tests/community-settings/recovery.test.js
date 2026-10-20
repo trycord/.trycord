@@ -5,7 +5,7 @@
 // all again, and the natural thing to do is give up and leave the rules
 // empty.
 
-import test from 'node:test';
+import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -15,8 +15,15 @@ import {
 const { communitySettingsSections } = await import('../../js/features/communitySettings.js');
 const { State } = await import('../../packages/store.js');
 
-State.servers = [{ id: 's1', name: 'The Community', permissions: ['*'], is_owner: true }];
-State.user = { id: 'u1', username: 'operator' };
+// The community this console is showing.
+//
+// It is set before each check rather than once at the top of the file: the
+// checks share a process with the others, and one file's tidy-up must not
+// take another's community away.
+beforeEach(() => {
+  State.servers = [{ id: 's1', name: 'The Community', permissions: ['*'], is_owner: true }];
+  State.user = { id: 'u1', username: 'operator' };
+});
 
 // The community, as the server holds it.
 function communityJson() {

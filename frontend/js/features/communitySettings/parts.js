@@ -52,17 +52,20 @@ export function managedSecret(options) {
   const note = el('p', { class: 'settings-note' }, opts.note || '');
 
   const actions = el('span', { class: 'rowtools' });
+  // What the credential is called, without the article: "Replace the
+  // signing secret", not "Replace the The signing secret".
+  const what = String(opts.label || 'secret').replace(/^the\s+/i, '');
   if (opts.onReplace) {
     actions.appendChild(el('button', {
       class: 'btn btn--ghost btn--sm', type: 'button',
-      'aria-label': (opts.replaceLabel || 'Replace') + (opts.label ? ' the ' + opts.label : ''),
+      'aria-label': (opts.replaceLabel || 'Replace') + ' ' + what,
       onClick: opts.onReplace,
     }, icon('refresh', { size: 14 }), opts.replaceLabel || 'Replace'));
   }
   if (opts.onClear) {
     actions.appendChild(el('button', {
       class: 'btn btn--danger btn--sm', type: 'button',
-      'aria-label': (opts.clearLabel || 'Clear') + (opts.label ? ' the ' + opts.label : ''),
+      'aria-label': (opts.clearLabel || 'Clear') + ' ' + what,
       onClick: opts.onClear,
     }, opts.clearLabel || 'Clear'));
   }

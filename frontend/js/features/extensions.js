@@ -38,6 +38,13 @@ export function renderExtensions(ctx) {
 
   const offered = () => SECTIONS.filter((section) => !section.operator || isOperator());
 
+  // The section may be named in the address, so that a particular one can be
+  // linked to and a reader can come back to it.
+  function wantedSection() {
+    const asked = ctx && ctx.query ? String(ctx.query.get('section') || '') : '';
+    return offered().some((section) => section.id === asked) ? asked : SECTIONS[0].id;
+  }
+
   function paintTabs() {
     tabs.replaceChildren(...offered().map((section) => el('button', {
       class: 'segmented-item',
@@ -73,7 +80,7 @@ export function renderExtensions(ctx) {
 
   return {
     node,
-    onMount: () => show(SECTIONS[0].id),
+    onMount: () => show(wantedSection()),
     cleanup() {
       if (live && live.cleanup) live.cleanup();
       live = null;
