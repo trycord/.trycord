@@ -230,11 +230,24 @@ They are listed below.
 
 ## The number to quote, and the number to quote honestly
 
-**1 166 checks across the three suites, all green** — 636 in the backend,
-473 in the client, 57 in the public site. The backend suite boots real
+**1 250 checks across the three suites, all green** — 697 in the backend,
+496 in the client, 57 in the public site. The backend suite boots real
 instances against real databases, the federation tests run two of them side
 by side over HTTP, and the client suite drives the client rather than reading
 it.
+
+On top of those, two more kinds of check:
+
+- **The layout, in a real browser.** Eight widths, measured in pixels:
+  whether a heading sits on top of the text, whether a button is clipped by
+  the card that holds it, whether the page scrolls sideways, and whether the
+  working surface uses the width it is given.
+- **The names the code uses and does not have.** Every module in the client
+  and the backend is parsed, and every name that is read is resolved
+  through the scope chain. This is the check that found the poll editor
+  throwing on every click, the account settings throwing when a reader
+  removed their own picture, and the voice service receiving every request
+  and answering none of them.
 
 And the release is **not ready to ship as "end-to-end encrypted"**, because
 the review that would let it be called that has not happened.
