@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Trycord">
   <link rel="apple-touch-icon" href="/assets/app-icon.svg">
   <title>Changelog: what changed in Trycord</title>
-  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 1.6.1, with development continuing on main.">
+  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 3.6.0, with development continuing on main.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
@@ -114,7 +114,7 @@
         <h1>What changed, and when</h1>
         <p class="lede">
           This is curated from the repository's own history. Releases are listed
-          newest first. The current release is <strong>1.6.4</strong>, and the
+          newest first. The current release is <strong>3.6.0</strong>, and the
           entry above it is work on <code>main</code> that has not been cut into
           a release yet.
         </p>
@@ -122,9 +122,26 @@
 
       <ol class="timeline">
         <li>
-          <p class="when">3.0.0 &middot; 20 October 2026</p>
-          <h2>Standalone sign-in, a demo that reaches its instance, and a version that says what it is</h2>
+          <p class="when">3.6.0 &middot; 20 October 2026</p>
+          <h2>The voice stack that answers, the bots that listen, and the settings that have one owner</h2>
           <ul>
+            <li><strong>Fixed</strong> — the context menu closed when it was scrolled, and a closed menu left a handler behind that closed live menus.</li>
+            <li><strong>Fixed</strong> — the poll editor threw on every click, so the whole poll surface was unreachable.</li>
+            <li><strong>Fixed</strong> — removing your own picture threw, because the account settings called a function that was not in scope.</li>
+            <li><strong>Fixed</strong> — the phone threw on a poll that had a voter, and on the poll editor.</li>
+            <li><strong>Fixed</strong> — the instance answered every STUN request with nothing, because the encoder used a constant that was never defined and the handler threw the error away.</li>
+            <li><strong>Fixed</strong> — the document editor refused a heading written with a single hash, and accused the writer of using two or three.</li>
+            <li><strong>Fixed</strong> — the place column disappeared at 125% zoom, because the width it turned at was a laptop width and not a phone width.</li>
+            <li><strong>Fixed</strong> — the registration form had no place to accept the documents, and the button said nothing about why it was closed.</li>
+            <li><strong>Fixed</strong> — the voice settings could be changed in two places at once, and the two could disagree.</li>
+            <li><strong>Fixed</strong> — the instance directory did not exist, and the register page linked to it.</li>
+            <li><strong>Fixed</strong> — the community settings mount swallowed the route a reader uses to join a community.</li>
+            <li><strong>Added</strong> — the voice subsystem is a process of its own, with its own health and its own diagnostics.</li>
+            <li><strong>Added</strong> — an application can listen: the gateway hands a bot the same events a webhook is handed.</li>
+            <li><strong>Added</strong> — community onboarding: the welcome, the rules, and the questions, and what an answer does.</li>
+            <li><strong>Added</strong> — the instance directory is a page of the public site.</li>
+            <li><strong>Added</strong> — the workspace uses the width it is given, and the card head stops clipping its button.</li>
+            <li><strong>Added</strong> — the client and the backend are checked for the names they use and do not have.</li>
             <li>The sign-in and registration pages now stand alone. The shell that was meant to hide was not hiding: a component that sets its own display beats the browser's rule for the hidden attribute, so the empty shell kept the viewport and pushed the page below it.</li>
             <li>The demo and the community directory reach the instance again. The public site and the API are different origins in a real deployment, and the pages were asking for a relative path that the site cannot answer; they now resolve the address the same way the application does.</li>
             <li>The deployment build was shipping an old tree: it fetched the newest source and then checked out the branch it already had. It now deploys what it fetched.</li>
