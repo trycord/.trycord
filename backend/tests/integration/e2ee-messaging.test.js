@@ -305,8 +305,10 @@ test('a message in an encrypted conversation', async (t) => {
     const aliceSocket = await openSocket(instance, alice, channelId);
     const bobSocket = await openSocket(instance, bob, channelId);
     t.after(() => {
-      aliceSocket.socket.close();
-      bobSocket.socket.close();
+      // Terminated rather than closed: the close handshake waits for the
+      // server, and the run must not be held open by a socket.
+      aliceSocket.socket.terminate();
+      bobSocket.socket.terminate();
     });
 
     // The socket carries the envelope, and the store holds the envelope.
@@ -420,7 +422,9 @@ test('a message in an encrypted conversation', async (t) => {
     const fileText = 'the bytes of a file only the members can read';
     const fileKey = primitives.randomBytes(32);
     // The client encrypts the file before it uploads it.
-    const ciphertext = Buffer.concat([primitives.randomBytes(32), Buffer.from(fileText)]);
+    const iv = primitives.randomBytes(primitives.GCM_IV_BYTES);
+    const sealed = primitives.encrypt(fileKey, iv, Buffer.from(fileText), Buffer.from('trycord-e2ee-v1|attachment'));
+    const ciphertext = Buffer.concat([sealed.iv, sealed.ciphertext, sealed.tag]);
 
     // The attachment id is the client's, so the seal can be bound to it.
     const attachmentId = 'attachment-' + Date.now();
