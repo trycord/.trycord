@@ -277,5 +277,10 @@
     join: function (id) {
       return request('/api/discover/servers/' + encodeURIComponent(id) + '/join', { method: 'POST' });
     },
+    // The instances this one knows about. Public on purpose: it is a listing
+    // of public instances and carries nothing private.
+    instances: function () {
+      return request('/api/discovery/instances', { auth: false });
+    },
   };
 })();

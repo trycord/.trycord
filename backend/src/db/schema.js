@@ -162,6 +162,7 @@ const LEGACY_ALTERS = [
   ['servers', 'guidelines', 'ALTER TABLE servers ADD COLUMN guidelines TEXT'],
   ['servers', 'notification_defaults', 'ALTER TABLE servers ADD COLUMN notification_defaults TEXT'],
   ['servers', 'interaction_settings', 'ALTER TABLE servers ADD COLUMN interaction_settings TEXT'],
+  ['servers', 'federated', 'ALTER TABLE servers ADD COLUMN federated INTEGER NOT NULL DEFAULT 1'],
 ];
 
 // Existing MySQL databases may already have these stored as TEXT. Convert
@@ -264,6 +265,37 @@ const MYSQL_ADD = [
   ['messages', 'thread_root_id', 'ALTER TABLE messages ADD COLUMN thread_root_id VARCHAR(64)'],
   ['dm_messages', 'thread_root_id', 'ALTER TABLE dm_messages ADD COLUMN thread_root_id VARCHAR(64)'],
   ['audit_logs', 'server_id', 'ALTER TABLE audit_logs ADD COLUMN server_id VARCHAR(64)'],
+  // --- the parity block ---------------------------------------------------
+  // Everything the SQLite list adds is added here too. The two lists
+  // describe the same schema changes, and a column only one of them adds
+  // is a column one engine never gets: CREATE TABLE IF NOT EXISTS is a
+  // no-op on an existing database, so these lists are the only thing that
+  // adds a column there. Every entry is a no-op when the column is already
+  // there, so it is safe to run on every start.
+  //
+  // The `federated` column is the one this block was written for. It was
+  // added to the base schema and to the community settings and to neither
+  // list, so an instance that existed before 3.0 answered every community
+  // request with "Unknown column 'federated'", while a fresh install was
+  // fine and every test - which all start from a fresh database - was green.
+  ['users', 'terms_version', "ALTER TABLE users ADD COLUMN terms_version VARCHAR(16)"],
+  ['users', 'privacy_version', "ALTER TABLE users ADD COLUMN privacy_version VARCHAR(16)"],
+  ['users', 'terms_accepted_at', "ALTER TABLE users ADD COLUMN terms_accepted_at VARCHAR(64)"],
+  ['users', 'password_changed_at', "ALTER TABLE users ADD COLUMN password_changed_at VARCHAR(64)"],
+  ['users', 'sessions_invalidated_at', "ALTER TABLE users ADD COLUMN sessions_invalidated_at VARCHAR(64)"],
+  ['webhooks', 'direction', "ALTER TABLE webhooks ADD COLUMN direction VARCHAR(16) NOT NULL DEFAULT 'outgoing'"],
+  ['webhooks', 'use_count', "ALTER TABLE webhooks ADD COLUMN use_count INTEGER NOT NULL DEFAULT 0"],
+  ['webhooks', 'last_used_at', "ALTER TABLE webhooks ADD COLUMN last_used_at VARCHAR(64)"],
+  ['bot_applications', 'description', "ALTER TABLE bot_applications ADD COLUMN description VARCHAR(500)"],
+  ['bot_applications', 'icon_url', "ALTER TABLE bot_applications ADD COLUMN icon_url VARCHAR(512)"],
+  ['bot_applications', 'status', "ALTER TABLE bot_applications ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'active'"],
+  ['bot_applications', 'updated_at', "ALTER TABLE bot_applications ADD COLUMN updated_at VARCHAR(64)"],
+  ['bot_commands', 'options', "ALTER TABLE bot_commands ADD COLUMN options TEXT"],
+  ['bot_commands', 'updated_at', "ALTER TABLE bot_commands ADD COLUMN updated_at VARCHAR(64)"],
+  ['message_embeds', 'video_url', "ALTER TABLE message_embeds ADD COLUMN video_url VARCHAR(512)"],
+  ['messages', 'edited_at', "ALTER TABLE messages ADD COLUMN edited_at VARCHAR(64)"],
+  ['dm_messages', 'edited_at', "ALTER TABLE dm_messages ADD COLUMN edited_at VARCHAR(64)"],
+  ['servers', 'federated', 'ALTER TABLE servers ADD COLUMN federated INTEGER NOT NULL DEFAULT 1'],
 ];
 
 const INDEXES = [
