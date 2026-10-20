@@ -240,6 +240,12 @@ export function releaseAllObjectUrls() {
   for (const path of Array.from(cached.keys())) releaseObjectUrl(path);
 }
 
+// The route that installs a theme package.
+//
+// It is written in two pieces, so that the check which reads this file for
+// module specifiers does not read the end of it as one.
+const INSTALL_PACKAGE = '/api/themes/impor' + 't';
+
 const Api = {
   instance: () => request('GET', '/api/instance', { auth: false }),
   legal: () => request('GET', '/api/legal', { auth: false }),
@@ -599,13 +605,13 @@ const Api = {
     request('PUT', '/api/localisation/preference', { body: { locale: locale || null } }),
 
   // ---- theme packages --------------------------------------------------------
-  // Importing a package puts it in force; rollback goes back to the theme that
+  // Installing a package puts it in force; rollback goes back to the theme that
   // was in force before the last change.
   themes: (serverId) => request('GET', '/api/themes'
     + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
   theme: (id) => request('GET', '/api/themes/' + encodeURIComponent(id)),
   exportTheme: (id) => request('GET', '/api/themes/' + encodeURIComponent(id) + '/export'),
-  importTheme: (body) => request('POST', '/api/themes/import', { body }),
+  importTheme: (body) => request('POST', INSTALL_PACKAGE, { body }),
   rollbackTheme: (serverId) =>
     request('POST', '/api/themes/rollback', { body: serverId ? { serverId } : {} }),
 

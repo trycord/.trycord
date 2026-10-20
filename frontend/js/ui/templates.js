@@ -97,41 +97,43 @@ export function templatePicker(onPick) {
     list.replaceChildren(el('p', { class: 'holdline', 'aria-busy': 'true' }, 'Reading your templates'));
     try {
       const rows = await templates();
-      list.replaceChildren(...(rows.length ? rows.map((entry) => el('div', { class: 'template-item' },
-        el('div', { class: 'template-item-main' },
-          el('span', { class: 'template-item-name' }, entry.name),
-          entry.shortcut ? el('span', { class: 'template-item-shortcut' },
-            SHORTCUT_MARK + entry.shortcut) : null,
-          el('span', { class: 'template-item-body' }, String(entry.body || '').slice(0, 160))),
-        el('div', { class: 'template-item-actions' },
-          el('button', {
-            class: 'btn btn--default btn--sm', type: 'button',
-            'aria-label': 'Insert the template ' + entry.name,
-            onClick: () => {
-              dialog.close();
-              if (onPick) onPick(entry);
-            },
-          }, 'Insert'),
-          el('button', {
-            class: 'btn btn--ghost btn--sm', type: 'button',
-            'aria-label': 'Remove the template ' + entry.name,
-            onClick: async () => {
-              const yes = await confirmDialog({
-                title: 'Remove this template?',
-                body: entry.name + ' goes, and the shortcut stops answering.',
-                confirmLabel: 'Remove',
-                danger: true,
-              });
-              if (!yes) return;
-              try {
-                await removeTemplate(entry.id);
-                forgetTemplates();
-                paint();
-              } catch (error) { errorToast(error); }
-            },
-          }, 'Remove')))) : [el('p', { class: 'form-note' },
-        'You have no templates yet. One is a piece of text you insert often.')],
-      ));
+      const items = rows.length
+        ? rows.map((entry) => el('div', { class: 'template-item' },
+          el('div', { class: 'template-item-main' },
+            el('span', { class: 'template-item-name' }, entry.name),
+            entry.shortcut ? el('span', { class: 'template-item-shortcut' },
+              SHORTCUT_MARK + entry.shortcut) : null,
+            el('span', { class: 'template-item-body' }, String(entry.body || '').slice(0, 160))),
+          el('div', { class: 'template-item-actions' },
+            el('button', {
+              class: 'btn btn--default btn--sm', type: 'button',
+              'aria-label': 'Insert the template ' + entry.name,
+              onClick: () => {
+                dialog.close();
+                if (onPick) onPick(entry);
+              },
+            }, 'Insert'),
+            el('button', {
+              class: 'btn btn--ghost btn--sm', type: 'button',
+              'aria-label': 'Remove the template ' + entry.name,
+              onClick: async () => {
+                const yes = await confirmDialog({
+                  title: 'Remove this template?',
+                  body: entry.name + ' goes, and the shortcut stops answering.',
+                  confirmLabel: 'Remove',
+                  danger: true,
+                });
+                if (!yes) return;
+                try {
+                  await removeTemplate(entry.id);
+                  forgetTemplates();
+                  paint();
+                } catch (error) { errorToast(error); }
+              },
+            }, 'Remove'))))
+        : [el('p', { class: 'form-note' },
+          'You have no templates yet. One is a piece of text you insert often.')];
+      list.replaceChildren(...items);
       list.appendChild(el('div', { class: 'formfoot' },
         el('button', {
           class: 'btn btn--default btn--sm', type: 'button',

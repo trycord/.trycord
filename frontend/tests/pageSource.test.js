@@ -126,6 +126,21 @@ test('a code block is a code block', () => {
   assert.deepEqual(blocks, [{ type: 'code', text: 'const x = 1;', language: 'js' }]);
 });
 
+test('a code block language the server refuses is refused here too', () => {
+  const { blocks, errors } = sourceToBlocks('```two words\nconst x = 1;\n```');
+  assert.equal(blocks.length, 0);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /language/);
+});
+
+test('a code block without a closing fence is refused, with its line', () => {
+  const { blocks, errors } = sourceToBlocks('```js\nconst x = 1;');
+  assert.equal(blocks.length, 0);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].line, 1);
+  assert.match(errors[0].message, /closing fence/);
+});
+
 test('lines that are not a block are a paragraph', () => {
   const { blocks } = sourceToBlocks('A paragraph that\nruns over two lines.');
   assert.equal(blocks.length, 1);
@@ -363,6 +378,38 @@ test('the editor accepts exactly what the server accepts', () => {
     }
   }
   assert.deepEqual(disagreements, [], 'the editor and the server disagree:\n' + disagreements.join('\n'));
+});
+
+test('the source writes the blocks the server stores', () => {
+  // The projection is checked against the server's own blocks, so what the
+  // source writes and reads back is what the server would have kept.
+  const stored = serverContent.normalise([
+    { type: 'heading', level: 3, text: 'What this covers' },
+    { type: 'lead', text: 'The standfirst.' },
+    { type: 'paragraph', text: '[b]A paragraph.[/b]' },
+    { type: 'list', ordered: true, items: ['one', 'two'] },
+    { type: 'note', kind: 'warn', text: 'Careful.' },
+    { type: 'link', text: 'The policy', href: 'https://example.org/policy' },
+    { type: 'rule' },
+    { type: 'image', src: '/uploads/picture.png', alt: 'A picture', width: 320 },
+    { type: 'quote', text: 'What they said.', attribution: 'Someone' },
+    { type: 'code', text: 'const x = 1;\n  const y = 2;', language: 'js' },
+    { type: 'table', headers: ['Name', 'Cost'], rows: [['Tea', '2']], caption: 'Prices' },
+  ]);
+  const source = blocksToSource(stored);
+  const { blocks: read, errors } = sourceToBlocks(source);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(read, stored);
+});
+
+test('a blank list item is the one place the editor is stricter', () => {
+  // The server drops a list item that is blank; the editor would rather tell
+  // the operator than lose the line on the way to the server.
+  const block = { type: 'list', ordered: false, items: ['', 'a line'] };
+  assert.equal(verdict(block, (body) => serverContent.normalise(body)), '');
+  const problems = blockErrors([block]);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0].message, /cannot be blank/);
 });
 
 test('the link policy is the one the server applies', () => {

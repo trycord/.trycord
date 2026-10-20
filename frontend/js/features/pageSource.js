@@ -260,18 +260,18 @@ function isSeparator(line) {
 // The image a line describes. The alt text is required, the source is held to
 // the allowlist, and a title may only carry a width.
 function readImage(match, line, errors) {
-  const alt = inlinePlain(unescapeValue(match[1]).trim());
+  const alt = unescapeValue(match[1]).trim();
   const src = unescapeValue(match[2]).trim();
-  const block = { type: 'image', src, alt };
+  if (!alt) {
+    errors.push({ line, message: 'an image needs alt text' });
+    return null;
+  }
   const problem = imageProblem(src);
   if (problem) {
     errors.push({ line, message: problem });
     return null;
   }
-  if (!alt) {
-    errors.push({ line, message: 'an image needs alt text' });
-    return null;
-  }
+  const block = { type: 'image', src, alt };
   if (match[3] !== undefined) {
     const title = match[3].trim();
     const width = /^width=(\d+)$/.exec(title);
@@ -289,11 +289,6 @@ function readImage(match, line, errors) {
   return block;
 }
 
-// The alt text of an image is shown, not parsed, so it keeps no formatting.
-function inlinePlain(text) {
-  return String(text == null ? '' : text);
-}
-
 // The code block that starts at a fence: the code, and the fence that closes
 // it. The code keeps its indentation, because indentation is what code means.
 function readCode(lines, start, fence, info, errors) {
@@ -304,6 +299,7 @@ function readCode(lines, start, fence, info, errors) {
   const body = [];
   for (let index = start + 1; index < lines.length; index += 1) {
     if (closing.test(lines[index].trim())) {
+      if (problem) return { block: null, last: index };
       const block = { type: 'code', text: body.join('\n') };
       if (language) block.language = language.toLowerCase();
       return { block, last: index };
@@ -381,7 +377,9 @@ export function sourceToBlocks(text) {
   }
 
   // A quotation is the lines that begin with a marker, and the last of them
-  // may say who said it.
+  // may say who said it. The marker needs a line of its own to be read as an
+  // attribution, so a quotation of one line is text: the writer escapes a line
+  // that would be read as one.
   function flushQuote() {
     if (!quote) return;
     const held = quote;

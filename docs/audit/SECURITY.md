@@ -69,9 +69,16 @@ deployment's secrets.
 
 ## 2. Findings
 
-### S1 — the guard that stops a webhook or a link preview reaching into the operator's network does not exist
+### S1 — the guard that stops a webhook or a link preview reaching into the operator's network did not exist
 
-**Severity: high. Two features do not work, and the control that is supposed to protect the network is absent.**
+**Severity: high. Two features did not work, and the control that is supposed to protect the network was absent.**
+
+> **FIXED.** `netguard.assertPublicHost` now exists and is exported. It asks the
+> same two questions `fetchJson` asks - is the host forbidden, and does it
+> resolve to a private address - and throws rather than returning a boolean, so
+> a caller that forgets the refusal fails loudly. The regression test is
+> `backend/tests/integration/netguard.test.js`, and it asserts the export
+> itself, because that is the thing that was missing.
 
 `backend/src/services/webhooks.js:15` and `backend/src/services/embeds.js:16`
 both import a function called `assertPublicHost` from `./netguard`:
