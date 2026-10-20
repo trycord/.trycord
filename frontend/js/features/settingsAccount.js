@@ -9,7 +9,14 @@ import { avatar, bannerNode } from '../ui/primitives.js';
 import { head, card, fault, fold } from '../ui/page.js';
 import { errorToast, toast } from '../ui/overlays.js';
 
-function paint(identity, user) {
+// The identity panel.
+//
+// `reload` is handed in: removing the avatar or the banner changes the
+// profile, and the panel has to show the profile as it now is. It used to
+// call a `reload` that was not in its scope - a function of the view below -
+// so removing your picture threw a ReferenceError after the picture was
+// already gone, and the reader was shown an error instead of their profile.
+function paint(identity, user, reload) {
   const name = el('input', {
     class: 'input', type: 'text', value: user.displayName || user.username || '',
     'aria-label': 'Display name',
@@ -115,7 +122,7 @@ export function profileView() {
     try {
       const me = await Api.me();
       State.user = Object.assign({}, State.user || {}, me || {});
-      paint(identity, State.user || {});
+      paint(identity, State.user || {}, reload);
     } catch (e) {
       identity.replaceChildren(fold([fault(e, null)]));
     }

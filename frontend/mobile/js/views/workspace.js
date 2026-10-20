@@ -25,7 +25,7 @@ import { sheet, menu, confirm, toast } from '../ui.js';
 import { relativeTime } from '../../../packages/format.js';
 import {
   RSVP_STATUSES, RSVP_LABELS, ATTENDANCE_VISIBILITY_LABELS,
-  PRIORITY_LABELS, STATUS_LABELS, POLL_SCORING_LABELS,
+  PRIORITY_LABELS, STATUS_LABELS, POLL_SCORINGS, POLL_SCORING_LABELS,
   mayManageStructure, mayWriteDocuments, mayPost, mayActOn, paramId,
   formatInstant, readerZone, attendanceCounts, attendanceRows, bordaPoints,
   instantInZone,
@@ -924,11 +924,16 @@ export function renderPoll(ctx) {
       }
     }
 
+    // The tally is the whole section's, not the block's: the voter list below
+    // needs it to name the options a ballot chose, and it is out of scope
+    // where it was - so the voter list threw a ReferenceError for every poll
+    // that had a voter.
+    const tally = results && results.results ? results.results : null;
+
     const result = el('div', { class: 'm-list' });
     if (resultsError) {
       result.appendChild(notice({ tone: 'info', title: 'The results are not visible yet', text: resultsError }));
-    } else if (results && results.results) {
-      const tally = results.results;
+    } else if (tally) {
       for (const option of tally.options || []) {
         result.appendChild(el('div', { class: 'm-row' },
           el('span', { class: 'm-row__body' },
