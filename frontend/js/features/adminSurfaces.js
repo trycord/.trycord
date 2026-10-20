@@ -145,16 +145,48 @@ function userActions(event, user, refresh) {
   openMenu({ anchor: event.currentTarget, items: userActionItems(user, refresh) });
 }
 
+// Apply an enforcement action to an account.
+//
+// The body is the **server's** contract, not a shorthand of our own. It used
+// to send `{ kind, duration, reason }`, and the server reads `actionType`,
+// `reason`, `expiresInHours` and `confirm` - so every one of these actions
+// was refused with "invalid action type for user target" and the menu items
+// did nothing at all.
+//
+// The mapping is here, in one place, so that a change to the server's
+// vocabulary is a change to one table rather than to three call sites.
+const ENFORCEMENT = {
+  // A warning: a note on the account, and nothing more.
+  warn: { actionType: 'WARNING' },
+  // A suspension for a while. The hours are how long it lasts; without them
+  // the suspension is until it is lifted.
+  suspend: { actionType: 'SUSPENSION' },
+  // An account ban. The server asks for an explicit confirmation, because a
+  // ban is the one action that cannot be taken back by lifting it.
+  ban: { actionType: 'ACCOUNT_BAN', confirm: true },
+};
+
 async function enforceWith(user, refresh, plan) {
+  const mapping = ENFORCEMENT[plan.kind];
+  if (!mapping) {
+    errorToast({ message: 'That enforcement is not one this console can apply.' });
+    return;
+  }
+  const body = Object.assign({}, mapping, { reason: plan.reason });
+  if (plan.duration === '1d') body.expiresInHours = 24;
+
   const yes = await confirmDialog({
-    title: 'Suspend or ban ' + (user.username || 'this account') + '?',
-    body: 'The person loses access until the enforcement is lifted on purpose.',
-    confirmLabel: 'Apply enforcement',
+    title: (plan.kind === 'ban' ? 'Ban ' : 'Suspend ') + (user.username || 'this account') + '?',
+    body: plan.kind === 'ban'
+      ? 'The person loses access to everything on this instance, and the action '
+        + 'has to be undone on purpose. The reason is recorded.'
+      : 'The person loses access until the enforcement is lifted on purpose.',
+    confirmLabel: plan.kind === 'ban' ? 'Ban the account' : 'Apply enforcement',
     danger: true,
   });
   if (!yes) return;
   try {
-    await Api.adminEnforceUser(user.id, plan);
+    await Api.adminEnforceUser(user.id, body);
     toast('Enforcement applied');
     refresh();
   } catch (e) { errorToast(e); }

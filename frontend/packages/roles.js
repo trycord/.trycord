@@ -246,6 +246,114 @@ export function colourChoice(initial) {
   };
 }
 
+// The colour field of the role editor.
+//
+// The swatches are the quick way and the hex field is the exact one, and the
+// hex field refuses a colour that is not a colour rather than saving
+// something that will be drawn as nothing.
+//
+// The field says whether the colour can be seen against the panel it sits on,
+// because a role's colour is chosen by a person and a pale colour on a pale
+// panel is a role nobody can pick out.
+//
+// It returns the element and a way to read the chosen colour: null means
+// "no colour", a string means the colour, and undefined means the value in
+// the field is not a colour and must not be saved.
+export function roleColourField(options) {
+  const opts = options || {};
+  const choice = colourChoice(opts.role ? opts.role.color : null);
+  const panel = opts.panel || FALLBACK_PANEL;
+
+  const hex = el('input', {
+    class: 'input role-colour__hex', type: 'text', value: choice.value,
+    placeholder: '#ff4d24', maxlength: 7, 'aria-label': 'The role colour, as a hex value',
+  });
+  const error = el('p', { class: 'form-error', role: 'alert', hidden: true });
+  const note = el('p', { class: 'settings-note' });
+
+  const swatches = el('div', {
+    class: 'role-colour__swatches', role: 'group', 'aria-label': 'Role colours',
+  });
+
+  const markChosen = (colour) => {
+    for (const other of swatches.children) {
+      const chosen = other.getAttribute('data-colour') === colour;
+      other.classList.toggle('is-chosen', chosen);
+      other.setAttribute('aria-pressed', chosen ? 'true' : 'false');
+    }
+  };
+
+  for (const colour of choice.presets) {
+    const button = el('button', {
+      class: 'role-colour__swatch', type: 'button',
+      'aria-label': 'Use the colour ' + colour,
+      'aria-pressed': 'false',
+      onClick: () => {
+        hex.value = colour;
+        choice.set(colour);
+        markChosen(colour);
+        paintNote();
+      },
+    });
+    button.setAttribute('data-colour', colour);
+    button.style.setProperty('--role-colour', colour);
+    swatches.appendChild(button);
+  }
+  markChosen(choice.value);
+
+  const paintNote = () => {
+    const read = choice.read();
+    if (!read.ok) {
+      note.textContent = '';
+      error.hidden = true;
+      return;
+    }
+    if (!read.colour) {
+      note.textContent = 'No colour: the role is drawn in the interface\'s own.';
+      error.hidden = true;
+      return;
+    }
+    const said = choice.note(panel);
+    note.textContent = said.text;
+    error.hidden = true;
+  };
+
+  hex.addEventListener('input', () => {
+    const read = choice.read();
+    if (!read.ok) {
+      error.hidden = false;
+      error.textContent = 'A colour is six hexadecimal digits, like #ff4d24.';
+      note.textContent = '';
+      markChosen('');
+      return;
+    }
+    error.hidden = true;
+    markChosen(read.colour || '');
+    paintNote();
+  });
+  paintNote();
+
+  return {
+    node: el('div', { class: 'role-colour' },
+      el('span', { class: 'field-label' }, opts.label || 'The colour of this role'),
+      el('p', { class: 'settings-note' },
+        'The colour identifies the role. The name keeps the interface\'s own '
+        + 'colour, so a role is never unreadable.'),
+      swatches,
+      hex,
+      note,
+      error),
+    // The colour to save: null for none, a string for one, undefined for a
+    // value that is not a colour.
+    read() {
+      const read = choice.read();
+      if (!read.ok) return undefined;
+      return read.colour || null;
+    },
+    element: hex,
+  };
+}
+
 // -- the contrast of a swatch -------------------------------------------------
 
 // The panel a swatch is drawn on, when the interface has not said.
@@ -319,7 +427,7 @@ export function swatchNote(colour, panel) {
 
 export default {
   roleColor, memberRoleColor, rolesOf, roleDot, memberRoleDot, roleNames,
-  roleTint, roleChips, PRESET_COLOURS, COLOR_PATTERN, isRoleColor,
+  roleTint, roleChips, roleColourField, PRESET_COLOURS, COLOR_PATTERN, isRoleColor,
   normalizeColor, readColorInput, colourChoice, FALLBACK_PANEL,
   panelColour, relativeLuminance, contrastRatio, swatchContrast, swatchNote,
 };

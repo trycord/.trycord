@@ -85,7 +85,7 @@ test('the voice console on the phone', async () => {
   await test('a provider shows only its own fields, plus the shared ones', async () => {
     installFetchStub({
       'http://localhost/api/voice/providers': { json: REPORT },
-      'http://localhost/api/admin/settings': { json: { ok: true, changed: [] } },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
     });
 
     const body = voiceBody();
@@ -106,7 +106,7 @@ test('the voice console on the phone', async () => {
   await test('a credential is masked and can be replaced', async () => {
     const calls = installFetchStub({
       'http://localhost/api/voice/providers': { json: REPORT },
-      'http://localhost/api/admin/settings': { json: { ok: true, changed: [] } },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
     });
 
     const body = voiceBody();
@@ -123,7 +123,7 @@ test('the voice console on the phone', async () => {
     replace.click();
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    const saved = calls.filter((call) => call.url.indexOf('/api/admin/settings') !== -1);
+    const saved = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1);
     assert.ok(saved.length, 'the replacement was saved');
     assert.equal(saved[saved.length - 1].body['voice.mesh.turnCredential'], 'a-new-credential');
   });
@@ -131,7 +131,7 @@ test('the voice console on the phone', async () => {
   await test('the result of a connectivity check is shown', async () => {
     const calls = installFetchStub({
       'http://localhost/api/voice/providers': { json: REPORT },
-      'http://localhost/api/admin/settings': { json: { ok: true, changed: [] } },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
       'http://localhost/api/voice/providers/mesh/check': {
         json: { provider: 'mesh', ok: false, detail: 'Nothing answered a binding request.', checkedAt: 2, missing: [] },
       },

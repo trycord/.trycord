@@ -114,10 +114,12 @@ async function joinCommunity(api, joinCode) {
 
 // Save instance settings as an administrator.
 //
-// The consequential ones - voice on, the provider - have to be confirmed, and
-// the console confirms them.
+// The voice settings are changed in the voice console, and the general
+// Configuration page refuses them - so a save of one goes to the voice
+// console's own route. The consequential ones - voice on, the provider - have
+// to be confirmed, and the console confirms them.
 async function saveSettings(api, values) {
-  const res = await api.put('/api/admin/settings', Object.assign({ __confirm: true }, values));
+  const res = await api.put('/api/admin/voice/settings', Object.assign({ __confirm: true }, values));
   return res;
 }
 

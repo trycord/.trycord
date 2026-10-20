@@ -141,8 +141,8 @@ function usersBody() {
   // The actions on an account, one list, raised either way.
   function userActions(user) {
     return [
-      { label: 'Suspend', icon: 'clock', onSelect: () => promptEnforce(user, 'USER_SUSPENSION') },
-      { label: 'Ban', icon: 'ban', danger: true, onSelect: () => promptEnforce(user, 'USER_BAN') },
+      { label: 'Suspend', icon: 'clock', onSelect: () => promptEnforce(user, 'SUSPENSION') },
+      { label: 'Ban', icon: 'ban', danger: true, onSelect: () => promptEnforce(user, 'ACCOUNT_BAN') },
       { label: 'Lift enforcement', icon: 'check', onSelect: () => promptLift(user) },
     ];
   }
@@ -157,7 +157,7 @@ function usersBody() {
   function promptEnforce(user, actionType) {
     const reason = el('input', { class: 'm-input', placeholder: 'What is this for?', 'aria-label': 'Reason' });
     const minutes = el('input', { class: 'm-input', type: 'number', min: '1', value: '1440', 'aria-label': 'Minutes' });
-    const isBan = actionType === 'USER_BAN';
+    const isBan = actionType === 'ACCOUNT_BAN';
     const layer = sheet({
       title: isBan ? 'Ban this account' : 'Suspend this account',
       body: el('div', { class: 'm-stack' }, field('Reason', reason), isBan ? null : field('Minutes', minutes)),
@@ -166,8 +166,19 @@ function usersBody() {
         onClick: async (event) => {
           event.currentTarget.disabled = true;
           try {
+            // The server's contract: the action type it knows, the reason, and
+            // the length of a suspension in **hours**. It asked for minutes
+            // and for a type it does not have, so every one of these actions
+            // was refused.
             const body = { actionType, reason: reason.value };
-            if (!isBan) body.minutes = Number(minutes.value) || 1440;
+            if (isBan) {
+              // A ban cannot be undone by lifting it, so the server asks for
+              // an explicit confirmation and the person pressing the button
+              // is it.
+              body.confirm = true;
+            } else {
+              body.expiresInHours = Math.max(1, Math.round((Number(minutes.value) || 1440) / 60));
+            }
             await Api.adminEnforceUser(user.id, body);
             layer.close();
             toast('Saved.', { type: 'success' });

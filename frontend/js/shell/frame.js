@@ -76,6 +76,22 @@ export function brandMark(className) {
   return home;
 }
 
+// Whether the window is narrow enough for the place column to be a panel over
+// the stage rather than a column beside it.
+//
+// The stylesheet has the same question in a media query, and the two have to
+// answer it the same way: the button decides which state the column is in,
+// and the stylesheet decides what that state looks like.
+export const NARROW_WIDTH = 860;
+
+export function narrowWindow() {
+  try {
+    return window.matchMedia('(max-width: ' + NARROW_WIDTH + 'px)').matches;
+  } catch {
+    return false;
+  }
+}
+
 export function buildFrame() {
   // -- the command bar -------------------------------------------------------
   const navToggle = el('button', {
@@ -164,10 +180,24 @@ export function buildFrame() {
     scrim, dock, skip,
   };
 
+  // The button that opens and closes the place column.
+  //
+  // Three states, not two. On a wide window the column is a column:
+  // 'expanded' or 'hidden'. On a narrow window it is a panel that opens over
+  // the stage: 'overlay' or 'hidden'.
+  //
+  // The button used to know only 'expanded' and 'hidden'. On a narrow window
+  // the state was 'overlay', so one click made it 'expanded' - which is
+  // *hidden* on a narrow window, because the panel is only shown when the
+  // state is 'overlay'. The second click made it 'hidden', which is also
+  // hidden. The column could be closed and never opened again: the button was
+  // broken exactly where it is the only way in.
   navToggle.addEventListener('click', () => {
-    const next = root.dataset.nav === 'expanded' ? 'hidden' : 'expanded';
+    const state = root.dataset.nav;
+    const open = state === 'expanded' || state === 'overlay';
+    const next = open ? 'hidden' : (narrowWindow() ? 'overlay' : 'expanded');
     root.dataset.nav = next;
-    navToggle.setAttribute('aria-expanded', next === 'expanded' ? 'true' : 'false');
+    navToggle.setAttribute('aria-expanded', next === 'hidden' ? 'false' : 'true');
   });
 
   return refs;

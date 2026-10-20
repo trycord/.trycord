@@ -23,7 +23,13 @@ import {
 } from '../../packages/voice.js';
 
 const PROVIDERS_PATH = '/api/voice/providers';
-const SETTINGS_PATH = '/api/admin/settings';
+// The voice console's own settings.
+//
+// The voice settings are changed here and nowhere else. The general
+// Configuration page shows them read-only and says where they are changed,
+// and a write that arrives there for one of them is refused - so this is the
+// path that actually works.
+const SETTINGS_PATH = '/api/admin/voice/settings';
 
 // The whole picture: the provider in force, the shared controls, and every
 // provider with its own fields and its own state.
