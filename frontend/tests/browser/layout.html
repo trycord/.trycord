@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-theme="trycord">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Trycord layout harness</title>
+
+  <!-- The application's own stylesheet, so what is measured here is what the
+       application uses. -->
+  <link rel="stylesheet" href="../../css/app.css">
+
+  <!-- A minimal shell, so the measurement is of a page inside the application
+       and not of a page on its own. -->
+  <style>
+    html, body { margin: 0; height: 100%; background: var(--app-bg, #141519); }
+    body { font-family: var(--font, system-ui, sans-serif); color: var(--text-1, #eee); }
+  </style>
+</head>
+<body>
+  <!-- The harness builds the structures here and the driver measures them. -->
+  <div id="harness"></div>
+
+  <script type="module">
+    // The application's own element helper, so the structures are built the
+    // way the application builds them.
+    import { el } from '../../packages/dom.js';
+
+    const host = document.getElementById('harness');
+
+    // A page head with a long title, a note and the actions beside them -
+    // the shape that clipped the button.
+    const longTitle = 'A document with a title long enough to crowd the tools '
+      + 'that sit beside it, and to show what happens when it does';
+
+    const cardHead = el('div', { class: 'card' },
+      el('header', { class: 'cardhead' },
+        el('span', { class: 'cardhead-glyph' }, 'D'),
+        el('h2', { class: 'cardhead-label' }, longTitle),
+        el('span', { class: 'cardhead-note' }, "the community's pages"),
+        el('div', { class: 'cardhead-tools' },
+          el('button', { class: 'btn btn--default btn--sm', type: 'button' }, 'New document'))),
+      el('div', { class: 'cardbody' }, 'The body of the card.'));
+
+    // The workspace: a rail, a list and an editor, the way the workspace
+    // draws itself.
+    const studio = el('div', { class: 'studio' },
+      el('nav', { class: 'studionav' },
+        el('p', { class: 'studionav-group' }, 'Workspace'),
+        el('a', { class: 'studionav-link studionav-link--active', href: '#' },
+          el('span', { class: 'studionav-label' }, 'Documents'))),
+      el('div', { class: 'studio-stage' },
+        el('div', { class: 'collection-layout' },
+          el('div', { class: 'collection-list' },
+            el('div', { class: 'rowlist' },
+              el('div', { class: 'cardrow' }, el('div', { class: 'cardrow-main' },
+                el('div', { class: 'cardrow-title' }, 'The community handbook'),
+                el('div', { class: 'cardrow-sub' }, 'edited yesterday'))),
+              el('div', { class: 'cardrow' }, el('div', { class: 'cardrow-main' },
+                el('div', { class: 'cardrow-title' }, 'Meeting notes'),
+                el('div', { class: 'cardrow-sub' }, 'edited last week'))))),
+          el('div', { class: 'collection-detail' },
+            el('div', { class: 'fold fold--wide' },
+              el('header', { class: 'pagehead' },
+                el('div', { class: 'pagehead-main' },
+                  el('p', { class: 'pagehead-kicker' }, 'Workspace'),
+                  el('h1', { class: 'pagehead-title' }, 'Documents'),
+                  el('p', { class: 'pagehead-lede' },
+                    'The pages this community keeps, written together and kept in step.')),
+                el('div', { class: 'pagehead-actions' },
+                  el('button', { class: 'btn btn--primary btn--sm', type: 'button' }, 'New document'))),
+              cardHead)))));
+
+    // The empty state, which has to be balanced and not a hole in the page.
+    const emptyNav = el('nav', { class: 'studionav' },
+      el('p', { class: 'studionav-group' }, 'Workspace'),
+      el('a', { class: 'studionav-link', href: '#' },
+        el('span', { class: 'studionav-label' }, 'Documents')));
+
+    // The list panel, with a card head of its own: in a narrow column the
+    // title has to yield to the tools, and the tools have to stay inside the
+    // card.
+    const emptyList = el('div', { class: 'collection-list' },
+      el('div', { class: 'card' },
+        el('header', { class: 'cardhead' },
+          el('span', { class: 'cardhead-glyph' }, 'D'),
+          el('h2', { class: 'cardhead-label' }, longTitle),
+          el('span', { class: 'cardhead-note' }, "the community's pages"),
+          el('div', { class: 'cardhead-tools' },
+            el('button', { class: 'btn btn--default btn--sm', type: 'button' }, 'New document'))),
+        el('div', { class: 'cardbody cardbody--flush' },
+          el('div', { class: 'rowlist' },
+            el('div', { class: 'cardrow' },
+              el('div', { class: 'cardrow-main' },
+                el('div', { class: 'cardrow-title' }, 'No documents yet'),
+                el('div', { class: 'cardrow-sub' }, 'Nothing has been written here yet.')))))));
+
+    const emptyDetail = el('div', { class: 'collection-detail' },
+      el('div', { class: 'fold fold--wide' },
+        el('div', { class: 'blank' },
+          el('p', { class: 'blank-title' }, 'No document open'),
+          el('p', { class: 'blank-text' }, 'Choose a document on the left to read it.'))));
+
+    const empty = el('div', { class: 'studio' },
+      emptyNav,
+      el('div', { class: 'studio-stage' },
+        el('div', { class: 'collection-layout' }, emptyList, emptyDetail)));
+
+    // A reading column, for comparison: it is meant to stay narrow.
+    const reading = el('div', { class: 'fold', style: 'padding:24px' },
+      el('h1', { class: 'pagehead-title' }, 'A long article'),
+      el('p', { class: 'pagehead-lede' },
+        'A reading column has one measure of text, so a long article is readable. '
+        + 'It is meant to be narrow, and it is.'));
+
+    host.appendChild(studio);
+    host.appendChild(el('hr'));
+    host.appendChild(empty);
+    host.appendChild(el('hr'));
+    host.appendChild(reading);
+
+    // The driver asks for this.
+    window.__harness = { studio, empty, reading, cardHead };
+    window.__harnessReady = true;
+  </script>
+</body>
+</html>
