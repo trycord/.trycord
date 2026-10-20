@@ -92,4 +92,94 @@ module.exports = (engine) => [
       created_at  VARCHAR(64) NOT NULL,
       updated_at  VARCHAR(64) NOT NULL
     )${engine}`,
+
+  // A localisation pack: a set of translations for one locale.
+  //
+  // A pack is untrusted content. It says what the interface says; it cannot
+  // say what a control does. Every string it carries was checked against the
+  // source catalogue before it was stored, and the check is repeated on
+  // install so a pack that was edited on disk is refused the same way.
+  //
+  // The locale and version are recorded, so an instance can say which
+  // version of a pack it is running.
+  //
+  // A pack with a server_id belongs to a community and overrides the
+  // instance's pack for that community. A pack without one is the instance's
+  // own.
+  `CREATE TABLE IF NOT EXISTS localisation_packs (
+      id             VARCHAR(64) PRIMARY KEY,
+      locale         VARCHAR(32) NOT NULL,
+      version        VARCHAR(32) NOT NULL,
+      format_version INTEGER NOT NULL DEFAULT 1,
+      name           VARCHAR(128) NOT NULL,
+      description    VARCHAR(255),
+      strings        TEXT NOT NULL,
+      author         VARCHAR(128),
+      reviewer       VARCHAR(128),
+      review_state   VARCHAR(16) NOT NULL DEFAULT 'pending',
+      reviewer_id    VARCHAR(64),
+      server_id      VARCHAR(64),
+      source_hash    VARCHAR(128) NOT NULL,
+      installed_by   VARCHAR(64),
+      created_at     VARCHAR(64) NOT NULL,
+      updated_at     VARCHAR(64),
+      FOREIGN KEY (reviewer_id) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (installed_by) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+
+  // A theme package: tokens, a schema version and a compatibility
+  // declaration. Values, never code.
+  `CREATE TABLE IF NOT EXISTS theme_packages (
+      id             VARCHAR(64) PRIMARY KEY,
+      name           VARCHAR(128) NOT NULL,
+      version        VARCHAR(32) NOT NULL,
+      schema_version INTEGER NOT NULL,
+      tokens         TEXT NOT NULL,
+      compatibility  TEXT NOT NULL,
+      scope          VARCHAR(16) NOT NULL DEFAULT 'instance',
+      server_id      VARCHAR(64),
+      state          VARCHAR(16) NOT NULL DEFAULT 'active',
+      installed_by   VARCHAR(64),
+      created_at     VARCHAR(64) NOT NULL,
+      FOREIGN KEY (installed_by) REFERENCES users(id) ON DELETE SET NULL,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+
+  // Which theme is in force, and what was in force before it.
+  //
+  // A rollback reads this backwards: the activation before the current one is
+  // the last theme known to have worked.
+  `CREATE TABLE IF NOT EXISTS theme_activations (
+      id           VARCHAR(64) PRIMARY KEY,
+      scope        VARCHAR(16) NOT NULL,
+      server_id    VARCHAR(64),
+      theme_id     VARCHAR(64) NOT NULL,
+      reason       VARCHAR(16) NOT NULL,
+      activated_at VARCHAR(64) NOT NULL,
+      activated_by VARCHAR(64),
+      FOREIGN KEY (theme_id) REFERENCES theme_packages(id) ON DELETE CASCADE,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+
+  // The operational incident timeline.
+  //
+  // Every row is something an operator wrote. The status page shows these
+  // rows and nothing else: an instance with no incidents says it has none
+  // rather than inventing an all-clear.
+  `CREATE TABLE IF NOT EXISTS incidents (
+      id            VARCHAR(64) PRIMARY KEY,
+      kind          VARCHAR(16) NOT NULL DEFAULT 'incident',
+      status        VARCHAR(16) NOT NULL DEFAULT 'investigating',
+      title         VARCHAR(128) NOT NULL,
+      summary       TEXT NOT NULL,
+      body          TEXT,
+      started_at    VARCHAR(64) NOT NULL,
+      scheduled_for VARCHAR(64),
+      resolved_at   VARCHAR(64),
+      created_by    VARCHAR(64) NOT NULL,
+      created_at    VARCHAR(64) NOT NULL,
+      updated_at    VARCHAR(64),
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
 ];

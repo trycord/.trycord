@@ -14,6 +14,8 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { State, refreshServerTree } from '../../packages/store.js';
 import { openDialog, confirmDialog, openMenu, toast, errorToast } from '../ui/overlays.js';
+import { copyText } from '../ui/clipboard.js';
+import { navigate, path } from '../../packages/nav.js';
 import Api from '../../packages/api.js';
 
 // The types the server can actually honour.
@@ -248,36 +250,174 @@ export async function moveChannel(serverId, channel, categoryId) {
   } catch (e) { errorToast(e); return false; }
 }
 
+/**
+ * Ask which category a channel should live in.
+ *
+ * The tree and the settings page both offer this, so it is written once here.
+ */
+export function openMoveDialog(serverId, channel) {
+  const tree = State.serverTree.get(serverId) || { categories: [] };
+  const categories = (tree.categories || []).slice()
+    .sort((a, b) => (a.position || 0) - (b.position || 0));
+  const pick = async (categoryId) => {
+    dialog.close();
+    await moveChannel(serverId, channel, categoryId);
+  };
+  const list = el('div', { class: 'rowlist' },
+    el('button', {
+      class: 'row row--button', type: 'button',
+      onClick: () => pick(null),
+    }, el('span', { class: 'row-title' }, 'No category')),
+    categories.map((category) => el('button', {
+      class: 'row row--button', type: 'button',
+      onClick: () => pick(category.id),
+    }, el('span', { class: 'row-title' }, category.name))),
+  );
+  const dialog = openDialog({
+    title: 'Move ' + channel.name,
+    sub: 'The channel keeps its messages and its order.',
+    body: list,
+  });
+  return dialog;
+}
+
 /** Put the channels into a new order. The server takes the whole list. */
 export async function reorderChannels(serverId, orderedIds) {
-  try {
-    await Api.reorderChannels(serverId, orderedIds);
+  const tree = State.serverTree.get(serverId) || { channels: [] };
+  const known = (tree.channels || []).map((channel) => String(channel.id));
+  const given = (orderedIds || []).map(String);
+  // The server refuses an order that does not name every channel, so nothing
+  // is sent when the list in hand is not the whole list. A tree that is out of
+  // date is refreshed instead, because the reader's drag was not wrong - the
+  // list they dragged on was.
+  if (given.length !== known.length || !known.every((id) => given.indexOf(id) !== -1)) {
     await reload(serverId);
-  } catch (e) { errorToast(e); }
+    errorToast(new Error('The order did not name every channel, so nothing was sent. The list has been reloaded.'));
+    return false;
+  }
+  try {
+    await Api.reorderChannels(serverId, given);
+    await reload(serverId);
+    return true;
+  } catch (e) { errorToast(e); return false; }
 }
 
 /** Put the categories into a new order. */
 export async function reorderCategories(serverId, orderedIds) {
-  try {
-    await Api.reorderCategories(serverId, orderedIds);
+  const tree = State.serverTree.get(serverId) || { categories: [] };
+  const known = (tree.categories || []).map((category) => String(category.id));
+  const given = (orderedIds || []).map(String);
+  if (given.length !== known.length || !known.every((id) => given.indexOf(id) !== -1)) {
     await reload(serverId);
-  } catch (e) { errorToast(e); }
+    errorToast(new Error('The order did not name every category, so nothing was sent. The list has been reloaded.'));
+    return false;
+  }
+  try {
+    await Api.reorderCategories(serverId, given);
+    await reload(serverId);
+    return true;
+  } catch (e) { errorToast(e); return false; }
+}
+
+/**
+ * The new order of a list when one item is dropped on another.
+ *
+ * The server holds one order for the whole community, so a drop moves the
+ * item to where it was dropped and leaves the rest where they were.
+ */
+export function orderAfterDrop(items, movedId, targetId) {
+  const ids = (items || []).map((item) => String(item.id));
+  const from = ids.indexOf(String(movedId));
+  const to = ids.indexOf(String(targetId));
+  if (from === -1 || to === -1 || from === to) return null;
+  const next = ids.slice();
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+// -- dragging ----------------------------------------------------------------
+//
+// A row that can be dragged. The browser's own drag-and-drop is used, so a
+// mouse and a keyboard both work: the keyboard path is the menu, and the
+// mouse path is this.
+
+function transferId(event) {
+  if (!event.dataTransfer) return null;
+  try {
+    const value = event.dataTransfer.getData('text/plain');
+    return value ? String(value) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Make a row draggable, and say where it was dropped. */
+export function attachDragOrder(node, options) {
+  const opts = options || {};
+  node.setAttribute('draggable', 'true');
+  node.addEventListener('dragstart', (event) => {
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      try { event.dataTransfer.setData('text/plain', String(opts.id)); } catch { /* no transfer */ }
+    }
+    node.dataset.dragging = 'true';
+  });
+  node.addEventListener('dragend', () => { delete node.dataset.dragging; });
+  node.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    node.dataset.dropping = 'true';
+  });
+  node.addEventListener('dragleave', () => { delete node.dataset.dropping; });
+  node.addEventListener('drop', (event) => {
+    event.preventDefault();
+    delete node.dataset.dropping;
+    const source = transferId(event);
+    if (!source || source === String(opts.id)) return;
+    if (opts.onDrop) opts.onDrop(source, String(opts.id));
+  });
+  return node;
+}
+
+/** Make a row a place to drop something - a category heading, for instance. */
+export function attachDropTarget(node, options) {
+  const opts = options || {};
+  node.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    node.dataset.dropping = 'true';
+  });
+  node.addEventListener('dragleave', () => { delete node.dataset.dropping; });
+  node.addEventListener('drop', (event) => {
+    event.preventDefault();
+    delete node.dataset.dropping;
+    const source = transferId(event);
+    if (source && opts.onDrop) opts.onDrop(source);
+  });
+  return node;
 }
 
 /**
  * The channel's menu.
  *
  * The management entries are only here for a reader who may actually do them.
+ * Every entry performs: it navigates, it opens a dialog, or it calls the API.
  */
 export function channelMenuItems(serverId, channel, options = {}) {
   const items = [];
   const canManage = !!options.canManageChannels;
-  const canEdit = !!options.canEditChannel;
 
-  if (canEdit) {
-    items.push({ label: 'Open', icon: 'arrow-right', onSelect: () => options.onOpen && options.onOpen() });
-  }
-  items.push({ label: 'Copy link', icon: 'link', onSelect: () => options.onCopyLink && options.onCopyLink() });
+  items.push({
+    label: 'Open', icon: 'arrow-right',
+    onSelect: () => (options.onOpen ? options.onOpen() : navigate('/server/' + serverId + '/channel/' + channel.id)),
+  });
+  items.push({
+    label: 'Copy link', icon: 'link',
+    onSelect: () => (options.onCopyLink
+      ? options.onCopyLink()
+      : copyText(window.location.origin + path('/server/' + serverId + '/channel/' + channel.id), 'Link copied.')),
+  });
   if (options.onToggleMute) {
     items.push({
       label: options.muted ? 'Unmute' : 'Mute',
@@ -292,12 +432,10 @@ export function channelMenuItems(serverId, channel, options = {}) {
   if (canManage) {
     items.push({ separator: true });
     items.push({ label: 'Edit channel', icon: 'edit', onSelect: () => renameChannel(serverId, channel) });
-    if (options.onMove) {
-      items.push({ label: 'Move to category', icon: 'folder', onSelect: () => options.onMove() });
-    }
+    items.push({ label: 'Move to category', icon: 'folder', onSelect: () => openMoveDialog(serverId, channel) });
     items.push({
-      label: 'Channel permissions', icon: 'shield',
-      onSelect: () => options.onPermissions && options.onPermissions(),
+      label: 'Channel settings', icon: 'shield',
+      onSelect: () => navigate('/server/' + serverId + '/settings/channels'),
     });
     items.push({
       label: 'Delete channel', icon: 'trash', danger: true,

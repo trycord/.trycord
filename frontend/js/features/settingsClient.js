@@ -10,7 +10,7 @@
 import { el } from '../../packages/dom.js';
 import Api from '../../packages/api.js';
 import theme, { THEMES, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS } from '../../packages/theme.js';
-import { readPrefs, patchPrefs, applyDensity, DENSITIES } from '../prefs.js';
+import { readPrefs, patchPrefs, applyDensity, rememberRegions, rememberStageWidth, DENSITIES, REGIONS, STAGE_MIN, STAGE_MAX } from '../prefs.js';
 import { switchControl, fieldRow } from '../ui/primitives.js';
 import { head, card, blank, fault, fold, facts } from '../ui/page.js';
 import { toast } from '../ui/overlays.js';
@@ -102,6 +102,45 @@ function densityControls() {
     }, name.charAt(0).toUpperCase() + name.slice(1))));
 }
 
+// The arrangement: which regions of the workspace are shown. Each one is a
+// switch, and the choice is remembered for this account.
+const REGION_LABEL = {
+  rail: ['Communities rail', 'The strip of communities down the left.'],
+  column: ['Place column', 'The navigation beside the page: the places you can go.'],
+  inspector: ['Side panel', 'The panel that opens beside the page, with the roster in it.'],
+};
+
+function regionControls() {
+  const prefs = readPrefs();
+  return el('div', { class: 'layout-regions' },
+    REGIONS.map((region) => {
+      const [label, description] = REGION_LABEL[region];
+      const control = switchControl(prefs.regions[region] !== false, (on) => {
+        const next = Object.assign({}, readPrefs().regions, { [region]: on });
+        rememberRegions(next);
+      }, label);
+      return fieldRow(label, description, control);
+    }));
+}
+
+// The reading column's width. The grip in the workspace does the same thing
+// with the pointer; this is the same number, written down.
+function stageWidthControl() {
+  const prefs = readPrefs();
+  const value = el('span', { class: 'layout-value' }, prefs.stageWidth + ' px');
+  const slider = el('input', {
+    class: 'layout-width', type: 'range',
+    min: String(STAGE_MIN), max: String(STAGE_MAX), step: '20',
+    value: String(prefs.stageWidth),
+    'aria-label': 'The width of the reading column',
+  });
+  slider.addEventListener('input', () => {
+    value.textContent = slider.value + ' px';
+    rememberStageWidth(Number(slider.value));
+  });
+  return el('div', { class: 'layout-widths' }, slider, value);
+}
+
 // The motion the reader asked for, as it is stored: the choice wins over what
 // the system asks for, because the reader made it on purpose.
 function storedMotion() {
@@ -150,6 +189,18 @@ export function appearanceView() {
         rows: [el('div', {},
           el('p', { class: 'card-note' }, 'How tall rows are and how much air they carry.'),
           densityControls())],
+      }),
+      card({
+        label: 'Arrangement', glyph: 'sidebar',
+        rows: [el('div', {},
+          el('p', { class: 'card-note' }, 'Which parts of the workspace are shown.'),
+          regionControls())],
+      }),
+      card({
+        label: 'Reading column', glyph: 'monitor',
+        rows: [el('div', {},
+          el('p', { class: 'card-note' }, 'How wide the conversation is. The grip on the stage does the same.'),
+          stageWidthControl())],
       }),
       card({
         label: 'Motion', glyph: 'wind',

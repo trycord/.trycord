@@ -12,16 +12,16 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { EVENTS, on, joinChannel, leaveChannel } from '../../packages/realtime.js';
 import {
-  State, nameOf, refreshServerTree, refreshServerMembers,
-  refreshServerRoles, can, isOwner, serverById, channelById,
+  State, nameOf, refreshServerTree, refreshServerRoles, can, isOwner, serverById, channelById,
 } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
 import { avatar } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
 import { conversationSurface, asMessage, messageRow, copyText } from '../ui/chat.js';
+import { memberList } from '../ui/members.js';
 import { communitySettingsSections } from './communitySettings.js';
 import { renderVoiceRoom } from '../voice/room.js';
-import { errorToast, toast, confirmDialog, openDialog, openMenu } from '../ui/overlays.js';
+import { errorToast, toast, confirmDialog, openDialog } from '../ui/overlays.js';
 
 function renderSettingsSection(ctx, section) {
   const table = communitySettingsSections();
@@ -125,6 +125,27 @@ export function renderChannelView(ctx) {
       cleanup() { room.cleanup(); },
     };
   }
+
+  // The panel beside a channel: who is here, and what this channel is. It is
+  // the same roster the members page draws, so a reader who has seen one knows
+  // the other.
+  const roster = memberList(serverId);
+  const inspector = {
+    kind: 'channel',
+    tabs: [
+      {
+        id: 'members', label: 'Members', icon: 'users',
+        render: () => roster.load().then(() => roster.node),
+      },
+      {
+        id: 'about', label: 'About', icon: 'info',
+        render: () => el('div', { class: 'inspector-note' },
+          el('p', {}, channel.topic || 'This channel has no topic.'),
+          el('p', {}, (channel.type || 'text') + ' channel in ' + server.name + '.')),
+      },
+    ],
+    dispose() { roster.cleanup(); },
+  };
 
   const surface = conversationSurface({
     kind: 'channel',
@@ -252,12 +273,14 @@ export function renderChannelView(ctx) {
 
   return {
     node: isPins ? pinsPage : host,
+    inspector,
     onMount: open,
     cleanup() {
       generation += 1;
       for (const off of unsubs) off();
       if (!isPins) leaveChannel();
       surface.cleanup();
+      roster.cleanup();
     },
   };
 }
@@ -276,105 +299,24 @@ export function pinRow(m) {
 export function renderMembers(ctx) {
   const serverId = ctx.serverId;
   const server = serverById(serverId) || State.serverDetail.get(serverId) || { name: 'Community' };
-  const body = el('div', { class: 'rowlist' });
-
-  const paint = () => {
-    const page = State.serverMembers.get(serverId);
-    const items = (page && page.items) || [];
-    if (!items.length) {
-      body.replaceChildren(blank({
-        glyph: 'users',
-        title: 'No one else is here',
-        text: 'An invite is the way in - open the invites page to make one.',
-      }));
-      return;
-    }
-    body.replaceChildren(...items.map((member) => row({
-      lead: avatar(member, { size: 'sm', rounded: true, presence: 'offline' }),
-      title: member.nickname || nameOf(member),
-      sub: (member.roleNames && member.roleNames.join(', '))
-        || (member.isOwner || member.is_owner ? 'Community owner' : '@' + member.username),
-      href: path('/users/' + member.id + '?serverId=' + serverId),
-      link: true,
-      side: can(serverId, 'KICK_MEMBERS') || can(serverId, 'BAN_MEMBERS')
-        ? el('button', {
-          class: 'btn btn--ghost btn--sm', type: 'button',
-          'aria-label': 'Actions for ' + nameOf(member),
-          onClick: (event) => memberMenu(event, serverId, member, paint),
-        }, icon('more', { size: 15 }))
-        : null,
-    })));
-  };
+  const roster = memberList(serverId);
 
   return {
     node: fold([
       head({
         kicker: server.name,
         title: 'Members',
-        lede: 'Everyone here, newest joins last.',
+        lede: 'Everyone here, and who is about.',
         actions: can(serverId, 'MANAGE_ROLES')
           ? el('a', { class: 'btn btn--ghost btn--sm', href: path('/server/' + serverId + '/roles') },
             icon('shield', { size: 14 }), 'Roles')
           : null,
       }),
-      card({ label: 'Roster', glyph: 'users', body, flush: true }),
+      card({ label: 'Roster', glyph: 'users', body: roster.node, flush: true }),
     ]),
-    onMount: async () => {
-      if (!State.serverMembers.get(serverId)) paint();
-      try {
-        await refreshServerMembers(serverId);
-        paint();
-      } catch (e) {
-        body.replaceChildren(fold([fault(e, null)]));
-      }
-    },
-    cleanup() {},
+    onMount: () => roster.load(),
+    cleanup() { roster.cleanup(); },
   };
-}
-
-function memberMenu(event, serverId, member, paint) {
-  const items = [
-    { header: nameOf(member) || member.username },
-    {
-      label: 'Open profile', icon: 'user',
-      onSelect: () => navigate('/users/' + member.id + '?serverId=' + serverId),
-    },
-  ];
-  if (can(serverId, 'TIMEOUT_MEMBERS')) {
-    items.push({
-      label: 'Timeout for 10 minutes', icon: 'clock',
-      onSelect: () => Api.timeoutMember(serverId, member.id, 10).then(() => paint()).catch((e) => errorToast(e)),
-    });
-  }
-  if (can(serverId, 'KICK_MEMBERS')) {
-    items.push({
-      label: 'Remove from community', icon: 'logout', danger: true,
-      onSelect: () => confirmDialog({
-        title: 'Remove ' + (nameOf(member) || member.username) + '?',
-        body: 'They can come back if there is a place for them.',
-        confirmLabel: 'Remove',
-        danger: true,
-      }).then((yes) => {
-        if (!yes) return;
-        Api.kickMember(serverId, member.id).then(() => paint()).catch((e) => errorToast(e));
-      }),
-    });
-  }
-  if (can(serverId, 'BAN_MEMBERS') && !isOwner(serverId)) {
-    items.push({
-      label: 'Ban from community', icon: 'ban', danger: true,
-      onSelect: () => confirmDialog({
-        title: 'Ban ' + (nameOf(member) || member.username) + '?',
-        body: 'A ban keeps them out until it is lifted on purpose.',
-        confirmLabel: 'Ban',
-        danger: true,
-      }).then((yes) => {
-        if (!yes) return;
-        Api.banMember(serverId, member.id, '').then(() => paint()).catch((e) => errorToast(e));
-      }),
-    });
-  }
-  openMenu(event, items);
 }
 
 // -- roles, invites, categories ------------------------------------------------

@@ -22,6 +22,11 @@ const PERMISSIONS = {
   STREAM: 'Share a screen in voice channels.',
   MOVE_MEMBERS: 'Move or disconnect members in voice channels.',
   MUTE_MEMBERS: 'Mute or deafen members in voice channels.',
+  // Community packs. Neither of these can change what a control does: a pack
+  // is a set of strings and a theme is a set of values. What they decide is
+  // what the community's own interface says and how it looks.
+  MANAGE_LOCALISATION: 'Install and manage the community\'s localisation pack.',
+  MANAGE_THEME: 'Install and manage the community\'s theme package.',
 };
 
 function isKnown(perm) {

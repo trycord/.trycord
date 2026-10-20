@@ -25,6 +25,7 @@ const attachments = require('./attachments');
 const recovery = require('./recovery');
 const status = require('./status');
 const membership = require('./membership');
+const bodies = require('./bodies');
 
 /** Register a device and tell the account's other devices about it. */
 async function registerDevice(userId, input) {
@@ -162,9 +163,43 @@ async function conversationState(userId, conversationId) {
   return status.conversationState(conversationId, userId);
 }
 
+/**
+ * Whether a conversation is encrypted, for a write that has to know.
+ *
+ * The answer is the status service's: whether a conversation is encrypted
+ * is a fact about the keys its member devices hold, and nothing a client
+ * says in a request body can change it.
+ */
+async function conversationEncryption(userId, conversationId) {
+  return status.encryptionSummary(conversationId, userId);
+}
+
+/**
+ * Check a message body against the conversation it is going into.
+ *
+ * In an encrypted conversation the body has to be an envelope, and a body
+ * the server cannot validate is refused: there is no plaintext path into an
+ * encrypted conversation and no "store it as a link" path out of one. In a
+ * conversation that is not encrypted the body is text and it is stored the
+ * way it always was.
+ */
+async function acceptMessageBody(userId, conversationId, body) {
+  return bodies.accept(conversationId, userId, body);
+}
+
 /** Record an encrypted attachment and its sealed key material. */
 async function registerAttachment(userId, input) {
   return attachments.register(userId, input);
+}
+
+/**
+ * Store an encrypted attachment: the ciphertext, and the key sealed to each
+ * member device.
+ *
+ * The key is never sent to the server. There is no field for it.
+ */
+async function storeEncryptedAttachment(userId, input) {
+  return attachments.store(userId, input);
 }
 
 /** An encrypted attachment, with the seals belonging to the caller's devices. */
@@ -217,7 +252,10 @@ module.exports = {
   publishConversationKey,
   conversationKey,
   conversationState,
+  conversationEncryption,
+  acceptMessageBody,
   registerAttachment,
+  storeEncryptedAttachment,
   attachment,
   saveBackup,
   fetchBackup,

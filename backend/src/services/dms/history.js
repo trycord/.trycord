@@ -14,6 +14,7 @@ const db = require('../../db');
 const uploads = require('../uploads');
 const threads = require('../threads');
 const embeds = require('../embeds');
+const bodies = require('../e2ee/bodies');
 const { visibleConversation } = require('./conversation');
 
 // Next canonical position within a conversation. The unique index on
@@ -81,22 +82,29 @@ async function history(userId, conversationId, { before = null, after = null, li
     embeds.listForMessages(ids, 'dm'),
   ]);
 
-  return rows.map((m) => ({
-    id: m.id,
-    seq: m.seq === null || m.seq === undefined ? null : Number(m.seq),
-    conversationId: m.conversation_id,
-    content: m.content,
-    createdAt: m.created_at,
-    editedAt: m.edited_at || null,
-    authorId: m.author_id,
-    authorName: m.author_display || m.author_name,
-    threadRootId: m.thread_root_id || null,
-    replyCount: counts[m.id] || 0,
-    attachments: files[m.id] || [],
-    // Present and empty rather than absent: an arriving card needs a tray, and a missing
-    // key is indistinguishable from a preview that never came.
-    embeds: cards[m.id] || [],
-  }));
+  return rows.map((m) => {
+    // A message in an encrypted conversation is an envelope, and the row
+    // says so: the ciphertext is never handed back as if it were the text.
+    const stored = bodies.readStored(m.content);
+    return {
+      id: m.id,
+      seq: m.seq === null || m.seq === undefined ? null : Number(m.seq),
+      conversationId: m.conversation_id,
+      content: stored.content,
+      encrypted: stored.encrypted,
+      envelopes: stored.envelopes,
+      createdAt: m.created_at,
+      editedAt: m.edited_at || null,
+      authorId: m.author_id,
+      authorName: m.author_display || m.author_name,
+      threadRootId: m.thread_root_id || null,
+      replyCount: counts[m.id] || 0,
+      attachments: files[m.id] || [],
+      // Present and empty rather than absent: an arriving card needs a tray, and a missing
+      // key is indistinguishable from a preview that never came.
+      embeds: cards[m.id] || [],
+    };
+  });
 }
 
 module.exports = { nextSeq, resolveSeq, history };

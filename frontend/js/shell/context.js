@@ -13,14 +13,15 @@ import { icon } from '../../packages/icons.js';
 import { avatar, channelIcon, countBadge, iconButton, serverMark } from '../ui/primitives.js';
 import { State, can, isMuted, nameOf, refreshMutes, refreshServers } from '../../packages/store.js';
 import { path, currentRoute, navigate } from '../../packages/nav.js';
-import { openMenu, openDialog, attachContextMenu, confirmDialog, toast, errorToast } from '../ui/overlays.js';
+import { openMenu, attachContextMenu, confirmDialog, toast, errorToast } from '../ui/overlays.js';
 import { globalPages } from '../../packages/registry.js';
 import { brandMark } from './frame.js';
 import { personContextMenu } from '../ui/person.js';
 import Api from '../../packages/api.js';
 import {
-  openChannelDialog, openCategoryDialog, createChannel, moveChannel,
-  channelMenuItems, categoryMenuItems,
+  openChannelDialog, openCategoryDialog, createChannel, moveChannel, openMoveDialog,
+  channelMenuItems, categoryMenuItems, reorderChannels, reorderCategories,
+  orderAfterDrop, attachDragOrder, attachDropTarget,
 } from '../community/manage.js';
 
 // ---- shared pieces ---------------------------------------------------------
@@ -193,8 +194,6 @@ function communityContext(serverId) {
     onCopyLink: () => copyLink('/server/' + serverId + '/channel/' + channel.id),
     onCopyTopic: () => copyValue(channel.topic),
     onToggleMute: () => toggleMute(channel),
-    onMove: () => openMoveDialog(serverId, channel),
-    onPermissions: () => navigate('/server/' + serverId + '/settings/channels'),
   });
 
   const channelItem = (channel) => {
@@ -210,6 +209,18 @@ function communityContext(serverId) {
       channel.unread ? el('span', { class: 'nav-dot' }) : null,
     );
     attachContextMenu(link, () => channelMenu(channel));
+    // A channel can be dragged onto another one to take its place, or onto a
+    // category to move into it. The order the server holds is the order of the
+    // tree's own list, so the drop is computed over that list.
+    if (managesChannels) {
+      attachDragOrder(link, {
+        id: channel.id,
+        onDrop: (movedId, targetId) => {
+          const order = orderAfterDrop(tree.channels, movedId, targetId);
+          if (order) reorderChannels(serverId, order);
+        },
+      });
+    }
     return link;
   };
 
@@ -241,12 +252,29 @@ function communityContext(serverId) {
       : null;
 
     // The heading itself carries the category's menu, so a right-click on the
-    // name reaches the same actions the control does.
+    // name reaches the same actions the control does. It is also a place to
+    // drop a channel into, and - for a reader who may manage channels - a
+    // thing that can be dragged to another category to take its place.
     const heading = el('div', { class: 'nav-label' }, category.name);
     attachContextMenu(heading, () => categoryMenuItems(serverId, category, {
       canManageChannels: managesChannels,
       onCreateChannel: () => createChannel(serverId, category.id),
     }));
+    if (managesChannels) {
+      attachDropTarget(heading, {
+        onDrop: (movedId) => {
+          const channel = (tree.channels || []).find((entry) => String(entry.id) === String(movedId));
+          if (channel) moveChannel(serverId, channel, category.id);
+        },
+      });
+      attachDragOrder(heading, {
+        id: category.id,
+        onDrop: (movedId, targetId) => {
+          const order = orderAfterDrop(tree.categories, movedId, targetId);
+          if (order) reorderCategories(serverId, order);
+        },
+      });
+    }
 
     sections.push(group(category.name, (byCategory.get(category.id) || []).map(channelItem), add));
     byCategory.delete(category.id);
@@ -288,29 +316,9 @@ function communityContext(serverId) {
   };
 }
 
-// Move a channel into another category.
-function openMoveDialog(serverId, channel) {
-  const tree = State.serverTree.get(serverId) || { categories: [] };
-  const categories = tree.categories.slice().sort((a, b) => (a.position || 0) - (b.position || 0));
-  const pick = async (categoryId) => {
-    await moveChannel(serverId, channel, categoryId);
-  };
-  const list = el('div', { class: 'rowlist' },
-    el('button', {
-      class: 'row row--button', type: 'button',
-      onClick: () => pick(null),
-    }, el('span', { class: 'row-title' }, 'No category')),
-    categories.map((category) => el('button', {
-      class: 'row row--button', type: 'button',
-      onClick: () => pick(category.id),
-    }, el('span', { class: 'row-title' }, category.name))),
-  );
-  openDialog({
-    title: 'Move ' + channel.name,
-    sub: 'The channel keeps its messages and its order.',
-    body: list,
-  });
-}
+// Move a channel into another category. The dialog itself is the shared one,
+// in community/manage.js, so the tree and the settings page ask the same
+// question the same way.
 
 function openCommunityMenu(event, serverId, server) {
   const items = [

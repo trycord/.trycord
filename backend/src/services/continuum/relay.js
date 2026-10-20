@@ -7,6 +7,19 @@
 //
 // The shape of an event is described in ./events.js. This module is the
 // policy behind it.
+//
+// The publisher serves two directions, and they are the same machinery:
+//
+//   forward  - this instance owns the community, and publishes what is
+//              written in it to the peers that read it.
+//   return   - this instance does not own the community; a member of it
+//              wrote here, and the message is published to the instance that
+//              owns the community.
+//
+// The difference is which local row the event is about, and that is carried
+// in the source kind: a message written here for a community elsewhere is an
+// 'outgoing' source, and a message that arrived from a peer and is being
+// taken back at its owner is a 'relay_message' source.
 
 const crypto = require('crypto');
 const db = require('../../db');
@@ -16,6 +29,7 @@ const rules = require('./rules');
 const ledger = require('./ledger');
 const sequences = require('./sequences');
 const identity = require('./identity');
+const store = require('./store');
 
 // A hash of the state that was published. Two states with the same hash are
 // the same state, so a changed hash is a change worth relaying.
@@ -68,6 +82,12 @@ async function readSource(sourceKind, sourceId) {
       [String(sourceId)]
     );
   }
+  if (sourceKind === 'outgoing') {
+    return db.get('SELECT * FROM continuum_relay_outgoing WHERE id = ?', [String(sourceId)]);
+  }
+  if (sourceKind === 'relay_message') {
+    return db.get('SELECT * FROM continuum_relay_messages WHERE id = ?', [String(sourceId)]);
+  }
   return null;
 }
 
@@ -81,6 +101,12 @@ function sourceFingerprint(sourceKind, row) {
   }
   if (sourceKind === 'community') {
     return fingerprint([row.name, row.description, row.icon_url, row.banner_url, row.is_public]);
+  }
+  // An outgoing message changes when its words change or when it is edited;
+  // a deletion is a change of its own, kept apart from an edit.
+  if (sourceKind === 'outgoing') return fingerprint([row.content, row.edited_at]);
+  if (sourceKind === 'relay_message') {
+    return fingerprint([row.content, row.edited_at, row.deleted_at]);
   }
   return null;
 }
@@ -125,6 +151,33 @@ async function contextFor(sourceKind, row) {
   if (sourceKind === 'community') {
     return { serverId: row.id };
   }
+  // A message written here for a community that lives elsewhere: the ids it
+  // has there, and the instance it has to go to.
+  if (sourceKind === 'outgoing') {
+    return {
+      serverId: row.origin_community_id,
+      channelId: row.origin_channel_id,
+      messageId: row.id,
+      originInstanceId: row.origin_instance_id,
+      authorId: row.author_id,
+      username: row.username,
+      displayName: row.display_name,
+      createdAt: row.created_at,
+      threadRootId: row.thread_root_id || null,
+      threadRootInstanceId: row.thread_root_instance_id || null,
+    };
+  }
+  // A message that arrived from a peer: the ids it has there, so a deletion
+  // can be published back to the instance that holds it.
+  if (sourceKind === 'relay_message') {
+    return {
+      serverId: row.origin_community_id,
+      channelId: row.origin_channel_id,
+      messageId: row.origin_message_id,
+      originInstanceId: row.origin_instance_id,
+      createdAt: row.created_at,
+    };
+  }
   return null;
 }
 
@@ -133,23 +186,10 @@ async function contextFor(sourceKind, row) {
 // The source is what the ledger is keyed by, so it is also what makes a
 // second publication of the same thing a no-op.
 async function resolveSource(kind, input) {
-  let sourceKind = null;
-  let sourceId = null;
-  if (events.isSubjectKind(kind, 'message')) {
-    sourceKind = 'message';
-    sourceId = input.messageId;
-  } else if (events.isSubjectKind(kind, 'reaction')) {
-    sourceKind = 'reaction';
-    sourceId = reactionKey(input.messageId, input.userId, input.emoji);
-  } else if (events.isSubjectKind(kind, 'channel')) {
-    sourceKind = 'channel';
-    sourceId = input.channelId;
-  } else if (events.isSubjectKind(kind, 'community')) {
-    sourceKind = 'community';
-    sourceId = input.serverId;
-  }
+  const sourceKind = input.sourceKind || sourceKindFor(kind);
+  const sourceId = sourceIdFor(sourceKind, input);
   if (!sourceKind || !sourceId) return null;
-
+  if (sourceKind === 'decision') return decisionSource(sourceId, input);
   const row = await readSource(sourceKind, sourceId);
   if (!row) return null;
   return {
@@ -158,6 +198,55 @@ async function resolveSource(kind, input) {
     row,
     fingerprint: sourceFingerprint(sourceKind, row),
     context: await contextFor(sourceKind, row),
+  };
+}
+
+// The kind of local row an event is about.
+//
+// The subject of the kind decides it, unless the caller says otherwise: the
+// return direction publishes a message.posted about a row that is not a
+// local message, and the direction is named by the source kind.
+function sourceKindFor(kind) {
+  if (events.isSubjectKind(kind, 'message')) return 'message';
+  if (events.isSubjectKind(kind, 'reaction')) return 'reaction';
+  if (events.isSubjectKind(kind, 'channel')) return 'channel';
+  if (events.isSubjectKind(kind, 'community')) return 'community';
+  if (events.isSubjectKind(kind, 'decision')) return 'decision';
+  if (events.isSubjectKind(kind, 'membership')) return 'membership';
+  return null;
+}
+
+// The id of the local row an event is about.
+function sourceIdFor(sourceKind, input) {
+  if (sourceKind === 'message') return input.messageId;
+  if (sourceKind === 'reaction') return reactionKey(input.messageId, input.userId, input.emoji);
+  if (sourceKind === 'channel') return input.channelId;
+  if (sourceKind === 'community') return input.serverId;
+  if (sourceKind === 'outgoing') return input.outgoingId || input.messageId;
+  if (sourceKind === 'relay_message') return input.relayMessageId;
+  // The owner's answer about one message: the message and the instance that
+  // wrote it, so the same message is not answered twice.
+  if (sourceKind === 'decision') return [input.originInstanceId, input.messageId].join(':');
+  return null;
+}
+
+// The owner's answer about a message a member wrote elsewhere.
+//
+// There is no local row for it - the message may never have existed here -
+// so the source is made up. The ledger still keeps it, which is what stops
+// the same message being answered twice.
+function decisionSource(sourceId, input) {
+  return {
+    kind: 'decision',
+    id: String(sourceId),
+    row: null,
+    fingerprint: fingerprint([String(input.decision || ''), String(input.reason || '')]),
+    context: {
+      serverId: input.serverId || null,
+      channelId: input.channelId || null,
+      messageId: input.messageId || null,
+      originInstanceId: input.originInstanceId || null,
+    },
   };
 }
 
@@ -170,7 +259,38 @@ function reactionKey(messageId, userId, emoji) {
 // ---- rules ----------------------------------------------------------------
 
 // The rules that apply to a kind.
-async function gateFor(kind, input) {
+//
+// The source kind decides as much as the event kind does: a message about a
+// row that is not a local message is asked about the community it belongs
+// to, and the rules of the instance that owns that community are the ones
+// that answer - later, and elsewhere.
+async function gateFor(kind, input, source) {
+  const sourceKind = source ? source.kind : sourceKindFor(kind);
+
+  // A message written here for a community that lives elsewhere.
+  if (sourceKind === 'outgoing') {
+    return rules.mayPublishRemoteMessage({
+      originInstanceId: input.originInstanceId,
+      originCommunityId: input.serverId,
+      originChannelId: input.channelId,
+      userId: input.authorId,
+      removal: !!input.removal,
+    });
+  }
+
+  // A message that arrived from a peer, being taken back at its owner.
+  if (sourceKind === 'relay_message') {
+    return rules.channelMayFederate(input.serverId, input.channelId);
+  }
+
+  // The owner's answer about a message a member wrote elsewhere.
+  if (events.isSubjectKind(kind, 'decision')) {
+    return rules.mayPublishDecision({
+      serverId: input.serverId,
+      destinationInstanceId: input.destination || input.originInstanceId,
+    });
+  }
+
   if (kind === 'message.deleted' || kind === 'reaction.removed') {
     // The row is gone - that is what a deletion means - so the author's
     // permission cannot be asked about. The question that can still be
@@ -223,6 +343,7 @@ function occurredAt(kind, source, input) {
   if (source && source.row) {
     if (source.kind === 'message' || source.kind === 'reaction') return source.row.created_at;
     if (source.kind === 'community') return source.row.created_at;
+    if (source.kind === 'outgoing') return source.row.created_at;
   }
   if (input.occurredAt) return String(input.occurredAt);
   return now();
@@ -237,6 +358,7 @@ async function actorFor(kind, source, input) {
   if (input.actorId) return String(input.actorId);
   if (source && source.row) {
     if (source.kind === 'message') return source.row.author_id;
+    if (source.kind === 'outgoing') return source.row.author_id;
     if (source.kind === 'reaction') return source.row.user_id;
     if (source.kind === 'community') return source.row.owner_id;
     if (source.kind === 'channel') {
@@ -264,6 +386,17 @@ async function communitySection(serverId, full) {
   };
 }
 
+// The community as the *owner* describes it, for an event about a community
+// that lives on another instance.
+//
+// This instance does not have the community: it has the description the owner
+// published, and the owner is the only one who can describe it.
+async function remoteCommunitySection(originInstanceId, originCommunityId) {
+  const community = await store.findCommunity(originInstanceId, originCommunityId);
+  if (!community) return null;
+  return { id: community.origin_community_id, name: community.name };
+}
+
 // The channel as the origin describes it.
 async function channelSection(serverId, channelId, full) {
   const row = await db.get(
@@ -276,6 +409,16 @@ async function channelSection(serverId, channelId, full) {
   return events.channelDescriptor(row, !!(granted && granted.has('SEND_MESSAGES')));
 }
 
+// The channel as the *owner* describes it, for a community that lives
+// elsewhere.
+async function remoteChannelSection(originInstanceId, originCommunityId, originChannelId) {
+  const community = await store.findCommunity(originInstanceId, originCommunityId);
+  if (!community) return null;
+  const channel = store.channelsOf(community).find((c) => String(c.id) === String(originChannelId));
+  if (!channel) return null;
+  return events.channelDescriptor(channel, true);
+}
+
 // Build the payload for one event.
 async function buildPayload(kind, input, source, opts) {
   const actorId = await actorFor(kind, source, input);
@@ -284,8 +427,27 @@ async function buildPayload(kind, input, source, opts) {
     ? { username: input.username, display_name: input.displayName || input.username }
     : await authorSnapshot(actorId);
 
+  const instanceId = identity.getInstanceId();
+  const outgoing = !!(source && source.kind === 'outgoing');
+
+  // Which instance owns the community the event is about. Everything this
+  // instance federates, it owns; a message written here for a community that
+  // lives elsewhere belongs to that other instance.
+  const communityOwnerId = outgoing
+    ? String(input.originInstanceId)
+    : (input.communityOwnerId || instanceId);
+
+  // Which instance holds the message. The message this instance publishes is
+  // this instance's, unless it is a message that arrived from a peer and is
+  // being taken back there.
+  const messageOwnerId = input.messageOwnerId || instanceId;
+
+  // Which instance holds the thread root, if there is one.
+  const threadRootOwnerId = input.threadRootInstanceId
+    || (outgoing ? null : instanceId);
+
   const origin = events.originBlock({
-    instance_id: identity.getInstanceId(),
+    instance_id: instanceId,
     actor_id: actorId,
     author_username: snapshot.username,
     author_display_name: snapshot.display_name,
@@ -295,6 +457,9 @@ async function buildPayload(kind, input, source, opts) {
     thread_root_origin_id: (source && source.row && source.row.thread_root_id)
       || input.threadRootId
       || null,
+    community_owner_id: communityOwnerId,
+    message_owner_id: messageOwnerId,
+    thread_root_owner_id: threadRootOwnerId,
     occurred_at: occurredAt(kind, source, input),
     seq: await sequences.nextOutbound(actorId),
   });
@@ -302,20 +467,32 @@ async function buildPayload(kind, input, source, opts) {
   const payload = { origin };
   // An event addressed to one instance says so. The receiver ignores it - it
   // is the sender's business - but the delivery path needs it.
-  if (opts.destination) payload.destination_instance_id = String(opts.destination);
+  const destination = opts.destination || input.destination;
+  if (destination) payload.destination_instance_id = String(destination);
+
+  // The owner's answer carries no description of the community: it travels
+  // even when the community has been closed, and a decision that named the
+  // community would be publishing the community.
+  const decision = events.isSubjectKind(kind, 'decision');
 
   if (events.isSubjectKind(kind, 'membership')) {
     // The community of a membership event lives on the instance the event is
     // addressed to, not here, so it is described rather than looked up.
-    payload.community = {
-      id: String(input.serverId),
-      name: input.communityName ? String(input.communityName) : 'Unknown community',
-    };
+    let name = input.communityName ? String(input.communityName) : null;
+    if (!name) {
+      const local = await db.get('SELECT name FROM servers WHERE id = ?', [input.serverId]);
+      name = local ? local.name : 'Unknown community';
+    }
+    payload.community = { id: String(input.serverId), name };
   } else if (events.isSubjectKind(kind, 'community')) {
     const community = await communitySection(input.serverId, true);
     if (!community) return { ok: false, reason: 'the community does not exist' };
     payload.community = community;
-  } else if (input.serverId) {
+  } else if (outgoing) {
+    const community = await remoteCommunitySection(input.originInstanceId, input.serverId);
+    if (!community) return { ok: false, reason: 'that community is not known here' };
+    payload.community = community;
+  } else if (input.serverId && !decision) {
     const community = await communitySection(input.serverId, false);
     if (!community) return { ok: false, reason: 'the community does not exist' };
     payload.community = community;
@@ -325,20 +502,34 @@ async function buildPayload(kind, input, source, opts) {
     const channel = await channelSection(input.serverId, input.channelId, true);
     if (!channel) return { ok: false, reason: 'the channel does not exist' };
     payload.channel = channel;
-  } else if (input.channelId) {
+  } else if (outgoing) {
+    const channel = await remoteChannelSection(input.originInstanceId, input.serverId, input.channelId);
+    if (!channel) return { ok: false, reason: 'that channel is not known here' };
+    payload.channel = channel;
+  } else if (input.channelId && !decision) {
     const channel = await channelSection(input.serverId, input.channelId, false);
     if (!channel) return { ok: false, reason: 'the channel does not exist' };
     payload.channel = channel;
   }
 
   if (events.isSubjectKind(kind, 'message')) {
-    const message = source && source.row;
-    if (message) {
+    const row = source && source.row;
+    if (source && source.kind === 'relay_message') {
+      // A message that arrived from a peer, taken back at its owner. The id
+      // it has is the one it has there.
       payload.message = {
-        id: message.id,
-        content: kind === 'message.deleted' ? null : message.content,
-        created_at: message.created_at,
-        edited_at: message.edited_at || null,
+        id: row.origin_message_id,
+        content: null,
+        created_at: row.created_at,
+        edited_at: row.edited_at || null,
+        deleted_at: now(),
+      };
+    } else if (row) {
+      payload.message = {
+        id: row.id,
+        content: kind === 'message.deleted' ? null : row.content,
+        created_at: row.created_at,
+        edited_at: row.edited_at || null,
         deleted_at: kind === 'message.deleted' ? now() : null,
       };
     } else {
@@ -372,9 +563,22 @@ async function buildPayload(kind, input, source, opts) {
   if (events.isSubjectKind(kind, 'membership')) {
     payload.membership = {
       user_id: String(input.userId),
+      // Which instance the member's id belongs to. A member's own instance
+      // speaks for them when they join; the owner speaks for them when it
+      // changes their standing.
+      member_instance_id: String(input.memberInstanceId || instanceId),
       username: input.username == null ? null : String(input.username),
       display_name: input.displayName == null ? null : String(input.displayName),
       state: String(input.state || 'joined'),
+    };
+  }
+
+  if (events.isSubjectKind(kind, 'decision')) {
+    payload.decision = {
+      decision: String(input.decision),
+      reason: input.reason ? String(input.reason) : null,
+      // The writer, as the instance that owns the community knows them.
+      author_origin_id: input.authorId ? String(input.authorId) : null,
     };
   }
 
@@ -421,7 +625,7 @@ async function prepare(kind, payload, opts = {}) {
     }
   }
 
-  const gate = await gateFor(kind, input);
+  const gate = await gateFor(kind, input, source);
   if (!gate.ok) return { ok: false, reason: gate.reason, withhold: true, source };
 
   // The row is claimed before the event is written, so two writers racing
@@ -449,6 +653,29 @@ async function prepare(kind, payload, opts = {}) {
   };
 }
 
+// The input that publishes a message written here for a community that lives
+// elsewhere.
+//
+// The ids it carries are the ones the owner knows it by: the community and
+// the channel as they are there, and the message as it is here.
+function outgoingInput(row) {
+  return {
+    sourceKind: 'outgoing',
+    outgoingId: row.id,
+    originInstanceId: row.origin_instance_id,
+    serverId: row.origin_community_id,
+    channelId: row.origin_channel_id,
+    messageId: row.id,
+    authorId: row.author_id,
+    username: row.username,
+    displayName: row.display_name,
+    occurredAt: row.created_at,
+    threadRootId: row.thread_root_id,
+    threadRootInstanceId: row.thread_root_instance_id,
+    destination: row.origin_instance_id,
+  };
+}
+
 // The input a change event carries, for a row that still exists.
 async function updateInput(sourceKind, row) {
   if (sourceKind === 'message') {
@@ -460,6 +687,11 @@ async function updateInput(sourceKind, row) {
   }
   if (sourceKind === 'community') {
     return { serverId: row.id };
+  }
+  // A message written here for a community that lives elsewhere: the change
+  // goes back to the instance that owns it, and to nobody else.
+  if (sourceKind === 'outgoing') {
+    return outgoingInput(row);
   }
   return null;
 }
@@ -493,6 +725,27 @@ function deletionInput(sourceKind, sourceId, context) {
       occurredAt: ctx.createdAt,
     };
   }
+  // A message written here for a community that lives elsewhere.
+  if (sourceKind === 'outgoing') {
+    const input = outgoingInput({
+      id: String(sourceId),
+      origin_instance_id: ctx.originInstanceId,
+      origin_community_id: ctx.serverId,
+      origin_channel_id: ctx.channelId,
+      author_id: ctx.authorId,
+      username: ctx.username,
+      display_name: ctx.displayName,
+      created_at: ctx.createdAt,
+      thread_root_id: ctx.threadRootId,
+      thread_root_instance_id: ctx.threadRootInstanceId,
+    });
+    // The writer took it back. The member's standing does not matter for a
+    // removal: the message has to go, and it goes to the instance that
+    // holds it.
+    input.removal = true;
+    input.messageId = ctx.messageId || String(sourceId);
+    return input;
+  }
   return null;
 }
 
@@ -502,4 +755,5 @@ module.exports = {
   prepare,
   updateInput,
   deletionInput,
+  outgoingInput,
 };

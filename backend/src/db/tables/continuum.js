@@ -211,9 +211,53 @@ module.exports = (engine) => [
       UNIQUE (origin_instance_id, origin_message_id, origin_user_id, emoji)
     )${engine}`,
 
+  // A message written here for a community that lives on another instance.
+  //
+  // This is the return direction. A member of a federated community writes on
+  // this instance, and the message travels to the instance that owns the
+  // community. It is not a local message - the community is not here - so it
+  // has a table of its own and a lifecycle of its own:
+  //
+  //   pending  - written here; the owner has not answered yet
+  //   accepted - the owner took it
+  //   refused  - the owner would not take it, and said why
+  //   deleted  - it was taken back, here or at the owner
+  //
+  // The community and the channel keep the ids they have on the instance that
+  // owns them (origin_community_id, origin_channel_id); the message keeps the
+  // id it has here, which is this row's id.
+  `CREATE TABLE IF NOT EXISTS continuum_relay_outgoing (
+      id                     VARCHAR(64) PRIMARY KEY,
+      origin_instance_id     VARCHAR(64) NOT NULL,
+      origin_community_id    VARCHAR(64) NOT NULL,
+      origin_channel_id      VARCHAR(64) NOT NULL,
+      author_id              VARCHAR(64) NOT NULL,
+      username               VARCHAR(128),
+      display_name           VARCHAR(128),
+      content                TEXT,
+      created_at             VARCHAR(64) NOT NULL,
+      edited_at              VARCHAR(64),
+      deleted_at             VARCHAR(64),
+      -- The thread root, and the instance that holds it: a reply can hang
+      -- from a message the owner wrote and from one another member wrote
+      -- here, and the two are not on the same instance.
+      thread_root_id         VARCHAR(64),
+      thread_root_instance_id VARCHAR(64),
+      state                  VARCHAR(16) NOT NULL DEFAULT 'pending',
+      reason                 TEXT,
+      event_id               VARCHAR(64),
+      decided_at             VARCHAR(64),
+      updated_at             VARCHAR(64) NOT NULL
+    )${engine}`,
+
   // A member of one of this instance's communities who lives on another
   // instance. The origin decides what such a member may do; this row is the
   // origin's record of them, and it grants nothing here.
+  //
+  // The state is what the owner has decided about them: 'joined' (a member),
+  // 'left' (they left, or the owner removed them), 'muted' (a member whose
+  // writing the owner does not accept) and 'removed' (taken out of the
+  // community).
   `CREATE TABLE IF NOT EXISTS continuum_relay_memberships (
       id                  VARCHAR(64) PRIMARY KEY,
       origin_instance_id  VARCHAR(64) NOT NULL,

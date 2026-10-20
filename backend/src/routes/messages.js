@@ -32,6 +32,8 @@ const bots = require('../services/bots');
 const mentions = require('../services/mentions');
 const { EVENTS } = require('../ws/events.js');
 const continuum = require('../services/continuum');
+const e2ee = require('../services/e2ee');
+const e2eeBodies = require('../services/e2ee/bodies');
 
 let broadcast = () => {};
 let sendToUser = () => {};
@@ -146,6 +148,10 @@ router.get('/', async (req, res, next) => {
     // backward page.
     if (req.query.after === undefined || req.query.after === '') rows.reverse();
     rows.forEach((r) => { r.attachments = byId[r.id] || []; });
+    // A message in an encrypted conversation is an envelope, and the row says
+    // so: the ciphertext is never handed back as if it were the text of the
+    // message.
+    rows.forEach((r) => { e2eeBodies.applyToRow(r); });
     // One grouped query for the whole page, so a history read costs the same
     // whether or not anything has been replied to.
     const counts = await threads.replyCounts('channel', ch.id, rows.map((r) => r.id));
@@ -167,7 +173,12 @@ router.get('/:messageId/thread', async (req, res, next) => {
     const ch = await visibleChannel(req.params.channelId, req.user.id);
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     const rootId = await threads.resolveRoot('channel', ch.id, req.params.messageId);
-    res.json(await threads.fetch('channel', ch.id, rootId));
+    const thread = await threads.fetch('channel', ch.id, rootId);
+    // The thread carries the same rows the history does, so the same rule
+    // applies: an envelope row says it is one.
+    e2eeBodies.applyToRow(thread.root);
+    for (const reply of thread.replies) e2eeBodies.applyToRow(reply);
+    res.json(thread);
   } catch (e) {
     if (e && e.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'message not found');
     next(e);
@@ -200,22 +211,30 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     const ch = await theChannel(req, res);
     if (!ch || !(await mayAct(req, res, ch, 'SEND_MESSAGES',
       'you cannot post in this community'))) return;
-    const content = readContent((req.body || {}).content);
+    const body = req.body || {};
+
+    // A message in an encrypted conversation is an envelope, not text. The
+    // text is not read and not stored: the body has to carry the envelope,
+    // and the server never holds the key that opens it.
+    const carriesEnvelopes = body.envelopes !== undefined && body.envelopes !== null;
+    const content = carriesEnvelopes ? '' : readContent(body.content);
 
     // Opt-out from link previews for this one message. Read here rather than
     // trusted from the client: a flag the server ignores is a toggle that only
     // looks like it works.
-    const suppressEmbeds = (req.body || {}).suppressEmbeds === true;
+    const suppressEmbeds = body.suppressEmbeds === true;
     // Attachments and text are independent: a message may carry files
     // alone, text alone, or both — but must carry at least one.
-    const ids = uploads.sanitizeIds((req.body || {}).attachmentIds);
-    if (!content && !ids.length) return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
+    const ids = uploads.sanitizeIds(body.attachmentIds);
+    if (!content && !ids.length && !carriesEnvelopes) {
+      return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
+    }
 
     // A reply to something that is not in this channel is refused rather than
     // quietly posted flat, which would look like the app had lost the message.
     let threadRootId = null;
     try {
-      threadRootId = await threads.resolveRoot('channel', ch.id, (req.body || {}).replyToId);
+      threadRootId = await threads.resolveRoot('channel', ch.id, body.replyToId);
     } catch (e) {
       return fail(res, e.code === 'NOT_FOUND' ? 'NOT_FOUND' : 'VALIDATION_ERROR',
         e.code === 'NOT_FOUND' ? 'the message being replied to does not exist here' : 'cannot reply to that message');
@@ -227,7 +246,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     // second copy. The nonce is scoped to the channel and is never compared
     // against message text or timestamps, so two genuinely different
     // messages that happen to be identical are still two messages.
-    const nonce = String((req.body || {}).clientNonce || '').trim().slice(0, 64) || null;
+    const nonce = String(body.clientNonce || '').trim().slice(0, 64) || null;
     if (nonce) {
       const existing = await db.get(
         `SELECT m.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
@@ -238,16 +257,43 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       if (existing) {
         const byId = await uploads.getForMessages([existing.id]);
         existing.attachments = byId[existing.id] || [];
+        e2eeBodies.applyToRow(existing);
         await attachEngagement([existing], req.user.id);
         // 200, not 201: nothing new was created.
         return res.json({ ...existing, server_id: ch.server_id, deduped: true });
       }
     }
 
+    // Whether this conversation is encrypted is the status service's answer,
+    // not the client's. In an encrypted conversation the body has to be an
+    // envelope, and a body the server cannot validate - a bad version, a
+    // malformed envelope, an envelope for another conversation - is refused
+    // with nothing stored. There is no plaintext path into an encrypted
+    // conversation and no "store it as a link" path out of one.
+    let accepted;
+    try {
+      accepted = await e2ee.acceptMessageBody(req.user.id, ch.id, {
+        content,
+        envelopes: body.envelopes,
+      });
+    } catch (e) {
+      if (e && e.code && e.status) return fail(res, e.code, e.message, e.status);
+      throw e;
+    }
+
     const msg = {
       id: uuid(), channel_id: ch.id, server_id: ch.server_id,
-      author_id: req.user.id, user: req.user.username, content, created_at: now(),
+      author_id: req.user.id, user: req.user.username,
+      // The text of a message that is not encrypted, and nothing at all for
+      // one that is: the client reads the envelope.
+      content: accepted.content,
+      encrypted: accepted.encrypted,
+      envelopes: accepted.envelopes,
+      created_at: now(),
       edited_at: null, thread_root_id: threadRootId,
+      // What is true about this conversation's encryption, so that a client
+      // can say it rather than guess.
+      encryption: accepted.encryption,
       // Present and empty rather than absent: the client stores previews per
       // message id, and a missing key is indistinguishable from a message whose
       // preview simply never arrived.
@@ -262,7 +308,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
         await db.run(
           'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq, client_nonce, thread_root_id)' +
           ' VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-          [msg.id, msg.channel_id, msg.author_id, msg.content, msg.created_at, seq, nonce, threadRootId]
+          [msg.id, msg.channel_id, msg.author_id, accepted.stored, msg.created_at, seq, nonce, threadRootId]
         );
         msg.seq = seq;
         inserted = true;
@@ -281,12 +327,18 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     if (!inserted) return fail(res, 'CONFLICT', 'could not assign a message position, please retry');
     // The search index follows the message. A failure here must not lose the
     // message - it is already written, and the backfill will pick it up.
-    require('../services/search-index')
-      .indexMessage({
-        id: msg.id, channelId: msg.channel_id, authorId: msg.author_id,
-        content: msg.content, createdAt: msg.created_at, serverId: ch.server_id,
-      })
-      .catch(() => {});
+    //
+    // An encrypted message is not indexed: the words of it are ciphertext,
+    // and indexing that would put the ciphertext in the index and answer a
+    // search with noise. A message nobody can read is not searchable.
+    if (!accepted.encrypted) {
+      require('../services/search-index')
+        .indexMessage({
+          id: msg.id, channelId: msg.channel_id, authorId: msg.author_id,
+          content, createdAt: msg.created_at, serverId: ch.server_id,
+        })
+        .catch(() => {});
+    }
     msg.attachments = ids.length
       ? await uploads.attachToMessage(ids, msg.id, req.user.id, { channelId: ch.id })
       : [];
@@ -296,10 +348,14 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     // Fan out to federated instances: a message posted to a community becomes a
     // durable outbox event that the job system delivers to trusted remote
     // instances. Never fails the post.
+    //
+    // An encrypted message travels as its envelope: the plaintext is not in
+    // the outbox, and there is no plaintext to put there.
     try {
       await continuum.enqueueEvent('message.posted', {
         serverId: ch.server_id, channelId: ch.id, messageId: msg.id,
-        authorId: msg.author_id, content,
+        authorId: msg.author_id, content: accepted.encrypted ? undefined : content,
+        encrypted: accepted.encrypted,
       }, { actorId: req.user.id, targetId: msg.id });
     } catch { /* continuum disabled or misconfigured: post still succeeded */ }
 
@@ -310,14 +366,19 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     //
     // Link previews resolve after the broadcast so the reader sees the message
     // immediately and the card arrives when it is ready.
-    if (content && !suppressEmbeds && /https?:\/\//i.test(content)) {
+    //
+    // An encrypted message has no text for any of this to work on. The
+    // server cannot read its own message, so there is no preview to build, no
+    // command to run and no mention to find: the client does those with the
+    // text it holds.
+    if (!accepted.encrypted && content && !suppressEmbeds && /https?:\/\//i.test(content)) {
       embeds.queue({ kind: 'channel', messageId: msg.id }, content).then((cards) => {
         if (!cards.length) return;
         broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_EMBEDS, channel_id: ch.id, server_id: ch.server_id, messageId: msg.id, embeds: cards });
       }).catch(() => {});
     }
     // A slash command answered by an application in this community.
-    if (content && content.charAt(0) === '/') {
+    if (!accepted.encrypted && content && content.charAt(0) === '/') {
       bots.respond(ch.server_id, ch, content).then((reply) => {
         if (!reply) return;
         webhooks.emit(ch.server_id, 'command.created', {
@@ -326,22 +387,29 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
         }).catch(() => {});
       }).catch(() => {});
     }
+    // The webhook carries the text of the message when there is one. An
+    // encrypted message has none, so the event says the message is encrypted
+    // rather than shipping ciphertext to a third party.
     webhooks.emit(ch.server_id, 'message.created', {
       serverId: ch.server_id, channelId: ch.id,
-      message: { id: msg.id, authorId: msg.author_id, content },
+      message: accepted.encrypted
+        ? { id: msg.id, authorId: msg.author_id, encrypted: true }
+        : { id: msg.id, authorId: msg.author_id, content },
     }).catch(() => {});
     // @username mentions become durable notifications (+ realtime push),
     // skipped for muted channels inside the helper. Never fails the post.
-    try {
-      const found = await mentions.notifyMentions({
-        serverId: ch.server_id, channelId: ch.id, messageId: msg.id,
-        authorId: req.user.id, content,
-      });
-      for (const f of found) {
-        if (f.held) continue;
-        try { sendToUser(f.userId, { type: EVENTS.NOTIFICATION, notification: f.notification }); } catch { /* ignore */ }
-      }
-    } catch { /* ignore */ }
+    if (!accepted.encrypted) {
+      try {
+        const found = await mentions.notifyMentions({
+          serverId: ch.server_id, channelId: ch.id, messageId: msg.id,
+          authorId: req.user.id, content,
+        });
+        for (const f of found) {
+          if (f.held) continue;
+          try { sendToUser(f.userId, { type: EVENTS.NOTIFICATION, notification: f.notification }); } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+    }
     // A reply tells the author of the message it hangs from. Null unless this
     // was a reply, and null for your own message.
     try {
@@ -410,21 +478,43 @@ router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, m
     // Editing is a write, so it is gated the same way posting is.
     if (!(await mayAct(req, res, ch, 'SEND_MESSAGES',
       'you cannot edit a message here'))) return;
-    const content = readContent((req.body || {}).content);
-    if (!content) return fail(res, 'VALIDATION_ERROR', 'content required');
+    const body = req.body || {};
+    // An edit of an encrypted message is an envelope too. Editing one with
+    // text would put the text in the row, which is the one thing an
+    // encrypted conversation may never hold.
+    const carriesEnvelopes = body.envelopes !== undefined && body.envelopes !== null;
+    const content = carriesEnvelopes ? '' : readContent(body.content);
+    if (!content && !carriesEnvelopes) return fail(res, 'VALIDATION_ERROR', 'content required');
+    let accepted;
+    try {
+      accepted = await e2ee.acceptMessageBody(req.user.id, ch.id, {
+        content,
+        envelopes: body.envelopes,
+      });
+    } catch (e) {
+      if (e && e.code && e.status) return fail(res, e.code, e.message, e.status);
+      throw e;
+    }
     const editedAt = now();
-    await db.run('UPDATE messages SET content = ?, edited_at = ? WHERE id = ?', [content, editedAt, msg.id]);
+    await db.run('UPDATE messages SET content = ?, edited_at = ? WHERE id = ?', [accepted.stored, editedAt, msg.id]);
     // The index follows the new words. The old ones are removed first, so an
     // edit cannot leave a word behind that the message no longer contains.
-    require('../services/search-index').indexMessage({
-      id: msg.id, channelId: msg.channel_id, authorId: msg.author_id,
-      content, createdAt: msg.created_at, serverId: ch.server_id,
-    }).catch(() => {});
+    // An encrypted message has no words to index.
+    if (!accepted.encrypted) {
+      require('../services/search-index').indexMessage({
+        id: msg.id, channelId: msg.channel_id, authorId: msg.author_id,
+        content, createdAt: msg.created_at, serverId: ch.server_id,
+      }).catch(() => {});
+    }
     const author = await db.get('SELECT username, display_name FROM users WHERE id = ?', [msg.author_id]);
     const out = {
       id: msg.id, channel_id: ch.id, server_id: ch.server_id,
-      author_id: msg.author_id, user: req.user.username, content,
+      author_id: msg.author_id, user: req.user.username,
+      content: accepted.content,
+      encrypted: accepted.encrypted,
+      envelopes: accepted.envelopes,
       created_at: msg.created_at, edited_at: editedAt,
+      encryption: accepted.encryption,
       author_name: (author && author.username) || req.user.username,
       author_display: (author && author.display_name) || req.user.username,
     };

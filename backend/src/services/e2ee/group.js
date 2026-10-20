@@ -54,6 +54,35 @@ async function sealForDevice(conversationId, deviceId) {
 }
 
 /**
+ * The devices a conversation's key is sealed to at an epoch.
+ *
+ * The set of devices a key was given to is the record of who was in the
+ * conversation when it was published, which is what makes a membership
+ * change detectable at all.
+ */
+async function sealedDevices(conversationId, epoch) {
+  if (!epoch) return [];
+  const rows = await db.all(
+    'SELECT device_id FROM e2ee_group_keys WHERE conversation_id = ? AND epoch = ?',
+    [conversationId, epoch]
+  );
+  return rows.map((r) => r.device_id);
+}
+
+/**
+ * The live devices of everybody in the conversation.
+ *
+ * The membership is the one the conversation actually has now, read from the
+ * same tables the message path reads.
+ */
+async function memberDevices(conversationId) {
+  const found = await membership.members(conversationId);
+  if (!found) return [];
+  const list = await devices.liveDevicesOfUsers(found.userIds);
+  return list.map((d) => d.id);
+}
+
+/**
  * Publish a conversation key.
  *
  * The caller is one of the members, and it seals the key to the devices it
@@ -86,6 +115,25 @@ async function publishKey(conversationId, userId, deviceId, input) {
     }
     if (device.revoked_at) {
       throw protocolError('E2EE_DEVICE_REVOKED', 'a revoked device cannot be given the key', 403);
+    }
+  }
+
+  // A key published again at the epoch that is already current has to be
+  // sealed to the devices it was sealed to before. If the set has changed,
+  // the membership has changed, and the epoch has to move: a member who
+  // left still holds the key they were given, and only a new epoch takes it
+  // away from them. The server cannot see the key itself, so this is the
+  // part of the rekey it can enforce - that the epoch moves when the
+  // membership does.
+  if (epoch === existing && existing > 0) {
+    const sealed = await sealedDevices(conversationId, existing);
+    const members = await memberDevices(conversationId);
+    if (!membership.sameMembers(sealed, members)) {
+      throw protocolError(
+        'E2EE_CONFLICT',
+        'the membership of this conversation changed since epoch ' + existing + ': publish a new epoch',
+        409
+      );
     }
   }
 
@@ -149,6 +197,8 @@ module.exports = {
   currentEpoch,
   deviceEpochs,
   sealForDevice,
+  sealedDevices,
+  memberDevices,
   publishKey,
   keyForDevice,
   sealAad,

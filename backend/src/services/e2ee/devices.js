@@ -118,6 +118,32 @@ async function liveDevicesOf(userId) {
   );
 }
 
+/**
+ * Every live device of several accounts.
+ *
+ * One query rather than one per account. A conversation is checked against
+ * the devices of everybody in it, and a community with a hundred members
+ * would otherwise cost a hundred queries every time a message was posted.
+ */
+async function liveDevicesOfUsers(userIds) {
+  const ids = (userIds || []).map(String).filter(Boolean);
+  if (!ids.length) return [];
+  const out = [];
+  // Chunked: a community can have more members than one statement is allowed
+  // to carry placeholders for.
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const rows = await db.all(
+      'SELECT * FROM e2ee_devices'
+      + ' WHERE user_id IN (' + chunk.map(() => '?').join(',') + ')'
+      + ' AND revoked_at IS NULL ORDER BY created_at ASC',
+      chunk
+    );
+    out.push(...rows);
+  }
+  return out;
+}
+
 /** Record that a device was seen. Cheap, and it is what "last seen" means. */
 async function touch(deviceId) {
   await db.run('UPDATE e2ee_devices SET last_seen_at = ? WHERE id = ?', [now(), deviceId]);
@@ -155,6 +181,7 @@ module.exports = {
   get,
   listForUser,
   liveDevicesOf,
+  liveDevicesOfUsers,
   touch,
   revoke,
 };

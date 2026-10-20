@@ -296,6 +296,12 @@
 .msg-rail { position: relative; }
 .msg--continued .msg-rail { visibility: hidden; height: 0; }
 
+/* Density changes the composition and not only the measurements: a compact
+ * workspace drops the face beside each message, because the name is already
+ * on the line above it. */
+:root[data-density="compact"] .msg-rail { display: none; }
+:root[data-density="compact"] .msg--continued .msg-rail { display: none; }
+
 .msg-main { position: relative; min-width: 0; }
 
 .msg-meta { display: flex; align-items: baseline; gap: 8px; min-height: 18px; }
@@ -395,6 +401,27 @@
 .msg-file-size { color: var(--text-3); font-size: var(--fs-xs); }
 
 .msg-embeds { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+
+/* -- the arrangement --------------------------------------------------------- */
+.layout-regions { display: flex; flex-direction: column; gap: var(--space-3); }
+.layout-widths { display: flex; align-items: center; gap: 12px; }
+.layout-width { flex: 1; min-width: 0; accent-color: var(--brand); }
+.layout-value { color: var(--text-3); font-size: var(--fs-micro); font-variant-numeric: tabular-nums; }
+
+/* -- the member roster --------------------------------------------------------
+ * The same roster is drawn on the members page and in the inspector beside a
+ * channel, so it has one set of rules. */
+.member-panel { display: flex; flex-direction: column; gap: 10px; }
+.member-head { display: flex; align-items: center; gap: 10px; }
+.member-search { flex: 1; min-width: 0; }
+.member-count { color: var(--text-3); font-size: var(--fs-micro); font-variant-numeric: tabular-nums; }
+.member-list { border-top: 1px solid var(--line); }
+.member-row .cardrow-meta { min-width: 68px; text-align: right; }
+.member-presence { color: var(--text-3); }
+.member-presence[data-presence="online"] { color: var(--success); }
+.member-presence[data-presence="idle"] { color: var(--warning); }
+.member-presence[data-presence="dnd"] { color: var(--danger); }
+.member-more { display: flex; justify-content: center; padding: 10px 0; }
 
 /* -- link previews -----------------------------------------------------------
  * A preview is a card: a picture or a player when the page had one, and the

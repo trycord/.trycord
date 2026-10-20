@@ -11,6 +11,7 @@ const replies = require('../services/replies');
 const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
 const embeds = require('../services/embeds');
+const e2eeBodies = require('../services/e2ee/bodies');
 const { EVENTS } = require('../ws/events.js');
 
 // A message body is capped rather than truncated. Slicing to the limit loses
@@ -107,23 +108,41 @@ router.get('/:id/messages/:messageId/thread', async (req, res, next) => {
     const seen = await dms.visibleConversation(req.params.id, req.user.id);
     if (!seen) return fail(res, 'NOT_FOUND', 'conversation not found');
     const rootId = await threads.resolveRoot('dm', req.params.id, req.params.messageId);
-    res.json(await threads.fetch('dm', req.params.id, rootId));
+    const thread = await threads.fetch('dm', req.params.id, rootId);
+    // The thread carries the same rows the history does, so the same rule
+    // applies: an envelope row says it is one.
+    e2eeBodies.applyToRow(thread.root);
+    for (const reply of thread.replies) e2eeBodies.applyToRow(reply);
+    res.json(thread);
   } catch (e) {
     if (e && e.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'message not found');
     serviceError(res, e);
   }
 });
 
-// POST /api/dms/:id/messages { content, attachmentIds, clientNonce, replyToId } — persist,
+// POST /api/dms/:id/messages { content, attachmentIds, clientNonce, replyToId, envelopes } — persist,
 // broadcast, notify. The nonce makes a retried submission collapse onto the row
 // the first attempt already wrote, so a lost response cannot duplicate a
 // message. A message with files and no text is allowed, as it is in a channel.
+//
+// A conversation that is encrypted takes an envelope instead of text: the
+// server stores what the client encrypted and never holds a key that opens
+// it. Whether the conversation is encrypted is the status service's answer,
+// not the client's.
 router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
+    const body = req.body || {};
+    const carriesEnvelopes = body.envelopes !== undefined && body.envelopes !== null;
+    const content = carriesEnvelopes ? '' : readContent(body.content);
     const msg = await dms.send(
       req.user.id, req.user.username, req.params.id,
-      readContent((req.body || {}).content), (req.body || {}).clientNonce,
-      (req.body || {}).attachmentIds, (req.body || {}).replyToId
+      {
+        content,
+        envelopes: body.envelopes,
+        clientNonce: body.clientNonce,
+        attachmentIds: body.attachmentIds,
+        replyToId: body.replyToId,
+      }
     );
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(members, { type: EVENTS.DM_MESSAGE, ...msg, conversationId: req.params.id });
@@ -131,12 +150,13 @@ router.post('/:id/messages', auth.requireVerified, rateLimit({ windowMs: 60000, 
     // Opt-out from link previews for this one message, read server-side for the
     // same reason as the channel path: a flag the server ignores is a control
     // that only looks like it works.
-    const suppressEmbeds = (req.body || {}).suppressEmbeds === true;
+    const suppressEmbeds = body.suppressEmbeds === true;
 
     // A link in a direct message gets the same preview a channel link does,
     // resolved after the broadcast so the message is not held on a slow link.
     // The stored text is used rather than the request body, so what is previewed
-    // is what was actually written.
+    // is what was actually written. An encrypted message has no text, and so
+    // has no preview: the server cannot read its own message.
     const text = String((msg && msg.content) || '');
     if (!suppressEmbeds && /https?:\/\//i.test(text)) {
       embeds.queue({ kind: 'dm', messageId: msg.id, conversationId: req.params.id }, text).then((cards) => {
@@ -188,9 +208,17 @@ router.delete('/:id/messages/:messageId', auth.requireVerified, async (req, res,
 });
 
 // PATCH /api/dms/:id/messages/:messageId — author-only edit.
+//
+// An edit of an encrypted message is an envelope, exactly as a new message in
+// an encrypted conversation is: editing one with text would put the text in
+// the row.
 router.patch('/:id/messages/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, max: 40 }), async (req, res, next) => {
   try {
-    const out = await dms.edit(req.user.id, req.params.id, req.params.messageId, readContent((req.body || {}).content), req.user.username);
+    const body = req.body || {};
+    const out = await dms.edit(req.user.id, req.params.id, req.params.messageId, {
+      content: body.envelopes !== undefined && body.envelopes !== null ? '' : readContent(body.content),
+      envelopes: body.envelopes,
+    }, req.user.username);
     const members = await dms.memberIds(req.params.id);
     gateway.broadcastDm(members, { type: EVENTS.DM_MESSAGE_UPDATED, ...out, conversationId: out.conversationId });
     res.json(out);

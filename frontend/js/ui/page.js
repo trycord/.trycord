@@ -10,6 +10,7 @@ import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { spinner } from './primitives.js';
 import { relativeTime } from '../../packages/format.js';
+import { attachContextMenu } from './overlays.js';
 
 // -- head ---------------------------------------------------------------------
 //
@@ -61,11 +62,16 @@ export function card(options) {
 //
 // One line in a card: lead element, main title + optional second line, a side
 // control and trailing meta. href or onClick makes the whole line the target.
+//
+// `menu` is a builder for the line's context menu: a right-click, or a long
+// press on a phone, raises the actions that belong to this line. Every surface
+// that can be acted on carries one, so the actions live with the thing they act
+// on rather than in a menu somewhere else.
 
 export function row(options) {
   const opts = options || {};
   const tag = opts.href ? 'a' : opts.onClick ? 'button' : 'div';
-  return el(tag, {
+  const node = el(tag, {
     class: 'cardrow' + (opts.link ? ' cardrow--link' : '') + (opts.active ? ' cardrow--active' : '')
       + (opts.unread ? ' cardrow--unread' : '') + (opts.class ? ' ' + opts.class : ''),
     href: opts.href || null,
@@ -79,6 +85,8 @@ export function row(options) {
     opts.side ? el('span', { class: 'cardrow-side' }, opts.side) : null,
     opts.meta ? el('span', { class: 'cardrow-meta' }, opts.meta) : null,
   );
+  if (opts.menu) attachContextMenu(node, opts.menu);
+  return node;
 }
 
 // -- memo ---------------------------------------------------------------------

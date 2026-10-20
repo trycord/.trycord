@@ -13,7 +13,7 @@ import { el, clear } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import {
   readPrefs, rememberInspectorTab, rememberInspectorOpen, rememberInspectorWidth,
-  INSPECTOR_MIN, INSPECTOR_MAX,
+  regionEnabled, INSPECTOR_MIN, INSPECTOR_MAX,
 } from '../prefs.js';
 import { attachColumnResize } from './frame.js';
 
@@ -25,6 +25,11 @@ export function createInspector(refs) {
   const isOpen = () => refs.root.dataset.context === 'open';
 
   function setSpec(next) {
+    // The panel that was on screen is torn down before the next one is built,
+    // so a roster that listens for presence stops listening.
+    if (spec && typeof spec.dispose === 'function') {
+      try { spec.dispose(); } catch { /* a disposal must not stop the next panel */ }
+    }
     spec = next && next.tabs && next.tabs.length ? next : null;
     cache.clear();
     activeId = null;
@@ -45,15 +50,19 @@ export function createInspector(refs) {
   }
 
   function apply(open, remember) {
-    refs.root.dataset.context = open ? 'open' : 'closed';
-    refs.inspector.hidden = !open;
+    // The reader may have taken the panel out of the arrangement; a panel that
+    // is not in the arrangement does not open.
+    const allowed = regionEnabled('inspector');
+    const shown = open && allowed;
+    refs.root.dataset.context = shown ? 'open' : 'closed';
+    refs.inspector.hidden = !shown;
     // Whatever control on the stage opens this panel reports its state too, so
     // the disclosure is never a lie after the panel was closed from inside.
     for (const toggle of document.querySelectorAll('.context-toggle')) {
-      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute('aria-expanded', String(shown));
     }
-    if (remember && spec) rememberInspectorOpen(spec.kind, open);
-    if (open && activeId && !refs.inspectorBody.childNodes.length) activate(activeId, false);
+    if (remember && spec) rememberInspectorOpen(spec.kind, shown);
+    if (shown && activeId && !refs.inspectorBody.childNodes.length) activate(activeId, false);
   }
 
   function open() { if (spec) apply(true, true); }
@@ -135,6 +144,9 @@ export function createInspector(refs) {
     setSpec,
     open,
     close,
+    // Close the panel without forgetting that the reader likes it open: the
+    // panel is taken away by the arrangement, not by the reader.
+    dismiss() { if (spec) apply(false, false); },
     toggle,
     isOpen,
     currentKind: () => (spec ? spec.kind : null),

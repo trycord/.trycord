@@ -81,6 +81,17 @@ function stateText(value) {
 }
 
 /**
+ * A session by its id, whoever owns it, or null.
+ *
+ * The caller checks what it needs to check: the sealed state is opaque and
+ * the counters are public, so a lookup that only wants to know whether a
+ * session exists does not have to be the owner.
+ */
+async function byId(sessionId) {
+  return db.get('SELECT * FROM e2ee_sessions WHERE id = ?', [sessionId]);
+}
+
+/**
  * A session of the caller's own.
  *
  * A session that exists but belongs to somebody else is refused rather than
@@ -181,6 +192,7 @@ module.exports = {
   DEAD,
   shape,
   create,
+  byId,
   owned,
   get,
   listForDevice,

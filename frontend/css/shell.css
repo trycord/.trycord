@@ -23,6 +23,14 @@
   background: var(--app-bg);
 }
 
+/* -- the arrangement --------------------------------------------------------
+ * The reader chooses which regions of the workspace are shown. The choice is a
+ * word list on the shell root, so the stylesheet answers "is this region here"
+ * with one selector and the shell hides nothing by hand. */
+.ws:not([data-regions~="rail"]) { --rail-w: 0px; }
+.ws:not([data-regions~="rail"]) .rail { display: none; }
+.ws:not([data-regions~="column"]) .context { display: none; }
+
 /* -- the command bar ------------------------------------------------------ */
 
 .cmdbar {
@@ -214,6 +222,14 @@
 .nav-item.is-active svg { color: var(--brand); }
 .nav-item--channel { min-height: 32px; gap: 8px; }
 .nav-item--dm { gap: 9px; }
+
+/* A row being dragged, and a row that would take it. The dragged row dims and
+ * the row under the pointer says it would take it. */
+.nav-item[data-dragging], .nav-label[data-dragging] { opacity: .45; }
+.nav-item[data-dropping], .nav-label[data-dropping] {
+  outline: 1px dashed var(--brand); outline-offset: -2px;
+}
+.nav-label[data-dragging] { cursor: grabbing; }
 .nav-muted { margin-left: auto; display: inline-flex; color: var(--text-3); }
 .nav-dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--brand); flex: none; }
 .nav-sep { height: 1px; background: var(--line); margin: 8px 6px; }
@@ -240,6 +256,7 @@
 }
 .grip--column { right: -5px; }
 .grip--inspector { left: -5px; }
+.grip--stage { right: -5px; }
 .grip::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px;
   background: var(--brand-line); opacity: 0;
@@ -249,8 +266,14 @@
 
 /* -- the stage ------------------------------------------------------------ */
 
-.stage { grid-area: stage; display: flex; min-width: 0; min-height: 0; }
-.screen { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.stage { grid-area: stage; display: flex; min-width: 0; min-height: 0; position: relative; }
+.screen {
+  display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0;
+  /* The reading column has a width the reader chooses; wider than the stage
+     and it simply fills it. */
+  max-width: var(--stage-w);
+  margin-inline: auto;
+}
 
 .stage-head {
   flex: none; display: flex; align-items: center; gap: 12px;

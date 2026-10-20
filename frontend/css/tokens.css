@@ -90,7 +90,8 @@
 
 /* Density. The attribute lives on <html> and is written by js/prefs.js; the
  * default block is cozy, and the two other arrangements change measurements
- * rather than type, so a row is still a row. */
+ * rather than type, so a row is still a row. The rail's width is part of the
+ * arrangement: a dense workspace gives the communities less room. */
 :root,
 :root[data-density="cozy"] {
   --row-h: 44px;
@@ -99,6 +100,7 @@
   --msg-gap: 15px;
   --panel-pad: 16px;
   --section-gap: 24px;
+  --rail-w: 68px;
 }
 :root[data-density="compact"] {
   --row-h: 36px;
@@ -107,6 +109,7 @@
   --msg-gap: 10px;
   --panel-pad: 12px;
   --section-gap: 18px;
+  --rail-w: 54px;
 }
 :root[data-density="comfortable"] {
   --row-h: 52px;
@@ -115,6 +118,7 @@
   --msg-gap: 20px;
   --panel-pad: 20px;
   --section-gap: 32px;
+  --rail-w: 82px;
 }
 
 /* Ember - the default dark palette. Charcoal from the canonical library, the

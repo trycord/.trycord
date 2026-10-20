@@ -11,10 +11,12 @@
 const db = require('../../db');
 const { now } = require('../../util');
 const uploads = require('../uploads');
+const bodies = require('../e2ee/bodies');
 const { visibleConversation } = require('./conversation');
 const { assertLength } = require('./limits');
 
-async function edit(userId, conversationId, messageId, content, username) {
+async function edit(userId, conversationId, messageId, body, username) {
+  const input = body || {};
   const seen = await visibleConversation(conversationId, userId);
   if (!seen) throw { code: 'NOT_A_MEMBER', message: 'Conversation not found' };
   const msg = await db.get(
@@ -23,16 +25,32 @@ async function edit(userId, conversationId, messageId, content, username) {
   );
   if (!msg) throw { code: 'NOT_FOUND', message: 'Message not found' };
   if (msg.author_id !== userId) throw { code: 'PERMISSION_DENIED', message: 'Only the author can edit' };
-  const text = String(content === null || content === undefined ? '' : content).trim();
-  if (!text) throw { code: 'VALIDATION_ERROR', message: 'Message is empty' };
-  assertLength(text);
+  // An edit of an encrypted message is an envelope too. Editing one with
+  // text would put the text in the row, which is the one thing an encrypted
+  // conversation may never hold.
+  const carriesEnvelopes = input.envelopes !== undefined && input.envelopes !== null;
+  const text = carriesEnvelopes
+    ? ''
+    : String(input.content === null || input.content === undefined ? '' : input.content).trim();
+  if (!text && !carriesEnvelopes) throw { code: 'VALIDATION_ERROR', message: 'Message is empty' };
+  if (!carriesEnvelopes) assertLength(text);
+
+  // Whether this conversation is encrypted is the status service's answer, and
+  // a body it cannot validate is refused with nothing stored.
+  const accepted = await bodies.accept(conversationId, userId, {
+    content: text,
+    envelopes: input.envelopes,
+  });
 
   const editedAt = now();
-  await db.run('UPDATE dm_messages SET content = ?, edited_at = ? WHERE id = ?', [text, editedAt, msg.id]);
+  await db.run('UPDATE dm_messages SET content = ?, edited_at = ? WHERE id = ?', [accepted.stored, editedAt, msg.id]);
   return {
     id: msg.id,
     conversationId,
-    content: text,
+    content: accepted.content,
+    encrypted: accepted.encrypted,
+    envelopes: accepted.envelopes,
+    encryption: accepted.encryption,
     createdAt: msg.created_at,
     editedAt,
     authorId: userId,

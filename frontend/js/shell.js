@@ -16,7 +16,7 @@
 import { el, clear } from '../packages/dom.js';
 import { icon } from '../packages/icons.js';
 import { avatar, countBadge, serverMark } from './ui/primitives.js';
-import { State, nameOf } from '../packages/store.js';
+import { State, nameOf, on as onStore } from '../packages/store.js';
 import { path, currentRoute, navigate, BASE } from '../packages/nav.js';
 import { openMenu, attachContextMenu, isOverlayOpen, isMenuOpen, closeTopOverlay } from './ui/overlays.js';
 import { buildContext, serverMenuItems } from './shell/context.js';
@@ -24,8 +24,8 @@ import { buildFrame, attachColumnResize, brandMark } from './shell/frame.js';
 import { createInspector } from './shell/inspector.js';
 import { openPalette, shortcutLabel } from './shell/palette.js';
 import {
-  applyDensity, applyLayoutWidths, rememberContextWidth,
-  CONTEXT_MIN, CONTEXT_MAX,
+  applyDensity, applyLayoutWidths, applyRegions, rememberContextWidth, rememberStageWidth,
+  onPrefsChange, regionEnabled, CONTEXT_MIN, CONTEXT_MAX, STAGE_MIN, STAGE_MAX,
 } from './prefs.js';
 import { setOverride, viewportWantsMobile, siblingMount } from '../packages/chooser.js';
 
@@ -46,6 +46,7 @@ export function mountShell() {
 
   applyDensity();
   applyLayoutWidths(frame.root);
+  applyRegions(frame.root);
 
   refs.frame.kbd.textContent = shortcutLabel();
   refs.frame.omnibox.addEventListener('click', () => openPalette());
@@ -58,6 +59,22 @@ export function mountShell() {
     sign: 1,
     remember: rememberContextWidth,
     fallback: 276,
+  });
+
+  attachColumnResize(frame.stageGrip, {
+    root: frame.root,
+    variable: '--stage-w',
+    min: STAGE_MIN,
+    max: STAGE_MAX,
+    sign: -1,
+    remember: rememberStageWidth,
+    fallback: 1180,
+  });
+
+  // The panel control belongs to the chrome, so it is the chrome that answers
+  // for it: it is offered only when the page on screen has a panel to show.
+  frame.inspectorToggle.addEventListener('click', () => {
+    if (refs.inspector) refs.inspector.toggle();
   });
 
   frame.scrim.addEventListener('click', () => {
@@ -83,6 +100,26 @@ export function mountShell() {
 
   syncNavMode();
   window.addEventListener('resize', syncNavMode);
+
+  // The arrangement is a reader's choice made in the settings screen, so the
+  // shell follows it the moment it changes rather than at the next reload.
+  onPrefsChange(() => {
+    applyLayoutWidths(frame.root);
+    applyRegions(frame.root);
+    // A panel that is no longer part of the arrangement is taken away, but the
+    // reader's taste is remembered: it comes back when they put it back.
+    if (refs.inspector && refs.inspector.isOpen() && !regionEnabled('inspector')) {
+      refs.inspector.dismiss();
+    }
+  });
+
+  // The column speaks for the community's tree, so a tree that changes - a
+  // channel made, moved or reordered - repaints the column where the reader
+  // is looking at it.
+  onStore('tree', () => paintContext());
+  onStore('mutes', () => paintContext());
+  onStore('presence', () => paintContext());
+
   return frame.root;
 }
 
@@ -194,7 +231,13 @@ function append(host, content) {
 // ---- the inspector ---------------------------------------------------------
 
 export function setInspector(spec) {
-  if (refs.inspector) refs.inspector.setSpec(spec || null);
+  if (!refs.inspector) return;
+  refs.inspector.setSpec(spec || null);
+  const frame = refs.frame;
+  if (!frame) return;
+  // The control is offered only when there is a panel behind it.
+  frame.inspectorToggle.hidden = !spec;
+  frame.inspectorToggle.setAttribute('aria-expanded', String(!!(spec && refs.inspector.isOpen())));
 }
 
 export function toggleInspector() {

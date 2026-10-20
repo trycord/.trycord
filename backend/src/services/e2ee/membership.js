@@ -54,4 +54,23 @@ async function requireMembership(conversationId, userId) {
   return found;
 }
 
-module.exports = { members, requireMembership };
+/**
+ * Whether two lists name the same members.
+ *
+ * The order does not matter and the lists are compared as sets, because
+ * they are built by two different queries and a membership that has not
+ * changed must not look like it has.
+ *
+ * @param {string[]} a
+ * @param {string[]} b
+ * @returns {boolean}
+ */
+function sameMembers(a, b) {
+  const left = new Set((a || []).map(String));
+  const right = new Set((b || []).map(String));
+  if (left.size !== right.size) return false;
+  for (const value of left) if (!right.has(value)) return false;
+  return true;
+}
+
+module.exports = { members, requireMembership, sameMembers };
