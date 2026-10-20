@@ -10,6 +10,12 @@ another instance stays there: it is described here, it is read here, and it is
 never copied into this instance's own tables. The instance that owns a
 community remains the only authority over it.
 
+The relay runs both ways. A community this instance owns is published to the
+instances that read it, and a member of such a community may write in it from
+here: the message travels to the instance that owns it, is kept there as
+something the owner can see and act on, and the owner answers - taken, or
+refused, with the reason.
+
 ## The event
 
 Every event is a JSON envelope signed with Ed25519 (`node:crypto` - no custom
@@ -34,16 +40,28 @@ The payload carries the sections its kind is about:
 
 | Section | What it says |
 | --- | --- |
-| `origin` | the instance that speaks (`instance_id`), the author on that instance (`actor_id`), the author's name as it was at the time (`author_username`, `author_display_name`), the ids the community, channel and message have **on the instance that owns them** (`community_origin_id`, `channel_origin_id`, `message_origin_id`, `thread_root_origin_id`), when it happened (`occurred_at`) and the per-actor sequence number (`seq`) |
+| `origin` | the instance that speaks (`instance_id`), the author on that instance (`actor_id`), the author's name as it was at the time (`author_username`, `author_display_name`), the ids the community, channel and message have **on the instance that owns them** (`community_origin_id`, `channel_origin_id`, `message_origin_id`, `thread_root_origin_id`), **which instance owns each of those ids** (`community_owner_id`, `message_owner_id`, `thread_root_owner_id`), when it happened (`occurred_at`) and the per-actor sequence number (`seq`) |
 | `community` | the community as the origin describes it: its id, name, description, icon and the channels it exposes |
 | `channel` | the channel: its id, name, type, topic and whether the members may post in it |
 | `message` | the message: its id, content, the origin's timestamps |
 | `reaction` | the reaction: the message it is on, the emoji, who reacted and their name at the time |
-| `membership` | the member: their id on the origin, their name, and whether they joined or left |
+| `membership` | the member: their id on the origin, the instance that id belongs to (`member_instance_id`), their name, and whether they joined, left, were muted or were removed |
+| `decision` | the owner's answer about a message a member wrote elsewhere: `accepted` or `refused`, the reason, and who wrote it |
 
 The author snapshot is taken when the event is published, not when it is
 read. A rename on the origin does not rewrite what a remote instance already
 knows about who wrote a message.
+
+**Why the owner fields are in the origin block.** A message about a community
+this instance owns may have been written here or on another instance, and the
+two are governed by different rules. The community is owned by the instance
+that hosts it; the message is owned by the instance it was written on; the
+thread root is owned by the instance that holds it - and those are not always
+the same instance. Without those fields a receiver cannot tell a message the
+owner wrote from one a member wrote elsewhere, and cannot tell whose rules
+apply to it. A receiver that meets an event without them falls back to what
+it can check for itself: a message about a community it owns is treated as a
+member's message whatever the sender says.
 
 ## The vocabulary
 
@@ -61,6 +79,9 @@ knows about who wrote a message.
 | `reaction.removed` | the same reaction, taken back |
 | `membership.joined` | a local account joined a community that lives on another instance |
 | `membership.left` | the same account left it again |
+| `message.accepted` | the owner took a message a member wrote on another instance |
+| `message.refused` | the owner would not take it, and says why |
+| `membership.updated` | the owner changed a member's standing: muted, removed or restored |
 
 A kind that is not in this table is not part of the protocol: the publisher
 cannot produce it and the receiver refuses it. That is deliberate - an
@@ -69,24 +90,36 @@ something it was never asked to understand.
 
 ## The relay rules
 
-These decide what leaves this instance. They live in one place
-(`backend/src/services/continuum/rules.js`) and every publication path asks
-them the same questions.
+These decide what leaves this instance, and what it accepts. They live in one
+place (`backend/src/services/continuum/rules.js`) and every publication path
+and every inbound path asks them the same questions.
 
 - **A private community is never federated.** A community with
   `is_public = 0` produces no outbound event of any kind, and the discovery
-  document does not list it.
+  document does not list it. It also accepts nothing: a member of a community
+  that has been made private is refused, with the reason.
 - **A restricted channel is never federated.** The decision is per channel,
   not per community: the channel is federable when the community's baseline
   role - the role every member holds - may still post in it, after the
   category and channel overrides are applied. A channel that has been made
-  staff-only produces no outbound event, whatever the sender may do in it.
+  staff-only produces no outbound event, whatever the sender may do in it,
+  and a member writing in it from another instance is refused.
 - **The sender's own permission is what counts.** A message is federated only
   if its author could post in that channel - the same check the send path
   makes, with the same timeout rule.
+- **A member of a federated community holds the baseline role, and nothing
+  else.** Joining grants no role, no permission and no moderation power. So
+  the question the owner asks about a member's message is the question it
+  asks about its own members: may the members of this community post in this
+  channel?
+- **A member may not write in a community they have not joined, and a muted
+  or removed member may not write at all.** The owner keeps the record of who
+  its members are (`continuum_relay_memberships`) and what it has decided
+  about them.
 - **Nothing is federated to an instance that is not trusted.** Only `trusted`
   peers are delivery targets. A `pending` or `blocked` peer is not asked, and
-  its earlier attempts are not retried.
+  its earlier attempts are not retried. Nothing is accepted from a peer that
+  is not trusted either.
 - **Encrypted content is never federated.** Not relayed in the clear, and not
   relayed as a ciphertext the far end cannot read. An end-to-end encrypted
   conversation is not federated at all. In this build the encrypted
@@ -95,11 +128,27 @@ them the same questions.
   encryption will meet.
 - **What was not federable when it was written is not federated later.** A
   message posted in a private community stays here even after the community
-  is made public.
+  is made public. The decision is kept in the ledger, with the reason that
+  produced it, so the operator is told which rule stopped it rather than
+  only that something did.
 
 A deletion is relayed, so the remote copy does not outlive the original. A
 remote instance that has never seen the message records the deletion as a
 no-op, not as an error: the outcome the sender wanted is already true.
+
+### The rules are asked in both directions
+
+Every rule above governs the relay in both directions, and they are enforced
+in both:
+
+| Rule | Leaving this instance | Arriving here |
+| --- | --- | --- |
+| A private community | nothing leaves it | a member's message in it is refused |
+| A restricted channel | nothing leaves it | a member's message in it is refused |
+| The sender's own permission | only what the author may write leaves | the member's standing here decides what the owner accepts |
+| A trusted peer only | only trusted peers are targets | only trusted peers are believed |
+| Encrypted content | it does not leave | it is refused on arrival |
+| Not federable when written | it stays here | the owner's answer is a refusal, not a delay |
 
 ## The trust model
 
@@ -175,6 +224,70 @@ federated, is recorded and not applied.
 
 Leaving relays `membership.left` in the same way.
 
+### Writing
+
+A member of a federated community may write in it from the instance they are
+on:
+
+```
+POST /api/continuum/communities/:instanceId/:communityId/channels/:channelId/messages
+```
+
+The message is kept here until the owner answers, and the answer is the
+owner's. This instance applies the rules it can see - the peer is trusted,
+the community is one the peer federates, the channel is one the peer
+exposes, and the writer has joined - and publishes the message to the owner.
+The owner applies its own rules to it and answers:
+
+- **accepted** - the owner took the message. It is kept at the owner as a
+  relayed message in the community it belongs to, with the author's name as
+  the other instance had it, and with the timestamp the writer gave it.
+- **refused** - the owner would not take it, and the reason says why: the
+  community is private, the channel is one the members may not post in, the
+  writer is not a member, the writer is muted or has been removed.
+
+The answer reaches the writer, and the writer is told - the message the
+writer wrote carries the answer and the reason. A message that vanishes
+without a word is worse than one that is refused.
+
+The message the writer wrote is kept here in `continuum_relay_outgoing`, with
+its state: `pending` until the owner answers, then `accepted`, `refused` or
+`deleted`. It is not a local message: the community is not here, and the
+message grants nothing over it. The writer may edit it and take it back
+while it is there, and both changes travel to the owner.
+
+**Writing grants no authority.** A member of a federated community gains no
+role, no permission and no moderation power on either instance. The message
+is not a message of the owner's community: it is not in the owner's message
+table, the writer is not in the owner's member list, and the writer's
+account is not an account on the owner's instance at all. The owner decides
+what its members may do, and it enforces it there.
+
+## Moderation across instances
+
+The owner of a community can see what its members wrote elsewhere, and act
+on it. The surfaces are:
+
+- `GET /api/continuum/moderation/messages` - the messages members of this
+  instance's communities wrote on other instances, with the author and the
+  timestamps as the other instance had them. A community moderator sees the
+  messages of their own community; a platform administrator sees all of them.
+- `DELETE /api/continuum/moderation/messages/:instanceId/:messageId` - take
+  one back. The message goes from here, and the instance that wrote it is
+  told, so the copy over there does not outlive this one. The writer is told
+  that their message was taken back.
+- `GET /api/continuum/moderation/members` - the members of this instance's
+  communities who live on another instance, with what this instance has
+  decided about them.
+- `POST /api/continuum/moderation/members/:instanceId/:userId` - mute,
+  remove or restore one. A muted member's messages are refused with the
+  reason; a removed member's are refused too. The member's own instance is
+  told, so the member stops writing rather than finding out one message at a
+  time.
+
+Everything done here is recorded in `audit_logs`, the same trail the local
+moderation writes to: who did it, to whom, in which community, and why.
+
 ## Delivery
 
 Delivery is an HTTPS POST to the remote inbox. An event that has not been
@@ -193,6 +306,38 @@ Every attempt is logged in `continuum_deliveries`. `GET
 /api/continuum/deliveries` adds that log up per event and per destination:
 `pending`, `delivered` or `failed`, the attempt count, the reason and when
 the last attempt was made.
+
+## The change feed
+
+The relay publishes from this instance's own state rather than from a hook
+in every write path. A hook in every write path is a promise that every
+write path remembers to keep it, and one that forgets does it silently: the
+message is posted, and the peer never hears about it.
+
+So the relay reconciles instead. It keeps a ledger of what it has already
+federated (`continuum_publications`), and each pass compares that ledger
+against the local tables:
+
+- rows the ledger does not know about are new: publish them
+- rows whose state has changed are updates: publish the change
+- rows that are gone are deletions: publish the deletion
+
+**The ledger is the record.** A row that is in it has been published, and a
+second pass over the same row publishes nothing. A row the rules decided
+against is kept as decided against, with the reason, and it is not published
+later.
+
+**A change is published once it has settled.** The feed publishes the state
+a row is in, not every state it was in, so a message that is edited twice in
+a moment is one change and not two. A row whose last change is more recent
+than the feed interval waits for the next pass. The bound on a change being
+noticed is therefore **two intervals** - one to notice it, one to be sure it
+has stopped moving.
+
+**The lag is visible.** `GET /api/continuum/feed` says how often the feed
+runs, when it last ran, how long ago that was, what it published, what the
+rules refused, and whether it is behind the bound. A feed that falls behind
+is not quiet about it.
 
 ## What is not federated
 
@@ -231,6 +376,15 @@ the last attempt was made.
 | `POST /api/continuum/communities/:instanceId/:communityId/join` | signed in | join a community that lives on another instance |
 | `POST /api/continuum/communities/:instanceId/:communityId/leave` | signed in | leave it again |
 | `GET /api/continuum/memberships` | signed in | the remote communities this account follows |
+| `POST /api/continuum/communities/:instanceId/:communityId/channels/:channelId/messages` | signed in | write in a federated channel from here |
+| `GET /api/continuum/outgoing` | signed in | the messages this account wrote into communities that live elsewhere, and what their owners said about them |
+| `PATCH /api/continuum/outgoing/:messageId` | signed in | edit one of them |
+| `DELETE /api/continuum/outgoing/:messageId` | signed in | take one of them back |
+| `GET /api/continuum/moderation/messages` | signed in, per community | what members of this instance's communities wrote elsewhere |
+| `DELETE /api/continuum/moderation/messages/:instanceId/:messageId` | signed in, per community | take one of those messages back |
+| `GET /api/continuum/moderation/members` | signed in, per community | the members of this instance's communities who live elsewhere |
+| `POST /api/continuum/moderation/members/:instanceId/:userId` | signed in, per community | mute, remove or restore one of them |
+| `GET /api/continuum/feed` | signed in | the change feed's state: when it last ran and how far behind it is |
 | `GET /api/continuum/relay/messages` | platform admin | everything that arrived from another instance |
 | `GET /api/continuum/relay/memberships` | platform admin | the members of this instance's communities who live elsewhere |
 
@@ -250,10 +404,11 @@ the ones that were already there.
 | `continuum_memberships` | which local account follows which remote community |
 | `continuum_relay_messages` | the messages that arrived: origin instance, origin message id, origin community and channel, the origin's author, the origin's timestamps, the edit and the deletion |
 | `continuum_relay_reactions` | the reactions that arrived, keyed by origin instance, message, user and emoji |
-| `continuum_relay_memberships` | the members of this instance's communities who live on another instance |
+| `continuum_relay_memberships` | the members of this instance's communities who live on another instance, and what this instance has decided about them |
+| `continuum_relay_outgoing` | the messages written here for a community that lives elsewhere: the owner instance, the community and channel as they are there, the author, the content, the state and the owner's answer |
 | `continuum_publications` | the relay's ledger: what has been federated, the state it was in, and the context a later deletion needs |
 | `continuum_sequences` | the per-actor sequence counters, outbound and inbound |
-| `continuum_feed_state` | where the change feed stopped, so the next pass picks up where it left off |
+| `continuum_feed_state` | where the change feed stopped, and what it last did |
 
 ## The environment
 
@@ -263,7 +418,7 @@ the ones that were already there.
 | `CONTINUUM_ALLOW_LOCALHOST` | off | whether a peer may live on a loopback or private address. It is off because a peer address is attacker-controlled; it is on for a private network that legitimately hosts a peer |
 | `CONTINUUM_MAX_ATTEMPTS` | 5 | how many times a delivery is attempted before it is given up on |
 | `CONTINUUM_RETRY_BASE_MS` | 1000 | the first wait between attempts; it doubles, with jitter, up to an hour |
-| `CONTINUUM_FEED_INTERVAL_MS` | 2000 | how often the change feed reconciles the local state against the ledger |
+| `CONTINUUM_FEED_INTERVAL_MS` | 2000 | how often the change feed reconciles the local state against the ledger, and how long a change has to have settled before it is published |
 
 ## Where an operator touches it
 
@@ -283,11 +438,11 @@ remote community, as a user-scoped event:
 | --- | --- |
 | `continuum:relay-message` | a message arrived in a remote community the account follows |
 | `continuum:relay-reaction` | a reaction arrived on one of those messages |
+| `continuum:relay-outgoing` | the state of a message this account wrote into a community that lives elsewhere changed: taken, refused, or taken back |
 
-Both carry `relayed: true` and the origin's ids. They belong in the
+They carry `relayed: true` and the origin's ids. They belong in the
 realtime vocabulary (`backend/src/ws/events.js`), which is where every event
 name in this codebase is written down.
-
 
 ## How it was verified
 
@@ -311,16 +466,35 @@ refused; an event whose timestamp is outside the accepted window is refused;
 an event whose sequence is not newer than the last one accepted from that
 actor is refused; and an event from a peer that was removed is refused.
 
+The same file proves the return direction: a member of a federated
+community writes in it from the other instance, and the owner keeps the
+message with its author, its origin ids and its original timestamp, and
+answers; the writer is told the answer. Writing grants no role, no
+permission and no moderation power on either instance - the writer is in no
+member list, holds no role, and has no account on the owner at all. The
+owner takes a message back and the removal reaches the writing instance; the
+owner mutes a member and the member is refused; a message in a channel the
+members may not post in is refused; a message in a community the owner has
+made private is refused; and every one of those refusals reaches the writer
+with the reason.
+
 `queue.test.js` watches the outbox: an event to a peer that cannot be
 reached stays pending, is retried a bounded number of times, ends in a
 reported `failed` state with a reason, and is not retried again; a delivery
 that works is recorded as `delivered` with its attempt count, and the peer
-really did receive the envelope over HTTP.
+really did receive the envelope over HTTP. It also watches the change feed:
+a change is published once and not again, a message edited twice in a moment
+is published as one change and not three, and the feed's lag is visible to
+the operator.
 
-`permissions.test.js` covers the rules where they live: a private community
-produces no events, a restricted channel produces no events, a sender who
-may not post produces no event, encrypted content is refused, and a peer that
-is not trusted is not a delivery target.
+`permissions.test.js` covers the rules where they live, in both directions:
+a private community produces no events and refuses what a member wrote
+elsewhere; a restricted channel produces no events and refuses what a member
+wrote elsewhere; a sender who may not post produces no event, and a member
+who may not post is refused; encrypted content is refused in either
+direction; a peer that is not trusted is neither a delivery target nor a
+destination; and what was not federable when it was written is not federated
+later.
 
 The one guard that decides which addresses may be reached lives in
 `backend/src/services/netguard.js`, shared by the federation probe, the
@@ -331,16 +505,37 @@ federation-disabled instance answers 404 everywhere.
 
 ## The limits of the protocol
 
-- The relay is one-way for content. A member of a federated community reads
-  it here; this build does not yet carry their messages back to the origin,
-  so the origin cannot act on them.
-- A channel that is closed on the origin is not relayed as closed. The
+- **A relayed message is not in the owner's channel history.** It is in the
+  federation moderation surface, where the owner and its moderators can see
+  it, and it is nobody's message in the community: putting it in the
+  channel's own history would make it look like a local message written by
+  one of the owner's own members. Merging the relay store into the channel
+  history is a change in the channel and message routes.
+- **A member's message does not notify the owner's members in real time.**
+  The owner sees it in the moderation surface; the community at large does
+  not see it in the channel.
+- **The return direction needs version 1.2 on both ends.** A peer that
+  speaks 1.1 does not know the answer kinds (`message.accepted`,
+  `message.refused`, `membership.updated`) and refuses them, so a writer
+  there is never told what the owner decided. A 1.1 peer also treats a
+  member's message as a relayed message about a community it does not own,
+  rather than as something to accept or refuse.
+- **Reactions do not travel back.** A member of a federated community can
+  write in it, but a reaction they leave on a message stays on their
+  instance.
+- **A removal does not travel when the community has been closed.** A
+  community that has been made private federates nothing more, not even the
+  removals - the same rule in both directions. The owner's answer to a
+  member's message does travel, because it carries no content of the
+  community.
+- **A channel that is closed on the origin is not relayed as closed.** The
   origin's channel list is corrected by the next `community.updated`.
-- The change feed that finds edits, deletions and reactions reconciles
-  continuously, in bounded batches. On a large instance a change is noticed
-  within a pass or two rather than instantly.
-- Attachments are not federated, and neither are the files behind a relayed
-  message.
-- The protocol version is `1.1`. A peer that speaks `1.0` understands the
+- **The change feed that finds edits, deletions and reactions reconciles
+  continuously, in bounded batches.** On a large instance a change is noticed
+  within a pass or two rather than instantly, and a change that has not
+  settled waits for one more interval.
+- **Attachments are not federated**, and neither are the files behind a
+  relayed message.
+- **The protocol version is `1.2`.** A peer that speaks `1.1` understands the
   kinds it knows; it refuses the ones it does not, and the refusal is
   visible in the delivery log.

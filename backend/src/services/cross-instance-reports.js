@@ -291,6 +291,9 @@ async function receive(envelope) {
   }
 
   const continuum = require('./continuum');
+  if (!continuum.enabled()) {
+    return { accepted: false, reason: 'federation is disabled on this instance' };
+  }
   const sender = await db.get(
     'SELECT id, origin, public_key, trust_status FROM continuum_instances WHERE id = ?',
     [envelope.key_id]
@@ -383,6 +386,6 @@ async function get(id) {
 
 module.exports = {
   SHARED, NOT_SHARED,
-  buildPayload, checkPayload, disclosure,
+  buildPayload, disclosure,
   create, deliver, receive, listOutbound, listInbound, get,
 };

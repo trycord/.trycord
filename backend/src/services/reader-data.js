@@ -106,6 +106,4 @@ function registerSweep() {
 
 registerSweep();
 
-module.exports = {
-  purgeReaderData, sweepErasedAccounts, registerSweep, TABLES, SWEEP_KIND, SWEEP_INTERVAL_MS,
-};
+module.exports = { purgeReaderData, sweepErasedAccounts };

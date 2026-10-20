@@ -325,6 +325,5 @@ function schema() {
 }
 
 module.exports = {
-  KNOWN_SCHEMA_VERSIONS, TOKEN_KEYS, PACKAGE_FIELDS,
-  validate, importTheme, exportTheme, get, listThemes, activeTheme, rollback, schema, isColour,
+  validate, importTheme, exportTheme, get, listThemes, activeTheme, rollback, schema,
 };
