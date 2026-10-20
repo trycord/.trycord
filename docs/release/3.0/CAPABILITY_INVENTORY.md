@@ -112,6 +112,30 @@ channels inside a category, rename, move, reorder, partial-reorder refusal,
 deletion, the member list with paging and search, role assignment, and the
 refusals for a member without the permission and for a stranger.
 
+**Community onboarding.** A community that greets nobody is a community that
+loses people. The onboarding is what it says to somebody who has just
+arrived: the welcome, the rules, the channels worth looking at, and a few
+questions whose answers decide what the member is shown. On the desk and on
+the phone.
+
+An answer may assign a role, and a role is authority, so the roles an
+answer may assign are checked **twice**: the picker offers only what the
+answer would actually give, and the check happens again when the answer is
+recorded, because a role that was ordinary when the question was written may
+be the owner's role by the time somebody answers it. A role that carries the
+wildcard permission, or one that administers the community, is refused
+outright and the refusal names the role and the reason. A member may change
+their mind later, and their own answers are the only ones they may change.
+
+`backend/tests/community/onboarding.test.js` is 14 checks.
+
+**A poll may be edited.** The service has had an update all along, routed
+and unreached, and with no permission check of its own: the rule lived in the
+route, and a service that can be called from anywhere should not depend on
+its caller to check it. The rule is in the service now. A closed poll is not
+edited, because its result is on record; a poll that has answers is not
+edited, because the ballots were given for the options as they stand.
+
 ## 3.7 Forums, threads, discussion — Verified
 
 A forum is a channel of type `forum`. Its topics are the channel's root
