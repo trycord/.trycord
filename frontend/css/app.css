@@ -130,7 +130,8 @@
 
 /* Density. The attribute lives on <html> and is written by js/prefs.js; the
  * default block is cozy, and the two other arrangements change measurements
- * rather than type, so a row is still a row. */
+ * rather than type, so a row is still a row. The rail's width is part of the
+ * arrangement: a dense workspace gives the communities less room. */
 :root,
 :root[data-density="cozy"] {
   --row-h: 44px;
@@ -139,6 +140,7 @@
   --msg-gap: 15px;
   --panel-pad: 16px;
   --section-gap: 24px;
+  --rail-w: 68px;
 }
 :root[data-density="compact"] {
   --row-h: 36px;
@@ -147,6 +149,7 @@
   --msg-gap: 10px;
   --panel-pad: 12px;
   --section-gap: 18px;
+  --rail-w: 54px;
 }
 :root[data-density="comfortable"] {
   --row-h: 52px;
@@ -155,6 +158,7 @@
   --msg-gap: 20px;
   --panel-pad: 20px;
   --section-gap: 32px;
+  --rail-w: 82px;
 }
 
 /* Ember - the default dark palette. Charcoal from the canonical library, the
@@ -786,6 +790,14 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   background: var(--app-bg);
 }
 
+/* -- the arrangement --------------------------------------------------------
+ * The reader chooses which regions of the workspace are shown. The choice is a
+ * word list on the shell root, so the stylesheet answers "is this region here"
+ * with one selector and the shell hides nothing by hand. */
+.ws:not([data-regions~="rail"]) { --rail-w: 0px; }
+.ws:not([data-regions~="rail"]) .rail { display: none; }
+.ws:not([data-regions~="column"]) .context { display: none; }
+
 /* -- the command bar ------------------------------------------------------ */
 
 .cmdbar {
@@ -798,6 +810,10 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 }
 
 .cmdbar-nav { display: none; margin-left: -2px; }
+
+/* The panel control in the command bar: it is offered only when the page on
+ * screen has a panel behind it. */
+.cmdbar-panel { flex: none; }
 
 .cmdbar-omni {
   display: flex; align-items: center; gap: 9px;
@@ -977,6 +993,14 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .nav-item.is-active svg { color: var(--brand); }
 .nav-item--channel { min-height: 32px; gap: 8px; }
 .nav-item--dm { gap: 9px; }
+
+/* A row being dragged, and a row that would take it. The dragged row dims and
+ * the row under the pointer says it would take it. */
+.nav-item[data-dragging], .nav-label[data-dragging] { opacity: .45; }
+.nav-item[data-dropping], .nav-label[data-dropping] {
+  outline: 1px dashed var(--brand); outline-offset: -2px;
+}
+.nav-label[data-dragging] { cursor: grabbing; }
 .nav-muted { margin-left: auto; display: inline-flex; color: var(--text-3); }
 .nav-dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--brand); flex: none; }
 .nav-sep { height: 1px; background: var(--line); margin: 8px 6px; }
@@ -1003,6 +1027,7 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 }
 .grip--column { right: -5px; }
 .grip--inspector { left: -5px; }
+.grip--stage { right: -5px; }
 .grip::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px;
   background: var(--brand-line); opacity: 0;
@@ -1012,8 +1037,14 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 
 /* -- the stage ------------------------------------------------------------ */
 
-.stage { grid-area: stage; display: flex; min-width: 0; min-height: 0; }
-.screen { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.stage { grid-area: stage; display: flex; min-width: 0; min-height: 0; position: relative; }
+.screen {
+  display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0;
+  /* The reading column has a width the reader chooses; wider than the stage
+     and it simply fills it. */
+  max-width: var(--stage-w);
+  margin-inline: auto;
+}
 
 .stage-head {
   flex: none; display: flex; align-items: center; gap: 12px;
@@ -1482,6 +1513,12 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .msg-rail { position: relative; }
 .msg--continued .msg-rail { visibility: hidden; height: 0; }
 
+/* Density changes the composition and not only the measurements: a compact
+ * workspace drops the face beside each message, because the name is already
+ * on the line above it. */
+:root[data-density="compact"] .msg-rail { display: none; }
+:root[data-density="compact"] .msg--continued .msg-rail { display: none; }
+
 .msg-main { position: relative; min-width: 0; }
 
 .msg-meta { display: flex; align-items: baseline; gap: 8px; min-height: 18px; }
@@ -1515,9 +1552,6 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 
 /* The non-image attachment row's leading glyph column. */
 .msg-file-glyph { display: grid; place-items: center; flex: none; color: var(--text-3); }
-
-/* An embed card's text column beside its optional image. */
-.msg-embed-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
 /* The emoji face of a reaction chip: sized to the chip, not the author text. */
 .msg-reaction-emoji { line-height: 1; font-size: var(--fs-sm); }
@@ -1578,24 +1612,119 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   max-width: 100%;
 }
 .msg-file:hover { background: var(--hover); }
+.msg-file--image { padding: 0; border: 0; background: none; display: block; max-width: 100%; }
+.msg-file--image:hover { background: none; }
 .msg-file-name { font-weight: 600; overflow-wrap: anywhere; }
 .msg-file-size { color: var(--text-3); font-size: var(--fs-xs); }
 
 .msg-embeds { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
-.msg-embed {
-  display: flex; gap: 10px; align-items: stretch;
+
+/* -- the arrangement --------------------------------------------------------- */
+.layout-regions { display: flex; flex-direction: column; gap: var(--space-3); }
+.layout-widths { display: flex; align-items: center; gap: 12px; }
+.layout-width { flex: 1; min-width: 0; accent-color: var(--brand); }
+.layout-value { color: var(--text-3); font-size: var(--fs-micro); font-variant-numeric: tabular-nums; }
+
+/* -- the member roster --------------------------------------------------------
+ * The same roster is drawn on the members page and in the inspector beside a
+ * channel, so it has one set of rules. */
+.channel-row .cardrow-sub, .category-row .cardrow-sub { white-space: normal; }
+.member-panel { display: flex; flex-direction: column; gap: 10px; }
+.member-head { display: flex; align-items: center; gap: 10px; }
+.member-search { flex: 1; min-width: 0; }
+.member-count { color: var(--text-3); font-size: var(--fs-micro); font-variant-numeric: tabular-nums; }
+.member-list { border-top: 1px solid var(--line); }
+.member-row .cardrow-meta { min-width: 68px; text-align: right; }
+.member-presence { color: var(--text-3); }
+.member-presence[data-presence="online"] { color: var(--success); }
+.member-presence[data-presence="idle"] { color: var(--warning); }
+.member-presence[data-presence="dnd"] { color: var(--danger); }
+.member-more { display: flex; justify-content: center; padding: 10px 0; }
+
+/* -- link previews -----------------------------------------------------------
+ * A preview is a card: a picture or a player when the page had one, and the
+ * page's own words when it did not. The site is named by a tile of its first
+ * letter rather than by a favicon - a favicon is a request to an arbitrary
+ * host on behalf of every reader who opens the channel. */
+.embed-card {
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 520px;
   border: 1px solid var(--line-2); border-left: 3px solid var(--brand);
   border-radius: var(--radius-md); padding: 10px; background: var(--panel-2);
-  color: var(--text-1); text-decoration: none; max-width: 520px;
 }
-.msg-embed:hover { border-color: var(--line-3); }
-.msg-embed-host { display: block; font-size: var(--fs-xs); color: var(--text-3); }
-.msg-embed-title { display: block; font-weight: 600; }
-.msg-embed-text {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; color: var(--text-2); font-size: var(--fs-sm);
+.embed-card:hover { border-color: var(--line-3); }
+.embed-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.embed-site { display: flex; align-items: center; gap: 7px; margin: 0; }
+.embed-tile {
+  display: grid; place-items: center;
+  width: 20px; height: 20px; flex: none;
+  border-radius: var(--radius-sm);
+  background: var(--panel-3); color: var(--text-2);
+  font-size: var(--fs-xs); font-weight: var(--weight-bold); text-transform: uppercase;
 }
-.msg-embed-image { width: 96px; height: 96px; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--line-2); }
+.embed-site-name {
+  font-size: var(--fs-xs); color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.embed-title {
+  display: block; color: var(--text-1); font-weight: 600; text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.embed-title:hover { color: var(--brand); }
+.embed-text {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; margin: 0; color: var(--text-2); font-size: var(--fs-sm);
+}
+.embed-host { margin: 0; font-size: var(--fs-xs); color: var(--text-3); }
+.embed-original {
+  align-self: flex-start; margin-top: 2px;
+  font-size: var(--fs-xs); color: var(--brand); text-decoration: none;
+}
+.embed-original:hover { text-decoration: underline; }
+.embed-media {
+  display: block; padding: 0; border: 0; background: none; cursor: zoom-in;
+  border-radius: var(--radius-md); overflow: hidden; max-width: 100%;
+}
+.embed-media:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.embed-image {
+  display: block; max-width: min(420px, 100%); max-height: 320px;
+  object-fit: contain; border-radius: var(--radius-md); border: 1px solid var(--line-2);
+}
+.embed-video {
+  display: block; width: 100%; max-width: 480px; aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md); border: 1px solid var(--line-2); background: var(--panel-3);
+}
+/* A preview the server could not describe is the link and nothing else. */
+.embed-plain {
+  align-self: flex-start; margin-top: 4px;
+  color: var(--brand); font-size: var(--fs-sm); overflow-wrap: anywhere;
+}
+
+/* -- the lightbox ------------------------------------------------------------
+ * An image opened from a message, read large, with the other images of the
+ * message a keypress away. */
+.dialog--lightbox { max-width: min(1100px, 94vw); width: 94vw; background: transparent; }
+.dialog--lightbox .dialog-body { padding: 0; }
+.lightbox { display: flex; flex-direction: column; gap: 8px; }
+.lightbox-image {
+  display: block; max-width: 100%; max-height: 74vh; margin: 0 auto;
+  object-fit: contain; border-radius: var(--radius-md); background: var(--panel-3);
+}
+.lightbox-bar { display: flex; align-items: center; gap: 10px; }
+.lightbox-caption {
+  flex: 1; min-width: 0; margin: 0; color: var(--text-2); font-size: var(--fs-sm);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lightbox-count { color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.lightbox-close, .lightbox-nav {
+  display: grid; place-items: center; width: 36px; height: 36px; flex: none;
+  border: 1px solid var(--line-2); border-radius: var(--radius-md);
+  background: var(--panel-2); color: var(--text-2);
+}
+.lightbox-close:hover, .lightbox-nav:hover { background: var(--hover); color: var(--text-1); }
+.lightbox-nav { position: absolute; top: 50%; transform: translateY(-50%); }
+.lightbox-nav--prev { left: 8px; }
+.lightbox-nav--next { right: 8px; }
 
 .msg-reactions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .msg-reaction {

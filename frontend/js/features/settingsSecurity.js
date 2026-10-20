@@ -27,6 +27,13 @@ export function securityView() {
     try {
       const rows = await Api.sessions();
       const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
+      const revoke = async (session) => {
+        try {
+          await Api.revokeSession(session.jti);
+          toast('That session is out');
+          paintSessions();
+        } catch (e) { errorToast(e); }
+      };
       sessionsList.replaceChildren(...(items.length ? items.map((s) => row({
         lead: el('span', { class: 'role-dot' }, icon('monitor', { size: 15 })),
         title: s.userAgent || s.ua || 'A signed-in device',
@@ -34,14 +41,12 @@ export function securityView() {
         side: s.jti ? el('button', {
           class: 'btn btn--danger btn--sm', type: 'button',
           'aria-label': 'Revoke this session',
-          onClick: async () => {
-            try {
-              await Api.revokeSession(s.jti);
-              toast('That session is out');
-              paintSessions();
-            } catch (e) { errorToast(e); }
-          },
+          onClick: () => revoke(s),
         }, 'Revoke') : null,
+        // The same thing, raised by a right-click on the row.
+        menu: () => (s.jti ? [
+          { label: 'Revoke this session', icon: 'logout', danger: true, onSelect: () => revoke(s) },
+        ] : []),
       })) : [blank({
         glyph: 'monitor', title: 'This device only',
         text: 'Nothing else is signed in as you.',

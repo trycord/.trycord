@@ -608,9 +608,25 @@ async function boot(options = {}) {
   // the Privacy and Notification summaries load in a single round trip.
   app.use('/api/me', require('./routes/privacy'));
   app.use('/api/me', require('./routes/export'));
+  // The reader's own working material: the message templates they reuse and
+  // the collections they save things into. It goes with the account.
+  app.use('/api/personal', require('./routes/personal'));
   // The devices this instance may reach a reader on. Mounted under /api/me
   // because a device registration belongs to the account that made it.
   app.use('/api/me/push-devices', require('./routes/push'));
+  // The locales this instance offers, and the packs that provide them. The
+  // list is readable without a session so a sign-in page can say which
+  // language it is in; everything that changes anything needs one.
+  app.use('/api/localisation', require('./routes/localisation'));
+  // Theme packages: a declarative set of tokens, versioned, validated on
+  // import and never able to carry a script.
+  app.use('/api/themes', require('./routes/themes'));
+  // The operational incident timeline. Public, because a reader should be able
+  // to see when something was broken; written only by an administrator.
+  app.use('/api/incidents', require('./routes/incidents'));
+  // A report about activity on another instance. It carries the reference and
+  // the reason, never the content.
+  app.use('/api/federation-reports', require('./routes/federation-reports'));
   app.use('/api/mutes', require('./routes/mutes'));
   app.use('/api/voice', require('./routes/voice'));
   // Instance-wide announcement banners (per-deployment, not global).

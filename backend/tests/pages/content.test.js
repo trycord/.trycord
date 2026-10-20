@@ -162,6 +162,14 @@ test('the content model', async (t) => {
     assert.match(html, /&lt;\/code&gt;&lt;\/pre&gt;&lt;script&gt;/);
   });
 
+  await t.test('a code block keeps its indentation', () => {
+    const blocks = content.normalise([
+      { type: 'code', text: '  if (x) {\n    y();\n  }', language: 'js' },
+    ]);
+    assert.equal(blocks[0].text, '  if (x) {\n    y();\n  }');
+    assert.equal(blocks[0].language, 'js');
+  });
+
   await t.test('a table is escaped too', () => {
     const html = content.toHtml(content.normalise([
       { type: 'table', headers: ['<b>head</b>'], rows: [['<script>alert(1)</script>']], caption: 'A "caption"' },

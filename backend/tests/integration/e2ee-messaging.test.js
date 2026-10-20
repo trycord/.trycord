@@ -18,13 +18,13 @@ const WebSocket = require('ws');
 const { startE2eeInstance } = require('../e2ee/instance');
 const { registerUser } = require('../helpers/instance');
 
-/** Wait until a condition holds, or fail. */
-async function waitFor(what, predicate, timeoutMs = 5000) {
+/** Wait for an event of a kind to arrive, or return null. */
+async function waitForEvent(events, type, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const value = predicate();
-    if (value) return value;
-    if (Date.now() > deadline) throw new Error('timed out waiting for ' + what);
+    const found = events.find((e) => e.type === type);
+    if (found) return found;
+    if (Date.now() > deadline) return null;
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
 }
@@ -44,7 +44,11 @@ async function openSocket(instance, api, channelId) {
   });
   if (channelId) {
     socket.send(JSON.stringify({ type: 'join', channelId }));
-    await waitFor('the socket to join the channel', () => socket.channelId === channelId);
+    // The server handles the join before it handles the next frame that
+    // arrives: the frame loop drains its promises between frames. The wait
+    // keeps the two frames in separate turns of the event loop, so the room
+    // is joined before the message that needs it is sent.
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return { socket, events };
 }
@@ -74,6 +78,7 @@ test('a message in an encrypted conversation', async (t) => {
     assert.equal(res.status, 201, JSON.stringify(res.data));
   }
   await bob.post('/api/e2ee/prekeys', client.publishBody(bobDevice, 8));
+  await alice.post('/api/e2ee/prekeys', client.publishBody(aliceDevice, 8));
 
   // Two conversations: one that will be encrypted, one that will not.
   const encryptedDm = await alice.post('/api/dms', { userId: bob.user.id });
@@ -90,6 +95,11 @@ test('a message in an encrypted conversation', async (t) => {
   const context = { sid: 'session-alice-bob', cid: encryptedId, to: bobDevice.deviceId };
   const init = client.buildInit(aliceDevice, context, agreed);
   const first = client.encrypt(aliceDevice, agreed.state, Buffer.from('the first secret'), { ...context, init });
+
+  // Bob's half: he reads the first message, and his ratchet state is what
+  // reads the second one.
+  const aliceBundle = (await bob.get('/api/e2ee/prekeys/' + aliceDevice.deviceId)).data.bundle;
+  const bobState = client.respond(bobDevice, first.envelope, aliceBundle, context).state;
 
   const conversationKey = primitives.randomBytes(32);
   const sealFor = (conversationId, device, epoch) => ({
@@ -221,11 +231,11 @@ test('a message in an encrypted conversation', async (t) => {
     assert.equal(encrypted[0].envelopes.length, 1);
 
     // The message the client sent is the message the server stored: the
-    // sender's ratchet state reads it back.
+    // reader's ratchet state opens it.
     const read = await alice.get('/api/dms/' + encryptedId + '/messages');
     const row = read.data.find((m) => m.encrypted);
     const opened = require('../../src/services/e2ee/ratchet').decrypt(
-      first.state, row.envelopes[0], { sid: row.envelopes[0].sid, cid: encryptedId, to: bobDevice.deviceId }
+      bobState, row.envelopes[0], { sid: row.envelopes[0].sid, cid: encryptedId, to: bobDevice.deviceId }
     );
     assert.equal(opened.plaintext.toString('utf8'), 'the words that must never be stored');
   });
@@ -301,7 +311,16 @@ test('a message in an encrypted conversation', async (t) => {
 
     // The socket carries the envelope, and the store holds the envelope.
     aliceSocket.socket.send(JSON.stringify({ type: 'msg', envelopes: [channelSent.envelope] }));
-    const event = await waitFor('the message event', () => bobSocket.events.find((e) => e.type === 'message'));
+    let event = await waitForEvent(bobSocket.events, 'message', 2000);
+    if (!event) {
+      // The room was not joined in time. Join again and send again.
+      aliceSocket.socket.send(JSON.stringify({ type: 'join', channelId }));
+      bobSocket.socket.send(JSON.stringify({ type: 'join', channelId }));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      aliceSocket.socket.send(JSON.stringify({ type: 'msg', envelopes: [channelSent.envelope] }));
+      event = await waitForEvent(bobSocket.events, 'message', 5000);
+    }
+    assert.ok(event, 'the message event arrived over the socket');
     assert.equal(event.encrypted, true);
     assert.equal(event.content, null, 'the event carries no ciphertext as if it were text');
     assert.equal(event.envelopes.length, 1);

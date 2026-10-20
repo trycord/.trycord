@@ -411,6 +411,7 @@
 /* -- the member roster --------------------------------------------------------
  * The same roster is drawn on the members page and in the inspector beside a
  * channel, so it has one set of rules. */
+.channel-row .cardrow-sub, .category-row .cardrow-sub { white-space: normal; }
 .member-panel { display: flex; flex-direction: column; gap: 10px; }
 .member-head { display: flex; align-items: center; gap: 10px; }
 .member-search { flex: 1; min-width: 0; }

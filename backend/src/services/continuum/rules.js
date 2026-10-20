@@ -257,7 +257,14 @@ async function mayPublishRemoteMessage({
   }
   if (!removal) {
     const membership = await store.findMembership(userId, originInstanceId, originCommunityId);
-    if (!membership || membership.state !== 'joined') {
+    if (!membership) return { ok: false, reason: 'you have not joined that community' };
+    if (membership.state === 'muted') {
+      return { ok: false, reason: 'you are muted in that community' };
+    }
+    if (membership.state === 'removed') {
+      return { ok: false, reason: 'you have been removed from that community' };
+    }
+    if (membership.state !== 'joined') {
       return { ok: false, reason: 'you have not joined that community' };
     }
   }

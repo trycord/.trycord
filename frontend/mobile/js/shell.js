@@ -12,6 +12,7 @@ import { path, currentRoute, navigate } from '../../packages/nav.js';
 import { mobilePages } from '../../packages/registry.js';
 import { attachViewSwipe } from '../js/gestures.js';
 import { State } from '../../packages/store.js';
+import { readPrefs, applyDensity, onPrefsChange } from './prefs.js';
 
 let refs = null;
 let tabRecords = [];
@@ -31,8 +32,17 @@ export function mountShell() {
     banner, view, composer, tabs);
 
   refs = { root, lead, title, actions, banner, view, composer, tabs };
+  applyDensity();
   buildTabs();
   refreshTabs();
+
+  // The reader's choices about the phone's own composition take effect at
+  // once, not at the next launch.
+  onPrefsChange(() => {
+    applyDensity();
+    buildTabs();
+    refreshTabs();
+  });
 
   // Horizontal swipe on the view (started at the top of the scroll) hops between
   // the bottom-tab destinations. Vertical scrolling always wins.
@@ -109,9 +119,14 @@ export function setConnection(state, label) {
     icon(state === 'offline' ? 'wifi-off' : 'loader', { size: 16 }), el('span', {}, label || ''));
 }
 
+// The bottom bar carries the destinations the reader kept, in the order they
+// chose. The registry says what exists; the phone's own preferences say which
+// of them are here.
 function buildTabs() {
   refs.tabs.replaceChildren();
-  tabRecords = mobilePages().map((page) => {
+  const wanted = readPrefs().tabs;
+  const pages = mobilePages().filter((page) => wanted.indexOf(page.id) !== -1);
+  tabRecords = pages.map((page) => {
     const nav = page.nav || {};
     const label = page.nav.tabLabel || page.nav.short || page.nav.label || page.label;
     const badgeHost = el('span', { class: 'm-tab__badge', hidden: true });

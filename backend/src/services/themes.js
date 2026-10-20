@@ -177,7 +177,13 @@ async function importTheme(raw, options) {
       scope, opts.serverId || null, 'active', opts.actorId || null, ts,
     ]
   );
-  await activate({ id, scope, serverId: opts.serverId, reason: 'install', actorId: opts.actorId });
+  await activate({
+    themeId: id,
+    scope,
+    serverId: opts.serverId,
+    reason: 'install',
+    actorId: opts.actorId,
+  });
   return get(id);
 }
 

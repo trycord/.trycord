@@ -85,6 +85,7 @@ async function send(userId, username, conversationId, body) {
   const accepted = await bodies.accept(conversationId, userId, {
     content: text,
     envelopes: input.envelopes,
+    attachmentIds: ids,
   });
 
   const msg = {

@@ -101,7 +101,8 @@ different things in two renderers is a table nobody can rely on.
 Every attribute in that table is written by the renderer. No block carries an
 attribute an editor supplied: there is no event handler to strip, no inline
 style, and no class name that came from a document. The text of a code block
-is escaped whole, so it cannot close the element it is in.
+is escaped whole, so it cannot close the element it is in, and it keeps its
+whitespace, because whitespace is what code means.
 
 ## The page and its metadata
 

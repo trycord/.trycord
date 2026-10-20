@@ -13,14 +13,21 @@ import { State, loadSession, applyToken } from '../../../packages/store.js';
 import Api from '../../../packages/api.js';
 import { TrycordConfig } from '../../../packages/config.js';
 import { path, publicPath } from '../../../packages/nav.js';
-import { scopeNav } from '../../../packages/registry.js';
+import { scopeNav, pageById } from '../../../packages/registry.js';
+import { readPrefs, rememberDensity, rememberTabs, DENSITIES, TABS } from '../prefs.js';
 import { toast, confirm, sheet } from '../ui.js';
 import { currentTheme, setTheme, THEMES } from '../../../packages/theme.js';
 import { relativeTime } from '../../../packages/format.js';
 import { screen } from './util.js';
 
-function field(label, control, note) {
-  return el('label', { class: 'm-field' },
+// What each density means on a phone.
+const DENSITY_HINT = {
+  compact: 'Small rows; more of them on screen.',
+  cozy: 'The ordinary phone.',
+  comfortable: 'Large rows, and larger touch targets.',
+};
+
+function field(label, control, note) {  return el('label', { class: 'm-field' },
     el('span', { class: 'm-field__label' }, label),
     control,
     note ? el('span', { class: 'm-field__note' }, note) : null);
@@ -505,6 +512,64 @@ function notificationsBody() {
 
 // -- appearance --------------------------------------------------------------
 
+// -- the phone's own arrangement ------------------------------------------------
+//
+// The phone has its own composition and its own choices: how dense the lists
+// are, and which destinations the bottom bar carries. They are the phone's
+// business and are stored as the phone's business.
+
+function layoutBody() {
+  const host = el('div', { class: 'm-stack' });
+
+  const density = el('div', { class: 'm-list' });
+  function paintDensity() {
+    clear(density);
+    const current = readPrefs().density;
+    for (const name of DENSITIES) {
+      const active = current === name;
+      density.appendChild(el('button', {
+        class: 'm-row' + (active ? ' is-active' : ''), type: 'button',
+        'aria-pressed': String(active),
+        onClick: () => { rememberDensity(name); paintDensity(); },
+      },
+        el('span', { class: 'm-row__body' },
+          el('span', { class: 'm-row__title' }, name.charAt(0).toUpperCase() + name.slice(1)),
+          el('span', { class: 'm-row__sub' }, DENSITY_HINT[name] || '')),
+        el('span', { class: 'm-row__actions' }, active ? icon('check', { size: 18 }) : null)));
+    }
+  }
+  paintDensity();
+
+  const tabs = el('div', { class: 'm-list' });
+  function paintTabs() {
+    clear(tabs);
+    const current = readPrefs().tabs;
+    for (const id of TABS) {
+      const page = pageById(id);
+      if (!page) continue;
+      const active = current.indexOf(id) !== -1;
+      tabs.appendChild(el('button', {
+        class: 'm-row' + (active ? ' is-active' : ''), type: 'button',
+        'aria-pressed': String(active),
+        onClick: () => {
+          const next = active ? current.filter((entry) => entry !== id) : current.concat([id]);
+          rememberTabs(next);
+          paintTabs();
+        },
+      },
+        el('span', { class: 'm-row__lead' }, icon(page.nav && page.nav.icon ? page.nav.icon : 'circle-dot', { size: 18 })),
+        el('span', { class: 'm-row__body' },
+          el('span', { class: 'm-row__title' }, (page.nav && (page.nav.tabLabel || page.nav.short || page.nav.label)) || page.label)),
+        el('span', { class: 'm-row__actions' }, active ? icon('check', { size: 18 }) : null)));
+    }
+  }
+  paintTabs();
+
+  host.append(group('Density', density));
+  host.append(group('Bottom bar', tabs));
+  return host;
+}
+
 function appearanceBody() {
   const host = el('div', { class: 'm-list' });
   const choices = THEMES.filter((theme) => theme.id !== 'custom');
@@ -524,7 +589,7 @@ function appearanceBody() {
     }
   }
   paint();
-  return el('div', { class: 'm-stack' }, group('Theme', host));
+  return el('div', { class: 'm-stack' }, group('Theme', host), layoutBody());
 }
 
 // -- connection --------------------------------------------------------------

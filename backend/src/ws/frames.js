@@ -53,11 +53,26 @@ function admitFrame(ws, nowMs) {
   return false;
 }
 
+// Whether email verification is enforceable on this instance.
+//
+// The same rule the REST post uses: verification is only enforceable when the
+// instance can actually deliver a verification email. With mail disabled
+// there is nobody who could ever confirm an address, so the guard is a no-op
+// - and the socket must not be stricter than the HTTP path it mirrors, or a
+// message that the REST post accepts would be refused here.
+function verificationEnforceable() {
+  try {
+    return require('../services/mail').mode() !== 'disabled';
+  } catch {
+    return false;
+  }
+}
+
 module.exports = function createFrames({ rooms, registry }) {
   async function postChannelMessage(ws, user, data) {
     // Email verification gate, same as REST posts. Re-read once when cached false, so a
     // verification that lands mid-session takes effect without forcing a reconnect.
-    if (!ws.verified) {
+    if (verificationEnforceable() && !ws.verified) {
       try {
         const v = await db.get('SELECT email_verified_at FROM users WHERE id = ?', [user.id]);
         ws.verified = !!(v && v.email_verified_at);
@@ -111,6 +126,7 @@ module.exports = function createFrames({ rooms, registry }) {
       accepted = await e2ee.acceptMessageBody(user.id, ch.id, {
         content: rawContent,
         envelopes: data.envelopes,
+        attachmentIds: ids,
       });
     } catch {
       return;

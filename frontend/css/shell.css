@@ -44,6 +44,10 @@
 
 .cmdbar-nav { display: none; margin-left: -2px; }
 
+/* The panel control in the command bar: it is offered only when the page on
+ * screen has a panel behind it. */
+.cmdbar-panel { flex: none; }
+
 .cmdbar-omni {
   display: flex; align-items: center; gap: 9px;
   width: min(560px, 100%);

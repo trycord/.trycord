@@ -10,7 +10,9 @@ import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar } from '../components.js';
 import { State } from '../../../packages/store.js';
-import { menu, confirm, toast, sheet } from '../ui.js';
+import { menu, confirm, toast, sheet, attachLongPress } from '../ui.js';
+import { copyText } from '../clipboard.js';
+import { embedCard, imagesOf, kindOf } from '../embeds.js';
 import { mediaUrl } from '../../../packages/media.js';
 import { dayLabel, toDate, timeOfDay, fileSize } from '../../../packages/format.js';
 import realtime, { EVENTS } from '../../../packages/realtime.js';
@@ -111,22 +113,57 @@ function renderRich(container, text) {
 function attachmentNode(att) {
   const url = att.url || ('/api/attachments/' + att.id);
   const kind = String(att.content_type || att.contentType || '');
+  const name = att.filename || 'Attachment';
   if (kind.indexOf('image/') === 0) {
     const img = el('img', { class: 'm-attach__image', alt: att.filename || 'image', loading: 'lazy' });
     mediaUrl(url).then((src) => { if (src) img.src = src; }).catch(() => {});
-    return el('div', { class: 'm-attach' }, img);
+    const holder = el('div', { class: 'm-attach' }, img);
+    attachLongPress(holder, () => attachmentMenuItems(att, url, name), { title: name });
+    return holder;
   }
   if (kind.indexOf('video/') === 0 || kind.indexOf('audio/') === 0) {
     const tag = kind.indexOf('video/') === 0 ? 'video' : 'audio';
     const media = el(tag, { class: 'm-attach__media', controls: true, preload: 'metadata' });
     mediaUrl(url).then((src) => { if (src) media.src = src; }).catch(() => {});
-    return el('div', { class: 'm-attach' }, media);
+    const holder = el('div', { class: 'm-attach' }, media);
+    attachLongPress(holder, () => attachmentMenuItems(att, url, name), { title: name });
+    return holder;
   }
   const link = el('a', { class: 'm-attach m-attach--file', href: url, target: '_blank', rel: 'noopener noreferrer' },
     icon('file', { size: 18 }),
-    el('span', { class: 'm-attach__name truncate' }, att.filename || 'Attachment'),
+    el('span', { class: 'm-attach__name truncate' }, name),
     att.size ? el('span', { class: 'm-attach__size' }, fileSize(att.size)) : null);
+  attachLongPress(link, () => attachmentMenuItems(att, url, name), { title: name });
   return link;
+}
+
+// The menu a file offers. Every entry acts on the file.
+function attachmentMenuItems(att, url, name) {
+  const items = [];
+  if (url) {
+    items.push({
+      label: 'Open the file', icon: 'external',
+      onSelect: () => { window.open(url, '_blank', 'noopener,noreferrer'); },
+    });
+    items.push({ label: 'Copy the address', icon: 'link', onSelect: () => copyText(url, 'File address') });
+  }
+  items.push({ label: 'Copy the name', icon: 'copy', onSelect: () => copyText(name, 'File name') });
+  return items;
+}
+
+// The previews of one message. The images of the message are collected first
+// so the sheet can move between them.
+function embedRow(cards) {
+  const list = cards || [];
+  const images = imagesOf(list);
+  let seen = 0;
+  const holder = el('div', { class: 'm-embed-row' });
+  for (const card of list) {
+    let index = 0;
+    if (kindOf(card) === 'image') { index = seen; seen += 1; }
+    holder.appendChild(embedCard(card, { images, index, onCopy: copyText }));
+  }
+  return holder;
 }
 
 function reactionRow(message, handlers) {
@@ -166,11 +203,7 @@ function messageRow(message, previous, handlers) {
     main.appendChild(body);
   }
   for (const att of message.attachments || []) main.appendChild(attachmentNode(att));
-  for (const card of message.embeds || []) {
-    main.appendChild(el('a', { class: 'm-embed', href: card.url || '#', target: '_blank', rel: 'noopener noreferrer' },
-      el('div', { class: 'm-embed__title truncate' }, card.title || card.url || 'Link'),
-      card.description ? el('div', { class: 'm-embed__text' }, card.description) : null));
-  }
+  if ((message.embeds || []).length) main.appendChild(embedRow(message.embeds));
   if ((message.reactions || []).length) main.appendChild(reactionRow(message, handlers));
   if (message.editedAt) main.appendChild(el('span', { class: 'm-msg__edited' }, 'edited'));
   if (message.replyCount) {
@@ -444,18 +477,6 @@ export function renderConversation(ctx, scope) {
       remove(message.id);
     } catch (error) {
       toast(error && error.message ? error.message : 'That message did not delete.', { type: 'danger' });
-    }
-  }
-
-  function copyText(value) {
-    const text = String(value || '');
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {});
-    else {
-      const area = el('textarea', { class: 'visually-hidden' }, text);
-      document.body.appendChild(area);
-      area.select();
-      try { document.execCommand('copy'); } catch { /* nothing to do */ }
-      area.remove();
     }
   }
 

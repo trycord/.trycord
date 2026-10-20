@@ -16,6 +16,10 @@ const { serviceError } = require('../errors');
 const templates = require('../services/message-templates');
 const collections = require('../services/saved-collections');
 
+// The erasure sweep. Loading it registers the background job that takes a
+// reader's own rows away when their account is erased.
+require('../services/reader-data');
+
 const router = express.Router();
 router.use(auth);
 

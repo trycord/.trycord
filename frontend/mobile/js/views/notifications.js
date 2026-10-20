@@ -8,10 +8,12 @@ import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar, empty, loading, failure } from '../components.js';
 import { State, refreshNotifications } from '../../../packages/store.js';
-import { navigate } from '../../../packages/nav.js';
+import { navigate, path } from '../../../packages/nav.js';
 import { relativeTime } from '../../../packages/format.js';
 import Api from '../../../packages/api.js';
 import { screen, section } from './util.js';
+import { attachLongPress } from '../ui.js';
+import { copyText } from '../clipboard.js';
 
 const PHRASE = {
   dm: 'sent you a direct message',
@@ -68,7 +70,7 @@ export function renderNotifications() {
   function rowFor(entry) {
     const actor = entry.actor || null;
     const who = actor ? (actor.displayName || actor.username) : 'Trycord';
-    return el('button', {
+    const node = el('button', {
       class: 'm-row' + (entry.readAt ? '' : ' is-unread'),
       type: 'button',
       onClick: () => follow(entry),
@@ -80,6 +82,36 @@ export function renderNotifications() {
         el('span', { class: 'm-row__title' }, who + ' ' + (PHRASE[entry.type] || 'sent you something')),
         el('span', { class: 'm-row__sub truncate' }, entry.createdAt ? relativeTime(entry.createdAt) : '')),
       entry.readAt ? null : el('span', { class: 'm-row__dot', 'aria-label': 'Unread' }));
+    // A long press on an entry raises the actions that belong to it.
+    attachLongPress(node, () => entryActions(entry), { title: who });
+    return node;
+  }
+
+  // What an entry can be asked for: opened, its address copied, and marked
+  // read without being followed.
+  function entryActions(entry) {
+    const items = [];
+    const to = destination(entry);
+    if (to) {
+      items.push({ label: 'Open', icon: 'external', onSelect: () => follow(entry) });
+      items.push({
+        label: 'Copy the link', icon: 'link',
+        onSelect: () => copyText(window.location.origin + path(to), 'Link'),
+      });
+    }
+    if (!entry.readAt) {
+      items.push({ separator: true });
+      items.push({ label: 'Mark as read', icon: 'check', onSelect: () => markRead(entry) });
+    }
+    return items;
+  }
+
+  function markRead(entry) {
+    if (entry.readAt) return;
+    entry.readAt = new Date().toISOString();
+    State.notifications.unreadCount = Math.max(0, (State.notifications.unreadCount || 1) - 1);
+    Api.readNotification(entry.id).catch(() => { /* the next load corrects it */ });
+    paint();
   }
 
   async function follow(entry) {

@@ -111,8 +111,54 @@ export function confirm(options) {
   });
 }
 
-let toastRoot = null;
+// -- the long press ------------------------------------------------------------
+//
+// A phone has no right-click, so the gesture that opens an entity's actions is
+// a long press. It raises the same sheet of choices a right-click raises on a
+// desk: the module's own bottom sheet, thumb-reachable.
 
+const LONG_PRESS_MS = 480;
+const LONG_PRESS_SLOP = 10;
+
+export function attachLongPress(node, build, options) {
+  const opts = options || {};
+  let timer = null;
+  let startX = 0;
+  let startY = 0;
+
+  function cancel() {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  }
+
+  function summon() {
+    Promise.resolve(build({ target: node })).then((items) => {
+      if (items && items.length) menu({ title: opts.title, items });
+    }).catch(() => { /* a sheet that cannot be built simply does not open */ });
+  }
+
+  node.addEventListener('touchstart', (event) => {
+    if (event.touches.length !== 1) { cancel(); return; }
+    startX = event.touches[0].clientX;
+    startY = event.touches[0].clientY;
+    cancel();
+    timer = setTimeout(() => { timer = null; summon(); }, LONG_PRESS_MS);
+  }, { passive: true });
+
+  node.addEventListener('touchmove', (event) => {
+    if (!timer) return;
+    const touch = event.touches[0];
+    if (Math.abs(touch.clientX - startX) > LONG_PRESS_SLOP
+      || Math.abs(touch.clientY - startY) > LONG_PRESS_SLOP) cancel();
+  }, { passive: true });
+
+  node.addEventListener('touchend', cancel);
+  node.addEventListener('touchcancel', cancel);
+  node.addEventListener('scroll', cancel, { passive: true });
+  return node;
+}
+
+let toastRoot = null;
 export function toast(message, options) {
   const opts = options || {};
   if (!toastRoot) {
@@ -129,4 +175,4 @@ export function closeAll() {
   while (stack.length) stack[stack.length - 1].close();
 }
 
-export default { sheet, menu, confirm, toast, closeAll };
+export default { sheet, menu, confirm, toast, closeAll, attachLongPress };

@@ -275,6 +275,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       accepted = await e2ee.acceptMessageBody(req.user.id, ch.id, {
         content,
         envelopes: body.envelopes,
+        attachmentIds: ids,
       });
     } catch (e) {
       if (e && e.code && e.status) return fail(res, e.code, e.message, e.status);

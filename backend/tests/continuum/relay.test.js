@@ -529,3 +529,289 @@ test('a community relays between two instances', async (t) => {
     assert.equal(community.relationship, 'revoked', 'the relationship is over');
   });
 });
+
+// The return direction.
+//
+// A member of a federated community reads it here. This is the other half:
+// a member writes in it from here, and the message travels to the instance
+// that owns the community.
+//
+// The owner is the authority. It applies its own rules to what arrives, it
+// can refuse, and the refusal reaches the writer. And it can act on what
+// was accepted: take the message back, mute the member, remove the member.
+test('a member writes in a federated community, and the owner sees it and can act on it', async (t) => {
+  const a = await startFederatedInstance('instance-a');
+  const b = await startFederatedInstance('instance-b');
+  t.after(async () => {
+    await a.stop();
+    await b.stop();
+  });
+
+  const adminA = await registerUser(a, 'operator');
+  const adminB = await registerUser(b, 'operator');
+  const bob = await registerUser(b, 'bob');
+  await peerInstances(a, b, adminA, adminB);
+
+  // The community, on the instance that owns it.
+  const created = await adminA.post('/api/servers', {
+    name: 'Return Community',
+    description: 'A community that lives on instance A.',
+    isPublic: true,
+  });
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  const communityId = created.data.serverId;
+  const channelId = created.data.channelId;
+
+  // The other instance learns of it, and one of our accounts joins it.
+  await waitFor(async () => {
+    const res = await adminB.get('/api/continuum/communities');
+    if (!res.ok) return null;
+    return res.data.find((c) => c.origin_community_id === communityId) || null;
+  }, { message: 'the community to reach the other instance' });
+
+  const joined = await bob.post('/api/continuum/communities/instance-a/' + communityId + '/join');
+  assert.equal(joined.status, 200, JSON.stringify(joined.data));
+
+  // The owner records the member, and the member's standing is what decides
+  // what the owner accepts from them.
+  await waitFor(async () => {
+    const res = await adminA.get('/api/continuum/relay/memberships?community_id=' + communityId);
+    if (!res.ok) return null;
+    return res.data.find((m) => m.origin_user_id === bob.user.id) || null;
+  }, { message: 'the owner to record the remote member' });
+
+  // The write. The route is the only way in: a member of a federated
+  // community writes in it from the instance they are on.
+  const write = async (content) => {
+    const res = await bob.post(
+      '/api/continuum/communities/instance-a/' + communityId + '/channels/' + channelId + '/messages',
+      { content }
+    );
+    assert.equal(res.status, 201, JSON.stringify(res.data));
+    return res.data;
+  };
+
+  // The first message a member wrote, kept for the checks that follow.
+  let firstMessageId = null;
+
+  // What the writer sees of a message they wrote.
+  const outgoing = async (id) => {
+    const res = await bob.get('/api/continuum/outgoing');
+    assert.ok(res.ok, JSON.stringify(res.data));
+    return res.data.find((m) => m.id === id) || null;
+  };
+
+  // What the owner sees: the messages members wrote in this community.
+  const moderation = async () => {
+    const res = await adminA.get('/api/continuum/moderation/messages?community_id=' + communityId);
+    assert.ok(res.ok, JSON.stringify(res.data));
+    return res.data;
+  };
+
+  await t.test('a message written on the other instance reaches the owner', async () => {
+    const written = await write('a word from the other side');
+    firstMessageId = written.id;
+
+    const relayed = await waitFor(async () => {
+      const list = await moderation();
+      return list.find((m) => m.origin_message_id === written.id) || null;
+    }, { message: 'the message to reach the owner' });
+
+    assert.equal(relayed.content, 'a word from the other side');
+    assert.equal(relayed.relayed, true, 'it is presented as a relayed message');
+    assert.equal(relayed.origin_instance_id, 'instance-b', 'it says where it came from');
+    assert.equal(relayed.origin_community_id, communityId, 'it belongs to the community it was written in');
+    assert.equal(relayed.origin_channel_id, channelId);
+    assert.equal(relayed.author_username, 'bob', 'the author is the one who wrote it');
+    assert.equal(relayed.author_display_name, 'bob');
+    assert.equal(relayed.created_at, written.created_at, 'the original timestamp is kept');
+
+    // The owner answers, and the writer is told.
+    const answered = await waitFor(async () => {
+      const row = await outgoing(written.id);
+      return row && row.state === 'accepted' ? row : null;
+    }, { message: 'the owner to answer the writer' });
+    assert.equal(answered.state, 'accepted');
+    assert.equal(answered.reason, null);
+  });
+
+  await t.test('writing grants no authority on either instance', async () => {
+    // The member is nobody here. The owner records them; it does not make
+    // them one of its own.
+    const members = await a.modules.db.all(
+      'SELECT * FROM server_members WHERE server_id = ? AND user_id = ?', [communityId, bob.user.id]
+    );
+    assert.equal(members.length, 0, 'the remote member is not a member of the community here');
+    const roles = await a.modules.db.all(
+      'SELECT * FROM member_roles WHERE server_id = ? AND user_id = ?', [communityId, bob.user.id]
+    );
+    assert.equal(roles.length, 0, 'the remote member holds no role here');
+
+    // And the message is not a local message: it grants nothing and it is
+    // nobody's.
+    const local = await a.modules.db.all(
+      'SELECT * FROM messages WHERE content = ?', ['a word from the other side']
+    );
+    assert.equal(local.length, 0, 'the relayed message is not a message of this community');
+
+    // The other way round: the community is not a community of the instance
+    // that wrote in it.
+    const mine = await bob.get('/api/servers');
+    assert.ok(
+      !mine.data.some((s) => s.id === communityId),
+      'the community is still not a community of the instance that wrote in it'
+    );
+
+    // The member cannot moderate the community they are in: they have no
+    // account on the owner at all, so the owner's moderation surface is not
+    // theirs to use.
+    const asRemote = await apiClient(a.baseUrl, bob.token).delete(
+      '/api/continuum/moderation/messages/instance-b/' + firstMessageId
+    );
+    assert.equal(asRemote.status, 401, 'a remote member has no account on the origin');
+
+    // And the surface is not open to the community's ordinary members
+    // either: it belongs to the people who moderate the community.
+    const plain = await registerUser(a, 'plain');
+    const invite = await adminA.post('/api/servers/' + communityId + '/invites', { maxUses: 5 });
+    const accepted = await plain.post('/api/invites/' + invite.data.code + '/join', {});
+    assert.equal(accepted.status, 200, JSON.stringify(accepted.data));
+
+    const asMember = await plain.delete(
+      '/api/continuum/moderation/messages/instance-b/' + firstMessageId
+    );
+    assert.equal(asMember.status, 403, 'an ordinary member may not moderate');
+    assert.match(asMember.data.error.message, /may not moderate/);
+  });
+
+  await t.test('the owner removes the message, and the removal reaches the writer', async () => {
+    const written = await write('a word the owner will take back');
+    await waitFor(async () => {
+      const list = await moderation();
+      return list.find((m) => m.origin_message_id === written.id) || null;
+    }, { message: 'the message to reach the owner' });
+
+    const removed = await adminA.delete(
+      '/api/continuum/moderation/messages/instance-b/' + written.id,
+      { reason: 'not wanted here' }
+    );
+    assert.equal(removed.status, 200, JSON.stringify(removed.data));
+    assert.equal(removed.data.removed, true);
+    assert.equal(removed.data.relayed, true, 'the removal was published to the instance that wrote it');
+
+    // The owner no longer holds it.
+    const list = await moderation();
+    const held = list.find((m) => m.origin_message_id === written.id);
+    assert.ok(held.deleted, 'the owner has taken the message back');
+    assert.equal(held.content, null, 'the message does not outlive the taking back');
+
+    // And the instance that wrote it is told.
+    const row = await waitFor(async () => {
+      const found = await outgoing(written.id);
+      return found && found.state === 'deleted' ? found : null;
+    }, { message: 'the removal to reach the writer' });
+    assert.equal(row.deleted, true);
+    assert.ok(row.deleted_at, 'the removal is recorded on the message the writer wrote');
+
+    // The trail says who did it.
+    const trail = await a.modules.db.all(
+      'SELECT * FROM audit_logs WHERE action = ? ORDER BY created_at DESC LIMIT 1',
+      ['relay_message_remove']
+    );
+    assert.equal(trail.length, 1, 'the removal is in the audit trail');
+    assert.equal(trail[0].actor_id, adminA.user.id, 'the trail says who did it');
+    assert.equal(trail[0].server_id, communityId);
+  });
+
+  await t.test('a channel the members may not post in refuses the message', async () => {
+    // The owner closes the channel to its own members. A member who may not
+    // post there does not post there by writing to a federated copy of it.
+    await a.modules.permissions.setOverride(
+      'channel_permission_overrides', channelId, 'SEND_MESSAGES', 'deny'
+    );
+
+    const written = await write('into a channel the members cannot use');
+    const refused = await waitFor(async () => {
+      const row = await outgoing(written.id);
+      return row && row.state === 'refused' ? row : null;
+    }, { message: 'the refusal to reach the writer' });
+
+    assert.match(refused.reason, /cannot post in this channel/);
+    assert.ok(refused.decided_at, 'the answer is dated');
+
+    // And nothing was kept at the owner.
+    const list = await moderation();
+    assert.ok(
+      !list.some((m) => m.origin_message_id === written.id),
+      'a refused message is not kept at the owner'
+    );
+
+    // The channel is open again for the next case.
+    await a.modules.permissions.setOverride(
+      'channel_permission_overrides', channelId, 'SEND_MESSAGES', 'inherit'
+    );
+  });
+
+  await t.test('the owner mutes the member, and the member is refused', async () => {
+    const muted = await adminA.post(
+      '/api/continuum/moderation/members/instance-b/' + bob.user.id,
+      { action: 'mute', community_id: communityId, reason: 'too loud' }
+    );
+    assert.equal(muted.status, 200, JSON.stringify(muted.data));
+    assert.equal(muted.data.state, 'muted');
+
+    // The owner's record says so.
+    const members = await adminA.get('/api/continuum/moderation/members?community_id=' + communityId);
+    const member = members.data.find((m) => m.origin_user_id === bob.user.id);
+    assert.equal(member.state, 'muted', 'the owner has muted the member');
+
+    // The member's own instance is told, so the member stops writing here.
+    const standing = await waitFor(async () => {
+      const res = await bob.get('/api/continuum/memberships');
+      if (!res.ok) return null;
+      const row = res.data.find((m) => m.origin_community_id === communityId);
+      return row && row.state === 'muted' ? row : null;
+    }, { message: 'the mute to reach the member' });
+    assert.equal(standing.state, 'muted', 'the member cannot write there any more');
+
+    const refused = await bob.post(
+      '/api/continuum/communities/instance-a/' + communityId + '/channels/' + channelId + '/messages',
+      { content: 'still here' }
+    );
+    assert.equal(refused.status, 403, 'a muted member may not write');
+    assert.match(refused.data.error.message, /muted/);
+
+    // The trail says who did it.
+    const trail = await a.modules.db.all(
+      'SELECT * FROM audit_logs WHERE action = ? ORDER BY created_at DESC LIMIT 1',
+      ['relay_member_mute']
+    );
+    assert.equal(trail.length, 1, 'the mute is in the audit trail');
+    assert.equal(trail[0].actor_id, adminA.user.id);
+  });
+
+  await t.test('a community the owner has made private refuses the message', async () => {
+    // The member is restored first: a muted member would be refused for
+    // being muted, and this case is about the community being closed.
+    const restored = await adminA.post(
+      '/api/continuum/moderation/members/instance-b/' + bob.user.id,
+      { action: 'restore', community_id: communityId }
+    );
+    assert.equal(restored.status, 200, JSON.stringify(restored.data));
+    await waitFor(async () => {
+      const res = await bob.get('/api/continuum/memberships');
+      const row = res.data.find((m) => m.origin_community_id === communityId);
+      return row && row.state === 'joined' ? row : null;
+    }, { message: 'the member to be restored' });
+    const closed = await adminA.patch('/api/servers/' + communityId, { isPublic: false });
+    assert.equal(closed.status, 200, JSON.stringify(closed.data));
+
+    const written = await write('into a community that is closed');
+    const refused = await waitFor(async () => {
+      const row = await outgoing(written.id);
+      return row && row.state === 'refused' ? row : null;
+    }, { message: 'the refusal to reach the writer' });
+
+    assert.match(refused.reason, /private/);
+  });
+});
