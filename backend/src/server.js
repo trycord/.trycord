@@ -498,6 +498,11 @@ async function boot(options = {}) {
   app.use('/api/servers/:serverId/invites', inviteRoutes.managed);
   app.use('/api/servers/:serverId/communityMemory', require('./routes/communityMemory'));
   app.use('/api/channels/:channelId/messages', require('./routes/messages'));
+  // Forums. A forum is a channel of type 'forum': its root messages are
+  // topics, its replies are the discussion under each, and the thread model
+  // is the thread model. Mounted under the channel prefix so it shares the
+  // one access chain.
+  app.use('/api/channels/:channelId', require('./routes/forums'));
   app.use('/api', require('./routes/attachments'));
   app.use('/api/servers', require('./routes/servers'));
   // Scoped community extensions: webhooks, bot applications, analytics. Mounted

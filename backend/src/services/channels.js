@@ -8,12 +8,24 @@ function cleanName(name) {
   return String(name || '').trim().toLowerCase().replace(/[^a-z0-9-_ ]/g, '').slice(0, 32) || 'channel';
 }
 
-// The types the backend can actually honour. `announcement` and `forum` exist in older
-// rows as icons only - a channel of those types behaves exactly like text - so they stay
-// readable but are not offered: letting one be set would promise a behaviour that is not
-// there. `stage` is a voice channel the audience cannot speak in until a moderator grants
-// it; see services/voice.js.
-const CHANNEL_TYPES = ['text', 'voice', 'stage'];
+// The types the backend can actually honour. `announcement` exists in older
+// rows as an icon only - a channel of that type behaves exactly like text - so
+// it stays readable but is not offered: letting one be set would promise a
+// behaviour that is not there. `stage` is a voice channel the audience cannot
+// speak in until a moderator grants it; see services/voice.js.
+//
+// The types the backend can actually honour.
+//
+// 'announcement' and 'forum' exist in older rows as icons only - a channel of
+// those types behaved exactly like a text channel - so they stayed readable
+// but were not offered: letting one be set would promise a behaviour that is
+// not there.
+//
+// 'forum' is different now. A forum channel presents its root messages as
+// topics and their replies as the discussion under each, and the routes that
+// do that are in services/forums.js. The messages are the same messages; the
+// forum is a way of listing them.
+const CHANNEL_TYPES = ['text', 'voice', 'stage', 'forum'];
 
 function cleanType(type, fallback = 'text') {
   if (type === undefined || type === null || String(type).trim() === '') return fallback;

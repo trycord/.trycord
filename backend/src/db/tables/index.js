@@ -23,10 +23,12 @@ const messaging = require('./messaging');
 const social = require('./social');
 const moderation = require('./moderation');
 const instance = require('./instance');
+const pages = require('./pages');
 const continuum = require('./continuum');
 const developer = require('./developer');
 const extensions = require('./extensions');
 const workspace = require('./workspace');
+const forums = require('./forums');
 
 // e2ee sits next to identity because every table in it points at users(id)
 // and nothing in it points at anything else: the sessions, the prekeys and
@@ -41,8 +43,8 @@ const workspace = require('./workspace');
 // users, channels, messages - and before nothing, because nothing references
 // them yet.
 const GROUPS = [
-  identity, e2ee, communities, messaging, social, moderation, instance, continuum,
-  developer, extensions, workspace,
+  identity, e2ee, communities, messaging, social, moderation, instance, pages, continuum,
+  developer, extensions, workspace, forums,
 ];
 
 module.exports = (engine) => GROUPS.flatMap((group) => group(engine));
