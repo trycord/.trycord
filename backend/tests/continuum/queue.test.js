@@ -21,7 +21,6 @@ const {
   sleep,
   eventsAboutMessage,
 } = require('./helpers');
-
 test('the outbox reports what was delivered and what failed', async (t) => {
   // Three attempts and a short wait, so a failure is watched rather than
   // waited out.
@@ -119,5 +118,102 @@ test('the outbox reports what was delivered and what failed', async (t) => {
     }, { message: 'the peer to receive the envelope' });
     assert.equal(received.kind, 'message.posted');
     assert.equal(received.key_id, 'instance-a');
+  });
+});
+
+// The change feed.
+//
+// The feed publishes from the instance's own state, not from a hook in every
+// write path. What that buys is that a change cannot be published twice and
+// cannot be missed by accident; what it costs is latency, and the latency
+// has to be bounded and visible.
+//
+// This instance runs without the background jobs, so the feed is driven from
+// the test: what is in the outbox is what the feed published, and nothing
+// else was.
+test('the change feed publishes once, and says how far behind it is', async (t) => {
+  const instance = await startFederatedInstance('instance-a', {
+    CONTINUUM_FEED_INTERVAL_MS: '200',
+  }, { jobs: false });
+  t.after(() => instance.stop());
+
+  const admin = await registerUser(instance, 'operator');
+  const created = await admin.post('/api/servers', { name: 'Feed Community', isPublic: true });
+  assert.equal(created.status, 200, JSON.stringify(created.data));
+  const channelId = created.data.channelId;
+
+  const feedPass = () => instance.modules.feed.run(instance.modules.continuum.publishEvent);
+
+  await t.test('the feed does not publish a change twice', async () => {
+    const posted = await admin.post('/api/channels/' + channelId + '/messages', {
+      content: 'a message the feed will find',
+    });
+    assert.equal(posted.status, 200, JSON.stringify(posted.data));
+
+    await feedPass();
+    const first = await eventsAboutMessage(admin, posted.data.id);
+    assert.equal(first.length, 1, 'the message is published once');
+    assert.equal(first[0].kind, 'message.posted');
+
+    // The ledger is the record: a second pass over the same row publishes
+    // nothing.
+    await feedPass();
+    await feedPass();
+    const second = await eventsAboutMessage(admin, posted.data.id);
+    assert.equal(second.length, 1, 'the message is not published again');
+    assert.equal(second[0].id, first[0].id, 'it is the same event');
+  });
+
+  await t.test('a message edited twice quickly is published as one change, not three', async () => {
+    const posted = await admin.post('/api/channels/' + channelId + '/messages', {
+      content: 'the first version',
+    });
+    assert.equal(posted.status, 200, JSON.stringify(posted.data));
+    await feedPass();
+
+    // Two edits, one after the other. The feed publishes the state the
+    // message is in, not every state it was in.
+    const edited = await admin.patch(
+      '/api/channels/' + channelId + '/messages/' + posted.data.id,
+      { content: 'the second version' }
+    );
+    assert.equal(edited.status, 200, JSON.stringify(edited.data));
+    const editedAgain = await admin.patch(
+      '/api/channels/' + channelId + '/messages/' + posted.data.id,
+      { content: 'the third version' }
+    );
+    assert.equal(editedAgain.status, 200, JSON.stringify(editedAgain.data));
+
+    // The change has not settled yet: the words may be edited again.
+    await feedPass();
+    const whileMoving = await eventsAboutMessage(admin, posted.data.id);
+    assert.equal(whileMoving.length, 1, 'a change that has not settled is not published');
+
+    // And once it has, it is published once, carrying the last version.
+    await sleep(300);
+    await feedPass();
+    const settled = await eventsAboutMessage(admin, posted.data.id);
+    assert.equal(settled.length, 2, 'the message is published once and edited once');
+    const edit = settled.find((event) => event.kind === 'message.edited');
+    assert.ok(edit, 'the edit is published');
+    assert.equal(edit.payload.message.content, 'the third version', 'it carries the last version');
+  });
+
+  await t.test('the lag is observable', async () => {
+    const status = await admin.get('/api/continuum/feed');
+    assert.ok(status.ok, JSON.stringify(status.data));
+    assert.equal(status.data.interval_ms, 200, 'the feed says how often it runs');
+    assert.equal(status.data.bound_ms, 400, 'and the bound on a change being noticed');
+    assert.ok(status.data.last_pass_at, 'the feed says when it last ran');
+    assert.ok(status.data.lag_ms >= 0, 'and how long ago that was');
+    assert.equal(status.data.behind, false, 'it is not behind');
+
+    // Nothing runs the feed in this instance, so the lag grows - and the
+    // operator is told rather than left to guess.
+    await sleep(700);
+    const behind = await admin.get('/api/continuum/feed');
+    assert.equal(behind.data.behind, true, 'a feed that falls behind is visible');
+    assert.ok(behind.data.lag_ms >= 700, 'the lag is the time since the last pass');
+    assert.ok(behind.data.published >= 1, 'and it says what it published');
   });
 });

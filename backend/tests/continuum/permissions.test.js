@@ -173,3 +173,238 @@ test('the relay rules', async (t) => {
     );
   });
 });
+
+// The same rules, asked of the other direction.
+//
+// The relay carries content two ways: what an instance publishes about a
+// community it owns, and what a member of that community wrote elsewhere and
+// sent to it. The rules are the same rules, asked the other way round, and
+// they live in the same module - so they are proved here, in both
+// directions, against the same functions.
+test('the relay rules, in the direction a member writes in', async (t) => {
+  const instance = await startInstance({
+    jobs: false,
+    env: Object.assign({}, FEDERATION_ENV, {
+      TRYCORD_INSTANCE_ID: 'instance-a',
+      ADMIN_USERNAMES: 'operator',
+    }),
+  });
+  t.after(() => instance.stop());
+
+  const db = require('../../src/db');
+  const continuum = require('../../src/services/continuum');
+  const permissions = require('../../src/services/permissions');
+  const rules = require('../../src/services/continuum/rules');
+  const store = require('../../src/services/continuum/store');
+
+  const admin = await registerUser(instance, 'operator');
+  const member = await registerUser(instance, 'member');
+
+  // A community of this instance, and a member of it who lives elsewhere.
+  const community = await admin.post('/api/servers', { name: 'Return Rules', isPublic: true });
+  assert.equal(community.status, 200, JSON.stringify(community.data));
+  const communityId = community.data.serverId;
+  const channelId = community.data.channelId;
+
+  await store.upsertRelayMembership({
+    originInstanceId: 'instance-b',
+    originCommunityId: communityId,
+    originUserId: 'a-remote-member',
+    username: 'a-remote-member',
+    displayName: 'A Remote Member',
+    state: 'joined',
+  });
+
+  // The writing side of the same story: a community that lives on another
+  // instance, and a peer to write to.
+  await db.run(
+    'INSERT INTO continuum_instances (id, name, origin, public_key, trust_status, created_at) '
+    + 'VALUES (?, ?, ?, ?, ?, ?)',
+    ['instance-b', 'instance b', 'http://127.0.0.1:9101', 'a-key', 'trusted', new Date().toISOString()]
+  );
+  await store.upsertCommunity({
+    originInstanceId: 'instance-b',
+    originCommunityId: 'a-remote-community',
+    name: 'A Remote Community',
+    channels: [{ id: 'a-remote-channel', name: 'general', type: 'text', topic: null, is_public: true }],
+  });
+  await store.upsertMembership({
+    userId: member.user.id,
+    originInstanceId: 'instance-b',
+    originCommunityId: 'a-remote-community',
+    state: 'joined',
+  });
+
+  await t.test('what a member wrote elsewhere is accepted when the rules allow it', async () => {
+    const gate = await rules.mayAcceptRemoteMessage({
+      serverId: communityId,
+      channelId,
+      originInstanceId: 'instance-b',
+      originUserId: 'a-remote-member',
+    });
+    assert.equal(gate.ok, true, gate.reason);
+  });
+
+  await t.test('a private community refuses what a member wrote elsewhere', async () => {
+    const closed = await admin.patch('/api/servers/' + communityId, { isPublic: false });
+    assert.equal(closed.status, 200, JSON.stringify(closed.data));
+
+    const gate = await rules.mayAcceptRemoteMessage({
+      serverId: communityId,
+      channelId,
+      originInstanceId: 'instance-b',
+      originUserId: 'a-remote-member',
+    });
+    assert.equal(gate.ok, false, 'a private community is not federated');
+    assert.match(gate.reason, /private/);
+
+    await admin.patch('/api/servers/' + communityId, { isPublic: true });
+  });
+
+  await t.test('a channel the members may not post in refuses what a member wrote elsewhere', async () => {
+    await permissions.setOverride(
+      'channel_permission_overrides', channelId, 'SEND_MESSAGES', 'deny'
+    );
+
+    const gate = await rules.mayAcceptRemoteMessage({
+      serverId: communityId,
+      channelId,
+      originInstanceId: 'instance-b',
+      originUserId: 'a-remote-member',
+    });
+    assert.equal(gate.ok, false, 'a restricted channel is not federated');
+    assert.match(gate.reason, /cannot post in this channel/);
+
+    await permissions.setOverride(
+      'channel_permission_overrides', channelId, 'SEND_MESSAGES', 'inherit'
+    );
+  });
+
+  await t.test('a member who may not post is refused', async () => {
+    // The owner has muted them.
+    await store.setRelayMembershipState('instance-b', communityId, 'a-remote-member', 'muted');
+    const muted = await rules.mayAcceptRemoteMessage({
+      serverId: communityId,
+      channelId,
+      originInstanceId: 'instance-b',
+      originUserId: 'a-remote-member',
+    });
+    assert.equal(muted.ok, false, 'a muted member may not write');
+    assert.match(muted.reason, /muted/);
+
+    // And the owner has removed them.
+    await store.setRelayMembershipState('instance-b', communityId, 'a-remote-member', 'removed');
+    const removed = await rules.mayAcceptRemoteMessage({
+      serverId: communityId,
+      channelId,
+      originInstanceId: 'instance-b',
+      originUserId: 'a-remote-member',
+    });
+    assert.equal(removed.ok, false, 'a member who was removed may not write');
+    assert.match(removed.reason, /removed/);
+
+    await store.setRelayMembershipState('instance-b', communityId, 'a-remote-member', 'joined');
+  });
+
+  await t.test('somebody who is not a member is refused', async () => {
+    const gate = await rules.mayAcceptRemoteMessage({
+      serverId: communityId,
+      channelId,
+      originInstanceId: 'instance-b',
+      originUserId: 'a-stranger',
+    });
+    assert.equal(gate.ok, false, 'a stranger may not write in the community');
+    assert.match(gate.reason, /not a member/);
+  });
+
+  await t.test('a peer that is not trusted is not a target', async () => {
+    // The writing side: nothing is federated to a peer that is not trusted.
+    await db.run("UPDATE continuum_instances SET trust_status = 'pending' WHERE id = ?", ['instance-b']);
+    const gate = await rules.mayPublishRemoteMessage({
+      originInstanceId: 'instance-b',
+      originCommunityId: 'a-remote-community',
+      originChannelId: 'a-remote-channel',
+      userId: member.user.id,
+    });
+    assert.equal(gate.ok, false, 'a pending peer is not a target');
+    assert.match(gate.reason, /not trusted/);
+    await db.run("UPDATE continuum_instances SET trust_status = 'trusted' WHERE id = ?", ['instance-b']);
+  });
+
+  await t.test('a channel the community does not expose is not a target', async () => {
+    const gate = await rules.mayPublishRemoteMessage({
+      originInstanceId: 'instance-b',
+      originCommunityId: 'a-remote-community',
+      originChannelId: 'a-channel-nobody-exposed',
+      userId: member.user.id,
+    });
+    assert.equal(gate.ok, false, 'a channel the owner does not expose is not a target');
+    assert.match(gate.reason, /does not expose/);
+  });
+
+  await t.test('a writer who has not joined may not write', async () => {
+    const gate = await rules.mayPublishRemoteMessage({
+      originInstanceId: 'instance-b',
+      originCommunityId: 'a-remote-community',
+      originChannelId: 'a-remote-channel',
+      userId: admin.user.id,
+    });
+    assert.equal(gate.ok, false, 'writing needs a membership');
+    assert.match(gate.reason, /have not joined/);
+  });
+
+  await t.test('encrypted content is never federated, in either direction', async () => {
+    const result = await continuum.publishEvent('message.posted', {
+      sourceKind: 'outgoing',
+      outgoingId: 'an-outgoing-message',
+      serverId: 'a-remote-community',
+      channelId: 'a-remote-channel',
+      encrypted: true,
+    }, { destination: 'instance-b' });
+    assert.equal(result.ok, false, 'encrypted content does not leave');
+    assert.match(result.reason, /encrypted/);
+  });
+
+  await t.test('what was not federable when it was written is not federated later', async () => {
+    // The peer is not trusted when the message is written, so the message
+    // is withheld - and it stays withheld when the peer is trusted after.
+    await db.run("UPDATE continuum_instances SET trust_status = 'pending' WHERE id = ?", ['instance-b']);
+    const outgoingId = await store.createOutgoing({
+      originInstanceId: 'instance-b',
+      originCommunityId: 'a-remote-community',
+      originChannelId: 'a-remote-channel',
+      authorId: member.user.id,
+      username: member.user.username,
+      content: 'written when the peer was not trusted',
+      createdAt: new Date().toISOString(),
+    });
+
+    const first = await continuum.publishEvent('message.posted', {
+      sourceKind: 'outgoing',
+      outgoingId,
+      originInstanceId: 'instance-b',
+      serverId: 'a-remote-community',
+      channelId: 'a-remote-channel',
+      messageId: outgoingId,
+      authorId: member.user.id,
+      username: member.user.username,
+      destination: 'instance-b',
+    }, { destination: 'instance-b' });
+    assert.equal(first.ok, false, 'it does not leave while the peer is not trusted');
+
+    await db.run("UPDATE continuum_instances SET trust_status = 'trusted' WHERE id = ?", ['instance-b']);
+    const second = await continuum.publishEvent('message.posted', {
+      sourceKind: 'outgoing',
+      outgoingId,
+      originInstanceId: 'instance-b',
+      serverId: 'a-remote-community',
+      channelId: 'a-remote-channel',
+      messageId: outgoingId,
+      authorId: member.user.id,
+      username: member.user.username,
+      destination: 'instance-b',
+    }, { destination: 'instance-b' });
+    assert.equal(second.ok, false, 'it does not leave later either');
+    assert.match(second.reason, /not federable when it was written/);
+  });
+});

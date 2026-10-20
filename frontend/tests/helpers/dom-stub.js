@@ -152,6 +152,18 @@ function makeElement(doc, tagName) {
     node.children = [];
     for (const child of children) node.appendChild(child);
   };
+  // The DOM's own names for the same thing: childNodes is children, and
+  // append() is appendChild() over several children at once.
+  Object.defineProperty(node, 'childNodes', {
+    get() { return node.children; },
+    configurable: true,
+  });
+  node.append = (...children) => {
+    for (const child of children) node.appendChild(child);
+  };
+  node.prepend = (...children) => {
+    for (const child of children.reverse()) node.insertBefore(child, node.children[0] || null);
+  };
   node.remove = () => { if (node.parentNode) node.parentNode.removeChild(node); };
   node.contains = (other) => {
     if (other === node) return true;
