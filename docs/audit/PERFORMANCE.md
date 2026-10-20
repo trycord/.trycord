@@ -361,9 +361,18 @@ chat, and it is why the post path costs 22 statements.
 
 ## 11. Findings
 
-### P1 — a fresh MySQL database cannot be created
+### P1 — a fresh MySQL database could not be created
 
 **Severity: high. It stops a new deployment.**
+
+> **FIXED.** The table that pointed at `messages` from the communities
+> group moved into the messaging group, and three more tables inside that
+> group were out of order as well. The schema's own declaration order is
+> now a valid order for MySQL, and a test asserts it: every table is
+> declared after every table it points at
+> (`backend/tests/integration/schema.test.js`). The mechanism was proved on
+> the live server rather than assumed - a forward foreign-key reference is
+> refused with errno 150 and a backward one is accepted.
 
 `backend/src/db/tables/index.js:43` orders the table groups as `identity,
 e2ee, communities, messaging, …`, and two tables point at tables that come

@@ -250,6 +250,17 @@ test('the preview is rendered by the server, not by the client', async () => {
   assert.deepEqual(asked.body.body, PAGE.draft);
 });
 
+test('the preview of the new blocks is rendered by the server too', async () => {
+  const { editor, calls } = await openEditor({ [BASE + '/api/admin/pages/terms']: { json: RICH } });
+  buttonNamed(editor.node, 'Preview').click();
+  await settle();
+
+  const asked = calls.find((call) => call.options.method === 'PUT');
+  assert.ok(asked, 'the preview was not asked for');
+  assert.equal(asked.body.preview, true);
+  assert.deepEqual(asked.body.body, RICH.draft, 'the client rendered the blocks itself');
+});
+
 // -- the new block types ------------------------------------------------------
 
 test('the editor shows a row for each of the new block types', async () => {
@@ -496,6 +507,29 @@ test('a block can be saved to the library on the server', async () => {
   assert.ok(written, 'the block was never written to the library');
   assert.equal(written.body.name, 'Our address');
   assert.deepEqual(written.body.body, [{ type: 'heading', level: 2, text: 'What this covers' }]);
+});
+
+test('a reusable block can be renamed', async () => {
+  const { editor, calls } = await openEditor({
+    [BASE + '/api/admin/pages/blocks']: { json: LIBRARY },
+  });
+  const rename = find(editor.node, (node) => (
+    node.tagName === 'BUTTON' && node.getAttribute('aria-label') === 'Rename the reusable block Contact details'
+  ))[0];
+  assert.ok(rename, 'there is no way to rename the block');
+  rename.click();
+
+  const name = fieldNamed(document.body, 'Name for this reusable block');
+  assert.ok(name, 'the name of the block was not asked for');
+  name.value = 'How to reach us';
+  name.dispatch('input');
+  name.parentNode.dispatch('submit');
+  await settle();
+
+  const written = calls.find((call) => call.options.method === 'PUT');
+  assert.ok(written, 'the block was never renamed');
+  assert.equal(written.url, BASE + '/api/admin/pages/blocks/block-1');
+  assert.equal(written.body.name, 'How to reach us');
 });
 
 test('two revisions can be compared, and the server says what changed', async () => {

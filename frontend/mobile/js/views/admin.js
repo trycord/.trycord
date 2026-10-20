@@ -1327,6 +1327,193 @@ function openAddSheet(refresh) {
   return layer;
 }
 
+// -- incidents ----------------------------------------------------------------
+//
+// The incident timeline an operator writes. What is written here is what the
+// status page shows, so the screen says plainly what it will do: it posts what
+// you write.
+
+const INCIDENT_STATUSES = [
+  ['investigating', 'Being looked at'],
+  ['identified', 'The cause is known'],
+  ['monitoring', 'Being watched'],
+  ['resolved', 'Resolved'],
+];
+
+function incidentsBody() {
+  const host = el('div', { class: 'm-stack' });
+  const list = el('div', { class: 'm-list' });
+
+  const kind = el('select', { class: 'm-input m-input--select', 'aria-label': 'What kind of entry this is' });
+  kind.appendChild(el('option', { value: 'incident' }, 'An incident'));
+  kind.appendChild(el('option', { value: 'maintenance' }, 'Planned maintenance'));
+  const status = el('select', { class: 'm-input m-input--select', 'aria-label': 'The status' });
+  for (const [value, label] of INCIDENT_STATUSES) {
+    status.appendChild(el('option', { value }, label));
+  }
+  const title = el('input', { class: 'm-input', type: 'text', 'aria-label': 'The title', placeholder: 'What it says at a glance' });
+  const summary = el('input', { class: 'm-input', type: 'text', 'aria-label': 'The summary', placeholder: 'What is happening' });
+  const body = el('input', { class: 'm-input', type: 'text', 'aria-label': 'The note under it', placeholder: 'Anything else people should know' });
+  const scheduled = el('input', { class: 'm-input', type: 'datetime-local', 'aria-label': 'The date the maintenance is planned for' });
+  const note = el('p', { class: 'm-notice__text' });
+
+  function paintScheduled() {
+    scheduled.hidden = kind.value !== 'maintenance';
+  }
+  kind.addEventListener('change', paintScheduled);
+  paintScheduled();
+
+  const post = el('button', { class: 'm-btn m-btn--block m-btn--primary', type: 'button' }, 'Post it');
+  post.addEventListener('click', async () => {
+    if (!title.value.trim() || !summary.value.trim()) {
+      note.textContent = 'An incident needs a title and a summary.';
+      return;
+    }
+    if (kind.value === 'maintenance' && !scheduled.value) {
+      note.textContent = 'Planned maintenance needs the date it is planned for.';
+      return;
+    }
+    note.textContent = '';
+    post.disabled = true;
+    try {
+      await Api.createIncident({
+        kind: kind.value,
+        status: kind.value === 'maintenance' ? 'scheduled' : status.value,
+        title: title.value.trim(),
+        summary: summary.value.trim(),
+        body: body.value.trim() || undefined,
+        scheduledFor: kind.value === 'maintenance' ? scheduled.value : undefined,
+      });
+      title.value = '';
+      summary.value = '';
+      body.value = '';
+      scheduled.value = '';
+      toast('Posted. It is on the status page now.', { type: 'success' });
+      await paint();
+    } catch (error) { toast(error.message, { type: 'danger' }); }
+    finally { post.disabled = false; }
+  });
+
+  async function paint() {
+    clear(list);
+    list.appendChild(loading('Reading the timeline'));
+    try {
+      const rows = await Api.incidents({ limit: 100 });
+      const entries = Array.isArray(rows) ? rows : [];
+      clear(list);
+      if (!entries.length) {
+        list.appendChild(empty({
+          icon: 'activity',
+          title: 'Nothing has been recorded',
+          text: 'An instance with nothing recorded says so.',
+        }));
+        return;
+      }
+      for (const entry of entries) {
+        const next = INCIDENT_STATUSES[INCIDENT_STATUSES.findIndex(([value]) => value === entry.status) + 1];
+        list.appendChild(el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__title truncate' }, entry.title),
+            el('span', { class: 'm-row__sub truncate' },
+              (INCIDENT_STATUSES.find(([value]) => value === entry.status) || [null, entry.status])[1]
+              + ' · ' + relativeTime(entry.startedAt))),
+          el('span', { class: 'm-row__actions' },
+            next ? el('button', {
+              class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
+              onClick: async () => {
+                try {
+                  await Api.updateIncident(entry.id, { status: next[0] });
+                  toast('Moved to ' + next[1].toLowerCase() + '.', { type: 'success' });
+                  await paint();
+                } catch (error) { toast(error.message, { type: 'danger' }); }
+              },
+            }, 'Next') : null,
+            entry.status !== 'resolved' ? el('button', {
+              class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
+              onClick: async () => {
+                const sure = await confirm({
+                  title: 'Close this incident?',
+                  text: 'It stays on the timeline, marked resolved. Nothing is deleted.',
+                  confirmLabel: 'Close it',
+                });
+                if (!sure) return;
+                try {
+                  await Api.updateIncident(entry.id, { status: 'resolved' });
+                  toast('Closed.', { type: 'success' });
+                  await paint();
+                } catch (error) { toast(error.message, { type: 'danger' }); }
+              },
+            }, 'Close') : null)));
+      }
+    } catch (error) {
+      clear(list);
+      list.appendChild(failure(error, paint));
+    }
+  }
+
+  host.append(
+    group('Post an incident', el('div', { class: 'm-stack' },
+      field('Kind', kind),
+      field('Status', status),
+      field('Title', title),
+      field('Summary', summary),
+      field('Note', body),
+      field('Planned for', scheduled),
+      note,
+      post)),
+    group('The timeline', list));
+
+  paint();
+  return host;
+}
+
+// -- federation reports -------------------------------------------------------
+
+function federationBody() {
+  const host = el('div', { class: 'm-stack' });
+  const list = el('div', { class: 'm-list' });
+
+  async function paint() {
+    clear(list);
+    list.appendChild(loading('Reading the reports'));
+    try {
+      const rows = await Api.inboundFederationReports(100);
+      const reports = Array.isArray(rows) ? rows : [];
+      clear(list);
+      if (!reports.length) {
+        list.appendChild(empty({
+          icon: 'share',
+          title: 'No reports have arrived',
+          text: 'When another instance sends a report about something here, it is listed here.',
+        }));
+        return;
+      }
+      for (const entry of reports) {
+        list.appendChild(el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__lead' }, icon('flag', { size: 17 })),
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__title truncate' }, entry.reason),
+            el('span', { class: 'm-row__sub truncate' },
+              'about a ' + (entry.contentType || 'message') + ' on this instance')),
+          el('span', { class: 'm-row__actions' },
+            el('span', { class: 'm-chip' }, entry.actionable ? 'actionable' : 'no content here'))));
+      }
+    } catch (error) {
+      clear(list);
+      list.appendChild(failure(error, paint));
+    }
+  }
+
+  host.append(
+    group('Reports received', list),
+    group('What a report carries', el('p', { class: 'm-lede' },
+      'A reference and a reason. The content stays where it was written, and nothing '
+      + 'about the person who reported it crosses either.')));
+
+  paint();
+  return host;
+}
+
 // -- the admin shell ---------------------------------------------------------
 
 export function renderAdmin(ctx) {
