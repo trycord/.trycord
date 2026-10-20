@@ -12,7 +12,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { State, refreshServerTree } from '../../packages/store.js';
+import { State, refreshServerTree, isMuted, refreshMutes } from '../../packages/store.js';
 import { openDialog, confirmDialog, openMenu, toast, errorToast } from '../ui/overlays.js';
 import { copyText } from '../ui/clipboard.js';
 import { navigate, path } from '../../packages/nav.js';
@@ -96,7 +96,9 @@ export function openChannelDialog(serverId, options = {}) {
       // the name that is now in force is the one it returned, not the one that
       // was typed. Saying so is better than letting the tree disagree with
       // the box the reader just filled in.
-      toast(channel ? 'Channel updated.' : 'Channel created.', { type: 'success' });
+      toast(channel
+        ? 'Channel saved as #' + ((saved && saved.name) || channel.name)
+        : 'Channel created.', { type: 'success' });
       if (options.onDone) options.onDone(saved);
     } catch (e) { errorToast(e); }
   };
@@ -251,11 +253,27 @@ export async function moveChannel(serverId, channel, categoryId) {
 }
 
 /**
+ * Mute or unmute a channel.
+ *
+ * The state is the server's, so it is read rather than remembered: the menu
+ * says "Mute" or "Unmute" according to what the reader has muted.
+ */
+export async function toggleMute(channel) {
+  const muted = isMuted(channel.id);
+  try {
+    if (muted) await Api.unmuteChannel(channel.id);
+    else await Api.muteChannel(channel.id);
+    await refreshMutes();
+    toast(muted ? 'Unmuted.' : 'Muted.', { type: 'success' });
+    return true;
+  } catch (error) { errorToast(error); return false; }
+}
+
+/**
  * Ask which category a channel should live in.
  *
  * The tree and the settings page both offer this, so it is written once here.
- */
-export function openMoveDialog(serverId, channel) {
+ */export function openMoveDialog(serverId, channel) {
   const tree = State.serverTree.get(serverId) || { categories: [] };
   const categories = (tree.categories || []).slice()
     .sort((a, b) => (a.position || 0) - (b.position || 0));

@@ -34,6 +34,8 @@
 //   store.js              the relay store and the remote community registry
 //   remote-communities.js the communities a peer federates
 //   membership.js         joining and leaving a remote community
+//   outgoing.js           writing in a community that lives elsewhere
+//   moderation.js         moderating what a member of these communities wrote
 //   ledger.js             what has already been federated
 //   sequences.js          the per-actor sequence numbers
 //   guard.js              where this instance is allowed to reach out to
@@ -51,6 +53,8 @@ const identity = require('./continuum/identity');
 const inbound = require('./continuum/inbound');
 const ledger = require('./continuum/ledger');
 const membership = require('./continuum/membership');
+const moderation = require('./continuum/moderation');
+const outgoing = require('./continuum/outgoing');
 const relay = require('./continuum/relay');
 const remoteCommunities = require('./continuum/remote-communities');
 const sequences = require('./continuum/sequences');
@@ -308,8 +312,12 @@ async function discovery() {
   return {
     instance_id: identity.getInstanceId(),
     protocol: 'trycord-continuum',
-    protocol_version: '1.1',
-    capabilities: ['event_delivery', 'event_receipt', 'community_relay'],
+    // 1.2 is the version that carries the return direction: a message a
+    // member writes on another instance, the owner's answer about it, and
+    // the owner changing a member's standing. A peer that speaks 1.1 does
+    // not know those kinds and refuses them.
+    protocol_version: '1.2',
+    capabilities: ['event_delivery', 'event_receipt', 'community_relay', 'member_relay'],
     public_key: publicKeyPem,
     enabled: enabled(),
     communities: enabled() ? await remoteCommunities.federatedCommunities() : [],
@@ -396,10 +404,11 @@ async function publishEvent(kind, payload, opts = {}) {
 
 // The change feed ------------------------------------------------------------
 
-// How often the feed reconciles the local state against the ledger.
+// How often the feed reconciles the local state against the ledger. The
+// interval is the feed's own: it is also how long a change has to have
+// settled before it is published, and the bound the operator is shown.
 function feedIntervalMs() {
-  const value = Number(process.env.CONTINUUM_FEED_INTERVAL_MS);
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 2000;
+  return feed.intervalMs();
 }
 
 // The feed is a durable job that queues the next pass, so it survives a
@@ -435,7 +444,6 @@ async function runFeed() {
       .catch(() => {});
   }
 }
-
 // The feed is a job kind of its own. It is registered here rather than in the
 // boot because the boot belongs to the server module, and because a job kind
 // that is registered twice is a startup error: the registration is
@@ -521,7 +529,7 @@ async function processInboundEvent(payload) {
       kind: row.kind,
       payload: row.payload,
       event_id: eventId,
-    });
+    }, { publish: publishEvent });
     await db.run('UPDATE continuum_inbox SET processed = 1 WHERE event_id = ?', [eventId]);
     await announceRelayed(result);
   } catch (e) {
@@ -534,6 +542,10 @@ async function processInboundEvent(payload) {
 // Tell the local accounts that follow a remote community that something
 // arrived. A relayed message is presented as a relayed message, and the
 // client is told so by the type of the event.
+//
+// The return direction is told too: the writer of a message that went to the
+// owner of a community is told what the owner said about it - taken, or
+// refused with the reason - and told when the owner takes it back.
 async function announceRelayed(result) {
   if (!result || !result.applied) return;
   if (result.subject === 'message' || result.subject === 'reaction') {
@@ -547,6 +559,16 @@ async function announceRelayed(result) {
         relayed: true,
       });
     }
+  }
+  if (result.authorId) {
+    realtime.emitTo(result.authorId, 'continuum:relay-outgoing', {
+      origin_instance_id: result.originInstanceId || null,
+      origin_community_id: result.originCommunityId || null,
+      origin_message_id: result.originMessageId || null,
+      state: result.decision || (result.deleted ? 'deleted' : 'accepted'),
+      reason: result.reason || null,
+      relayed: true,
+    });
   }
 }
 
@@ -827,6 +849,76 @@ async function listUserMemberships(userId) {
   return membership.listForUser(userId);
 }
 
+// Writing in a community that lives on another instance -----------------------
+
+// A member of a federated community writes here. The message travels to the
+// instance that owns the community, and the owner answers: taken, or refused
+// with the reason.
+async function writeRemoteMessage(user, originInstanceId, originCommunityId, originChannelId, body) {
+  return outgoing.write({
+    user,
+    originInstanceId,
+    originCommunityId,
+    originChannelId,
+    content: body && body.content,
+    replyToId: body && body.replyToId,
+    publish: publishEvent,
+  });
+}
+
+async function editRemoteMessage(user, outgoingId, body) {
+  return outgoing.edit({ user, outgoingId, content: body && body.content });
+}
+
+async function deleteRemoteMessage(user, outgoingId) {
+  return outgoing.remove({ user, outgoingId });
+}
+
+// What this account has written into communities that live elsewhere, and
+// what the owners said about it.
+async function listOutgoingMessages(userId, filter) {
+  return outgoing.listForUser(userId, filter);
+}
+
+// Moderation of what members of these communities wrote elsewhere -------------
+
+// The moderation surface: the messages members of these communities wrote on
+// other instances.
+async function listModerationMessages(actor, filter) {
+  return moderation.listMessages(Object.assign({ actor }, filter || {}));
+}
+
+async function removeModerationMessage(actor, originInstanceId, originMessageId, body) {
+  return moderation.removeMessage({
+    actor,
+    originInstanceId,
+    originMessageId,
+    reason: body && body.reason,
+    publish: publishEvent,
+  });
+}
+
+async function restrictRelayMember(actor, originInstanceId, originUserId, body) {
+  return moderation.restrictMember({
+    actor,
+    originInstanceId,
+    originUserId,
+    communityId: body && body.community_id,
+    action: body && body.action,
+    reason: body && body.reason,
+    publish: publishEvent,
+  });
+}
+
+async function listModerationMembers(actor, filter) {
+  return moderation.listMembers(Object.assign({ actor }, filter || {}));
+}
+
+// The change feed's own state: when it last ran, and how far behind it is.
+async function feedStatus() {
+  return feed.status();
+}
+
 module.exports = {
   enabled,
   setInstanceId,
@@ -860,5 +952,14 @@ module.exports = {
   joinRemoteCommunity,
   leaveRemoteCommunity,
   listUserMemberships,
+  writeRemoteMessage,
+  editRemoteMessage,
+  deleteRemoteMessage,
+  listOutgoingMessages,
+  listModerationMessages,
+  removeModerationMessage,
+  restrictRelayMember,
+  listModerationMembers,
+  feedStatus,
   runFeedSoon: scheduleFeed,
 };

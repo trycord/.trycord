@@ -11,7 +11,7 @@
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { avatar, channelIcon, countBadge, iconButton, serverMark } from '../ui/primitives.js';
-import { State, can, isMuted, nameOf, refreshMutes, refreshServers } from '../../packages/store.js';
+import { State, can, isMuted, nameOf, refreshServers } from '../../packages/store.js';
 import { path, currentRoute, navigate } from '../../packages/nav.js';
 import { openMenu, attachContextMenu, confirmDialog, toast, errorToast } from '../ui/overlays.js';
 import { globalPages } from '../../packages/registry.js';
@@ -19,7 +19,7 @@ import { brandMark } from './frame.js';
 import { personContextMenu } from '../ui/person.js';
 import Api from '../../packages/api.js';
 import {
-  openChannelDialog, openCategoryDialog, createChannel, moveChannel, openMoveDialog,
+  openChannelDialog, openCategoryDialog, createChannel, moveChannel, toggleMute,
   channelMenuItems, categoryMenuItems, reorderChannels, reorderCategories,
   orderAfterDrop, attachDragOrder, attachDropTarget,
 } from '../community/manage.js';
@@ -354,18 +354,6 @@ async function leaveCommunity(serverId, server) {
 // The menu itself is the shared one, in community/manage.js: the column and
 // the settings page draw the same entries for the same channel, and one
 // place decides what a moderator may do with it.
-
-async function toggleMute(channel) {
-  const muted = isMuted(channel.id);
-  try {
-    if (muted) await Api.unmuteChannel(channel.id);
-    else await Api.muteChannel(channel.id);
-    await refreshMutes();
-    toast(muted ? 'Unmuted.' : 'Muted.', { type: 'success' });
-  } catch (error) {
-    errorToast(error);
-  }
-}
 
 // Both helpers fall back to showing the value when the clipboard is unavailable,
 // rather than claiming a copy that did not happen.

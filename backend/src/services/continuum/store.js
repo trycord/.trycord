@@ -466,6 +466,12 @@ async function updateOutgoing(id, changes) {
   return findOutgoing(id);
 }
 
+// Take a message written here back. The row goes, and the feed publishes the
+// deletion from what the ledger kept about it.
+async function deleteOutgoing(id) {
+  await db.run('DELETE FROM continuum_relay_outgoing WHERE id = ?', [String(id)]);
+}
+
 // A message written here, as the writer sees it.
 function shapeOutgoing(row) {
   return {
@@ -539,6 +545,7 @@ module.exports = {
   listRelayMessages,
   listAllRelayMessages,
   listRelayMessagesForLocalCommunities,
+  shapeRelayMessage,
   upsertRelayReaction,
   removeRelayReaction,
   listRelayReactions,

@@ -11,11 +11,17 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import {
   State, nameOf, refreshServer, refreshServerTree, refreshServerMembers, isOwner, serverById,
+  isMuted,
 } from '../../packages/store.js';
 import { navigate } from '../../packages/nav.js';
 import { switchControl, fieldRow, bannerNode, channelIcon, serverMark } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold, facts, hold } from '../ui/page.js';
 import { errorToast, toast, confirmDialog, openDialog } from '../ui/overlays.js';
+import { copyText } from '../ui/clipboard.js';
+import {
+  openChannelDialog, renameChannel, deleteChannel, channelMenuItems,
+  reorderChannels, orderAfterDrop, attachDragOrder,
+} from '../community/manage.js';
 
 const isOwnerOf = isOwner;
 
@@ -197,41 +203,16 @@ function appearanceSection(ctx) {
 }
 
 // -- channels -------------------------------------------------------------------
-
-function channelDialog(serverId, channel, onDone) {
-  const name = el('input', {
-    class: 'input', type: 'text', value: channel ? (channel.name || '') : '',
-    'aria-label': 'Channel name',
-    placeholder: channel ? '' : 'general',
-  });
-  const typeSelect = el('select', { class: 'input', 'aria-label': 'Channel type' },
-    el('option', { value: 'text' }, 'Text'),
-    el('option', { value: 'voice' }, 'Voice'));
-  typeSelect.value = channel ? (channel.type || 'text') : 'text';
-  const save = async (event) => {
-    event.preventDefault();
-    if (!name.value.trim()) { name.focus(); return; }
-    try {
-      if (channel) await Api.updateChannel(serverId, channel.id, { name: name.value.trim() });
-      else await Api.createChannel(serverId, { name: name.value.trim(), type: typeSelect.value });
-      dialog.close();
-      await refreshServerTree(serverId, { force: true });
-      onDone();
-    } catch (e) { errorToast(e); }
-  };
-  const dialog = openDialog({
-    title: channel ? 'Rename the channel' : 'New channel',
-    body: el('form', { class: 'fold', onSubmit: save },
-      name,
-      channel ? null : typeSelect,
-      el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save')),
-  });
-  name.focus();
-}
+//
+// The channel list. Every action here is the shared one from
+// community/manage.js - the same dialogs the tree uses, the same deletes, the
+// same reordering - so the two surfaces cannot disagree about what a channel
+// is or what creating one does.
 
 function channelsSection(ctx) {
   const serverId = ctx.serverId;
   const body = el('div', { class: 'rowlist' });
+  const canManage = can(serverId, 'MANAGE_CHANNELS') || isOwner(serverId);
 
   const read = () => {
     const tree = State.serverTree.get(serverId) || { categories: [], channels: [] };
@@ -244,35 +225,46 @@ function channelsSection(ctx) {
       }));
       return;
     }
-    body.replaceChildren(...channels.map((channel) => row({
-      lead: channelIcon(channel, 16),
-      title: channel.name,
-      sub: channel.type === 'voice' ? 'Voice' : 'Text',
-      side: el('span', { class: 'rowtools' },
-        el('button', {
-          class: 'btn btn--ghost btn--sm', type: 'button',
-          'aria-label': 'Rename ' + channel.name,
-          onClick: () => channelDialog(serverId, channel, read),
-        }, icon('edit', { size: 14 })),
-        el('button', {
-          class: 'btn btn--danger btn--sm', type: 'button',
-          'aria-label': 'Delete ' + channel.name,
-          onClick: async () => {
-            const yes = await confirmDialog({
-              title: 'Delete ' + channel.name + '?',
-              body: 'The messages in it are gone with it; this cannot be undone.',
-              confirmLabel: 'Delete channel',
-              danger: true,
-            });
-            if (!yes) return;
-            try {
-              await Api.deleteChannel(serverId, channel.id);
-              await refreshServerTree(serverId, { force: true });
-              read();
-            } catch (e) { errorToast(e); }
+    const categories = new Map((tree.categories || []).map((category) => [category.id, category.name]));
+    body.replaceChildren(...channels.map((channel) => {
+      const categoryName = channel.category_id ? (categories.get(channel.category_id) || '') : '';
+      const node = row({
+        class: 'channel-row',
+        link: true,
+        lead: channelIcon(channel, 16),
+        title: channel.name,
+        sub: (channel.type === 'voice' ? 'Voice' : 'Text')
+          + (categoryName ? ' · ' + categoryName : ' · No category'),
+        onClick: () => navigate('/server/' + serverId + '/channel/' + channel.id),
+        menu: () => channelMenuItems(serverId, channel, {
+          canManageChannels: canManage,
+          muted: isMuted(channel.id),
+          onCopyTopic: () => copyText(channel.topic || '', 'Topic copied.'),
+          onToggleMute: () => toggleMute(serverId, channel),
+        }),
+        side: canManage ? el('span', { class: 'rowtools' },
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            'aria-label': 'Edit ' + channel.name,
+            onClick: (event) => { event.stopPropagation(); renameChannel(serverId, channel); },
+          }, icon('edit', { size: 14 })),
+          el('button', {
+            class: 'btn btn--danger btn--sm', type: 'button',
+            'aria-label': 'Delete ' + channel.name,
+            onClick: (event) => { event.stopPropagation(); deleteChannel(serverId, channel); },
+          }, 'Delete')) : null,
+      });
+      if (canManage) {
+        attachDragOrder(node, {
+          id: channel.id,
+          onDrop: (movedId, targetId) => {
+            const order = orderAfterDrop(channels, movedId, targetId);
+            if (order) reorderChannels(serverId, order);
           },
-        }, 'Delete')),
-    })));
+        });
+      }
+      return node;
+    }));
   };
   read();
 
@@ -281,10 +273,10 @@ function channelsSection(ctx) {
       head({
         kicker: 'Community',
         title: 'Channels',
-        lede: 'Where conversations happen, in order.',
+        lede: 'Where conversations happen, in order. Drag a channel onto another to move it.',
         actions: el('button', {
           class: 'btn btn--default btn--sm', type: 'button',
-          onClick: () => channelDialog(serverId, null, read),
+          onClick: () => openChannelDialog(serverId, { onDone: read }),
         }, icon('plus', { size: 14 }), 'New channel'),
       }),
       card({ label: 'Channels', glyph: 'hash', body, flush: true }),

@@ -22,6 +22,7 @@ const x3dh = require('../../src/services/e2ee/x3dh');
 const envelope = require('../../src/services/e2ee/envelope');
 const sealing = require('../../src/services/e2ee/sealing');
 const group = require('../../src/services/e2ee/group');
+const attachments = require('../../src/services/e2ee/attachments');
 const protocol = require('../../src/services/e2ee/protocol');
 
 /** A device with fresh keys. */
@@ -295,6 +296,33 @@ function openConversationKey(conversationId, epoch, seal, device) {
   );
 }
 
+/**
+ * Seal an attachment key to a device, the way a client does.
+ *
+ * The key is agreed with the device's identity key and an ephemeral key that
+ * is thrown away afterwards, so the server can store the seal without being
+ * able to open it.
+ */
+function sealAttachmentKey(conversationId, attachmentId, key, targetIdentityDhPublic) {
+  return sealing.seal(
+    key,
+    primitives.unb64(targetIdentityDhPublic),
+    attachments.sealAad(conversationId, attachmentId),
+    protocol.ATTACHMENT_SEAL_INFO
+  );
+}
+
+/** Open an attachment key seal with the device's own identity key. */
+function openAttachmentKey(conversationId, attachmentId, seal, device) {
+  return sealing.open(
+    seal,
+    device.keys.ik.privateKey,
+    device.keys.ik.publicKey,
+    attachments.sealAad(conversationId, attachmentId),
+    protocol.ATTACHMENT_SEAL_INFO
+  );
+}
+
 module.exports = {
   createDevice,
   publicKeys,
@@ -309,4 +337,6 @@ module.exports = {
   respond,
   sealConversationKey,
   openConversationKey,
+  sealAttachmentKey,
+  openAttachmentKey,
 };

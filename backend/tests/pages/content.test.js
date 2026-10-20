@@ -119,6 +119,18 @@ test('the content model', async (t) => {
     assert.doesNotMatch(html, /javascript:/i);
   });
 
+  await t.test('an image cannot add an attribute of its own', () => {
+    const html = content.toHtml(content.normalise([
+      { type: 'image', src: '/x.png" onerror="alert(1)', alt: 'A " onload="alert(1)' },
+    ]));
+    // The quote in the source is escaped, so the attribute it was written
+    // into ends there and the rest of it stays part of the value.
+    assert.match(html, /src="\/x\.png&quot; onerror=&quot;alert\(1\)"/);
+    assert.match(html, /alt="A &quot; onload=&quot;alert\(1\)"/);
+    // Six attributes, and no seventh one made out of the injected quote.
+    assert.equal((html.match(/"/g) || []).length, 12);
+  });
+
   await t.test('a table with too many columns is refused', () => {
     const headers = Array.from({ length: content.MAX_COLUMNS + 1 }, (unused, i) => 'Column ' + i);
     assert.match(
