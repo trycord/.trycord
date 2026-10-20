@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Trycord">
   <link rel="apple-touch-icon" href="/assets/app-icon.svg">
   <title>Changelog: what changed in Trycord</title>
-  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 3.6.12, with development continuing on main.">
+  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 3.6.20, with development continuing on main.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
@@ -114,13 +114,27 @@
         <h1>What changed, and when</h1>
         <p class="lede">
           This is curated from the repository's own history. Releases are listed
-          newest first. The current release is <strong>3.6.12</strong>, and the
+          newest first. The current release is <strong>3.6.20</strong>, and the
           entry above it is work on <code>main</code> that has not been cut into
           a release yet.
         </p>
       </div>
 
       <ol class="timeline">
+        <li>
+          <p class="when">3.6.20 &middot; 2026-10-20</p>
+          <h2>The roles in their colours, and a harness that measures this product</h2>
+          <ul>
+            <li><strong>Fixed</strong> — the role colours were never drawn, because no rule read the colour</li>
+            <li><strong>Fixed</strong> — the roster never showed the roles, because the row read a field the roster does not send</li>
+            <li><strong>Fixed</strong> — the sheet about a person had no face, because the menu drew the header as a line of text</li>
+            <li><strong>Fixed</strong> — a page printed the word null where a banner should have been</li>
+            <li><strong>Fixed</strong> — the profile said Profile rather than the name of the person</li>
+            <li><strong>Fixed</strong> — the stylesheet check did not look at the packages, so a class with no rule went unnoticed</li>
+            <li><strong>Fixed</strong> — the quick paths said Direct instead of Direct messages</li>
+            <li><strong>Fixed</strong> — the browser harness was measuring the deployed instance instead of the answers</li>
+          </ul>
+        </li>
         <li>
           <p class="when">3.6.12 &middot; 2026-10-20</p>
           <h2>The pictures, the previews, and the phone</h2>
