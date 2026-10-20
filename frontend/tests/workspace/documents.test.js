@@ -6,7 +6,7 @@
 // save written against an older revision is refused rather than quietly
 // replacing somebody's work.
 
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub } from '../helpers/dom-stub.js';
@@ -16,6 +16,10 @@ installDomStub();
 
 const { documentsList, documentsDetail } = await import('../../js/features/workspace/documents.js');
 const { State } = await import('../../packages/store.js');
+
+// The store is shared with the other checks, so what these checks put in it
+// is taken out again when they are done.
+after(() => { State.servers = []; State.user = null; });
 
 const DOCUMENT = {
   id: 'doc-1',

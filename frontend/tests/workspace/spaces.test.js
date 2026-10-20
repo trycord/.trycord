@@ -4,7 +4,7 @@
 // checks drive the desk's space surface against a stubbed server and ask what
 // a reader would see, and what the client would send.
 
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { installDomStub, installFetchStub } from '../helpers/dom-stub.js';
@@ -16,6 +16,10 @@ installDomStub();
 
 const { spacesList, spacesDetail } = await import('../../js/features/workspace/spaces.js');
 const { State } = await import('../../packages/store.js');
+
+// The store is shared with the other checks, so what these checks put in it
+// is taken out again when they are done.
+after(() => { State.servers = []; State.user = null; });
 
 const SPACE = {
   id: 'space-1',
