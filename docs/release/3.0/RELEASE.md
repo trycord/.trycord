@@ -212,7 +212,7 @@ They are listed below.
 
 ## The number to quote, and the number to quote honestly
 
-**1 139 checks across the three suites, all green** — 609 in the backend,
+**1 155 checks across the three suites, all green** — 625 in the backend,
 473 in the client, 57 in the public site. The backend suite boots real
 instances against real databases, the federation tests run two of them side
 by side over HTTP, and the client suite drives the client rather than reading

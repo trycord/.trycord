@@ -23,13 +23,13 @@ directory form works there too.
 
 | Command | Result |
 |---|---|
-| `cd backend && node --test "tests/**/*.test.js"` | **609 tests, 609 pass, 0 fail** |
+| `cd backend && node --test "tests/**/*.test.js"` | **625 tests, 625 pass, 0 fail** |
 | `cd backend && node --test "tests/e2ee/*.test.js"` | 64 tests, 64 pass |
 | `cd backend && node --test "tests/continuum/*.test.js"` | 53 tests, 53 pass — the relay, in **both** directions between two independently running instances |
 | `cd backend && node --test "tests/workspace/*.test.js"` | 40 tests, 40 pass |
 | `cd backend && node --test "tests/developer/*.test.js"` | 38 tests, 38 pass |
 | `cd backend && node --test "tests/dashboard/*.test.js"` | 43 tests, 43 pass |
-| `cd backend && node --test "tests/extensions/*.test.js"` | 46 tests, 46 pass |
+| `cd backend && node --test "tests/extensions/*.test.js"` | 51 tests, 51 pass — the lifecycle, the registry, the sandbox and the capability catalogue |
 | `cd backend && node --test "tests/workflows/*.test.js"` | 13 tests, 13 pass |
 | `cd backend && node --test "tests/pages/*.test.js"` | 35 tests, 35 pass |
 | `cd backend && node --test "tests/localisation/*.test.js"` | 15 tests, 15 pass |
@@ -39,7 +39,7 @@ directory form works there too.
 | `cd backend && node --test "tests/personal/*.test.js"` | 17 tests, 17 pass |
 | `cd backend && node --test "tests/voice/*.test.js"` | 25 tests, 25 pass — the three media providers |
 | `cd backend && node --test "tests/security-3.0/*.test.js"` | 34 tests, 34 pass — the review's nine findings, one regression file each |
-| `cd backend && node --test "tests/integration/*.test.js"` | 136 tests, 136 pass |
+| `cd backend && node --test "tests/integration/*.test.js"` | 141 tests, 141 pass |
 | `cd backend && node --test tests/integration/auth.test.js` | 13 tests, 13 pass |
 | `cd backend && node --test tests/integration/community.test.js` | 19 tests, 19 pass |
 | `cd backend && node --test tests/integration/migrations.test.js` | 10 tests, 10 pass |
@@ -51,8 +51,10 @@ directory form works there too.
 | `cd backend && node --test tests/integration/forums.test.js` | 12 tests, 12 pass |
 | `cd backend && node --test tests/integration/providers.test.js` | 13 tests, 13 pass |
 | `cd backend && node --test tests/integration/module-graph.test.js` | 5 tests, 5 pass — every route and service module loads |
-| `cd frontend && node --test "tests/**/*.test.js"` | **435 tests, 435 pass** — including the accessibility audit and the community-settings parity check |
-| `cd public && node --test "tests/**/*.test.js"` | 57 tests, 57 pass |
+| `cd backend && node --test tests/integration/schema-parity.test.js` | 5 tests, 5 pass — the SQLite and MySQL change lists say the same thing |
+| `cd frontend && node --test "tests/**/*.test.js"` | **473 tests, 473 pass** — including the accessibility audit, the community-settings parity check and every console |
+| `cd frontend && node --test tests/` | 473 tests, 473 pass — the same checks in one process, which is how the documented command runs them |
+| `cd public && node --test "tests/**/*.test.js"` | 57 tests, 57 pass — the instance directory is one of the pages they check |
 | `node native/scripts/check-native.mjs` | 6 JSON files parsed, 91 source files scanned, 290 relative imports resolved, 0 problems |
 | `cd backend && node --test tests/integration/fresh-install.test.js` | 10 tests, 10 pass — a first install, on a database that did not exist |
 | `cd backend && npm run css` | the stylesheets are up to date |
