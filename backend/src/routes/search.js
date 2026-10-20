@@ -23,7 +23,7 @@ const { now } = require('../util');
 const router = express.Router();
 router.use(auth);
 
-router.get('/', rateLimit(30), async (req, res, next) => {
+router.get('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     settings.get('search.provider');
     const q = String(req.query.q || '').trim().slice(0, 200);
@@ -150,31 +150,31 @@ async function scanMessages(parsed, options) {
 
 // --- saved searches --------------------------------------------------------
 
-router.get('/saved', rateLimit(30), async (req, res, next) => {
+router.get('/saved', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json(await savedSearches.list(req.user.id));
   } catch (e) { next(e); }
 });
 
-router.post('/saved', rateLimit(30), async (req, res, next) => {
+router.post('/saved', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.status(201).json(await savedSearches.create(req.user.id, req.body || {}));
   } catch (e) { serviceError(res, e); }
 });
 
-router.get('/saved/:id', rateLimit(30), async (req, res, next) => {
+router.get('/saved/:id', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json(await savedSearches.get(req.user.id, req.params.id));
   } catch (e) { serviceError(res, e); }
 });
 
-router.patch('/saved/:id', rateLimit(30), async (req, res, next) => {
+router.patch('/saved/:id', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json(await savedSearches.update(req.user.id, req.params.id, req.body || {}));
   } catch (e) { serviceError(res, e); }
 });
 
-router.delete('/saved/:id', rateLimit(30), async (req, res, next) => {
+router.delete('/saved/:id', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json(await savedSearches.remove(req.user.id, req.params.id));
   } catch (e) { serviceError(res, e); }
@@ -182,19 +182,19 @@ router.delete('/saved/:id', rateLimit(30), async (req, res, next) => {
 
 // --- search history --------------------------------------------------------
 
-router.get('/history', rateLimit(30), async (req, res, next) => {
+router.get('/history', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json(await searchHistory.list(req.user.id));
   } catch (e) { next(e); }
 });
 
-router.delete('/history', rateLimit(30), async (req, res, next) => {
+router.delete('/history', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json(await searchHistory.clear(req.user.id));
   } catch (e) { next(e); }
 });
 
-router.delete('/history/:id', rateLimit(30), async (req, res, next) => {
+router.delete('/history/:id', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json(await searchHistory.remove(req.user.id, req.params.id));
   } catch (e) { serviceError(res, e); }
@@ -207,7 +207,7 @@ router.delete('/history/:id', rateLimit(30), async (req, res, next) => {
 // The instance has no other record of what a member has read, so this is
 // where "is:unread" is answered from. Writing one is writing the reader's
 // own state, so it needs their membership of the channel and nothing else.
-router.post('/read-cursor', rateLimit(60), async (req, res, next) => {
+router.post('/read-cursor', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     const channelId = String((req.body && req.body.channelId) || '').trim();
     if (!channelId) return fail(res, 'VALIDATION_ERROR', 'channelId is required');

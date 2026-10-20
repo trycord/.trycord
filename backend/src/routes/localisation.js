@@ -22,7 +22,7 @@ const localisation = require('../services/localisation');
 const router = express.Router();
 
 // The locale and the strings, for anybody.
-router.get('/', optionalAuth, rateLimit(120), async (req, res, next) => {
+router.get('/', optionalAuth, rateLimit({ windowMs: 60000, max: 120 }), async (req, res, next) => {
   try {
     const serverId = req.query.serverId ? String(req.query.serverId) : null;
     const available = await localisation.effectivePacks({ serverId });
@@ -48,7 +48,7 @@ router.get('/', optionalAuth, rateLimit(120), async (req, res, next) => {
 });
 
 // The locales this instance has a pack for.
-router.get('/locales', rateLimit(120), async (req, res, next) => {
+router.get('/locales', rateLimit({ windowMs: 60000, max: 120 }), async (req, res, next) => {
   try {
     const serverId = req.query.serverId ? String(req.query.serverId) : null;
     const available = await localisation.effectivePacks({ serverId });
@@ -61,14 +61,14 @@ router.get('/locales', rateLimit(120), async (req, res, next) => {
 });
 
 // The reader's own preference.
-router.put('/preference', auth, rateLimit(30), async (req, res, next) => {
+router.put('/preference', auth, rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     const locale = (req.body && req.body.locale) || null;
     res.json(await localisation.setPreference(req.user.id, locale));
   } catch (e) { serviceError(res, e); }
 });
 
-router.get('/preference', auth, rateLimit(30), async (req, res, next) => {
+router.get('/preference', auth, rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     res.json({ locale: await localisation.preferenceOf(req.user.id) });
   } catch (e) { next(e); }
@@ -77,7 +77,7 @@ router.get('/preference', auth, rateLimit(30), async (req, res, next) => {
 // --- packs -----------------------------------------------------------------
 
 // The packs installed here, and the community ones for a community.
-router.get('/packs', adminGuard, rateLimit(30), async (req, res, next) => {
+router.get('/packs', adminGuard, rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
   try {
     const serverId = req.query.serverId ? String(req.query.serverId) : null;
     res.json(await localisation.listPacks({ serverId }));
@@ -90,7 +90,7 @@ router.get('/packs', adminGuard, rateLimit(30), async (req, res, next) => {
 // administrator may install it. With one it is a community's pack, and the
 // community's staff may install it - but it waits for a review before it is
 // served.
-router.post('/packs', auth, rateLimit(20), async (req, res, next) => {
+router.post('/packs', auth, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const body = req.body || {};
     const serverId = body.serverId ? String(body.serverId) : null;
@@ -122,7 +122,7 @@ router.post('/packs', auth, rateLimit(20), async (req, res, next) => {
 });
 
 // Sign a pack off, or turn it down.
-router.post('/packs/:id/review', adminGuard, rateLimit(20), async (req, res, next) => {
+router.post('/packs/:id/review', adminGuard, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     const name = req.user && req.user.username ? req.user.username : null;
     res.json(await localisation.reviewPack(req.params.id, {
@@ -133,7 +133,7 @@ router.post('/packs/:id/review', adminGuard, rateLimit(20), async (req, res, nex
   } catch (e) { serviceError(res, e); }
 });
 
-router.delete('/packs/:id', adminGuard, rateLimit(20), async (req, res, next) => {
+router.delete('/packs/:id', adminGuard, rateLimit({ windowMs: 60000, max: 20 }), async (req, res, next) => {
   try {
     res.json(await localisation.removePack(req.params.id));
   } catch (e) { serviceError(res, e); }

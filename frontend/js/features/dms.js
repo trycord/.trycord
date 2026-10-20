@@ -16,6 +16,7 @@ import { path, navigate } from '../../packages/nav.js';
 import { avatar } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold, stamp } from '../ui/page.js';
 import { conversationSurface, asMessage } from '../ui/chat.js';
+import { personSheetEntries } from '../ui/person.js';
 
 // -- the list -----------------------------------------------------------------
 
@@ -73,6 +74,9 @@ export function renderDms() {
         href: path('/dms/' + dm.id),
         link: true,
         meta: pair,
+        // A conversation is one of the things a person can be asked for, so the
+        // row carries that person's menu on a right-click.
+        menu: peer ? () => personSheetEntries(peer) : null,
       });
     }));
   };

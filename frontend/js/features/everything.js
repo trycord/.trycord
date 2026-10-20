@@ -14,6 +14,7 @@ import { globalPages } from '../../packages/registry.js';
 import Api from '../../packages/api.js';
 import { tokensIn } from '../../packages/format.js';
 import { head, card, row, hold, fault, fold, blank } from '../ui/page.js';
+import { copyText } from '../ui/clipboard.js';
 
 export function renderMenu() {
   const input = el('input', {
@@ -115,6 +116,17 @@ export function renderMenu() {
           link: true, href: path(item.route),
           lead: item.lead, title: item.label, sub: item.sub,
           side: icon('arrow-right', { size: 14 }),
+          // An answer is a place: it can be opened, and its address taken.
+          menu: () => [
+            {
+              label: 'Open', icon: 'external',
+              onSelect: () => navigate(item.route),
+            },
+            {
+              label: 'Copy the link', icon: 'link',
+              onSelect: () => copyText(window.location.origin + path(item.route), 'Link copied.'),
+            },
+          ],
         })),
       }));
     }
