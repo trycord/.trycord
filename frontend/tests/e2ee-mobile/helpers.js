@@ -17,6 +17,18 @@ export function installPhoneStub() {
   return stub;
 }
 
+/**
+ * A clean document.
+ *
+ * The checks in this directory share one process, so the document and the
+ * phone's storage are shared too: a sheet left open by one check would be
+ * found by the next. This clears the document between checks.
+ */
+export function resetPhone() {
+  document.body.replaceChildren();
+  return document;
+}
+
 /** Every node under a node, in the order the document has them. */
 export function order(node, out = []) {
   out.push(node);
@@ -40,6 +52,15 @@ export function buttonWithText(root, text) {
 /** The button that carries this label. */
 export function buttonWithLabel(root, label) {
   return find(root, (node) => node.tagName === 'BUTTON' && node.getAttribute('aria-label') === label)[0] || null;
+}
+
+/** The sheet that was opened last, or null. */
+export function lastDialog(root) {
+  const found = find(root, (node) => {
+    const role = node.getAttribute ? node.getAttribute('role') : null;
+    return role === 'dialog' || role === 'alertdialog';
+  });
+  return found[found.length - 1] || null;
 }
 
 /** The form the screen drew, or null. */
@@ -71,5 +92,6 @@ export function positionOf(root, pattern) {
 }
 
 export default {
-  installPhoneStub, order, find, buttonWithText, buttonWithLabel, formOf, formFor, fieldWithLabel, positionOf,
+  installPhoneStub, resetPhone, order, find, buttonWithText, buttonWithLabel, lastDialog,
+  formOf, formFor, fieldWithLabel, positionOf,
 };
