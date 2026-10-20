@@ -900,9 +900,13 @@ const SECTIONS = [
 export function renderExtensions(ctx) {
   const host = el('div', { class: 'm-stack' });
   const strip = el('div', { class: 'm-seg m-seg--scroll', role: 'tablist', 'aria-label': 'Extension console sections' });
-  let current = 'registry';
 
   const offered = () => SECTIONS.filter((section) => !section.operator || isOperator());
+
+  // The section may be named in the address, so that a particular one can be
+  // linked to and a reader can come back to it.
+  const asked = ctx && ctx.query ? String(ctx.query.get('section') || '') : '';
+  let current = offered().some((section) => section.id === asked) ? asked : 'registry';
 
   function paintStrip() {
     clear(strip);

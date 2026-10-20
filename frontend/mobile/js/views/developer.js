@@ -638,7 +638,11 @@ const SECTIONS = [
 export function renderDeveloper(ctx) {
   const host = el('div', { class: 'm-stack' });
   const strip = el('div', { class: 'm-seg m-seg--scroll', role: 'tablist', 'aria-label': 'Developer console sections' });
-  let current = 'keys';
+
+  // The section may be named in the address, so that a particular one can be
+  // linked to and a reader can come back to it.
+  const asked = ctx && ctx.query ? String(ctx.query.get('section') || '') : '';
+  let current = SECTIONS.some((section) => section.id === asked) ? asked : 'keys';
 
   function paintStrip() {
     clear(strip);

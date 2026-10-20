@@ -163,7 +163,11 @@ export function attachLongPress(node, build, options) {
 let toastRoot = null;
 export function toast(message, options) {
   const opts = options || {};
-  if (!toastRoot) {
+  // The root is made once and kept. If the document's body has been replaced
+  // since it was made - a page that swaps the body out, a check that clears
+  // it - the old root is no longer in the document, and a toast put into it
+  // would be seen by nobody. So the root is remade when it has left.
+  if (!toastRoot || !toastRoot.parentNode) {
     toastRoot = el('div', { class: 'm-toast-root', role: 'status', 'aria-live': 'polite' });
     document.body.appendChild(toastRoot);
   }

@@ -403,13 +403,20 @@ export function rolesSection(ctx) {
   // changes them is only for somebody who may change them.
   const mayRoles = can(serverId, 'MANAGE_ROLES') || isOwner(serverId);
   const mayChannels = can(serverId, 'MANAGE_CHANNELS') || isOwner(serverId);
-  return withPage(renderRoles, () => fold([
-    catalogueCard(serverId),
-    mayRoles ? assignmentCard(serverId) : null,
-    mayRoles ? orderCard(serverId) : null,
-    mayChannels ? overrideCard(serverId, 'channel') : null,
-    mayChannels ? overrideCard(serverId, 'category') : null,
-  ]))(ctx);
+  const catalogue = catalogueCard(serverId);
+  const assignment = mayRoles ? assignmentCard(serverId) : null;
+  const order = mayRoles ? orderCard(serverId) : null;
+  const channelOverrides = mayChannels ? overrideCard(serverId, 'channel') : null;
+  const categoryOverrides = mayChannels ? overrideCard(serverId, 'category') : null;
+  const cards = [catalogue, assignment, order, channelOverrides, categoryOverrides];
+  return withPage(renderRoles, () => ({
+    node: fold(cards.map((card) => (card ? card.node : null))),
+    onMount: async () => {
+      for (const card of cards) {
+        if (card && card.onMount) await card.onMount();
+      }
+    },
+  }))(ctx);
 }
 
 // The invites.
@@ -422,7 +429,11 @@ export function invitesSection(ctx) {
 export function categoriesSection(ctx) {
   const serverId = ctx.serverId;
   const mayChannels = can(serverId, 'MANAGE_CHANNELS') || isOwner(serverId);
-  return withPage(renderCategories, () => (mayChannels ? overrideCard(serverId, 'category') : null))(ctx);
+  const overrides = mayChannels ? overrideCard(serverId, 'category') : null;
+  return withPage(renderCategories, () => ({
+    node: overrides ? overrides.node : null,
+    onMount: overrides ? overrides.onMount : null,
+  }))(ctx);
 }
 
 export default { membersSection, rolesSection, invitesSection, categoriesSection };

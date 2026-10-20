@@ -142,7 +142,7 @@ test('a key is created and the secret is shown once', async () => {
     },
   }));
 
-  const view = renderDeveloper({ page: { id: 'developer' }, params: {}, rest: [] });
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
 
   byLabel(view.node, 'Create an API key')[0].click();
@@ -191,7 +191,7 @@ test('the list afterwards does not carry the secret', async () => {
     },
   }));
 
-  const view = renderDeveloper({ page: { id: 'developer' }, params: {}, rest: [] });
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
 
   byLabel(view.node, 'Create an API key')[0].click();
@@ -231,7 +231,7 @@ test('a rotation produces a new secret and says when the old one stops', async (
     },
   }));
 
-  const view = renderDeveloper({ page: { id: 'developer' }, params: {}, rest: [] });
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
 
   const rotate = byLabel(view.node, 'Rotate Nightly report')[0];
@@ -262,7 +262,7 @@ test('a revocation stops the key', async () => {
     [V1 + '/keys/k_abc/revoke']: { json: { key: Object.assign({}, KEY, { status: 'revoked' }) } },
   }));
 
-  const view = renderDeveloper({ page: { id: 'developer' }, params: {}, rest: [] });
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
 
   const revoke = byLabel(view.node, 'Revoke Nightly report')[0];
@@ -294,7 +294,7 @@ test('an application is not a person, and its token is shown once', async () => 
     },
   }));
 
-  const view = renderDeveloper({ page: { id: 'developer' }, params: {}, rest: [] });
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'Applications');
 
@@ -335,7 +335,7 @@ test('the applications of a community the reader does not manage are not offered
   State.servers = [{ id: 's1', name: 'A community', permissions: ['messages:read'], is_owner: false }];
   installFetchStub(baseRoutes());
 
-  const view = renderDeveloper({ page: { id: 'developer' }, params: {}, rest: [] });
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'Applications');
 
@@ -350,7 +350,7 @@ test('the keys a reader holds are listed with their scopes and never their secre
     [V1 + '/keys']: { json: { keys: [KEY] } },
   }));
 
-  const view = renderDeveloper({ page: { id: 'developer' }, params: {}, rest: [] });
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
 
   await waitFor(() => findAll(view.node, (node) => String(node.textContent || '').indexOf('Nightly report') !== -1)[0]);

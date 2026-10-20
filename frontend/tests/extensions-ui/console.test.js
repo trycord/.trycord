@@ -177,7 +177,7 @@ test('the registry lists what is on offer', async () => {
   State.user = { id: 'u1', isAdmin: true };
   const calls = installFetchStub(registryRoutes());
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
 
   assert.match(view.node.textContent, /Quiet Notes/,
@@ -193,7 +193,7 @@ test('the consent screen shows what the package asks for', async () => {
   State.user = { id: 'u1', isAdmin: true };
   installFetchStub(registryRoutes());
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
 
   const install = byLabel(view.node, 'Install Quiet Notes')[0];
@@ -222,7 +222,7 @@ test('an install is not sent without a grant list', async () => {
     [BASE + '/install']: { json: { extension: INSTALLED, granted: ['messages.read'], refused: [] } },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   byLabel(view.node, 'Install Quiet Notes')[0].click();
 
@@ -261,7 +261,7 @@ test('a capability that is not granted is not offered', async () => {
     [BASE + '/installed']: { json: { extensions: [INSTALLED] } },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'installed');
 
@@ -286,7 +286,7 @@ test('a revoked capability stops the extension', async () => {
     [BASE + '/' + PACKAGE.id + '/grants/messages.read']: { json: { grant: { capability: 'messages.read' } } },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'installed');
   await waitFor(() => findAll(view.node, (node) => String(node.textContent || '').indexOf('Quiet Notes') !== -1)[0]);
@@ -327,7 +327,7 @@ test('the policy is read and saved', async () => {
     },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'policy');
 
@@ -363,7 +363,7 @@ test('the dangerous switch says what it does, and asks before it is turned on', 
     },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'policy');
 
@@ -398,7 +398,7 @@ test('a workflow runs', async () => {
     [BASE + '/workflows/w1/run']: { json: { run: { id: 'r9', status: 'succeeded' } } },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'workflows');
 
@@ -437,7 +437,7 @@ test('a dry run does nothing and says what it would have done', async () => {
     },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'workflows');
 
@@ -470,7 +470,7 @@ test('a run that is waiting can be approved', async () => {
     [BASE + '/workflows/runs/r1/approve']: { json: { ok: true, status: 'succeeded' } },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'workflows');
 
@@ -502,7 +502,7 @@ test('the history shows the reason a step failed', async () => {
     [BASE + '/workflows/runs/r1']: { json: { run: RUN, steps: RUN_STEPS } },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
   tabOf(view, 'workflows');
 
@@ -527,7 +527,7 @@ test('the controls an account may not use are not offered', async () => {
     [BASE + '/workflows']: { json: { workflows: [] } },
   }));
 
-  const view = renderExtensions({ page: { id: 'extensions' }, params: {}, rest: [] });
+  const view = renderExtensions({ page: { id: 'extensions' }, query: new URLSearchParams(), params: {}, rest: [] });
   await view.onMount();
 
   const labels = findAll(view.node, (node) => node.getAttribute('aria-label')).map((node) => node.getAttribute('aria-label'));

@@ -8,6 +8,13 @@ import { installDomStub } from '../helpers/dom-stub.js';
 
 installDomStub();
 
+// The phone's sheets open on the next frame, so the platform they draw in
+// has to have a frame to draw on.
+if (typeof globalThis.requestAnimationFrame !== 'function') {
+  globalThis.requestAnimationFrame = (run) => setTimeout(run, 0);
+  globalThis.cancelAnimationFrame = (handle) => clearTimeout(handle);
+}
+
 // A fetch that answers from a table of routes, matched by the beginning of
 // the address.
 //
