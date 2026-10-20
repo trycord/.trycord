@@ -91,38 +91,86 @@ function writeVersion(version) {
   }
 }
 
-function addToChangelog(version, kind, summary) {
-  const rule = KINDS[kind];
-  const html = fs.readFileSync(CHANGELOG, 'utf8');
+// The changelog, read once and written back at the end.
+let html = fs.readFileSync(CHANGELOG, 'utf8');
 
+// The release entry a version belongs to.
+//
+// The document is a timeline of releases, each with its own list of changes.
+// A release is one entry, whatever the changes in it were: six fixes make
+// one release of six changes, and the entry says so.
+//
+//   - a version that already has an entry goes into that entry's list;
+//   - a version that has none gets an entry of its own, above the newest.
+//
+// The first list in the document is not used for this: it belongs to a
+// release that has already happened, and a change made afterwards does not
+// belong to it. Putting 3.6.1 in the list of 3.6.0 says the two releases
+// are one release.
+function releaseEntry(version) {
+  // The newest entry: the first one in the timeline.
+  const first = /<li>\s*<p class="when">([^<]+)<\/p>/.exec(html);
+  if (first && first[1].trim() === version) {
+    const at = html.indexOf('<ul>', first.index);
+    if (at !== -1) return { list: at + '<ul>'.length };
+  }
+
+  // An entry of its own.
   const day = new Date().toISOString().slice(0, 10);
   const entry = [
-    '        <li><strong>' + version + '</strong> — ' + rule.label + ': ' + summary + '</li>',
+    '        <li>',
+    '          <p class="when">' + version + ' &middot; ' + day + '</p>',
+    '          <h2>' + heading + '</h2>',
+    '          <ul>',
+    '          </ul>',
+    '        </li>',
   ].join('\n');
 
-  // The list of changes for the current release, at the top of the document.
-  //
-  // The document is a timeline of releases, so the entry goes into the list
-  // of the newest one - the first list in the document.
-  const at = html.indexOf('<ul>');
-  if (at === -1) {
-    console.log('the changelog has no list to add to; the version was bumped and '
+  const timeline = html.indexOf('<ol class="timeline">');
+  if (timeline === -1) {
+    console.log('the changelog has no timeline to add to; the version was bumped and '
       + 'the entry has to be written by hand.');
     return null;
   }
-  const insertAt = at + '<ul>'.length;
-  const next = html.slice(0, insertAt) + '\n' + entry + html.slice(insertAt);
-  fs.writeFileSync(CHANGELOG, next);
+  const insertAt = timeline + '<ol class="timeline">'.length;
+  html = html.slice(0, insertAt) + '\n' + entry + html.slice(insertAt);
+  const at = html.indexOf('<ul>', insertAt);
+  return { list: at + '<ul>'.length };
+}
+
+// The release's own heading.
+//
+// It is written by the person making the release, because a heading that
+// says nothing is a heading nobody reads. The tool says so when it is
+// missing rather than inventing one.
+let heading = '';
+
+// The changes of one release, as the lines of its entry.
+function addToChangelog(version, changes) {
+  const lines = changes.map((change) =>
+    '            <li><strong>' + KINDS[change.kind].label + '</strong> — ' + change.summary + '</li>');
+
+  const where = releaseEntry(version);
+  if (!where) return null;
+
+  html = html.slice(0, where.list) + '\n' + lines.join('\n') + html.slice(where.list);
 
   // The sentence that says what the current release is. A version that is
   // written in two places and disagrees with itself is a version nobody can
   // rely on.
   const said = /The current release is <strong>[^<]*<\/strong>/;
-  if (said.test(next)) {
-    fs.writeFileSync(CHANGELOG, next.replace(said,
-      'The current release is <strong>' + version + '</strong>'));
+  if (said.test(html)) {
+    html = html.replace(said, 'The current release is <strong>' + version + '</strong>');
   }
-  return entry;
+  // And the description the search engines and the link previews read.
+  const described = /The current release is [^<]*?, with development continuing/;
+  if (described.test(html)) {
+    html = html.replace(described,
+      'The current release is ' + version + ', with development continuing');
+  }
+
+  fs.writeFileSync(CHANGELOG, html);
+  return lines;
 }
 
 // The changes, in the order they happened.
@@ -135,8 +183,30 @@ function addToChangelog(version, kind, summary) {
 //
 // A change with no summary is refused: a version with no note is a version
 // nobody can read.
+//
+// The release's own heading is given with `--heading "..."`. It is the
+// sentence that says what the release is, and it is written by the person
+// making the release: a heading that says nothing is a heading nobody reads.
 const changes = [];
-for (const argument of process.argv.slice(2)) {
+const arguments_ = process.argv.slice(2);
+for (let i = 0; i < arguments_.length; i++) {
+  const argument = arguments_[i];
+  if (argument === '--heading' || argument === '--heading=') {
+    heading = argument.endsWith('=') ? argument.slice('--heading='.length) : (arguments_[++i] || '');
+    if (!heading) {
+      console.error('say what the release is: --heading with no text is a heading nobody reads');
+      process.exit(2);
+    }
+    continue;
+  }
+  if (argument.startsWith('--heading=')) {
+    heading = argument.slice('--heading='.length);
+    if (!heading) {
+      console.error('say what the release is: --heading with no text is a heading nobody reads');
+      process.exit(2);
+    }
+    continue;
+  }
   const at = argument.indexOf(':');
   const kind = at === -1 ? argument : argument.slice(0, at);
   const summary = at === -1 ? '' : argument.slice(at + 1).trim();
@@ -156,6 +226,17 @@ if (!changes.length) {
   process.exit(2);
 }
 
+// A release that opens a new entry needs a heading for it. The check needs to
+// know what the version will become, so it runs once the tree is known to be
+// clean and the current version has been read.
+function needsHeading(from) {
+  const first = /<li>\s*<p class="when">([^<]+)<\/p>/.exec(html);
+  const newest = first ? first[1].trim() : '';
+  let version = from;
+  for (const change of changes) version = bump(version, change.kind);
+  return version !== newest;
+}
+
 // A version is a claim about the history, so it is only claimed when the
 // history holds the work.
 try {
@@ -172,17 +253,25 @@ try {
 }
 
 const before = readVersion();
+if (!heading && needsHeading(before)) {
+  console.error('say what the release is: --heading "..." for the release this opens');
+  process.exit(2);
+}
+
+// The version moves once per change, and the release is the whole batch: one
+// entry in the changelog, with every change in it, and the version it was
+// released as.
 let version = before;
-const entries = [];
+const steps = [];
 for (const change of changes) {
   version = bump(version, change.kind);
-  const entry = addToChangelog(version, change.kind, change.summary);
-  entries.push({ version, kind: change.kind, summary: change.summary, entry });
+  steps.push({ version, kind: change.kind, summary: change.summary });
 }
+addToChangelog(version, changes);
 writeVersion(version);
 
 console.log(before + ' -> ' + version);
-for (const one of entries) {
+for (const one of steps) {
   console.log('  ' + one.version + '  ' + KINDS[one.kind].label + ': ' + one.summary);
 }
 console.log('the manifest and the changelog are updated; commit them with the change.');
