@@ -14,7 +14,7 @@ import { icon } from '../../packages/icons.js';
 import { State, nameOf, friendshipWith, normalizeUser } from '../../packages/store.js';
 import { navigate } from '../../packages/nav.js';
 import Api from '../../packages/api.js';
-import { menu, sheet, confirm, toast } from './ui.js';
+import { sheet, confirm, toast } from './ui.js';
 import { copyText } from './clipboard.js';
 
 export function isSelf(user) {
@@ -170,22 +170,32 @@ function raiseReport(user) {
  * `options.extra` carries what the caller knows that this module does not:
  * for a roster line, the moderation the community's permission list allows.
  */
+// The relationship as the profile screen reports it, and as the store holds
+// it, are the same vocabulary in two spellings.
+const RELATION = {
+  friend: 'friend',
+  'pending-in': 'incoming',
+  'pending-out': 'outgoing',
+  none: 'none',
+};
+
 export async function personActions(raw, options) {
   const opts = options || {};
   const user = normalizeUser(raw) || raw;
   const items = [];
   if (!user || user.id === undefined || user.id === null) return items;
 
-  items.push({ header: nameOf(user) + (isSelf(user) ? ' (you)' : '') });
+  const self = opts.relation === 'self' || isSelf(user);
+  items.push({ header: nameOf(user) + (self ? ' (you)' : '') });
 
-  if (isSelf(user)) {
+  if (self) {
     items.push({ label: 'Your profile', icon: 'user', onSelect: () => navigate('/users/' + user.id) });
     items.push({ label: 'Account settings', icon: 'settings', onSelect: () => navigate('/settings') });
   } else {
     items.push({ label: 'View profile', icon: 'user', onSelect: () => navigate('/users/' + user.id) });
     items.push({ label: 'Open a chat', icon: 'message', onSelect: () => openChat(user) });
 
-    const relation = friendshipWith(user.id);
+    const relation = opts.relation ? (RELATION[opts.relation] || 'none') : friendshipWith(user.id);
     if (relation === 'friend') {
       items.push({ label: 'Remove friend', icon: 'user-minus', onSelect: () => endFriendship(user, opts.onChanged) });
     } else if (relation === 'outgoing') {
@@ -202,7 +212,8 @@ export async function personActions(raw, options) {
 
   if (!isSelf(user)) {
     items.push({ label: 'Report', icon: 'flag', onSelect: () => raiseReport(user) });
-    items.push((await isBlocked(user))
+    const blocked = opts.blocked === undefined ? (await isBlocked(user)) : !!opts.blocked;
+    items.push(blocked
       ? { label: 'Unblock', icon: 'check', onSelect: () => unblockPerson(user, opts.onChanged) }
       : { label: 'Block', icon: 'x', danger: true, onSelect: () => blockPerson(user, opts.onChanged) });
   }

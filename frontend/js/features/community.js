@@ -12,10 +12,9 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { EVENTS, on, joinChannel, leaveChannel } from '../../packages/realtime.js';
 import {
-  State, nameOf, refreshServerTree, refreshServerRoles, can, isOwner, serverById, channelById,
+  State, refreshServerTree, refreshServerRoles, can, isOwner, serverById, channelById,
 } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
-import { avatar } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
 import { conversationSurface, asMessage, messageRow, copyText } from '../ui/chat.js';
 import { memberList } from '../ui/members.js';
@@ -25,7 +24,7 @@ import {
 } from '../community/manage.js';
 import { communitySettingsSections } from './communitySettings.js';
 import { renderVoiceRoom } from '../voice/room.js';
-import { errorToast, toast, confirmDialog, openDialog } from '../ui/overlays.js';
+import { errorToast, toast, openDialog } from '../ui/overlays.js';
 
 function renderSettingsSection(ctx, section) {
   const table = communitySettingsSections();

@@ -265,7 +265,11 @@ function reactionKey(messageId, userId, emoji) {
 // to, and the rules of the instance that owns that community are the ones
 // that answer - later, and elsewhere.
 async function gateFor(kind, input, source) {
-  const sourceKind = source ? source.kind : sourceKindFor(kind);
+  // The source kind decides as much as the event kind does. A deletion has
+  // no source - the row is gone - so the input says which kind of row it
+  // was: a message written here for a community elsewhere is asked about
+  // that community, not about a local one.
+  const sourceKind = source ? source.kind : (input.sourceKind || sourceKindFor(kind));
 
   // A message written here for a community that lives elsewhere.
   if (sourceKind === 'outgoing') {
@@ -428,7 +432,9 @@ async function buildPayload(kind, input, source, opts) {
     : await authorSnapshot(actorId);
 
   const instanceId = identity.getInstanceId();
-  const outgoing = !!(source && source.kind === 'outgoing');
+  // Whether this event is about a community that lives on another instance.
+  // A deletion has no source row, so the input is what says so.
+  const outgoing = input.sourceKind === 'outgoing' || !!(source && source.kind === 'outgoing');
 
   // Which instance owns the community the event is about. Everything this
   // instance federates, it owns; a message written here for a community that

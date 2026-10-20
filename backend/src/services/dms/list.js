@@ -12,7 +12,7 @@
 // things that each need three related values". It is worth being able to point at.
 
 const db = require('../../db');
-const bodies = require('../e2ee/bodies');
+const e2ee = require('../e2ee');
 const { publicPeer, visibleConversation, shape } = require('./conversation');
 const { history } = require('./history');
 
@@ -64,7 +64,7 @@ async function listMine(userId) {
     // The preview of the last message in the list. An encrypted message is
     // an envelope: the list shows that it is one and no more, because the
     // server has nothing else to show.
-    const preview = last ? bodies.readStored(last.content) : null;
+    const preview = last ? e2ee.readMessageBody(last.content) : null;
     return shape(
       {
         id: m.conversation_id,

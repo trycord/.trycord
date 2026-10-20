@@ -16,7 +16,7 @@ import {
 import { navigate } from '../../packages/nav.js';
 import { switchControl, fieldRow, bannerNode, channelIcon, serverMark } from '../ui/primitives.js';
 import { head, card, row, blank, fault, fold, facts, hold } from '../ui/page.js';
-import { errorToast, toast, confirmDialog, openDialog } from '../ui/overlays.js';
+import { errorToast, toast, confirmDialog } from '../ui/overlays.js';
 import { copyText } from '../ui/clipboard.js';
 import {
   openChannelDialog, renameChannel, deleteChannel, channelMenuItems,

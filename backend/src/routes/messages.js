@@ -33,7 +33,6 @@ const mentions = require('../services/mentions');
 const { EVENTS } = require('../ws/events.js');
 const continuum = require('../services/continuum');
 const e2ee = require('../services/e2ee');
-const e2eeBodies = require('../services/e2ee/bodies');
 
 let broadcast = () => {};
 let sendToUser = () => {};
@@ -151,7 +150,7 @@ router.get('/', async (req, res, next) => {
     // A message in an encrypted conversation is an envelope, and the row says
     // so: the ciphertext is never handed back as if it were the text of the
     // message.
-    rows.forEach((r) => { e2eeBodies.applyToRow(r); });
+    rows.forEach((r) => { e2ee.shapeMessage(r); });
     // One grouped query for the whole page, so a history read costs the same
     // whether or not anything has been replied to.
     const counts = await threads.replyCounts('channel', ch.id, rows.map((r) => r.id));
@@ -176,8 +175,8 @@ router.get('/:messageId/thread', async (req, res, next) => {
     const thread = await threads.fetch('channel', ch.id, rootId);
     // The thread carries the same rows the history does, so the same rule
     // applies: an envelope row says it is one.
-    e2eeBodies.applyToRow(thread.root);
-    for (const reply of thread.replies) e2eeBodies.applyToRow(reply);
+    e2ee.shapeMessage(thread.root);
+    for (const reply of thread.replies) e2ee.shapeMessage(reply);
     res.json(thread);
   } catch (e) {
     if (e && e.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'message not found');
@@ -257,7 +256,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       if (existing) {
         const byId = await uploads.getForMessages([existing.id]);
         existing.attachments = byId[existing.id] || [];
-        e2eeBodies.applyToRow(existing);
+        e2ee.shapeMessage(existing);
         await attachEngagement([existing], req.user.id);
         // 200, not 201: nothing new was created.
         return res.json({ ...existing, server_id: ch.server_id, deduped: true });
@@ -350,15 +349,18 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     // durable outbox event that the job system delivers to trusted remote
     // instances. Never fails the post.
     //
-    // An encrypted message travels as its envelope: the plaintext is not in
-    // the outbox, and there is no plaintext to put there.
-    try {
-      await continuum.enqueueEvent('message.posted', {
-        serverId: ch.server_id, channelId: ch.id, messageId: msg.id,
-        authorId: msg.author_id, content: accepted.encrypted ? undefined : content,
-        encrypted: accepted.encrypted,
-      }, { actorId: req.user.id, targetId: msg.id });
-    } catch { /* continuum disabled or misconfigured: post still succeeded */ }
+    // An encrypted message is not federated. The peer instance holds no key
+    // for this conversation, so all it could receive is ciphertext it cannot
+    // read - and the ciphertext of a message is not something to hand to
+    // another instance.
+    if (!accepted.encrypted) {
+      try {
+        await continuum.enqueueEvent('message.posted', {
+          serverId: ch.server_id, channelId: ch.id, messageId: msg.id,
+          authorId: msg.author_id, content,
+        }, { actorId: req.user.id, targetId: msg.id });
+      } catch { /* continuum disabled or misconfigured: post still succeeded */ }
+    }
 
     // Everything below is extra information about a message that has already
     // been accepted. None of it is allowed to fail the post: a slow link, a dead

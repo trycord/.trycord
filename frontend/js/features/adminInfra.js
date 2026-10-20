@@ -18,6 +18,19 @@ export function adminAnnouncements() {
     try {
       const rows = await Api.allAnnouncements();
       const items = Array.isArray(rows) ? rows : (rows && (rows.items || rows.announcements)) || [];
+      const remove = async (announcement) => {
+        const yes = await confirmDialog({
+          title: 'Delete this announcement?',
+          body: 'Everyone stops seeing it at once.',
+          confirmLabel: 'Delete', danger: true,
+        });
+        if (!yes) return;
+        try {
+          await Api.deleteAnnouncement(announcement.id);
+          toast('Announcement removed');
+          paintRows();
+        } catch (e) { errorToast(e); }
+      };
       list.replaceChildren(...(items.length ? items.map((a) => row({
         lead: el('span', { class: 'role-dot' }, icon('bell', { size: 15 })),
         title: a.title || 'An announcement',
@@ -25,20 +38,12 @@ export function adminAnnouncements() {
         side: el('button', {
           class: 'btn btn--danger btn--sm', type: 'button',
           'aria-label': 'Delete the announcement ' + (a.title || ''),
-          onClick: async () => {
-            const yes = await confirmDialog({
-              title: 'Delete this announcement?',
-              body: 'Everyone stops seeing it at once.',
-              confirmLabel: 'Delete', danger: true,
-            });
-            if (!yes) return;
-            try {
-              await Api.deleteAnnouncement(a.id);
-              toast('Announcement removed');
-              paintRows();
-            } catch (e) { errorToast(e); }
-          },
+          onClick: () => remove(a),
         }, 'Delete'),
+        // The same thing, raised by a right-click on the row.
+        menu: () => [
+          { label: 'Delete the announcement', icon: 'trash', danger: true, onSelect: () => remove(a) },
+        ],
       })) : [blank({
         glyph: 'bell', title: 'Nothing announced',
         text: 'An announcement reaches everyone who opens this instance.',

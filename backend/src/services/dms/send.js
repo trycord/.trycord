@@ -23,7 +23,7 @@ const db = require('../../db');
 const { now, uuid } = require('../../util');
 const uploads = require('../uploads');
 const threads = require('../threads');
-const bodies = require('../e2ee/bodies');
+const e2ee = require('../e2ee');
 const { visibleConversation } = require('./conversation');
 const { assertLength } = require('./limits');
 const { nextSeq } = require('./history');
@@ -61,7 +61,7 @@ async function send(userId, username, conversationId, body) {
       [conversationId, nonce, userId]
     );
     if (existing) {
-      const stored = bodies.readStored(existing.content);
+      const stored = e2ee.readMessageBody(existing.content);
       return {
         id: existing.id,
         seq: existing.seq === null || existing.seq === undefined ? null : Number(existing.seq),
@@ -82,7 +82,7 @@ async function send(userId, username, conversationId, body) {
 
   // Whether this conversation is encrypted is the status service's answer. A
   // body the server cannot validate is refused, and nothing is stored.
-  const accepted = await bodies.accept(conversationId, userId, {
+  const accepted = await e2ee.acceptMessageBody(userId, conversationId, {
     content: text,
     envelopes: input.envelopes,
     attachmentIds: ids,

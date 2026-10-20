@@ -19,8 +19,8 @@ import { setOverride, siblingMount } from '../../../packages/chooser.js';
 import { menu, sheet, confirm, toast, attachLongPress } from '../ui.js';
 import { personActions, openPerson } from '../person.js';
 import {
-  iconFor, openChannelEditor, deleteChannel, openCategoryEditor, deleteCategory,
-  channelActions, categoryActions, attachChannelMenu, canManageChannels,
+  iconFor, openChannelEditor, openCategoryEditor,
+  channelActions, categoryActions, attachChannelMenu,
 } from '../manage.js';
 import { copyText } from '../clipboard.js';
 import { relativeTime } from '../../../packages/format.js';

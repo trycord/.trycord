@@ -11,7 +11,7 @@ const replies = require('../services/replies');
 const privacy = require('../services/privacy');
 const notifications = require('../services/notifications');
 const embeds = require('../services/embeds');
-const e2eeBodies = require('../services/e2ee/bodies');
+const e2ee = require('../services/e2ee');
 const { EVENTS } = require('../ws/events.js');
 
 // A message body is capped rather than truncated. Slicing to the limit loses
@@ -111,8 +111,8 @@ router.get('/:id/messages/:messageId/thread', async (req, res, next) => {
     const thread = await threads.fetch('dm', req.params.id, rootId);
     // The thread carries the same rows the history does, so the same rule
     // applies: an envelope row says it is one.
-    e2eeBodies.applyToRow(thread.root);
-    for (const reply of thread.replies) e2eeBodies.applyToRow(reply);
+    e2ee.shapeMessage(thread.root);
+    for (const reply of thread.replies) e2ee.shapeMessage(reply);
     res.json(thread);
   } catch (e) {
     if (e && e.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'message not found');

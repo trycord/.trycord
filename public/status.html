@@ -158,6 +158,12 @@
         </table>
         <p class="status-when" id="status-when">Times are shown in your browser's local time.</p>
         <noscript><p class="small muted">These checks need JavaScript, because they run in your browser. With JavaScript off, no live state can be shown.</p></noscript>
+
+        <section class="status-incidents" data-incidents hidden>
+          <h2>What has happened here</h2>
+          <p class="small muted" data-incidents-empty>Nothing has been reported.</p>
+          <ol class="incident-list" data-incident-list></ol>
+        </section>
       </section>
 
       <section class="section">
@@ -230,7 +236,8 @@
             <li>Still down, or you have a detail this page cannot show? The <a href="/support">support page</a> explains who to tell, and the project's <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a> is where the community talks.</li>
           </ol>
           <h3>How far this record goes back</h3>
-          <p>When the instance runs the bundled status monitor, the results above are that monitor's most recent checks, held in memory for a short window and reported with the time each one was taken. Restart the monitor and the window begins again, so it is a recent snapshot, not a permanent incident history. Without the monitor, your browser runs each check once and nothing is stored. Either way there is no uptime percentage and no incident timeline, because neither would rest on a durable record.</p>
+          <p>When the instance runs the bundled status monitor, the results above are that monitor's most recent checks, held in memory for a short window and reported with the time each one was taken. Restart the monitor and the window begins again, so it is a recent snapshot, not a permanent history. Without the monitor, your browser runs each check once and nothing is stored.</p>
+          <p>The timeline below is different: it is what an administrator of the instance wrote down, and it stays until the instance's operator removes it. Where there is nothing there, the instance has nothing recorded — not that everything has been working, because nobody wrote that down. There is no uptime percentage, because nothing here computes one and a number that was not measured is not worth showing.</p>
         </div>
       </section>
     </div>
@@ -288,6 +295,7 @@
 
   <script src="/js/status.js"></script>
   <script src="/js/public-api.js"></script>
+  <script src="/js/incidents.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>
