@@ -368,7 +368,8 @@ async function publishEvent(kind, payload, opts = {}) {
     // change feed or from a publication asked for directly.
     if (prepared.withhold && prepared.source) {
       await ledger.markWithheld(
-        prepared.source.kind, prepared.source.id, prepared.source.fingerprint
+        prepared.source.kind, prepared.source.id, prepared.source.fingerprint,
+        prepared.reason
       );
     }
     return {
