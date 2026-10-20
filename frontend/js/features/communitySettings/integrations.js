@@ -171,6 +171,7 @@ function appDialog(serverId, app, onDone) {
 // The commands one application answers.
 async function commandsDialog(serverId, app) {
   const body = el('div', { class: 'fold' }, hold('Reading the commands'));
+  const problem = el('p', { class: 'form-error', role: 'alert' });
   const dialog = openDialog({ title: 'The commands of ' + (app.name || 'the application'), body });
 
   const paint = async () => {

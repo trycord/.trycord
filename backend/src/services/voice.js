@@ -46,12 +46,6 @@ function credentials() {
   };
 }
 
-const iceServers = (userId) => {
-  // The ICE list belongs to the provider in force: the mesh is reached through
-  // the instance's own relay, and the SFU carries the media itself.
-  return voiceConfig.iceServers(voiceConfig.selected(), { credentials: true, userId });
-};
-
 // One authenticated call to the media server. The App Secret is sent here and nowhere
 // else; a browser never sees it.
 async function sfu(method, path, body) {
@@ -517,5 +511,4 @@ module.exports = {
   // The Cloudflare transport. The other providers have their own; the caller
   // chooses between them.
   createSession, endSession, negotiate, answer, publishScreenShare, sessionState, closeTrack,
-  iceServers,
 };

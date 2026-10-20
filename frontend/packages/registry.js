@@ -66,6 +66,20 @@ export const PAGES = [
     layout: 'plain',
     nav: { label: 'Collections', short: 'Collections', icon: 'folder', global: true },
   }),
+  // The extension console and the developer console. Both are places a person
+  // goes deliberately rather than a rail everybody sees, so neither is in the
+  // global navigation - but both answer to the finder, and both are linked
+  // from the place they belong to.
+  p('extensions', '/extensions', {
+    layout: 'plain', sidebar: 'profile',
+    label: 'Extensions', icon: 'grid',
+    blurb: 'What this instance can run, and what is running',
+  }),
+  p('developer', '/developer', {
+    layout: 'plain', sidebar: 'profile',
+    label: 'Developer', icon: 'code',
+    blurb: 'Your API keys and the applications of your communities',
+  }),
   p('federation', '/federation', {
     layout: 'plain',
     nav: { label: 'Federation reports', short: 'Federation', icon: 'share' },
@@ -94,6 +108,46 @@ export const PAGES = [
   p('community.invites', '/server/:id/invites', { layout: 'channel', sidebar: 'community', hidden: true }),
   p('community.categories', '/server/:id/categories', { layout: 'channel', sidebar: 'community', hidden: true }),
   p('community.settings', '/server/:id/settings', { layout: 'channel', sidebar: 'community', hidden: true }),
+
+  // ---- the workspace. Five surfaces, each with its own address, so a reader
+  // can link to a document and a phone can open a board. The landing page
+  // chooses one of them.
+  p('community.workspace', '/server/:id/workspace', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.spaces', '/server/:id/workspace/spaces', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.space', '/server/:id/workspace/space/:space', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.documents', '/server/:id/workspace/documents', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.document', '/server/:id/workspace/document/:document', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.boards', '/server/:id/workspace/boards', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.board', '/server/:id/workspace/board/:board', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.card', '/server/:id/workspace/board/:board/card/:card', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.events', '/server/:id/workspace/events', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.event', '/server/:id/workspace/event/:event', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.polls', '/server/:id/workspace/polls', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.poll', '/server/:id/workspace/poll/:poll', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
 
   // ---- account settings. /account/* is the older spelling.
   p('settings', '/settings', {

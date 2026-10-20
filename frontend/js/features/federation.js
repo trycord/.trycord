@@ -337,8 +337,8 @@ export function renderFederation(ctx) {
   // was written in.
   const remoteNames = new Map();
 
-  function showDisclosure(answer) {
-    const found = answer && answer.disclosure;
+  function showDisclosure(report) {
+    const found = report && report.disclosure;
     if (!found) return;
     known = found;
     disclosure.replaceChildren(disclosurePanel(found));
@@ -594,18 +594,32 @@ export function renderFederation(ctx) {
       const names = {};
       for (const community of communities) names[community.id] = community.name;
 
+      // One community at a time would be one round trip after another; the
+      // communities are read together, and a community the server refuses is
+      // reported rather than hidden.
+      const read = await Promise.all(communities.map(async (community) => {
+        try {
+          const [rows, people] = await Promise.all([
+            continuum.moderationMessages(community.id),
+            continuum.moderationMembers(community.id),
+          ]);
+          return {
+            messages: Array.isArray(rows) ? rows : [],
+            members: Array.isArray(people) ? people : [],
+            error: null,
+          };
+        } catch (error) {
+          return { messages: [], members: [], error };
+        }
+      }));
+
       const messages = [];
       const members = [];
       const failures = [];
-      for (const community of communities) {
-        try {
-          const rows = await continuum.moderationMessages(community.id);
-          if (Array.isArray(rows)) messages.push(...rows);
-          const people = await continuum.moderationMembers(community.id);
-          if (Array.isArray(people)) members.push(...people);
-        } catch (error) {
-          failures.push(error);
-        }
+      for (const entry of read) {
+        messages.push(...entry.messages);
+        members.push(...entry.members);
+        if (entry.error) failures.push(entry.error);
       }
 
       moderation.replaceChildren(answer, moderationSurface({

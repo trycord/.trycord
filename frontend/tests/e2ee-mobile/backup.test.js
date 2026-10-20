@@ -10,13 +10,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installPhoneStub, resetPhone, buttonWithLabel, buttonWithText, lastDialog } from './helpers.js';
+import { installPhoneStub, resetPhone, find, buttonWithLabel, buttonWithText, lastDialog } from './helpers.js';
 import { fakeClient } from './fake-client.js';
 import { waitFor } from '../helpers/dom-stub.js';
 
 installPhoneStub();
 
 const { encryptionBody } = await import('../../mobile/js/views/encryption.js');
+const { State } = await import('../../packages/store.js');
 
 test('the key backup on a phone', async (t) => {
   await t.test('the screen says whether there is a backup', async () => {
@@ -67,5 +68,29 @@ test('the key backup on a phone', async (t) => {
     assert.ok(await waitFor(() => !lastDialog(document.body)));
     assert.ok(!node.textContent.includes('the-recovery-key-of-this-device'),
       'the screen still carries the recovery key');
+  });
+
+  await t.test('registering this phone shows its recovery key, once', async () => {
+    resetPhone();
+    const account = State.user;
+    State.user = { id: 'u1', username: 'reader' };
+    try {
+      const client = fakeClient({ device: null });
+      const node = encryptionBody({ client: async () => client });
+      assert.ok(await waitFor(() => /no device yet/.test(node.textContent)));
+
+      const register = find(node, (n) => n.tagName === 'BUTTON'
+        && /Register this phone/.test(n.textContent))[0];
+      assert.ok(register, 'the screen does not offer to register this phone');
+      register.click();
+
+      const sheetNode = await waitFor(() => lastDialog(document.body));
+      assert.ok(sheetNode, 'the recovery key did not open in a sheet');
+      assert.ok(sheetNode.textContent.includes('a-brand-new-recovery-key'),
+        'the sheet does not carry the new key');
+      assert.match(sheetNode.textContent, /only time the recovery key is shown/i);
+    } finally {
+      State.user = account;
+    }
   });
 });

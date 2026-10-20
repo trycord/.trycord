@@ -106,6 +106,17 @@ async function sessionOf(channelId, userId) {
   return voice.liveSession(channelId, userId);
 }
 
+// The people in the room, as ids, without the person who is asking.
+//
+// The client needs this to draw the roster the moment it sits down, and it
+// needs it in the same shape whichever provider is carrying the call.
+async function rosterOf(channelId, userId) {
+  const rows = await voice.participants(channelId, userId);
+  return rows
+    .map((row) => String(row.userId))
+    .filter((id) => id !== String(userId));
+}
+
 // Join a voice channel.
 async function join(channelId, userId) {
   const provider = await providerFor(channelId);
@@ -122,6 +133,7 @@ async function join(channelId, userId) {
       roomId: existing.room_id,
       rejoined: true,
       provider,
+      participants: await rosterOf(channelId, userId),
     };
   }
 
@@ -150,6 +162,7 @@ async function join(channelId, userId) {
     roomId,
     sessionId,
     iceServers: await iceServersForChannel(channelId, userId),
+    participants: await rosterOf(channelId, userId),
     joined: true,
     provider,
   };

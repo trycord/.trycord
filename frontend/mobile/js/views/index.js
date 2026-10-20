@@ -18,10 +18,17 @@ import { renderAuth } from './auth.js';
 import { renderInstances } from './instances.js';
 import { renderSettings } from './settings.js';
 import { renderAdmin } from './admin.js';
+import { renderExtensions } from './extensions.js';
+import { renderDeveloper } from './developer.js';
 import {
   renderChannel, renderChannelPins, renderMembersPage, renderRolesPage,
   renderInvitesPage, renderCategoriesPage, renderCommunitySettings, renderCommunityHome,
 } from './community.js';
+import {
+  renderWorkspace, renderSpaces, renderSpace, renderDocuments, renderDocument,
+  renderBoards, renderBoard, renderCard, renderEvents, renderEvent,
+  renderPolls, renderPoll,
+} from './workspace.js';
 import {
   renderSupport, renderLegal, renderInvite, renderServerCreate, renderNotFound,
 } from './plain.js';
@@ -55,7 +62,21 @@ export const RENDERERS = {
   'community.invites': (ctx) => renderInvitesPage(ctx),
   'community.categories': (ctx) => renderCategoriesPage(ctx),
   'community.settings': (ctx) => renderCommunitySettings(ctx),
+  'community.workspace': (ctx) => renderWorkspace(ctx),
+  'community.workspace.spaces': (ctx) => renderSpaces(ctx),
+  'community.workspace.space': (ctx) => renderSpace(ctx),
+  'community.workspace.documents': (ctx) => renderDocuments(ctx),
+  'community.workspace.document': (ctx) => renderDocument(ctx),
+  'community.workspace.boards': (ctx) => renderBoards(ctx),
+  'community.workspace.board': (ctx) => renderBoard(ctx),
+  'community.workspace.card': (ctx) => renderCard(ctx),
+  'community.workspace.events': (ctx) => renderEvents(ctx),
+  'community.workspace.event': (ctx) => renderEvent(ctx),
+  'community.workspace.polls': (ctx) => renderPolls(ctx),
+  'community.workspace.poll': (ctx) => renderPoll(ctx),
   'community.new': () => renderServerCreate(),
+  extensions: (ctx) => renderExtensions(ctx),
+  developer: (ctx) => renderDeveloper(ctx),
   support: () => renderSupport(),
   legal: (ctx) => renderLegal(ctx),
   invite: (ctx) => renderInvite(ctx),

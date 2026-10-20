@@ -54,8 +54,12 @@ function hasRoom(channelId) {
 //
 // The caller has already asked whether the person may join: the permission
 // checks and the participant limit are the same for every provider, and they
-// are asked of Trycord's own data before a session is created.
+// are asked of Trycord's own data before a session is created. The check is
+// made again here so that a seat cannot be taken by a path that skipped it.
 async function join(channelId, userId) {
+  const verdict = await authorize(userId, channelId);
+  if (!verdict.ok) return verdict;
+
   const room = roomMut(channelId);
   const limit = voiceConfig.limit('mesh');
   if (room.size >= limit) {

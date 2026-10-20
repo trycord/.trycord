@@ -220,7 +220,7 @@ function cardView(ctx, boardId, cardId) {
   const me = State.user && State.user.id;
 
   let board = null;
-  let card = null;
+  let theCard = null;
   const names = new Map();
 
   const actions = el('span', { class: 'rowtools' });
@@ -265,7 +265,7 @@ function cardView(ctx, boardId, cardId) {
   // to act on their own card and a moderator on anybody's; the client asks the
   // same question, so it never offers a write that would be refused.
   const paintActions = () => {
-    const mine = mayActOn(serverId, card.createdBy, me);
+    const mine = mayActOn(serverId, theCard.createdBy, me);
     const tools = [
       el('a', {
         class: 'btn btn--ghost btn--sm', href: path(boardRoute(serverId, boardId)),
@@ -274,7 +274,7 @@ function cardView(ctx, boardId, cardId) {
     if (mine) {
       tools.push(el('button', {
         class: 'btn btn--default btn--sm', type: 'button',
-        onClick: () => openCardEditor(serverId, board, null, card, load, showConflict),
+        onClick: () => openCardEditor(serverId, board, null, theCard, load, showConflict),
       }, icon('edit', { size: 14 }), 'Edit'));
     }
     actions.replaceChildren(...tools);
@@ -282,18 +282,18 @@ function cardView(ctx, boardId, cardId) {
 
   const paintHead = () => {
     head.replaceChildren(
-      el('h2', { class: 'pagehead-title' }, card.title),
-      el('p', { class: 'form-note' }, 'Version ' + card.version + ' · ' + relativeTime(card.updatedAt)),
-      card.body ? el('p', { class: 'form-note' }, card.body) : null,
+      el('h2', { class: 'pagehead-title' }, theCard.title),
+      el('p', { class: 'form-note' }, 'Version ' + theCard.version + ' · ' + relativeTime(theCard.updatedAt)),
+      theCard.body ? el('p', { class: 'form-note' }, theCard.body) : null,
     );
   };
 
   const paintFacts = () => {
     const cells = [
-      { value: PRIORITY_LABELS[card.priority] || card.priority, label: 'priority' },
-      { value: STATUS_LABELS[card.status] || card.status, label: 'status' },
-      { value: card.assigneeId ? (names.get(String(card.assigneeId)) || card.assigneeId) : '—', label: 'assignee' },
-      { value: card.dueAt ? relativeTime(card.dueAt) : '—', label: 'due' },
+      { value: PRIORITY_LABELS[theCard.priority] || theCard.priority, label: 'priority' },
+      { value: STATUS_LABELS[theCard.status] || theCard.status, label: 'status' },
+      { value: theCard.assigneeId ? (names.get(String(theCard.assigneeId)) || theCard.assigneeId) : '—', label: 'assignee' },
+      { value: theCard.dueAt ? relativeTime(theCard.dueAt) : '—', label: 'due' },
     ];
     facts.replaceChildren(el('div', { class: 'statstrip' },
       ...cells.map((cell) => el('div', { class: 'stat' },
@@ -302,7 +302,7 @@ function cardView(ctx, boardId, cardId) {
   };
 
   const paintLinks = () => {
-    const rows = card.links || [];
+    const rows = theCard.links || [];
     links.replaceChildren(...(rows.length
       ? rows.map((entry) => row({
         lead: el('span', { class: 'role-dot' }, icon('link', { size: 15 })),
@@ -316,22 +316,22 @@ function cardView(ctx, boardId, cardId) {
         title: 'Nothing linked',
         text: 'A card can point at a channel, a document, an event or a message.',
       })]));
-    if (mayActOn(serverId, card.createdBy, me)) {
+    if (mayActOn(serverId, theCard.createdBy, me)) {
       links.appendChild(el('div', { class: 'actionline' },
         el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
-          onClick: () => openLinkEditor(serverId, boardId, card, load),
+          onClick: () => openLinkEditor(serverId, boardId, theCard, load),
         }, icon('plus', { size: 14 }), 'Link from this card'),
         el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
-          onClick: () => openMilestonePicker(serverId, boardId, card, load),
+          onClick: () => openMilestonePicker(serverId, boardId, theCard, load),
         }, icon('flag', { size: 14 }), 'File under a milestone'),
-        moveControl(serverId, board, card, load, showConflict)));
+        moveControl(serverId, board, theCard, load, showConflict)));
     }
   };
 
   const paintMilestones = () => {
-    const rows = card.milestones || [];
+    const rows = theCard.milestones || [];
     milestones.replaceChildren(...(rows.length
       ? rows.map((entry) => row({
         lead: el('span', { class: 'role-dot' }, icon('flag', { size: 15 })),
@@ -343,7 +343,7 @@ function cardView(ctx, boardId, cardId) {
   };
 
   const paintActivity = () => {
-    const rows = card.activity || [];
+    const rows = theCard.activity || [];
     activity.replaceChildren(...(rows.length
       ? rows.map((entry) => row({
         title: activityLine(entry),
@@ -362,7 +362,7 @@ function cardView(ctx, boardId, cardId) {
         Api.serverMembers(serverId, { limit: 200 }),
       ]);
       board = answers[0];
-      card = answers[1];
+      theCard = answers[1];
       names.clear();
       for (const member of (answers[2] && answers[2].items) || []) {
         names.set(String(member.id), member.display_name || member.displayName || member.username);
