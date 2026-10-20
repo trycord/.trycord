@@ -1630,9 +1630,25 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 /* -- accepting the documents ------------------------------------------------- */
 /* The acceptance control on the registration form. */
 
-.m-auth__legal { align-items: flex-start; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+.m-auth__legal { align-items: flex-start; font-size: var(--fs-sm); color: var(--text-1); line-height: 1.5; }
 .m-auth__legal a { color: var(--m-brand); text-decoration: underline; }
 .m-auth__legal-version { color: var(--text-3); font-size: var(--fs-micro); }
+/* The acceptance is a block of its own, above the fields: on a phone the
+   bottom of a form is below the fold, and this is the one control on it a
+   reader cannot do without. */
+.m-auth__legal-block {
+  display: flex; flex-direction: column; gap: 8px;
+  margin: 0 0 var(--space-4, 16px); padding: 12px 14px;
+  border: 1px solid var(--m-line, var(--line-2)); border-radius: 12px;
+  background: var(--m-panel-2, var(--panel-2));
+}
+.m-auth__legal-block.is-accepted { border-color: var(--m-success, var(--success)); }
+.m-auth__legal-title { display: block; font-weight: 600; }
+.m-auth__legal-meta { display: block; margin-top: 2px; color: var(--text-3); font-size: var(--fs-micro); }
+.m-auth__legal-state { font-weight: 600; }
+.m-auth__legal-block.is-accepted .m-auth__legal-state { color: var(--m-success, var(--success)); }
+/* The reason the button is closed. */
+.m-auth__submit-note { margin: 8px 0 0; font-size: var(--fs-micro); color: var(--text-3); text-align: center; }
 
 /* ---- search filters, the incident timeline and the report disclosure ------- */
 

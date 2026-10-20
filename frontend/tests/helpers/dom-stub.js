@@ -195,6 +195,38 @@ function makeElement(doc, tagName) {
   node.append = (...children) => {
     for (const child of children) node.appendChild(child);
   };
+  // The DOM's way of putting something next to an element. The client uses it
+  // to put a note under a button, and the double did not have it - so a
+  // screen that put a note under a button could not be drawn in a check at
+  // all.
+  node.insertAdjacentElement = (position, element) => {
+    if (!element || !node.parentNode) return null;
+    const parent = node.parentNode;
+    const index = parent.children.indexOf(node);
+    const at = position === 'beforebegin' || position === 'afterbegin' ? index
+      : position === 'afterend' ? index + 1 : index;
+    parent.children.splice(at, 0, element);
+    element.parentNode = parent;
+    return element;
+  };
+  // The nearest ancestor that matches, the element itself included.
+  node.closest = (selector) => {
+    const chains = parseSelector(selector);
+    let current = node;
+    while (current) {
+      for (const chain of chains) if (matchesChain(current, chain)) return current;
+      current = current.parentNode;
+    }
+    return null;
+  };
+  // The element's own box. The double has no layout, so this is the size
+  // every element reports: enough for a check that asks whether something
+  // fits, and honest about not knowing.
+  node.getBoundingClientRect = () => ({
+    top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0,
+    x: 0, y: 0,
+  });
+  node.scrollIntoView = () => {};
   node.prepend = (...children) => {
     for (const child of children.reverse()) node.insertBefore(child, node.children[0] || null);
   };

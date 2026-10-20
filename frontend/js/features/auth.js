@@ -178,35 +178,78 @@ function loginGate() {
 
 // -- account creation ---------------------------------------------------------
 
-// The acceptance control. The server records the exact versions the reader
-// accepted, and refuses a registration whose versions are not the ones in
-// force, so the form states which versions they are and blocks the form until
-// they are accepted.
+// The acceptance of the documents.
+//
+// This is the one control on the registration form that a reader cannot do
+// without, and it used to be the last line of a long form: a checkbox below
+// five fields, with the submit button disabled and nothing saying why. On a
+// phone that is below the fold, so the form simply looked broken.
+//
+// It is now a block of its own, above the fields, with a heading that says
+// what it is, the two documents named as links that open in a new tab, the
+// versions in force stated, and the state of the acceptance said in words
+// rather than only shown by a tick.
+//
+// The server records the exact versions the reader accepted and refuses a
+// registration whose versions are not the ones in force, so the form says
+// which versions they are rather than sending a constant.
 function legalAcceptance() {
-  const accepted = el('input', { type: 'checkbox', name: 'legal' });
+  const accepted = el('input', {
+    type: 'checkbox', name: 'legal', id: 'gate-legal-accepted',
+  });
   const versions = el('span', { class: 'gate-legal-version' });
-  const terms = el('a', { href: publicPath('/terms') }, 'Terms of Service');
-  const privacy = el('a', { href: publicPath('/privacy') }, 'Privacy Policy');
+  const state = el('span', { class: 'gate-legal-state' });
+
+  const terms = el('a', {
+    href: publicPath('/terms'), target: '_blank', rel: 'noopener',
+  }, 'Terms of Service');
+  const privacy = el('a', {
+    href: publicPath('/privacy'), target: '_blank', rel: 'noopener',
+  }, 'Privacy Policy');
 
   const label = el('label', { class: 'checkbox gate-legal' },
     accepted,
-    el('span', {},
-      'I accept the ', terms, ' and the ', privacy, '. ',
-      versions));
+    el('span', { class: 'gate-legal-text' },
+      el('span', { class: 'gate-legal-title' },
+        'I accept the ', terms, ' and the ', privacy),
+      el('span', { class: 'gate-legal-meta' }, versions, ' ', state)));
+
+  // The block around the control. It is what makes the control look like the
+  // thing it is rather than another line of a form.
+  const block = el('section', { class: 'gate-legal-block', 'aria-labelledby': 'gate-legal-heading' },
+    el('h2', { class: 'gate-legal-heading', id: 'gate-legal-heading' },
+      'Before you can join'),
+    el('p', { class: 'gate-legal-lede' },
+      'This instance runs on its own rules, and an account here is bound by them. '
+      + 'Read both documents, then accept them.'),
+    label);
 
   const paintVersions = () => {
     const legal = State.legal;
     versions.textContent = legal && legal.termsVersion
-      ? '(Terms v' + legal.termsVersion + ', Privacy v' + legal.privacyVersion
-        + (legal.updated ? ', updated ' + legal.updated : '') + ')'
-      : '(this instance has not said which version is in force)';
+      ? 'Terms v' + legal.termsVersion + ', Privacy v' + legal.privacyVersion
+        + (legal.updated ? ', updated ' + legal.updated : '') + '.'
+      : 'This instance has not said which version is in force.';
+    versions.classList.toggle('is-missing', !legal);
   };
-  paintVersions();
 
-  return { accepted, label, paintVersions };
+  const paintState = () => {
+    const on = !!accepted.checked;
+    state.textContent = on ? 'Accepted.' : 'Not accepted yet.';
+    block.classList.toggle('is-accepted', on);
+  };
+
+  accepted.addEventListener('change', paintState);
+  paintVersions();
+  paintState();
+
+  return { accepted, label, block, paintVersions, paintState };
 }
 
-function registerGate() {
+// Exported so a check can draw the registration form on its own. The form is
+// the one screen every reader meets, and the one screen that cannot be
+// checked through the router without a session and a mount.
+export function registerGate() {
   const username = input('username');
   const display = input('displayName', { required: false });
   const email = input('email', { type: 'email', required: false, autocomplete: 'email' });
@@ -229,13 +272,26 @@ function registerGate() {
     field('Display name (optional)', display),
     field('Email (optional)', email),
     field('Password', password),
-    field('Confirm password', confirm),
-    legal.label,
+    field('Confirm password (optional)', confirm),
   ], 'Create account');
   form.insertBefore(instanceNote, form.firstChild);
+  // The documents come before the fields. A reader who is asked to accept
+  // something after a form is asked to accept it after the form.
+  form.insertBefore(legal.block, form.querySelector('.field'));
 
   const submit = form.querySelector('button[type="submit"]');
-  const syncSubmit = () => { submit.disabled = !legal.accepted.checked; };
+  // The button says why it is closed. A disabled control with no reason is
+  // the control everybody works around.
+  const submitNote = el('p', { class: 'gate-submit-note', role: 'status' });
+  submit.insertAdjacentElement('afterend', submitNote);
+
+  const syncSubmit = () => {
+    submit.disabled = !legal.accepted.checked;
+    submitNote.textContent = legal.accepted.checked
+      ? ''
+      : 'Accept the Terms of Service and the Privacy Policy to create an account.';
+    legal.paintState();
+  };
   legal.accepted.addEventListener('change', syncSubmit);
   syncSubmit();
 

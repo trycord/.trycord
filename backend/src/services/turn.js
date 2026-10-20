@@ -31,6 +31,20 @@ const dgram = require('dgram');
 
 const STUN_MAGIC = 0x2112A442;
 
+// The magic cookie as its four bytes, for the XOR encoding.
+//
+// RFC 5389 section 15.2: the port is XORed with the top 16 bits of the magic
+// cookie and each octet of the address with the corresponding octet of the
+// cookie. The cookie 0x2112A442 is the bytes 21 12 A4 42 in that order.
+//
+// This constant was used by the XOR-MAPPED-ADDRESS and XOR-PEER-ADDRESS
+// encoders and never defined, so every binding request threw a ReferenceError
+// inside the packet handler - and the handler swallowed it. The server bound
+// the port, received the request, and answered nothing: a STUN server that
+// listened and was silent, which is worse than one that was not there,
+// because the port was open and the diagnostics said the relay was running.
+const MAGIC = [0x21, 0x12, 0xa4, 0x42];
+
 const STYPE = {
   BINDING_REQUEST:   0x0001,
   BINDING_RESPONSE:  0x0101,
@@ -84,7 +98,9 @@ function parseStun(buf) {
     pos += 4 + aLen;
     if (aLen % 4 !== 0) pos += 4 - (aLen % 4);
   }
-  return { type, length: len, txId, attrs };
+  // The bytes are kept: the message-integrity check is over the packet as it
+  // arrived, not over the attributes that were read out of it.
+  return { type, length: len, txId, attrs, raw: buf };
 }
 
 function buildAttr(aType, valueBuf) {
@@ -143,7 +159,7 @@ function cfg() {
     host:   process.env.TRYCORD_TURN_HOST   || '0.0.0.0',
     port:   Number(process.env.TRYCORD_TURN_PORT) || 3478,
     realm:  process.env.TRYCORD_TURN_REALM   || 'trycord-turn',
-    secret: process.env.TRYCORD_TURN_SECRET  || 'change-me-in-production-must-be-consistent',
+    secret: sharedSecret(),
   };
 }
 
@@ -191,8 +207,56 @@ allocationSweeper.unref();
 
 // ===== Auth =====
 
+// The secret the credentials are made under.
+//
+// There is deliberately no default. A default would be the same on every
+// instance in the world, so a credential minted against one instance would
+// verify against any other - and the credentials are what lets a client use
+// the relay. An instance without a secret gets a secret of its own, made when
+// the process starts, so the relay works and the credentials do not outlive
+// it.
+let generatedSecret = null;
 function sharedSecret() {
-  return process.env.TRYCORD_TURN_SECRET || 'change-me-in-production-must-be-consistent';
+  const configured = String(process.env.TRYCORD_TURN_SECRET || '').trim();
+  if (configured) return configured;
+  if (!generatedSecret) {
+    generatedSecret = crypto.randomBytes(32).toString('hex');
+    console.warn('[turn] TRYCORD_TURN_SECRET is not set, so the credentials this '
+      + 'instance issues are good only until it restarts. Set it to a secret of '
+      + 'your own to keep them.');
+  }
+  return generatedSecret;
+}
+
+// The address a client is given.
+//
+// The relay listens on every interface, and every interface is not an
+// address a client can reach: "0.0.0.0" is a wildcard, not a place. The
+// address the peers are given has to be the one they can use - the one the
+// instance publishes, or the one the operator named.
+function publicHost() {
+  const named = String(process.env.TRYCORD_TURN_HOST || '').trim();
+  if (named && named !== '0.0.0.0' && named !== '::' && named !== '[::]') return named;
+  const publicUrl = String(process.env.TRYCORD_PUBLIC_URL || '').trim();
+  if (publicUrl) {
+    try { return new URL(publicUrl).hostname; } catch { /* not a usable address */ }
+  }
+  return named || '127.0.0.1';
+}
+
+// The range the relay ports are taken from.
+//
+// A relay port is a real port on this host, and a range keeps the ports a
+// client has to open known. The range is the listen port and the next
+// hundred, unless the operator says otherwise.
+function relayPortRange() {
+  const from = Number(process.env.TRYCORD_TURN_RELAY_MIN || 0);
+  const to = Number(process.env.TRYCORD_TURN_RELAY_MAX || 0);
+  if (Number.isFinite(from) && Number.isFinite(to) && from > 0 && to >= from) {
+    return { from, to };
+  }
+  const base = Number(process.env.TRYCORD_TURN_PORT || 3478) || 3478;
+  return { from: base + 1, to: base + 100 };
 }
 
 function defaultRealm() {
@@ -203,15 +267,89 @@ function longTermKey(username, realm, password) {
   return crypto.createHash('md5').update(`${username}:${realm}:${password}`, 'utf8').digest();
 }
 
+// The password a username is worth, right now.
+//
+// The credential this instance issues is `<expiry>:<name>` with a password
+// that is the HMAC of that string under the instance's secret. The check
+// here is the other half of the same thing: the same string, the same
+// secret, the same HMAC. A client that was given a credential this instance
+// issued can therefore be checked, and a client that was not cannot.
+//
+// The two halves used to disagree - the issuer produced an HMAC and the
+// checker looked for the shared secret itself - so no credential the server
+// issued would ever have verified.
+function passwordFor(username) {
+  const secret = Buffer.from(sharedSecret(), 'utf8');
+  return crypto.createHmac('sha1', secret).update(String(username)).digest('base64');
+}
+
+// The name and the expiry inside a username, or null when it is not one of
+// ours.
+function readUsername(username) {
+  const text = String(username || '');
+  const cut = text.indexOf(':');
+  if (cut <= 0) return null;
+  const expiry = Number(text.slice(0, cut));
+  if (!Number.isFinite(expiry)) return null;
+  return { expiry, name: text.slice(cut + 1) };
+}
+
+// The nonces this server has issued, per client address.
+//
+// A challenge is only good for the client it was sent to, and only for a
+// short while. The nonce is what proves the client is in a conversation with
+// this server rather than replaying a request it captured earlier.
+const nonces = new Map();
+
+function issueNonce(address) {
+  const nonce = crypto.randomBytes(16).toString('hex');
+  const now = Date.now();
+  for (const [key, entry] of nonces) {
+    if (now > entry.expiresAt) nonces.delete(key);
+  }
+  nonces.set(address, { nonce, expiresAt: now + 60 * 1000 });
+  return nonce;
+}
+
+function nonceFor(address) {
+  const entry = nonces.get(address);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { nonces.delete(address); return null; }
+  return entry.nonce;
+}
+
+// Check the credentials on a request.
+//
+// The rules, in the order they are applied:
+//   - the username, the nonce and the message-integrity must all be there;
+//   - the nonce must be one this server issued to this client, and must not
+//     have expired - so a captured request cannot be replayed;
+//   - the username must be one of ours, and must not have expired;
+//   - the message-integrity must be the HMAC-SHA1 of the canonical message
+//     under the key the client's password and the realm make.
 function verifyAuth(parsed, rinfo) {
-  const uBuf = parsed.attrs.get(ATTR_USERNAME);
+  const uBuf = parsed.attrs.get(ATTR.USERNAME);
   const realmBuf = parsed.attrs.get(ATTR.REALM);
-  const integrity = parsed.attrs.get(ATTR_MESSAGE_INTEGRITY);
-  if (!uBuf || !integrity) return null;
+  const nonceBuf = parsed.attrs.get(ATTR.NONCE);
+  const integrity = parsed.attrs.get(ATTR.MESSAGE_INTEGRITY);
+  if (!uBuf || !integrity || !nonceBuf) return null;
+
   const username = uBuf.value.toString('utf8').replace(/\0+$/, '');
-  const realmStr = realmBuf ? realmBuf.value.toString('utf8').replace(/\0+$/, '') : cfg().realm;
-  const password = cfg().secret;
-  const key = crypto.createHash('md5').update(`${username}:${realmStr}:${password}`, 'utf8').digest();
+  const realmStr = realmBuf ? realmBuf.value.toString('utf8').replace(/\0+$/, '') : defaultRealm();
+  const nonce = nonceBuf.value.toString('utf8').replace(/\0+$/, '');
+
+  // The nonce this server issued, to this client.
+  const expectedNonce = nonceFor(rinfo.address);
+  if (!expectedNonce || nonce !== expectedNonce) return null;
+
+  // The credential must be one of ours and must not have expired.
+  const parts = readUsername(username);
+  if (!parts) return null;
+  if (parts.expiry * 1000 <= Date.now()) return null;
+
+  const key = crypto.createHash('md5')
+    .update(`${username}:${realmStr}:${passwordFor(username)}`, 'utf8').digest();
+
   // Canonical message: everything up to (but not including) the
   // MESSAGE-INTEGRITY attribute, with its length field reset.
   const miOffset = indexOfBuf(parsed.raw, integrity.value);
@@ -223,19 +361,25 @@ function verifyAuth(parsed, rinfo) {
   if (expected.length !== integrity.value.length) return null;
   let diff = 0;
   for (let i = 0; i < expected.length; i++) diff |= expected[i] ^ integrity.value[i];
-  return diff === 0 ? { ok: true, username, realm: realmStr } : null;
+  if (diff !== 0) return null;
+  return { ok: true, username, realm: realmStr, name: parts.name, expiry: parts.expiry };
 }
 
+// The 401 that asks for credentials.
+//
+// The error code is 401 Unauthorized: two reserved bytes, the class (4) and
+// the number (1). The nonce is remembered for this client, because the
+// request that follows has to carry it back.
 function sendAuthChallenge(socket, parsed, rinfo) {
-  const nonce = crypto.randomBytes(16).toString('hex');
-  const errVal = Buffer.from([0, 0, 4, 1]); // 401 Unauthorized
+  const nonce = issueNonce(rinfo.address);
+  const errBuf = Buffer.from([0, 0, 4, 1]);
   const body = Buffer.concat([
     buildAttr(ATTR.REALM, Buffer.from(defaultRealm(), 'utf8')),
-    buildAttr(ATTR.NONCE, nonce),
+    buildAttr(ATTR.NONCE, Buffer.from(nonce, 'utf8')),
     buildAttr(ATTR.ERROR_CODE, errBuf),
   ]);
   const header = Buffer.alloc(20);
-  header.writeUInt16BE(STUN_BIND_REQUEST | 0x0100, 0);
+  header.writeUInt16BE(parsed.type | 0x0100, 0);
   header.writeUInt16BE(body.length, 2);
   header.writeUInt32BE(STUN_MAGIC, 4);
   parsed.txId.copy(header, 8);
@@ -264,22 +408,22 @@ function handlePacket(socket, buf, rinfo) {
   const parsed = parseStun(buf);
   if (!parsed) return;
   switch (parsed.type) {
-    case STUN_BIND_REQUEST:
+    case STYPE.BINDING_REQUEST:
       handleBinding(socket, parsed, rinfo);
       break;
-    case ALLOCATE_REQUEST:
+    case STYPE.ALLOCATE_REQUEST:
       handleAllocate(socket, parsed, rinfo);
       break;
-    case REFRESH_REQUEST:
+    case STYPE.REFRESH_REQUEST:
       handleRefresh(socket, parsed, rinfo);
       break;
-    case CREATE_PERM_REQUEST:
+    case STYPE.CREATE_PERMISSION_REQUEST:
       handleCreatePermission(socket, parsed, rinfo);
       break;
-    case CHANNEL_BIND_REQUEST:
+    case STYPE.CHANNEL_BIND_REQUEST:
       handleChannelBind(socket, parsed, rinfo);
       break;
-    case SEND_INDICATION:
+    case STYPE.SEND_INDICATION:
       handleSendIndication(socket, parsed, rinfo);
       break;
     default:
@@ -291,7 +435,7 @@ function handlePacket(socket, buf, rinfo) {
 function handleBinding(socket, parsed, rinfo) {
   const xma = xorMappedAddress(rinfo.address, rinfo.port);
   const body = buildAttr(ATTR.XOR_MAPPED_ADDRESS, xma);
-  const header = buildHeader(STUN_BIND_RESPONSE, parsed.txId, body.length);
+  const header = buildHeader(STYPE.BINDING_RESPONSE, parsed.txId, body.length);
   const out = Buffer.concat([header, body]);
   socket.send(out, 0, out.length, rinfo.port, rinfo.address);
 }
@@ -307,13 +451,20 @@ function handleAllocate(socket, parsed, rinfo) {
   if (prior) { try { prior.relaySocket.close(); } catch {} allocations.delete(key); }
 
   const relay = dgram.createSocket('udp4');
-  relay.bind(0, '0.0.0.0', () => {
+  const range = relayPortRange();
+  // The relay port is taken from the range, so the ports a client has to
+  // open are a known set rather than whatever the operating system happens
+  // to hand out.
+  const wanted = range.from + (allocations.size % Math.max(1, range.to - range.from + 1));
+  relay.bind(wanted, '0.0.0.0', () => {
     const inf = relay.address();
     const alloc = {
       id: crypto.randomBytes(12).toString('hex'),
       clientIp: rinfo.address,
       clientPort: rinfo.port,
-      relayIp: inf.address,
+      // The address the client is told is the one it can reach, not the
+      // wildcard this socket happens to be bound to.
+      relayIp: publicHost(),
       relayPort: inf.port,
       relaySocket: relay,
       lifetime: 600,
@@ -336,7 +487,7 @@ function handleAllocate(socket, parsed, rinfo) {
         buildAttr(ATTR.DATA, data),
       ]);
       const indHeader = Buffer.alloc(20);
-      indHeader.writeUInt16BE(DATA_INDICATION, 0);
+      indHeader.writeUInt16BE(STYPE.DATA_INDICATION, 0);
       indHeader.writeUInt16BE(body.length, 2);
       indHeader.writeUInt32BE(STUN_MAGIC, 4);
       parsed.txId.copy(indHeader, 8);
@@ -355,7 +506,7 @@ function handleAllocate(socket, parsed, rinfo) {
       buildAttr(ATTR.XOR_RELAYED_ADDRESS, xra),
     ]);
     const header = Buffer.alloc(20);
-    header.writeUInt16BE(ALLOCATE_RESPONSE, 0);
+    header.writeUInt16BE(STYPE.ALLOCATE_RESPONSE, 0);
     header.writeUInt16BE(body.length, 2);
     header.writeUInt32BE(STUN_MAGIC, 4);
     parsed.txId.copy(header, 8);
@@ -372,7 +523,7 @@ function handleRefresh(socket, parsed, rinfo) {
   const lifetimeBuf = Buffer.alloc(4); lifetimeBuf.writeUInt32BE(alloc.lifetime, 0);
   const body = buildAttr(ATTR.LIFETIME, lifetimeBuf);
   const header = Buffer.alloc(20);
-  header.writeUInt16BE(REFRESH_RESPONSE, 0);
+  header.writeUInt16BE(STYPE.REFRESH_RESPONSE, 0);
   header.writeUInt16BE(body.length, 2);
   header.writeUInt32BE(STUN_MAGIC, 4);
   parsed.txId.copy(header, 8);
@@ -385,12 +536,12 @@ function handleCreatePermission(socket, parsed, rinfo) {
   if (!auth) { sendAuthChallenge(socket, parsed, rinfo); return; }
   const alloc = allocations.get(rinfo.address + ':' + rinfo.port);
   if (!alloc) { sendError(socket, parsed.txId, 437, rinfo); return; }
-  const peerBuf = parsed.attrs.get(ATTR_XOR_PEER_ADDRESS);
+  const peerBuf = parsed.attrs.get(ATTR.XOR_PEER_ADDRESS);
   if (!peerBuf) { sendError(socket, parsed.txId, 400, rinfo); return; }
   const peer = parseXorPeerAddress(peerBuf.value);
   if (peer) alloc.peers.add(peer.ip + ':' + peer.port);
   const out = Buffer.alloc(20);
-  out.writeUInt16BE(CREATE_PERM_RESPONSE, 0);
+  out.writeUInt16BE(STYPE.CREATE_PERM_RESPONSE, 0);
   out.writeUInt16BE(0, 2);
   out.writeUInt32BE(STUN_MAGIC, 4);
   parsed.txId.copy(out, 8);
@@ -400,14 +551,14 @@ function handleCreatePermission(socket, parsed, rinfo) {
 function handleChannelBind(socket, parsed, rinfo) {
   const alloc = allocations.get(rinfo.address + ':' + rinfo.port);
   if (!alloc) { sendError(socket, parsed.txId, 437, rinfo); return; }
-  const chanBuf = parsed.attrs.get(ATTR_CHANNEL_NUMBER);
-  const peerBuf = parsed.attrs.get(ATTR_XOR_PEER_ADDRESS);
+  const chanBuf = parsed.attrs.get(ATTR.CHANNEL_NUMBER);
+  const peerBuf = parsed.attrs.get(ATTR.XOR_PEER_ADDRESS);
   if (!chanBuf || !peerBuf) { sendError(socket, parsed.txId, 400, rinfo); return; }
   const channelNum = chanBuf.value.readUInt16BE(0);
   const peer = parseXorPeerAddress(peerBuf.value);
   if (peer) alloc.channels.set(channelNum, peer.ip + ':' + peer.port);
   const out = Buffer.alloc(20);
-  out.writeUInt16BE(CHANNEL_BIND_RESPONSE, 0);
+  out.writeUInt16BE(STYPE.CHANNEL_BIND_RESPONSE, 0);
   out.writeUInt16BE(0, 2);
   out.writeUInt32BE(STUN_MAGIC, 4);
   parsed.txId.copy(out, 8);
@@ -417,8 +568,8 @@ function handleChannelBind(socket, parsed, rinfo) {
 function handleSendIndication(socket, parsed, rinfo) {
   const alloc = allocations.get(rinfo.address + ':' + rinfo.port);
   if (!alloc) return;
-  const peerBuf = parsed.attrs.get(ATTR_XOR_PEER_ADDRESS);
-  const dataBuf = parsed.attrs.get(ATTR_DATA);
+  const peerBuf = parsed.attrs.get(ATTR.XOR_PEER_ADDRESS);
+  const dataBuf = parsed.attrs.get(ATTR.DATA);
   if (!peerBuf || !dataBuf) return;
   const peer = parseXorPeerAddress(peerBuf.value);
   if (alloc.peers.size > 0 && !alloc.peers.has(peer.ip + ':' + peer.port)) return;
@@ -453,7 +604,17 @@ function startServer(config) {
   const port = (config && config.port) || 3478;
   const socket = dgram.createSocket('udp4');
   socket.on('message', (buf, rinfo) => {
-    try { handlePacket(socket, buf, rinfo); } catch {}
+    // A packet that cannot be handled is logged, not swallowed. The silent
+    // catch is what hid the missing magic-cookie bytes for as long as this
+    // file existed: the server received every request, threw, and said
+    // nothing, and the diagnostics - which reported the port as open - looked
+    // like a network problem rather than a fault in this file.
+    try {
+      handlePacket(socket, buf, rinfo);
+    } catch (error) {
+      console.error('[turn] a packet could not be handled: '
+        + ((error && error.message) || error));
+    }
   });
   socket.on('error', (e) => console.error('[turn] socket error', e && e.message));
   socket.bind(port, host, () => {
