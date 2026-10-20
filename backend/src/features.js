@@ -334,13 +334,15 @@ function reload() {
 function load() {
   if (features) return features;
   features = build();
-  // Startup validation: refuse to come up with a configuration that cannot work, rather
-  // than coming up and failing at the first join.
+  // A voice configuration that cannot work is reported, not fatal. Everything
+  // else on the instance works, and an operator who has pointed the instance at
+  // a provider they have not finished configuring has to be able to come in
+  // and finish it. The refusal belongs where a session is created, where it
+  // can name what is missing - and the diagnostics show the same list.
   const health = healthOf(features);
   if (features.voiceVideo.enabled && !health.available) {
-    throw new Error(
-      'VOICE_VIDEO_ENABLED is on, but voice cannot work: ' + health.problems.join('; ')
-    );
+    console.warn('[warn] voice and video is on, but it cannot work at the moment: '
+      + health.problems.join('; '));
   }
   return features;
 }

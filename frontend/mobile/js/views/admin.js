@@ -18,6 +18,7 @@ import { relativeTime } from '../../../packages/format.js';
 import Api from '../../../packages/api.js';
 import { screen, notice, stat, primaryButton, ghostButton } from './util.js';
 import { continuum, moderationSurface } from './federation.js';
+import { voiceBody } from './voice.js';
 
 function field(label, control, note) {
   return el('label', { class: 'm-field' },
@@ -1590,6 +1591,7 @@ export function renderAdmin(ctx) {
     'admin.settings': instanceSettingsBody,
     'admin.database': databaseBody,
     'admin.continuum': continuumBody,
+    'admin.voice': voiceBody,
     'admin.diagnostics': diagnosticsBody,
     'admin.incidents': incidentsBody,
     'admin.federation': federationBody,

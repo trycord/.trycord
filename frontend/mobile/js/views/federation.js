@@ -209,7 +209,7 @@ function actionSheet(options) {
     'aria-label': 'Why (it goes into the audit trail)',
     placeholder: 'Why',
   });
-  const note = el('p', { class: 'm-form-error' });
+  const note = el('p', { class: 'm-form-error', role: 'alert' });
   const confirm = el('button', {
     class: 'm-btn m-btn--block' + (opts.danger ? ' m-btn--danger' : ' m-btn--primary'),
     type: 'button',
@@ -251,7 +251,7 @@ export function renderFederation(ctx) {
   const answer = el('div', { class: 'm-stack' });
 
   function say(title, text, tone) {
-    answer.replaceChildren(notice({ tone: tone || 'info', title, text }));
+    answer.replaceChildren(notice({ tone: tone || 'info', role: 'status', title, text }));
   }
   const host = el('div', { class: 'm-stack' });
   const node = screen(
@@ -497,7 +497,7 @@ export function renderFederation(ctx) {
     const content = el('textarea', {
       class: 'm-input', rows: '4', 'aria-label': 'The message you wrote',
     }, message.content || '');
-    const note = el('p', { class: 'm-form-error' });
+    const note = el('p', { class: 'm-form-error', role: 'alert' });
     const save = el('button', {
       class: 'm-btn m-btn--block m-btn--primary', type: 'button',
       onClick: async () => {

@@ -18,6 +18,7 @@ import { adminPageEditor } from './adminPages.js';
 import { adminConfiguration } from './adminCfg.js';
 import { adminIncidents } from './adminIncidents.js';
 import { adminFederation } from './adminFederation.js';
+import { adminVoice } from './voice.js';
 import { scopeNav } from '../../packages/registry.js';
 import { icon } from '../../packages/icons.js';
 import { el } from '../../packages/dom.js';
@@ -37,6 +38,7 @@ const LAYOUTS = new Map([
   ['admin.settings', () => adminConfiguration()],
   ['admin.database', () => adminDatabase()],
   ['admin.continuum', () => adminContinuum()],
+  ['admin.voice', () => adminVoice()],
   ['admin.diagnostics', () => adminDiagnostics()],
   ['admin.incidents', () => adminIncidents()],
   ['admin.federation', () => adminFederation()],

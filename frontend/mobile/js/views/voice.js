@@ -135,7 +135,7 @@ function sharedSection(report, onChanged) {
 }
 
 // The fields of the provider in force, and nothing else.
-function providerSection(report, onChanged) {
+function providerFields(report, onChanged) {
   const provider = report.providers.find((entry) => entry.inForce) || report.providers[0];
   const rows = [];
 
@@ -263,9 +263,9 @@ export function voiceBody() {
     try {
       const report = await readProviders();
       host.replaceChildren(
-        providerSection(report, load),
+        providerChoice(report, load),
         sharedSection(report, load),
-        providerSection(report, load),
+        providerFields(report, load),
         diagnosticsSection(report, load),
       );
     } catch (error) {

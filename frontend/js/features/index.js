@@ -100,6 +100,7 @@ export const RENDERERS = {
   'admin.settings': (ctx) => renderAdmin(ctx),
   'admin.database': (ctx) => renderAdmin(ctx),
   'admin.continuum': (ctx) => renderAdmin(ctx),
+  'admin.voice': (ctx) => renderAdmin(ctx),
   'admin.diagnostics': (ctx) => renderAdmin(ctx),
   'admin.incidents': (ctx) => renderAdmin(ctx),
   'admin.federation': (ctx) => renderAdmin(ctx),
