@@ -1,0 +1,305 @@
+// The E2EE client: this device, its sessions, and the conversations it is in.
+//
+// The client is the half of the protocol the server is not: it holds the
+// private keys, it agrees the secrets, it encrypts and decrypts, and it
+// decides what a message becomes. The server holds the public keys, the
+// sealed blobs and the counters, and nothing it could open.
+//
+// Everything here is asynchronous and everything here fails loudly. A
+// failure must never turn into a message sent in the clear.
+
+import { utf8 } from './bytes.js';
+import { openStore } from './store.js';
+import { createE2eeApi } from './api.js';
+import { createDevice, loadDevice, saveDevice, ensureSealedPrivateKey, PREKEY_BATCH, PREKEY_LOW_WATER } from './device.js';
+import { SessionManager } from './sessions.js';
+import { publishKey, keyForDevice } from './group.js';
+import { upload as uploadAttachment, keyForDevice as attachmentKeyForDevice, decryptFile } from './attachments.js';
+import { sealBackup, backupMaterial, openBackup, recover as recoverDevice } from './recovery.js';
+import { readMessage } from './message.js';
+import { decide } from './send.js';
+import { protocolError } from './envelope.js';
+
+/**
+ * The client's own state.
+ */
+export class E2eeClient {
+  /**
+   * @param {object} deps { store, api }
+   */
+  constructor(deps) {
+    this.store = deps.store;
+    this.api = deps.api;
+    this.device = null;
+    this.manager = null;
+  }
+
+  /**
+   * Open a client.
+   *
+   * @param {object} options { request, upload, namespace, backend }
+   */
+  static async open(options = {}) {
+    const store = options.store || await openStore({
+      namespace: options.namespace,
+      backend: options.backend,
+    });
+    const api = options.api || createE2eeApi({ request: options.request, upload: options.upload });
+    return new E2eeClient({ store, api });
+  }
+
+  /** Where the keys are kept. */
+  backend() {
+    return this.store.backend;
+  }
+
+  /**
+   * The device this browser has, or null.
+   */
+  async load() {
+    this.device = await loadDevice(this.store);
+    if (this.device) this.manager = new SessionManager({ device: this.device, store: this.store, api: this.api });
+    return this.device;
+  }
+
+  /**
+   * Make sure the device exists, is registered with the server, and has
+   * one-time prekeys to offer.
+   *
+   * @param {object} options { userId, label }
+   */
+  async ready(options = {}) {
+    if (!this.device) await this.load();
+    if (!this.device) {
+      this.device = await createDevice({ userId: options.userId, label: options.label });
+      this.device.registered = false;
+      await saveDevice(this.store, this.device);
+      this.manager = new SessionManager({ device: this.device, store: this.store, api: this.api });
+    }
+    if (!this.device.registered) {
+      await this.register();
+    }
+    await this.publishPrekeysIfNeeded();
+    return this.device;
+  }
+
+  /** Register the device with the server. */
+  async register() {
+    const sealed = await ensureSealedPrivateKey(this.device);
+    await this.api.registerDevice(this.device.registrationBody({ sealedPrivateKey: sealed }));
+    this.device.registered = true;
+    await saveDevice(this.store, this.device);
+    return this.device;
+  }
+
+  /**
+   * Publish a batch of one-time prekeys.
+   *
+   * The device publishes a fresh batch when the one it has is running out:
+   * every session that is opened with it takes one, and a device with no
+   * prekeys left can only be reached with the three agreements of X3DH
+   * rather than the four.
+   */
+  async publishPrekeys(count = PREKEY_BATCH) {
+    const prekeys = await this.device.oneTimePreKeyBatch(count);
+    const answer = await this.api.publishPrekeys(this.device.publishBody(prekeys));
+    await saveDevice(this.store, this.device);
+    return answer;
+  }
+
+  /** Publish a batch when the prekeys are running low. */
+  async publishPrekeysIfNeeded() {
+    if (this.device.preKeyCount() >= PREKEY_LOW_WATER) return null;
+    return this.publishPrekeys();
+  }
+
+  /** The peer's public keys, from the cache or from the server. */
+  peerKeys(deviceId) {
+    return this.manager.peerKeys(deviceId);
+  }
+
+  /**
+   * What the server says about a conversation's encryption.
+   */
+  async conversationState(conversationId) {
+    const answer = await this.api.conversationState(conversationId);
+    return answer && answer.state ? answer.state : answer;
+  }
+
+  /**
+   * The devices that are in a conversation.
+   */
+  async memberDevices(conversationId) {
+    const state = await this.conversationState(conversationId);
+    return (state && state.memberDevices) || [];
+  }
+
+  /**
+   * Publish the conversation's key, sealed to the devices that are in it now.
+   *
+   * The key is new every time: a member who left still holds the key they
+   * were given, and only a new epoch takes it away from them.
+   */
+  async publishConversationKey(conversationId) {
+    const state = await this.conversationState(conversationId);
+    const members = (state && state.memberDevices) || [];
+    const epoch = Number(state && state.epoch ? state.epoch : 0) + 1;
+    const published = await publishKey(
+      { api: this.api, device: this.device, peerKeys: (id) => this.peerKeys(id) },
+      { conversationId, epoch, memberDevices: members },
+    );
+    return published;
+  }
+
+  /**
+   * The conversation key this device holds, if it holds one.
+   */
+  async conversationKey(conversationId) {
+    return keyForDevice({ api: this.api, device: this.device }, { conversationId });
+  }
+
+  /**
+   * Encrypt a message to every member device of a conversation.
+   *
+   * One envelope per device, each with its own session and its own key. A
+   * device the client cannot open a session with is a device that would not
+   * be able to read the message, so it is an error rather than a smaller
+   * message: the reader is told, and nothing is sent.
+   *
+   * @param {object} options { conversationId, text, memberDevices }
+   * @returns {Promise<object[]>} the envelopes
+   */
+  async encryptMessage(options) {
+    const members = options.memberDevices || await this.memberDevices(options.conversationId);
+    const plaintext = utf8(options.text === undefined || options.text === null ? '' : String(options.text));
+    const envelopes = [];
+    for (const member of members) {
+      if (member.deviceId === this.device.id) continue;
+      let session = await this.manager.sessionForPeer(member.deviceId);
+      if (!session) {
+        session = await this.manager.establish(member.deviceId, { conversationId: options.conversationId });
+      }
+      const out = await this.manager.encryptTo(session, {
+        conversationId: options.conversationId,
+        plaintext,
+      });
+      envelopes.push(out.envelope);
+    }
+    if (!envelopes.length) {
+      throw protocolError(
+        'E2EE_VALIDATION_ERROR',
+        'there is nobody to encrypt this message to',
+        400,
+      );
+    }
+    return envelopes;
+  }
+
+  /**
+   * Read a message row.
+   */
+  async readMessage(row, conversationId) {
+    return readMessage(row, {
+      deviceId: this.device ? this.device.id : null,
+      manager: this.manager,
+      conversationId,
+    });
+  }
+
+  /**
+   * Push the state of the sessions that have moved on.
+   */
+  async pushStates() {
+    const sessions = await this.manager.listSessions();
+    for (const session of sessions) {
+      await this.manager.pushState(session);
+    }
+    return sessions.length;
+  }
+
+  /**
+   * Encrypt a file and upload the ciphertext.
+   *
+   * @param {object} options { conversationId, bytes, filename, mime, memberDevices }
+   */
+  async uploadFile(options) {
+    const members = options.memberDevices || await this.memberDevices(options.conversationId);
+    const uploaded = await uploadAttachment(
+      { api: this.api, device: this.device, peerKeys: (id) => this.peerKeys(id) },
+      {
+        conversationId: options.conversationId,
+        filename: options.filename,
+        mime: options.mime,
+        bytes: options.bytes,
+        memberDevices: members,
+      },
+    );
+    return { id: uploaded.id };
+  }
+
+  /**
+   * The bytes of an attachment, opened with the key sealed to this device.
+   */
+  async openAttachment(conversationId, attachmentId, bytes) {
+    const opened = await attachmentKeyForDevice(
+      { api: this.api, device: this.device },
+      { conversationId, attachmentId },
+    );
+    if (!opened) {
+      throw protocolError('E2EE_FORBIDDEN', 'this attachment was not sealed to this device', 403);
+    }
+    return decryptFile(opened.key, bytes);
+  }
+
+  /**
+   * The key backup, sealed under the recovery key.
+   */
+  async backup() {
+    const sessions = this.manager ? await this.manager.listSessions() : [];
+    const material = backupMaterial(this.device, sessions);
+    const sealed = await sealBackup(material, this.device.recoveryKey);
+    await this.api.saveBackup(sealed);
+    return sealed;
+  }
+
+  /**
+   * The key backup the server holds, opened with the recovery key.
+   */
+  async openBackup(recoveryKey) {
+    const answer = await this.api.fetchBackup();
+    if (!answer || !answer.backup) return null;
+    return openBackup(answer.backup, recoveryKey);
+  }
+
+  /**
+   * Recover a device from the one that was lost.
+   *
+   * The new device gets new keys: a recovered device that kept the old
+   * identity would be the old device wearing a new label, and revoking the
+   * old one would mean nothing.
+   *
+   * @param {object} options { userId, sourceDeviceId, sourceKeys, newDevice }
+   */
+  async recover(options) {
+    const sealed = await ensureSealedPrivateKey(options.newDevice);
+    return recoverDevice(
+      { api: this.api },
+      {
+        userId: options.userId,
+        sourceDeviceId: options.sourceDeviceId,
+        sourceKeys: options.sourceKeys,
+        newDevice: options.newDevice,
+        sealedPrivateKey: sealed,
+      },
+    );
+  }
+
+  /**
+   * What the composer should do with a message in this conversation.
+   */
+  async decideFor(conversationId) {
+    const state = await this.conversationState(conversationId);
+    return decide(state);
+  }
+}
+

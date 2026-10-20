@@ -104,6 +104,7 @@ export function templateSheet(onPick) {
           list.appendChild(el('div', { class: 'm-row' },
             el('button', {
               class: 'm-row__body m-row__body--button', type: 'button',
+              'aria-label': 'Insert the template ' + entry.name,
               onClick: () => {
                 layer.close();
                 if (onPick) onPick(entry);
@@ -174,6 +175,7 @@ export function collectionSheet(serverId, item) {
     for (const entry of collections) {
       list.appendChild(el('button', {
         class: 'm-row', type: 'button',
+        'aria-label': 'Save into ' + entry.name,
         onClick: async () => {
           try {
             await addCollectionItem(entry.id, item);

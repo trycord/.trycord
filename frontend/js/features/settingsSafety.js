@@ -143,7 +143,10 @@ export function privacyView() {
                 const payload = await Api.exportMyData();
                 const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
-                const a = el('a', { href: url, download: 'trycord-export.json' });
+                const a = el('a', {
+                  href: url, download: 'trycord-export.json',
+                  'aria-label': 'The export of your data',
+                });
                 document.body.appendChild(a);
                 a.click();
                 a.remove();

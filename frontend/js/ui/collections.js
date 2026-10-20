@@ -50,6 +50,7 @@ export function saveToCollection(serverId, item) {
       }
       list.replaceChildren(...collections.map((entry) => el('button', {
         class: 'cardrow cardrow--link collection-pick', type: 'button',
+        'aria-label': 'Save into ' + entry.name,
         onClick: async () => {
           try {
             await addCollectionItem(entry.id, item);
