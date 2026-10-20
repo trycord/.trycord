@@ -930,9 +930,13 @@
 
 /* -- quick paths ------------------------------------------------------------- */
 
+/* The quick paths.
+   As many columns as the space allows and no more: a fixed pair of columns
+   in a narrow column gave every tile about half the width it needed, and
+   "Direct messages" became "Direct ...". */
 .quickgrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--space-2);
   padding: var(--space-3);
 }

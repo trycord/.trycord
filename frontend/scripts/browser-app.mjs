@@ -81,25 +81,36 @@ const ANSWERS = {
       ],
     },
   },
-  // The shape the instance answers with: the person, not a wrapper.
+  // The shape the instance answers with: the person, not a wrapper. The
+  // client asks for /api/users/me, and the other module for /api/me.
+  'GET /api/users/me': {
+    id: 'u1', username: 'ada', displayName: 'Ada', isAdmin: true,
+    avatarUrl: null, bannerUrl: null, bio: '', statusText: '',
+    email: null, emailVerified: false, verificationRequired: false,
+  },
   'GET /api/me': {
     id: 'u1', username: 'ada', displayName: 'Ada', isAdmin: true,
     avatarUrl: null, bannerUrl: null, bio: '', statusText: '',
     email: null, emailVerified: false, verificationRequired: false,
   },
+  // The names the instance really uses: a community's columns are the
+  // database's, so a stub that answers with the client's names is measuring a
+  // shape the instance never sends.
   'GET /api/servers': [
     {
       id: 's1', name: 'The Community', description: 'A place to talk.',
-      iconUrl: null, bannerUrl: null, memberCount: 12, isPublic: true,
-      isDiscoverable: true, ownerId: 'u1', permissions: ['*'], is_owner: true,
-      createdAt: '2026-01-01T00:00:00.000Z',
+      icon_url: null, banner_url: null, slug: 'the-community',
+      member_count: 12, channel_count: 3, is_public: true,
+      is_discoverable: true, owner_id: 'u1', permissions: ['*'], is_owner: true,
+      created_at: '2026-01-01T00:00:00.000Z', join_code: 'join-me',
     },
   ],
   'GET /api/servers/s1': {
     id: 's1', name: 'The Community', description: 'A place to talk.',
-    iconUrl: null, bannerUrl: null, memberCount: 12, isPublic: true,
-    isDiscoverable: true, ownerId: 'u1', permissions: ['*'], is_owner: true,
-    createdAt: '2026-01-01T00:00:00.000Z',
+    icon_url: null, banner_url: null, slug: 'the-community',
+    member_count: 12, channel_count: 3, is_public: true,
+    is_discoverable: true, owner_id: 'u1', permissions: ['*'], is_owner: true,
+    created_at: '2026-01-01T00:00:00.000Z', join_code: 'join-me',
   },
   'GET /api/servers/s1/channels': {
     channels: [
