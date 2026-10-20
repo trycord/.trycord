@@ -17,7 +17,7 @@
 // MANAGE_MESSAGES; the structure of the board - its lanes, its milestones and
 // the board itself - needs MANAGE_CHANNELS.
 
-import { el } from '../../../packages/dom.js';
+import { el, replaceChildren } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { card, row, blank, fault, fold, hold, memo } from '../../ui/page.js';
 import { openDialog, toast, errorToast } from '../../ui/overlays.js';
@@ -55,10 +55,10 @@ export function boardsList(ctx) {
   });
 
   const load = async () => {
-    host.replaceChildren(hold('Reading the boards'));
+    replaceChildren(host, hold('Reading the boards'));
     try {
       const boards = await Workspace.boards(serverId);
-      host.replaceChildren(...(boards.length
+      replaceChildren(host, ...(boards.length
         ? boards.map((board) => row({
           lead: el('span', { class: 'role-dot' }, icon('grid', { size: 15 })),
           title: board.name,
@@ -72,7 +72,7 @@ export function boardsList(ctx) {
           text: 'A board holds lanes, and a lane holds the work.',
         })]));
     } catch (error) {
-      host.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(host, fold([fault(error, load)]));
     }
   };
 
@@ -131,7 +131,7 @@ function boardView(ctx, boardId) {
   ], { wide: true });
 
   const paintHead = () => {
-    head.replaceChildren(
+    replaceChildren(head, 
       el('h2', { class: 'pagehead-title' }, board.name),
       el('p', { class: 'form-note' }, board.description
         || 'The lanes of this board and the cards in them.'),
@@ -146,24 +146,24 @@ function boardView(ctx, boardId) {
   const paintLanes = () => {
     const columns = board.columns || [];
     if (!columns.length) {
-      lanes.replaceChildren(blank({
+      replaceChildren(lanes, blank({
         glyph: 'list',
         title: 'This board has no lanes',
         text: canManage ? 'Add a lane and cards can be filed in it.' : 'Nobody has made a lane yet.',
       }));
       return;
     }
-    lanes.replaceChildren(...columns.map((column) => laneColumn(serverId, board, column, canPost, load)));
+    replaceChildren(lanes, ...columns.map((column) => laneColumn(serverId, board, column, canPost, load)));
   };
 
   const load = async () => {
-    lanes.replaceChildren(hold('Reading the board'));
+    replaceChildren(lanes, hold('Reading the board'));
     try {
       board = await Workspace.board(serverId, boardId);
       paintHead();
       paintLanes();
     } catch (error) {
-      lanes.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(lanes, fold([fault(error, load)]));
     }
   };
 
@@ -179,7 +179,7 @@ function laneColumn(serverId, board, column, canPost, load) {
   const cards = (board.cards || []).filter((entry) => String(entry.columnId) === String(column.id));
   const body = el('div', { class: 'rowlist' });
   if (cards.length) {
-    body.replaceChildren(...cards.map((entry) => row({
+    replaceChildren(body, ...cards.map((entry) => row({
       lead: el('span', { class: 'role-dot' }, icon(priorityIcon(entry.priority), { size: 15 })),
       title: entry.title,
       sub: [PRIORITY_LABELS[entry.priority] || entry.priority, entry.status && STATUS_LABELS[entry.status]]
@@ -189,7 +189,7 @@ function laneColumn(serverId, board, column, canPost, load) {
       link: true,
     })));
   } else {
-    body.replaceChildren(el('p', { class: 'form-note' }, 'Nothing filed here yet.'));
+    replaceChildren(body, el('p', { class: 'form-note' }, 'Nothing filed here yet.'));
   }
 
   return card({
@@ -248,7 +248,7 @@ function cardView(ctx, boardId, cardId) {
   // answer says which version the card is at now.
   const showConflict = (error) => {
     const current = (error && error.details && error.details.currentVersion) || null;
-    conflict.replaceChildren(memo({
+    replaceChildren(conflict, memo({
       tone: 'warning',
       title: 'This card changed while you were editing it',
       text: current
@@ -277,11 +277,11 @@ function cardView(ctx, boardId, cardId) {
         onClick: () => openCardEditor(serverId, board, null, theCard, load, showConflict),
       }, icon('edit', { size: 14 }), 'Edit'));
     }
-    actions.replaceChildren(...tools);
+    replaceChildren(actions, ...tools);
   };
 
   const paintHead = () => {
-    head.replaceChildren(
+    replaceChildren(head, 
       el('h2', { class: 'pagehead-title' }, theCard.title),
       el('p', { class: 'form-note' }, 'Version ' + theCard.version + ' · ' + relativeTime(theCard.updatedAt)),
       theCard.body ? el('p', { class: 'form-note' }, theCard.body) : null,
@@ -295,7 +295,7 @@ function cardView(ctx, boardId, cardId) {
       { value: theCard.assigneeId ? (names.get(String(theCard.assigneeId)) || theCard.assigneeId) : '—', label: 'assignee' },
       { value: theCard.dueAt ? relativeTime(theCard.dueAt) : '—', label: 'due' },
     ];
-    facts.replaceChildren(el('div', { class: 'statstrip' },
+    replaceChildren(facts, el('div', { class: 'statstrip' },
       ...cells.map((cell) => el('div', { class: 'stat' },
         el('span', { class: 'stat-value' }, cell.value),
         el('span', { class: 'stat-label' }, cell.label)))));
@@ -303,7 +303,7 @@ function cardView(ctx, boardId, cardId) {
 
   const paintLinks = () => {
     const rows = theCard.links || [];
-    links.replaceChildren(...(rows.length
+    replaceChildren(links, ...(rows.length
       ? rows.map((entry) => row({
         lead: el('span', { class: 'role-dot' }, icon('link', { size: 15 })),
         title: CARD_LINK_LABELS[entry.kind] || entry.kind,
@@ -332,7 +332,7 @@ function cardView(ctx, boardId, cardId) {
 
   const paintMilestones = () => {
     const rows = theCard.milestones || [];
-    milestones.replaceChildren(...(rows.length
+    replaceChildren(milestones, ...(rows.length
       ? rows.map((entry) => row({
         lead: el('span', { class: 'role-dot' }, icon('flag', { size: 15 })),
         title: entry.name,
@@ -344,7 +344,7 @@ function cardView(ctx, boardId, cardId) {
 
   const paintActivity = () => {
     const rows = theCard.activity || [];
-    activity.replaceChildren(...(rows.length
+    replaceChildren(activity, ...(rows.length
       ? rows.map((entry) => row({
         title: activityLine(entry),
         sub: relativeTime(entry.createdAt),
@@ -354,7 +354,7 @@ function cardView(ctx, boardId, cardId) {
   };
 
   const load = async () => {
-    head.replaceChildren(hold('Opening the card'));
+    replaceChildren(head, hold('Opening the card'));
     try {
       const answers = await Promise.all([
         Workspace.board(serverId, boardId),
@@ -367,7 +367,7 @@ function cardView(ctx, boardId, cardId) {
       for (const member of (answers[2] && answers[2].items) || []) {
         names.set(String(member.id), member.display_name || member.displayName || member.username);
       }
-      conflict.replaceChildren();
+      replaceChildren(conflict);
       paintActions();
       paintHead();
       paintFacts();
@@ -375,7 +375,7 @@ function cardView(ctx, boardId, cardId) {
       paintMilestones();
       paintActivity();
     } catch (error) {
-      head.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(head, fold([fault(error, load)]));
     }
   };
 
@@ -705,7 +705,7 @@ function openLinkEditor(serverId, boardId, card, onDone) {
     message.hidden = !isMessage;
     target.hidden = isMessage;
     if (isMessage) return;
-    target.replaceChildren();
+    replaceChildren(target);
     const list = choices[kind.value] || [];
     if (!list.length) {
       target.appendChild(el('option', { value: '' }, 'Nothing to link to yet'));

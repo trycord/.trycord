@@ -19,13 +19,14 @@
 // right-click, with the community's moderation entries added when the reader
 // holds the permission that allows them.
 
-import { el } from '../../packages/dom.js';
+import { el, replaceChildren } from '../../packages/dom.js';
 import Api from '../../packages/api.js';
 import {
   nameOf, presenceOf, refreshPresence, can, isOwner, on as onStore,
 } from '../../packages/store.js';
 import { on as onRealtime, EVENTS } from '../../packages/realtime.js';
 import { avatarUrlOf } from '../../packages/identity.js';
+import { roleChips } from '../../packages/roles.js';
 import { avatar } from './primitives.js';
 import { row, blank, fault, hold } from './page.js';
 import { personSheet, personContextMenu } from './person.js';
@@ -119,15 +120,26 @@ export function memberRow(serverId, member, repaint) {
     link: true,
     lead: avatar(user, { size: 'sm', rounded: true, presence: status }),
     title: nameOf(user),
-    sub: (member.roleNames && member.roleNames.join(', '))
-      || (member.isOwner || member.is_owner ? 'Community owner' : '@' + (member.username || '')),
+    // The roles, in the colours the community gave them.
+    //
+    // The roster answered with the roles of every member, and the row read a
+    // field that was never there - so a member's roles were never shown at
+    // all, and the colour of a role was a colour nothing drew.
+    sub: roleChips(member) || (member.isOwner || member.is_owner
+      ? 'Community owner' : '@' + (member.username || '')),
     meta: el('span', {
       class: 'member-presence', dataset: { presence: status },
     }, label),
-    onClick: () => personSheet(node, user, { extra: memberActions(serverId, member, repaint) }),
+    onClick: () => personSheet(node, user, {
+      roles: member.roles || [],
+      extra: memberActions(serverId, member, repaint),
+    }),
   });
 
-  personContextMenu(node, user, { extra: memberActions(serverId, member, repaint) });
+  personContextMenu(node, user, {
+    roles: member.roles || [],
+    extra: memberActions(serverId, member, repaint),
+  });
   return node;
 }
 
@@ -162,7 +174,7 @@ export function memberList(serverId, options) {
 
   function paint() {
     if (!items.length) {
-      body.replaceChildren(query
+      replaceChildren(body, query
         ? blank({
           glyph: 'search',
           title: 'Nobody by that name',
@@ -174,14 +186,14 @@ export function memberList(serverId, options) {
           text: 'An invite is the way in - open the invites page to make one.',
         }));
       count.textContent = '';
-      more.replaceChildren();
+      replaceChildren(more);
       return;
     }
-    body.replaceChildren(...items.map((member) => memberRow(serverId, member, repaint)));
+    replaceChildren(body, ...items.map((member) => memberRow(serverId, member, repaint)));
     count.textContent = total
       ? items.length + ' of ' + total
       : items.length + (items.length === 1 ? ' member' : ' members');
-    more.replaceChildren(hasMore
+    replaceChildren(more, hasMore
       ? el('button', {
         class: 'btn btn--default btn--sm', type: 'button',
         onClick: () => loadMore(),
@@ -204,8 +216,8 @@ export function memberList(serverId, options) {
   async function load() {
     const mine = ++generation;
     loading = true;
-    body.replaceChildren(hold('Reading the roster'));
-    more.replaceChildren();
+    replaceChildren(body, hold('Reading the roster'));
+    replaceChildren(more);
     try {
       const page = await fetchPage(0);
       if (mine !== generation) return;
@@ -219,7 +231,7 @@ export function memberList(serverId, options) {
       refreshPresence(items.map((member) => member.id)).catch(() => {});
     } catch (error) {
       if (mine !== generation) return;
-      body.replaceChildren(fault(error, load));
+      replaceChildren(body, fault(error, load));
     } finally {
       if (mine === generation) loading = false;
     }
@@ -228,7 +240,7 @@ export function memberList(serverId, options) {
   async function loadMore() {
     if (loading || !hasMore) return;
     loading = true;
-    more.replaceChildren(el('p', { class: 'holdline' }, 'Reading more'));
+    replaceChildren(more, el('p', { class: 'holdline' }, 'Reading more'));
     try {
       const page = await fetchPage(items.length);
       for (const member of page.items) {
@@ -239,7 +251,7 @@ export function memberList(serverId, options) {
       paint();
       refreshPresence(page.items.map((member) => member.id)).catch(() => {});
     } catch (error) {
-      more.replaceChildren(fault(error, loadMore));
+      replaceChildren(more, fault(error, loadMore));
     } finally {
       loading = false;
     }

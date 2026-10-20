@@ -194,7 +194,19 @@ export function openMenu(options) {
   for (const item of opts.items || []) {
     if (!item) continue;
     if (item.separator) { menu.appendChild(el('div', { class: 'menu-sep' })); continue; }
-    if (item.header) { menu.appendChild(el('div', { class: 'menu-label' }, item.header)); continue; }
+    if (item.header) {
+      // A header can carry a face and a line of detail under the name.
+      //
+      // The person sheet is a header with a face and the person's roles in
+      // it, and neither was drawn: the face was passed and ignored, and the
+      // roles were never passed at all.
+      menu.appendChild(el('div', { class: 'menu-label' },
+        item.lead ? el('span', { class: 'menu-lead' }, item.lead) : null,
+        el('span', { class: 'menu-headtext' },
+          el('span', { class: 'menu-headname' }, item.header),
+          item.sub ? el('span', { class: 'menu-sub' }, item.sub) : null)));
+      continue;
+    }
     menu.appendChild(el('button', {
       class: 'menu-item' + (item.danger ? ' menu-item--danger' : ''),
       type: 'button',

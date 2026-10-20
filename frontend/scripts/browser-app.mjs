@@ -30,6 +30,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { matchRoute } from '../packages/registry.js';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT = path.join(HERE, '..');
 const CHROME = process.env.CHROME_PATH || '/usr/bin/chromium';
@@ -65,6 +67,20 @@ const ANSWERS = {
     apiVersion: 1, protocolVersion: 'trycord-continuum/1.0',
   },
   'GET /api/legal': { termsVersion: '1.0', privacyVersion: '1.0', updated: '2026-09-20' },
+  'GET /api/users/u2': {
+    id: 'u2', username: 'grace', displayName: 'Grace Hopper',
+    createdAt: '2024-02-11T09:00:00.000Z',
+    bio: 'Compiler pioneer. Currently untangling a moth.',
+    avatarUrl: null, bannerUrl: null, statusText: 'In the workshop',
+    presence: 'online', isBot: false, relation: 'friend',
+    membership: {
+      joinedAt: '2024-03-01T09:00:00.000Z',
+      roles: [
+        { id: 'r1', name: 'Maintainer', position: 3, color: '#ff8a24' },
+        { id: 'r2', name: 'Member', position: 1, color: null },
+      ],
+    },
+  },
   'GET /api/me': {
     user: {
       id: 'u1', username: 'ada', displayName: 'Ada', isAdmin: true,
@@ -226,6 +242,19 @@ function writeMobileHarnessDocument() {
   fs.cpSync(path.join(CLIENT, 'packages'), path.join(CLIENT, '.browser-harness', 'packages'),
     { recursive: true });
   return target;
+}
+
+// The layout a route is drawn in, or null when the route is not one.
+//
+// The registry is the same one the client routes with, so the harness and
+// the application agree about which pages have a place column.
+function layoutOf(route) {
+  try {
+    const matched = matchRoute(route);
+    return matched && matched.page ? String(matched.page.layout || '') : null;
+  } catch {
+    return null;
+  }
 }
 
 // ---- the browser ------------------------------------------------------------
@@ -401,13 +430,19 @@ try {
       if (measured.overflow > 2) {
         faults.push('the page scrolls sideways by ' + measured.overflow + ' pixels');
       }
-      if (width >= 1024 && measured.hasContext && measured.columnBox && !measured.columnBox.shown) {
+      // The place column belongs to the pages that have one. A page with a
+      // layout of its own - the profile, the sign-in - draws what it draws,
+      // and asking it for a column it does not have is asking for a fault
+      // that is not one.
+      const layout = layoutOf(route);
+      const hasColumn = layout !== 'plain' && layout !== 'profile';
+      if (width >= 1024 && hasColumn && measured.hasContext && measured.columnBox && !measured.columnBox.shown) {
         faults.push('the place column is not shown at ' + width + ' pixels');
       }
-      if (width >= 1024 && measured.hasContext && measured.columnBox && measured.columnBox.w < 160) {
+      if (width >= 1024 && hasColumn && measured.hasContext && measured.columnBox && measured.columnBox.w < 160) {
         faults.push('the place column is ' + measured.columnBox.w + ' pixels wide');
       }
-      if (width >= 1024 && measured.hasContext && measured.rail && !measured.rail.shown) {
+      if (width >= 1024 && hasColumn && measured.hasContext && measured.rail && !measured.rail.shown) {
         faults.push('the communities rail is not shown at ' + width + ' pixels');
       }
 

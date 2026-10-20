@@ -14,7 +14,7 @@
 // with fewer controls to reach for one-handed. The seven the phone offers are
 // the ones somebody writes with.
 
-import { el, clear } from '../../../packages/dom.js';
+import { clear, el, replaceChildren } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { Workspace, SURFACES, surfaceRoute, spaceRoute, documentRoute, boardRoute, cardRoute, eventRoute, pollRoute } from '../../../packages/workspace.js';
 import { State, channelsOf, refreshServerTree } from '../../../packages/store.js';
@@ -54,7 +54,7 @@ export function renderWorkspace(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the workspace'));
+    replaceChildren(host, loading('Reading the workspace'));
     try {
       const answers = await Promise.all([
         Workspace.spaces(serverId), Workspace.documents(serverId), Workspace.boards(serverId),
@@ -76,14 +76,14 @@ export function renderWorkspace(ctx) {
           el('span', { class: 'm-row__sub' }, surface.blurb)),
         el('span', { class: 'm-row__meta' }, String(counts.get(surface.id)))));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         el('div', { class: 'm-hero m-hero--quiet' },
           el('div', { class: 'm-hero__eyebrow' }, 'Workspace'),
           el('div', { class: 'm-hero__title' }, 'What this community holds'),
           el('div', { class: 'm-hero__sub' }, 'Spaces, documents, boards, events and polls.')),
         section('The surfaces', rows));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -102,7 +102,7 @@ export function renderSpaces(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the spaces'));
+    replaceChildren(host, loading('Reading the spaces'));
     try {
       const spaces = await Workspace.spaces(serverId);
       const rows = el('div', { class: 'm-list' });
@@ -126,7 +126,7 @@ export function renderSpaces(ctx) {
             + (space.isPrivate ? ' · private' : ''))),
         el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         surfaceStrip(serverId, 'spaces'),
         section('Spaces', rows, {
           action: mayManageStructure(serverId)
@@ -134,7 +134,7 @@ export function renderSpaces(ctx) {
             : null,
         }));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -153,7 +153,7 @@ export function renderSpace(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Opening the space'));
+    replaceChildren(host, loading('Opening the space'));
     try {
       const space = await Workspace.space(serverId, spaceId);
       const rows = el('div', { class: 'm-list' });
@@ -183,7 +183,7 @@ export function renderSpace(ctx) {
           text: 'Add a channel, a document or a board to point at.',
         }));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         heading(space.name, space.description || null),
         section('References', rows, {
           action: canManage
@@ -191,7 +191,7 @@ export function renderSpace(ctx) {
             : null,
         }));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -210,7 +210,7 @@ export function renderDocuments(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the documents'));
+    replaceChildren(host, loading('Reading the documents'));
     try {
       const documents = await Workspace.documents(serverId);
       const rows = el('div', { class: 'm-list' });
@@ -233,7 +233,7 @@ export function renderDocuments(ctx) {
             'revision ' + document.revision + ' · ' + relativeTime(document.updatedAt))),
         el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         surfaceStrip(serverId, 'documents'),
         section('Documents', rows, {
           action: mayWriteDocuments(serverId)
@@ -241,7 +241,7 @@ export function renderDocuments(ctx) {
             : null,
         }));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -366,7 +366,7 @@ export function renderDocument(ctx) {
         onClick: () => (editing ? save() : startEditing()),
       }, editing ? 'Save' : 'Edit'));
     }
-    host.replaceChildren(...[
+    replaceChildren(host, ...[
       head,
       editing ? paintEditor() : paintRead(),
       tools.length ? actions(tools) : null,
@@ -494,7 +494,7 @@ export function renderDocument(ctx) {
       if (error && error.code === 'CONFLICT' && error.details) {
         // The document moved on while this one was being written. The work is
         // not thrown away and it is not written over the server's version.
-        host.replaceChildren(
+        replaceChildren(host, 
           notice({
             tone: 'warning',
             title: 'This document changed while you were writing it',
@@ -528,12 +528,12 @@ export function renderDocument(ctx) {
   };
 
   const load = async () => {
-    host.replaceChildren(loading('Opening the document'));
+    replaceChildren(host, loading('Opening the document'));
     try {
       doc = await Workspace.document(serverId, documentId);
       paint();
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -552,7 +552,7 @@ export function renderBoards(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the boards'));
+    replaceChildren(host, loading('Reading the boards'));
     try {
       const boards = await Workspace.boards(serverId);
       const rows = el('div', { class: 'm-list' });
@@ -574,11 +574,11 @@ export function renderBoards(ctx) {
           el('span', { class: 'm-row__sub' }, board.description || 'A board of cards')),
         el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         surfaceStrip(serverId, 'boards'),
         section('Boards', rows));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -596,7 +596,7 @@ export function renderBoard(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the board'));
+    replaceChildren(host, loading('Reading the board'));
     try {
       const board = await Workspace.board(serverId, boardId);
       const body = el('div', { class: 'm-stack' });
@@ -623,11 +623,11 @@ export function renderBoard(ctx) {
           note: cards.length + ' card' + (cards.length === 1 ? '' : 's'),
         }));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         heading(board.name, board.description || null),
         body);
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -646,7 +646,7 @@ export function renderCard(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Opening the card'));
+    replaceChildren(host, loading('Opening the card'));
     try {
       const card = await Workspace.card(serverId, boardId, cardId);
       const facts_ = el('div', { class: 'm-strip' },
@@ -663,13 +663,13 @@ export function renderCard(ctx) {
       if (!(card.activity || []).length) {
         activity.appendChild(el('p', { class: 'm-section__note' }, 'Nothing has happened to this card yet.'));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         heading(card.title, 'Version ' + card.version + ' · ' + relativeTime(card.updatedAt)),
         card.body ? el('p', { class: 'm-lede' }, card.body) : null,
         facts_,
         section('Activity', activity));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -688,7 +688,7 @@ export function renderEvents(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the events'));
+    replaceChildren(host, loading('Reading the events'));
     try {
       const events = await Workspace.events(serverId);
       const rows = el('div', { class: 'm-list' });
@@ -711,7 +711,7 @@ export function renderEvents(ctx) {
             (event.startsAtLocal || '') + (event.timezone ? ' · ' + event.timezone : ''))),
         el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         surfaceStrip(serverId, 'events'),
         section('Events', rows, {
           action: mayManageStructure(serverId)
@@ -719,7 +719,7 @@ export function renderEvents(ctx) {
             : null,
         }));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -773,7 +773,7 @@ export function renderEvent(ctx) {
 
     // A null child would be drawn as the word "null", so the parts that are not
     // there are left out rather than passed along.
-    host.replaceChildren(...[
+    replaceChildren(host, ...[
       heading(event.title, (event.startsAtLocal || '') + (event.timezone ? ' · ' + event.timezone : '')),
       event.description ? el('p', { class: 'm-lede' }, event.description) : null,
       el('p', { class: 'm-section__note' },
@@ -809,13 +809,13 @@ export function renderEvent(ctx) {
   };
 
   const load = async () => {
-    host.replaceChildren(loading('Opening the event'));
+    replaceChildren(host, loading('Opening the event'));
     try {
       event = await Workspace.event(serverId, eventId);
       paint();
       await loadAttendance();
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -834,7 +834,7 @@ export function renderPolls(ctx) {
   const node = screen(host);
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the polls'));
+    replaceChildren(host, loading('Reading the polls'));
     try {
       const polls = await Workspace.polls(serverId);
       const rows = el('div', { class: 'm-list' });
@@ -858,7 +858,7 @@ export function renderPolls(ctx) {
             + (poll.isAnonymous ? ' · anonymous' : ''))),
         el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         surfaceStrip(serverId, 'polls'),
         section('Polls', rows, {
           action: mayPost(serverId)
@@ -866,7 +866,7 @@ export function renderPolls(ctx) {
             : null,
         }));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -978,7 +978,7 @@ export function renderPoll(ctx) {
       tools.push(ghostButton('Close the poll', () => close()));
     }
 
-    host.replaceChildren(...[
+    replaceChildren(host, ...[
       heading(poll.question, (POLL_SCORING_LABELS[poll.scoring] || poll.scoring)
         + (poll.isAnonymous ? ' · anonymous' : '')),
       section('The options', choices),
@@ -1040,14 +1040,14 @@ export function renderPoll(ctx) {
   };
 
   const load = async () => {
-    host.replaceChildren(loading('Opening the poll'));
+    replaceChildren(host, loading('Opening the poll'));
     try {
       poll = await Workspace.poll(serverId, pollId);
       ballot = [];
       paint();
       await loadResults();
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -1218,7 +1218,7 @@ function openReferencePicker(serverId, spaceId, onDone) {
     url.hidden = kind.value !== 'resource';
     target.hidden = kind.value === 'resource';
     if (kind.value === 'resource') return;
-    target.replaceChildren();
+    replaceChildren(target);
     const list = choices[kind.value] || [];
     if (!list.length) {
       target.appendChild(el('option', { value: '' }, 'Nothing to reference yet'));

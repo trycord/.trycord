@@ -5,7 +5,7 @@
 // to what is unread; the footer keeps older entries one step away. This is the
 // full list behind the Pulse card on Home - same rows, same voice.
 
-import { el } from '../../packages/dom.js';
+import { el, replaceChildren } from '../../packages/dom.js';
 import { State, refreshNotifications } from '../../packages/store.js';
 import Api from '../../packages/api.js';
 import { head, hold, fault, blank, fold } from '../ui/page.js';
@@ -80,7 +80,7 @@ export function renderInbox() {
     const shown = filter === 'unread' ? all.filter((entry) => !entry.readAt) : all;
 
     if (!shown.length) {
-      list.replaceChildren(blank({
+      replaceChildren(list, blank({
         glyph: 'mail',
         title: filter === 'unread' ? 'Nothing waiting' : 'You are all caught up',
         text: 'Messages, mentions, replies and requests arrive here by day.',
@@ -93,22 +93,22 @@ export function renderInbox() {
         if (key !== last) { parts.push(dayRail(key)); last = key; }
         parts.push(activityRow(entry, paint));
       }
-      list.replaceChildren(...parts);
+      replaceChildren(list, ...parts);
     }
     paintChips();
-    pager.replaceChildren(
+    replaceChildren(pager, 
       State.notifications.hasMore
         ? el('button', { class: 'btn btn--default btn--sm', type: 'button', onClick: () => more() }, 'Load older')
         : null);
   }
 
   async function load() {
-    list.replaceChildren(hold('Opening your inbox'));
+    replaceChildren(list, hold('Opening your inbox'));
     try {
       await refreshNotifications({ limit: 30 });
       paint();
     } catch (error) {
-      list.replaceChildren(fault(error, load));
+      replaceChildren(list, fault(error, load));
     }
   }
 
@@ -117,7 +117,7 @@ export function renderInbox() {
       await refreshNotifications({ limit: 30, before: State.notifications.nextCursor });
       paint();
     } catch (error) {
-      list.replaceChildren(fault(error, paint));
+      replaceChildren(list, fault(error, paint));
     }
   }
 
@@ -128,7 +128,7 @@ export function renderInbox() {
       await refreshNotifications({ limit: 30 });
       paint();
     } catch (error) {
-      list.replaceChildren(fault(error, paint));
+      replaceChildren(list, fault(error, paint));
     }
   }
 

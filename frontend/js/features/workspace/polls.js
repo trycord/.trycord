@@ -19,7 +19,7 @@
 // An anonymous poll never names its voters, before the close or after it, and
 // the desk does not name them either.
 
-import { el } from '../../../packages/dom.js';
+import { el, replaceChildren } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { card, row, blank, fault, fold, hold, memo, facts } from '../../ui/page.js';
 import { iconButton } from '../../ui/primitives.js';
@@ -55,10 +55,10 @@ export function pollsList(ctx) {
   });
 
   const load = async () => {
-    host.replaceChildren(hold('Reading the polls'));
+    replaceChildren(host, hold('Reading the polls'));
     try {
       const polls = await Workspace.polls(serverId);
-      host.replaceChildren(...(polls.length
+      replaceChildren(host, ...(polls.length
         ? polls.map((poll) => row({
           lead: el('span', { class: 'role-dot' }, icon('chart', { size: 15 })),
           title: poll.question,
@@ -76,7 +76,7 @@ export function pollsList(ctx) {
           text: 'A poll is a question the community answers.',
         })]));
     } catch (error) {
-      host.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(host, fold([fault(error, load)]));
     }
   };
 
@@ -152,7 +152,7 @@ export function pollsDetail(ctx) {
         onClick: () => close(),
       }, 'Close it'));
     }
-    actions.replaceChildren(...tools);
+    replaceChildren(actions, ...tools);
   };
 
   // Closing a poll records the result it had and stops the votes. Only the
@@ -176,7 +176,7 @@ export function pollsDetail(ctx) {
   };
 
   const paintHead = () => {
-    head.replaceChildren(
+    replaceChildren(head, 
       el('h2', { class: 'pagehead-title' }, poll.question),
       el('p', { class: 'form-note' },
         (POLL_SCORING_LABELS[poll.scoring] || poll.scoring)
@@ -193,7 +193,7 @@ export function pollsDetail(ctx) {
   const paintChoices = () => {
     const options = poll.options || [];
     if (!canPost || poll.status === 'closed') {
-      choices.replaceChildren(el('p', { class: 'form-note' },
+      replaceChildren(choices, el('p', { class: 'form-note' },
         poll.status === 'closed'
           ? 'This poll is closed. The result it recorded is below.'
           : 'Voting needs the permission to post in this community.'));
@@ -220,7 +220,7 @@ export function pollsDetail(ctx) {
             })),
         }));
       });
-      choices.replaceChildren(list, el('div', { class: 'actionline' },
+      replaceChildren(choices, list, el('div', { class: 'actionline' },
         el('button', {
           class: 'btn btn--primary btn--sm', type: 'button',
           onClick: () => vote(order),
@@ -255,7 +255,7 @@ export function pollsDetail(ctx) {
         title: option.label,
       }));
     }
-    choices.replaceChildren(list, el('div', { class: 'actionline' },
+    replaceChildren(choices, list, el('div', { class: 'actionline' },
       el('button', {
         class: 'btn btn--primary btn--sm', type: 'button',
         onClick: () => vote(ballot),
@@ -292,7 +292,7 @@ export function pollsDetail(ctx) {
 
   const paintResults = () => {
     if (resultsError) {
-      outcome.replaceChildren(memo({
+      replaceChildren(outcome, memo({
         tone: 'info',
         title: 'The results are not visible yet',
         text: resultsError,
@@ -300,7 +300,7 @@ export function pollsDetail(ctx) {
       return;
     }
     if (!results || !results.results) {
-      outcome.replaceChildren(el('p', { class: 'form-note' }, 'No result has been recorded.'));
+      replaceChildren(outcome, el('p', { class: 'form-note' }, 'No result has been recorded.'));
       return;
     }
     const tally = results.results;
@@ -316,7 +316,7 @@ export function pollsDetail(ctx) {
       cells.push({ value: tally.quorum.met ? 'met' : 'not met', label: 'quorum' });
     }
 
-    outcome.replaceChildren(fold([
+    replaceChildren(outcome, fold([
       facts(cells),
       el('p', { class: 'form-note' },
         poll.scoring === 'ranked'
@@ -353,19 +353,19 @@ export function pollsDetail(ctx) {
   const paintVoters = () => {
     // An anonymous poll names nobody, before the close and after it.
     if (poll.isAnonymous) {
-      voters.replaceChildren(el('p', { class: 'form-note' },
+      replaceChildren(voters, el('p', { class: 'form-note' },
         'This poll is anonymous. It names nobody, before it closes or after.'));
       return;
     }
     const rows = results && results.results ? (results.results.voters || []) : [];
     if (!rows.length) {
-      voters.replaceChildren(el('p', { class: 'form-note' },
+      replaceChildren(voters, el('p', { class: 'form-note' },
         resultsError
           ? 'The voters are not visible until the poll closes.'
           : 'Nobody has voted yet.'));
       return;
     }
-    voters.replaceChildren(...rows.map((entry) => row({
+    replaceChildren(voters, ...rows.map((entry) => row({
       lead: el('span', { class: 'role-dot' }, icon('user', { size: 15 })),
       title: entry.displayName || entry.username || 'A member',
       sub: (entry.choices || [])
@@ -375,7 +375,7 @@ export function pollsDetail(ctx) {
   };
 
   const loadResults = async () => {
-    outcome.replaceChildren(hold('Reading the result'));
+    replaceChildren(outcome, hold('Reading the result'));
     try {
       results = await Workspace.pollResults(serverId, pollId);
       resultsError = null;
@@ -394,7 +394,7 @@ export function pollsDetail(ctx) {
   };
 
   const load = async () => {
-    head.replaceChildren(hold('Opening the poll'));
+    replaceChildren(head, hold('Opening the poll'));
     try {
       poll = await Workspace.poll(serverId, pollId);
       ballot = [];
@@ -403,7 +403,7 @@ export function pollsDetail(ctx) {
       paintChoices();
       await loadResults();
     } catch (error) {
-      head.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(head, fold([fault(error, load)]));
     }
   };
 
@@ -452,7 +452,7 @@ function openPollEditor(serverId, onDone, poll) {
     anonymous.checked = !!editing.isAnonymous;
   }
   const paintAnswers = () => {
-    options.replaceChildren(...answers.map((answer, index) => {
+    replaceChildren(options, ...answers.map((answer, index) => {
       const field = el('input', {
         class: 'input', type: 'text', maxlength: '255', 'aria-label': 'Option ' + (index + 1),
       });

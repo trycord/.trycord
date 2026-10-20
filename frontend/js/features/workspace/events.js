@@ -19,7 +19,7 @@
 //
 // Creating an event needs MANAGE_CHANNELS; answering one needs SEND_MESSAGES.
 
-import { el } from '../../../packages/dom.js';
+import { el, replaceChildren } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { card, row, blank, fault, fold, hold, facts } from '../../ui/page.js';
 import { openDialog, toast, errorToast } from '../../ui/overlays.js';
@@ -55,10 +55,10 @@ export function eventsList(ctx) {
   });
 
   const load = async () => {
-    host.replaceChildren(hold('Reading the events'));
+    replaceChildren(host, hold('Reading the events'));
     try {
       const events = await Workspace.events(serverId);
-      host.replaceChildren(...(events.length
+      replaceChildren(host, ...(events.length
         ? events.map((event) => row({
           lead: el('span', { class: 'role-dot' }, icon('calendar', { size: 15 })),
           title: event.title,
@@ -73,7 +73,7 @@ export function eventsList(ctx) {
           text: 'An event is something the community does at a time.',
         })]));
     } catch (error) {
-      host.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(host, fold([fault(error, load)]));
     }
   };
 
@@ -127,7 +127,7 @@ export function eventsDetail(ctx) {
 
   const paintHead = () => {
     const zone = event.timezone || 'UTC';
-    head.replaceChildren(
+    replaceChildren(head, 
       el('h2', { class: 'pagehead-title' }, event.title),
       event.description ? el('p', { class: 'form-note' }, event.description) : null,
       el('p', { class: 'form-note' },
@@ -147,7 +147,7 @@ export function eventsDetail(ctx) {
 
   const paintCounts = () => {
     const tally = attendanceCounts(attendance);
-    counts.replaceChildren(facts([
+    replaceChildren(counts, facts([
       { value: String(tally.going), label: 'going' },
       { value: String(tally.maybe), label: 'maybe' },
       { value: String(tally.declined), label: 'not going' },
@@ -157,13 +157,13 @@ export function eventsDetail(ctx) {
   const paintPeople = () => {
     const rows = attendanceRows(attendance);
     if (!rows.length) {
-      people.replaceChildren(el('p', { class: 'form-note' },
+      replaceChildren(people, el('p', { class: 'form-note' },
         attendance && attendance.attendanceVisibility === 'organisers'
           ? 'The names are not shown for this event. The counts above are what everybody sees.'
           : 'Nobody has answered yet.'));
       return;
     }
-    people.replaceChildren(...rows.map((entry) => row({
+    replaceChildren(people, ...rows.map((entry) => row({
       lead: el('span', { class: 'role-dot' }, icon('user', { size: 15 })),
       title: entry.displayName || entry.username || 'A member',
       sub: RSVP_LABELS[entry.status] || entry.status,
@@ -173,11 +173,11 @@ export function eventsDetail(ctx) {
 
   const paintRsvp = () => {
     if (!canPost) {
-      rsvp.replaceChildren(el('p', { class: 'form-note' },
+      replaceChildren(rsvp, el('p', { class: 'form-note' },
         'Answering an event needs the permission to post in this community.'));
       return;
     }
-    rsvp.replaceChildren(el('div', { class: 'rowtools' },
+    replaceChildren(rsvp, el('div', { class: 'rowtools' },
       ...RSVP_STATUSES.map((status) => el('button', {
         class: 'btn btn--sm ' + (mine && mine.status === status ? 'btn--primary' : 'btn--ghost'),
         type: 'button',
@@ -210,19 +210,19 @@ export function eventsDetail(ctx) {
       paintPeople();
       paintRsvp();
     } catch (error) {
-      people.replaceChildren(fold([fault(error, loadAttendance)]));
+      replaceChildren(people, fold([fault(error, loadAttendance)]));
     }
   };
 
   const load = async () => {
-    head.replaceChildren(hold('Opening the event'));
+    replaceChildren(head, hold('Opening the event'));
     try {
       event = await Workspace.event(serverId, eventId);
       paintHead();
       paintRsvp();
       await loadAttendance();
     } catch (error) {
-      head.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(head, fold([fault(error, load)]));
     }
   };
 
