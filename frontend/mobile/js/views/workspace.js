@@ -517,6 +517,7 @@ export function renderDocument(ctx) {
       items: [
         { label: 'Paragraph', icon: 'file', onSelect: () => { blocks.push({ type: 'paragraph', text: '' }); paint(); } },
         { label: 'Heading', icon: 'edit', onSelect: () => { blocks.push({ type: 'heading', level: 2, text: '' }); paint(); } },
+        { label: 'Title', icon: 'edit', onSelect: () => { blocks.push({ type: 'heading', level: 1, text: '' }); paint(); } },
         { label: 'List', icon: 'list', onSelect: () => { blocks.push({ type: 'list', ordered: false, items: [''] }); paint(); } },
         { label: 'Quotation', icon: 'chat', onSelect: () => { blocks.push({ type: 'quote', text: '' }); paint(); } },
         { label: 'Note', icon: 'alert', onSelect: () => { blocks.push({ type: 'note', kind: 'info', text: '' }); paint(); } },
@@ -1064,7 +1065,8 @@ function blockNode(block) {
   switch (block.type) {
     case 'heading':
       return el('div', { class: 'm-heading' },
-        el('h2', { class: 'm-heading__title' }, block.text));
+        el(block.level === 1 ? 'h1' : (block.level === 3 ? 'h3' : 'h2'),
+          { class: 'm-heading__title' }, block.text));
     case 'lead':
       return el('p', { class: 'm-lede' }, block.text);
     case 'paragraph':

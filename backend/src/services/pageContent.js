@@ -155,7 +155,12 @@ function normaliseBlock(raw) {
 
   switch (type) {
     case 'heading': {
-      const level = Number(raw.level) === 3 ? 3 : 2;
+      // A heading is level one, two or three. Level one is the most ordinary
+      // heading there is - a person writes "# Title" - and a server that
+      // quietly turned it into level two made the source and the stored
+      // document disagree about what the writer had typed.
+      const wanted = Number(raw.level);
+      const level = wanted === 1 || wanted === 3 ? wanted : 2;
       const text = str(raw.text, 200, 'heading text').trim();
       if (!text) fail('a heading needs text');
       return { type, level, text };

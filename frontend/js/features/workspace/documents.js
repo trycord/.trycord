@@ -397,7 +397,8 @@ export function documentsDetail(ctx) {
     switch (block.type) {
       case 'heading': {
         const level = el('select', { class: 'select', 'aria-label': 'The level of the heading' },
-          el('option', { value: '2', selected: block.level !== 3 }, 'Heading'),
+          el('option', { value: '1', selected: block.level === 1 }, 'Title'),
+          el('option', { value: '2', selected: block.level !== 1 && block.level !== 3 }, 'Heading'),
           el('option', { value: '3', selected: block.level === 3 }, 'Subheading'));
         level.addEventListener('change', () => write(index, { level: Number(level.value) }));
         fields.appendChild(el('div', { class: 'pageblock-row' }, level,
@@ -863,7 +864,7 @@ export function documentsDetail(ctx) {
 export function blockNode(block) {
   switch (block.type) {
     case 'heading':
-      return el(block.level === 3 ? 'h3' : 'h2', {}, block.text);
+      return el(block.level === 1 ? 'h1' : (block.level === 3 ? 'h3' : 'h2'), {}, block.text);
     case 'lead':
       return el('p', { class: 'lede' }, block.text);
     case 'paragraph':
