@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { installDomStub, installFetchStub } from './helpers/dom-stub.js';
+import { installDomStub, installFetchStub, waitFor } from './helpers/dom-stub.js';
 
 installDomStub();
 
@@ -118,15 +118,17 @@ test('the palette and the search panel read the same query', async () => {
   assert.ok(input, 'the palette has no search field');
   input.value = 'from:ada release';
   input.dispatch('input', {});
-  await wait(320);
 
   // The palette keeps the filters as filters and says so.
-  const chips = find(palette.element, classed('palette-item-hint')).map((node) => node.textContent);
-  assert.ok(chips.some((text) => String(text).indexOf('from:ada') !== -1),
-    'the palette did not show the filter it had read');
+  const chips = await waitFor(() => {
+    const found = find(palette.element, classed('palette-item-hint'))
+      .map((node) => node.textContent);
+    return found.some((text) => String(text).indexOf('from:ada') !== -1) ? found : null;
+  });
+  assert.ok(chips, 'the palette did not show the filter it had read');
 
   // And the search it runs carries the whole query, filters and all.
-  const asked = calls.find((call) => call.url.indexOf('/api/search?') !== -1);
+  const asked = await waitFor(() => calls.find((call) => call.url.indexOf('/api/search?') !== -1));
   assert.ok(asked, 'the palette did not search');
   assert.match(asked.url, /from%3Aada/);
 
@@ -161,11 +163,13 @@ test('the saved searches are listed', async () => {
 
   const page = renderSearch({ page: { id: 'search' }, query: new URLSearchParams(), params: {}, rest: [] });
   await page.onMount();
-  await wait(20);
 
-  const text = page.node.textContent || '';
-  assert.match(text, /Ada on releases/, 'the saved searches were not drawn');
-  assert.match(text, /Files/);
+  const drawn = await waitFor(() => {
+    const text = page.node.textContent || '';
+    return text.indexOf('Ada on releases') !== -1 ? text : null;
+  });
+  assert.ok(drawn, 'the saved searches were not drawn');
+  assert.match(drawn, /Files/);
 });
 
 test('a search is saved from the query that is in front of the reader', async () => {
@@ -173,7 +177,7 @@ test('a search is saved from the query that is in front of the reader', async ()
   const calls = installFetchStub({
     'http://localhost/api/search/saved': { json: [] },
     'http://localhost/api/search/history': { json: [] },
-    'http://localhost/api/search?q=from%3Aada+release&limit=25': { json: [] },
+    'http://localhost/api/search?q=release+from%3Aada&limit=25': { json: [] },
   });
 
   const page = renderSearch({
@@ -183,24 +187,26 @@ test('a search is saved from the query that is in front of the reader', async ()
     rest: [],
   });
   await page.onMount();
-  await wait(20);
 
-  const save = find(page.node, (node) => node.tagName === 'BUTTON'
-    && String(node.textContent).indexOf('Save this search') !== -1)[0];
+  const save = await waitFor(() => find(page.node, (node) => node.tagName === 'BUTTON'
+    && String(node.textContent).indexOf('Save this search') !== -1)[0]);
   assert.ok(save, 'there is no way to save the search');
   save.click();
-  await wait(20);
 
-  const dialog = find(document.body, classed('dialog'))[0];
-  assert.ok(dialog, 'saving a search opened no dialog');
+  const form = await waitFor(() => {
+    const dialog = find(document.body, classed('dialog'))
+      .filter((node) => String(node.textContent).indexOf('Save this search') !== -1)[0];
+    if (!dialog) return null;
+    return find(dialog, (node) => node.tagName === 'FORM')[0];
+  });
+  assert.ok(form, 'saving a search opened no dialog');
+  const dialog = form.parentNode;
   const name = find(dialog, (node) => node.tagName === 'INPUT')[0];
   name.value = 'Ada on releases';
-  const form = find(dialog, (node) => node.tagName === 'FORM')[0];
-  assert.ok(form, 'the dialog has no form to submit');
   form.submit();
-  await wait(30);
 
-  const posted = calls.find((call) => call.url.indexOf('/api/search/saved') !== -1 && call.options.method === 'POST');
+  const posted = await waitFor(() => calls.find((call) => call.url.indexOf('/api/search/saved') !== -1
+    && call.options.method === 'POST'));
   assert.ok(posted, 'the search was never saved');
   assert.deepEqual(posted.body, { name: 'Ada on releases', query: 'release from:ada' });
 });
