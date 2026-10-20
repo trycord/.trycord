@@ -108,25 +108,43 @@ function loginForm() {
 function legalAcceptance() {
   const accepted = el('input', { type: 'checkbox', class: 'm-check' });
   const versions = el('span', { class: 'm-auth__legal-version' });
+  const state = el('span', { class: 'm-auth__legal-state' });
   const label = el('label', { class: 'm-check-row m-auth__legal' },
     accepted,
     el('span', {},
-      'I accept the ',
-      el('a', { href: publicPath('/terms') }, 'Terms of Service'),
-      ' and the ',
-      el('a', { href: publicPath('/privacy') }, 'Privacy Policy'),
-      '. ',
-      versions));
+      el('span', { class: 'm-auth__legal-title' },
+        'I accept the ',
+        el('a', { href: publicPath('/terms'), target: '_blank', rel: 'noopener' }, 'Terms of Service'),
+        ' and the ',
+        el('a', { href: publicPath('/privacy'), target: '_blank', rel: 'noopener' }, 'Privacy Policy')),
+      el('span', { class: 'm-auth__legal-meta' }, versions, ' ', state)));
+
+  // A block of its own, above the fields. On a phone the bottom of a form is
+  // below the fold, and a control a reader cannot do without has to be where
+  // they can see it.
+  const block = el('section', { class: 'm-auth__legal-block' },
+    el('p', { class: 'm-eyebrow' }, 'Before you can join'),
+    el('p', { class: 'm-lede' },
+      'This instance runs on its own rules, and an account here is bound by them. '
+      + 'Read both documents, then accept them.'),
+    label);
 
   const paintVersions = () => {
     const legal = State.legal;
     versions.textContent = legal && legal.termsVersion
-      ? '(Terms v' + legal.termsVersion + ', Privacy v' + legal.privacyVersion + ')'
-      : '(this instance has not said which version is in force)';
+      ? 'Terms v' + legal.termsVersion + ', Privacy v' + legal.privacyVersion + '.'
+      : 'This instance has not said which version is in force.';
   };
+  const paintState = () => {
+    const on = !!accepted.checked;
+    state.textContent = on ? 'Accepted.' : 'Not accepted yet.';
+    block.classList.toggle('is-accepted', on);
+  };
+  accepted.addEventListener('change', paintState);
   paintVersions();
+  paintState();
 
-  return { accepted, label, paintVersions };
+  return { accepted, label, block, paintVersions, paintState };
 }
 
 function registerForm() {
@@ -139,15 +157,25 @@ function registerForm() {
   const form = el('form', { class: 'm-auth__form' },
     el('p', { class: 'm-auth__instance' },
       'Joining ', el('strong', {}, TrycordConfig.backendUrl())),
+    legal.block,
     field({ label: 'Username', control: username }),
     field({ label: 'Display name', control: display }),
     field({ label: 'Email (optional)', control: email }),
     field({ label: 'Password', control: password }),
-    legal.label,
     submit);
 
-  // The form cannot be sent until the documents are accepted.
-  const syncSubmit = () => { submit.disabled = !legal.accepted.checked; };
+  // The form cannot be sent until the documents are accepted, and the button
+  // says why: a disabled control with no reason is the control everybody
+  // works around.
+  const submitNote = el('p', { class: 'm-auth__submit-note' });
+  submit.insertAdjacentElement('afterend', submitNote);
+  const syncSubmit = () => {
+    submit.disabled = !legal.accepted.checked;
+    submitNote.textContent = legal.accepted.checked
+      ? ''
+      : 'Accept the Terms of Service and the Privacy Policy to create an account.';
+    legal.paintState();
+  };
   legal.accepted.addEventListener('change', syncSubmit);
   syncSubmit();
 

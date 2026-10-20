@@ -614,6 +614,9 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .badge--danger { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 .badge--success { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); }
 .badge--warning { background: color-mix(in srgb, var(--warning) 16%, transparent); color: var(--warning); }
+/* A state the server has not answered yet. It is not a warning: nothing is
+   wrong, nothing is known, and the badge says so without claiming otherwise. */
+.badge--muted { background: var(--panel-3); color: var(--text-3); }
 
 .count-badge {
   min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--radius-pill);
@@ -656,6 +659,12 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .menu {
   position: fixed; z-index: var(--z-menu);
   min-width: 204px; max-height: min(420px, calc(100vh - 24px)); overflow-y: auto;
+  /* Scrolling the menu must not scroll the page behind it. A scroll that
+     reaches the document is a scroll of the window, and the window's scroll
+     closes the menu - so a menu whose items overflowed could be neither
+     scrolled nor left open. */
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   padding: 5px; background: var(--raised);
   border: 1px solid var(--line-2); border-radius: var(--radius-md);
   box-shadow: var(--shadow-3);
@@ -2847,13 +2856,31 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 
 /* -- accepting the documents ------------------------------------------------- */
 /* The acceptance control on the registration form: the checkbox, the links to
-   the two documents, and the versions that are being accepted. */
+   the two documents, and the versions that are being accepted.
+   It is a block of its own rather than a line at the bottom of a long form,
+   because it is the one control on the form a reader cannot do without. */
 
-.gate-legal {
-  align-items: flex-start;
-  margin-top: var(--space-2);
-  color: var(--text-2);
-  line-height: 1.5;
+.gate-legal-block {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-2); border-radius: var(--radius-md);
+  background: var(--panel-2);
 }
+.gate-legal-block.is-accepted { border-color: color-mix(in srgb, var(--success) 40%, var(--line-2)); }
+.gate-legal-heading {
+  margin: 0; font-size: var(--fs-sm); font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-3);
+}
+.gate-legal-lede { margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.55; }
+.gate-legal { align-items: flex-start; margin-top: var(--space-1); color: var(--text-1); line-height: 1.5; }
 .gate-legal a { color: var(--brand); text-decoration: underline; text-underline-offset: 2px; }
-.gate-legal-version { color: var(--text-3); font-size: var(--fs-meta); }
+.gate-legal-text { display: flex; flex-direction: column; gap: 2px; }
+.gate-legal-title { font-weight: var(--weight-medium); }
+.gate-legal-meta { color: var(--text-3); font-size: var(--fs-meta); }
+.gate-legal-version.is-missing { color: var(--warning); }
+.gate-legal-state { font-weight: var(--weight-medium); }
+.gate-legal-block.is-accepted .gate-legal-state { color: var(--success); }
+
+/* The reason the button is closed. A disabled control with no reason is the
+   control everybody works around. */
+.gate-submit-note { margin: var(--space-2) 0 0; font-size: var(--fs-meta); color: var(--text-3); text-align: center; }
