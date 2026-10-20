@@ -258,7 +258,10 @@ export function adminPageEditor() {
       { value: current.publishedAt ? String(current.publishedAt) : '—', label: 'published' },
     ];
     const outstanding = current.outstandingFields || [];
-    metaHost.replaceChildren(
+    // The second child is nothing when there is nothing outstanding, and
+    // `replaceChildren` renders a null argument as the text "null". So the
+    // children are filtered rather than passed as they are.
+    const metaChildren = [
       facts(facts_),
       outstanding.length
         ? memo({
@@ -267,7 +270,8 @@ export function adminPageEditor() {
           text: outstanding.join(' · '),
         })
         : null,
-    );
+    ].filter(Boolean);
+    metaHost.replaceChildren(...metaChildren);
   };
 
   // -- the blocks ------------------------------------------------------------
@@ -606,7 +610,7 @@ export function adminPageEditor() {
         // The table is a table, so the columns line up: the headings, the
         // control that takes a column away under each of them, and a row for
         // every line of the table.
-        const grid = el('table');
+        const grid = el('table', { class: 'pageblock-table' });
         const headingRow = el('tr');
         headers.forEach((heading, column) => {
           const field = el('input', {

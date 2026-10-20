@@ -548,6 +548,18 @@ const Api = {
   pageRevisions: (route, limit) =>
     request('GET', '/api/admin/pages/' + encodeURIComponent(route) + '/revisions'
       + (limit ? '?limit=' + encodeURIComponent(limit) : '')),
+  // What changed between two revisions. The server answers, because the
+  // server holds the revisions and knows the block model; the client only
+  // shows the report.
+  comparePageRevisions: (route, from, to) =>
+    request('GET', '/api/admin/pages/' + encodeURIComponent(route) + '/revisions/compare'
+      + '?from=' + encodeURIComponent(String(from)) + '&to=' + encodeURIComponent(String(to))),
+  // The library of reusable blocks, which lives on the instance rather than in
+  // the browser, so two administrators share it.
+  pageBlocks: () => request('GET', '/api/admin/pages/blocks'),
+  createPageBlock: (body) => request('POST', '/api/admin/pages/blocks', { body }),
+  updatePageBlock: (id, body) => request('PUT', '/api/admin/pages/blocks/' + encodeURIComponent(id), { body }),
+  deletePageBlock: (id) => request('DELETE', '/api/admin/pages/blocks/' + encodeURIComponent(id)),
   restorePageRevision: (route, revision) =>
     request('POST', '/api/admin/pages/' + encodeURIComponent(route) + '/revisions/' + encodeURIComponent(revision) + '/restore'),
   mailConsole: () => request('GET', '/api/admin/mail'),

@@ -2384,6 +2384,65 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   padding: var(--space-3) var(--space-4);
   overflow-x: auto;
 }
+/* The blocks the server's renderer emits for the newer block types. The
+   picture, the table and the quotation's attribution each carry a class the
+   renderer puts there, so the preview and the published page can be told
+   apart from ordinary prose. */
+.page-preview figure.page-image { margin: var(--space-4) 0; }
+.page-preview figure.page-image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+}
+.page-preview footer.page-quote-source {
+  color: var(--text-3);
+  font-size: var(--fs-meta);
+  margin-top: var(--space-2);
+}
+.page-preview table.page-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-4) 0;
+  font-size: var(--fs-sm);
+}
+.page-preview table.page-table caption {
+  text-align: left;
+  color: var(--text-3);
+  font-size: var(--fs-meta);
+  padding-bottom: var(--space-2);
+}
+.page-preview table.page-table th,
+.page-preview table.page-table td {
+  border: 1px solid var(--line);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  vertical-align: top;
+}
+.page-preview table.page-table th {
+  background: var(--panel-3);
+  color: var(--text-1);
+  font-weight: var(--weight-semibold);
+}
+.page-preview pre.page-code code { font-family: var(--mono); font-size: var(--fs-sm); }
+
+/* The table editor's grid. A real table, so the columns line up; the rule is
+   what makes it look like an editor rather than a spreadsheet. */
+.pageblock-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-2) 0;
+  font-size: var(--fs-sm);
+}
+.pageblock-table th,
+.pageblock-table td {
+  border: 1px solid var(--line);
+  padding: var(--space-2);
+  vertical-align: top;
+}
+.pageblock-table th { background: var(--panel-3); color: var(--text-1); font-weight: var(--weight-semibold); }
+.pageblock-table th .input, .pageblock-table td .input { width: 100%; }
 .page-preview .draft-note {
   background: var(--panel-3);
   border: 1px solid var(--line-2);

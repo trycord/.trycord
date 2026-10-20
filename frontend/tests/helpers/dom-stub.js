@@ -326,4 +326,20 @@ export function installFetchStub(routes) {
   return calls;
 }
 
-export default { installDomStub, installFetchStub };
+// Wait for a condition to hold, rather than for a fixed time.
+//
+// A test that sleeps for a fixed number of milliseconds passes on an idle
+// machine and fails on a busy one, which is a test that reports on the
+// machine rather than on the client.
+export async function waitFor(predicate, timeout = 3000) {
+  const started = Date.now();
+  for (;;) {
+    let value = null;
+    try { value = predicate(); } catch { /* the condition is not true yet */ }
+    if (value) return value;
+    if (Date.now() - started > timeout) return null;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+export default { installDomStub, installFetchStub, waitFor };

@@ -72,9 +72,14 @@ function showError(form, error, action) {
   const node = form.querySelector('.form-error');
   if (!node) return;
   node.hidden = false;
+  // The children are filtered rather than passed as they are:
+  // `replaceChildren` renders a null argument as the text "null", and a sign-in
+  // form that says "null" under the message is a bug somebody will report.
   node.replaceChildren(
-    el('span', {}, (error && error.message) || 'Something went wrong.'),
-    action || null,
+    ...[
+      el('span', {}, (error && error.message) || 'Something went wrong.'),
+      action || null,
+    ].filter(Boolean),
   );
 }
 
