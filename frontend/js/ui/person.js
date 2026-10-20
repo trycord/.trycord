@@ -16,6 +16,7 @@ import { avatar } from './primitives.js';
 import { State, nameOf, friendshipWith, normalizeUser } from '../../packages/store.js';
 import { navigate } from '../../packages/nav.js';
 import Api from '../../packages/api.js';
+import { roleChips } from '../../packages/roles.js';
 
 export function isSelf(user) {
   return !!(user && State.user && String(user.id) === String(State.user.id));
@@ -170,9 +171,16 @@ export async function personSheetEntries(raw, options) {
   const items = [];
   if (!user || user.id === undefined || user.id === null) return items;
 
+  // The roles, in the colours the community gave them.
+  //
+  // The sheet is the one place a person is described in full, and it said
+  // only their name. The roles are known by the caller - the roster has
+  // them, and the sheet is drawn from the roster.
+  const roles = (opts.roles && opts.roles.length) ? opts.roles : (user.roles || []);
   items.push({
     header: nameOf(user) + (isSelf(user) ? ' (you)' : ''),
     lead: avatar(user, { size: 'sm' }),
+    sub: roles.length ? roleChips({ roles }) : null,
   });
 
   if (isSelf(user)) {

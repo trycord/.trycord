@@ -39,6 +39,43 @@ function member(id, username) {
   return { id, username, display_name: username, nickname: null, is_owner: false, roles: [] };
 }
 
+test('the roster shows the roles, in the colours the community gave them', async () => {
+  // The roster answered with the roles of every member, and the row read a
+  // field that was never there - so a member's roles were never shown at
+  // all, and the colour of a role was a colour nothing drew.
+  installFetchStub({
+    [BASE + '?limit=50']: {
+      json: {
+        items: [
+          {
+            id: 'm1', username: 'ada', display_name: 'Ada Lovelace',
+            nickname: null, is_owner: false,
+            roles: [
+              { id: 'r1', name: 'Maintainer', color: '#ff8a24' },
+              { id: 'r2', name: 'Member', color: null },
+            ],
+          },
+        ],
+        total: 1, hasMore: false, limit: 25, offset: 0,
+      },
+    },
+  });
+
+  const list = memberList(SERVER_ID);
+  await list.load();
+
+  const chips = find(list.node, classed('role-chip'));
+  assert.ok(chips.length, 'the member\'s roles are not shown');
+
+  const names = find(list.node, classed('role-name')).map((node) => node.textContent);
+  assert.deepEqual(names, ['Maintainer', 'Member'], 'the roles are not the ones the roster answered with');
+
+  // The colour is on the element, and the stylesheet draws it from there.
+  const coloured = find(list.node, classed('role-name'))[0];
+  assert.equal(coloured.style.getPropertyValue('--role-colour'), '#ff8a24',
+    'the role is not drawn in the colour the community gave it');
+});
+
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

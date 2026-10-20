@@ -6,7 +6,7 @@
 // is read from the same permission the server sent with the community, so a
 // control that would be refused is never drawn.
 
-import { el, clear } from '../../../packages/dom.js';
+import { clear, el, replaceChildren } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar, serverMark, empty, loading, failure } from '../components.js';
 import {
@@ -223,11 +223,11 @@ export function renderChannelPins(ctx) {
   const node = screen(host);
 
   async function load() {
-    host.replaceChildren(loading('Loading pinned messages'));
+    replaceChildren(host, loading('Loading pinned messages'));
     try {
       const pins = await Api.listPins(serverId, channel.id);
       const list = Array.isArray(pins) ? pins : (pins.messages || []);
-      host.replaceChildren();
+      replaceChildren(host);
       if (!list.length) {
         host.appendChild(empty({ icon: 'pin', title: 'Nothing pinned', text: 'Pin a message from its menu to keep it here.' }));
         return;
@@ -246,7 +246,7 @@ export function renderChannelPins(ctx) {
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Pinned in ' + (channel.name || 'this channel'))), rows));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   }
 
@@ -416,10 +416,10 @@ function membersScreen(serverId, title, sub) {
   let loading = false;
 
   function paint() {
-    list.replaceChildren();
+    replaceChildren(list);
     for (const item of items) list.appendChild(memberRow(serverId, item, load));
     note.textContent = total ? items.length + ' of ' + total : String(items.length);
-    more.replaceChildren(hasMore
+    replaceChildren(more, hasMore
       ? el('button', { class: 'm-btn m-btn--block m-btn--ghost', type: 'button', onClick: () => loadMore() }, 'Load more members')
       : null);
   }
@@ -438,8 +438,8 @@ function membersScreen(serverId, title, sub) {
 
   async function load() {
     loading = true;
-    list.replaceChildren(loading('Reading the roster'));
-    more.replaceChildren();
+    replaceChildren(list, loading('Reading the roster'));
+    replaceChildren(more);
     try {
       const page = await fetchPage(0);
       items.length = 0;
@@ -449,7 +449,7 @@ function membersScreen(serverId, title, sub) {
       paint();
       refreshPresence(items.map((item) => item.id)).catch(() => {});
     } catch (error) {
-      list.replaceChildren(failure(error, load));
+      replaceChildren(list, failure(error, load));
     } finally {
       loading = false;
     }
@@ -458,7 +458,7 @@ function membersScreen(serverId, title, sub) {
   async function loadMore() {
     if (loading || !hasMore) return;
     loading = true;
-    more.replaceChildren(el('div', { class: 'm-loading' }, 'Reading more'));
+    replaceChildren(more, el('div', { class: 'm-loading' }, 'Reading more'));
     try {
       const page = await fetchPage(items.length);
       for (const item of page.items) {
@@ -469,7 +469,7 @@ function membersScreen(serverId, title, sub) {
       paint();
       refreshPresence(page.items.map((item) => item.id)).catch(() => {});
     } catch (error) {
-      more.replaceChildren(failure(error, loadMore));
+      replaceChildren(more, failure(error, loadMore));
     } finally {
       loading = false;
     }
@@ -504,11 +504,11 @@ function rolesScreen(serverId) {
   }, 'New role');
 
   async function load() {
-    host.replaceChildren(loading('Loading roles'));
+    replaceChildren(host, loading('Loading roles'));
     try {
       await refreshServerRoles(serverId);
       const roles = State.serverRoles.get(serverId) || [];
-      host.replaceChildren();
+      replaceChildren(host);
       if (!roles.length) {
         host.appendChild(empty({ icon: 'shield', title: 'No roles', text: 'Every community has at least one role.' }));
         return;
@@ -527,7 +527,7 @@ function rolesScreen(serverId) {
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Roles'), newButton), list));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   }
 
@@ -597,11 +597,11 @@ function invitesScreen(serverId) {
   }, 'New invite');
 
   async function load() {
-    host.replaceChildren(loading('Loading invites'));
+    replaceChildren(host, loading('Loading invites'));
     try {
       const invites = await Api.invites(serverId);
       const list = Array.isArray(invites) ? invites : (invites.invites || []);
-      host.replaceChildren();
+      replaceChildren(host);
       if (!list.length) {
         host.appendChild(empty({ icon: 'mail', title: 'No invites', text: 'Make one and share the code.' }));
         return;
@@ -622,7 +622,7 @@ function invitesScreen(serverId) {
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Invites'), newButton), rows));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   }
 
@@ -675,13 +675,13 @@ function categoriesScreen(serverId) {
   }, 'New category');
 
   async function load() {
-    host.replaceChildren(loading('Loading categories'));
+    replaceChildren(host, loading('Loading categories'));
     try {
       await refreshServerTree(serverId);
       const channels = channelsOf(serverId);
       const categories = (State.serverTree.get(serverId) ? (State.serverTree.get(serverId).categories || []) : [])
         .map((category) => ({ ...category, count: channels.filter((c) => c.category_id === category.id).length }));
-      host.replaceChildren();
+      replaceChildren(host);
       if (!categories.length) {
         host.appendChild(empty({ icon: 'layers', title: 'No categories', text: 'Group channels to keep the list short.' }));
         return;
@@ -703,7 +703,7 @@ function categoriesScreen(serverId) {
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Categories'), newButton), list));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   }
 
@@ -722,11 +722,11 @@ function channelsSection(serverId) {
   }, 'New channel');
 
   async function load() {
-    host.replaceChildren(loading('Loading channels'));
+    replaceChildren(host, loading('Loading channels'));
     try {
       await refreshServerTree(serverId, { force: true });
       const channels = sortedSiblings(serverId);
-      host.replaceChildren();
+      replaceChildren(host);
       if (!channels.length) {
         host.appendChild(empty({ icon: 'hash', title: 'No channels', text: 'Make one so people can talk.' }));
         return;
@@ -748,7 +748,7 @@ function channelsSection(serverId) {
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Channels'), newButton), list));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   }
 
@@ -804,10 +804,10 @@ export function renderCommunitySettings(ctx) {
     for (const button of strip.children) button.classList.toggle('is-active', button.textContent === labelOf(id));
     for (const button of strip.children) button.setAttribute('aria-selected', button.textContent === labelOf(id) ? 'true' : 'false');
     if (current && current.cleanup) current.cleanup();
-    host.replaceChildren(loading('Loading'));
+    replaceChildren(host, loading('Loading'));
     const section = builders()[id]();
     current = section;
-    host.replaceChildren(section.node);
+    replaceChildren(host, section.node);
     if (section.load) section.load();
   }
 
@@ -881,7 +881,7 @@ function appearanceSection(serverId) {
   const host = el('div', { class: 'm-stack' });
   const build = () => {
     const server = serverById(serverId) || {};
-    host.replaceChildren();
+    replaceChildren(host);
     const iconPreview = el('div', { class: 'm-media-preview' }, serverMark(server, { size: 'lg' }));
     const bannerPreview = el('div', { class: 'm-media-preview m-media-preview--wide' });
     if (server.banner_url) {
@@ -929,11 +929,11 @@ async function removeServerImage(serverId, kind, done) {
 function moderationSection(serverId) {
   const host = el('div', { class: 'm-stack' });
   async function load() {
-    host.replaceChildren(loading('Loading bans'));
+    replaceChildren(host, loading('Loading bans'));
     try {
       const out = await Api.bans(serverId);
       const bans = Array.isArray(out) ? out : (out.bans || out.items || []);
-      host.replaceChildren();
+      replaceChildren(host);
       if (!bans.length) {
         host.appendChild(empty({ icon: 'ban', title: 'Nobody is banned', text: 'People you ban appear here, and can be unbanned.' }));
         return;
@@ -957,7 +957,7 @@ function moderationSection(serverId) {
       }
       host.appendChild(el('section', { class: 'm-section' }, el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Banned')), list));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   }
   return { node: host, load };
@@ -971,11 +971,11 @@ function integrationsSection(serverId) {
   }, 'New webhook');
 
   async function load() {
-    host.replaceChildren(loading('Loading webhooks'));
+    replaceChildren(host, loading('Loading webhooks'));
     try {
       const out = await Api.webhooks(serverId);
       const hooks = Array.isArray(out) ? out : (out.webhooks || []);
-      host.replaceChildren();
+      replaceChildren(host);
       if (!hooks.length) {
         host.appendChild(empty({ icon: 'webhook', title: 'No webhooks', text: 'Notify another service about what happens here.' }));
         return;
@@ -994,7 +994,7 @@ function integrationsSection(serverId) {
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Webhooks'), newButton), list));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   }
 
@@ -1041,12 +1041,12 @@ async function deleteWebhook(serverId, hook, reload) {
 function analyticsSection(serverId) {
   const host = el('div', { class: 'm-stack' });
   async function load() {
-    host.replaceChildren(loading('Reading activity'));
+    replaceChildren(host, loading('Reading activity'));
     try {
       const report = await Api.analytics(serverId, 30);
-      host.replaceChildren(render(report));
+      replaceChildren(host, render(report));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   }
   function render(report) {
@@ -1142,7 +1142,7 @@ export function renderCommunityHome(ctx) {
   return { node, head: { lead: 'back', title: 'Channels' }, onMount() { paint(); } };
 
   function paint() {
-    host.replaceChildren();
+    replaceChildren(host);
     const channels = sortedSiblings(serverId);
     if (!channels.length) {
       host.appendChild(empty({ icon: 'hash', title: 'No channels yet', text: 'An administrator can make one in settings.' }));

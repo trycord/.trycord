@@ -408,6 +408,36 @@
 }
 .role-dot--invite { background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand); }
 
+/* A role that carries a colour, and the things that draw it.
+   The colour is set on the element as --role-colour, so one rule draws the
+   dot, the name and the chip, and a role with no colour keeps the
+   interface's own. */
+.role-dot--role { background: var(--role-colour, var(--panel-3)); }
+.role-dot--sm { width: 16px; height: 16px; }
+
+.role-name { color: var(--role-colour, currentColor); }
+.role-separator { color: var(--text-3); }
+
+.role-chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.role-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px 2px 4px; border-radius: 999px;
+  background: var(--panel-2); color: var(--text-2);
+  font-size: var(--fs-micro); line-height: 1.4;
+}
+
+/* The colour picker in the role editor. */
+.role-colour { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.role-colour__swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.role-colour__swatch {
+  width: 28px; height: 28px; padding: 0;
+  border: 2px solid transparent; border-radius: 50%;
+  background: var(--role-colour, var(--panel-3));
+  cursor: pointer;
+}
+.role-colour__swatch.is-chosen { border-color: var(--text-1); }
+.role-colour__hex { width: 10rem; }
+
 /* The settings item's label column, distinct from the control column. */
 .settings-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
@@ -630,7 +660,9 @@
 .profile-name { font-size: var(--fs-xl); font-weight: 800; color: var(--text-1); margin: 0; }
 .profile-status { color: var(--text-2); margin: 0; }
 .profile-relation { color: var(--text-3); font-size: var(--fs-sm); margin: 0; }
-.profile-roles { color: var(--brand); font-size: var(--fs-sm); font-weight: 600; margin: 0; }
+/* The roles, each in the colour the community gave it. A role with no colour
+   keeps the interface's own, so it is never the brand by accident. */
+.profile-roles { color: var(--text-2); font-size: var(--fs-sm); font-weight: 600; margin: 0; }
 
 /* == settings surfaces ============================================================== */
 

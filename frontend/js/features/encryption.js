@@ -15,7 +15,7 @@
 //   3. Recovering registers a NEW device. The lost device keeps its identity
 //      until it is revoked, and revoking it is a separate, deliberate act.
 
-import { el } from '../../packages/dom.js';
+import { el, replaceChildren } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { State } from '../../packages/store.js';
 import { head, card, row, blank, fault, fold, memo } from '../ui/page.js';
@@ -94,7 +94,7 @@ export function encryptionView() {
     try {
       const open = await client();
       if (!open.device) {
-        thisDevice.replaceChildren(blank({
+        replaceChildren(thisDevice, blank({
           glyph: 'lock',
           title: 'No device yet',
           text: 'This browser has not registered a device. It does so the first time you send an encrypted message.',
@@ -102,7 +102,7 @@ export function encryptionView() {
         return;
       }
       const keys = open.device.publicKeys();
-      thisDevice.replaceChildren(
+      replaceChildren(thisDevice, 
         memo({
           tone: 'success',
           glyph: 'lock',
@@ -125,7 +125,7 @@ export function encryptionView() {
         }),
       );
     } catch (error) {
-      thisDevice.replaceChildren(fold([fault(error, () => paintThisDevice())]));
+      replaceChildren(thisDevice, fold([fault(error, () => paintThisDevice())]));
     }
   };
 
@@ -146,14 +146,14 @@ export function encryptionView() {
       const answer = await open.api.listDevices();
       const devices = (answer && answer.devices) || [];
       if (!devices.length) {
-        devicesList.replaceChildren(blank({
+        replaceChildren(devicesList, blank({
           glyph: 'monitor',
           title: 'No devices',
           text: 'This account has not registered a device yet.',
         }));
         return;
       }
-      devicesList.replaceChildren(...devices.map((device) => row({
+      replaceChildren(devicesList, ...devices.map((device) => row({
         lead: el('span', { class: 'role-dot' }, icon(device.revoked ? 'x' : 'lock', { size: 15 })),
         title: device.label + (device.id === open.device.id ? ' (this browser)' : ''),
         sub: el('span', {},
@@ -167,7 +167,7 @@ export function encryptionView() {
         }, 'Revoke'),
       })));
     } catch (error) {
-      devicesList.replaceChildren(fold([fault(error, () => paintDevices())]));
+      replaceChildren(devicesList, fold([fault(error, () => paintDevices())]));
     }
   };
 
@@ -203,14 +203,14 @@ export function encryptionView() {
         event.preventDefault();
         const userId = input.value.trim();
         if (!userId) return;
-        output.replaceChildren(el('p', { class: 'holdline' }, 'Reading the safety number'));
+        replaceChildren(output, el('p', { class: 'holdline' }, 'Reading the safety number'));
         try {
           const open = await client();
           const answer = await open.api.safetyNumber(userId);
           const digits = (answer && answer.digits) || '';
           const before = rememberedSafety(userId);
           rememberSafety(userId, digits);
-          output.replaceChildren(
+          replaceChildren(output, 
             el('p', { class: 'cardrow-sub' }, 'Read this out and compare it with the other person.'),
             el('p', { class: 'keyblock' }, (answer && answer.display) || digits),
             before && before !== digits
@@ -223,11 +223,11 @@ export function encryptionView() {
               : null,
           );
         } catch (error) {
-          output.replaceChildren(fold([fault(error)]));
+          replaceChildren(output, fold([fault(error)]));
         }
       },
     }, input, el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Show'));
-    safetyBox.replaceChildren(form, output);
+    replaceChildren(safetyBox, form, output);
   };
 
   // -- the recovery -------------------------------------------------------------
@@ -286,7 +286,7 @@ export function encryptionView() {
       key,
       el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Recover this account'),
       status);
-    recoveryBox.replaceChildren(form);
+    replaceChildren(recoveryBox, form);
   };
 
   const onMount = () => {

@@ -192,6 +192,18 @@ function makeElement(doc, tagName) {
     get() { return node.children; },
     configurable: true,
   });
+  // firstChild and lastChild. The stub answers to the names the DOM uses, and
+  // a helper that empties a node by removing its first child until there is
+  // none emptied nothing at all - so the node kept what it had and the new
+  // content was added to it rather than replacing it.
+  Object.defineProperty(node, 'firstChild', {
+    get() { return node.children[0] || null; },
+    configurable: true,
+  });
+  Object.defineProperty(node, 'lastChild', {
+    get() { return node.children[node.children.length - 1] || null; },
+    configurable: true,
+  });
   node.append = (...children) => {
     for (const child of children) node.appendChild(child);
   };

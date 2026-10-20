@@ -6,7 +6,7 @@
 // about the room before the server has been asked: "nobody is here" arrives
 // only after the roster has answered.
 
-import { el } from '../../packages/dom.js';
+import { el, replaceChildren } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { avatar } from '../ui/primitives.js';
 import { State, nameOf } from '../../packages/store.js';
@@ -77,13 +77,13 @@ export function renderVoiceRoom(channel, serverId) {
     lastStructure = sig;
 
     if (!capsReady) {
-      body.replaceChildren(hold('Asking whether this instance runs voice'));
+      replaceChildren(body, hold('Asking whether this instance runs voice'));
       return;
     }
 
     const c = currentCaps();
     if (c && !c.enabled) {
-      body.replaceChildren(blank({
+      replaceChildren(body, blank({
         glyph: 'volume-off',
         title: 'Voice is off on this instance',
         text: 'An administrator can enable voice and video. Nothing here pretends a room exists before then.',
@@ -94,7 +94,7 @@ export function renderVoiceRoom(channel, serverId) {
     if (!s.joined) {
       // The roster is asked before anything is claimed about it. A room with
       // people shows them and the way in; a room without says so, having asked.
-      body.replaceChildren(hold('Asking who is in the room'));
+      replaceChildren(body, hold('Asking who is in the room'));
       Api.voiceMeshPeers(channel.id).then((room) => {
         if (current().joined) return; // the join landed while this was away
         const ids = (room && room.participants) || [];
@@ -102,7 +102,7 @@ export function renderVoiceRoom(channel, serverId) {
         const note = (room && (room.iceServers || []).length)
           ? 'Peer-to-peer audio, straight between members. The server only relays the introduction.'
           : 'No STUN or TURN is configured on this instance; connections may only form on the same network.';
-        body.replaceChildren(
+        replaceChildren(body, 
           el('div', { class: 'voice-room__gate' },
             preview.length
               ? card({
@@ -120,7 +120,7 @@ export function renderVoiceRoom(channel, serverId) {
             el('p', { class: 'voice-room__note' }, note)));
       }).catch(() => {
         if (current().joined) return;
-        body.replaceChildren(blank({
+        replaceChildren(body, blank({
           glyph: 'volume',
           title: 'The room could not be read',
           text: 'The roster did not answer. Join anyway, or come back when the instance is reachable.',
@@ -139,7 +139,7 @@ export function renderVoiceRoom(channel, serverId) {
       }, icon('mic', { size: 16 }), 'Speak: grant the microphone'))
       : null;
 
-    body.replaceChildren(
+    replaceChildren(body, 
       card({
         label: 'In the room',
         glyph: 'headphones',

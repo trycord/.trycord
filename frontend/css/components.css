@@ -203,6 +203,14 @@
 .menu-label {
   padding: 7px 9px 4px; font-family: var(--mono); font-size: var(--fs-micro);
   letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-3);
+  display: flex; align-items: center; gap: 8px;
+}
+.menu-lead { display: inline-flex; flex: none; }
+.menu-headtext { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.menu-headname { color: var(--text-2); }
+.menu-sub {
+  font-family: var(--font); font-size: var(--fs-micro); letter-spacing: normal;
+  text-transform: none; color: var(--text-3);
 }
 
 /* -- dialog -------------------------------------------------------------- */

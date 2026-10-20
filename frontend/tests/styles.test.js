@@ -23,7 +23,11 @@ const STYLESHEETS = {
 };
 
 const SOURCES = {
-  desktop: walk(MODULES.desktop),
+  // The packages are checked with the desktop module, because they are
+  // shared: a class they state is drawn in the desktop shell and in the
+  // phone one, and a rule that is missing from either is a rule that is
+  // missing.
+  desktop: walk(MODULES.desktop).concat(walk(MODULES.packages)),
   mobile: walk(MODULES.mobile),
 };
 

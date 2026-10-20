@@ -17,7 +17,7 @@
 //   - a section with unsaved changes asks before it is left;
 //   - a secret is shown once, in a sheet, and never again.
 
-import { el } from '../../../packages/dom.js';
+import { el, replaceChildren } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import Api from '../../../packages/api.js';
 import { navigate } from '../../../packages/nav.js';
@@ -261,7 +261,7 @@ function overviewSection(serverId) {
     const documentNote = (document) => (document.ok ? null : el('p', { class: 'm-section__note' },
       document.reason + ' It is shown exactly as it is stored; edit it here to replace it.'));
 
-    host.replaceChildren(
+    replaceChildren(host, 
       status.node,
       el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'The community')),
@@ -313,12 +313,12 @@ function overviewSection(serverId) {
   };
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the community settings'));
+    replaceChildren(host, loading('Reading the community settings'));
     let community = null;
     try {
       community = await Api.server(serverId);
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
       return;
     }
     let settings = {};
@@ -358,7 +358,7 @@ function appearanceSection(serverId) {
       });
       input.click();
     };
-    host.replaceChildren(
+    replaceChildren(host, 
       el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'The house')),
         el('div', { class: 'm-stack' },
@@ -398,7 +398,7 @@ function appearanceSection(serverId) {
   };
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the community'));
+    replaceChildren(host, loading('Reading the community'));
     try {
       await refreshServer(serverId);
     } catch { /* the form still edits what it has */ }
@@ -414,11 +414,11 @@ function channelsSection(serverId) {
   const host = el('div', { class: 'm-stack' });
 
   const load = async () => {
-    host.replaceChildren(loading('Loading channels'));
+    replaceChildren(host, loading('Loading channels'));
     try {
       await refreshServerTree(serverId, { force: true });
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
       return;
     }
     const tree = State.serverTree.get(serverId) || { channels: [] };
@@ -428,7 +428,7 @@ function channelsSection(serverId) {
       onClick: () => openChannelEditor(serverId, null, load),
     }, 'New channel');
     if (!channels.length) {
-      host.replaceChildren(empty({
+      replaceChildren(host, empty({
         icon: 'hash', title: 'No channels', text: 'Make one so people can talk.',
       }));
       return;
@@ -452,7 +452,7 @@ function channelsSection(serverId) {
             onClick: () => deleteChannel(serverId, channel, load),
           }, 'Delete'))));
     }
-    host.replaceChildren(
+    replaceChildren(host, 
       el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' },
           el('div', { class: 'm-section__title' }, 'Channels'), newButton),
@@ -471,10 +471,10 @@ function categoriesSection(serverId) {
   const mayManage = can(serverId, 'MANAGE_CHANNELS') || isOwner(serverId);
 
   const load = async () => {
-    host.replaceChildren(loading('Loading the categories'));
+    replaceChildren(host, loading('Loading the categories'));
     const page = renderCategoriesPage({ serverId });
     const overrides = mayManage ? overridesEditor(serverId, 'category') : null;
-    host.replaceChildren(
+    replaceChildren(host, 
       el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Categories')),
         page.node),
@@ -504,16 +504,16 @@ function overridesEditor(serverId, kind) {
 
   const load = async () => {
     const list = entities();
-    picker.replaceChildren(...list.map((entity) => el('option', {
+    replaceChildren(picker, ...list.map((entity) => el('option', {
       value: entity.id,
     }, isChannel ? '#' + entity.name : entity.name)));
     if (!list.length) {
-      host.replaceChildren(el('p', { class: 'm-section__note' },
+      replaceChildren(host, el('p', { class: 'm-section__note' },
         isChannel ? 'There are no channels to change yet.' : 'There are no categories to change yet.'));
       return;
     }
     if (!picker.value) picker.value = list[0].id;
-    host.replaceChildren(loading('Reading the overrides'));
+    replaceChildren(host, loading('Reading the overrides'));
     try {
       const [answer, catalogue] = await Promise.all([
         isChannel
@@ -552,7 +552,7 @@ function overridesEditor(serverId, kind) {
             el('span', { class: 'm-row__sub' }, descriptions[permission] || '')),
           el('span', { class: 'm-row__side' }, control)));
       }
-      host.replaceChildren(
+      replaceChildren(host, 
         status.node,
         el('section', { class: 'm-section' },
           el('div', { class: 'm-section__head' },
@@ -560,7 +560,7 @@ function overridesEditor(serverId, kind) {
           el('div', { class: 'm-stack' }, picker, rows)),
       );
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -581,7 +581,7 @@ function rolesSection(serverId) {
   const mayChannels = can(serverId, 'MANAGE_CHANNELS') || isOwner(serverId);
 
   const load = async () => {
-    host.replaceChildren(loading('Loading the roles'));
+    replaceChildren(host, loading('Loading the roles'));
     const page = renderRolesPage({ serverId });
     const catalogue = el('div', { class: 'm-list' });
     const assignment = el('div', { class: 'm-stack' });
@@ -623,19 +623,19 @@ function rolesSection(serverId) {
             status.fail(error);
           }
         });
-        assignment.replaceChildren(status.node, el('div', { class: 'm-stack' },
+        replaceChildren(assignment, status.node, el('div', { class: 'm-stack' },
           field('The role', rolePick),
           field('The member', memberPick),
           el('div', { class: 'm-actions' }, give)));
       } catch (error) {
-        assignment.replaceChildren(failure(error, null));
+        replaceChildren(assignment, failure(error, null));
       }
     }
 
     const channelOverrides = mayChannels ? overridesEditor(serverId, 'channel') : null;
     const categoryOverrides = mayChannels ? overridesEditor(serverId, 'category') : null;
 
-    host.replaceChildren(
+    replaceChildren(host, 
       el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Roles')),
         page.node),
@@ -662,7 +662,7 @@ function moderationSection(serverId) {
   const status = reporter();
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the moderation lists'));
+    replaceChildren(host, loading('Reading the moderation lists'));
     const mayBan = can(serverId, 'BAN_MEMBERS') || isOwner(serverId);
     const mayKick = can(serverId, 'KICK_MEMBERS') || isOwner(serverId);
     let bans = [];
@@ -675,7 +675,7 @@ function moderationSection(serverId) {
       bans = Array.isArray(banRows) ? banRows : (banRows && banRows.items) || [];
       members = (page && page.items) || [];
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
       return;
     }
 
@@ -776,7 +776,7 @@ function moderationSection(serverId) {
           }, 'Remove'))));
     }
 
-    host.replaceChildren(
+    replaceChildren(host, 
       status.node,
       el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Banned')),
@@ -801,7 +801,7 @@ function integrationsSection(serverId) {
   const status = reporter();
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the integrations'));
+    replaceChildren(host, loading('Reading the integrations'));
     let hooks = [];
     let apps = [];
     try {
@@ -812,7 +812,7 @@ function integrationsSection(serverId) {
       hooks = (hookAnswer && hookAnswer.webhooks) || [];
       apps = (appAnswer && appAnswer.apps) || [];
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
       return;
     }
 
@@ -919,7 +919,7 @@ function integrationsSection(serverId) {
       onClick: () => appSheet(serverId, load),
     }, 'New application');
 
-    host.replaceChildren(
+    replaceChildren(host, 
       status.node,
       el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' },
@@ -1007,7 +1007,7 @@ async function appCommands(serverId, app, status) {
   const body = el('div', { class: 'm-stack' });
   const layer = sheet({ title: 'The commands of ' + (app.name || 'the application'), body });
   const paint = async () => {
-    body.replaceChildren(loading('Reading the commands'));
+    replaceChildren(body, loading('Reading the commands'));
     try {
       const answer = await communityApi.appCommands(serverId, app.id);
       const commands = (answer && answer.commands) || [];
@@ -1041,9 +1041,9 @@ async function appCommands(serverId, app, status) {
               },
             }, 'Remove'))));
       }
-      body.replaceChildren(rows);
+      replaceChildren(body, rows);
     } catch (error) {
-      body.replaceChildren(failure(error, null));
+      replaceChildren(body, failure(error, null));
     }
   };
   await paint();
@@ -1056,7 +1056,7 @@ function ownershipSection(serverId) {
   const status = reporter();
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the roster'));
+    replaceChildren(host, loading('Reading the roster'));
     const pick = el('select', { class: 'm-input m-input--select', 'aria-label': 'Who takes over' });
     const transfer = el('button', { class: 'm-btn m-btn--block m-btn--primary', type: 'button' }, 'Transfer ownership');
     try {
@@ -1066,7 +1066,7 @@ function ownershipSection(serverId) {
         pick.appendChild(el('option', { value: member.id }, memberName(member)));
       }
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
       return;
     }
     transfer.addEventListener('click', async () => {
@@ -1096,7 +1096,7 @@ function ownershipSection(serverId) {
       } catch (error) { status.fail(error); }
     });
 
-    host.replaceChildren(
+    replaceChildren(host, 
       status.node,
       el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Hand it over')),
@@ -1118,7 +1118,7 @@ function analyticsSection(serverId) {
   const host = el('div', { class: 'm-stack' });
 
   const load = async () => {
-    host.replaceChildren(loading('Reading the numbers'));
+    replaceChildren(host, loading('Reading the numbers'));
     try {
       const report = await Api.analytics(serverId);
       const totals = (report && (report.totals || report)) || {};
@@ -1138,11 +1138,11 @@ function analyticsSection(serverId) {
           el('div', { class: 'm-stat__value' }, String(value === undefined || value === null ? '—' : value)),
           el('div', { class: 'm-stat__label' }, labels[fieldName] || fieldName)));
       }
-      host.replaceChildren(el('section', { class: 'm-section' },
+      replaceChildren(host, el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Facts')),
         any ? rows : empty({ icon: 'chart', title: 'No numbers yet', text: 'Activity shows up once there is any.' })));
     } catch (error) {
-      host.replaceChildren(failure(error, load));
+      replaceChildren(host, failure(error, load));
     }
   };
 
@@ -1218,10 +1218,10 @@ export function renderCommunitySettings(ctx) {
       button.setAttribute('aria-selected', isActive ? 'true' : 'false');
     }
     if (current && current.cleanup) current.cleanup();
-    host.replaceChildren(loading('Loading the section'));
+    replaceChildren(host, loading('Loading the section'));
     const section = table[id]();
     current = section;
-    host.replaceChildren(section.node);
+    replaceChildren(host, section.node);
     if (section.load) await section.load();
   };
 

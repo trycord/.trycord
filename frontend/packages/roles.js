@@ -103,11 +103,13 @@ export function memberRoleDot(member, extra, base) {
 export function roleNames(member) {
   const roles = rolesOf(member);
   if (roles.length) {
-    return roles.map((role) => {
+    // The names are separated, so two of them do not read as one long word.
+    return roles.flatMap((role, index) => {
       const name = el('span', { class: 'role-name' }, role.name || '');
       const colour = roleColor(role);
       if (colour) name.style.setProperty('--role-colour', colour);
-      return name;
+      if (index === 0) return [name];
+      return [el('span', { class: 'role-separator', 'aria-hidden': 'true' }, '·'), name];
     });
   }
   if (member.roleNames && member.roleNames.length) {
@@ -162,7 +164,12 @@ export function roleChips(member, options) {
     const colour = roleColor(role);
     if (colour) chip.style.setProperty('--role-colour', colour);
     chip.appendChild(roleDot(role, 'role-dot--sm'));
-    chip.appendChild(el('span', { class: classes.name }, role.name || ''));
+    // The name is in the role's colour as well as the dot beside it: a dot
+    // is a colour, and a name is a sentence, and the sentence should say
+    // which role it is about.
+    const name = el('span', { class: classes.name }, role.name || '');
+    if (colour) name.style.setProperty('--role-colour', colour);
+    chip.appendChild(name);
     wrap.appendChild(chip);
   }
   return wrap;

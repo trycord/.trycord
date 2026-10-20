@@ -5,7 +5,7 @@
 // offer something the account policy removes. A profile is also where the
 // community-aware facts (the member pages) link back to.
 
-import { el } from '../../packages/dom.js';
+import { el, replaceChildren } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { State, nameOf } from '../../packages/store.js';
@@ -13,6 +13,8 @@ import { navigate } from '../../packages/nav.js';
 import { avatar, bannerNode } from '../ui/primitives.js';
 import { head, card, blank, fault, fold, facts } from '../ui/page.js';
 import { errorToast, confirmDialog, toast } from '../ui/overlays.js';
+import { roleNames } from '../../packages/roles.js';
+import { displayNameOf, usernameOf } from '../../packages/identity.js';
 
 const relationText = (p) => {
   switch (p.relation) {
@@ -127,14 +129,15 @@ export function renderProfile(ctx) {
   const serverId = ctx.query && ctx.query.serverId;
 
   const identity = el('div', { class: 'profile' });
-  const host = el('div', { class: 'fold fold--tight' },
-    head({
-      kicker: 'Profile',
-      title: 'Profile',
-      lede: 'Who is here, and what can be done about it.',
-      actions: null,
-    }),
-    identity);
+  // The head is replaced once the profile is known: a head that says
+  // "Profile" is a head that says nothing, and the name of the person is
+  // the one thing the page is about.
+  let headNode = head({
+    kicker: 'Profile',
+    title: 'Profile',
+    lede: 'Who is here, and what can be done about it.',
+  });
+  const host = el('div', { class: 'fold fold--tight' }, headNode, identity);
 
   let version = 0;
   const load = async () => {
@@ -145,12 +148,28 @@ export function renderProfile(ctx) {
       if (mine !== version || !profile) return;
       if (!profile.id) throw { code: 'NOT_FOUND', message: 'There is no one here.' };
 
-      const actions = el('div', { class: 'pagehead-actions' }, actionFor(profile, load));
       const banner = profile.bannerUrl ? bannerNode(profile.bannerUrl, 'profile-banner') : null;
-      const name = nameOf(profile) || profile.username;
+      const name = displayNameOf(profile) || profile.username;
+      // The roles are drawn in the colours the community gave them, so a
+      // role that is coloured is coloured everywhere it appears - here, in
+      // the member list, and in the message headers.
       const roles = profile.membership && profile.membership.roles
-        ? (profile.membership.roles || []).map((r) => r.name) : [];
-      identity.replaceChildren(
+        ? roleNames({ roles: profile.membership.roles || [] }) : [];
+      const isSelf = String(profile.id) === String(State.user && State.user.id);
+
+      // The head names the person, and carries what can be done about them.
+      const next = head({
+        kicker: 'Profile',
+        title: name,
+        lede: isSelf
+          ? 'This is you.'
+          : '@' + (usernameOf(profile) || 'someone') + ' · ' + relationText(profile),
+        actions: actionFor(profile, load),
+      });
+      host.replaceChild(next, headNode);
+      headNode = next;
+
+      replaceChildren(identity, 
         banner,
         el('div', { class: 'profile-main' },
           avatar(profile, { size: 'lg', rounded: true, presence: profile.presence || 'offline' }),
@@ -158,15 +177,18 @@ export function renderProfile(ctx) {
             el('p', { class: 'pagehead-kicker' }, '@' + profile.username),
             el('p', { class: 'profile-name' }, name),
             profile.statusText ? el('p', { class: 'profile-status' }, profile.statusText) : null,
-            el('p', { class: 'profile-relation' }, relationText(profile)),
-            roles.length ? el('p', { class: 'profile-roles' }, roles.join(' · ')) : null,
-            actions)),
+            roles.length
+              ? el('p', { class: 'profile-roles' }, roles)
+              : null)),
         el('div', { class: 'fold fold--tight' },
           card({
             label: 'Facts',
             glyph: 'info',
             body: facts([
               { value: profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '—', label: 'Joined' },
+              profile.membership && profile.membership.joinedAt
+                ? { value: new Date(profile.membership.joinedAt).toLocaleDateString(), label: 'In this community' }
+                : null,
             ]),
           }),
           profile.bio ? card({
@@ -180,7 +202,7 @@ export function renderProfile(ctx) {
           }) : null));
     } catch (e) {
       if (mine !== version) return;
-      identity.replaceChildren(fold([
+      replaceChildren(identity, fold([
         blank({
           glyph: 'user',
           title: 'No one goes by that here',

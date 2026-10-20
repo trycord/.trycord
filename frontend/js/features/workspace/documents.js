@@ -17,7 +17,7 @@
 // Writing a document needs MEMORIZE; commenting on one needs SEND_MESSAGES;
 // acting on somebody else's comment needs MANAGE_MESSAGES.
 
-import { el } from '../../../packages/dom.js';
+import { el, replaceChildren } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { card, row, blank, fault, fold, hold, memo } from '../../ui/page.js';
 import { iconButton } from '../../ui/primitives.js';
@@ -53,10 +53,10 @@ export function documentsList(ctx) {
   });
 
   const load = async () => {
-    host.replaceChildren(hold('Reading the documents'));
+    replaceChildren(host, hold('Reading the documents'));
     try {
       const documents = await Workspace.documents(serverId);
-      host.replaceChildren(...(documents.length
+      replaceChildren(host, ...(documents.length
         ? documents.map((document) => row({
           lead: el('span', { class: 'role-dot' }, icon('file', { size: 15 })),
           title: document.title,
@@ -70,7 +70,7 @@ export function documentsList(ctx) {
           text: 'A document is a page the community writes together.',
         })]));
     } catch (error) {
-      host.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(host, fold([fault(error, load)]));
     }
   };
 
@@ -139,7 +139,7 @@ export function documentsDetail(ctx) {
   // -- reading -----------------------------------------------------------------
 
   const paintMeta = () => {
-    meta.replaceChildren(
+    replaceChildren(meta, 
       el('p', { class: 'form-note' },
         'Revision ' + doc.revision + ' · ' + relativeTime(doc.updatedAt)
         + (dirty ? ' · unsaved changes in this browser' : '')),
@@ -148,19 +148,19 @@ export function documentsDetail(ctx) {
 
   const paintBody = () => {
     if (editing) {
-      body.replaceChildren(editor());
+      replaceChildren(body, editor());
       return;
     }
     const blocks = doc.body || [];
     if (!blocks.length) {
-      body.replaceChildren(blank({
+      replaceChildren(body, blank({
         glyph: 'file',
         title: 'An empty document',
         text: canWrite ? 'Edit it to write the first block.' : 'Nobody has written it yet.',
       }));
       return;
     }
-    body.replaceChildren(el('div', { class: 'fold' }, ...blocks.map((block) => blockNode(block))));
+    replaceChildren(body, el('div', { class: 'fold' }, ...blocks.map((block) => blockNode(block))));
   };
 
   // -- writing -----------------------------------------------------------------
@@ -169,10 +169,10 @@ export function documentsDetail(ctx) {
   // editor is offered a save, and a reader is offered the editor.
   const paintActions = () => {
     if (!canWrite) {
-      actions.replaceChildren();
+      replaceChildren(actions);
       return;
     }
-    actions.replaceChildren(
+    replaceChildren(actions, 
       el('button', {
         class: 'btn btn--default btn--sm', type: 'button',
         onClick: () => (editing ? save() : startEditing()),
@@ -262,7 +262,7 @@ export function documentsDetail(ctx) {
 
   const showConflict = (error) => {
     const current = (error && error.details && error.details.currentRevision) || null;
-    conflict.replaceChildren(memo({
+    replaceChildren(conflict, memo({
       tone: 'warning',
       title: 'This document changed while you were writing it',
       text: current
@@ -272,7 +272,7 @@ export function documentsDetail(ctx) {
         el('button', {
           class: 'btn btn--default btn--sm', type: 'button',
           onClick: async () => {
-            conflict.replaceChildren();
+            replaceChildren(conflict);
             await load();
             stopEditing();
           },
@@ -302,7 +302,7 @@ export function documentsDetail(ctx) {
       doc = saved;
       working = { title: saved.title, blocks: (saved.body || []).map((block) => Object.assign({}, block)) };
       dirty = false;
-      conflict.replaceChildren();
+      replaceChildren(conflict);
       paintActions();
       paintMeta();
       paintBody();
@@ -333,7 +333,7 @@ export function documentsDetail(ctx) {
     const problems_ = el('div', { class: 'fold fold--tight' });
     const paintProblems = () => {
       const faults = problems();
-      problems_.replaceChildren(...(faults.length
+      replaceChildren(problems_, ...(faults.length
         ? [memo({
           tone: 'danger',
           title: 'This document cannot be saved as it is',
@@ -640,10 +640,10 @@ export function documentsDetail(ctx) {
   // -- the history ---------------------------------------------------------------
 
   const loadHistory = async () => {
-    history.replaceChildren(hold('Reading the history'));
+    replaceChildren(history, hold('Reading the history'));
     try {
       const revisions = await Workspace.documentRevisions(serverId, documentId, 25);
-      history.replaceChildren(...(revisions.length
+      replaceChildren(history, ...(revisions.length
         ? revisions.map((revision, index) => row({
           title: 'Revision ' + revision.revision,
           sub: relativeTime(revision.createdAt) + (revision.authorId ? ' · by ' + revision.authorId : ''),
@@ -665,7 +665,7 @@ export function documentsDetail(ctx) {
         }))
         : [blank({ glyph: 'book', title: 'No history yet', text: 'Every save is recorded here.' })]));
     } catch (error) {
-      history.replaceChildren(fold([fault(error, loadHistory)]));
+      replaceChildren(history, fold([fault(error, loadHistory)]));
     }
   };
 
@@ -679,11 +679,11 @@ export function documentsDetail(ctx) {
       wide: true,
       body: report,
     });
-    report.replaceChildren(hold('Asking what changed'));
+    replaceChildren(report, hold('Asking what changed'));
     try {
       const answer = await Workspace.compareDocument(serverId, documentId, from, to);
       const changes = answer && answer.changes ? answer.changes : [];
-      report.replaceChildren(
+      replaceChildren(report, 
         el('p', { class: 'form-note' },
           (answer && answer.titleChanged ? 'The title changed. ' : '')
           + changes.length + ' block' + (changes.length === 1 ? '' : 's') + ' differ.'),
@@ -693,7 +693,7 @@ export function documentsDetail(ctx) {
             plainBlock(change.before) + ' → ' + plainBlock(change.after)))),
       );
     } catch (error) {
-      report.replaceChildren(fold([fault(error, () => compare(from, to))]));
+      replaceChildren(report, fold([fault(error, () => compare(from, to))]));
     }
   };
 
@@ -712,7 +712,7 @@ export function documentsDetail(ctx) {
       working = { title: doc.title, blocks: (doc.body || []).map((block) => Object.assign({}, block)) };
       editing = false;
       dirty = false;
-      conflict.replaceChildren();
+      replaceChildren(conflict);
       paintMeta();
       paintBody();
       toast('Revision ' + revision + ' is the document now');
@@ -726,7 +726,7 @@ export function documentsDetail(ctx) {
   // -- the comments ---------------------------------------------------------------
 
   const loadComments = async () => {
-    comments.replaceChildren(hold('Reading the comments'));
+    replaceChildren(comments, hold('Reading the comments'));
     try {
       const rows = await Workspace.documentComments(serverId, documentId);
       const me = State.user && State.user.id;
@@ -751,10 +751,10 @@ export function documentsDetail(ctx) {
         })]);
       // A null child would be drawn as the word "null", so the comment box is
       // added only when there is one.
-      comments.replaceChildren(...drawn);
+      replaceChildren(comments, ...drawn);
       if (canComment) comments.appendChild(commentBox());
     } catch (error) {
-      comments.replaceChildren(fold([fault(error, loadComments)]));
+      replaceChildren(comments, fold([fault(error, loadComments)]));
     }
   };
 
@@ -796,10 +796,10 @@ export function documentsDetail(ctx) {
   // -- the links -------------------------------------------------------------------
 
   const loadLinks = async () => {
-    links.replaceChildren(hold('Reading the links'));
+    replaceChildren(links, hold('Reading the links'));
     try {
       const rows = await Workspace.documentLinks(serverId, documentId);
-      links.replaceChildren(...(rows.length
+      replaceChildren(links, ...(rows.length
         ? rows.map((entry) => {
           const href = entry.kind === 'url'
             ? entry.url
@@ -826,14 +826,14 @@ export function documentsDetail(ctx) {
           text: 'A link points at another document or at a place on the web.',
         })]));
     } catch (error) {
-      links.replaceChildren(fold([fault(error, loadLinks)]));
+      replaceChildren(links, fold([fault(error, loadLinks)]));
     }
   };
 
   // -- the whole document -----------------------------------------------------------
 
   const load = async () => {
-    body.replaceChildren(hold('Opening the document'));
+    replaceChildren(body, hold('Opening the document'));
     try {
       doc = await Workspace.document(serverId, documentId);
       title.textContent = doc.title;
@@ -841,7 +841,7 @@ export function documentsDetail(ctx) {
       paintMeta();
       paintBody();
     } catch (error) {
-      body.replaceChildren(fold([fault(error, load)]));
+      replaceChildren(body, fold([fault(error, load)]));
     }
   };
 
