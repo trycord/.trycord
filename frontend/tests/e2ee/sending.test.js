@@ -56,6 +56,11 @@ test('sending', async (t) => {
   await bob.post('/api/e2ee/devices', serverClient.registerBody(bobDevice));
   await bob.post('/api/e2ee/prekeys', serverClient.publishBody(bobDevice, 4));
 
+  // The client's transport throws on a refusal, and the recorder keeps
+  // every request that was made - so a check can see that a refused message
+  // was offered once and once only.
+  const post = (path, body) => calls.request('POST', path, { body });
+
   const opened = await alice.post('/api/dms', { userId: bob.user.id });
   assert.equal(opened.status, 200, JSON.stringify(opened.data));
   const conversationId = opened.data.id;
@@ -96,7 +101,7 @@ test('sending', async (t) => {
 
     // Sending it without the reader acknowledging is refused.
     await assert.rejects(
-      () => client.sendPrepared(prepared, (body) => alice.post('/api/dms/' + conversationId + '/messages', body)),
+      () => client.sendPrepared(prepared, (body) => post('/api/dms/' + conversationId + '/messages', body)),
       (error) => error.code === 'E2EE_NOT_ACKNOWLEDGED',
     );
 
@@ -104,11 +109,11 @@ test('sending', async (t) => {
     // which is what the warning said would happen.
     const sent = await client.sendPrepared(
       prepared,
-      (body) => alice.post('/api/dms/' + conversationId + '/messages', body),
+      (body) => post('/api/dms/' + conversationId + '/messages', body),
       { acknowledged: true },
     );
-    assert.equal(sent.status, 201, JSON.stringify(sent.data));
-    assert.equal(sent.data.encrypted, false);
+    assert.equal(sent.encrypted, false);
+    assert.equal(sent.content, 'hello bob');
   });
 
   await t.test('the server refuses text in a conversation it reports as encrypted', async () => {
@@ -138,18 +143,19 @@ test('sending', async (t) => {
     // The envelope the client produced is accepted.
     const sent = await client.sendPrepared(
       prepared,
-      (body) => alice.post('/api/dms/' + conversationId + '/messages', body),
+      (body) => post('/api/dms/' + conversationId + '/messages', body),
     );
-    assert.equal(sent.status, 201, JSON.stringify(sent.data));
-    assert.equal(sent.data.encrypted, true);
-    assert.equal(sent.data.content, null, 'the stored message carries no text');
-    assert.equal(sent.data.envelopes.length, 1);
+    assert.equal(sent.encrypted, true);
+    assert.equal(sent.content, null, 'the stored message carries no text');
+    assert.equal(sent.envelopes.length, 1);
   });
 
   await t.test('a refused message is not sent again in the clear', async () => {
     // A conversation the server does not call encrypted: an envelope is
-    // refused, and the client does not answer that by sending text.
-    const other = await alice.post('/api/dms', { userId: bob.user.id });
+    // refused, and the client does not answer that by sending text. The
+    // conversation is with somebody else, so it is a different one.
+    const carol = await register(instance, 'carol');
+    const other = await alice.post('/api/dms', { userId: carol.user.id });
     const plain = other.data.id;
     const prepared = await client.prepareMessage(conversationId, { content: 'hello bob' });
     const envelope = prepared.body.envelopes[0];
@@ -158,7 +164,7 @@ test('sending', async (t) => {
     await assert.rejects(
       () => client.sendPrepared(
         { mode: 'encrypted', warn: null, state: 'encrypted', body: { envelopes: [{ ...envelope, cid: plain }] } },
-        (body) => alice.post('/api/dms/' + plain + '/messages', body),
+        (body) => post('/api/dms/' + plain + '/messages', body),
       ),
       (error) => error.status === 400,
     );

@@ -119,6 +119,20 @@ export class E2eeClient {
   }
 
   /**
+   * Take a device as this browser's own.
+   *
+   * A recovered device is a new device: new keys, new fingerprint. The old
+   * one keeps its identity and can be revoked, and until it is revoked it is
+   * still a device somebody can read this account's conversations with.
+   */
+  async adoptDevice(device) {
+    this.device = device;
+    this.manager = new SessionManager({ device, store: this.store, api: this.api });
+    await saveDevice(this.store, device);
+    return device;
+  }
+
+  /**
    * What the server says about a conversation's encryption.
    *
    * The route answers with the state itself: the conversation, its state, the

@@ -217,12 +217,10 @@ export async function createDevice(options) {
     sealedPrivateKey: null,
   };
   const device = new Device(record);
-  if (!options.recoveryKey) {
-    // The sealed copy is what the server keeps and what a recovery opens. It
-    // is made here so the device is ready to be recovered from the moment it
-    // exists, and it is sealed under a key the server never sees.
-    device.sealedPrivateKey = await sealPrivateMaterial(keys, device.recoveryKey);
-  }
+  // The sealed copy is what the server keeps and what a recovery opens. It
+  // is made here so the device is ready to be recovered from the moment it
+  // exists, and it is sealed under a key the server never sees.
+  device.sealedPrivateKey = await sealPrivateMaterial(keys, device.recoveryKey);
   return device;
 }
 
