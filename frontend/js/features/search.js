@@ -180,7 +180,16 @@ function hitRow(hit) {
 
 export function renderSearch(ctx) {
   const initial = (ctx.query && ctx.query.get('q')) || '';
-  const state = stateFrom(initial);
+  // A query the server would refuse is refused here too, with the same
+  // words, rather than opening a page that cannot be drawn.
+  let state = { terms: '', filters: {} };
+  let problem = null;
+  try {
+    state = stateFrom(initial);
+  } catch (error) {
+    problem = error.message;
+    state = { terms: initial, filters: {} };
+  }
 
   const input = el('input', {
     class: 'input search-input', type: 'search',
@@ -247,7 +256,6 @@ export function renderSearch(ctx) {
       resultNote.textContent = '';
     }
   }
-
   // -- the saved searches ------------------------------------------------------
 
   async function paintSaved() {

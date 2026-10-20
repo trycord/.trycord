@@ -212,6 +212,13 @@ commercial use.
 
 ## 8. Finding L3 — the published attribution for the server's dependencies is not there
 
+> **FIXED.** The licences page now lists the server's direct dependencies with
+> the licence each one carries, and names the one library the client vendors
+> with where its licence text is. A `THIRD-PARTY-NOTICES` file gathering the
+> upstream notices is still open — the published page is the part a reader
+> sees, and a redistribution still has to copy the notices out of the
+> installed packages.
+
 `public/licenses.html` says:
 
 > Each dependency carries its own licence, and those licences are listed in
