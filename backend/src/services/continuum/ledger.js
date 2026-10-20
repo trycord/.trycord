@@ -70,22 +70,34 @@ async function markLive(sourceKind, sourceId, { fingerprint, kind, eventId }) {
   );
 }
 
-// Record that a row was decided against.
+// Record that a row was decided against, and why.
 //
 // An upsert rather than an insert: a row can be refused more than once - a
 // peer that is not trusted yet, and trusted a moment later - and the second
 // refusal is the same decision, not a second row that collides with the
 // first.
-async function markWithheld(sourceKind, sourceId, fingerprint) {
+//
+// The reason is kept, because "this was not federable when it was written"
+// on its own does not tell an operator which rule stopped it. The first
+// reason is the one that matters: it is the one that applied when the
+// content was written.
+async function markWithheld(sourceKind, sourceId, fingerprint, reason) {
   const stamp = now();
+  const existing = await find(sourceKind, sourceId);
+  const context = Object.assign({}, contextOf(existing));
+  if (!context.withheld_reason && reason) context.withheld_reason = String(reason).slice(0, 300);
   await db.upsert(
     'continuum_publications',
-    ['source_kind', 'source_id', 'fingerprint', 'state', 'published_at', 'updated_at'],
-    [sourceKind, String(sourceId), fingerprint, 'withheld', stamp, stamp],
+    ['source_kind', 'source_id', 'fingerprint', 'state', 'context', 'published_at', 'updated_at'],
+    [
+      sourceKind, String(sourceId), fingerprint, 'withheld',
+      JSON.stringify(context), stamp, stamp,
+    ],
     ['source_kind', 'source_id'],
     {
       fingerprint: db.newRef('fingerprint'),
       state: db.newRef('state'),
+      context: db.newRef('context'),
       published_at: db.newRef('published_at'),
       updated_at: db.newRef('updated_at'),
     }

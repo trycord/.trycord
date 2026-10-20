@@ -616,9 +616,14 @@ async function prepare(kind, payload, opts = {}) {
       return { ok: false, reason: 'already published', duplicate: true, eventId: existing.last_event_id, source };
     }
     if (existing.state === 'withheld') {
+      // The reason the content was decided against is kept with it: "not
+      // federable when it was written" on its own does not say which rule
+      // stopped it.
+      const kept = ledger.contextOf(existing).withheld_reason;
       return {
         ok: false,
-        reason: 'this content was not federable when it was written',
+        reason: 'this content was not federable when it was written'
+          + (kept ? ': ' + kept : ''),
         withhold: true,
         source,
       };

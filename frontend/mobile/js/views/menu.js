@@ -94,7 +94,7 @@ export function renderMenu() {
       for (const channel of sorted) {
         const row = el('a', { class: 'm-row', href: path('/server/' + server.id + '/channel/' + channel.id) },
           el('span', { class: 'm-row__lead' }, icon(channelIcon(channel), { size: 16 })),
-          el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__title truncate' }, channel.name))));
+          el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__title truncate' }, channel.name)));
         // A long press on a channel raises the actions that belong to it.
         attachLongPress(row, () => channelActions(server.id, channel, null), { title: '#' + channel.name });
         list.appendChild(row);
