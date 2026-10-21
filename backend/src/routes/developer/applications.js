@@ -177,10 +177,12 @@ async function postMessage(req, res) {
 
   const channel = await visibleChannel(req.params.channelId, req.user.id, req.server.id);
   if (!channel) return fail(res, 'NOT_FOUND', 'channel not found');
-  // The permission is evaluated for the owner, so an application cannot post
-  // where its owner could not.
-  if (!(await hasChannelPermission(app.owner_user_id, channel.server_id, channel.id, 'SEND_MESSAGES'))) {
-    return fail(res, 'PERMISSION_DENIED', 'the application owner cannot post in this channel');
+  // The permission is evaluated for the bot's own account, so an application
+  // posts with the rights the community gave it - and cannot post where the
+  // community would not let it.
+  const author = bots.botUserIdOf(app);
+  if (!(await hasChannelPermission(author, channel.server_id, channel.id, 'SEND_MESSAGES'))) {
+    return fail(res, 'PERMISSION_DENIED', 'the application cannot post in this channel');
   }
   const content = String((req.body || {}).content || '').trim().slice(0, 2000);
   if (!content) return fail(res, 'VALIDATION_ERROR', 'content is required');
@@ -195,14 +197,15 @@ async function postMessage(req, res) {
     channelId: channel.id,
     actor: { id: app.id, type: 'application' },
     data: {
-      message: { id: posted.id, authorId: app.owner_user_id, content },
+      message: { id: posted.id, authorId: author, content },
     },
   });
 
   res.status(201).json({
     id: posted.id,
     channel_id: channel.id,
-    author_id: app.owner_user_id,
+    // The bot wrote it, so the bot is the author.
+    author_id: posted.author_id,
     content,
     created_at: posted.created_at,
     seq: posted.seq,
@@ -232,7 +235,43 @@ async function getSelf(req, res) {
   });
 }
 
+// DELETE /api/v1/communities/:serverId/applications/:applicationId
+//
+// Take the application away for good.
+//
+// The token stops working with the row, and the bot's account leaves the
+// community, so an application that is gone cannot be spoken for either.
+async function deleteApplication(req, res) {
+  const removed = await bots.removeApp(req.params.applicationId, req.server.id);
+  if (!removed) return fail(res, 'NOT_FOUND', 'application not found');
+  res.json({ ok: true });
+}
+
 const definitions = [
+  {
+    method: 'delete',
+    path: '/communities/:serverId/applications/:applicationId',
+    auth: 'principal',
+    scopes: ['communities:write', 'bots:write'],
+    bots: false,
+    community: 'manage',
+    tags: ['Applications'],
+    summary: 'Delete a bot application',
+    description:
+      'Deletes the application, which ends its token at once, and takes its bot out of the community.'
+      + ' The messages it wrote stay where they are.',
+    parameters: [
+      pathParam('serverId', 'The community id or its slug.'),
+      pathParam('applicationId', 'The application id.'),
+    ],
+    responses: {
+      200: ok('The application is gone.', { type: 'object', properties: { ok: { type: 'boolean' } } }),
+      401: ERRORS.unauthenticated,
+      403: ERRORS.forbidden,
+      404: ERRORS.missing,
+    },
+    handler: deleteApplication,
+  },
   {
     method: 'get',
     path: '/applications/self',
@@ -602,7 +641,14 @@ const definitions = [
     method: 'post',
     path: '/communities/:serverId/channels/:channelId/messages',
     auth: 'principal',
-    scopes: ['communities:write', 'messages:write'],
+    // Only the scope that says what the route does.
+    //
+    // It asked for `communities:write` as well, which says "may change this
+    // community's developer configuration" - and posting a message does not
+    // change the configuration. A bot that may post was told it could also
+    // create applications and webhooks, which it still may not, but the
+    // scope it was given said it might.
+    scopes: ['messages:write'],
     bots: true,
     community: 'member',
     tags: ['Messages'],
