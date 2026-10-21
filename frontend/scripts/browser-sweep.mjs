@@ -134,6 +134,9 @@ const measure = (minTarget) => `
     if (style.overflow !== 'hidden' && style.overflowX !== 'hidden') continue;
     if (node.clientWidth <= 0) continue;
     if (node.scrollWidth <= node.clientWidth + 2) continue;
+    // A label that ends in an ellipsis is saying that the text continues
+    // somewhere else. A label that is cut without one is losing the text.
+    if (style.textOverflow === 'ellipsis') continue;
     var text = String(node.textContent || '').trim();
     if (!text) continue;
     clipped.push({
@@ -157,10 +160,16 @@ const measure = (minTarget) => `
     if (rect.width === 0 && rect.height === 0) continue;
     // A link inside a line of text is not a control a person presses.
     if (node.tagName === 'A' && node.closest('p, li, .lede, .m-row__sub')) continue;
-    var cx = rect.left + rect.width / 2;
-    var cy = rect.top + rect.height / 2;
+    // A control inside a label is pressed by the label: a checkbox that is
+    // twenty-two pixels square inside a row that is forty-four pixels tall is
+    // a control a finger can hit, and it is the label that is hit.
+    var label = node.closest('label');
+    var box = label || node;
+    var boxRect = label ? label.getBoundingClientRect() : rect;
+    var cx = boxRect.left + boxRect.width / 2;
+    var cy = boxRect.top + boxRect.height / 2;
     if (cy < 0 || cy > window.innerHeight || cx < 0 || cx > window.innerWidth) continue;
-    if (rect.width < MIN_TARGET || rect.height < MIN_TARGET) {
+    if (boxRect.width < MIN_TARGET || boxRect.height < MIN_TARGET) {
       small.push({
         cls: String(node.className || '').slice(0, 40),
         label: String(node.getAttribute('aria-label') || node.textContent || '').trim().slice(0, 30),
@@ -179,8 +188,13 @@ const measure = (minTarget) => `
     var node = controls[i];
     var style = getComputedStyle(node);
     if (style.display === 'none' || style.visibility === 'hidden') continue;
+    // A control is named by its own attributes, by the text it holds, or by
+    // the label it sits in - and a control inside a label is named by the
+    // text of that label.
+    var label = node.closest('label');
     var name = (node.getAttribute('aria-label') || node.getAttribute('title')
-      || String(node.textContent || '')).trim();
+      || String(node.textContent || '')
+      || (label ? String(label.textContent || '') : '')).trim();
     if (!name) unnamed.push(String(node.className || node.tagName).slice(0, 40));
   }
   for (var u of unnamed) problems.push('a control with no name (' + u + ')');

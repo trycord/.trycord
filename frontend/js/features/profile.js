@@ -13,7 +13,7 @@ import { navigate } from '../../packages/nav.js';
 import { avatar, bannerNode } from '../ui/primitives.js';
 import { head, card, blank, fault, fold, facts } from '../ui/page.js';
 import { errorToast, confirmDialog, toast } from '../ui/overlays.js';
-import { roleNames } from '../../packages/roles.js';
+import { roleNames, roleChips as roleChipList } from '../../packages/roles.js';
 import { displayNameOf, usernameOf } from '../../packages/identity.js';
 
 const relationText = (p) => {
@@ -74,8 +74,10 @@ function actionFor(profile, refresh) {
       }, 'Remove friend'));
     }
 
+    // Writing to somebody is what a reader who has come to a profile
+    // usually wants, so it is the action that stands out.
     actions.push(el('button', {
-      class: 'btn btn--default btn--sm', type: 'button',
+      class: 'btn btn--primary btn--sm', type: 'button',
       onClick: async () => {
         try {
           const dm = await Api.createDm(profile.id);
@@ -155,6 +157,8 @@ export function renderProfile(ctx) {
       // the member list, and in the message headers.
       const roles = profile.membership && profile.membership.roles
         ? roleNames({ roles: profile.membership.roles || [] }) : [];
+      const roleChips = profile.membership && profile.membership.roles
+        ? roleChipList({ roles: profile.membership.roles || [] }) : null;
       const isSelf = String(profile.id) === String(State.user && State.user.id);
 
       // The head names the person, and carries what can be done about them.
@@ -177,29 +181,37 @@ export function renderProfile(ctx) {
             el('p', { class: 'pagehead-kicker' }, '@' + profile.username),
             el('p', { class: 'profile-name' }, name),
             profile.statusText ? el('p', { class: 'profile-status' }, profile.statusText) : null,
-            roles.length
-              ? el('p', { class: 'profile-roles' }, roles)
-              : null)),
+            roleChips
+              ? el('p', { class: 'profile-roles' }, roleChips)
+              : (roles.length ? el('p', { class: 'profile-roles' }, roles) : null))),
         el('div', { class: 'fold fold--tight' },
           card({
             label: 'Facts',
             glyph: 'info',
             body: facts([
-              { value: profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '—', label: 'Joined' },
+              { value: profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '—', label: 'Joined Trycord' },
               profile.membership && profile.membership.joinedAt
                 ? { value: new Date(profile.membership.joinedAt).toLocaleDateString(), label: 'In this community' }
                 : null,
+              profile.statusText ? { value: profile.statusText, label: 'Status' } : null,
             ]),
           }),
           profile.bio ? card({
             label: 'About', glyph: 'file',
             body: el('p', { class: 'lede' }, profile.bio),
           }) : null,
-          profile.membership && profile.membership.joinedAt ? card({
-            label: 'In this community', glyph: 'users',
-            body: el('div', { class: 'lede' }, 'Sitting in this community since '
-              + new Date(profile.membership.joinedAt).toLocaleDateString() + '.'),
-          }) : null));
+          // The community they are in, and what they are in it - said once,
+          // and not twice.
+          profile.membership && profile.membership.roles && profile.membership.roles.length
+            ? card({
+              label: 'In this community', glyph: 'users',
+              body: el('div', { class: 'lede' },
+                profile.membership.joinedAt
+                  ? 'Here since ' + new Date(profile.membership.joinedAt).toLocaleDateString() + '.'
+                  : 'Here.',
+                roleChips ? el('p', { class: 'profile-roles' }, roleChips) : null),
+            })
+            : null));
     } catch (e) {
       if (mine !== version) return;
       replaceChildren(identity, fold([

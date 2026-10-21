@@ -1096,6 +1096,8 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   display: inline-flex;
   align-items: center;
   min-height: var(--m-tap);
+  /* Wide enough to hit: a finger does not aim. */
+  min-width: var(--m-tap);
   padding: 0 14px;
   border: 0;
   border-radius: var(--tc-radius-pill);
@@ -1589,7 +1591,13 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
-.m-pub__back { display: grid; place-items: center; color: var(--text-2); text-decoration: none; }
+/* The way back, on the public pages. It is a link and it is pressed with a
+   finger, so it is as tall as a finger can reach. */
+.m-pub__back {
+  display: grid; place-items: center;
+  min-width: var(--m-tap); min-height: var(--m-tap);
+  color: var(--text-2); text-decoration: none;
+}
 .m-pub__title { font-size: var(--fs-body); font-weight: var(--weight-strong); color: var(--text-1); }
 .m-pub__body {
   flex: 1 1 auto;
