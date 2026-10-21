@@ -100,8 +100,8 @@ function describeConfiguration() {
   //
   // The values come from the instance's own settings, so an administrator who
   // changes the port in the console changes the port the relay binds. The
-  // deployment's environment outranks them, as it outranks every other
-  // setting.
+  // deployment's environment is the seed for a setting that has never been
+  // saved, and the fallback for a process that has not read the database.
   const listenHost = String(setting('voice.mesh.turnHost', process.env.TRYCORD_TURN_HOST || '::')).trim();
   const listenPort = Number(setting('voice.mesh.turnPort', process.env.TRYCORD_TURN_PORT || 3478));
   // The published address. The instance knows its own public address, and
@@ -430,10 +430,12 @@ async function ticketIsGood(ticket) {
 
 // One setting of the instance, read the way everything else is read.
 //
-// The deployment's environment outranks the instance's saved value, and the
-// saved value outranks the default. A process that has not read the
-// database has the environment and the default, which is enough to run the
-// relay and not enough to change it.
+// The instance's saved value is the one in force, and the deployment's
+// environment is what it falls back to - the same rule every setting
+// follows, so a restart cannot quietly undo a change an administrator
+// made. A process that has not read the database has the environment and
+// the default, which is enough to run the relay and not enough to change
+// it.
 function setting(key, fallback) {
   try {
     const value = settings.read(key, fallback);
@@ -513,9 +515,9 @@ function renderConfigPage(state) {
   const lines = [];
 
   lines.push('<h1>Configure the relay</h1>');
-  lines.push('<p class="lede">The in-house STUN and TURN service. These are the instance\'s own settings, '
-    + 'and the deployment\'s environment outranks them: a value that comes from the environment is shown as '
-    + 'such, and changing it here changes nothing until the environment stops saying it.</p>');
+  lines.push('<p class="lede">The in-house STUN and TURN service. These are the instance\'s own settings: '
+    + 'the value the instance saved is the one in force, and the deployment\'s environment is what it '
+    + 'falls back to until something is saved here.</p>');
 
   if (view.saved) lines.push('<p class="saved">' + escapeHtml(view.saved) + '</p>');
   if (view.problem) lines.push('<p class="problem">' + escapeHtml(view.problem) + '</p>');
