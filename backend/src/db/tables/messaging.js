@@ -69,9 +69,14 @@ module.exports = (engine) => [
       PRIMARY KEY (user_id, channel_id)
     )${engine}`,
 
+  // A conversation of two people is identified by its pair key. A
+  // conversation of more than two is a group, and a group has a name - which
+  // is what its readers see, because "General" on its own says nothing about
+  // which conversation it is.
   `CREATE TABLE IF NOT EXISTS dm_conversations (
       id         VARCHAR(64) PRIMARY KEY,
       pair_key   VARCHAR(129) UNIQUE,
+      name       VARCHAR(255),
       created_at VARCHAR(64) NOT NULL,
       updated_at VARCHAR(64) NOT NULL
     )${engine}`,

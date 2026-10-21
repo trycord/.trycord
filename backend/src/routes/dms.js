@@ -76,6 +76,23 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 20 }), 
   } catch (e) { serviceError(res, e); }
 });
 
+// A conversation with more than two people in it.
+//
+// The people have to be able to open a conversation with the person who
+// creates it: the same gate a one-to-one conversation goes through, so a
+// group cannot be used to reach somebody who has said no.
+//
+// The group route has a budget of its own: it is rare, and it is not the
+// same cost as writing a message, and the other routes in this router would
+// otherwise spend it.
+router.post('/groups', auth.requireVerified,
+  rateLimit({ windowMs: 60000, max: 10, key: 'dm-groups' }), async (req, res, next) => {
+  try {
+    const group = await dms.createGroup({ id: req.user.id }, req.body || {});
+    res.status(201).json(group);
+  } catch (e) { serviceError(res, e); }
+});
+
 // GET /api/dms/:id — full conversation payload for opening a chat.
 router.get('/:id', async (req, res, next) => {
   try {
@@ -226,6 +243,54 @@ router.patch('/:id/messages/:messageId', auth.requireVerified, rateLimit({ windo
 });
 
 // POST /api/dms/:id/read — viewing drives read state, never list loads.
+// The name of a group, and who is in it.
+//
+// Anybody in the conversation may do this: a name is what the people in the
+// conversation call it, and it is not a setting of the instance.
+router.patch('/:id', auth.requireVerified,
+  rateLimit({ windowMs: 60000, max: 20, key: 'dm-groups' }), async (req, res, next) => {
+  try {
+    res.json(await dms.renameGroup(req.params.id, req.user.id, (req.body || {}).name));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Somebody joins a group.
+//
+// The same gate a one-to-one conversation goes through: the person being
+// added has to be somebody the person adding them can open a conversation
+// with.
+router.post('/:id/members', auth.requireVerified,
+  rateLimit({ windowMs: 60000, max: 20, key: 'dm-groups' }), async (req, res, next) => {
+  try {
+    res.json(await dms.addGroupMember(req.params.id, req.user.id, (req.body || {}).userId));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Somebody leaves a group.
+//
+// A conversation of two people cannot lose one of them: it would not be a
+// conversation any more.
+//
+// The address is the one that leaves, and the member who is taken out has
+// their own address - so the two are never confused for each other.
+router.delete('/:id/members', auth.requireVerified,
+  rateLimit({ windowMs: 60000, max: 20, key: 'dm-groups' }), async (req, res, next) => {
+  try {
+    res.json(await dms.leaveGroup(req.params.id, req.user.id));
+  } catch (e) { serviceError(res, e); }
+});
+
+// Somebody is taken out of a group.
+//
+// The member is named in the address, so leaving and removing are two
+// different things and neither of them is guessed at.
+router.delete('/:id/members/:userId', auth.requireVerified,
+  rateLimit({ windowMs: 60000, max: 20, key: 'dm-groups' }), async (req, res, next) => {
+    try {
+      res.json(await dms.removeGroupMember(req.params.id, req.user.id, req.params.userId));
+    } catch (e) { serviceError(res, e); }
+  });
+
 router.post('/:id/read', async (req, res, next) => {
   try {
     const out = await dms.markRead(req.user.id, req.params.id);

@@ -178,6 +178,35 @@ const MIGRATIONS = [
       }
     },
   },
+  {
+    version: 4,
+    name: '3.7.0 group conversations',
+    // A conversation of more than two people is a group, and a group has a
+    // name.
+    //
+    // The members were always in `dm_members`, so the table could hold a
+    // group and nothing could create one. The name is the one thing that is
+    // missing, and it is a column.
+    //
+    // The column is added, and the existing rows keep their null name: a
+    // one-to-one conversation has no name, and the pair key is its identity.
+    //
+    // Not transactional: MySQL commits DDL implicitly, so a transaction
+    // around it would promise an atomicity the engine does not give. The
+    // statement is written so that re-running it is safe.
+    transactional: false,
+    async up(conn) {
+      const columns = await tableColumns(conn, 'dm_conversations');
+      if (columns.includes('name')) return;
+      await conn.exec('ALTER TABLE dm_conversations ADD COLUMN name VARCHAR(255) NULL');
+    },
+    async verify(conn) {
+      const columns = await tableColumns(conn, 'dm_conversations');
+      if (!columns.includes('name')) {
+        throw new Error('the conversation name column is missing');
+      }
+    },
+  },
 ];
 
 // The version this build knows about.
@@ -204,6 +233,28 @@ async function readLedger(conn) {
     durationMs: Number(r.duration_ms || 0),
     detail: r.detail || null,
   }));
+}
+
+// The columns a table has.
+//
+// A migration that adds a column has to know whether it is already there:
+// "add the column if it is missing" is the only statement that is safe to
+// run twice, and this build's migrations may be run more than once.
+async function tableColumns(conn, name) {
+  try {
+    if (conn.dialect === 'mysql') {
+      const rows = await conn.all(
+        'SELECT COLUMN_NAME AS name FROM INFORMATION_SCHEMA.COLUMNS '
+        + 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+        [name]
+      );
+      return (rows || []).map((row) => String(row.name));
+    }
+    const rows = await conn.all('PRAGMA table_info(' + name + ')');
+    return (rows || []).map((row) => String(row.name));
+  } catch {
+    return [];
+  }
 }
 
 async function tableExists(conn, name) {

@@ -7,7 +7,9 @@
 import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar, empty, loading, failure, badge } from '../components.js';
-import { State, dmPeer, nameOf, refreshDms, presenceOf, on as onStore } from '../../../packages/store.js';
+import {
+  State, dmPeer, dmName, dmPeople, nameOf, refreshDms, presenceOf, on as onStore,
+} from '../../../packages/store.js';
 import { path, navigate } from '../../../packages/nav.js';
 import { relativeTime } from '../../../packages/format.js';
 import Api from '../../../packages/api.js';
@@ -82,7 +84,10 @@ export function renderDms() {
 
   function rowFor(dm) {
     const peer = peerOf(dm);
-    const name = peer ? nameOf(peer) : 'Conversation';
+    // A group is called by its name and has no single person on the other
+    // side, so it is shown by a mark rather than a face.
+    const group = !!(dm && dm.isGroup);
+    const name = group ? dmName(dm) : (peer ? nameOf(peer) : 'Conversation');
     const updated = dm.updatedAt || dm.updated_at
       || (dm.lastMessage && (dm.lastMessage.created_at || dm.lastMessage.createdAt));
     const unread = Number(dm.unreadCount) || 0;
@@ -90,16 +95,20 @@ export function renderDms() {
       class: 'm-row' + (unread ? ' is-unread' : ''),
       href: path('/dms/' + dm.id),
     },
-      el('span', { class: 'm-row__lead' }, peer ? avatar(peer, { size: 'md', presence: true, decorative: true }) : el('span', { class: 'm-avatar m-avatar--md' }, '')),
+      el('span', { class: 'm-row__lead' }, peer && !group
+        ? avatar(peer, { size: 'md', presence: true, decorative: true })
+        : el('span', { class: 'm-avatar m-avatar--md' }, icon(group ? 'users' : 'message', { size: 16 }))),
       el('span', { class: 'm-row__body' },
         el('span', { class: 'm-row__title truncate' }, name),
-        el('span', { class: 'm-row__sub truncate' }, preview(dm))),
+        el('span', { class: 'm-row__sub truncate' }, group
+          ? String(dm.memberCount || 0) + ' people · ' + preview(dm)
+          : preview(dm))),
       el('span', { class: 'm-row__trailing' },
         badge(unread),
         updated ? el('span', { class: 'm-row__time' }, relativeTime(updated)) : null));
     // A conversation is one of the things a person can be asked for, so the row
     // carries that person's actions on a long press.
-    if (peer) attachLongPress(node, () => personActions(peer), { title: name });
+    if (peer && !group) attachLongPress(node, () => personActions(peer), { title: name });
     return node;
   }
 
