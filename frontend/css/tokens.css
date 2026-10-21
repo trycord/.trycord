@@ -74,10 +74,29 @@
   --ease: var(--tc-ease);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
 
-  /* -- layering ------------------------------------------------------------ */
+  /* -- layering ------------------------------------------------------------
+   * The bands, from the page upwards:
+   *
+   *   nav    the shell's own chrome - the command bar
+   *   scrim  the backdrop that dims the page behind a panel
+   *   panel  the shell's panels - the place column, the inspector, the
+   *          voice dock. One band, so a panel is never above another
+   *          panel, and a panel is never above the menus, the toasts or
+   *          the dialogs that belong to the reader's attention.
+   *   menu   the menus
+   *   overlay the sheets and the dialogs
+   *   toast  the notices
+   *   popover the thing that follows the pointer
+   *   modal  the last word
+   *
+   * A panel that sits above the menus is a panel that covers the menu the
+   * reader just opened; a panel above the toasts hides the answer to what
+   * they just did. So the panels are one band, and the band is below every
+   * one of those.
+   */
   --z-nav: 30;
-  --z-drawer: 60;
-  --z-scrim: 55;
+  --z-scrim: 35;
+  --z-panel: 40;
   --z-menu: 75;
   --z-overlay: 80;
   --z-toast: 90;

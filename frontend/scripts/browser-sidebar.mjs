@@ -1,21 +1,28 @@
 #!/usr/bin/env node
 'use strict';
 
-// The sidebar, at the width where it is a drawer.
+// The sidebar, at both widths.
 //
 // At a narrow width the place column is drawn over the page with a scrim
-// behind it, and the scrim is there to close the column when the reader
-// taps outside it. If the scrim is drawn over the column instead of behind
-// it, the column cannot be touched at all: it appears, and every one of its
-// links does nothing.
+// behind it, and the scrim is there to close the column when the reader taps
+// outside it. If the scrim is drawn over the column instead of behind it, the
+// column cannot be touched at all: it appears, and every one of its links
+// does nothing.
 //
 // So this measures the thing that matters: is the column above the scrim, and
 // does a tap on one of its links land on the link?
+//
+// And it measures the other thing that matters: the column glides. It opens
+// and it closes by moving, not by appearing and vanishing between one frame
+// and the next - a column that snaps reads as a fault rather than as a
+// choice. The check reads the width twice while the transition is running and
+// refuses a column that went from open to shut in one step.
 
 import { harness, wait, writeHarnessDocument } from './browser-harness.mjs';
 
 const PORT = Number(process.env.BROWSER_APP_PORT || 9401);
 const WIDTH = 390;
+const DESK = 1280;
 
 const run = await harness(await (await import('./browser-harness.mjs')).freePort(PORT));
 
@@ -24,6 +31,20 @@ const ok = (condition, message) => {
   console.log((condition ? '  ok    ' : '  FAIL  ') + message);
   if (!condition) failures += 1;
 };
+
+// The width of the column, and whether it is on its way somewhere.
+const measure = () => run.page.evaluate(`
+  var column = document.querySelector('.context');
+  var root = document.querySelector('.ws');
+  if (!column) return { error: 'there is no column' };
+  var box = column.getBoundingClientRect();
+  return {
+    nav: String((root || {}).dataset?.nav || 'none'),
+    width: Math.round(box.width),
+    opacity: Number(getComputedStyle(column).opacity),
+    transition: getComputedStyle(column).transitionDuration,
+  };
+`);
 
 try {
   const document = writeHarnessDocument();
@@ -112,6 +133,92 @@ try {
     console.log('        the stage z', measured.stageZ, measured.stagePosition,
       ' the scrim z', measured.scrimZ, measured.scrimShown);
   }
+
+  // -- the layers -------------------------------------------------------------
+  //
+  // The shell's panels - the place column, the inspector, the voice dock -
+  // share one band, and that band is below the menus, the toasts and the
+  // dialogs. A panel that sat above all of those would cover the menu the
+  // reader just opened, and the answer to what they just did.
+  //
+  // The backdrop that dims the page sits below the panels: a panel under the
+  // backdrop cannot be touched at all, which is how a drawer ends up visible
+  // and dead.
+  const layers = await run.page.evaluate(`
+    var root = document.querySelector('.ws');
+    var read = function (selector) {
+      var node = document.querySelector(selector);
+      if (!node) return null;
+      return Number(getComputedStyle(node).zIndex);
+    };
+    var tokens = getComputedStyle(root);
+    return {
+      column: read('.context'),
+      inspector: read('.inspector'),
+      dock: read('.dock'),
+      scrim: read('.scrim'),
+      panel: Number(tokens.getPropertyValue('--z-panel')),
+      scrimBand: Number(tokens.getPropertyValue('--z-scrim')),
+      menu: Number(tokens.getPropertyValue('--z-menu')),
+      toast: Number(tokens.getPropertyValue('--z-toast')),
+      modal: Number(tokens.getPropertyValue('--z-modal')),
+    };
+  `);
+
+  ok(layers.column !== null && layers.panel !== null,
+    'the bands can be read: ' + JSON.stringify(layers));
+  if (layers.column !== null && layers.panel !== null) {
+    ok(layers.column === layers.panel,
+      'the column is in the panels\' band (' + layers.column + ', the band is ' + layers.panel + ')');
+    ok(layers.inspector === null || layers.inspector === layers.panel,
+      'the inspector is in the same band as the column (' + layers.inspector + ')');
+    ok(layers.dock === null || layers.dock === layers.panel,
+      'the voice dock is in the same band as the column (' + layers.dock + ')');
+    ok(layers.column < layers.menu && layers.column < layers.toast
+      && layers.column < layers.modal,
+      'the column is below the menus, the toasts and the dialogs ('
+      + layers.column + ' against ' + layers.menu + '/' + layers.toast + '/' + layers.modal + ')');
+  }
+
+  // -- the glide, on a desk ---------------------------------------------------
+  //
+  // The column is a column on a desk: it takes its room from the stage, and
+  // it takes it back. The check reads the width twice while the transition is
+  // running. A column that was open and is shut in one reading has snapped,
+  // and a snapping column is what the reader asked to have fixed.
+  await run.page.send('Emulation.setDeviceMetricsOverride', {
+    width: DESK, height: 900, deviceScaleFactor: 1, mobile: false,
+  });
+  await wait(600);
+
+  const before = await measure();
+  ok(!before.error, 'the column can be measured on a desk: ' + (before.error || ''));
+  ok(before.width > 100, 'the column is open on a desk (it is ' + before.width + ' wide)');
+
+  // Close it, and read the width while it is still moving.
+  await clickNav();
+  await wait(60);
+  const during = await measure();
+  await wait(600);
+  const after = await measure();
+
+  ok(after.nav === 'hidden', 'the column is closed (the state is ' + after.nav + ')');
+  ok(after.width < 4, 'the column has gone (it is ' + after.width + ' wide)');
+  ok(during.width < before.width && during.width > after.width,
+    'the column glided rather than snapped ('
+    + before.width + ' -> ' + during.width + ' -> ' + after.width + ')');
+
+  // And open it again, the same way.
+  await clickNav();
+  await wait(60);
+  const opening = await measure();
+  await wait(600);
+  const opened = await measure();
+
+  ok(opened.width > 100, 'the column is open again (it is ' + opened.width + ' wide)');
+  ok(opening.width > after.width && opening.width < opened.width,
+    'the column glided open rather than appearing ('
+    + after.width + ' -> ' + opening.width + ' -> ' + opened.width + ')');
 } catch (error) {
   console.log('  FAIL  the run failed: ' + ((error && error.message) || error));
   failures += 1;

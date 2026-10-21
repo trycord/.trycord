@@ -45,6 +45,14 @@ router.get('/', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) 
 
     const rows = await runSearch(parsed, { userId: req.user.id, serverId, limit });
 
+    // The conversation each hit came from.
+    //
+    // A line on its own is often cryptic: "no" means nothing until the line
+    // before it is read. So each hit carries the messages immediately around
+    // it - the same channel, so exactly as visible as the hit itself.
+    const context = require('../services/search-context');
+    await context.attach(rows).catch(() => { /* a search without context is still a search */ });
+
     // The reader's own recent searches, recorded after the answer so a
     // refused search is not in the history.
     await searchHistory.record(req.user.id, q);

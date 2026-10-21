@@ -111,10 +111,15 @@ function routes() {
  * `minTarget` is the smallest control the device in hand can hit: 24 pixels
  * for a mouse, 44 for a finger.
  */
-const measure = (minTarget) => `
+const measure = (minTarget, access) => `
   var root = document.body;
   var problems = [];
   var MIN_TARGET = ${Number(minTarget)};
+  // The pages a reader who is not signed in is meant to see: the sign-in
+  // screen, the password reset, the second factor. On those a signed-out
+  // client is the page, and on every other page it is a fault.
+  var MAY_BE_SIGNED_OUT = ${JSON.stringify(['guest', 'public'])};
+  var ACCESS = ${JSON.stringify(access || 'member')};
 
   // The page scrolls sideways.
   var overflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
@@ -199,6 +204,20 @@ const measure = (minTarget) => `
   }
   for (var u of unnamed) problems.push('a control with no name (' + u + ')');
 
+  // The harness itself.
+  //
+  // A measurement of a page the harness never loaded is a measurement of
+  // nothing, and it reports itself as a clean run. So the stub has to
+  // announce that it is in place, and the reader has to be signed in -
+  // a signed-out client draws the sign-in screen, and every page then
+  // measures the same screen.
+  if (window.__trycordStub !== true) {
+    problems.push('the harness stub is not in place, so this page was not measured');
+  }
+  if (document.querySelector('.auth-page') && MAY_BE_SIGNED_OUT.indexOf(ACCESS) === -1) {
+    problems.push('the page is the sign-in screen, so the reader was not signed in');
+  }
+
   return {
     problems: problems,
     text: String(root.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 160),
@@ -243,7 +262,25 @@ try {
         }
         await wait(300);
 
-        const measured = await run.page.evaluate(measure(minTarget));
+        // The measurement can race a page that is on its way somewhere else:
+        // a link that has been followed, a gate that has just answered. The
+        // measurement is taken again once, and a page that will not hold
+        // still is a fault rather than a silence.
+        let measured = null;
+        for (let attempt = 0; attempt < 2 && !measured; attempt += 1) {
+          try {
+            measured = await run.page.evaluate(measure(minTarget, entry.access));
+          } catch (error) {
+            if (attempt === 1) {
+              measured = {
+                problems: ['the page would not hold still long enough to be measured (' + ((error && error.message) || error) + ')'],
+                text: '', height: 0, errors: [],
+              };
+            } else {
+              await wait(400);
+            }
+          }
+        }
         const faults = measured.problems.slice();
         for (const error of measured.errors || []) faults.push(error);
         if (measured.height < 120) faults.push('the page drew almost nothing');

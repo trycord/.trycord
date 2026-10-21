@@ -1380,6 +1380,26 @@
 }
 .search-hit { align-items: start; }
 .search-hit-glyph { display: inline-flex; color: var(--text-3); }
+
+/* The conversation a search hit came from.
+   The lines around the hit, so the reader can see the exchange the hit was
+   part of without leaving the search. The hit itself is not repeated: the
+   reader has just read it. */
+.search-context {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: 6px; padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+.search-context__line { display: flex; gap: 8px; min-width: 0; }
+.search-context__who {
+  flex: 0 0 auto; max-width: 14ch;
+  color: var(--text-3); font-size: var(--fs-micro);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.search-context__text {
+  color: var(--text-3); font-size: var(--fs-micro);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .saved-row, .history-row { cursor: pointer; }
 
 /* -- the filter bar ---------------------------------------------------------- */
