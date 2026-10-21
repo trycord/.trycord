@@ -62,7 +62,25 @@ function routes() {
   const out = [];
   for (const page of PAGES) {
     if (!page.route) continue;
-    if (ONLY.length && !ONLY.includes(page.route)) continue;
+    // The filter takes either the pattern or the address it fills into, so
+    // a route can be asked for by the address a reader would type.
+    if (ONLY.length && !ONLY.includes(page.route)) {
+      const filled = page.route.replace(/:[a-zA-Z]+/g, (match) => {
+        const name = match.slice(1);
+        if (name === 'slug') return 'the-community';
+        if (name === 'channel') return 'c1';
+        if (name === 'code') return 'join-me';
+        if (name === 'token') return 'a-token';
+        if (name === 'space') return 'space-1';
+        if (name === 'document' || name === 'doc') return 'doc-1';
+        if (name === 'board') return 'board-1';
+        if (name === 'card') return 'card-1';
+        if (name === 'event') return 'event-1';
+        if (name === 'poll') return 'poll-1';
+        return 's1';
+      });
+      if (!ONLY.includes(filled)) continue;
+    }
     const route = page.route.replace(/:[a-zA-Z]+/g, (match) => {
       const name = match.slice(1);
       if (name === 'slug') return 'the-community';
@@ -196,6 +214,8 @@ try {
       });
 
       for (const entry of all) {
+        const started = Date.now();
+        process.stdout.write('      ' + entry.route + '...');
         await run.nameRoute(entry.route);
         await run.page.send('Page.navigate', { url: 'file://' + document });
         for (let i = 0; i < 60; i++) {
@@ -214,6 +234,7 @@ try {
         for (const error of measured.errors || []) faults.push(error);
         if (measured.height < 120) faults.push('the page drew almost nothing');
 
+        process.stdout.write(' ' + Math.round((Date.now() - started) / 1000) + 's\n');
         if (faults.length) {
           failures += faults.length;
           console.log('  FAIL  ' + width + 'px ' + entry.route + ' (' + entry.id + ')');

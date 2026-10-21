@@ -185,6 +185,32 @@ export const STUB = `
     window.localStorage.setItem('trycord.token.http://localhost:9971', 'harness-token');
   } catch (e) { /* the client will be signed out */ }
 
+  // The history, on a document off disk.
+  //
+  // A document on disk cannot change its own address, so a history write
+  // throws and the navigation never happens: a community that opens its
+  // first channel would ask for the same page for ever, because the route it
+  // asked for was never recorded.
+  //
+  // The harness gives it a history that works, and the route it was asked
+  // for is remembered, so a page that navigates actually goes there.
+  (function () {
+    var realPush = history.pushState.bind(history);
+    var realReplace = history.replaceState.bind(history);
+    function record(url) {
+      if (typeof url !== 'string' || url.charAt(0) !== '/') return;
+      window.__trycordRoute = url;
+    }
+    history.pushState = function (state, title, url) {
+      record(url);
+      try { realPush(state, title, location.pathname); } catch (e) { /* the address cannot change */ }
+    };
+    history.replaceState = function (state, title, url) {
+      record(url);
+      try { realReplace(state, title, location.pathname); } catch (e) { /* the address cannot change */ }
+    };
+  })();
+
   window.fetch = function (input, options) {
     var url = String(input);
     var method = String((options && options.method) || 'GET').toUpperCase();
