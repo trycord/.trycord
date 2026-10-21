@@ -17,6 +17,7 @@ import {
 import { path, navigate, BASE } from '../../../packages/nav.js';
 import { setOverride, siblingMount } from '../../../packages/chooser.js';
 import { menu, sheet, confirm, toast, attachLongPress } from '../ui.js';
+import { createCropper } from '../../../packages/imageCropper.js';
 import { personActions, openPerson } from '../person.js';
 import {
   iconFor, openChannelEditor, openCategoryEditor,
@@ -1059,10 +1060,46 @@ function pickServerImage(serverId, kind, done) {
     const file = input.files && input.files[0];
     input.remove();
     if (!file) return;
-    try { await Api.setServerImage(serverId, kind, file); toast('Image updated.', { type: 'success' }); if (done) done(); }
+    // The part of the picture to use is chosen first: a community's picture
+    // is its own art, so the frame keeps whatever shape it was drawn in, and
+    // the administrator still chooses which part of it is the picture.
+    const chosen = await chooseImagePart(file);
+    if (!chosen) return;
+    try { await Api.setServerImage(serverId, kind, chosen); toast('Image updated.', { type: 'success' }); if (done) done(); }
     catch (error) { toast(error.message, { type: 'danger' }); }
   });
   input.click();
+}
+
+// The part of a picture to use, chosen over the picture.
+function chooseImagePart(file) {
+  return new Promise((resolve) => {
+    createCropper(file, { shape: 'free', size: 512 }).then((cropper) => {
+      if (!cropper) {
+        // A browser that cannot draw the picture cannot crop it either, so
+        // the picture goes up as it is.
+        resolve(file);
+        return;
+      }
+      const done = (picked) => {
+        cropper.destroy();
+        layer.close();
+        resolve(picked);
+      };
+      const layer = sheet({
+        title: 'Choose the picture',
+        body: el('div', { class: 'm-stack' },
+          el('p', { class: 'm-section__note' }, 'Drag the frame over the part of the picture to use.'),
+          cropper.node),
+        footer: el('div', { class: 'm-actions' },
+          el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => done(null) }, 'Cancel'),
+          el('button', {
+            class: 'm-btn m-btn--sm m-btn--primary', type: 'button',
+            onClick: async () => { done(await cropper.result() || file); },
+          }, 'Use this picture')),
+      });
+    }).catch(() => resolve(file));
+  });
 }
 
 async function removeServerImage(serverId, kind, done) {

@@ -716,6 +716,40 @@
 /* == settings surfaces ============================================================== */
 
 .settings-profile-top { display: flex; align-items: center; gap: 14px; }
+/* The cropper: the picture, and the part of it the reader chose.
+   The shade is the picture with the chosen part cut out of it, so the
+   choice is visible rather than described. */
+.cropper {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--panel-3);
+  touch-action: none;
+  user-select: none;
+}
+.cropper__image { display: block; max-width: 100%; }
+.cropper__shade {
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, .58);
+  pointer-events: none;
+}
+.cropper__selection {
+  position: absolute;
+  border: 2px solid var(--brand);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .5);
+  cursor: move;
+  touch-action: none;
+}
+.cropper__handle {
+  position: absolute;
+  right: -7px; bottom: -7px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--brand);
+  background: var(--panel-1);
+  cursor: nwse-resize;
+}
+
 /* The mark that says a bot is a bot. A reader should not have to guess
    whether they are talking to a person, and the mark is used wherever a
    bot's name is shown: in a message, in a member list, in a conversation

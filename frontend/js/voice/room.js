@@ -25,8 +25,22 @@ function memberOf(serverId, userId) {
 }
 
 function rosterRow(participant, serverId, { small } = {}) {
-  const person = memberOf(serverId, participant.userId) || { id: participant.userId };
-  const label = person.nickname || nameOf(person) || 'Someone';
+  // The name comes from the room's own list of people, which the server
+  // sends with the roster. The member list is the second place to look, and
+  // a name that neither of them knows is said as "Someone" - a room that
+  // calls everybody "Unknown" tells the reader nothing.
+  const fromRoom = {
+    id: participant.userId,
+    username: participant.username || null,
+    displayName: participant.displayName || null,
+    nickname: participant.nickname || null,
+    avatarUrl: participant.avatarUrl || null,
+  };
+  const known = fromRoom.displayName || fromRoom.username || fromRoom.nickname;
+  const person = known
+    ? fromRoom
+    : (memberOf(serverId, participant.userId) || fromRoom);
+  const label = person.nickname || person.displayName || person.username || 'Someone';
   const side = participant.connection === 'reconnecting'
     ? el('span', { class: 'chip chip--warn' }, 'Reconnecting')
     : participant.connection === 'connecting'
@@ -98,7 +112,14 @@ export function renderVoiceRoom(channel, serverId) {
       Api.voiceMeshPeers(channel.id).then((room) => {
         if (current().joined) return; // the join landed while this was away
         const ids = (room && room.participants) || [];
-        const preview = ids.map((userId) => ({ userId: String(userId), connection: 'live', muted: false, speaking: false }));
+        // The people come with the roster, so the room can name them before
+        // the reader has joined it.
+        const people = (room && Array.isArray(room.people)) ? room.people : [];
+        const byId = new Map(people.map((person) => [String(person.userId), person]));
+        const preview = ids.map((userId) => Object.assign(
+          { userId: String(userId), connection: 'live', muted: false, speaking: false },
+          byId.get(String(userId)) || {},
+        ));
         const note = (room && (room.iceServers || []).length)
           ? 'Peer-to-peer audio, straight between members. The server only relays the introduction.'
           : 'No STUN or TURN is configured on this instance; connections may only form on the same network.';
