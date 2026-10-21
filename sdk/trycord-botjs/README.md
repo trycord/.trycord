@@ -67,6 +67,36 @@ const message = messages[0]!;
 await message.reply('And hello to you.');
 ```
 
+### Declaring a command
+
+A command is declared in the community, so a member sees it there. The
+declaration needs the `communities:write` and `commands:write` scopes, and
+the application has to be one the community manages.
+
+The credential that declares it is a **person's**, not the application's own:
+the server refuses an application on this route, because a bot that could
+declare its own commands would be able to answer anything it liked.
+
+```ts
+await client.registerCommand(communityId, applicationId, {
+  name: 'ping',
+  description: 'Answers with a word.',
+  response: 'Pong.',
+  options: [{ name: 'loud', type: 'boolean' }],
+});
+```
+
+`{name}` in the response is filled in with the argument of that name, and
+`{name:something}` with the argument or with `something` when the member
+left it out. Nothing else is substituted: a response cannot reach into
+anything the declaration did not name.
+
+A command is taken away the same way it was declared:
+
+```ts
+await client.removeCommand(communityId, applicationId, commandId);
+```
+
 ## The gateway
 
 An application that can post and cannot hear anything is a mail-merge. The

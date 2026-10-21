@@ -19,3 +19,5 @@ uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
   `CommunityObject` — and the helpers that read the server's two spellings
   of one field.
 - The `Events` names, taken from the ones the server sends.
+- `client.registerCommand` and `client.removeCommand`, for the commands a
+  community's bot answers.

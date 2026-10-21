@@ -29,6 +29,7 @@ import type {
   Application,
   Channel,
   Command,
+  CommandOption,
   Community,
   Health,
   Member,
@@ -268,6 +269,48 @@ export class Client {
     const id = applicationId || this.options.applicationId || (await this.findApplicationId());
     if (!id) return [];
     return listCommands(this.rest, id);
+  }
+
+  /**
+   * Declare a command the application answers.
+   *
+   * The command is a name, a sentence about it, the arguments it takes and
+   * the answer it gives. It is declared in the community, so a member sees
+   * it there and not here.
+   *
+   * @param communityId The community's id or slug.
+   * @param applicationId The application's id.
+   * @param command What to declare.
+   */
+  async registerCommand(
+    communityId: string,
+    applicationId: string,
+    command: { name: string; description?: string; response: string; options?: CommandOption[] },
+  ): Promise<Command> {
+    const data = await this.rest.request<{ command?: Command } | Command>({
+      method: 'PUT',
+      path: `/communities/${encodeURIComponent(communityId)}`
+        + `/applications/${encodeURIComponent(applicationId)}/commands`,
+      body: command,
+    });
+    return (data && typeof data === 'object' && 'command' in data
+      ? (data as { command: Command }).command
+      : data as Command);
+  }
+
+  /**
+   * Take a command away.
+   *
+   * @param communityId The community's id or slug.
+   * @param applicationId The application's id.
+   * @param commandId The command's id.
+   */
+  async removeCommand(communityId: string, applicationId: string, commandId: string): Promise<void> {
+    await this.rest.request({
+      method: 'DELETE',
+      path: `/communities/${encodeURIComponent(communityId)}`
+        + `/applications/${encodeURIComponent(applicationId)}/commands/${encodeURIComponent(commandId)}`,
+    });
   }
 
   /**

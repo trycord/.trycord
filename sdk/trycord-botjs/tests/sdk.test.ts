@@ -176,6 +176,42 @@ test('the client', async (t) => {
   });
 });
 
+test('the commands', async (t) => {
+  await t.test('a command is declared on the route the server has', async () => {
+    const { fetchImpl, calls } = stubFetch([
+      { status: 200, body: { command: { id: 'c1', name: 'ping', response: 'Pong.' } } },
+    ]);
+    const client = new Client({ baseUrl: 'https://example.test', token: 'x' });
+    client.rest.fetchImpl = fetchImpl as never;
+    const command = await client.registerCommand('s1', 'a1', {
+      name: 'ping',
+      description: 'Answers with a word.',
+      response: 'Pong.',
+      options: [{ name: 'loud', type: 'boolean' }],
+    });
+    assert.equal(command.name, 'ping');
+    const first = calls[0]!;
+    assert.equal(first.url, 'https://example.test/api/v1/communities/s1/applications/a1/commands');
+    assert.equal(first.init.method, 'PUT');
+    assert.deepEqual(JSON.parse(first.init.body as string), {
+      name: 'ping',
+      description: 'Answers with a word.',
+      response: 'Pong.',
+      options: [{ name: 'loud', type: 'boolean' }],
+    });
+  });
+
+  await t.test('a command is taken away', async () => {
+    const { fetchImpl, calls } = stubFetch([{ status: 200, body: { ok: true } }]);
+    const client = new Client({ baseUrl: 'https://example.test', token: 'x' });
+    client.rest.fetchImpl = fetchImpl as never;
+    await client.removeCommand('s1', 'a1', 'c1');
+    const first = calls[0]!;
+    assert.equal(first.url, 'https://example.test/api/v1/communities/s1/applications/a1/commands/c1');
+    assert.equal(first.init.method, 'DELETE');
+  });
+});
+
 test('the errors', async (t) => {
   await t.test('a refusal says whether trying again could work', () => {
     assert.equal(new HttpError(500, 'X', 'no').retryable, true);
