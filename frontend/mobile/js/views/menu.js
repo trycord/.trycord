@@ -15,6 +15,7 @@ import Api from '../../../packages/api.js';
 import { screen, section } from './util.js';
 import { attachLongPress } from '../ui.js';
 import { channelActions } from '../manage.js';
+import { federatedRoute, federatedName, federatedOrigin } from '../../../packages/places.js';
 
 const GLOBAL = [
   { route: '/home', label: 'Home', icon: 'home' },
@@ -71,6 +72,27 @@ export function renderMenu() {
         el('a', { class: 'm-btn m-btn--ghost', href: path('/discover') }, 'Discover'))));
     } else {
       for (const { server, tree } of trees) host.appendChild(communitySection(server, tree));
+    }
+
+    // The communities that live on another instance, in a section of their
+    // own: a community of this instance is here, and a community on another
+    // one is a reference.
+    const federated = State.federated || [];
+    if (federated.length) {
+      const list = el('div', { class: 'm-list' });
+      for (const community of federated) {
+        list.appendChild(el('a', {
+          class: 'm-row', href: path(federatedRoute(community)),
+          'aria-label': federatedName(community) + ', ' + federatedOrigin(community),
+        },
+        el('span', { class: 'm-row__lead' }, serverMark(
+          { id: community.originCommunityId, name: federatedName(community), icon_url: community.iconUrl },
+          { size: 'sm' })),
+        el('span', { class: 'm-row__body' },
+          el('span', { class: 'm-row__title truncate' }, federatedName(community)),
+          el('span', { class: 'm-row__sub truncate' }, federatedOrigin(community)))));
+      }
+      host.appendChild(section('On other instances', list));
     }
 
     host.appendChild(accountSection());

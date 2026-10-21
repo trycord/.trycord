@@ -127,6 +127,18 @@
 }
 .rail-community .avatar { width: 38px; height: 38px; }
 .rail-divider { width: 26px; height: 1px; background: var(--line); margin: 2px 0; }
+
+/* The communities that live on another instance, in a section of their own.
+   A community of this instance is here; a community on another one is a
+   reference, and the reader is told which it is. */
+.rail-divider--federated { margin-top: var(--space-3); }
+.rail-list--federated { padding-top: var(--space-1); }
+.rail-community--federated { position: relative; }
+.rail-community--federated .avatar {
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-sm);
+}
+.rail-community--federated.is-joined .avatar { border-style: solid; }
 .rail-add { border: 1px dashed var(--line-2); color: var(--text-3); }
 .rail-add:hover { border-color: var(--brand-line); color: var(--brand); }
 

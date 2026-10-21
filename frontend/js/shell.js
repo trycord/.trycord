@@ -31,6 +31,7 @@ import {
   onPrefsChange, regionEnabled, CONTEXT_MIN, CONTEXT_MAX, STAGE_MIN, STAGE_MAX,
 } from './prefs.js';
 import { setOverride, viewportWantsMobile, siblingMount } from '../packages/chooser.js';
+import { federatedRoute, federatedName, federatedOrigin, federatedIsJoined } from '../packages/places.js';
 
 const refs = { frame: null, inspector: null };
 let contextSource = null;
@@ -231,8 +232,16 @@ function paintContext() {
 
   let parts = null;
   if (contextSource) {
-    try { parts = buildContext(contextSource.kind, contextSource.ctx, contextSource.page); }
-    catch { parts = null; }
+    try {
+      parts = buildContext(contextSource.kind, contextSource.ctx, contextSource.page);
+    } catch (error) {
+      // The column is not the page, and a column that cannot be drawn is not
+      // a reason to lose the page. The error is reported rather than
+      // swallowed, because a column that is silently empty is a column
+      // nobody can tell is broken.
+      parts = null;
+      console.error('the place column could not be drawn:', error);
+    }
   }
 
   if (!parts) {
@@ -332,6 +341,29 @@ function renderRail() {
   }, icon('plus', { size: 20 })));
 
   frame.rail.replaceChildren(home, el('div', { class: 'rail-divider' }), list);
+
+  // The communities that live on another instance.
+  //
+  // They are a section of their own, below a divider: a community of this
+  // instance is here, and a community on another one is a reference. Mixing
+  // them in one list makes both of them harder to tell apart, and the reader
+  // is looking for one of them in particular.
+  const federated = State.federated || [];
+  if (federated.length) {
+    const section = el('div', { class: 'rail-list rail-list--federated' });
+    for (const community of federated) {
+      const mark = el('a', {
+        class: 'rail-item rail-community rail-community--federated'
+          + (federatedIsJoined(community) ? ' is-joined' : ''),
+        href: path(federatedRoute(community)),
+        title: federatedName(community) + ' — ' + federatedOrigin(community),
+        'aria-label': federatedName(community) + ', ' + federatedOrigin(community),
+      }, serverMark({ id: community.originCommunityId, name: federatedName(community), icon_url: community.iconUrl }, { size: 'md' }));
+      section.appendChild(mark);
+    }
+    frame.rail.appendChild(el('div', { class: 'rail-divider rail-divider--federated' }));
+    frame.rail.appendChild(section);
+  }
 }
 
 // The community the address is inside, if it is inside one. The rail lights it

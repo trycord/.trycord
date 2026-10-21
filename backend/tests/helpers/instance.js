@@ -102,6 +102,11 @@ function freePort() {
  */
 async function startInstance(options = {}) {
   const dir = options.dir || fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-run-'));
+  // A run that is interrupted - a failure before the cleanup is registered, or
+  // a killed process - leaves its directory behind, and a hundred of those
+  // fill the disk the tests are run on. So they are taken away when the
+  // process goes, whatever happened to it.
+  rememberDirectory(dir);
   fs.mkdirSync(dir, { recursive: true });
 
   const env = Object.assign(baseEnv(dir), options.env || {});
@@ -167,9 +172,31 @@ async function startInstance(options = {}) {
       await instance.close();
       this.restoreEnv();
       try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
+      usedDirectories.delete(dir);
     },
   };
 }
+// The directories the instances of this process have used.
+//
+// They are removed when the instance stops, and again when the process goes:
+// a test that fails before its cleanup is registered, or a run that is
+// interrupted, would otherwise leave a database behind every time.
+const usedDirectories = new Set();
+let cleanupOnExit = false;
+
+function rememberDirectory(dir) {
+  usedDirectories.add(dir);
+  if (cleanupOnExit) return;
+  cleanupOnExit = true;
+  const forget = () => {
+    for (const one of usedDirectories) {
+      try { fs.rmSync(one, { recursive: true, force: true }); } catch { /* best effort */ }
+    }
+    usedDirectories.clear();
+  };
+  process.on('exit', forget);
+}
+
 /**
  * A small HTTP client bound to one instance.
  *

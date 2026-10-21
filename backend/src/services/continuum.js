@@ -838,6 +838,57 @@ async function listRemoteCommunities() {
   return out;
 }
 
+// The federated communities, for the reader.
+//
+// A community that lives on another instance is a reference, not a copy. This
+// is the list the reader sees, and it is the list the community list is
+// built from: the same communities, in a section of their own, because a
+// community of this instance and a community of another one are different
+// things and mixing them in one list makes both of them harder to read.
+//
+// What is here is what this instance knows about. The instance it lives on
+// is named, because "General" on another instance is not the same "General",
+// and the reader is shown where it is from.
+async function listFederatedFor(readerId) {
+  const communities = await store.listCommunities();
+  const out = [];
+  for (const community of communities) {
+    const origin = await db.get(
+      'SELECT id, name, origin FROM continuum_instances WHERE id = ?',
+      [community.origin_instance_id]
+    );
+    const membership = readerId
+      ? await db.get(
+        'SELECT state FROM continuum_memberships WHERE user_id = ? AND origin_instance_id = ? AND origin_community_id = ?',
+        [String(readerId), community.origin_instance_id, community.origin_community_id]
+      )
+      : null;
+    out.push({
+      id: community.id,
+      originInstanceId: community.origin_instance_id,
+      originCommunityId: community.origin_community_id,
+      name: community.name,
+      description: community.description == null ? null : String(community.description),
+      iconUrl: community.icon_url == null ? null : String(community.icon_url),
+      // Where it lives. A community whose instance has gone is still named:
+      // the reader may follow something that is no longer there.
+      originName: origin ? origin.name : null,
+      originUrl: origin ? origin.origin : null,
+      // 'joined' when this reader follows it, 'discovered' when they do not,
+      // and 'left' when they followed it and left again.
+      relationship: membership ? membership.state : 'discovered',
+      channels: (community.channels || []).map((channel) => ({
+        id: channel.id,
+        name: channel.name,
+        type: channel.type || 'text',
+        topic: channel.topic == null ? null : String(channel.topic),
+        canPost: channel.is_public !== false,
+      })),
+    });
+  }
+  return out;
+}
+
 // Ask a peer for the communities it federates and record them.
 async function syncPeerCommunities(instanceId) {
   const peer = await db.get('SELECT * FROM continuum_instances WHERE id = ?', [instanceId]);
@@ -991,6 +1042,7 @@ module.exports = {
   joinRemoteCommunity,
   leaveRemoteCommunity,
   listUserMemberships,
+  listFederatedFor,
   writeRemoteMessage,
   editRemoteMessage,
   deleteRemoteMessage,

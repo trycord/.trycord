@@ -104,6 +104,12 @@ export const PAGES = [
     layout: 'channel', sidebar: 'community', hidden: true,
   }),
   p('community.members', '/server/:id/members', { layout: 'channel', sidebar: 'community', hidden: true }),
+  // A community that lives on another instance. It is a reference and not a
+  // copy: it grants no role and no permission here, and the instance it lives
+  // on stays the only authority over it.
+  p('federated.community', '/federated/:instanceId/:communityId', {
+    layout: 'channel', sidebar: 'federated', hidden: true,
+  }),
   p('community.roles', '/server/:id/roles', { layout: 'channel', sidebar: 'community', hidden: true }),
   p('community.invites', '/server/:id/invites', { layout: 'channel', sidebar: 'community', hidden: true }),
   p('community.categories', '/server/:id/categories', { layout: 'channel', sidebar: 'community', hidden: true }),

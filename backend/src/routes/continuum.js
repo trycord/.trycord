@@ -183,10 +183,30 @@ router.get('/api/continuum/probe', adminGuard, rateLimit({ windowMs: 60000, max:
 
 // The remote communities this instance knows about, with the local
 // relationship to each of them.
+//
+// This is the operator's view: every community of every peer, whatever this
+// instance's relationship with it. A reader's view is the one below, which
+// is the list the community list is built from.
 router.get('/api/continuum/communities', adminGuard, async (req, res, next) => {
   try {
     if (!continuum.enabled()) return res.status(404).json({ error: { code: 'DISABLED', message: 'Continuum is not enabled on this instance' } });
     res.json(await continuum.listRemoteCommunities());
+  } catch (e) { serviceError(res, e); }
+});
+
+// The federated communities, for a reader.
+//
+// The community list of the application is built from this and from the
+// communities of this instance, and the two are shown in sections of their
+// own: a community that lives on another instance is a reference, and the
+// reader is told where it is from.
+//
+// What a reader may read in those communities is a separate question, and it
+// is answered by the server where the messages are asked for.
+router.get('/api/continuum/federated', auth, async (req, res, next) => {
+  try {
+    if (!continuum.enabled()) return res.json([]);
+    res.json(await continuum.listFederatedFor(req.user.id));
   } catch (e) { serviceError(res, e); }
 });
 

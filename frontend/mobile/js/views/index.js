@@ -25,6 +25,7 @@ import {
   renderChannel, renderChannelPins, renderMembersPage, renderRolesPage,
   renderInvitesPage, renderCategoriesPage, renderCommunitySettings, renderCommunityHome,
 } from './community.js';
+import { renderFederatedCommunity } from './federatedCommunity.js';
 import {
   renderWorkspace, renderSpaces, renderSpace, renderDocuments, renderDocument,
   renderBoards, renderBoard, renderCard, renderEvents, renderEvent,
@@ -59,6 +60,7 @@ export const RENDERERS = {
   'community.channel': (ctx) => renderChannel(ctx),
   'community.channelPins': (ctx) => renderChannelPins(ctx),
   'community.members': (ctx) => renderMembersPage(ctx),
+  'federated.community': (ctx) => renderFederatedCommunity(ctx),
   'community.roles': (ctx) => renderRolesPage(ctx),
   'community.invites': (ctx) => renderInvitesPage(ctx),
   'community.categories': (ctx) => renderCategoriesPage(ctx),

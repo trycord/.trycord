@@ -40,6 +40,12 @@ export const State = {
   legal: null,
   announcements: [],
   servers: [],
+  // The communities that live on other instances and that this instance knows
+  // about. They are references, not copies: they grant no role and no
+  // permission here, and the instance they live on stays the only authority
+  // over them. They are kept apart from `servers` because they are different
+  // things, and the community list shows them in a section of their own.
+  federated: [],
   serverDetail: new Map(),
   serverTree: new Map(),
   serverMembers: new Map(),
@@ -233,6 +239,26 @@ export async function refreshServers() {
   State.servers = await Api.servers();
   emit('servers', State.servers);
   return State.servers;
+}
+
+// The communities that live on other instances.
+//
+// An instance that does not federate has none, and the answer is an empty
+// list rather than an error: federation is off, not broken.
+export async function refreshFederated() {
+  try {
+    const answer = await Api.continuumFederated();
+    // Only a list is a list. An instance that answers with something else -
+    // an error page, an object - must not put that in the community list.
+    State.federated = Array.isArray(answer) ? answer : [];
+  } catch (e) {
+    // The reader may not be allowed to ask, or this instance does not
+    // federate. Either way there is nothing to show, and the community list
+    // is not broken by it.
+    State.federated = [];
+  }
+  emit('federated', State.federated);
+  return State.federated;
 }
 
 export async function refreshServer(serverId) {

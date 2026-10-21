@@ -11,6 +11,7 @@ import { path } from '../../../packages/nav.js';
 import Api from '../../../packages/api.js';
 import { relativeTime } from '../../../packages/format.js';
 import { screen, notice, section } from './util.js';
+import { federatedRoute, federatedName, federatedOrigin, federatedIsJoined } from '../../../packages/places.js';
 
 function greeting() {
   const hour = new Date().getHours();
@@ -40,6 +41,27 @@ function renderPlaces(host) {
         el('span', { class: 'm-row__title truncate' }, server.name),
         el('span', { class: 'm-row__sub truncate' }, (server.member_count || 0) + ' members')),
       el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
+  }
+
+  // The communities that live on another instance, in a section of their
+  // own: a community of this instance is here, and a community on another
+  // one is a reference.
+  const federated = State.federated || [];
+  if (!federated.length) return;
+  host.appendChild(el('p', { class: 'm-section__note' }, 'On other instances'));
+  for (const community of federated) {
+    host.appendChild(el('a', {
+      class: 'm-row', href: path(federatedRoute(community)),
+      'aria-label': federatedName(community) + ', ' + federatedOrigin(community),
+    },
+    el('span', { class: 'm-row__lead' }, serverMark(
+      { id: community.originCommunityId, name: federatedName(community), icon_url: community.iconUrl },
+      { size: 'md' })),
+    el('span', { class: 'm-row__body' },
+      el('span', { class: 'm-row__title truncate' }, federatedName(community)),
+      el('span', { class: 'm-row__sub truncate' }, federatedOrigin(community)
+        + (federatedIsJoined(community) ? ' · you follow this' : ''))),
+    el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 18 }))));
   }
 }
 

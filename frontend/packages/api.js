@@ -686,6 +686,15 @@ const Api = {
 
   // ---- the communities this account follows on other instances ---------------
   continuumMemberships: () => request('GET', '/api/continuum/memberships'),
+  // The communities that live on other instances, for the community list.
+  continuumFederated: () => request('GET', '/api/continuum/federated'),
+  // Following a community that lives on another instance, and stopping.
+  continuumJoinCommunity: (instanceId, communityId) =>
+    request('POST', '/api/continuum/communities/' + encodeURIComponent(instanceId)
+      + '/' + encodeURIComponent(communityId) + '/join', { body: {} }),
+  continuumLeaveCommunity: (instanceId, communityId) =>
+    request('POST', '/api/continuum/communities/' + encodeURIComponent(instanceId)
+      + '/' + encodeURIComponent(communityId) + '/leave', { body: {} }),
   continuumRelayedMessages: (instanceId, communityId, limit) => {
     const qs = limit ? '?limit=' + encodeURIComponent(limit) : '';
     return request('GET', '/api/continuum/communities/' + encodeURIComponent(instanceId)

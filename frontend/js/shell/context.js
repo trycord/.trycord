@@ -19,6 +19,7 @@ import { brandMark } from './frame.js';
 import { personContextMenu } from '../ui/person.js';
 import Api from '../../packages/api.js';
 import { avatarUrlOf } from '../../packages/identity.js';
+import { federatedName } from '../../packages/places.js';
 import {
   openCategoryDialog, createChannel, moveChannel, toggleMute,
   channelMenuItems, categoryMenuItems, reorderChannels, reorderCategories,
@@ -399,7 +400,51 @@ export function buildContext(kind, ctx, page) {
       return youContext(kind);
     case 'community':
       return communityContext(ctx.serverId);
+    case 'federated':
+      return federatedContext(ctx);
     default:
       return null;
   }
+}
+
+// The place column of a community that lives on another instance.
+//
+// There is no channel tree to draw here: the channels are the ones the other
+// instance publishes, and they are read, not joined. What the column shows is
+// where the community lives and what the reader may do with it.
+function federatedContext(ctx) {
+  const instanceId = ctx.params && ctx.params.instanceId;
+  const communityId = ctx.params && ctx.params.communityId;
+  const community = (State.federated || []).find((entry) =>
+    String(entry.originInstanceId) === String(instanceId)
+    && String(entry.originCommunityId) === String(communityId)) || null;
+  const name = community ? federatedName(community) : 'A community on another instance';
+
+  const parts = [
+    el('div', { class: 'context-identity' },
+      serverMark({
+        id: communityId,
+        name,
+        icon_url: community ? community.iconUrl : null,
+      }, { size: 'sm' }),
+      el('span', { class: 'truncate' }, name)),
+    el('p', { class: 'context-empty' },
+      community && community.originName
+        ? 'It lives on ' + community.originName + '.'
+        : 'It lives on another instance.'),
+  ];
+
+  const channels = community && community.channels ? community.channels : [];
+  if (channels.length) {
+    parts.push(el('div', { class: 'nav-sep' }));
+    parts.push(el('p', { class: 'nav-group' }, 'Channels'));
+    for (const channel of channels) {
+      parts.push(el('div', { class: 'nav-item nav-item--channel' },
+        channelIcon(channel, 16),
+        el('span', { class: 'truncate' }, channel.name),
+        el('span', { class: 'nav-muted' }, channel.canPost ? 'open' : 'read only')));
+    }
+  }
+
+  return { head: null, body: parts };
 }

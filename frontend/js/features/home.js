@@ -13,6 +13,7 @@ import { path } from '../../packages/nav.js';
 import Api from '../../packages/api.js';
 import { head, card, memo, fold, hold, fault, blank, stamp } from '../ui/page.js';
 import { activityRow } from './activity.js';
+import { federatedRoute, federatedName, federatedOrigin, federatedIsJoined } from '../../packages/places.js';
 
 const RECENT = 8;
 
@@ -122,7 +123,28 @@ export function renderHome() {
       }));
       return;
     }
-    places.replaceChildren(...State.servers.slice(0, 9).map(placeTile));
+    const parts = State.servers.slice(0, 9).map(placeTile);
+
+    // The communities that live on another instance, in a section of their
+    // own. A community of this instance is here; a community on another one is
+    // a reference, and the reader is told where it is from.
+    const federated = State.federated || [];
+    if (federated.length) {
+      parts.push(el('p', { class: 'places-heading' }, 'On other instances'));
+      for (const community of federated.slice(0, 5)) {
+        parts.push(el('a', {
+          class: 'placecard placecard--federated', href: path(federatedRoute(community)),
+          'aria-label': federatedName(community) + ', ' + federatedOrigin(community),
+        },
+        serverMark({ id: community.originCommunityId, name: federatedName(community), icon_url: community.iconUrl }, { size: 'lg' }),
+        el('span', { class: 'placecard-main' },
+          el('span', { class: 'placecard-name' }, federatedName(community)),
+          el('span', { class: 'placecard-meta' }, federatedOrigin(community)
+            + (federatedIsJoined(community) ? ' · you follow this' : ''))),
+        el('span', { class: 'placecard-go' }, icon('arrow-right', { size: 15 }))));
+      }
+    }
+    places.replaceChildren(...parts);
   }
 
   async function load() {

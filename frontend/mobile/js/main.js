@@ -11,7 +11,7 @@ import { applyTheme } from '../../packages/theme.js';
 import { TrycordConfig } from '../../packages/config.js';
 import {
   State, on as onStore, loadInstance, loadLegal, loadSession, logout,
-  refreshServers, refreshDms, refreshFriends, refreshNotifications,
+  refreshServers, refreshFederated, refreshDms, refreshFriends, refreshNotifications,
   markConversationRead,
 } from '../../packages/store.js';
 import { installLinkHandler, installPopStateHandler, BASE, setBase, mountFromModuleUrl } from '../../packages/nav.js';
@@ -134,7 +134,11 @@ async function boot() {
   try { await loadLocale(); } catch { /* the built-in language stands */ }
 
   if (State.user) {
-    await Promise.allSettled([refreshServers(), refreshDms(), refreshFriends(), refreshNotifications()]);
+    // The communities that live on another instance are asked for with the
+    // rest, and are kept apart from the ones that live here.
+    await Promise.allSettled([
+      refreshServers(), refreshFederated(), refreshDms(), refreshFriends(), refreshNotifications(),
+    ]);
     realtime.connect();
   }
 
