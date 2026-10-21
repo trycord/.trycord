@@ -698,6 +698,18 @@
 
 .settings-profile-top { display: flex; align-items: center; gap: 14px; }
 .settings-banner { max-height: 140px; width: 100%; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--line-2); }
+
+/* The picture and the cover on the profile page.
+   The chosen picture is shown in the same place as the one that is up, so
+   the reader sees what they picked rather than the old face until the
+   server has answered. */
+.settings-profile-face { display: grid; place-items: center; }
+.settings-profile-face .avatar-img {
+  width: 88px; height: 88px; border-radius: 32%; object-fit: cover;
+  display: block;
+}
+.settings-profile-cover.is-empty { display: none; }
+
 .settings-image-field { display: flex; flex-direction: column; gap: 10px; }
 .settings-image-tools { display: flex; align-items: center; gap: 10px; }
 .settings-image-field .form-error { margin: 0; }

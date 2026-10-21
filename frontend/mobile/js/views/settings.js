@@ -10,6 +10,9 @@ import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar, empty, loading, failure } from '../components.js';
 import { State, loadSession, applyToken } from '../../../packages/store.js';
+import {
+  checkImage, uploadProfilePicture, removeProfilePicture,
+} from '../../../packages/profileMedia.js';
 import Api from '../../../packages/api.js';
 import { TrycordConfig } from '../../../packages/config.js';
 import { path, publicPath } from '../../../packages/nav.js';
@@ -113,15 +116,35 @@ function profileBody() {
     input.addEventListener('change', async () => {
       const file = input.files && input.files[0];
       if (!file) return;
+      // The file is checked here, so a picture that is not one is refused
+      // before it is sent and the reader is told why.
+      const checked = checkImage(file);
+      if (!checked.ok) {
+        toast(checked.reason, { type: 'danger' });
+        input.value = '';
+        return;
+      }
       upload.disabled = true;
-      try { await Api.uploadProfileImage(kind, file); await loadSession(); toast('Image updated.', { type: 'success' }); paint(); }
-      catch (error) { toast(error.message, { type: 'danger' }); }
-      finally { upload.disabled = false; }
+      try {
+        await uploadProfilePicture(kind, file);
+        await loadSession();
+        toast(kind === 'banner' ? 'The cover image was uploaded.' : 'The picture was uploaded.', { type: 'success' });
+        paint();
+      } catch (error) {
+        toast(error.message, { type: 'danger' });
+      } finally {
+        upload.disabled = false;
+        input.value = '';
+      }
     });
     const remove = el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button' }, 'Remove');
     remove.addEventListener('click', async () => {
-      try { await Api.removeProfileImage(kind); await loadSession(); paint(); toast('Image removed.', { type: 'success' }); }
-      catch (error) { toast(error.message, { type: 'danger' }); }
+      try {
+        await removeProfilePicture(kind);
+        await loadSession();
+        paint();
+        toast(kind === 'banner' ? 'The cover image was removed.' : 'The picture was removed.', { type: 'success' });
+      } catch (error) { toast(error.message, { type: 'danger' }); }
     });
     return el('div', { class: 'm-media-row' },
       el('div', { class: 'm-media-preview' }, preview),

@@ -76,7 +76,12 @@ export function renderNotifications() {
       onClick: () => follow(entry),
     },
       el('span', { class: 'm-row__lead' }, actor
-        ? avatar({ id: actor.id, username: actor.username, displayName: actor.displayName }, { size: 'md', decorative: true })
+        ? avatar({
+          id: actor.id,
+          username: actor.username,
+          displayName: actor.displayName,
+          avatarUrl: actor.avatarUrl,
+        }, { size: 'md', decorative: true })
         : el('span', { class: 'm-mark m-mark--sm' }, icon(GLYPH[entry.type] || 'bell', { size: 18 }))),
       el('span', { class: 'm-row__body' },
         el('span', { class: 'm-row__title' }, who + ' ' + (PHRASE[entry.type] || 'sent you something')),

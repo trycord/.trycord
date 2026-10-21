@@ -14,7 +14,7 @@
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { avatar } from '../ui/primitives.js';
-import { State, nameOf } from '../../packages/store.js';
+import { State } from '../../packages/store.js';
 import {
   subscribe, current, setMuted, setDeafened, leave, enableMic,
   refreshDevices, setInputDevice, setOutputDevice,
@@ -36,9 +36,29 @@ function personOf(userId, serverId) {
   return member || null;
 }
 
+// The person a participant is, by the name the server sent with them.
+//
+// The room's own list is the first place to look, because it is the list of
+// the people who are in the room. The member list is the second, and a name
+// that neither of them knows is said as "Someone" - a room that calls
+// everybody "Unknown" is not telling the reader anything.
+function personFor(participant, serverId) {
+  const fromRoom = {
+    id: participant.userId,
+    username: participant.username || null,
+    displayName: participant.displayName || null,
+    nickname: participant.nickname || null,
+    avatarUrl: participant.avatarUrl || null,
+  };
+  const fromRoster = personOf(participant.userId, serverId);
+  const known = fromRoom.displayName || fromRoom.username || fromRoom.nickname;
+  if (known) return fromRoom;
+  return fromRoster || fromRoom;
+}
+
 function chip(participant, serverId) {
-  const person = personOf(participant.userId, serverId) || { id: participant.userId };
-  const label = person.nickname || nameOf(person) || 'Someone';
+  const person = personFor(participant, serverId);
+  const label = person.nickname || person.displayName || person.username || 'Someone';
   return el('span', {
     class: 'voice-dock__peer', 'data-peer': String(participant.userId), title: label,
   },
@@ -176,10 +196,13 @@ function dockNode() {
       class: 'voice-dock__screen', autoplay: true, playsinline: true, muted: true,
     });
     video.srcObject = stream;
+    const sharer = (s.participants || []).find((row) => String(row.userId) === String(userId));
+    const who = sharer
+      ? (sharer.nickname || sharer.displayName || sharer.username || 'Someone')
+      : ((personOf(userId, s.channel && s.channel.serverId) || {}).displayName || 'A screen');
     screens.appendChild(el('div', { class: 'voice-dock__screenwrap' },
       video,
-      el('span', { class: 'voice-dock__screenwho' },
-        (personOf(userId, s.channel && s.channel.serverId) || {}).displayName || 'A screen')));
+      el('span', { class: 'voice-dock__screenwho' }, who)));
   }
 
   // Sharing this seat's screen.

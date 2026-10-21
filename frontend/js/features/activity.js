@@ -96,7 +96,12 @@ export function activityRow(entry, onOpened) {
     unread: !entry.readAt,
     link: true,
     lead: actor
-      ? avatar({ id: actor.id, username: actor.username, displayName: actor.displayName }, { size: 'md' })
+      ? avatar({
+        id: actor.id,
+        username: actor.username,
+        displayName: actor.displayName,
+        avatarUrl: actor.avatarUrl,
+      }, { size: 'md' })
       : el('span', { class: 'blank-glyph' }, icon(GLYPH[entry.type] || 'bell', { size: 18 })),
     title: phraseFor(entry),
     sub: stamp(entry.createdAt),

@@ -114,7 +114,21 @@ async function list(serverId) {
     categories(serverId),
     db.all('SELECT * FROM channels WHERE server_id = ? ORDER BY position, name', [serverId]),
   ]);
-  return { categories: cats, channels };
+
+  // The people in the voice channels of this community.
+  //
+  // A voice channel shows who is in it, and the names come from here: a
+  // reader should not have to open the member list to learn who is in the
+  // room they are about to join.
+  const voice = require('../services/voice');
+  const inRooms = await voice.occupantsOf(serverId);
+  const withPeople = channels.map((channel) => (
+    (channel.type === 'voice' || channel.type === 'stage')
+      ? Object.assign({}, channel, { participants: inRooms.get(channel.id) || [] })
+      : channel
+  ));
+
+  return { categories: cats, channels: withPeople };
 }
 
 async function create(serverId, { name, topic, categoryId, type, slowMode }) {

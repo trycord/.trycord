@@ -44,7 +44,14 @@ function shape(n, actor) {
   return {
     id: n.id, type: n.type, createdAt: n.created_at, readAt: n.read_at,
     referenceId: n.reference_id,
-    actor: actor ? { id: actor.id, username: actor.username, displayName: actor.display_name } : null,
+    // The actor, with their picture. A notification that shows a name and no
+    // face is a notification about somebody the reader cannot recognise.
+    actor: actor ? {
+      id: actor.id,
+      username: actor.username,
+      displayName: actor.display_name,
+      avatarUrl: actor.avatar_url || null,
+    } : null,
   };
 }
 
@@ -82,7 +89,7 @@ async function list(userId, limit, cursor) {
   let rows;
   if (anchor) {
     rows = await db.all(
-      `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display
+      `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display, u.avatar_url AS actor_avatar
        FROM notifications n LEFT JOIN users u ON u.id = n.actor_id
        WHERE n.user_id = ?
          AND (n.created_at < ? OR (n.created_at = ? AND n.id < ?))
@@ -91,7 +98,7 @@ async function list(userId, limit, cursor) {
     );
   } else {
     rows = await db.all(
-      `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display
+      `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display, u.avatar_url AS actor_avatar
        FROM notifications n LEFT JOIN users u ON u.id = n.actor_id
        WHERE n.user_id = ? ORDER BY n.created_at DESC, n.id DESC LIMIT ${lim + 1}`,
       [userId]
@@ -140,7 +147,12 @@ async function list(userId, limit, cursor) {
     // not shrink just because the caller paged.
     unreadCount: unread ? unread.n : 0,
     items: rows.map((r) => {
-      const out = shape(r, r.actor_name ? { id: r.actor_id, username: r.actor_name, display_name: r.actor_display } : null);
+      const out = shape(r, r.actor_name ? {
+        id: r.actor_id,
+        username: r.actor_name,
+        display_name: r.actor_display,
+        avatar_url: r.actor_avatar,
+      } : null);
       if ((r.type === 'mention' || r.type === 'reply') && ctx[String(r.reference_id)]) {
         out.context = ctx[String(r.reference_id)];
       }

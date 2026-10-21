@@ -12,7 +12,7 @@ import { el, replaceChildren } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { sheet, toast } from '../ui.js';
 import { avatar } from '../components.js';
-import { State, nameOf } from '../../../packages/store.js';
+import { State } from '../../../packages/store.js';
 import {
   subscribe, current, join, leave, setMuted, setDeafened, enableMic,
   refreshDevices, setInputDevice, setOutputDevice,
@@ -20,15 +20,30 @@ import {
 } from '../../../packages/voiceSession.js';
 
 // The name of somebody in the room.
-function personOf(userId, serverId) {
+//
+// The room's own list is the first place to look, because it is the list of
+// the people who are in the room, and the server sends their names with it.
+// The member list is the second. A name that neither of them knows is said
+// as "Someone": a room that calls everybody "Unknown" tells the reader
+// nothing at all.
+function personOf(participant, serverId) {
+  const fromRoom = {
+    id: participant.userId,
+    username: participant.username || null,
+    displayName: participant.displayName || null,
+    nickname: participant.nickname || null,
+    avatarUrl: participant.avatarUrl || null,
+  };
   const roster = State.serverMembers.get(serverId)
     || (() => {
       for (const entry of State.serverMembers.values()) return entry;
       return null;
     })();
   const items = (roster && roster.items) || [];
-  return items.find((member) => String(member && member.id) === String(userId))
-    || { id: userId };
+  const fromRoster = items.find((member) => String(member && member.id) === String(participant.userId));
+  const known = fromRoom.displayName || fromRoom.username || fromRoom.nickname;
+  if (known) return fromRoom;
+  return fromRoster || fromRoom;
 }
 
 // The state of the connection, in a word.
@@ -76,8 +91,8 @@ export async function joinVoiceCall(channel) {
       people.appendChild(el('p', { class: 'm-section__note' }, 'Nobody is here yet.'));
     }
     for (const row of rows) {
-      const person = personOf(row.userId, channel.serverId);
-      const label = person.nickname || nameOf(person) || 'Someone';
+      const person = personOf(row, channel.serverId);
+      const label = person.nickname || person.displayName || person.username || 'Someone';
       people.appendChild(el('div', {
         class: 'm-row' + (row.speaking ? ' is-speaking' : ''),
       },

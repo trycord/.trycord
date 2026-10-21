@@ -14,6 +14,9 @@ import { icon } from '../../../packages/icons.js';
 import Api from '../../../packages/api.js';
 import { head, card, fold, hold, fault, memo } from '../../ui/page.js';
 import { fieldRow, switchControl, serverMark, bannerNode } from '../../ui/primitives.js';
+import {
+  checkImage, uploadCommunityPicture, removeCommunityPicture,
+} from '../../../packages/profileMedia.js';
 import { copyText } from '../../ui/clipboard.js';
 import { refreshServer } from '../../../packages/store.js';
 import {
@@ -121,8 +124,16 @@ export function overviewSection(ctx) {
     const uploadPicture = async (kind, input) => {
       const file = input.files && input.files[0];
       if (!file) return;
+      const checked = checkImage(file);
+      if (!checked.ok) {
+        // Said here, and nothing is uploaded: the picture that is up stays
+        // exactly where it was.
+        picturesReport.fail(new Error(checked.reason));
+        input.value = '';
+        return;
+      }
       try {
-        await Api.setServerImage(serverId, kind, file);
+        await uploadCommunityPicture(serverId, kind, file);
         picturesReport.ok(kind === 'banner'
           ? 'The cover image was uploaded.'
           : 'The picture was uploaded.');
@@ -136,7 +147,7 @@ export function overviewSection(ctx) {
     };
     const removePicture = async (kind) => {
       try {
-        await Api.removeServerImage(serverId, kind);
+        await removeCommunityPicture(serverId, kind);
         picturesReport.ok(kind === 'banner'
           ? 'The cover image was removed.'
           : 'The picture was removed.');
