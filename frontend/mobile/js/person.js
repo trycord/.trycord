@@ -15,6 +15,7 @@ import { State, nameOf, friendshipWith, normalizeUser } from '../../packages/sto
 import { navigate } from '../../packages/nav.js';
 import Api from '../../packages/api.js';
 import { sheet, confirm, toast } from './ui.js';
+import { avatar } from './components.js';
 import { copyText } from './clipboard.js';
 
 export function isSelf(user) {
@@ -231,10 +232,22 @@ export async function personActions(raw, options) {
 // The person's profile, in full: the sheet with their face, their name and the
 // actions that belong to them.
 export function openPerson(user, options) {
+  // The face, the name and what the person is doing.
+  //
+  // The face was the one thing this sheet was missing: the desk's sheet has
+  // had it all along, and a sheet about somebody with no picture of them is
+  // a sheet about a name.
+  const person = normalizeUser(user) || user || {};
   const body = el('div', { class: 'm-person' },
-    el('div', { class: 'm-person__name' }, nameOf(user)),
-    el('div', { class: 'm-person__handle' }, '@' + (user.username || '')),
-    user.statusText ? el('div', { class: 'm-person__status' }, user.statusText) : null);
+    el('div', { class: 'm-person__face' },
+      avatar(person, { size: 'lg', rounded: true, presence: person.presence || 'offline', decorative: true })),
+    el('div', { class: 'm-person__name' }, nameOf(person)),
+    el('div', { class: 'm-person__handle' }, '@' + (person.username || '')),
+    person.isBot
+      ? el('div', { class: 'm-person__kind' },
+        el('span', { class: 'botflag', title: 'This is a bot' }, 'BOT'))
+      : null,
+    person.statusText ? el('div', { class: 'm-person__status' }, person.statusText) : null);
   const layer = sheet({ title: nameOf(user) || 'Person', body });
   personActions(user, options).then((items) => {
     if (!items.length) return;

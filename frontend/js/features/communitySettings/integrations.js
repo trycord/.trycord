@@ -402,6 +402,26 @@ export function integrationsSection(ctx) {
           side: el('span', { class: 'rowtools' },
             el('button', {
               class: 'btn btn--ghost btn--sm', type: 'button',
+              'aria-label': (app.status === 'active' ? 'Switch off ' : 'Switch on ')
+                + 'the application ' + (app.name || ''),
+              title: app.status === 'active'
+                ? 'The application stops posting until it is switched on again.'
+                : 'The application posts again.',
+              onClick: async () => {
+                const on = app.status !== 'active';
+                try {
+                  await communityApi.updateApp(serverId, app.id, { status: on ? 'active' : 'disabled' });
+                  report.answered(on
+                    ? 'The application is switched on.'
+                    : 'The application is switched off. Its token still works, and it cannot post.');
+                  await load();
+                } catch (error) {
+                  report.fail(error);
+                }
+              },
+            }, app.status === 'active' ? 'Switch off' : 'Switch on'),
+            el('button', {
+              class: 'btn btn--ghost btn--sm', type: 'button',
               'aria-label': 'Rename the application ' + (app.name || ''),
               onClick: () => appDialog(serverId, app, load),
             }, icon('edit', { size: 14 })),
