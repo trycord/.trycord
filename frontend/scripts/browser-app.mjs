@@ -29,7 +29,7 @@ import path from 'node:path';
 
 import { matchRoute } from '../packages/registry.js';
 import {
-  harness, wait, writeHarnessDocument, writeMobileHarnessDocument,
+  harness, wait, freePort, writeHarnessDocument, writeMobileHarnessDocument,
 } from './browser-harness.mjs';
 
 const CLIENT = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -70,7 +70,7 @@ function layoutOf(route) {
 const report = [];
 let failures = 0;
 
-const run = await harness(PORT);
+const run = await harness(await freePort(PORT));
 const { page, nameRoute } = run;
 
 try {

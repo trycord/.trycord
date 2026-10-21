@@ -14,6 +14,7 @@ import { menu, confirm, toast, sheet, attachLongPress } from '../ui.js';
 import { copyText } from '../clipboard.js';
 import { embedCard, imagesOf, kindOf } from '../embeds.js';
 import { mediaUrl } from '../../../packages/media.js';
+import { saveDraft, clearDraft, restoreDraft } from '../../../packages/drafts.js';
 import { dayLabel, toDate, timeOfDay, fileSize } from '../../../packages/format.js';
 import realtime, { EVENTS } from '../../../packages/realtime.js';
 import { navigate, path } from '../../../packages/nav.js';
@@ -251,6 +252,9 @@ function createComposer(scope, submit) {
     placeholder: scope.placeholder || 'Message',
     'aria-label': scope.placeholder || 'Message',
   });
+  // The draft is in the box before the conversation is: a reader who comes
+  // back to a conversation finds what they were writing.
+  restoreDraft(scope.id, input);
   const replyBar = el('div', { class: 'm-composer__reply', hidden: true });
   const fileInput = el('input', { type: 'file', class: 'visually-hidden', multiple: true, 'aria-label': 'Attach files', tabindex: '-1' });
   const staged = el('div', { class: 'm-composer__staged' });
@@ -293,6 +297,10 @@ function createComposer(scope, submit) {
   });
 
   input.addEventListener('input', () => {
+    // The draft is remembered as it is written, so a reader who goes to
+    // another conversation and comes back finds their sentence where they
+    // left it - and so does a reader whose phone reloads.
+    saveDraft(scope.id, input.value);
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 140) + 'px';
     if (scope.onTyping) scope.onTyping();
@@ -322,6 +330,9 @@ function createComposer(scope, submit) {
     if (send) send.disabled = true;
     try {
       await submit({ content, files: files.slice(), replyTo });
+      // The draft is forgotten when the message is sent. A send that failed
+      // leaves it alone, because the text is still in the box.
+      clearDraft(scope.id);
       input.value = '';
       input.style.height = 'auto';
       files.length = 0;
