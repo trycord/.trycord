@@ -78,13 +78,16 @@ function brandPane() {
 
 function input(name, options) {
   const opts = options || {};
-  return el('input', {
+  const node = el('input', {
     class: 'input', name, type: opts.type || 'text',
     placeholder: opts.placeholder || null,
     autocomplete: opts.autocomplete || 'off',
     required: opts.required !== false,
     spellcheck: 'false', autocapitalize: 'none',
   });
+  // A field that is prefilled shows what is in it.
+  if (opts.value) node.value = opts.value;
+  return node;
 }
 
 function field(label, control) {
