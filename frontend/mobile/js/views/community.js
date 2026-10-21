@@ -869,6 +869,20 @@ function channelsSection(serverId) {
         // A long press on a channel raises the actions that belong to it.
         attachChannelMenu(row, serverId, channel, load);
         list.appendChild(row);
+
+        // The people in a voice room are shown under it, so a member can see
+        // who is in there before they join it.
+        const people = (channel.participants || []);
+        if (!people.length) continue;
+        list.appendChild(el('div', { class: 'm-room__people' },
+          ...people.map((person) => el('span', { class: 'm-room__person' },
+            avatar({
+              id: person.userId,
+              username: person.username,
+              displayName: person.displayName,
+              avatarUrl: person.avatarUrl,
+            }, { size: 'xs', decorative: true }),
+            el('span', { class: 'truncate' }, person.displayName || person.username || 'Someone')))));
       }
       host.appendChild(el('section', { class: 'm-section' },
         el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Channels'), newButton), list));

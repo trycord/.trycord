@@ -263,6 +263,26 @@
 .nav-item--channel { min-height: 32px; gap: 8px; }
 .nav-item--dm { gap: 9px; }
 
+/* The people in a voice channel, shown under the channel. A member should be
+   able to see who is in a room before they join it, so the room carries its
+   own faces rather than asking for them one at a time. */
+.nav-room { display: block; }
+.nav-room__people {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 6px 26px;
+}
+.nav-room__person {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.nav-room__person .avatar { flex: 0 0 auto; }
+
 /* A row being dragged, and a row that would take it. The dragged row dims and
  * the row under the pointer says it would take it. */
 .nav-item[data-dragging], .nav-label[data-dragging] { opacity: .45; }

@@ -264,7 +264,12 @@ router.post('/channels/:channelId/mesh-leave', requireVerified, wrap(async (req,
 
 router.get('/channels/:channelId/mesh-peers', requireVerified, wrap(async (req, res) => {
   const voiceMesh = require('../services/voice-mesh');
-  res.json(await voiceMesh.participants(req.params.channelId));
+  const voice = require('../services/voice');
+  const room = await voiceMesh.participants(req.params.channelId);
+  // The peers and the people: the ids are what the mesh connects, and the
+  // names are what the reader reads. Both, so a client does not have to
+  // guess who is in the room from a list of ids.
+  res.json(Object.assign({}, room, { people: await voice.occupants(req.params.channelId) }));
 }));
 
 router.post('/channels/:channelId/mesh-signal', requireVerified, limit({ windowMs: 60000, max: 600 }), wrap(async (req, res) => {

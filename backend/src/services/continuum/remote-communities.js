@@ -47,7 +47,18 @@ async function fetchDiscovery(origin) {
     return { ok: false, error: 'federation is not enabled on that instance' };
   }
   if (!Array.isArray(document.communities)) {
-    return { ok: true, document, imported: [] };
+    // The peer does not say which communities it has. It says so here,
+    // because an empty list with no explanation looks like a fault in this
+    // instance, and it is not: the peer is older than the communities were
+    // published in.
+    return {
+      ok: true,
+      document,
+      imported: [],
+      note: 'That instance does not list its communities in its discovery document'
+        + ' (it speaks protocol ' + (document.protocol_version || 'unknown')
+        + '; this instance speaks 1.2), so there was nothing to import from it.',
+    };
   }
   const imported = await importCommunities(document.instance_id, document.communities);
   return { ok: true, document, imported };

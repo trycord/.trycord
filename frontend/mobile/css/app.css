@@ -1635,6 +1635,22 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 /* ---- rows, the parts a page supplies -------------------------------------- */
 
 .m-row__actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+
+/* The people in a voice room, shown under the channel in the list. */
+.m-room__people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 2px 12px 10px 41px;
+}
+.m-room__person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
 .m-row__side { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; justify-content: flex-end; }
 .m-row__time { font-size: var(--fs-micro); color: var(--text-3); white-space: nowrap; }
 .m-row__dot {

@@ -21,6 +21,7 @@ import {
   listHistory, clearHistory, removeHistoryEntry,
 } from '../../packages/search.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
+import { avatar } from '../ui/primitives.js';
 import { openDialog, confirmDialog, errorToast, toast } from '../ui/overlays.js';
 import { path } from '../../packages/nav.js';
 import { relativeTime } from '../../packages/format.js';
@@ -175,7 +176,16 @@ function hitRow(hit) {
     link: true,
     href: path(route),
     class: 'search-hit',
-    lead: el('span', { class: 'search-hit-glyph' }, icon(isDocument ? 'file' : 'message', { size: 15 })),
+    // The face of whoever wrote it, when the hit has one. A result the
+    // reader cannot recognise is a result they have to read twice.
+    lead: hit.author_avatar
+      ? avatar({
+        id: hit.author_id,
+        username: hit.author_name,
+        displayName: hit.author_display,
+        avatarUrl: hit.author_avatar,
+      }, { size: 'sm', rounded: true, decorative: true })
+      : el('span', { class: 'search-hit-glyph' }, icon(isDocument ? 'file' : 'message', { size: 15 })),
     title: text || '(an attachment)',
     sub: [author, where].filter(Boolean).join(' · '),
     meta: hit.created_at ? relativeTime(hit.created_at) : '',

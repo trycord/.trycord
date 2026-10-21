@@ -526,9 +526,64 @@ async function requestSpeak(channelId, userId) {
   return { ok: true };
 }
 
+// The people in a voice channel, with their names.
+//
+// The mesh keeps its rooms in memory and knows who is in them; the names are
+// in the users table. This joins the two, so a client that asks who is in a
+// room gets the names and not only the ids - a room that lists "Unknown" for
+// everybody is a room nobody can recognise anyone in.
+//
+// The caller decides who may ask. The members list is a different question
+// and is answered by the route that asks it.
+async function occupants(channelId) {
+  const rows = await db.all(
+    `SELECT p.user_id, u.username, u.display_name, u.avatar_url, p.muted, p.deafened
+       FROM voice_participants p JOIN users u ON u.id = p.user_id
+      WHERE p.channel_id = ? AND p.left_at IS NULL
+      ORDER BY p.joined_at`,
+    [channelId]
+  );
+  return rows.map((row) => ({
+    userId: row.user_id,
+    username: row.username,
+    displayName: row.display_name,
+    avatarUrl: row.avatar_url || null,
+    muted: !!row.muted,
+    deafened: !!row.deafened,
+  }));
+}
+
+// The people in every voice channel of a community, by channel id.
+//
+// One query for the whole community: the channel list is asked on every
+// navigation, and a query per voice channel would be a round trip per room.
+async function occupantsOf(serverId) {
+  const rows = await db.all(
+    `SELECT p.channel_id, p.user_id, u.username, u.display_name, u.avatar_url, p.muted
+       FROM voice_participants p
+       JOIN users u ON u.id = p.user_id
+       JOIN channels c ON c.id = p.channel_id
+      WHERE p.left_at IS NULL AND c.server_id = ? AND c.type IN ('voice', 'stage')
+      ORDER BY p.joined_at`,
+    [serverId]
+  );
+  const out = new Map();
+  for (const row of rows) {
+    if (!out.has(row.channel_id)) out.set(row.channel_id, []);
+    out.get(row.channel_id).push({
+      userId: row.user_id,
+      username: row.username,
+      displayName: row.display_name,
+      avatarUrl: row.avatar_url || null,
+      muted: !!row.muted,
+    });
+  }
+  return out;
+}
+
 module.exports = {
   available, authorizeVoice,
-  participants, setSelfState, moderate, requestSpeak,
+  participants, occupants, occupantsOf, setSelfState, moderate, requestSpeak,
   // The roster and the bookkeeping a session needs. The provider that carries a
   // session is remembered beside it, so a call finishes on the provider it
   // started on.

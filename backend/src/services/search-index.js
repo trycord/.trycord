@@ -131,7 +131,11 @@ async function find(query, options) {
 async function fetchMessages(ids) {
   if (!ids.length) return [];
   return db.all(
+    // The author's picture comes with the row: a search result that shows a
+    // name and no face is a result about somebody the reader cannot
+    // recognise.
     'SELECT m.*, u.username AS author_name, u.display_name AS author_display,'
+    + ' u.avatar_url AS author_avatar,'
     + ' ch.name AS channel_name, ch.server_id AS server_id, s.name AS server_name'
     + ' FROM messages m'
     + ' JOIN users u ON u.id = m.author_id'

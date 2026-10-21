@@ -407,10 +407,28 @@ function speakingOf(stream) {
   }
 }
 
-function peerRow(userId) {
+function peerRow(userId, person) {
   const known = state.participants.find((p) => String(p.userId) === String(userId));
-  if (known) return known;
-  const row = { userId: String(userId), speaking: false, connection: 'connecting', muted: false };
+  if (known) {
+    // The name is filled in when it is first heard, and kept after that: a
+    // person who joins the room is named in the room's list, and the list is
+    // the only place the name comes from.
+    if (person && !known.displayName) {
+      known.username = person.username;
+      known.displayName = person.displayName;
+      known.avatarUrl = person.avatarUrl;
+    }
+    return known;
+  }
+  const row = {
+    userId: String(userId),
+    speaking: false,
+    connection: 'connecting',
+    muted: false,
+    username: (person && person.username) || null,
+    displayName: (person && person.displayName) || null,
+    avatarUrl: (person && person.avatarUrl) || null,
+  };
   state.participants.push(row);
   return row;
 }
@@ -575,9 +593,14 @@ async function refreshRoom() {
   if (!state.channel) return;
   let seat = null;
   let ids = [];
+  let people = [];
   try {
     const room = await Api.voiceMeshPeers(state.channel.id);
     ids = ((room && room.participants) || []).map(String);
+    // The people the room holds, with their names. The server sends them
+    // with the peers, so a room that lists "Unknown" for everybody is a
+    // thing that cannot happen.
+    people = (room && Array.isArray(room.people)) ? room.people : [];
     if (myId() && !ids.includes(myId())) {
       // The server dropped the seat: the socket blinked, or a moderator
       // disconnected it. Re-seating is honest; pretending is not.
@@ -590,8 +613,9 @@ async function refreshRoom() {
     return;
   }
 
+  const byId = new Map(people.map((person) => [String(person.userId), person]));
   for (const userId of ids) {
-    peerRow(userId);
+    peerRow(userId, byId.get(String(userId)));
     if (!peers.has(String(userId))) buildPeer(userId);
   }
   for (const key of Array.from(peers.keys())) {
@@ -665,8 +689,19 @@ export async function join(channel) {
     }
     if (localStream) selfWatch = speakingOf(localStream);
 
+    // The people already in the room, with their names, so the dock shows
+    // who is speaking from the first paint and not from the second one.
+    let people = [];
+    try {
+      const room = await Api.voiceMeshPeers(channel.id);
+      people = (room && Array.isArray(room.people)) ? room.people : [];
+    } catch {
+      // The names are not worth failing a join over: the room poll brings
+      // them a moment later.
+    }
+    const byId = new Map(people.map((person) => [String(person.userId), person]));
     for (const userId of ((seat && seat.participants) || [])) {
-      peerRow(String(userId));
+      peerRow(String(userId), byId.get(String(userId)));
       buildPeer(String(userId));
     }
 

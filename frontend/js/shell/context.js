@@ -226,7 +226,26 @@ function communityContext(serverId) {
         },
       });
     }
-    return link;
+
+    // The people in a voice room are shown under it, so a member can see who
+    // is in there before they join it. A text channel has nobody in it, so
+    // nothing is drawn for it.
+    const people = (channel.participants || []);
+    if (!people.length) return link;
+    return el('div', { class: 'nav-room' },
+      link,
+      el('div', { class: 'nav-room__people' },
+        ...people.map((person) => el('span', {
+          class: 'nav-room__person',
+          title: person.displayName || person.username || 'Someone in this room',
+        },
+          avatar({
+            id: person.userId,
+            username: person.username,
+            displayName: person.displayName,
+            avatarUrl: person.avatarUrl,
+          }, { size: 'xs', rounded: true, decorative: true }),
+          el('span', { class: 'truncate' }, person.displayName || person.username || 'Someone')))));
   };
 
   const byCategory = new Map();
