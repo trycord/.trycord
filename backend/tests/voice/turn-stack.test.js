@@ -145,7 +145,8 @@ let serverPort = 0;
 let turn = null;
 
 test.before(async () => {
-  process.env.TRYCORD_TURN_SECRET = 'a-secret-for-the-test-only';
+  process.env.TRYCORD_TURN_STUNKEY = 'a-stunkey-for-the-test-only';
+  delete process.env.TRYCORD_TURN_SECRET;
   process.env.TRYCORD_TURN_HOST = '127.0.0.1';
   delete process.env.TRYCORD_PUBLIC_URL;
   turn = require('../../src/services/turn');
@@ -285,6 +286,73 @@ test('the relayed address is one a client can reach', async (t) => {
   assert.notEqual(relayed.ip, '0.0.0.0',
     'the relayed address is the wildcard, which no client can reach');
   assert.notEqual(relayed.ip, '::');
+});
+
+// ---- the credentials, and the hosts that mint them -------------------------
+
+// The password a third party computes.
+//
+// This is the derivation Coturn uses for a static auth secret, written out
+// here from the standard rather than taken from the instance, so the test
+// checks the instance against the standard and not against itself.
+function foreignPassword(username, realm, stunkey) {
+  return crypto.createHash('md5')
+    .update(`${username}:${realm}:${stunkey}`, 'utf8')
+    .digest('hex');
+}
+
+test('the credential is the hash another host would compute', () => {
+  const issued = turn.issueCredentials('alice');
+  const expected = foreignPassword(issued.username, 'trycord-turn', 'a-stunkey-for-the-test-only');
+  assert.equal(issued.password, expected,
+    'the credential is not the hash a host with the stunkey would compute');
+  assert.match(issued.password, /^[0-9a-f]{32}$/,
+    'the password is not the 32-character hash the standard asks for');
+  assert.match(issued.username, /^\d+:alice$/,
+    'the username is not an expiry and a name');
+});
+
+test('a credential minted by another host is accepted', async (t) => {
+  // A host on the other side of the internet, with the stunkey and nothing
+  // else: no session with this instance, no call to the API, no credential
+  // from it. It mints one the way the standard says, for its own name and
+  // its own expiry, and the relay has to take it.
+  const c = client();
+  await c.listen();
+  t.after(() => c.socket.close());
+
+  const challenge = await c.request(TYPE.ALLOCATE_REQUEST, Buffer.alloc(0));
+  const nonce = challenge.attrs.get(ATTR.NONCE).toString('utf8');
+  const realm = challenge.attrs.get(ATTR.REALM).toString('utf8');
+
+  const expiry = Math.floor(Date.now() / 1000) + 600;
+  const username = `${expiry}:a-host-elsewhere`;
+  const password = foreignPassword(username, realm, 'a-stunkey-for-the-test-only');
+
+  const accepted = await c.request(TYPE.ALLOCATE_REQUEST, buildAllocate(username, realm, nonce, password));
+  assert.equal(accepted.type, TYPE.ALLOCATE_RESPONSE,
+    'a credential minted by another host was refused: '
+    + (accepted.attrs.get(ATTR.ERROR_CODE) || {}).toString('hex'));
+  const relayed = accepted.attrs.get(ATTR.XOR_RELAYED_ADDRESS);
+  assert.ok(relayed, 'the allocation carried no relayed address');
+});
+
+test('a credential minted with the wrong stunkey is refused', async (t) => {
+  const c = client();
+  await c.listen();
+  t.after(() => c.socket.close());
+
+  const challenge = await c.request(TYPE.ALLOCATE_REQUEST, Buffer.alloc(0));
+  const nonce = challenge.attrs.get(ATTR.NONCE).toString('utf8');
+  const realm = challenge.attrs.get(ATTR.REALM).toString('utf8');
+
+  const expiry = Math.floor(Date.now() / 1000) + 600;
+  const username = `${expiry}:a-host-elsewhere`;
+  const password = foreignPassword(username, realm, 'not-the-stunkey');
+
+  const refused = await c.request(TYPE.ALLOCATE_REQUEST, buildAllocate(username, realm, nonce, password));
+  assert.equal(refused.type, TYPE.ALLOCATE_ERROR,
+    'a credential minted with the wrong stunkey was accepted');
 });
 
 // ---- building a request ----------------------------------------------------

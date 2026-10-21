@@ -136,9 +136,15 @@ async function checkMesh(cfg) {
   // An entry can carry one address or several, and the STUN and the TURN
   // address of the in-house relay are the same one, so they are flattened
   // and asked once each.
+  //
+  // Asked once each *address*, not once each address as it is written: the
+  // relay is in the list twice - once as a STUN server and once as a TURN
+  // server - and both entries are the same host and the same port. Asked
+  // twice, it answered twice or said nothing twice, and the console read
+  // the same sentence out twice in a row.
   const addresses = Array.from(new Set(
     servers.flat().map((url) => String(url || '').trim()).filter(Boolean),
-  ));
+  )).filter((url, index, all) => all.findIndex((other) => sameAddress(url, other)) === index);
   if (!addresses.length) {
     return { ok: false, detail: 'The mesh has no STUN server and no TURN relay.' };
   }
@@ -155,12 +161,13 @@ async function checkMesh(cfg) {
   // nothing to do with voice must not be taken for the relay.
   const local = relay.localAddress();
   const localUrl = local ? 'stun:' + local + ':' + relay.localPort() : null;
-  const asked = localUrl && addresses.indexOf(localUrl) === -1
+  const asked = localUrl && !addresses.some((url) => sameAddress(url, localUrl))
     ? [localUrl].concat(addresses)
     : addresses;
   const probed = await Promise.all(asked.map((url) => relay.probeAddress(url)));
   const localAnswer = localUrl ? probed.find((result) => result.url === localUrl) : null;
-  const results = probed.filter((result) => result.url !== localUrl);
+  const results = probed.filter((result) => result.url !== localUrl
+    || !localUrl || !sameAddress(result.url, localUrl));
   const answered = results.filter((result) => result.ok);
 
   if (!answered.length) {
@@ -174,15 +181,26 @@ async function checkMesh(cfg) {
       extra += ' Something answered a binding request at ' + localAnswer.host + ':' + localAnswer.port
         + ', so the relay is running here, but the address the clients are given is not reachable.';
     }
-    return { ok: false, detail: detail + extra + ' ' + wildcardNote(inHouse) };
+    return { ok: false, detail: (detail + extra + ' ' + wildcardNote(inHouse)).replace(/\s+/g, ' ').trim() };
   }
 
   return {
     ok: true,
     detail: answered.length + ' of ' + results.length + ' ICE addresses answered a binding request.'
-      + ' ' + wildcardNote(relay.inHouseState()),
+      + ' ' + wildcardNote(relay.inHouseState()).trim(),
     results,
   };
+}
+
+// Whether two addresses are the same place.
+//
+// The scheme is not part of the place: `stun:voice.example.test:3478` and
+// `turn:voice.example.test:3478` are one relay, and a check that asks it
+// twice says the same thing twice.
+function sameAddress(one, other) {
+  const a = String(one || '').replace(/^[a-z]+:/i, '');
+  const b = String(other || '').replace(/^[a-z]+:/i, '');
+  return a === b;
 }
 
 // The address the peers are given.

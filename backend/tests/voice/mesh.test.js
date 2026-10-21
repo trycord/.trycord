@@ -198,6 +198,15 @@ test('the mesh', async (t) => {
     const mesh = providerOf(report, 'mesh');
     assert.ok(mesh, 'the mesh is one of the providers');
     assert.deepEqual(mesh.missing, [], 'the mesh is not waiting for anything');
-    assert.deepEqual(mesh.secrets, [], 'the mesh has no secret the operator has to enter');
+
+    // The mesh runs the relay itself, so it asks for nobody else's
+    // credential. The one secret it has is its own: the key the relay mints
+    // credentials under.
+    const names = mesh.secrets.map((secret) => secret.key);
+    for (const name of ['voice.cloudflare.appSecret', 'voice.sfu.token', 'voice.sfu.turnCredential']) {
+      assert.equal(names.indexOf(name), -1, 'the mesh asks for ' + name);
+    }
+    assert.deepEqual(names, ['voice.mesh.stunkey'],
+      'the mesh asks for one secret, and it is the one its own relay uses');
   });
 });

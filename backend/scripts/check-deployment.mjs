@@ -60,7 +60,7 @@ ok(fs.existsSync(path.join(ROOT, 'backend', 'src', 'voice', 'index.js')),
 const health = /HEALTHCHECK[\s\S]*?CMD node -e "([\s\S]*?)"/.exec(docker);
 ok(health, 'the image has no health check');
 if (health) {
-  const route = /'(\/[a-z-]+)'/.exec(health[1]);
+  const route = /'(\/[^']*)'/.exec(health[1]);
   ok(route && ['/api/health', '/health', '/ready'].includes(route[1]),
     'the health check asks for something that is not a route the server has');
 }
@@ -111,6 +111,19 @@ if (fs.existsSync(composePath)) {
     'the voice service does not publish the relay port as UDP, and a relay needs UDP');
   ok(voice.healthcheck !== undefined, 'the voice service has no health check');
   ok((services.trycord || {}).healthcheck !== undefined, 'the API service has no health check');
+
+  // The voice process's own interface is on the loopback, and the process
+  // refuses to start on any other address. A compose file that asked for a
+  // public one would not publish anything dangerous - it would stop the voice
+  // service from coming up at all, and the relay with it.
+  const voiceBlock = text.split('\n').slice(
+    text.split('\n').findIndex((line) => /^  trycord-voice:\s*$/.test(line)),
+  ).join('\n').split('\n  [a-zA-Z0-9_-]+:\s*$')[0] || '';
+  const voiceHost = voiceBlock.match(/TRYCORD_VOICE_PROCESS_HOST:\s*(\S+)/);
+  if (voiceHost) {
+    failures.push('the compose file puts the voice process interface on '
+      + voiceHost[1] + ', and it only runs on the loopback');
+  }
 }
 
 if (failures.length) {

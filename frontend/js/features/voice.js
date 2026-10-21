@@ -119,7 +119,10 @@ function secretRow(secret, onSaved) {
   const clear = async () => {
     const confirmed = await confirmDialog({
       title: 'Clear ' + secret.label + '?',
-      body: 'The credential will be removed. A provider that needs it cannot carry a call until a new one is set.',
+      body: secret.key === 'voice.mesh.stunkey'
+        ? 'The key will be removed. The credentials minted under it stop being accepted, '
+          + 'and the instance makes a key of its own until a new one is set.'
+        : 'The credential will be removed. A provider that needs it cannot carry a call until a new one is set.',
       confirmLabel: 'Clear it',
       danger: true,
     });

@@ -49,8 +49,9 @@ test('what the providers share', async (t) => {
     assert.equal(providerOf(report, 'cloudflare').maxParticipants, 12);
 
     assert.deepEqual(providerOf(report, 'mesh').fields.map((field) => field.key),
-      ['voice.mesh.maxParticipants', 'voice.mesh.publicUrl'],
-      'Mesh asks for the room limit and the published address, and nothing else');
+      ['voice.mesh.maxParticipants', 'voice.mesh.publicUrl', 'voice.mesh.turnPort',
+        'voice.mesh.turnHost', 'voice.mesh.turnRealm'],
+      'Mesh asks for the room limit, the published address, and the relay\'s own settings');
     const cloudflareApp = providerOf(report, 'cloudflare').fields
       .find((field) => field.key === 'voice.cloudflare.appId');
     assert.equal(cloudflareApp.value, 'cloudflare-application',
@@ -188,7 +189,9 @@ test('what the providers share', async (t) => {
     const mesh = providerOf(report, 'mesh');
     assert.equal(mesh.maxParticipants, 9, 'the old participant limit is the one in force');
     assert.deepEqual(mesh.fields.map((field) => field.key),
-      ['voice.mesh.maxParticipants', 'voice.mesh.publicUrl']);
+      ['voice.mesh.maxParticipants', 'voice.mesh.publicUrl', 'voice.mesh.turnPort',
+        'voice.mesh.turnHost', 'voice.mesh.turnRealm'],
+      'Mesh asks for the room limit, the published address, and the relay\'s own settings');
 
     const retired = await saveSettings(owner, { 'voice.mesh.turnUrl': 'turn:legacy.example:3478' });
     assert.equal(retired.status, 400);

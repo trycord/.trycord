@@ -59,6 +59,24 @@ const settings = require('../services/settings');
 const PORT = Number(process.env.TRYCORD_VOICE_PROCESS_PORT || 9973);
 const HOST = String(process.env.TRYCORD_VOICE_PROCESS_HOST || '127.0.0.1').trim();
 
+// The process interface is on the loopback, and it is there by rule.
+//
+// The relay - the STUN and TURN service, the UDP port - is meant to be
+// reachable from other hosts; that is the whole point of it. This interface
+// is the other thing: the page that says whether the voice stack works, the
+// health checks, the configuration. It holds the addresses the instance
+// publishes and the credentials it mints, so it has no business on a public
+// address. It is on the loopback, and a setting that asks for anything else
+// is refused rather than obeyed.
+function isLoopback(address) {
+  const text = String(address || '').trim().toLowerCase();
+  if (!text) return false;
+  if (text === 'localhost') return true;
+  if (text === '::1' || text === '[::1]') return true;
+  if (text.startsWith('127.')) return true;
+  return false;
+}
+
 let engine = null;
 let engineState = null;
 let server = null;
@@ -79,8 +97,13 @@ let shuttingDown = false;
 function describeConfiguration() {
   // The relay is a service of this instance: it listens on every interface
   // unless the operator names an address.
-  const listenHost = String(process.env.TRYCORD_TURN_HOST || '0.0.0.0').trim();
-  const listenPort = Number(process.env.TRYCORD_TURN_PORT || 3478);
+  //
+  // The values come from the instance's own settings, so an administrator who
+  // changes the port in the console changes the port the relay binds. The
+  // deployment's environment outranks them, as it outranks every other
+  // setting.
+  const listenHost = String(setting('voice.mesh.turnHost', process.env.TRYCORD_TURN_HOST || '::')).trim();
+  const listenPort = Number(setting('voice.mesh.turnPort', process.env.TRYCORD_TURN_PORT || 3478));
   // The published address. The instance knows its own public address, and
   // that is the address the clients are given - "0.0.0.0" is a wildcard and
   // not a place. The settings are read for it, so the voice process and the
@@ -91,8 +114,9 @@ function describeConfiguration() {
   if (!Number.isFinite(listenPort) || listenPort <= 0) {
     problems.push('TRYCORD_TURN_PORT is not a port');
   }
-  if (!process.env.TRYCORD_TURN_SECRET) {
-    problems.push('TRYCORD_TURN_SECRET is not set, so the credentials this '
+  if (!String(process.env.TRYCORD_TURN_STUNKEY || process.env.TRYCORD_TURN_SECRET || '').trim()
+    && !stunkeyIsSet()) {
+    problems.push('TRYCORD_TURN_STUNKEY is not set, so the credentials this '
       + 'instance issues are good only until it restarts');
   }
   if (!advertised || advertised === '0.0.0.0' || advertised === '::') {
@@ -353,6 +377,451 @@ function isProxyAddress(ip) {
   return '';
 }
 
+// ---- the configuration and the credentials -----------------------------------
+
+// One setting of the instance, read the way everything else is read.
+//
+// The deployment's environment outranks the instance's saved value, and the
+// saved value outranks the default. A process that has not read the
+// database has the environment and the default, which is enough to run the
+// relay and not enough to change it.
+function setting(key, fallback) {
+  try {
+    const value = settings.read(key, fallback);
+    return value === undefined || value === null ? fallback : value;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+// Where a value came from, in words an operator reads.
+function sourceName(source) {
+  if (source === 'environment') return 'set by the deployment';
+  if (source === 'instance') return 'saved by an administrator';
+  return 'the default';
+}
+
+// The relay's own settings, and where each of them came from.
+function relaySettings() {
+  return {
+    host: setting('voice.mesh.turnHost', process.env.TRYCORD_TURN_HOST || '::'),
+    port: setting('voice.mesh.turnPort', process.env.TRYCORD_TURN_PORT || 3478),
+    realm: setting('voice.mesh.turnRealm', process.env.TRYCORD_TURN_REALM || 'trycord-turn'),
+    published: setting('voice.mesh.publicUrl', process.env.TRYCORD_VOICE_PUBLIC_URL || ''),
+    sources: {
+      host: settingSource('voice.mesh.turnHost'),
+      port: settingSource('voice.mesh.turnPort'),
+      realm: settingSource('voice.mesh.turnRealm'),
+      published: settingSource('voice.mesh.publicUrl'),
+    },
+  };
+}
+
+function settingSource(key) {
+  try {
+    return settings.source(key);
+  } catch (e) {
+    return 'default';
+  }
+}
+
+// Whether the instance has a key of its own for the credentials.
+//
+// Whether, and never what: the key is the one thing on this page that is
+// never shown, because a page that shows it is a page that has it in a
+// screenshot.
+function stunkeyIsSet() {
+  try {
+    const value = settings.secretValue('voice.mesh.stunkey');
+    return !!String(value || '').trim();
+  } catch (e) {
+    return false;
+  }
+}
+
+// One field of the configuration form.
+function field(label, name, value, source, type, note) {
+  const lines = [];
+  lines.push('<div class="field">');
+  lines.push('<label for="' + escapeHtml(name) + '">' + escapeHtml(label) + '</label>');
+  lines.push('<input id="' + escapeHtml(name) + '" name="' + escapeHtml(name) + '" type="' + type
+    + '" value="' + escapeHtml(value === undefined || value === null ? '' : value) + '">');
+  lines.push('<p class="note">' + escapeHtml(note) + ' It is ' + escapeHtml(sourceName(source)) + '.</p>');
+  lines.push('</div>');
+  return lines.join('\n');
+}
+
+/**
+ * The configuration page.
+ *
+ * The relay's own settings: the address it binds, the port it binds it on,
+ * the address the clients are given, the realm its credentials are issued in,
+ * and the key they are minted under.
+ */
+function renderConfigPage(state) {
+  const view = state || {};
+  const relay = relaySettings();
+  const lines = [];
+
+  lines.push('<h1>Configure the relay</h1>');
+  lines.push('<p class="lede">The in-house STUN and TURN service. These are the instance\'s own settings, '
+    + 'and the deployment\'s environment outranks them: a value that comes from the environment is shown as '
+    + 'such, and changing it here changes nothing until the environment stops saying it.</p>');
+
+  if (view.saved) lines.push('<p class="saved">' + escapeHtml(view.saved) + '</p>');
+  if (view.problem) lines.push('<p class="problem">' + escapeHtml(view.problem) + '</p>');
+
+  lines.push('<form method="post" action="/config">');
+  lines.push(field('The address the relay listens on', 'voice.mesh.turnHost', relay.host, relay.sources.host,
+    'text', 'A wildcard - 0.0.0.0 or :: - means every interface, which is what a relay that has to be reached from outside wants.'));
+  lines.push(field('The port the relay listens on', 'voice.mesh.turnPort', relay.port, relay.sources.port,
+    'number', 'This is the port the clients are given, so it has to be open on the network they are on.'));
+  lines.push(field('The address the clients are given', 'voice.mesh.publicUrl', relay.published, relay.sources.published,
+    'text', 'A hostname that points straight at this instance - DNS only, not through a proxy that terminates TLS - or the address of the machine on its own network.'));
+  lines.push(field('The realm the credentials are issued in', 'voice.mesh.turnRealm', relay.realm, relay.sources.realm,
+    'text', 'The name the client is told to use. It has to match the realm the relay answers with, or a credential that is right is refused.'));
+  lines.push('<div class="field">');
+  lines.push('<label for="voice.mesh.stunkey">The key the credentials are minted under</label>');
+  lines.push('<input id="voice.mesh.stunkey" name="voice.mesh.stunkey" type="password" value="" '
+    + 'autocomplete="new-password" placeholder="' + (stunkeyIsSet() ? 'a key is set - type to replace it' : 'no key is set') + '">');
+  lines.push('<p class="note">The shared secret, the same thing Coturn calls a static auth secret. '
+    + 'A host that has it can mint credentials of its own. It is never shown again once it is set.</p>');
+  lines.push('</div>');
+  lines.push('<button type="submit">Save</button>');
+  lines.push('</form>');
+
+  lines.push('<nav class="links">'
+    + '<a href="/">Whether it is working</a>'
+    + '<a href="/credentials">Mint a credential</a>'
+    + '<a href="/status">The state as JSON</a>'
+    + '</nav>');
+
+  lines.push('<footer>The address and the port take effect as soon as they are saved: the relay is bound again '
+    + 'with the new ones. This page is served on the loopback of this instance and on nothing else.</footer>');
+
+  return pageShell('Configure the relay - the voice stack', lines);
+}
+
+/**
+ * The credential page.
+ *
+ * A credential is a username and a password, and the pair is worth
+ * something to whoever holds it - so it is shown once, here, and nowhere
+ * else. The username carries its own expiry, and the password is the hash
+ * the standard asks for.
+ */
+function renderCredentialsPage(state) {
+  const view = state || {};
+  const lines = [];
+
+  lines.push('<h1>Mint a credential</h1>');
+  lines.push('<p class="lede">A credential for the relay: the username the client gives, and the password '
+    + 'it gives with it. The username carries the moment it stops working, and the password is the 32-character '
+    + 'hash of the username, the realm and the key.</p>');
+
+  if (view.problem) lines.push('<p class="problem">' + escapeHtml(view.problem) + '</p>');
+
+  if (view.credential) {
+    lines.push('<table>');
+    lines.push('<tbody>');
+    lines.push('<tr><th scope="row">Username</th><td><code>' + escapeHtml(view.credential.username) + '</code></td></tr>');
+    lines.push('<tr><th scope="row">Password</th><td><code>' + escapeHtml(view.credential.password) + '</code></td></tr>');
+    lines.push('<tr><th scope="row">Realm</th><td><code>' + escapeHtml(view.credential.realm) + '</code></td></tr>');
+    lines.push('<tr><th scope="row">Good for</th><td>' + escapeHtml(view.credential.hours) + ' hour(s)</td></tr>');
+    lines.push('<tr><th scope="row">Relay</th><td><code>' + escapeHtml(view.credential.url) + '</code></td></tr>');
+    lines.push('</tbody>');
+    lines.push('</table>');
+    lines.push('<p class="note">This is the only time the password is shown. Copy it now.</p>');
+  }
+
+  lines.push('<form method="post" action="/credentials">');
+  lines.push('<div class="field">');
+  lines.push('<label for="name">Who it is for</label>');
+  lines.push('<input id="name" name="name" type="text" value="' + escapeHtml(view.name || '') + '" placeholder="a host, an application, a person">');
+  lines.push('</div>');
+  lines.push('<div class="field">');
+  lines.push('<label for="hours">How many hours it is good for</label>');
+  lines.push('<input id="hours" name="hours" type="number" min="1" max="168" value="' + escapeHtml(view.hours || 24) + '">');
+  lines.push('</div>');
+  lines.push('<button type="submit">Mint it</button>');
+  lines.push('</form>');
+
+  lines.push('<nav class="links">'
+    + '<a href="/">Whether it is working</a>'
+    + '<a href="/config">Configure the relay</a>'
+    + '<a href="/status">The state as JSON</a>'
+    + '</nav>');
+
+  lines.push('<footer>Another host that has the key can mint its own credential without this page. '
+    + 'This page is served on the loopback of this instance and on nothing else.</footer>');
+
+  return pageShell('Mint a credential - the voice stack', lines);
+}
+
+// The body of a form, as a map.
+function readBody(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      const text = Buffer.concat(chunks).toString('utf8');
+      const body = {};
+      for (const pair of text.split('&')) {
+        if (!pair) continue;
+        const at = pair.indexOf('=');
+        const name = decodeURIComponent((at === -1 ? pair : pair.slice(0, at)).replace(/\+/g, ' '));
+        const value = at === -1 ? '' : decodeURIComponent(pair.slice(at + 1).replace(/\+/g, ' '));
+        if (name) body[name] = value;
+      }
+      resolve(body);
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
+/**
+ * Save the relay's configuration.
+ *
+ * The settings are the instance's own, and the voice console is the one that
+ * owns them, so the write names that owner: a write that arrived from
+ * anywhere else would be a second editor for one value.
+ *
+ * When the address or the port has changed, the relay is bound again - a
+ * relay that is still listening on the old port is a relay the clients
+ * cannot reach.
+ */
+async function saveConfiguration(body) {
+  const entries = {};
+  const host = String(body['voice.mesh.turnHost'] || '').trim();
+  const realm = String(body['voice.mesh.turnRealm'] || '').trim();
+  const published = String(body['voice.mesh.publicUrl'] || '').trim();
+  const port = Number(body['voice.mesh.turnPort']);
+  const key = String(body['voice.mesh.stunkey'] || '').trim();
+
+  if (!host) return { problem: 'The relay has to listen on an address.' };
+  if (!Number.isFinite(port) || port < 1 || port > 65535) {
+    return { problem: 'The port has to be a number between 1 and 65535.' };
+  }
+  if (!realm) return { problem: 'The realm cannot be empty: the client is told to use it.' };
+
+  entries['voice.mesh.turnHost'] = host;
+  entries['voice.mesh.turnPort'] = port;
+  entries['voice.mesh.turnRealm'] = realm;
+  entries['voice.mesh.publicUrl'] = published;
+  // An empty field means "leave the key that is set alone", because a page
+  // that shows the key as a blank field would otherwise wipe it.
+  if (key) entries['voice.mesh.stunkey'] = key;
+
+  const before = describeConfiguration();
+
+  let result;
+  try {
+    result = await settings.save(entries, 'the voice process', { owner: 'admin.voice' });
+  } catch (error) {
+    return { problem: String((error && error.message) || error) };
+  }
+  if (!result || !result.ok) {
+    return { problem: (result && result.problems ? result.problems.join('; ') : 'the configuration was refused') };
+  }
+
+  const after = describeConfiguration();
+  if (before.listenHost !== after.listenHost || before.listenPort !== after.listenPort) {
+    // The relay is bound again with the new address and the new port.
+    stopEngine();
+    try {
+      await startEngine();
+    } catch (error) {
+      return { problem: 'The configuration is saved, but the relay could not be bound again: '
+        + String((error && error.message) || error) };
+    }
+  }
+
+  return { saved: 'The configuration is saved. The relay is listening on '
+    + after.listenHost + ':' + after.listenPort + ' and is published as ' + after.advertised + '.' };
+}
+
+/**
+ * Mint a credential for the relay.
+ *
+ * The name is for the holder's own use - it goes into the username, so the
+ * person reading a log can tell whose credential it was. The expiry is the
+ * username's own, and the relay refuses it once it has passed.
+ */
+function mintCredential(body) {
+  const name = String(body.name || '').trim() || 'the voice process';
+  const hours = Math.max(1, Math.min(168, Number(body.hours) || 24));
+  const realm = setting('voice.mesh.turnRealm', process.env.TRYCORD_TURN_REALM || 'trycord-turn');
+  const host = setting('voice.mesh.turnHost', process.env.TRYCORD_TURN_HOST || '::');
+  const port = Number(setting('voice.mesh.turnPort', process.env.TRYCORD_TURN_PORT || 3478)) || 3478;
+  const advertised = publishedAddress();
+
+  const minted = turn.issueCredentials(name, hours * 3600);
+  return {
+    credential: {
+      username: minted.username,
+      password: minted.password,
+      realm,
+      hours,
+      url: 'turn:' + (advertised || host) + ':' + port,
+    },
+    name,
+    hours,
+  };
+}
+
+// ---- the page ---------------------------------------------------------------
+
+/**
+ * Whether the voice stack is working, and what says otherwise.
+ *
+ * The answer is one word, because that is what somebody opening the page
+ * wants to know: does a call work right now, yes or no. The reasons are
+ * behind it, because a "no" without a reason is not worth opening a page
+ * for.
+ *
+ * A published address that does not answer counts against the verdict. The
+ * service can be alive on this host and still be useless to a client, if the
+ * address the clients are given is one that nothing answers on.
+ */
+function verdictOf(state) {
+  const reasons = [];
+  const configuration = state.configuration || {};
+  const engine = state.engine || {};
+  const service = state.service || {};
+  const published = state.published || {};
+
+  if (configuration.ok === false) reasons.push(configuration.detail || 'The configuration is not usable.');
+  if (engine.ok === false) reasons.push(engine.detail || 'The service is not running.');
+  if (service.ok === false) reasons.push(service.detail || 'Nothing answered a binding request.');
+  if (published.ok === false) reasons.push(published.detail || 'The published address does not answer.');
+
+  return { working: reasons.length === 0, reasons };
+}
+
+function escapeHtml(text) {
+  return String(text === undefined || text === null ? '' : text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * The page.
+ *
+ * It is a page of its own rather than a line of text, because the answer
+ * "NOT WORKING" is useless without the reason next to it. The page carries
+ * no stylesheet and no script from the site: it is served on a machine that
+ * may have no internet at all, and it must still say what it says.
+ */
+function renderPage(state) {
+  const verdict = verdictOf(state);
+  const config = describeConfiguration();
+  const rows = [
+    ['The process', state.process && state.process.detail, state.process && state.process.ok],
+    ['The configuration', state.configuration && state.configuration.detail, state.configuration && state.configuration.ok],
+    ['The service', state.service && state.service.detail, state.service && state.service.ok],
+    ['The published address', state.published && state.published.detail, state.published && state.published.ok],
+    ['Reachability from outside', state.reachability && state.reachability.detail, state.reachability && state.reachability.ok],
+  ];
+
+  const heading = verdict.working ? 'WORKING' : 'NOT WORKING';
+  const tone = verdict.working ? 'good' : 'bad';
+
+  const lines = [];
+  lines.push('<h1 class="' + tone + '">' + heading + '</h1>');
+  lines.push('<p class="lede">The voice stack of this instance'
+    + (verdict.working ? ' is working.' : ' is not working.') + '</p>');
+
+  if (!verdict.working) {
+    lines.push('<ul class="reasons">');
+    for (const reason of verdict.reasons) {
+      lines.push('<li>' + escapeHtml(reason) + '</li>');
+    }
+    lines.push('</ul>');
+  }
+
+  lines.push('<table>');
+  lines.push('<tbody>');
+  for (const [name, detail] of rows) {
+    lines.push('<tr><th scope="row">' + escapeHtml(name) + '</th><td>' + escapeHtml(detail) + '</td></tr>');
+  }
+  lines.push('<tr><th scope="row">Published at</th><td><code>' + escapeHtml(config.advertised) + ':' + escapeHtml(config.listenPort) + '</code></td></tr>');
+  lines.push('<tr><th scope="row">Listening on</th><td><code>' + escapeHtml(config.listenHost) + ':' + escapeHtml(config.listenPort) + '</code></td></tr>');
+  lines.push('<tr><th scope="row">Checked at</th><td><code>' + escapeHtml(state.at) + '</code></td></tr>');
+  lines.push('</tbody>');
+  lines.push('</table>');
+
+  lines.push('<nav class="links">'
+    + '<a href="/config">Configure the relay</a>'
+    + '<a href="/credentials">Mint a credential</a>'
+    + '<a href="/status">The state as JSON</a>'
+    + '</nav>');
+
+  lines.push('<footer>This page is served on the loopback of this instance and on nothing else. '
+    + 'Reload it to make the checks again.</footer>');
+
+  return pageShell(heading + ' - the voice stack', lines);
+}
+
+/**
+ * The document every page of this interface is drawn with.
+ *
+ * The page carries no stylesheet and no script from the site: it is served
+ * on a machine that may have no internet at all, and it must still say what
+ * it says. The styles are therefore a dozen lines in the document itself.
+ */
+function pageShell(title, body) {
+  const lines = [];
+  lines.push('<!doctype html>');
+  lines.push('<html lang="en">');
+  lines.push('<head>');
+  lines.push('<meta charset="utf-8">');
+  lines.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
+  lines.push('<title>' + escapeHtml(title) + '</title>');
+  lines.push('<style>');
+  lines.push(':root { color-scheme: light dark; }');
+  lines.push('body { margin: 0; padding: 2rem 1.25rem; font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; '
+    + 'background: #f6f7f9; color: #17191c; }');
+  lines.push('@media (prefers-color-scheme: dark) { body { background: #14161a; color: #e8eaed; } '
+    + '.card { background: #1c1f25 !important; border-color: #2b2f36 !important; } '
+    + 'th { color: #aeb4bd !important; } td { border-color: #2b2f36 !important; } '
+    + 'code { background: #23262c !important; } '
+    + 'label { color: #5b6270 !important; } input { background: #23262c !important; color: #e8eaed !important; '
+    + 'border-color: #2b2f36 !important; } .note { color: #aeb4bd !important; } }');
+  lines.push('.card { max-width: 44rem; margin: 0 auto; background: #fff; border: 1px solid #e2e5ea; border-radius: 12px; padding: 1.75rem; }');
+  lines.push('h1 { font-size: 2.4rem; margin: 0 0 .25rem; letter-spacing: -0.02em; }');
+  lines.push('h1.good { color: #157a4a; } h1.bad { color: #b3261e; }');
+  lines.push('h2 { font-size: 1.15rem; margin: 1.75rem 0 .5rem; }');
+  lines.push('p.lede { margin: 0 0 1.5rem; color: #5b6270; }');
+  lines.push('table { width: 100%; border-collapse: collapse; margin: 0 0 1.5rem; }');
+  lines.push('th, td { text-align: left; padding: .55rem .5rem; border-bottom: 1px solid #e2e5ea; vertical-align: top; }');
+  lines.push('th { color: #5b6270; font-weight: 600; width: 12rem; }');
+  lines.push('ul.reasons { margin: 0 0 1.5rem; padding-left: 1.1rem; }');
+  lines.push('ul.reasons li { margin-bottom: .5rem; }');
+  lines.push('code { background: #eef0f3; border-radius: 4px; padding: .1rem .35rem; font-size: .9em; }');
+  lines.push('.field { display: grid; gap: .3rem; margin: 0 0 1rem; }');
+  lines.push('label { color: #5b6270; font-size: .9rem; font-weight: 600; }');
+  lines.push('input { font: inherit; padding: .55rem .65rem; border: 1px solid #e2e5ea; border-radius: 8px; background: #fff; color: #17191c; min-height: 40px; }');
+  lines.push('button { font: inherit; font-weight: 600; min-height: 40px; padding: .55rem 1.1rem; border-radius: 8px; '
+    + 'border: 1px solid #17191c; background: #17191c; color: #fff; cursor: pointer; }');
+  lines.push('.note { color: #5b6270; font-size: .9rem; margin: .4rem 0 0; }');
+  lines.push('.saved { background: #e8f5ee; border: 1px solid #b6ddc6; color: #10502f; border-radius: 8px; padding: .7rem .9rem; margin: 0 0 1.25rem; }');
+  lines.push('.problem { background: #fdeceb; border: 1px solid #f2c2bf; color: #8c1d18; border-radius: 8px; padding: .7rem .9rem; margin: 0 0 1.25rem; }');
+  lines.push('nav.links { display: flex; flex-wrap: wrap; gap: 1rem; margin: 0 0 1.5rem; }');
+  lines.push('nav.links a { color: #17191c; }');
+  lines.push('footer { color: #5b6270; font-size: .85rem; border-top: 1px solid #e2e5ea; padding-top: .9rem; }');
+  lines.push('</style>');
+  lines.push('</head>');
+  lines.push('<body>');
+  lines.push('<div class="card">');
+  for (const line of body) lines.push(line);
+  lines.push('</div>');
+  lines.push('</body>');
+  lines.push('</html>');
+  return lines.join('\n');
+}
+
 // ---- the process interface -------------------------------------------------
 
 /**
@@ -366,6 +835,78 @@ function isProxyAddress(ip) {
  */
 function handler(req, res) {
   const path = String(req.url || '/').split('?')[0];
+
+  // The page. It says whether the voice stack works, and it says it in one
+  // word, with the reason underneath when the word is "not".
+  if (path === '/' || path === '/index.html' || path === '/voice') {
+    check().then((state) => {
+      const body = renderPage(state);
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      res.end(body);
+    }).catch((error) => {
+      const body = renderPage({
+        at: new Date().toISOString(),
+        process: { ok: true, detail: 'The voice process is running.' },
+        configuration: { ok: false, detail: 'The checks could not be made: ' + String((error && error.message) || error) },
+        engine: { ok: false, detail: 'The service state is not known.' },
+        service: { ok: false, detail: 'The service state is not known.' },
+        published: { ok: null, detail: 'The published address was not checked.' },
+        reachability: { ok: null, detail: 'The reachability was not checked.' },
+      });
+      res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(body);
+    });
+    return;
+  }
+
+  // The configuration of the relay, and the page that changes it.
+  if (path === '/config') {
+    if (req.method === 'POST') {
+      readBody(req).then((body) => saveConfiguration(body)).then((result) => {
+        const page = renderConfigPage(result);
+        res.writeHead(result.problem ? 400 : 200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(page);
+      }).catch((error) => {
+        const page = renderConfigPage({ problem: String((error && error.message) || error) });
+        res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(page);
+      });
+      return;
+    }
+    const page = renderConfigPage({});
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(page);
+    return;
+  }
+
+  // A credential for the relay.
+  if (path === '/credentials') {
+    if (req.method === 'POST') {
+      readBody(req).then((body) => mintCredential(body)).then((result) => {
+        const page = renderCredentialsPage(result);
+        res.writeHead(result.problem ? 400 : 200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(page);
+      }).catch((error) => {
+        const page = renderCredentialsPage({ problem: String((error && error.message) || error) });
+        res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(page);
+      });
+      return;
+    }
+    const page = renderCredentialsPage({});
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(page);
+    return;
+  }
 
   if (path === '/health' || path === '/healthz') {
     // The process is up. Whether the service is, is a different question and
@@ -406,8 +947,38 @@ function handler(req, res) {
 // ---- the lifecycle ---------------------------------------------------------
 
 async function main() {
-  // The instance's own settings, for the address it publishes itself at. A
-  // failure here is not fatal: the environment's address is the fallback.
+  // The process interface is on the loopback. A setting that asks for
+  // anything else is refused: the page and the health checks of the voice
+  // stack are an operator's surface, and an operator's surface does not
+  // belong on the internet.
+  //
+  // The relay is the other thing, and it is meant to be reachable: the UDP
+  // port is opened to the world on purpose. Only this interface is local.
+  if (!isLoopback(HOST)) {
+    console.error('[voice] the voice process serves its page and its health checks on the '
+      + 'loopback and on nothing else, and TRYCORD_VOICE_PROCESS_HOST is ' + HOST + '. '
+      + 'That address would put the diagnostics of the voice stack, and the '
+      + 'addresses it publishes, on the network. Remove the variable, or give it 127.0.0.1. '
+      + 'The relay itself is published separately, with TRYCORD_TURN_HOST.');
+    process.exitCode = 1;
+    return;
+  }
+
+  // The instance's own settings, for the address it publishes itself at and
+  // for the relay's configuration. The database is what holds them, so the
+  // connection is made first.
+  //
+  // A failure here is not fatal: the environment's address is the fallback,
+  // and the relay runs either way. What is lost is the ability to *change*
+  // the configuration from this process - the page says so rather than
+  // pretending a save worked.
+  try {
+    const db = require('../db');
+    await db.connect();
+  } catch (error) {
+    console.warn('[voice] the database could not be reached, so the instance\'s saved '
+      + 'settings are not read: ' + ((error && error.message) || error));
+  }
   try {
     await settings.load();
   } catch (error) {
@@ -477,10 +1048,28 @@ process.on('unhandledRejection', (reason) => {
   console.error('[voice] an unhandled rejection: ' + ((reason && reason.stack) || reason));
 });
 
-main().catch((error) => {
-  console.error('[voice] the voice process could not start: '
-    + ((error && error.stack) || error));
-  process.exit(1);
-});
+// The process is started when this file *is* the process. It is also
+// required by the tests, which want the checks and the page without a
+// relay, a socket and a timer, so the start is under the entry point's
+// name and not at the top of the file.
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('[voice] the voice process could not start: '
+      + ((error && error.stack) || error));
+    process.exit(1);
+  });
+}
 
-module.exports = { describeConfiguration, check, startEngine, stopEngine };
+module.exports = {
+  describeConfiguration,
+  check,
+  startEngine,
+  stopEngine,
+  verdictOf,
+  renderPage,
+  renderConfigPage,
+  renderCredentialsPage,
+  relaySettings,
+  isLoopback,
+  handler,
+};

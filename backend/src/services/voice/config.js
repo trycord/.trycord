@@ -29,8 +29,12 @@ const turn = require('../turn');
 const GROUPS = {
   mesh: {
     prefix: 'voice.mesh.',
-    settings: ['maxParticipants', 'publicUrl'],
-    secrets: [],
+    // The relay's own settings: the port it listens on, the address it
+    // binds, the realm its credentials are issued in, and the key they are
+    // minted under. They belong to the mesh and to nothing else, because the
+    // mesh is the only provider that runs a relay of its own.
+    settings: ['maxParticipants', 'publicUrl', 'turnPort', 'turnHost', 'turnRealm'],
+    secrets: ['stunkey'],
     legacy: {
       maxParticipants: 'voice.maxParticipants',
       publicUrl: 'voice.publicUrl',
@@ -179,9 +183,16 @@ function secret(providerId, name, overlay) {
 // address is the one the deployment configured; the realm and the secret come
 // from the same place and never leave the process.
 function inHouseRelay() {
-  const host = String(process.env.TRYCORD_TURN_HOST || '0.0.0.0').trim();
-  const port = Number(process.env.TRYCORD_TURN_PORT || 3478);
-  const realm = String(process.env.TRYCORD_TURN_REALM || 'trycord-turn');
+  // The relay's own configuration.
+  //
+  // It is read through the settings service, so the deployment's environment
+  // outranks the instance's saved value and the saved value outranks the
+  // default - the same rule every other setting follows. Reading the
+  // environment directly, as this used to, meant an administrator who changed
+  // the port in the console was changing a number nobody read.
+  const host = String(settings.read('voice.mesh.turnHost', process.env.TRYCORD_TURN_HOST || '::')).trim();
+  const port = Number(settings.read('voice.mesh.turnPort', process.env.TRYCORD_TURN_PORT || 3478));
+  const realm = String(settings.read('voice.mesh.turnRealm', process.env.TRYCORD_TURN_REALM || 'trycord-turn')).trim();
   const listenPort = Number.isFinite(port) && port > 0 ? port : 3478;
 
   // The addresses the clients are given.
@@ -466,7 +477,7 @@ function descriptor(key) {
 }
 
 function typeOf(name) {
-  if (name === 'maxParticipants') return 'integer';
+  if (name === 'maxParticipants' || name === 'turnPort') return 'integer';
   if (name === 'stunUrls') return 'list';
   return 'string';
 }
