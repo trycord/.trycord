@@ -207,7 +207,10 @@
    and not a wall of buttons. */
 .nav-add {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; padding: 0; margin-bottom: 5px;
+  /* The mark is small and quiet, and the target is not: a control that is
+     twenty pixels square is hard to hit with a mouse and impossible with a
+     finger. */
+  width: 26px; height: 26px; padding: 0; margin-bottom: 3px;
   border: 0; border-radius: var(--radius-sm);
   background: transparent; color: var(--text-3); cursor: pointer;
   opacity: 0;
@@ -219,8 +222,9 @@
 .nav-add:hover { background: var(--hover); color: var(--text-1); }
 .nav-add:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 @media (hover: none) {
-  /* A touch screen has no hover, so the control is always there. */
-  .nav-add { opacity: 1; }
+  /* A touch screen has no hover, so the control is always there - and a finger
+     needs a target it can hit without aiming. */
+  .nav-add { opacity: 1; width: 44px; height: 44px; }
 }
 .nav-item {
   display: flex; align-items: center; gap: 10px;
