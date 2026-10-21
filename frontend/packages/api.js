@@ -490,6 +490,15 @@ const Api = {
     request('POST', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId) + '/reactions', { body: { emoji } }),
   unreactDm: (id, messageId, emoji) =>
     request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId) + '/reactions/' + encodeURIComponent(emoji)),
+  // The conversations of more than two people.
+  createDmGroup: (body) => request('POST', '/api/dms/groups', { body }),
+  renameDmGroup: (id, name) => request('PATCH', '/api/dms/' + encodeURIComponent(id), { body: { name } }),
+  addDmGroupMember: (id, userId) =>
+    request('POST', '/api/dms/' + encodeURIComponent(id) + '/members', { body: { userId } }),
+  removeDmGroupMember: (id, userId) =>
+    request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/members/' + encodeURIComponent(userId)),
+  leaveDmGroup: (id) => request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/members'),
+
   dmRead: (id) => request('POST', '/api/dms/' + encodeURIComponent(id) + '/read'),
 
   friends: () => request('GET', '/api/friends'),

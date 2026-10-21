@@ -15,11 +15,13 @@ const db = require('../../db');
 const e2ee = require('../e2ee');
 const { publicPeer, visibleConversation, shape } = require('./conversation');
 const { history } = require('./history');
+const groups = require('./groups');
 
 // Everyone the user chats with, most-recently-active first.
 async function listMine(userId) {
   const memberships = await db.all(
-    `SELECT m.*, c.updated_at, c.created_at AS conv_created,
+    `SELECT m.*, c.updated_at, c.created_at AS conv_created, c.name AS conv_name,
+       (SELECT COUNT(*) FROM dm_members cm WHERE cm.conversation_id = m.conversation_id) AS member_count,
        (SELECT om.user_id FROM dm_members om
          WHERE om.conversation_id = m.conversation_id AND om.user_id != ? LIMIT 1) AS peer_id,
        (SELECT dm.id FROM dm_messages dm
@@ -65,6 +67,10 @@ async function listMine(userId) {
     // an envelope: the list shows that it is one and no more, because the
     // server has nothing else to show.
     const preview = last ? e2ee.readMessageBody(last.content) : null;
+    // A conversation of more than two people is a group, and a group is shown
+    // by its name. The peer of a one-to-one conversation is unchanged, so a
+    // client that knows nothing about groups still works.
+    const group = Number(m.member_count || 0) > 2 || !!m.conv_name;
     return shape(
       {
         id: m.conversation_id,
@@ -73,7 +79,7 @@ async function listMine(userId) {
         // otherwise the first message in a dormant chat floats it to the top.
         updated_at: last ? last.created_at : m.updated_at,
       },
-      publicPeer((m.peer_id && peers[String(m.peer_id)]) || null),
+      group ? null : publicPeer((m.peer_id && peers[String(m.peer_id)]) || null),
       last ? {
         id: last.id,
         content: preview.content,
@@ -84,7 +90,12 @@ async function listMine(userId) {
         authorId: last.author_id,
         authorName: last.author_display || last.author_name,
       } : null,
-      m.unread_n || 0
+      m.unread_n || 0,
+      {
+        name: m.conv_name || null,
+        isGroup: group,
+        memberCount: Number(m.member_count || 0),
+      }
     );
   });
   out.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
@@ -111,11 +122,25 @@ async function detail(userId, conversationId, opts) {
     ),
     history(userId, conversationId, opts),
   ]);
+  // The people in the conversation, and what they are called. A group is
+  // shown by these, so they are part of the answer and not something the
+  // client has to ask for separately.
+  const people = await groups.members(conversationId);
+  const group = groups.isGroup(seen.conv, people);
   return {
     id: seen.conv.id,
     createdAt: seen.conv.created_at,
     updatedAt: seen.conv.updated_at,
-    peer: publicPeer(peerRow),
+    // A group has no single peer: naming one of its members as "the person
+    // you are talking to" would be a lie about a group of five.
+    peer: group ? null : publicPeer(peerRow),
+    name: seen.conv.name || null,
+    isGroup: group,
+    displayName: groups.displayName(seen.conv, people),
+    memberCount: people.length,
+    people: people.map((person) => ({
+      id: person.id, username: person.username, displayName: person.displayName,
+    })),
     members: members.map((m) => ({ userId: m.user_id, lastReadAt: m.last_read_at })),
     messages,
   };

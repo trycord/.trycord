@@ -379,14 +379,52 @@ export function markConversationRead(conversationId) {
 }
 
 // The person on the other side of a one-to-one conversation.
+//
+// A conversation of more than two people is a group, and it has no single
+// person on the other side: naming one of them as "the person you are
+// talking to" would be a lie about a group of five.
 export function dmPeer(dm) {
   if (!dm) return null;
+  if (dm.isGroup) return null;
   // The list answer carries the peer directly; older spells kept a users array.
   const users = dm.users || dm.participants || [];
   const me = State.user && State.user.id;
   const others = users.filter((u) => u.id !== me);
   const peer = dm.peer ? dm.peer : (others.length ? others[0] : (users[0] || null));
   return peer ? normalizeUser(peer) : null;
+}
+
+// What a conversation is called.
+//
+// A group is called by its name. A conversation of two people is called by
+// the other person's name. A group with no name is called by the people in
+// it, because that is the only thing that says which conversation it is.
+export function dmName(dm) {
+  if (!dm) return 'Conversation';
+  if (dm.isGroup) {
+    const named = String(dm.name || '').trim();
+    if (named) return named;
+    const people = (dm.people || dm.members || []).filter((person) =>
+      String(person.id) !== String(State.user && State.user.id));
+    if (!people.length) return 'A group';
+    if (people.length === 1) return nameOf(normalizeUser(people[0]));
+    if (people.length === 2) {
+      return nameOf(normalizeUser(people[0])) + ' and ' + nameOf(normalizeUser(people[1]));
+    }
+    return nameOf(normalizeUser(people[0])) + ' and ' + String(people.length - 1) + ' others';
+  }
+  const peer = dmPeer(dm);
+  return peer ? nameOf(peer) : 'Conversation';
+}
+
+// The people in a conversation, apart from the reader.
+export function dmPeople(dm) {
+  if (!dm) return [];
+  const people = dm.people || dm.users || dm.participants || [];
+  const me = State.user && State.user.id;
+  return people
+    .filter((person) => String(person.id) !== String(me))
+    .map((person) => normalizeUser(person));
 }
 
 // --- friends ----------------------------------------------------------------

@@ -82,7 +82,8 @@ async function getOrCreate(me, peerId) {
   }
 }
 
-function shape(conv, peer, lastMessage, unreadCount, members) {
+function shape(conv, peer, lastMessage, unreadCount, extra) {
+  const more = extra || {};
   return {
     id: conv.id,
     createdAt: conv.created_at,
@@ -90,7 +91,13 @@ function shape(conv, peer, lastMessage, unreadCount, members) {
     peer,
     lastMessage: lastMessage || null,
     unreadCount: unreadCount || 0,
-    members: members || undefined,
+    // A conversation of more than two people is a group. It has a name, and
+    // it has no single peer, because naming one of its members as "the
+    // person you are talking to" would be a lie about a group of five.
+    name: more.name || null,
+    isGroup: !!more.isGroup,
+    memberCount: more.memberCount || 0,
+    members: more.members || undefined,
   };
 }
 
