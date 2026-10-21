@@ -277,9 +277,30 @@ async function updateApp(appId, serverId, patch) {
   return appShape(await getApp(appId, serverId));
 }
 
+// Take an application away for good.
+//
+// Its token stops working with the row, and the bot's account leaves the
+// community: an application that is gone has no business being a member,
+// and a member that is still there could still be spoken for.
+//
+// The account itself stays. The messages it wrote are still in the
+// channels, and a message whose author has been deleted is a message with
+// a hole in it.
 async function removeApp(appId, serverId) {
   const row = await getApp(appId, serverId);
   if (!row) return false;
+  if (row.bot_user_id) {
+    const memberships = require('./memberships');
+    await memberships.leave(row.server_id, row.bot_user_id).catch(() => {});
+  }
+  // The credential goes with the application. A key that outlived the
+  // application it belonged to would still be a key to the community.
+  const ts = now();
+  await db.run(
+    'UPDATE developer_api_keys SET status = ?, revoked_at = ?, revoked_reason = ?'
+    + ' WHERE bot_application_id = ? AND status = ?',
+    ['revoked', ts, 'the application was deleted', appId, 'active']
+  );
   await db.run('DELETE FROM bot_applications WHERE id = ?', [appId]);
   return true;
 }

@@ -65,7 +65,13 @@ test('bot applications', async (t) => {
       .post('/communities/' + communityId + '/channels/' + channelId + '/messages', { content: 'from the application' });
     assert.equal(res.status, 201, 'the message is posted: ' + JSON.stringify(res.data));
     assert.equal(res.data.content, 'from the application');
-    assert.equal(res.data.author_id, session.user.id, 'the message is attributed to the owner');
+    // The message is written by the bot, not by the person who made it. It
+    // used to be attributed to the owner, which made a bot look like a human
+    // in the channel and gave the bot the owner's rights.
+    assert.equal(res.data.author_id, created.application.botUserId,
+      'the message is attributed to the bot');
+    assert.notEqual(res.data.author_id, session.user.id,
+      'and not to the developer who made it');
   });
 
   await t.test('a token without the scope may not post', async () => {

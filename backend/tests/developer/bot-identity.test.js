@@ -78,6 +78,56 @@ test('a bot has an account of its own', async (t) => {
     assert.equal(message.author_id, application.botUserId, 'and it belongs to the bot');
   });
 
+  await t.test('the versioned API posts as the bot as well', async () => {
+    const botApi = apiClient(base, token);
+    const posted = await botApi.post(
+      '/communities/' + communityId + '/channels/' + channelId + '/messages',
+      { content: 'hello from the versioned API' },
+    );
+    assert.equal(posted.status, 201, JSON.stringify(posted.data));
+    assert.equal(posted.data.author_id, application.botUserId,
+      'the message is written by the bot, not by the developer');
+  });
+
+  await t.test('a bot with the scope to post may post, and nothing more', async () => {
+    // The credential that posts a message must not be able to change the
+    // community's developer configuration: that is another scope, and the
+    // route asks for it.
+    const botApi = apiClient(base, token);
+    const attempt = await botApi.post(
+      '/communities/' + communityId + '/applications',
+      { name: 'another one' },
+    );
+    assert.equal(attempt.status, 403,
+      'the application cannot create applications: ' + JSON.stringify(attempt.data));
+  });
+
+  await t.test('deleting the application takes the bot out of the community', async () => {
+    const botApi = apiClient(base, token);
+    const before = await apiClient(instance.baseUrl, session.token)
+      .get('/api/servers/' + communityId + '/members');
+    assert.ok((before.data.items || []).some((m) => m.id === application.botUserId),
+      'the bot is a member while the application exists');
+
+    const removed = await sessionApi.delete('/communities/' + communityId + '/applications/' + application.id);
+    assert.equal(removed.status, 200, JSON.stringify(removed.data));
+
+    const after = await apiClient(instance.baseUrl, session.token)
+      .get('/api/servers/' + communityId + '/members');
+    assert.ok(!(after.data.items || []).some((m) => m.id === application.botUserId),
+      'the bot is not a member once the application is gone');
+
+    // The token stops working with the application.
+    const posted = await botApi.post(
+      '/communities/' + communityId + '/channels/' + channelId + '/messages',
+      { content: 'after the end' },
+    );
+    // The token is refused - the credential behind it was revoked with the
+    // application - and the refusal says so.
+    assert.ok(posted.status === 401 || posted.status === 404,
+      'the token does not work after the application is deleted: ' + JSON.stringify(posted.data));
+  });
+
   await t.test('the developer cannot speak as the bot with their own session', async () => {
     // The bot's account has no password, so there is nothing to sign in with.
     const attempt = await apiClient(instance.baseUrl, session.token)
