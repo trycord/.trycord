@@ -117,6 +117,10 @@ ${group('About', [
   ['/changelog', 'Changelog', "What's shipped recently."],
   ['/roadmap', 'Roadmap', 'Where the project is going.'],
 ], false)}
+
+        <div class="nav-mobile-actions">
+          <a class="btn btn-ghost btn-sm" href="/app/" data-app-link>Open the app</a>
+        </div>
       </nav>
 
       <div class="masthead-actions">

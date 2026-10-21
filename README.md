@@ -11,6 +11,7 @@ web app (WAC) or the desktop shell (DAC).
 - `backend/` — REST API, WebSocket gateway, accounts, permissions,
   moderation, uploads, database access
 - `frontend/` — the web client (desktop and mobile modules)
+- `trycord-desktop/` — the desktop application, a window around that client
 - `public/` — the public website and legal pages
 - `docs/` — self-hosting, theming, and the architecture reference
 
@@ -72,12 +73,14 @@ lists what each surface is and how to exercise it.
 ## Clients
 
 Trycord ships one web client under `frontend/`, with desktop browser support
-and a purpose-built mobile module. There is no separate desktop wrapper; point
-a self-hosted deployment or a browser at the instance and it serves both the
-desktop and mobile surfaces from the same client.
+and a purpose-built mobile module. A browser pointed at the instance gets
+both surfaces from that one client.
 
-See `docs/desktop.md` for desktop usage and `docs/launcher.md` if a launcher
-workflow is still required by your deployment.
+The desktop application in `trycord-desktop/` is a window around the same
+client: it holds no database and no authority of its own, it can be pointed
+at any instance, and a release of it is attached to the releases on GitHub.
+See `docs/desktop.md` for how it works and `docs/launcher.md` for the
+startup layer it uses.
 
 ## Configuration
 
@@ -89,6 +92,18 @@ deployment, including the nginx topology and the Docker volume layout,
 `docs/backups.md` for taking a backup and putting it back,
 `docs/instances.md` for running alongside other instances, and
 `docs/architecture.md` for how the system is put together.
+
+The voice subsystem runs as a process of its own and owns the instance's
+STUN and TURN relay. It answers on the loopback of the machine:
+
+```
+http://127.0.0.1:9973/          # WORKING or NOT WORKING, and why
+http://127.0.0.1:9973/config    # the relay's own configuration
+http://127.0.0.1:9973/credentials   # a credential, minted on the spot
+```
+
+`docs/voice.md` has the whole of it, including the stunkey the credentials
+are derived from and how a host outside this instance mints its own.
 
 ## Deployment
 

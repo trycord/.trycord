@@ -2,5 +2,11 @@
   "name": "trycord-client",
   "private": true,
   "type": "module",
-  "description": "The Trycord web client. ES modules served to the browser; this file marks that scope so the same files can be parsed and tested by Node."
+  "description": "The Trycord web client. ES modules served to the browser; this file marks that scope so the same files can be parsed and tested by Node.",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\"",
+    "check:names": "node scripts/check-client-names.mjs",
+    "check:site": "node scripts/browser-site.mjs",
+    "sweep": "node scripts/browser-sweep.mjs"
+  }
 }

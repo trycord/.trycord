@@ -21,7 +21,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import http from 'node:http';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 import { harness, wait, freePort, cleanupHarness } from './browser-harness.mjs';
@@ -30,53 +30,38 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(HERE, '..', '..', 'public');
 const PORT = Number(process.env.BROWSER_SITE_PORT || 9381);
 
-// The site is served over HTTP, the way it is in a deployment.
+// The site is checked off disk, the way the application's sweep checks it.
 //
-// The pages ask for their stylesheets and their scripts by an absolute path -
-// `/css/site.css`, `/js/site.js` - because that is where they live on a real
-// instance. Loaded off the disk those paths point at the root of the
-// filesystem, so the page would draw without its script: the menu would not
-// open and the copy buttons would never appear. That is the harness lying
-// about the site, so the site is served properly and the pages are read the
-// way a reader reads them.
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
-  '.txt': 'text/plain; charset=utf-8',
-  '.webmanifest': 'application/manifest+json',
-};
+// The browser in this environment cannot make a network request - not even to
+// the loopback - so the pages are read off the disk. Their stylesheets and
+// their scripts are asked for by an absolute path (`/css/site.css`,
+// `/js/site.js`), because that is where they live on a real instance, and off
+// the disk those paths point at the root of the filesystem. So the pages are
+// copied into a scratch directory with the paths made relative, and the browser
+// reads the copy.
+//
+// The copy is what a reader sees: the same markup, the same stylesheet, the
+// same script. Only the addresses of the files differ.
+const SCRATCH = path.join(os.tmpdir(), 'trycord-site-check');
 
-function serveSite(port) {
-  const server = http.createServer((req, res) => {
-    const url = new URL(req.url, 'http://127.0.0.1:' + port);
-    let name = decodeURIComponent(url.pathname);
-    if (name.endsWith('/')) name += 'index.html';
-    const file = path.join(PUBLIC, name);
-    if (!path.resolve(file).startsWith(path.resolve(PUBLIC)) || !fs.existsSync(file)
-      || !fs.statSync(file).isFile()) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not found');
-      return;
+function stagePages() {
+  fs.rmSync(SCRATCH, { recursive: true, force: true });
+  fs.mkdirSync(SCRATCH, { recursive: true });
+  for (const name of fs.readdirSync(PUBLIC)) {
+    const source = path.join(PUBLIC, name);
+    if (fs.statSync(source).isDirectory()) {
+      fs.cpSync(source, path.join(SCRATCH, name), { recursive: true });
+      continue;
     }
-    res.writeHead(200, {
-      'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
-      'Cache-Control': 'no-store',
-    });
-    res.end(fs.readFileSync(file));
-  });
-  return new Promise((resolve) => {
-    server.listen(port, '127.0.0.1', () => resolve(server));
-  });
+    if (!name.endsWith('.html')) {
+      fs.copyFileSync(source, path.join(SCRATCH, name));
+      continue;
+    }
+    let html = fs.readFileSync(source, 'utf8');
+    html = html.replace(/(href|src)="\/(?!\/)([^"]*)"/g, '$1="./$2"');
+    fs.writeFileSync(path.join(SCRATCH, name), html);
+  }
+  return SCRATCH;
 }
 
 function arg(name, fallback) {
@@ -139,12 +124,37 @@ const measure = `
     }
   }
 
+  // An attribute written outside its tag is text on the page.
+  //
+  // It happened: the pager's attribute sat after the tag it belonged to, so
+  // the reader saw "data-next=1" at the top of eight pages and the pager
+  // never appeared. A page must not show anything that looks like markup.
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  var text;
+  while ((text = walker.nextNode())) {
+    var value = String(text.nodeValue || '');
+    if (/^\s*[a-zA-Z-]+="[^"]*"\s*$/.test(value)) {
+      problems.push('the page shows "' + value.trim() + '" as text');
+      break;
+    }
+  }
+
+  // A page that asks for the pager gets one.
+  var main = document.querySelector('#main');
+  if (main && main.getAttribute('data-next')) {
+    var pager = document.querySelector('.pager');
+    if (!pager) {
+      problems.push('the page asked for a pager and did not get one');
+    } else if (!pager.querySelector('a[href]')) {
+      problems.push('the pager has no link in it');
+    }
+  }
+
   return { problems: problems, height: document.body.scrollHeight };
 `;
 
+const staged = stagePages();
 const run = await harness(await freePort(PORT));
-const sitePort = await freePort(PORT + 1);
-const site = await serveSite(sitePort);
 let failures = 0;
 const report = [];
 
@@ -156,11 +166,11 @@ try {
     });
 
     for (const name of pages) {
-      const file = path.join(PUBLIC, name);
+      const file = path.join(staged, name);
       const started = Date.now();
       process.stdout.write('      ' + name + '...');
 
-      await run.page.send('Page.navigate', { url: 'http://127.0.0.1:' + sitePort + '/' + name });
+      await run.page.send('Page.navigate', { url: 'file://' + file });
       await wait(350);
 
       const faults = [];
@@ -231,7 +241,7 @@ try {
   }
 } finally {
   await run.shutdown();
-  site.close();
+  fs.rmSync(staged, { recursive: true, force: true });
 }
 
 console.log('\n' + report.length + ' page(s) at ' + WIDTHS.length + ' width(s); '
