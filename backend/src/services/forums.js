@@ -77,7 +77,7 @@ async function topics(channel, options = {}) {
 
   const rows = await db.all(
     `SELECT m.*, u.username AS author_name, u.display_name AS author_display,
-            u.avatar_url AS author_avatar, u.banner_url AS author_banner,
+            u.avatar_url AS author_avatar, u.banner_url AS author_banner, u.is_bot AS author_is_bot,
             (SELECT COUNT(*) FROM messages r
                WHERE r.thread_root_id = m.id AND r.channel_id = m.channel_id) AS reply_count,
             (SELECT COALESCE(MAX(r.created_at), m.created_at) FROM messages r

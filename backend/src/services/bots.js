@@ -33,6 +33,9 @@ function appShape(r) {
     id: r.id,
     serverId: r.server_id,
     ownerUserId: r.owner_user_id,
+    // The account the application posts as. It is a bot account of its own,
+    // not the developer who made it.
+    botUserId: r.bot_user_id || null,
     name: r.name,
     description: r.description || null,
     iconUrl: r.icon_url || null,
@@ -162,6 +165,57 @@ async function getApp(appId, serverId) {
   return row || null;
 }
 
+// The account a bot posts as.
+//
+// An application is not its developer. It used to post under the developer's
+// name, which made a bot indistinguishable from a person in the channel and
+// meant that a developer's own account was what everyone saw - and what
+// everything the bot could do was measured against.
+//
+// A bot has an account of its own: it cannot sign in, it is marked as a bot
+// everywhere it appears, and it belongs to the community the application was
+// created in, with the rights that community gives an ordinary member.
+const BOT_USERNAME_MAX = 32;
+
+function botUsername(label) {
+  const base = String(label || 'bot')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, BOT_USERNAME_MAX - 5) || 'bot';
+  return 'bot_' + base;
+}
+
+// A username nobody has taken. The bot's name is a suggestion; a collision
+// with a real account must not stop a developer from making their bot.
+async function freeBotUsername(label) {
+  const base = botUsername(label);
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const candidate = attempt === 0 ? base : base.slice(0, BOT_USERNAME_MAX - 5) + '_' + attempt;
+    const taken = await db.get('SELECT id FROM users WHERE username = ?', [candidate]);
+    if (!taken) return candidate;
+  }
+  return base + '_' + crypto.randomBytes(3).toString('hex');
+}
+
+// The bot's account, and its membership of the community.
+//
+// The account has no password: it cannot sign in, and there is nothing to
+// guess. The membership is an ordinary one, so the bot gets the rights the
+// community gives a member and not the rights of the developer who made it.
+async function createBotAccount(app, label) {
+  const username = await freeBotUsername(label);
+  const userId = uuid();
+  await db.run(
+    'INSERT INTO users (id, username, display_name, password_hash, created_at, is_bot, avatar_url)'
+    + ' VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [userId, username, label, 'bot:' + crypto.randomBytes(24).toString('hex'), now(), 1, app.icon_url || null]
+  );
+  const memberships = require('./memberships');
+  await memberships.join(app.server_id, { id: userId, username });
+  return userId;
+}
+
 async function createApp({ serverId, ownerUserId, name, description, iconUrl }) {
   const label = String(name || '').trim();
   if (!label || label.length > 64) bad('name must be 1-64 characters');
@@ -183,8 +237,12 @@ async function createApp({ serverId, ownerUserId, name, description, iconUrl }) 
     [id, ownerUserId, serverId, label, desc, icon, 'active', hashToken(token), ts, ts]
   );
   const row = await getApp(id, serverId);
+  // The bot's account is created with the application, so the two are born
+  // together and an application is never left without an identity.
+  const botUserId = await createBotAccount(row, label);
+  await db.run('UPDATE bot_applications SET bot_user_id = ? WHERE id = ?', [botUserId, id]);
   // The token is the only time it exists in plaintext.
-  return Object.assign(appShape(row), { token });
+  return Object.assign(appShape(await getApp(id, serverId)), { token });
 }
 
 async function updateApp(appId, serverId, patch) {
@@ -353,6 +411,15 @@ async function refuseIfEncrypted(channelRow, reason) {
   throw e;
 }
 
+// The account the application acts as.
+//
+// The bot's own account where it has one. An application made before the
+// column existed has none, and acts as its owner until it is saved again -
+// the old behaviour, kept working rather than breaking.
+function botUserIdOf(app) {
+  return (app && app.bot_user_id) || (app && app.owner_user_id) || null;
+}
+
 async function postAsApp(app, channelRow, content, { kind } = {}) {
   const text = String(content || '').trim().slice(0, 2000);
   if (!text) return null;
@@ -361,20 +428,23 @@ async function postAsApp(app, channelRow, content, { kind } = {}) {
   const ts = now();
   const seqRow = await db.get('SELECT COALESCE(MAX(seq), 0) AS m FROM messages WHERE channel_id = ?', [channelRow.id]);
   const seq = (seqRow ? Number(seqRow.m) : 0) + 1;
+  // The author is the bot, not the developer who made it. A message that
+  // says "the bot said this" has to be attributable to the bot.
+  const authorId = botUserIdOf(app);
   await db.run(
     'INSERT INTO messages (id, channel_id, author_id, content, created_at, seq) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, channelRow.id, app.owner_user_id, text, ts, seq]
+    [id, channelRow.id, authorId, text, ts, seq]
   );
   events.emitChannel(channelRow.server_id, channelRow.id, {
     type: EVENTS.MESSAGE,
     id, channel_id: channelRow.id, server_id: channelRow.server_id,
-    author_id: app.owner_user_id,
+    author_id: authorId,
     content: text, created_at: ts, edited_at: null, seq,
     attachments: [], reactions: [], pinned: false, reply_count: 0, thread_root_id: null,
     embeds: [],
     bot: { applicationId: app.id, name: app.name, kind: kind || 'app' },
   });
-  return { id, channel_id: channelRow.id, author_id: app.owner_user_id, content: text, created_at: ts, seq };
+  return { id, channel_id: channelRow.id, author_id: authorId, content: text, created_at: ts, seq };
 }
 
 // A slash command: bind the declared options, then post the configured answer.
@@ -421,6 +491,7 @@ async function respond(serverId, channelRow, invocation) {
 }
 
 module.exports = {
+  botUserIdOf,
   TOKEN_PREFIX,
   listApps, getApp, createApp, removeApp,
   listCommands, setCommand, removeCommand,

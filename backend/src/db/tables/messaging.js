@@ -217,6 +217,11 @@ module.exports = (engine) => [
       -- administrator has switched it off without deleting its commands.
       status        VARCHAR(16) NOT NULL DEFAULT 'active',
       token_hash    VARCHAR(255) NOT NULL,
+      -- The account the application posts as. It is a bot account: it
+      -- cannot sign in, and it is marked as a bot everywhere it appears.
+      -- An application made before this column existed posts as its owner,
+      -- and the column is filled in for it the next time it is saved.
+      bot_user_id   VARCHAR(64),
       created_at    VARCHAR(64) NOT NULL,
       updated_at    VARCHAR(64) NOT NULL,
       FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,

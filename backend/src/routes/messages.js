@@ -104,7 +104,7 @@ router.get('/', async (req, res, next) => {
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     // Integer embedded after validation (keeps LIMIT working on every database).
     const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10) || 50, 1), 200);
-    const select = `SELECT m.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
+    const select = `SELECT m.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner, u.is_bot AS author_is_bot
          FROM messages m JOIN users u ON u.id = m.author_id`;
     let rows;
     if (req.query.after !== undefined && req.query.after !== '') {
@@ -271,7 +271,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     const nonce = String(body.clientNonce || '').trim().slice(0, 64) || null;
     if (nonce) {
       const existing = await db.get(
-        `SELECT m.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner
+        `SELECT m.*, u.username AS author_name, u.display_name AS author_display, u.avatar_url AS author_avatar, u.banner_url AS author_banner, u.is_bot AS author_is_bot
          FROM messages m JOIN users u ON u.id = m.author_id
          WHERE m.channel_id = ? AND m.client_nonce = ? AND m.author_id = ?`,
         [ch.id, nonce, req.user.id]

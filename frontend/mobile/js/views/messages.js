@@ -53,7 +53,10 @@ function normalizeMessage(raw) {
       authorId: raw.authorId,
       authorName: raw.authorName,
       authorDisplay: raw.authorDisplay || raw.authorName,
-      authorAvatar: raw.authorAvatar || null,
+      authorAvatar: raw.authorAvatar || raw.author_avatar || null,
+      // Whether the author is a bot. The server says so; a name that says
+      // "bot" is not a substitute for knowing it.
+      authorIsBot: !!(raw.authorIsBot || raw.author_is_bot),
       replyCount: raw.replyCount || raw.reply_count || 0,
       attachments: raw.attachments || [],
       reactions: raw.reactions || [],
@@ -208,7 +211,9 @@ function messageRow(message, previous, handlers) {
   const main = el('div', { class: 'm-msg__main' });
   if (!compact) {
     main.appendChild(el('div', { class: 'm-msg__head' },
-      el('button', { class: 'm-msg__author', type: 'button', onClick: () => handlers.openProfile(message.authorId) }, message.authorDisplay || message.authorName || 'Unknown'),
+      el('button', { class: 'm-msg__author', type: 'button', onClick: () => handlers.openProfile(message.authorId) },
+        message.authorDisplay || message.authorName || 'Unknown',
+        message.authorIsBot ? el('span', { class: 'm-msg__botflag', title: 'This is a bot' }, 'BOT') : null),
       el('time', { class: 'm-msg__time', datetime: message.createdAt || '' }, timeOfDay(message.createdAt))));
   }
   if (message.content) {

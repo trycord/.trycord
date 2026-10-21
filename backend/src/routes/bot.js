@@ -48,7 +48,10 @@ async function requireApp(req, res, next) {
 router.get('/channels/:channelId/messages', requireApp, rateLimit({ windowMs: 60000, max: 60 }),
   async (req, res, next) => {
     try {
-      const ch = await visibleChannel(req.params.channelId, req.botApp.owner_user_id, req.serverId);
+      // The bot's own account, so it reads and writes with the rights the
+      // community gave it and not with the rights of the developer who made
+      // it.
+      const ch = await visibleChannel(req.params.channelId, bots.botUserIdOf(req.botApp), req.serverId);
       if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found');
       const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10) || 20, 1), 100);
       const rows = await db.all(
@@ -68,11 +71,14 @@ router.get('/channels/:channelId/messages', requireApp, rateLimit({ windowMs: 60
 router.post('/channels/:channelId/messages', requireApp, rateLimit({ windowMs: 60000, max: 30 }),
   async (req, res, next) => {
     try {
-      const ch = await visibleChannel(req.params.channelId, req.botApp.owner_user_id, req.serverId);
+      // The bot's own account, so it reads and writes with the rights the
+      // community gave it and not with the rights of the developer who made
+      // it.
+      const ch = await visibleChannel(req.params.channelId, bots.botUserIdOf(req.botApp), req.serverId);
       if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found');
       // Permission is evaluated for the owner, so an application cannot post
       // where its owner could not.
-      if (!(await hasChannelPermission(req.botApp.owner_user_id, ch.server_id, ch.id, 'SEND_MESSAGES'))) {
+      if (!(await hasChannelPermission(bots.botUserIdOf(req.botApp), ch.server_id, ch.id, 'SEND_MESSAGES'))) {
         return fail(res, 'PERMISSION_DENIED', 'the application owner cannot post in this channel');
       }
       const content = String((req.body || {}).content || '').trim().slice(0, 2000);
@@ -81,17 +87,17 @@ router.post('/channels/:channelId/messages', requireApp, rateLimit({ windowMs: 6
         return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
       }
       const posted = await bots.postAsApp(req.botApp, ch, content);
-      if (ids.length) posted.attachments = await uploads.attachToMessage(ids, posted.id, req.botApp.owner_user_id, { channelId: ch.id });
+      if (ids.length) posted.attachments = await uploads.attachToMessage(ids, posted.id, bots.botUserIdOf(req.botApp), { channelId: ch.id });
       embeds.queue({ kind: 'channel', messageId: posted.id }, content).then((cards) => {
         if (!cards.length) return;
         events.emitChannel(ch.server_id, ch.id, { type: EVENTS.MESSAGE_EMBEDS, channel_id: ch.id, server_id: ch.server_id, messageId: posted.id, embeds: cards });
       }).catch(() => {});
       webhooks.emit(ch.server_id, 'message.created', {
         serverId: ch.server_id, channelId: ch.id,
-        message: { id: posted.id, authorId: req.botApp.owner_user_id, content },
+        message: { id: posted.id, authorId: bots.botUserIdOf(req.botApp), content },
       }).catch(() => {});
       res.status(201).json({
-        id: posted.id, channel_id: ch.id, author_id: req.botApp.owner_user_id,
+        id: posted.id, channel_id: ch.id, author_id: bots.botUserIdOf(req.botApp),
         content, created_at: posted.created_at, seq: posted.seq, attachments: [],
       });
     } catch (e) { next(e); }
@@ -106,7 +112,7 @@ router.delete('/messages/:messageId', requireApp, rateLimit({ windowMs: 60000, m
       if (!row || row.channel_id == null) return fail(res, 'NOT_FOUND', 'message not found');
       const ch = await db.get('SELECT * FROM channels WHERE id = ?', [row.channel_id]);
       if (!ch || ch.server_id !== req.serverId) return fail(res, 'NOT_FOUND', 'message not found');
-      if (row.author_id !== req.botApp.owner_user_id) {
+      if (row.author_id !== bots.botUserIdOf(req.botApp)) {
         return fail(res, 'PERMISSION_DENIED', 'not the application owner\'s message');
       }
       const fileRows = await db.all('SELECT id FROM attachments WHERE message_id = ?', [row.id]);

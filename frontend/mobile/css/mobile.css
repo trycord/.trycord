@@ -805,6 +805,17 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   flex-wrap: wrap;
 }
 .m-msg__author { font-weight: var(--weight-strong); color: var(--text-1); font-size: var(--fs-sm); }
+/* The mark that says a message was written by a bot. */
+.m-msg__botflag {
+  margin-left: 6px;
+  font-size: var(--fs-micro);
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--text-3);
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  padding: 0 4px;
+}
 .m-msg__time { font-size: var(--fs-micro); color: var(--text-3); }
 .m-msg__stamp { font-size: var(--fs-micro); color: var(--text-3); }
 .m-msg__text {

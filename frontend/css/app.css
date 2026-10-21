@@ -2031,6 +2031,19 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 /* == settings surfaces ============================================================== */
 
 .settings-profile-top { display: flex; align-items: center; gap: 14px; }
+/* The mark that says a message was written by a bot. A reader should not
+   have to guess whether they are talking to a person. */
+.msg-botflag {
+  font-size: var(--fs-micro);
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--text-3);
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  padding: 0 4px;
+  line-height: 1.5;
+}
+
 .settings-banner { max-height: 140px; width: 100%; object-fit: cover; border-radius: var(--radius-md); border: 1px solid var(--line-2); }
 
 /* The picture and the cover on the profile page.
