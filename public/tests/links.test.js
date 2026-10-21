@@ -21,6 +21,7 @@ const {
   PUBLIC_DIR,
   SERVER_ONLY_ROUTES,
   APP_PREFIX,
+  assetExists,
   serverRoutes,
   htmlFiles,
   read,
@@ -81,9 +82,11 @@ test('every internal link and asset on the public site resolves', (t) => {
         // Anything else is a static file the server serves from this
         // directory: a stylesheet, a script, an image.
         const asset = path.join(PUBLIC_DIR, target.replace(/^\//, ''));
-        if (!fs.existsSync(asset)) {
-          failures.push(name + ': link to a file that does not exist: ' + raw);
-        }
+        if (fs.existsSync(asset)) continue;
+        // The site has no assets of its own: the icons and the fonts are the
+        // client's library, published at the root of the site.
+        if (target.startsWith('/assets/') && assetExists(target)) continue;
+        failures.push(name + ': link to a file that does not exist: ' + raw);
         continue;
       }
 

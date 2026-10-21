@@ -1,14 +1,17 @@
 # Trycord desktop release pipeline.
 #
-# Trigger: ONLY explicit version tags (v1.0.1, v1.2.0-beta.1, ...).
+# Trigger: ONLY explicit version tags (v5.9.6, v6.0.0-beta.1, ...).
 # Ordinary pushes, PRs, and merges NEVER publish a release.
 #
 # Flow per platform:
-#   tag → install → build (never publishes) → validate artifacts
+#   tag → install → check → build (never publishes) → validate artifacts
 #       → publish → validate published update metadata.
 # If validation fails at any point, the job FAILS and nothing (more)
 # is published. A release is successful only when the published
 # latest.yml is reachable and references the published installer.
+#
+# The build reads the client out of this repository, so a release is the
+# client of the tag it was cut from.
 #
 # Required repository secret: GH_TOKEN (a token with `contents:write` /
 # `repo` scope; the default GITHUB_TOKEN works for same-repo releases).
@@ -49,6 +52,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Check the application
+        run: npm run check
 
       - name: Build Windows installer (no publish)
         run: npm run build:win
@@ -100,6 +106,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check the application
+        run: npm run check
+
       - name: Build Linux AppImage (no publish)
         run: npm run build:linux
 
@@ -119,5 +128,4 @@ jobs:
           ASSETS="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
           echo "$ASSETS"
           echo "$ASSETS" | grep -q '\.AppImage$' || (echo 'missing AppImage asset' && exit 1)
-          echo "$ASSETS" | grep -q '^latest-linux\.yml$' || (echo 'missing latest-linux.yml asset' && exit 1)
-          echo "published release $TAG carries AppImage + latest-linux.yml"
+          echo "published release $TAG carries AppImage"

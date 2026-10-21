@@ -86,9 +86,25 @@ function functionBody(source, name) {
   return null;
 }
 
+// The asset library.
+//
+// The site has no assets of its own: the icons, the fonts and the brand
+// images are the client's library, published at the root of the site by the
+// deployment. So a reference to one of them is checked against that library
+// rather than against public/, which does not hold them.
+const ASSET_LIBRARY = path.join(REPO_DIR, 'frontend', 'assets');
+
+function assetExists(target) {
+  // The site asks for the library at /assets/, which is where the deployment
+  // publishes it; the library's own tree starts at the folder itself.
+  const inside = String(target || '').replace(/^\/+/, '').replace(/^assets\//, '');
+  return fs.existsSync(path.join(ASSET_LIBRARY, inside));
+}
+
 module.exports = {
   PUBLIC_DIR,
   REPO_DIR,
+  ASSET_LIBRARY,
   SERVER_ONLY_ROUTES,
   APP_PREFIX,
   serverRoutes,
@@ -96,4 +112,5 @@ module.exports = {
   read,
   references,
   functionBody,
+  assetExists,
 };

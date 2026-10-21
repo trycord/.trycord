@@ -333,7 +333,7 @@ function mountPublicSite(app, opts) {
     const titleM = /<title>([\s\S]*?)<\/title>/i.exec(html);
     const descM = /<meta\s+name="description"\s+content="([^"]*)"/i.exec(html);
     const title = titleM ? esc(titleM[1].trim()) : 'Trycord';
-    const image = origin + '/assets/og-image.png';
+    const image = origin + '/assets/trycord-assets/app/trycord-og-image.png';
     const meta = [
       '<link rel="canonical" href="' + esc(url) + '">',
       '<meta property="og:url" content="' + esc(url) + '">',
@@ -471,15 +471,16 @@ function mountPublicSite(app, opts) {
   // Browsers auto-request /favicon.ico on every page: serve the brand icon instead of
   // logging a 404 into every console. The icon is read from the client tree, which is
   // the single copy; public/ no longer carries one.
-  // The brand icon lives in the client tree, which is the single copy. The public
+  // The brand icon lives in the asset library, which is the single copy. The public
   // website has no assets of its own, so when it is mounted first this falls back
   // to the repository's frontend directory.
+  const FAVICON = 'assets/trycord-assets/app/trycord-logo.ico';
   app.get('/favicon.ico', (req, res) => {
     const root = clientDir || publicDir;
-    res.set('Cache-Control', 'public, max-age=86400').sendFile('assets/trycord-logo.ico', { root }, () => {
+    res.set('Cache-Control', 'public, max-age=86400').sendFile(FAVICON, { root }, () => {
       if (res.headersSent) return;
       const fallback = path.join(__dirname, '..', '..', 'frontend');
-      res.sendFile('assets/trycord-logo.ico', { root: fallback }, () => {
+      res.sendFile(FAVICON, { root: fallback }, () => {
         if (!res.headersSent) res.status(404).end();
       });
     });

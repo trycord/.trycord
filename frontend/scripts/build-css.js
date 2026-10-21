@@ -20,7 +20,6 @@ const CSS = path.join(__dirname, '..', 'css');
 // library, prepended here exactly as it is for the desktop build.
 const MOBILE_CSS = path.join(__dirname, '..', 'mobile', 'css');
 const PUBLIC_CSS = path.join(__dirname, '..', '..', 'public', 'css');
-const PUBLIC_ASSETS = path.join(__dirname, '..', '..', 'public', 'assets');
 // The canonical design-token library. It is the first layer rather than a copy,
 // so a value changed there reaches the application without being duplicated.
 const ASSET_TOKENS = path.join(__dirname, '..', 'assets', 'trycord-assets', 'tokens', 'trycord.css');
@@ -99,20 +98,26 @@ function buildPublicTokens(library) {
   console.log('wrote ' + path.relative(process.cwd(), PUBLIC_TOKEN_OUT) + ' (' + lines.length + ' bytes)');
 }
 
-// Stage the canonical app icons into the public site. Written only when they
-// differ, so a normal build leaves the working tree quiet.
-function buildPublicIcons() {
-  fs.mkdirSync(PUBLIC_ASSETS, { recursive: true });
-  for (const [from, to] of [['favicon.svg', 'favicon.svg'], ['trycord-app-icon.svg', 'app-icon.svg']]) {
-    const source = path.join(ASSET_APP, from);
-    const out = path.join(PUBLIC_ASSETS, to);
-    const content = fs.readFileSync(source);
-    if (fs.existsSync(out) && fs.readFileSync(out).equals(content)) {
-      console.log('public ' + to + ' is up to date');
+// The public site has no assets of its own.
+//
+// It used to: the build copied the icons out of the library into
+// public/assets/, and the site asked for them there. That was a second copy
+// of the same two files, and the site and the application could drift apart.
+// The library is published at the root of the site instead - by the server
+// that serves the client tree, and by the deployment that publishes it - so
+// the pages ask for the library and there is one copy of each file.
+//
+// Nothing is staged any more. The check is that the library still holds what
+// the pages ask for.
+function checkPublicIcons() {
+  for (const file of ['favicon.svg', 'trycord-app-icon.svg']) {
+    const source = path.join(ASSET_APP, file);
+    if (fs.existsSync(source)) {
+      console.log('the public site uses the library\'s ' + file);
       continue;
     }
-    fs.writeFileSync(out, content);
-    console.log('wrote ' + path.relative(process.cwd(), out));
+    console.warn('[warn] the asset library has no ' + file
+      + ', and the public site asks for it');
   }
 }
 
@@ -150,4 +155,4 @@ const library = fs.readFileSync(ASSET_TOKENS, 'utf8').trim();
 buildApplication(library);
 buildMobile(library);
 buildPublicTokens(library);
-buildPublicIcons();
+checkPublicIcons();

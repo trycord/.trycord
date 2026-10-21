@@ -82,5 +82,15 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||9971)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # ENTRYPOINT is tini so it is PID 1 and reaps children; CMD is the server.
+#
+# The image carries the voice subsystem too. It is a process of its own - it
+# fails differently from the application, and the API's health says nothing
+# about whether the relay answered a binding request - so a deployment that
+# wants the mesh runs it as a second service from this same image:
+#
+#   docker compose up -d trycord trycord-voice
+#
+# The command is the API's by default; the compose file overrides it for the
+# voice service.
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "src/server.js"]

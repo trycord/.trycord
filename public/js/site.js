@@ -245,4 +245,124 @@
 
   var yearEl = document.querySelector('[data-year]');
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+
+  /* ---- copying from a code block ---------------------------------------------
+     A reader who wants the command in their terminal should not have to
+     select it by hand, and a copy button that does nothing is worse than no
+     button at all. So the button is added here, it says what happened, and
+     when the clipboard is not available the text is selected instead. */
+  var copies = Array.prototype.slice.call(document.querySelectorAll('.prose pre'));
+  copies.forEach(function (pre) {
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'copy-button';
+    button.textContent = 'Copy';
+    button.setAttribute('aria-label', 'Copy this code');
+    pre.classList.add('has-copy');
+    pre.appendChild(button);
+    button.addEventListener('click', function () {
+      var text = pre.textContent || '';
+      var done = function (ok) {
+        button.textContent = ok ? 'Copied' : 'Select it';
+        button.classList.toggle('is-done', ok);
+        window.setTimeout(function () {
+          button.textContent = 'Copy';
+          button.classList.remove('is-done');
+        }, 1800);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () {
+          selectIt(pre);
+          done(false);
+        });
+        return;
+      }
+      selectIt(pre);
+      done(false);
+    });
+  });
+
+  function selectIt(pre) {
+    try {
+      var range = document.createRange();
+      range.selectNodeContents(pre);
+      var selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    } catch (e) { /* the text is still there to be copied by hand */ }
+  }
+
+  /* ---- the way back -----------------------------------------------------------
+     A reader who has arrived from somewhere should be able to see where, and a
+     reader who is part way through the documentation should be able to see
+     what is next. Both are opt-in: a page says what it wants with a
+     data attribute, and nothing is added to a page that did not ask. */
+  var main = document.querySelector('#main');
+  if (main && main.getAttribute('data-crumbs')) {
+    var crumbs = document.createElement('nav');
+    crumbs.className = 'crumbs';
+    crumbs.setAttribute('aria-label', 'Breadcrumb');
+    var items = [{ href: '/', label: 'Home' }];
+    var section = main.getAttribute('data-crumbs');
+    if (section) items.push({ href: sectionHref(section), label: section });
+    var here = document.querySelector('h1');
+    var title = here ? (here.textContent || '').trim() : '';
+    if (title && title !== section) items.push({ label: title, current: true });
+    crumbs.innerHTML = items.map(function (item, index) {
+      var last = index === items.length - 1;
+      if (item.href && !last) {
+        return '<a href="' + item.href + '">' + item.label + '</a>';
+      }
+      return '<span' + (last ? ' aria-current="page"' : '') + '>' + item.label + '</span>';
+    }).join('<span class="crumbs__sep" aria-hidden="true">/</span>');
+    main.insertBefore(crumbs, main.firstChild);
+  }
+
+  function sectionHref(name) {
+    var sections = {
+      'Documentation': '/docs',
+      'Developer guide': '/developers',
+      'Legal': '/terms',
+      'Project': '/about',
+      'Community': '/support'
+    };
+    return sections[name] || '/';
+  }
+
+  /* ---- the next page ----------------------------------------------------------
+     The documentation is a handful of pages that read in an order. A reader
+     who has finished one of them should be offered the next one, and the
+     offer is a link, not a page of its own. */
+  var order = [
+    '/docs', '/install', '/faq', '/developers', '/download',
+    '/features', '/about', '/changelog'
+  ];
+  if (main && main.getAttribute('data-next')) {
+    var at = order.indexOf(here);
+    var pages = [];
+    if (at > -1) {
+      if (at > 0) pages.push({ href: order[at - 1], label: 'Previous' });
+      if (at < order.length - 1) pages.push({ href: order[at + 1], label: 'Next' });
+    }
+    if (pages.length) {
+      var nav = document.createElement('nav');
+      nav.className = 'pager';
+      nav.setAttribute('aria-label', 'More pages');
+      nav.innerHTML = pages.map(function (page) {
+        return '<a class="pager__link pager__link--' + page.label.toLowerCase() + '" href="' + page.href + '">'
+          + '<span class="pager__label">' + page.label + '</span>'
+          + '<span class="pager__title">' + pageTitle(page.href) + '</span></a>';
+      }).join('');
+      main.appendChild(nav);
+    }
+  }
+
+  function pageTitle(href) {
+    var link = document.querySelector('.site-nav a[href="' + href + '"]');
+    if (link) {
+      var strong = link.querySelector('strong');
+      if (strong) return strong.textContent || '';
+    }
+    return href.replace(/^\//, '').replace(/-/g, ' ');
+  }
 })();
