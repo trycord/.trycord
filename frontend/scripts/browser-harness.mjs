@@ -315,10 +315,24 @@ export class Page {
     };
   }
 
+  /**
+   * Send a call and wait for its answer.
+   *
+   * The wait is bounded. A browser that is asked something it never answers
+   * - a page that is navigating, a tab that is gone - would otherwise leave
+   * the harness waiting for ever, with nothing to say so.
+   */
   send(method, params) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const id = ++this.next;
-      this.waiting.set(id, resolve);
+      const timer = setTimeout(() => {
+        this.waiting.delete(id);
+        reject(new Error('the browser did not answer ' + method));
+      }, 30000);
+      this.waiting.set(id, (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      });
       this.socket.send(JSON.stringify({ id, method, params: params || {} }));
     });
   }
