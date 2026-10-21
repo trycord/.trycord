@@ -56,6 +56,10 @@ const PLATFORM = new Set([
   'process', 'TextDecoderStream', 'ReadableStream', 'WritableStream',
   'TransformStream', 'BroadcastChannel', 'MessageChannel', 'MessagePort',
   'DOMParser', 'XMLHttpRequest', 'Notification', 'matchMedia', 'getComputedStyle',
+  // The media classes a voice session names: the element a speaker is chosen
+  // on, and the streams and tracks the call is made of.
+  'HTMLMediaElement', 'HTMLAudioElement', 'HTMLVideoElement', 'MediaStream',
+  'MediaStreamTrack', 'RTCPeerConnection', 'AudioContext',
   'scrollTo', 'scrollBy', 'alert', 'confirm', 'prompt', 'open', 'close',
   'isSecureContext', 'origin', 'parent', 'top', 'self', 'frames', 'name',
   'encodeURIComponent', 'decodeURIComponent', 'encodeURI', 'decodeURI',

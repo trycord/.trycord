@@ -17,7 +17,8 @@ import { avatar } from '../ui/primitives.js';
 import { State, nameOf } from '../../packages/store.js';
 import {
   subscribe, current, setMuted, setDeafened, leave, enableMic,
-} from './session.js';
+  refreshDevices, setInputDevice, setOutputDevice,
+} from '../../packages/voiceSession.js';
 
 let paintFn = null;
 let host = null;
@@ -50,7 +51,10 @@ function structureSignature() {
   const s = current();
   if (!s.joined) return '';
   return JSON.stringify([
-    s.channel && s.channel.id, s.muted, s.deafened, s.listenOnly,
+    s.channel && s.channel.id, s.muted, s.deafened, s.listenOnly, s.connection,
+    s.inputDeviceId, s.outputDeviceId, s.canChooseOutput,
+    (s.inputs || []).map((device) => device.id),
+    (s.outputs || []).map((device) => device.id),
     (s.participants || []).map((p) => [String(p.userId), !!p.muted]),
   ]);
 }
@@ -73,6 +77,21 @@ function dockNode() {
     el('span', { class: 'voice-dock__glyph' }, icon('headphones', { size: 18 })),
     el('span', { class: 'voice-dock__title' }, '#' + (s.channel.name || 'voice')));
 
+  // The state of the connection, in words.
+  //
+  // It is the state the session worked out from the peers, so the dock cannot
+  // say "connected" while every peer is still trying.
+  const state_ = s.connection || 'idle';
+  const stateWord = {
+    idle: 'Not in a room',
+    joining: 'Joining the room',
+    connecting: 'Connecting',
+    connected: 'Connected',
+    reconnecting: 'Reconnecting',
+    failed: 'The connection failed',
+    leaving: 'Leaving',
+  }[state_] || 'Connected';
+
   const micBtn = el('button', {
     class: 'dock-btn dock-btn--round' + (s.muted ? ' is-off' : ''), type: 'button',
     'aria-pressed': String(s.muted), 'aria-label': s.muted ? 'Unmute yourself' : 'Mute yourself',
@@ -93,6 +112,43 @@ function dockNode() {
       onClick: () => leave(),
     }, 'Disconnect'));
 
+  // The devices.
+  //
+  // The microphone and the speaker, from the list the browser reports. A
+  // browser that will not let a page choose the speaker says so, and the
+  // browser's own settings are the way - a picker that does nothing is worse
+  // than no picker.
+  const devices = el('div', { class: 'voice-dock__devices' });
+  const inputs = s.inputs || [];
+  const outputs = s.outputs || [];
+  if (inputs.length > 1 || (s.canChooseOutput && outputs.length > 1)) {
+    const mic = el('select', {
+      class: 'input input--sm', 'aria-label': 'The microphone you speak with',
+    }, ...inputs.map((device) => el('option', {
+      value: device.id,
+      selected: device.id === s.inputDeviceId ? 'selected' : null,
+    }, device.label)));
+    mic.addEventListener('change', () => { setInputDevice(mic.value); });
+    devices.appendChild(el('label', { class: 'voice-dock__device' },
+      el('span', { class: 'voice-dock__devicelabel' }, 'Microphone'), mic));
+
+    if (s.canChooseOutput) {
+      const speaker = el('select', {
+        class: 'input input--sm', 'aria-label': 'The speaker you hear the room through',
+      }, ...outputs.map((device) => el('option', {
+        value: device.id,
+        selected: device.id === s.outputDeviceId ? 'selected' : null,
+      }, device.label)));
+      speaker.addEventListener('change', () => { setOutputDevice(speaker.value); });
+      devices.appendChild(el('label', { class: 'voice-dock__device' },
+        el('span', { class: 'voice-dock__devicelabel' }, 'Speaker'), speaker));
+    }
+  } else if (s.canChooseOutput && outputs.length) {
+    // One speaker: it is the one, and there is nothing to choose.
+    devices.appendChild(el('p', { class: 'voice-dock__devicehint' },
+      'Playing through ' + (outputs[0].label || 'the default speaker') + '.'));
+  }
+
   const status = el('div', { class: 'voice-dock__status', role: 'status' },
     el('p', { class: 'voice-dock__note' },
       icon(s.listenOnly ? 'mic-off' : 'info', { size: 14 }),
@@ -108,9 +164,11 @@ function dockNode() {
     (s.participants || []).slice(0, 6).map((p) => chip(p, s.channel && s.channel.serverId)));
 
   return el('div', { class: 'voice-dock', role: 'complementary', 'aria-label': 'Voice session' },
-    el('div', { class: 'voice-dock__top' }, lead),
+    el('div', { class: 'voice-dock__top' }, lead,
+      el('span', { class: 'voice-dock__state', 'data-state': state_ }, stateWord)),
     peers,
     status,
+    devices,
     controls);
 }
 
@@ -150,6 +208,9 @@ export function mountVoiceDock(setDock) {
   if (!paintFn) paintFn = setDock;
   subscribe(render);
   render();
+  // The devices are read once, so the picker is ready before there is a
+  // session to pick one in.
+  refreshDevices().catch(() => {});
 }
 
 export default { mountVoiceDock };

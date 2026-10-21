@@ -2133,6 +2133,17 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .voice-dock__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .voice-dock__lead { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .voice-dock__glyph { display: inline-flex; color: var(--brand); }
+/* The state of the connection, in a word.
+   The colour is the only difference between the states, so the word is
+   always there beside it. */
+.voice-dock__state {
+  font-size: var(--fs-micro); color: var(--text-3);
+  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
+}
+.voice-dock__state[data-state="connected"] { color: var(--brand); border-color: var(--brand-line); }
+.voice-dock__state[data-state="reconnecting"] { color: var(--warning); border-color: var(--warning); }
+.voice-dock__state[data-state="failed"] { color: var(--danger); border-color: var(--danger); }
+
 .voice-dock__title {
   font-weight: var(--weight-strong); color: var(--text-1);
   font-size: var(--fs-md); letter-spacing: var(--tracking-tight);
@@ -2147,6 +2158,14 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   border: 1px solid var(--line-2);
 }
 .voice-dock__status { grid-column: 1 / -1; }
+
+/* The devices.
+   The microphone and the speaker the reader chose, and the one speaker
+   there is when there is only one. */
+.voice-dock__devices { display: grid; gap: var(--space-2); }
+.voice-dock__device { display: grid; gap: 4px; font-size: var(--fs-micro); color: var(--text-3); }
+.voice-dock__devicelabel { font-weight: var(--weight-strong); color: var(--text-2); }
+.voice-dock__devicehint { margin: 0; font-size: var(--fs-micro); color: var(--text-3); }
 .voice-dock__note {
   margin: 0; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.55;
   display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;

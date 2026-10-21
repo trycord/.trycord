@@ -17,6 +17,20 @@ const {
   saveSettings, providers, providerOf,
 } = require('./helpers');
 
+// The ICE list, flattened.
+//
+// An entry's urls may be one address or a list of them - the browser takes
+// both - so the checks read them as a list either way.
+function urlsOf(entries) {
+  const out = [];
+  for (const entry of entries || []) {
+    const urls = entry && entry.urls;
+    if (Array.isArray(urls)) out.push(...urls);
+    else if (urls) out.push(urls);
+  }
+  return out;
+}
+
 test('the mesh', async (t) => {
   await t.test('a seat is given without a single SFU credential', async () => {
     const relay = await startRelay();
@@ -35,7 +49,7 @@ test('the mesh', async (t) => {
 
     // The ICE list the peers are given: the instance's own relay, and no
     // credential for any SFU, because there is none.
-    const urls = (res.data.iceServers || []).map((entry) => entry.urls);
+    const urls = urlsOf(res.data.iceServers);
     assert.ok(urls.some((url) => url.indexOf('stun:') === 0), 'a STUN server is offered');
     assert.ok(urls.some((url) => url.indexOf('turn:') === 0), 'a TURN relay is offered');
     const serialised = JSON.stringify(res.data);
@@ -51,7 +65,7 @@ test('the mesh', async (t) => {
 
     const caps = await owner.get('/api/voice/capabilities');
     assert.equal(caps.status, 200, JSON.stringify(caps.data));
-    const ice = (caps.data.features.voiceVideo.iceServers || []).map((entry) => entry.urls);
+    const ice = urlsOf(caps.data.features.voiceVideo.iceServers);
 
     assert.ok(ice.indexOf('stun:127.0.0.1:' + port) !== -1,
       'the in-house STUN address is offered: ' + JSON.stringify(ice));

@@ -188,15 +188,46 @@ function inHouseRelay() {
   const host = String(process.env.TRYCORD_TURN_HOST || '0.0.0.0').trim();
   const port = Number(process.env.TRYCORD_TURN_PORT || 3478);
   const realm = String(process.env.TRYCORD_TURN_REALM || 'trycord-turn');
+  const listenPort = Number.isFinite(port) && port > 0 ? port : 3478;
+
+  // The addresses the clients are given.
+  //
+  // Both families, when the instance has both: a client with no IPv6 route
+  // cannot reach an IPv6 address, and a client on an IPv6-only network
+  // cannot reach an IPv4 one. The browser tries the list, so one list
+  // carries both.
+  const advertised = advertisedHost(host);
+  const address = require('./address');
+  const addresses = [];
+  // The family the relay listens on comes first, so a client that can reach
+  // it does not try the other one first.
+  const listenFamily = host.indexOf(':') === -1 ? 4 : 6;
+  for (const family of [listenFamily, listenFamily === 4 ? 6 : 4]) {
+    const text = String(address.publicHost(family) || '').trim();
+    if (!text || addresses.indexOf(text) !== -1) continue;
+    addresses.push(text);
+  }
+  if (!addresses.length) addresses.push(advertised);
+  const urls = addresses.map((address) => 'stun:' + address + ':' + listenPort);
+  const turnUrls = addresses.map((address) => 'turn:' + address + ':' + listenPort);
+
   return {
     host,
-    port: Number.isFinite(port) && port > 0 ? port : 3478,
+    port: listenPort,
     realm,
     // The address a browser can reach. A wildcard listen address is not one,
     // so the instance's own public address is used when it knows one.
-    advertised: advertisedHost(host),
-    stunUrl: 'stun:' + advertisedHost(host) + ':' + (Number.isFinite(port) && port > 0 ? port : 3478),
-    turnUrl: 'turn:' + advertisedHost(host) + ':' + (Number.isFinite(port) && port > 0 ? port : 3478),
+    advertised,
+    // Every published address, and the family of each.
+    addresses: addresses.map((address) => ({
+      address,
+      family: require('./address').familyOf(address),
+    })),
+    listenFamily,
+    stunUrls: urls,
+    turnUrls,
+    stunUrl: urls[0] || '',
+    turnUrl: turnUrls[0] || '',
   };
 }
 
@@ -220,28 +251,23 @@ function advertisedHost(host) {
   const plain = String(host || '').trim();
   if (plain && plain !== '0.0.0.0' && plain !== '::' && plain !== '[::]') return plain;
 
-  // The voice stack has an address of its own, and it is the one the clients
-  // are given.
+  // The shared address, so the relay and the ICE configuration a client is
+  // given cannot disagree about it.
   //
-  // The relay listens on this host. Unless the operator has named an address
-  // that a client elsewhere can reach, the address it is published at is the
-  // one it is listening on - and that is the local one. A relay published at
-  // a wildcard is published at nothing, and a relay published at the site's
-  // address is published at a proxy that does not carry the UDP a TURN service
-  // needs.
-  const voiceUrl = String(
-    process.env.TRYCORD_VOICE_PUBLIC_URL || settings.read('voice.publicUrl', '') || '',
-  ).trim();
-  if (voiceUrl) {
-    try { return new URL(voiceUrl).hostname; } catch { /* not a usable address */ }
-  }
+  // When nothing is named the address is the loopback, which a browser
+  // resolves to the reader's own machine - so the instance says so, plainly,
+  // wherever the address is published, rather than handing out an address
+  // that cannot work.
+  return require('./address').publicHost();
+}
 
-  const named = String(process.env.TRYCORD_TURN_HOST || '').trim();
-  if (named && named !== '0.0.0.0' && named !== '::' && named !== '[::]') return named;
-
-  // Nothing named: the relay is on this host, and the address it is published
-  // at is this host.
-  return '127.0.0.1';
+// Whether an address a client is given can be reached from outside this
+// instance.
+//
+// The loopback is the address that cannot: a browser resolves it to the
+// reader's own machine. A wildcard is not an address at all.
+function addressIsReachable(address) {
+  return require('./address').addressIsReachable(address);
 }
 
 // The ICE servers one provider hands to a client.
@@ -261,17 +287,22 @@ function iceServers(providerId, options) {
     const turnUrl = String(value('mesh', 'turnUrl').value || '');
     if (!list.length && !turnUrl) {
       // Nothing is configured, so the instance's own relay is used.
+      //
+      // This is the turnkey path: the administrator enables the mesh and the
+      // instance supplies the STUN server, the TURN server and a credential
+      // minted for this caller and nobody else. There is nothing to write
+      // down and nothing to fill in.
       const relay = inHouseRelay();
-      out.push({ urls: relay.stunUrl });
+      out.push({ urls: relay.stunUrls.length ? relay.stunUrls : relay.stunUrl });
       if (opts.credentials && opts.userId) {
         const minted = turn.issueCredentials(String(opts.userId));
         out.push({
-          urls: relay.turnUrl,
+          urls: relay.turnUrls.length ? relay.turnUrls : relay.turnUrl,
           username: minted.username,
           credential: minted.password,
         });
       } else {
-        out.push({ urls: relay.turnUrl });
+        out.push({ urls: relay.turnUrls.length ? relay.turnUrls : relay.turnUrl });
       }
       return out;
     }
@@ -493,6 +524,7 @@ module.exports = {
   limit,
   iceServers,
   inHouseRelay,
+  addressIsReachable,
   isRequiredSecret,
   typeOf,
 };

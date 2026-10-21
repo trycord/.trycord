@@ -191,16 +191,28 @@ async function authorizeVoice(channelId, userId, { screen = false, video = false
 }
 
 // A voice channel gets a room when its first participant arrives.
+//
+// A channel has one room, and two people arriving at the same moment would
+// both decide the room does not exist yet. The second insert is refused by
+// the uniqueness that keeps one room per channel, and the refusal is read
+// back as the room that the first insert made - so the race is a room, not
+// a failed join.
 async function ensureRoom(channelId, serverId) {
   const existing = await db.get('SELECT id FROM voice_rooms WHERE channel_id = ?', [channelId]);
   if (existing) return existing.id;
 
   const id = uuid();
-  await db.run(
-    'INSERT INTO voice_rooms (id, channel_id, server_id, created_at) VALUES (?, ?, ?, ?)',
-    [id, channelId, serverId, now()]
-  );
-  return id;
+  try {
+    await db.run(
+      'INSERT INTO voice_rooms (id, channel_id, server_id, created_at) VALUES (?, ?, ?, ?)',
+      [id, channelId, serverId, now()]
+    );
+    return id;
+  } catch (error) {
+    const again = await db.get('SELECT id FROM voice_rooms WHERE channel_id = ?', [channelId]);
+    if (again) return again.id;
+    throw error;
+  }
 }
 
 // A second join answers with the session that already exists, so a client retrying a
@@ -216,8 +228,22 @@ async function liveSession(channelId, userId) {
 //
 // The two are written together because they answer one question: who is in
 // this channel, and what is carrying them.
+//
+// The row for a person in a channel is *one* row: the table allows one per
+// person per channel, and the time they were there is on the row. So a
+// rejoin updates the row and clears the time they left, rather than adding a
+// second one.
+//
+// It used to look only for a row with no leaving time, which meant that a
+// person who had left could not come back: the row was there, the insert was
+// not, and the insert was refused by the very uniqueness that was meant to
+// keep one row per person. The refusal came back as a duplicate key, and the
+// join failed with it.
 async function recordParticipant({ channelId, userId, roomId, sessionId, provider }) {
-  const existing = await liveSession(channelId, userId);
+  const existing = await db.get(
+    'SELECT * FROM voice_participants WHERE channel_id = ? AND user_id = ?',
+    [channelId, userId]
+  );
   let participantId = existing ? existing.id : uuid();
 
   if (existing) {
