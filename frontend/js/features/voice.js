@@ -30,6 +30,8 @@ const PROVIDERS_PATH = '/api/voice/providers';
 // and a write that arrives there for one of them is refused - so this is the
 // path that actually works.
 const SETTINGS_PATH = '/api/admin/voice/settings';
+// The ticket that opens the voice process's own page on the machine.
+const LOCAL_TICKET_PATH = '/api/admin/voice/settings/local-ticket';
 
 // The whole picture: the provider in force, the shared controls, and every
 // provider with its own fields and its own state.
@@ -406,6 +408,42 @@ function diagnosticsSection(report, lastCheck, onChecked) {
   return card({ label: 'Diagnostics', glyph: 'activity', body });
 }
 
+// The voice process's own page.
+//
+// It is on the loopback of this machine, on a port of its own, and it does
+// three things the console cannot: it says whether the voice stack is
+// working, it changes the relay's configuration, and it mints a credential
+// for the relay.
+//
+// Opening it needs a ticket, and the ticket comes from here. This console is
+// behind the platform-admin gate, so a ticket says that the person asking
+// for one is an administrator - and the voice process checks it with the
+// API, which is the thing that knows who an administrator is.
+function localPageSection() {
+  const open = el('button', {
+    class: 'btn btn--primary btn--sm',
+    type: 'button',
+    onClick: async () => {
+      try {
+        const answer = await request('POST', LOCAL_TICKET_PATH, { body: {} });
+        const tab = window.open(answer.url, '_blank', 'noopener');
+        if (!tab) toast('The browser blocked the tab; allow popups for this site');
+      } catch (e) { errorToast(e); }
+    },
+  }, 'Open the voice page');
+
+  return card({
+    label: 'The voice process',
+    glyph: 'activity',
+    body: el('div', { class: 'fold' },
+      el('p', { class: 'settings-note' },
+        'The voice process has a page of its own on this machine, on the loopback: it says whether '
+        + 'the voice stack is working, it configures the relay, and it mints a credential. The page '
+        + 'is opened with a ticket, so only an administrator gets in - and the ticket is good once.'),
+      el('div', { class: 'settings-item-actions' }, open)),
+  });
+}
+
 export function adminVoice() {
   const stage = el('div', { class: 'fold fold--tight' });
   let report = null;
@@ -472,6 +510,7 @@ export function adminVoice() {
         limitSection(report, refresh),
         providerSection(inForce, refresh),
         stackSection(report),
+        localPageSection(),
         diagnosticsSection(report, lastCheck, (answer) => {
           lastCheck = answer;
           paint();

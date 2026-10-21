@@ -377,6 +377,55 @@ function isProxyAddress(ip) {
   return '';
 }
 
+// ---- the ticket -------------------------------------------------------------
+
+// The ticket that says the person at the machine is an administrator.
+//
+// The page can change the instance and mint a credential for the relay, so
+// it asks for a ticket: the voice console mints one - behind the
+// platform-admin gate - and the API is asked whether it is good. The API is
+// the thing that knows who an administrator is, and it is the thing that
+// says yes or no.
+//
+// The ticket is remembered in a cookie for the length of the visit, so the
+// operator is not asked for it on every form.
+const COOKIE = 'trycord_voice_admin';
+
+function cookieValue(req, name) {
+  const header = String(req.headers && req.headers.cookie ? req.headers.cookie : '');
+  for (const part of header.split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(rest.join('='));
+  }
+  return '';
+}
+
+// Ask the API whether a ticket is good.
+//
+// The API is on the loopback of the same machine, and the answer is a yes
+// or a no. An API that cannot be reached is a no: a page that unlocks
+// itself because the check was skipped is not a page that is locked.
+async function ticketIsGood(ticket) {
+  const api = String(process.env.TRYCORD_API_URL || '').trim()
+    || 'http://127.0.0.1:' + String(process.env.PORT || 9971);
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const answer = await fetch(api + '/api/voice-local-ticket/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket: String(ticket || '') }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!answer.ok) return false;
+    const body = await answer.json().catch(() => ({}));
+    return body && body.ok === true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // ---- the configuration and the credentials -----------------------------------
 
 // One setting of the instance, read the way everything else is read.
@@ -470,6 +519,11 @@ function renderConfigPage(state) {
 
   if (view.saved) lines.push('<p class="saved">' + escapeHtml(view.saved) + '</p>');
   if (view.problem) lines.push('<p class="problem">' + escapeHtml(view.problem) + '</p>');
+  if (view.canSave === false) {
+    lines.push('<p class="note">This page shows what the relay runs with. Saving it needs an '
+      + 'administrator: open it from the voice console in the application, and the console gives '
+      + 'the page a ticket that is good for a moment.</p>');
+  }
 
   lines.push('<form method="post" action="/config">');
   lines.push(field('The address the relay listens on', 'voice.mesh.turnHost', relay.host, relay.sources.host,
@@ -487,7 +541,9 @@ function renderConfigPage(state) {
   lines.push('<p class="note">The shared secret, the same thing Coturn calls a static auth secret. '
     + 'A host that has it can mint credentials of its own. It is never shown again once it is set.</p>');
   lines.push('</div>');
-  lines.push('<button type="submit">Save</button>');
+  if (view.canSave !== false) {
+    lines.push('<button type="submit">Save</button>');
+  }
   lines.push('</form>');
 
   lines.push('<nav class="links">'
@@ -669,6 +725,23 @@ function mintCredential(body) {
   };
 }
 
+/**
+ * The page a refused ticket gets.
+ *
+ * It says what happened and what to do about it, because the alternative -
+ * a page that simply refuses - leaves the operator guessing.
+ */
+function renderTicketPage(problem) {
+  const lines = [];
+  lines.push('<h1 class="bad">Not open</h1>');
+  lines.push('<p class="lede">' + escapeHtml(problem || 'That ticket was not good.') + '</p>');
+  lines.push('<p>Open the voice console in the application and use the button that opens this page. '
+    + 'The console gives it a ticket that is good once, and for a minute or two.</p>');
+  lines.push('<nav class="links"><a href="/">Whether the stack is working</a></nav>');
+  lines.push('<footer>This page is served on the loopback of this instance and on nothing else.</footer>');
+  return pageShell('Not open - the voice stack', lines);
+}
+
 // ---- the page ---------------------------------------------------------------
 
 /**
@@ -835,6 +908,33 @@ function pageShell(title, body) {
  */
 function handler(req, res) {
   const path = String(req.url || '/').split('?')[0];
+  // The query, for the one thing that arrives in one: the ticket.
+  const query = new URLSearchParams(String(req.url || '/').split('?')[1] || '');
+
+  // A ticket in the address opens the pages that change things.
+  //
+  // It is checked before anything else, because the ticket is in the address
+  // of the page it opens - and the page it opens is the one that would
+  // otherwise answer.
+  if (req.method === 'GET' && (query.get('ticket') || '')) {
+    const ticket = query.get('ticket') || '';
+    ticketIsGood(ticket).then((good) => {
+      if (!good) {
+        const page = renderTicketPage('That ticket was not good. It is good once, and it does not last long.');
+        res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(page);
+        return;
+      }
+      res.writeHead(302, {
+        Location: '/',
+        'Set-Cookie': COOKIE + '=' + encodeURIComponent(ticket.slice(0, 12))
+          + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=1800',
+        'Cache-Control': 'no-store',
+      });
+      res.end();
+    });
+    return;
+  }
 
   // The page. It says whether the voice stack works, and it says it in one
   // word, with the reason underneath when the word is "not".
@@ -862,9 +962,21 @@ function handler(req, res) {
     return;
   }
 
+  const isAdmin = !!cookieValue(req, COOKIE);
+
   // The configuration of the relay, and the page that changes it.
   if (path === '/config') {
     if (req.method === 'POST') {
+      if (!isAdmin) {
+        const page = renderConfigPage({
+          problem: 'Changing the configuration needs an administrator. Open this page from the voice '
+            + 'console in the application, which gives it a ticket that is good for a moment.',
+          canSave: false,
+        });
+        res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(page);
+        return;
+      }
       readBody(req).then((body) => saveConfiguration(body)).then((result) => {
         const page = renderConfigPage(result);
         res.writeHead(result.problem ? 400 : 200, {
@@ -879,7 +991,7 @@ function handler(req, res) {
       });
       return;
     }
-    const page = renderConfigPage({});
+    const page = renderConfigPage({ canSave: isAdmin });
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(page);
     return;
@@ -887,6 +999,15 @@ function handler(req, res) {
 
   // A credential for the relay.
   if (path === '/credentials') {
+    if (!isAdmin) {
+      const page = renderCredentialsPage({
+        problem: 'Minting a credential needs an administrator. Open this page from the voice console '
+          + 'in the application, which gives it a ticket that is good for a moment.',
+      });
+      res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(page);
+      return;
+    }
     if (req.method === 'POST') {
       readBody(req).then((body) => mintCredential(body)).then((result) => {
         const page = renderCredentialsPage(result);

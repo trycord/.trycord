@@ -17,6 +17,7 @@ const { fail, wrap } = require('../errors');
 const rateLimit = require('../middleware/ratelimit');
 const adminGuard = require('../middleware/adminGuard');
 const settings = require('../services/settings');
+const localTicket = require('../services/voice/local-ticket');
 
 const router = express.Router();
 router.use(adminGuard);
@@ -92,6 +93,25 @@ router.put('/', rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req, res) =
     changed: result.changed,
     settings: entries,
     status: settings.status(),
+  });
+}));
+
+// A ticket that opens the voice process's own page.
+//
+// The voice process answers on the loopback, on a port of its own, and it
+// can change the instance's configuration and mint a credential for the
+// relay. The ticket is what says that the person holding it is an
+// administrator: this route is behind the platform-admin gate, so only one
+// gets a ticket, and the voice process asks this API whether the ticket is
+// good.
+router.post('/local-ticket', rateLimit({ windowMs: 60000, max: 20 }), wrap(async (req, res) => {
+  const minted = localTicket.mint(req.user.id);
+  const port = Number(process.env.TRYCORD_VOICE_PROCESS_PORT || 9973);
+  const host = String(process.env.TRYCORD_VOICE_PROCESS_HOST || '127.0.0.1').trim();
+  res.json({
+    ticket: minted.ticket,
+    expiresIn: minted.expiresIn,
+    url: 'http://' + host + ':' + port + '/?ticket=' + encodeURIComponent(minted.ticket),
   });
 }));
 

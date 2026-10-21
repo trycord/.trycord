@@ -254,6 +254,13 @@ Two more pages live on the same port:
 | `/config` | The relay's own configuration: the address it binds, the port, the address the clients are given, the realm, and the key. Saving it binds the relay again with the new values. |
 | `/credentials` | Minting a credential for the relay: the username and the password, shown once. |
 
+The pages that change something need a ticket. The voice console in the
+application has a button that opens them, and the button asks the API for a
+ticket first - the API is behind the platform-admin gate, so only an
+administrator gets one, and the ticket is good once and for a couple of
+minutes. The voice process checks the ticket with the API before it lets
+anything through, so the door is the same door the console is behind.
+
 The configuration is the instance's own setting, and the voice console in the
 application is where an administrator changes it. The page on the loopback
 changes the same setting, and the same rule applies to both: the value the
