@@ -659,6 +659,10 @@ async function boot(options = {}) {
   app.use('/api/federation-reports', require('./routes/federation-reports'));
   app.use('/api/mutes', require('./routes/mutes'));
   app.use('/api/voice', require('./routes/voice'));
+  // The ticket that opens the voice process's own page on the loopback. It is
+  // not behind the admin gate: the ticket is the proof, and the voice
+  // process has no session to present.
+  app.use('/api/voice-local-ticket', require('./routes/voiceLocalTicket'));
   // Instance-wide announcement banners (per-deployment, not global).
   app.use('/api/announcements', require('./routes/announcements'));
   require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });
