@@ -10,6 +10,7 @@
 // realtime events through the apply* functions and owns the lifecycle.
 
 import { el } from '../../packages/dom.js';
+import { saveDraft, clearDraft, restoreDraft } from '../../packages/drafts.js';
 import { icon } from '../../packages/icons.js';
 import { avatar, spinner } from './primitives.js';
 import { State, nameOf } from '../../packages/store.js';
@@ -669,6 +670,9 @@ export function conversationSurface(config) {
   });
   const errorLine = el('p', { class: 'form-error', role: 'alert', hidden: 'true' });
   const contextBanner = el('div', { class: 'composer-context', hidden: 'true' });
+  // The draft is in the box before the conversation is: a reader who comes
+  // back to a conversation finds what they were writing.
+  restoreDraft(cfg.scopeId, textarea);
   const fileInput = el('input', {
     type: 'file', class: 'visually-hidden', tabindex: '-1',
     'aria-label': 'Attach a file',
@@ -813,6 +817,7 @@ export function conversationSurface(config) {
     repaint(true);
     try {
       const sent = asMessage(await cfg.send(payload));
+      clearDraft(cfg.scopeId);
       dropPending(pendingRow);
       insert(sent);
       rememberRoots();
@@ -845,6 +850,10 @@ export function conversationSurface(config) {
   // templates are read once, so this costs nothing per keystroke.
   let expanding = false;
   textarea.addEventListener('input', () => {
+    // The draft is remembered as it is written, so a reader who goes to
+    // another conversation and comes back finds their sentence where they
+    // left it - and so does a reader whose page reloads.
+    saveDraft(cfg.scopeId, textarea.value);
     resize();
     if (expanding) return;
     expanding = true;

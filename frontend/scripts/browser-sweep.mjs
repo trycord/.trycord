@@ -32,7 +32,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { PAGES } from '../packages/registry.js';
-import { harness, wait, writeHarnessDocument, writeMobileHarnessDocument } from './browser-harness.mjs';
+import {
+  harness, wait, freePort, writeHarnessDocument, writeMobileHarnessDocument,
+} from './browser-harness.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.BROWSER_SWEEP_PORT || 9377);
@@ -173,7 +175,7 @@ const measure = (minTarget) => `
   };
 `;
 
-const run = await harness(PORT);
+const run = await harness(await freePort(PORT));
 let failures = 0;
 const report = [];
 

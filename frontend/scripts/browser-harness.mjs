@@ -347,6 +347,29 @@ export class Page {
  * error is a harness that quietly measures the real instance instead of the
  * answers.
  */
+/**
+ * A port nothing is listening on.
+ *
+ * A browser that cannot bind the port it was asked for leaves the harness
+ * waiting for a browser that is never going to come - and a stale browser
+ * from an interrupted run is enough to do it. So the port is checked first,
+ * and a busy one is an error rather than a wait.
+ */
+export async function freePort(preferred) {
+  const net = await import('node:net');
+  const taken = (port) => new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(true));
+    server.once('listening', () => server.close(() => resolve(false)));
+    server.listen(port, '127.0.0.1');
+  });
+  if (preferred && !(await taken(preferred))) return preferred;
+  for (let port = 9400; port < 9500; port++) {
+    if (!(await taken(port))) return port;
+  }
+  throw new Error('no free port for the browser');
+}
+
 export async function harness(port) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-app-'));
   // A run that is interrupted leaves the browser's profile behind, and a
