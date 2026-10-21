@@ -146,6 +146,43 @@ router.post('/users/:id/bot', async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
+// The second factor of an account, cleared.
+//
+// Somebody who has lost the phone their authenticator was on cannot get in:
+// the second factor is the way in, and the only way to turn it off is
+// through the second factor. A platform administrator is the way out, and
+// what they do is written down.
+//
+// The recovery codes are cleared with it: they are a way in as well.
+router.post('/users/:id/two-factor/clear', async (req, res, next) => {
+  try {
+    const target = await db.get(
+      'SELECT id, username, totp_enabled_at FROM users WHERE id = ?',
+      [req.params.id]
+    );
+    if (!target) return fail(res, 'NOT_FOUND', 'user not found');
+    if (!target.totp_enabled_at) {
+      return fail(res, 'NOT_A_MEMBER', 'that account has no second factor');
+    }
+    await db.transaction(async (t) => {
+      await t.run(
+        'UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL WHERE id = ?',
+        [target.id]
+      );
+      await t.run('DELETE FROM totp_recovery_codes WHERE user_id = ?', [target.id]);
+    });
+    try {
+      const { uuid, now } = require('../util');
+      await db.run(
+        'INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [uuid(), req.user.id, 'two_factor_cleared', 'user', target.id,
+          String((req.body || {}).reason || 'the account holder lost the authenticator'), now()]
+      );
+    } catch { /* audit is best-effort */ }
+    res.json({ id: target.id, cleared: true });
+  } catch (e) { serviceError(res, e); }
+});
+
 // --- servers ---
 
 router.get('/servers', async (req, res, next) => {
