@@ -85,7 +85,10 @@ export function row(options) {
     opts.lead ? el('span', { class: 'cardrow-lead' }, opts.lead) : null,
     el('span', { class: 'cardrow-main' },
       opts.title ? el('span', { class: 'cardrow-title' }, opts.title) : null,
-      opts.sub ? el('span', { class: 'cardrow-sub' }, opts.sub) : null),
+      opts.sub ? el('span', { class: 'cardrow-sub' }, opts.sub) : null,
+      // Anything else the line has to carry: the conversation a search hit
+      // came from, for instance.
+      opts.body || null),
     opts.side ? el('span', { class: 'cardrow-side' }, opts.side) : null,
     opts.meta ? el('span', { class: 'cardrow-meta' }, opts.meta) : null,
   );

@@ -179,7 +179,25 @@ function hitRow(hit) {
     title: text || '(an attachment)',
     sub: [author, where].filter(Boolean).join(' · '),
     meta: hit.created_at ? relativeTime(hit.created_at) : '',
+    body: contextOf(hit),
   });
+}
+
+// The conversation the hit came from.
+//
+// A line on its own is often cryptic: "no" means nothing until the line
+// before it is read. So the messages around the hit are shown under it - the
+// ones before it and the one after - so the reader can see the exchange the
+// hit was part of without leaving the search.
+//
+// The hit itself is not repeated: the reader has just read it.
+function contextOf(hit) {
+  const lines = Array.isArray(hit && hit.context) ? hit.context : [];
+  if (!lines.length) return null;
+  return el('span', { class: 'search-context' },
+    ...lines.map((line) => el('span', { class: 'search-context__line' },
+      el('span', { class: 'search-context__who' }, line.authorName || 'Someone'),
+      el('span', { class: 'search-context__text' }, line.content || '(an attachment)'))));
 }
 
 export function renderSearch(ctx) {

@@ -146,7 +146,11 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 .skip-link {
-  position: fixed; top: 8px; left: 8px; z-index: var(--z-toast);
+  /* The skip link is chrome, not a notice. It belongs with the command bar
+     and the app bar, and not in the band the toasts and the popovers use:
+     a link that is above the toasts covers the answer to what the reader
+     just did. */
+  position: fixed; top: 8px; left: 8px; z-index: var(--z-nav);
   transform: translateY(-200%); background: var(--panel-3); color: var(--text-1);
   padding: 10px 16px; border-radius: var(--radius-sm); box-shadow: var(--shadow-2);
   transition: transform var(--dur-1) var(--ease);

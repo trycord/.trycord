@@ -114,10 +114,29 @@
   --ease: var(--tc-ease);
   --ease-out: cubic-bezier(.16, 1, .3, 1);
 
-  /* -- layering ------------------------------------------------------------ */
+  /* -- layering ------------------------------------------------------------
+   * The bands, from the page upwards:
+   *
+   *   nav    the shell's own chrome - the command bar
+   *   scrim  the backdrop that dims the page behind a panel
+   *   panel  the shell's panels - the place column, the inspector, the
+   *          voice dock. One band, so a panel is never above another
+   *          panel, and a panel is never above the menus, the toasts or
+   *          the dialogs that belong to the reader's attention.
+   *   menu   the menus
+   *   overlay the sheets and the dialogs
+   *   toast  the notices
+   *   popover the thing that follows the pointer
+   *   modal  the last word
+   *
+   * A panel that sits above the menus is a panel that covers the menu the
+   * reader just opened; a panel above the toasts hides the answer to what
+   * they just did. So the panels are one band, and the band is below every
+   * one of those.
+   */
   --z-nav: 30;
-  --z-drawer: 60;
-  --z-scrim: 55;
+  --z-scrim: 35;
+  --z-panel: 40;
   --z-menu: 75;
   --z-overlay: 80;
   --z-toast: 90;
@@ -444,7 +463,11 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 .skip-link {
-  position: fixed; top: 8px; left: 8px; z-index: var(--z-toast);
+  /* The skip link is chrome, not a notice. It belongs with the command bar
+     and the app bar, and not in the band the toasts and the popovers use:
+     a link that is above the toasts covers the answer to what the reader
+     just did. */
+  position: fixed; top: 8px; left: 8px; z-index: var(--z-nav);
   transform: translateY(-200%); background: var(--panel-3); color: var(--text-1);
   padding: 10px 16px; border-radius: var(--radius-sm); box-shadow: var(--shadow-2);
   transition: transform var(--dur-1) var(--ease);
@@ -802,7 +825,11 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .ws {
   display: grid;
   grid-template-rows: var(--cmdbar-h) minmax(0, 1fr);
-  grid-template-columns: var(--rail-w) auto minmax(0, 1fr);
+  /* The column's width is a length and not `auto`, so the grid can be
+     animated: the column glides out of the way and the stage takes its room
+     as it goes, rather than the whole thing snapping from one shape to
+     another. */
+  grid-template-columns: var(--rail-w) var(--context-w) minmax(0, 1fr);
   grid-template-areas:
     "cmd cmd cmd"
     "rail column stage";
@@ -811,6 +838,18 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   position: relative;
   overflow: hidden;
   background: var(--app-bg);
+  transition: grid-template-columns var(--dur-2) var(--ease-out);
+}
+
+/* The column, closed.
+ *
+ * The reader asked for it out of the way, so it goes out of the way - but it
+ * goes smoothly, and it fades as it goes, because a thing that vanishes
+ * between one frame and the next reads as a fault rather than as a choice. */
+.ws[data-nav="hidden"] { grid-template-columns: var(--rail-w) 0px minmax(0, 1fr); }
+.ws[data-nav="hidden"] .context {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* -- the arrangement --------------------------------------------------------
@@ -938,9 +977,13 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   grid-area: column;
   position: relative;
   display: flex; flex-direction: column; min-width: 0;
-  width: var(--context-w);
+  width: 100%;
+  overflow: hidden;
   background: var(--panel);
   border-right: 1px solid var(--line);
+  /* The fade that goes with the glide. The movement is the grid's; this is
+     the column's own. */
+  transition: opacity var(--dur-2) var(--ease-out);
 }
 .ws[data-column="off"] .context { display: none; }
 
@@ -1131,7 +1174,7 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 /* -- the inspector -------------------------------------------------------- */
 
 .inspector {
-  position: absolute; top: 0; right: 0; bottom: 0; z-index: var(--z-drawer);
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: var(--z-panel);
   width: min(var(--inspector-w), calc(100vw - var(--rail-w)));
   max-width: 92vw;
   display: flex; flex-direction: column; min-height: 0;
@@ -1169,7 +1212,7 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 /* -- the dock ------------------------------------------------------------- */
 
 .dock {
-  position: fixed; left: calc(var(--rail-w) + 16px); bottom: 16px; z-index: var(--z-drawer);
+  position: fixed; left: calc(var(--rail-w) + 16px); bottom: 16px; z-index: var(--z-panel);
   width: min(430px, calc(100vw - var(--rail-w) - 32px));
   background: var(--raised);
   border: 1px solid var(--line-2); border-radius: var(--radius-lg);
@@ -1242,10 +1285,13 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
        not be touched at all: the column appeared, and every one of its
        links did nothing. The column is a drawer here, and a drawer is
        above the thing that dims it. */
-    z-index: var(--z-drawer);
+    z-index: var(--z-panel);
     width: min(var(--context-w), calc(100vw - var(--rail-w)));
     box-shadow: var(--shadow-3);
-    transform: translateX(-16px); opacity: 0; visibility: hidden;
+    /* The drawer slides the whole way in, rather than a little: a drawer
+       that only shifts a few pixels reads as a fault rather than as a
+       drawer opening. */
+    transform: translateX(-100%); opacity: 0; visibility: hidden;
     transition: transform var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out),
       visibility var(--dur-2);
   }
@@ -2648,6 +2694,26 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 }
 .search-hit { align-items: start; }
 .search-hit-glyph { display: inline-flex; color: var(--text-3); }
+
+/* The conversation a search hit came from.
+   The lines around the hit, so the reader can see the exchange the hit was
+   part of without leaving the search. The hit itself is not repeated: the
+   reader has just read it. */
+.search-context {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: 6px; padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+.search-context__line { display: flex; gap: 8px; min-width: 0; }
+.search-context__who {
+  flex: 0 0 auto; max-width: 14ch;
+  color: var(--text-3); font-size: var(--fs-micro);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.search-context__text {
+  color: var(--text-3); font-size: var(--fs-micro);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .saved-row, .history-row { cursor: pointer; }
 
 /* -- the filter bar ---------------------------------------------------------- */

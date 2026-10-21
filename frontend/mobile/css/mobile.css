@@ -138,6 +138,9 @@ html, body {
   --z-overlay: 80;
   --z-menu: 75;
   --z-toast: 90;
+  --z-scrim: 35;
+  --z-panel: 40;
+  --z-nav: 30;
 }
 [data-theme="light"] { --app-bg: #F4EEE6; }
 
@@ -188,6 +191,85 @@ a:hover { text-decoration: underline; }
   background: var(--app-bg);
 }
 
+/* The wide phone.
+   A phone turned sideways is a small tablet, and a small tablet has room for
+   a column of communities and a column of channels beside the conversation.
+   So on a wide screen the phone grows the two columns the desktop has, and on
+   a narrow one it keeps the bottom tabs it has always had.
+
+   The columns are the shell's own grid areas, so the view beside them is
+   the same view it has always been - only narrower. */
+.m-railwrap, .m-drawerwrap { display: none; }
+
+@media (min-width: 760px) {
+  .m-app--wide {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "rail drawer appbar"
+      "rail drawer banner"
+      "rail drawer view"
+      "rail drawer composer"
+      "rail drawer tabs";
+  }
+  .m-app--wide .m-railwrap {
+    display: block;
+    grid-area: rail;
+    overflow-y: auto;
+    background: var(--panel-1);
+    border-right: 1px solid var(--line);
+    padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0));
+  }
+  .m-app--wide .m-drawerwrap {
+    display: block;
+    grid-area: drawer;
+    overflow-y: auto;
+    background: var(--panel-2);
+    border-right: 1px solid var(--line);
+    padding: 10px 8px;
+  }
+  .m-app--wide .m-appbar { grid-area: appbar; }
+  .m-app--wide .m-banner { grid-area: banner; }
+  .m-app--wide .m-view { grid-area: view; }
+  .m-app--wide #m-composer { grid-area: composer; }
+  .m-app--wide .m-tabs { grid-area: tabs; }
+}
+
+/* The column of communities. */
+.m-rail { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.m-rail__item {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; border-radius: 14px;
+  text-decoration: none;
+  transition: border-radius var(--dur-2) var(--ease);
+}
+.m-rail__item.is-active { border-radius: 12px; outline: 2px solid var(--m-brand-line); }
+.m-rail__item--home, .m-rail__item--new {
+  background: var(--panel-3); color: var(--text-2);
+  border: 1px solid var(--line);
+}
+.m-rail__mark { display: grid; place-items: center; }
+
+/* The column of channels. */
+.m-drawer { display: flex; flex-direction: column; gap: 4px; min-width: 208px; }
+.m-drawer__head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px 10px; text-decoration: none; color: inherit;
+  border-bottom: 1px solid var(--line); margin-bottom: 6px;
+}
+.m-drawer__name { font-weight: var(--weight-strong); color: var(--text-1); font-size: var(--fs-sm); }
+.m-drawer__mark { display: grid; place-items: center; flex: 0 0 auto; }
+.m-drawer__label { min-width: 0; }
+.m-drawer__empty { padding: 8px; color: var(--text-3); font-size: var(--fs-sm); }
+.m-drawer__list { display: flex; flex-direction: column; gap: 1px; }
+.m-drawer__item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: var(--radius-sm);
+  color: var(--text-2); text-decoration: none; font-size: var(--fs-sm);
+}
+.m-drawer__item:hover { background: var(--hover); color: var(--text-1); }
+.m-drawer__item.is-active { background: var(--active); color: var(--text-1); font-weight: var(--weight-strong); }
+.m-drawer__glyph { display: grid; place-items: center; color: var(--text-3); }
+
 /* When installed as a webapp (display-mode: standalone) there is no browser
    chrome: no address bar, no back button, no tabs. The shell is self-contained -
    its own app bar, tab bar and composer - and safe-area insets cover the status
@@ -204,10 +286,11 @@ a:hover { text-decoration: underline; }
    jump straight to the view instead of tabbing through the app bar and tab bar
    on every screen. */
 .m-skip {
+  /* Chrome, not a notice - the same band as the app bar. */
   position: fixed;
   left: env(safe-area-inset-left, 0);
   top: env(safe-area-inset-top, 0);
-  z-index: var(--z-scrim, 55);
+  z-index: var(--z-nav, 30);
   padding: 6px 12px;
   margin: 6px;
   background: var(--panel);
@@ -846,7 +929,7 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-scrim {
   position: fixed;
   inset: 0;
-  z-index: var(--z-scrim, 55);
+  z-index: var(--z-scrim);
   background: rgba(0, 0, 0, .5);
   opacity: 0;
   transition: opacity var(--tc-motion-fast) var(--tc-ease);

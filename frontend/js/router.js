@@ -227,7 +227,13 @@ export async function run() {
     }
   }
 
-  setContextPage(page.sidebar, ctx, page);
+  // Every page in the shell has the place column.
+  //
+  // The column is the reader's own spine - the places they can go - and a
+  // page without one has a command bar whose navigation button opens
+  // nothing. So the pages that do not name a column of their own get the
+  // reader's own places, and the button is honest on every page.
+  setContextPage(page.sidebar || 'home', ctx, page);
 
   let result;
   try {

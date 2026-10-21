@@ -13,6 +13,7 @@ import { mobilePages } from '../../packages/registry.js';
 import { attachViewSwipe } from '../js/gestures.js';
 import { State } from '../../packages/store.js';
 import { readPrefs, applyDensity, onPrefsChange } from './prefs.js';
+import { buildRail, buildDrawer, isWide } from './rail.js';
 
 let refs = null;
 let tabRecords = [];
@@ -26,12 +27,19 @@ export function mountShell() {
   const composer = el('div', { id: 'm-composer', hidden: true });
   const tabs = el('nav', { class: 'm-tabs', id: 'm-tabs', 'aria-label': 'Primary' });
 
+  // The columns a wide phone grows: the communities, and the channels of the
+  // community that is open. On a narrow phone they are not drawn at all -
+  // the bottom tabs do that job, and they have always done it.
+  const rail = el('div', { class: 'm-railwrap', id: 'm-rail', hidden: true });
+  const drawer = el('div', { class: 'm-drawerwrap', id: 'm-drawer', hidden: true });
+
   const root = el('div', { class: 'm-app', id: 'm-shell' },
     el('a', { class: 'm-skip', href: '#m-view' }, 'Skip to content'),
+    rail, drawer,
     el('header', { class: 'm-appbar' }, lead, title, actions),
     banner, view, composer, tabs);
 
-  refs = { root, lead, title, actions, banner, view, composer, tabs };
+  refs = { root, lead, title, actions, banner, view, composer, tabs, rail, drawer };
   applyDensity();
   buildTabs();
   refreshTabs();
@@ -43,6 +51,14 @@ export function mountShell() {
     buildTabs();
     refreshTabs();
   });
+
+  // The columns follow the window: a phone turned sideways has room for
+  // them, and a phone held upright does not.
+  const onResize = () => refreshColumns();
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('resize', onResize);
+  }
+  refreshColumns();
 
   // Horizontal swipe on the view (started at the top of the scroll) hops between
   // the bottom-tab destinations. Vertical scrolling always wins.
@@ -160,6 +176,44 @@ function badgeCount(pageId) {
   return 0;
 }
 
-export function refreshChrome() { if (refs) refreshTabs(); }
+// The columns of a wide phone.
+//
+// The communities on the left, and the channels of the community that is
+// open next to them. They are drawn only when there is room for them, and
+// they are drawn from the same state the rest of the phone reads, so they
+// cannot disagree with the menu screen about which communities there are.
+export function refreshColumns() {
+  if (!refs) return;
+  const wide = isWide();
+  refs.root.classList.toggle('m-app--wide', wide);
+  if (!wide) {
+    refs.rail.hidden = true;
+    refs.drawer.hidden = true;
+    refs.rail.replaceChildren();
+    refs.drawer.replaceChildren();
+    return;
+  }
+  refs.rail.hidden = false;
+  refs.rail.replaceChildren(buildRail());
+
+  // The community that is open, if there is one.
+  const route = currentRoute() || '';
+  const match = /^\/server\/([^/]+)/.exec(route);
+  const serverId = match ? match[1] : null;
+  const column = serverId ? buildDrawer(serverId) : null;
+  if (column) {
+    refs.drawer.hidden = false;
+    refs.drawer.replaceChildren(column);
+  } else {
+    refs.drawer.hidden = true;
+    refs.drawer.replaceChildren();
+  }
+}
+
+export function refreshChrome() {
+  if (!refs) return;
+  refreshTabs();
+  refreshColumns();
+}
 
 export default { mountShell, setAppBar, setView, setComposer, setLayout, setConnection, refreshChrome };

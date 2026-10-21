@@ -219,6 +219,12 @@ export const STUB = `
     };
   })();
 
+  // The announcement.
+  //
+  // A check that drives the browser asks for it, and a stub that is not in
+  // place is a measurement of nothing at all.
+  window.__trycordStub = true;
+
   window.fetch = function (input, options) {
     var url = String(input);
     var method = String((options && options.method) || 'GET').toUpperCase();
@@ -260,7 +266,19 @@ export const STUB = `
     }
     if (answer === undefined) answer = {};
     // A reader with no session is told so, whatever the stub would answer.
-    if (window.__trycordSignedOut && /\/api\/(me|users\/me)$/.test(url)) {
+    // The signed-out reader is told so on the two addresses that ask who the
+    // reader is.
+    //
+    // The test is written without a regular expression, and that is not a
+    // style choice: this source is a template literal, so the backslashes in
+    // an escaped slash are eaten by it. The regular expression that was here
+    // became a comment, and the whole stub stopped being a script.
+    //
+    // So the harness now says so out loud: the stub announces itself, and a
+    // check that finds no announcement says the measurements were hollow
+    // rather than reporting a clean run over a sign-in screen.
+    var isMe = url.indexOf('/api/me') !== -1 || url.indexOf('/api/users/me') !== -1;
+    if (window.__trycordSignedOut && isMe) {
       answer = { error: { code: 'AUTH_REQUIRED', message: 'not signed in' } };
       window.__calls = window.__calls || [];
       window.__calls.push(method + ' ' + url);

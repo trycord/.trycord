@@ -12,7 +12,11 @@
 .ws {
   display: grid;
   grid-template-rows: var(--cmdbar-h) minmax(0, 1fr);
-  grid-template-columns: var(--rail-w) auto minmax(0, 1fr);
+  /* The column's width is a length and not `auto`, so the grid can be
+     animated: the column glides out of the way and the stage takes its room
+     as it goes, rather than the whole thing snapping from one shape to
+     another. */
+  grid-template-columns: var(--rail-w) var(--context-w) minmax(0, 1fr);
   grid-template-areas:
     "cmd cmd cmd"
     "rail column stage";
@@ -21,6 +25,18 @@
   position: relative;
   overflow: hidden;
   background: var(--app-bg);
+  transition: grid-template-columns var(--dur-2) var(--ease-out);
+}
+
+/* The column, closed.
+ *
+ * The reader asked for it out of the way, so it goes out of the way - but it
+ * goes smoothly, and it fades as it goes, because a thing that vanishes
+ * between one frame and the next reads as a fault rather than as a choice. */
+.ws[data-nav="hidden"] { grid-template-columns: var(--rail-w) 0px minmax(0, 1fr); }
+.ws[data-nav="hidden"] .context {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* -- the arrangement --------------------------------------------------------
@@ -148,9 +164,13 @@
   grid-area: column;
   position: relative;
   display: flex; flex-direction: column; min-width: 0;
-  width: var(--context-w);
+  width: 100%;
+  overflow: hidden;
   background: var(--panel);
   border-right: 1px solid var(--line);
+  /* The fade that goes with the glide. The movement is the grid's; this is
+     the column's own. */
+  transition: opacity var(--dur-2) var(--ease-out);
 }
 .ws[data-column="off"] .context { display: none; }
 
@@ -341,7 +361,7 @@
 /* -- the inspector -------------------------------------------------------- */
 
 .inspector {
-  position: absolute; top: 0; right: 0; bottom: 0; z-index: var(--z-drawer);
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: var(--z-panel);
   width: min(var(--inspector-w), calc(100vw - var(--rail-w)));
   max-width: 92vw;
   display: flex; flex-direction: column; min-height: 0;
@@ -379,7 +399,7 @@
 /* -- the dock ------------------------------------------------------------- */
 
 .dock {
-  position: fixed; left: calc(var(--rail-w) + 16px); bottom: 16px; z-index: var(--z-drawer);
+  position: fixed; left: calc(var(--rail-w) + 16px); bottom: 16px; z-index: var(--z-panel);
   width: min(430px, calc(100vw - var(--rail-w) - 32px));
   background: var(--raised);
   border: 1px solid var(--line-2); border-radius: var(--radius-lg);
@@ -452,10 +472,13 @@
        not be touched at all: the column appeared, and every one of its
        links did nothing. The column is a drawer here, and a drawer is
        above the thing that dims it. */
-    z-index: var(--z-drawer);
+    z-index: var(--z-panel);
     width: min(var(--context-w), calc(100vw - var(--rail-w)));
     box-shadow: var(--shadow-3);
-    transform: translateX(-16px); opacity: 0; visibility: hidden;
+    /* The drawer slides the whole way in, rather than a little: a drawer
+       that only shifts a few pixels reads as a fault rather than as a
+       drawer opening. */
+    transform: translateX(-100%); opacity: 0; visibility: hidden;
     transition: transform var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out),
       visibility var(--dur-2);
   }
