@@ -246,6 +246,16 @@
   var yearEl = document.querySelector('[data-year]');
   if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
+  /* ---- the address in the mockup ---------------------------------------------
+     The framed client on the homepage shows an address in its title bar. It is
+     the address the reader is actually on: the same software, running on
+     their instance, and saying "trycord.dev" to somebody who runs their own
+     would be a small lie about whose server they are looking at. */
+  var addresses = Array.prototype.slice.call(document.querySelectorAll('.app-url'));
+  if (addresses.length && window.location && window.location.host) {
+    addresses.forEach(function (node) { node.textContent = window.location.host; });
+  }
+
   /* ---- copying from a code block ---------------------------------------------
      A reader who wants the command in their terminal should not have to
      select it by hand, and a copy button that does nothing is worse than no
@@ -305,8 +315,8 @@
     var items = [{ href: '/', label: 'Home' }];
     var section = main.getAttribute('data-crumbs');
     if (section) items.push({ href: sectionHref(section), label: section });
-    var here = document.querySelector('h1');
-    var title = here ? (here.textContent || '').trim() : '';
+    var heading = document.querySelector('h1');
+    var title = heading ? (heading.textContent || '').trim() : '';
     if (title && title !== section) items.push({ label: title, current: true });
     crumbs.innerHTML = items.map(function (item, index) {
       var last = index === items.length - 1;
@@ -315,7 +325,10 @@
       }
       return '<span' + (last ? ' aria-current="page"' : '') + '>' + item.label + '</span>';
     }).join('<span class="crumbs__sep" aria-hidden="true">/</span>');
-    main.insertBefore(crumbs, main.firstChild);
+    // Inside the wrap, so the crumbs line up with the text under them.
+    (main.querySelector('.wrap') || main).insertBefore(crumbs, main.querySelector('.wrap')
+      ? main.querySelector('.wrap').firstChild
+      : main.firstChild);
   }
 
   function sectionHref(name) {
@@ -332,17 +345,42 @@
   /* ---- the next page ----------------------------------------------------------
      The documentation is a handful of pages that read in an order. A reader
      who has finished one of them should be offered the next one, and the
-     offer is a link, not a page of its own. */
+     offer is a link, not a page of its own.
+
+     The position is found by the address the page is served at, not by its
+     heading: the list holds the addresses, and the heading is a title - two
+     pages can carry the same one, and a pager that guessed would send a
+     reader sideways.
+
+     A page can be served at more than one address - the documentation is
+     /docs on an instance and documentation.html on the disk - so each entry
+     carries the names it answers to. */
   var order = [
-    '/docs', '/install', '/faq', '/developers', '/download',
-    '/features', '/about', '/changelog'
+    { href: '/docs', names: ['/docs', '/documentation'] },
+    { href: '/install', names: ['/install'] },
+    { href: '/faq', names: ['/faq'] },
+    { href: '/developers', names: ['/developers'] },
+    { href: '/download', names: ['/download'] },
+    { href: '/features', names: ['/features'] },
+    { href: '/about', names: ['/about'] },
+    { href: '/changelog', names: ['/changelog'] },
   ];
   if (main && main.getAttribute('data-next')) {
-    var at = order.indexOf(here);
+    var path = String(window.location.pathname || '')
+      .replace(/\.html$/, '')
+      .replace(/\/+$/, '');
+    var at = -1;
+    for (var i = 0; i < order.length; i++) {
+      for (var n = 0; n < order[i].names.length; n++) {
+        var name = order[i].names[n];
+        if (path === name || path.slice(-name.length) === name) { at = i; break; }
+      }
+      if (at !== -1) break;
+    }
     var pages = [];
     if (at > -1) {
-      if (at > 0) pages.push({ href: order[at - 1], label: 'Previous' });
-      if (at < order.length - 1) pages.push({ href: order[at + 1], label: 'Next' });
+      if (at > 0) pages.push({ href: order[at - 1].href, label: 'Previous' });
+      if (at < order.length - 1) pages.push({ href: order[at + 1].href, label: 'Next' });
     }
     if (pages.length) {
       var nav = document.createElement('nav');
@@ -353,7 +391,8 @@
           + '<span class="pager__label">' + page.label + '</span>'
           + '<span class="pager__title">' + pageTitle(page.href) + '</span></a>';
       }).join('');
-      main.appendChild(nav);
+      // Inside the wrap, like the rest of the page.
+      (main.querySelector('.wrap') || main).appendChild(nav);
     }
   }
 

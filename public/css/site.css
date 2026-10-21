@@ -313,6 +313,22 @@ h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
   flex: 0 0 auto;
 }
 
+/* The actions that only make sense on a narrow screen: the masthead keeps
+   one button there, and the rest live in the menu that opens under it. */
+.nav-mobile-actions { display: none; }
+
+@media (max-width: 700px) {
+  .masthead-actions .btn-ghost { display: none; }
+  .nav-mobile-actions {
+    display: flex;
+    gap: var(--space-3);
+    padding: var(--space-4) 0 var(--space-2);
+    border-top: 1px solid var(--hairline);
+    margin-top: var(--space-2);
+  }
+  .nav-mobile-actions .btn { width: 100%; }
+}
+
 .theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -954,7 +970,8 @@ pre.has-copy { position: relative; padding-right: var(--space-10); }
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  min-height: 32px;
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--duration-fast) ease, color var(--duration-fast) ease;
@@ -968,9 +985,26 @@ pre.has-copy:focus-within .copy-button { opacity: 1; }
   outline-offset: 2px;
   opacity: 1;
 }
-/* A reader on a touch screen cannot hover, so the button is always there. */
+/* A reader on a touch screen cannot hover, so the button is always there - and
+   it is as tall as a finger can reach. */
 @media (hover: none) {
-  .copy-button { opacity: 1; }
+  .copy-button { opacity: 1; min-height: 40px; }
+}
+@media (max-width: 700px) {
+  .copy-button { min-height: 40px; }
+}
+
+/* A finger is bigger than a cursor.
+   The controls that are small on a desk are as tall as a thumb on a phone, and
+   the ones that are already large enough are left alone. */
+@media (max-width: 700px) {
+  .btn-sm { min-height: 40px; }
+  .mini-channel { min-height: 44px; }
+  .mini-rail-btn { width: 44px; height: 44px; }
+  .text-link { min-height: 40px; }
+  /* A segmented control is a row of buttons, so each one has to be a target
+     rather than a stripe. */
+  .seg button { min-height: 40px; padding-inline: var(--space-4); }
 }
 
 /* The way back: where this page sits in the site, and what is next. */
@@ -1026,6 +1060,27 @@ pre.has-copy:focus-within .copy-button { opacity: 1; }
   padding: var(--space-2) var(--space-5);
   border-left: 3px solid var(--color-accent);
   color: var(--color-text-secondary);
+}
+
+/* A table in a document. The reader gets the same table on a phone as on a
+   desk: it scrolls sideways inside its own box rather than pushing the page
+   wide. */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-5);
+}
+.prose th, .prose td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+.prose th { color: var(--color-text-primary); }
+.prose td { color: var(--color-text-secondary); }
+@media (max-width: 700px) {
+  .prose table { display: block; overflow-x: auto; }
 }
 
 .toc {
@@ -1258,8 +1313,8 @@ select.dir-control { width: auto; cursor: pointer; }
 .dir-placeholder { color: var(--color-text-muted); font-size: var(--text-sm); }
 .dir-note { color: var(--color-text-muted); font-size: var(--text-xs); margin-top: var(--space-4); }
 
-.pager { display: flex; align-items: center; gap: var(--space-3); justify-content: center; margin-top: var(--space-6); }
-.pager .page-of { color: var(--color-text-secondary); font-size: var(--text-sm); }
+.dir-pager { display: flex; align-items: center; gap: var(--space-3); justify-content: center; margin-top: var(--space-6); }
+.dir-pager .page-of { color: var(--color-text-secondary); font-size: var(--text-sm); }
 
 
 .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-8); }

@@ -4,11 +4,14 @@ The official SDK for Trycord bots. It talks to the routes the Trycord server
 really has, and it does not pretend to more.
 
 ```bash
-npm install /path/to/.trycord/sdk/trycord-botjs
+npm install trycord-botjs
 ```
 
-The package has not been published to npm yet. Once released, this becomes
-`npm install trycord-botjs`.
+To work against a checkout instead of the published package:
+
+```bash
+npm install /path/to/.trycord/sdk/trycord-botjs
+```
 
 ```ts
 import { Client, Events } from 'trycord-botjs';

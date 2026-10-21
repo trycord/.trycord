@@ -15,18 +15,22 @@ column on the right says which test does it.
 
 ```
 cd backend && npm test                    # everything
-cd ../frontend && node --test "tests/**/*.test.js"   # the client
-cd ../public && node --test "tests/**/*.test.js"     # the public website
-cd ../sdk/trycord-botjs && npm test                  # the SDK
-cd ../frontend && node scripts/browser-sweep.mjs     # every route, in a browser
+cd ../frontend && npm test                # the client
+cd ../public && node --test "tests/**/*.test.js"   # the public website
+cd ../sdk/trycord-botjs && npm test        # the SDK
+cd ../frontend && npm run sweep            # every route of the application, in a browser
+cd ../frontend && npm run check:site       # every page of the public site, in a browser
 ```
 
 The checks that are not tests run on their own:
 
 ```
-cd backend && npm run check:names        # the client: names, paths, overlay options
-cd backend && npm run check:names:backend  # the backend: the same, and the route definitions
+cd backend && npm run check:names         # the client: names, paths, overlay options
+cd backend && npm run check:names:backend # the backend: the same, and the route definitions
 cd backend && npm run check:contract      # the paths the client asks for, against the routes there are
+cd backend && npm run check:deployment    # the image and the compose file
+cd ../public && node scripts/build-site.mjs --check  # the shared masthead and footer
+cd ../trycord-desktop && npm run check    # the desktop application
 ```
 
 The browser sweep is a real Chromium, real CSS and real pixels. The instance's

@@ -94,6 +94,10 @@
             <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
           </div>
         </div>
+
+        <div class="nav-mobile-actions">
+          <a class="btn btn-ghost btn-sm" href="/app/" data-app-link>Open the app</a>
+        </div>
       </nav>
 
       <div class="masthead-actions">
@@ -107,7 +111,7 @@
     </div>
   </header>
 
-  <main id="main" class="page" data-crumbs="Documentation"> data-next="1"
+  <main id="main" class="page" data-crumbs="Documentation" data-next="1">
     <div class="wrap">
       <div class="page-head">
         <p class="kicker">Install</p>
@@ -170,7 +174,10 @@ node backend/src/server.js</code></pre>
           <p>
             Voice is off by default. To enable it, turn on the voice provider
             in the Configuration Centre. The in-house STUN/TURN server starts
-            automatically on port 3478. No third-party media service is needed.
+            automatically on port 3478, and no third-party media service is
+            needed. Open <code>http://localhost:9973/</code> on the machine
+            itself to see whether the voice stack is working - the page says
+            WORKING or NOT WORKING, and says why when it says the second one.
           </p>
 
           <h2>Updating</h2>

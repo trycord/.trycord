@@ -94,6 +94,10 @@
             <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
           </div>
         </div>
+
+        <div class="nav-mobile-actions">
+          <a class="btn btn-ghost btn-sm" href="/app/" data-app-link>Open the app</a>
+        </div>
       </nav>
 
       <div class="masthead-actions">
@@ -107,7 +111,7 @@
     </div>
   </header>
 
-  <main id="main" class="page" data-crumbs="Developer guide"> data-next="1"
+  <main id="main" class="page" data-crumbs="Developer guide" data-next="1">
     <div class="wrap">
       <div class="page-head">
         <p class="kicker">Developers</p>
@@ -229,8 +233,11 @@ wss://your-instance.example/api/v1/gateway?application={applicationId}&amp;ticke
 
           <h2>The SDK: trycord-botjs</h2>
           <p>The official client for everything above. It calls the routes this page describes and returns the shapes they return.</p>
-          <p><code>trycord-botjs</code> is not on npm yet. From a Trycord source checkout, install it with:</p>
-          <pre><code>npm install ./sdk/trycord-botjs</code></pre>
+          <p>Install it from npm, or from a Trycord source checkout:</p>
+          <pre><code>npm install trycord-botjs
+
+# or, from a checkout of this repository
+npm install ./sdk/trycord-botjs</code></pre>
           <pre><code>import { Client, Events } from 'trycord-botjs';
 
 const client = new Client({
