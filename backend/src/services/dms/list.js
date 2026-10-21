@@ -48,7 +48,7 @@ async function listMine(userId) {
     lastIds.length
       ? db.all(
         `SELECT dm.*, u.username AS author_name, u.display_name AS author_display,
-                u.avatar_url AS author_avatar, u.banner_url AS author_banner
+                u.avatar_url AS author_avatar, u.banner_url AS author_banner, u.is_bot AS author_is_bot
          FROM dm_messages dm JOIN users u ON u.id = dm.author_id
          WHERE dm.id IN (${lastIds.map(() => '?').join(',')})`,
         lastIds

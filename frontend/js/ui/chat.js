@@ -49,6 +49,9 @@ export function asMessage(raw) {
     authorId: pick('authorId', 'author_id'),
     authorName: raw.authorName || raw.author_display || raw.author_name || 'Someone',
     authorAvatar: raw.author_avatar || raw.avatar_url || null,
+    // Whether the author is a bot. The server says so; a name that says
+    // "bot" is not a substitute for knowing it.
+    authorIsBot: !!(raw.author_is_bot || raw.authorIsBot),
     threadRootId: pick('threadRootId', 'thread_root_id') || null,
     replyCount: Number(pick('replyCount', 'reply_count') || 0),
     attachments: raw.attachments || [],
@@ -369,6 +372,7 @@ export function buildMessageRow(deps) {
 
     const meta = continued ? null : el('div', { class: 'msg-meta' },
       el('span', { class: 'msg-author' }, m.authorName),
+      m.authorIsBot ? el('span', { class: 'msg-botflag', title: 'This is a bot' }, 'BOT') : null,
       when ? el('time', {
         class: 'msg-stamp',
         dateTime: when.toISOString(),

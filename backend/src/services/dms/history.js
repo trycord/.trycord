@@ -38,7 +38,7 @@ async function resolveSeq(conversationId, id) {
 }
 
 const SELECT = `SELECT dm.*, u.username AS author_name, u.display_name AS author_display,
-       u.avatar_url AS author_avatar, u.banner_url AS author_banner
+       u.avatar_url AS author_avatar, u.banner_url AS author_banner, u.is_bot AS author_is_bot
   FROM dm_messages dm JOIN users u ON u.id = dm.author_id`;
 
 async function history(userId, conversationId, { before = null, after = null, limit = 50 } = {}) {
