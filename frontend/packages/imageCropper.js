@@ -187,6 +187,7 @@ export async function createCropper(file, options = {}) {
     window.removeEventListener('pointerup', onUp);
     if (observer) observer.disconnect();
     URL.revokeObjectURL(picture.src);
+    bitmap.close?.();
   };
 
   return { node: frame, result, destroy };

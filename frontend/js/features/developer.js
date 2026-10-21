@@ -20,6 +20,7 @@
 import { el } from '../../packages/dom.js';
 import { State, refreshServers } from '../../packages/store.js';
 import { icon } from '../../packages/icons.js';
+import { publicPath } from '../../packages/nav.js';
 import { formatDateTime } from '../../packages/locale.js';
 import { card, row, blank, fault, fold, facts, head, hold, memo } from '../ui/page.js';
 import { confirmDialog, openDialog, errorToast, toast } from '../ui/overlays.js';
@@ -851,11 +852,79 @@ function applicationsSection() {
   };
 }
 
+// -- the documentation ------------------------------------------------------------
+
+// Where somebody reads about the API. The guide is a page of the public site,
+// the reference is the machine-readable document the server serves, and the
+// SDK is the client that saves writing the requests by hand.
+function documentationSection() {
+  function linkRow(title, note, href, external) {
+    return row({
+      lead: el('span', { class: 'role-dot' }, icon('book', { size: 15 })),
+      title,
+      sub: note,
+      side: el('a', {
+        class: 'btn btn--ghost btn--sm',
+        href,
+        target: external ? '_blank' : null,
+        rel: external ? 'noopener noreferrer' : null,
+      }, external ? 'Open it' : 'Read it'),
+    });
+  }
+
+  return {
+    node: fold([
+      memo({
+        tone: 'info',
+        title: 'Read before you build',
+        text: 'The guide walks through making an application, keeping its token, posting a first '
+          + 'message and hearing events. The reference lists every route this instance serves, and '
+          + 'the SDK calls them for you.',
+      }),
+      card({
+        label: 'The documentation',
+        glyph: 'book',
+        note: 'the guide, the reference, and the client library',
+        flush: true,
+        body: el('div', { class: 'rowlist' }, [
+          linkRow(
+            'The developer guide',
+            'Make an application, use its token, post a message, hold the gateway open.',
+            publicPath('/developers'),
+            false,
+          ),
+          linkRow(
+            'The API reference',
+            'Every route and every scope, as a machine-readable document.',
+            publicPath('/api/v1/openapi.json'),
+            false,
+          ),
+          linkRow(
+            'The SDK: trycord-botjs',
+            'The client library, with its types, its tests and its examples.',
+            'https://github.com/trycord/.trycord/tree/main/sdk/trycord-botjs',
+            true,
+          ),
+          linkRow(
+            'Running your own instance',
+            'Install it, choose a database, put it behind a proxy, back it up.',
+            publicPath('/docs'),
+            false,
+          ),
+        ]),
+      }),
+    ]),
+    onMount: () => {},
+    cleanup() {},
+  };
+}
+
 // -- the page --------------------------------------------------------------------
 
 const SECTIONS = [
   { id: 'keys', label: 'API keys', view: keysSection },
   { id: 'applications', label: 'Applications', view: applicationsSection },
+  { id: 'documentation', label: 'Documentation', view: documentationSection },
 ];
 
 export function renderDeveloper(ctx) {

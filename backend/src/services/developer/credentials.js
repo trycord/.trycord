@@ -73,6 +73,7 @@ async function resolveCredential(token) {
         kind: 'bot',
         id: row.key_id,
         ownerUserId: app.owner_user_id,
+        userId: bots.botUserIdOf(app),
         scopes: apiKeys.readScopes(row.scopes),
         rateLimit: Number(row.rate_limit_per_minute || apiKeys.DEFAULT_RATE_LIMIT),
         communityId: app.server_id,
@@ -123,9 +124,12 @@ async function authenticate(req, res, next) {
       return fail(res, refusal.code, refusal.message, refusal.status);
     }
     req.principal = resolved.principal;
-    // The routes below check community membership and permissions, and those
-    // checks are about the person the credential acts for.
-    req.user = { id: resolved.principal.ownerUserId };
+    // A bot acts as its own account. A human API key acts as its owner.
+    req.user = {
+      id: resolved.principal.kind === 'bot'
+        ? (resolved.principal.userId || resolved.principal.ownerUserId)
+        : resolved.principal.ownerUserId,
+    };
     // The last use is recorded at most once a minute. Writing it on every
     // request would turn every call into a write, and the answer it gives -
     // "when was this key last used" - does not need to be that exact.

@@ -18,7 +18,7 @@ import { State } from '../../packages/store.js';
 import {
   subscribe, current, setMuted, setDeafened, leave, enableMic,
   refreshDevices, setInputDevice, setOutputDevice,
-  canShareScreen, startScreenShare, stopScreenShare,
+  canShareScreen, startScreenShare, stopScreenShare, CONNECTION_STATES,
 } from '../../packages/voiceSession.js';
 
 let paintFn = null;
@@ -104,15 +104,7 @@ function dockNode() {
   // It is the state the session worked out from the peers, so the dock cannot
   // say "connected" while every peer is still trying.
   const state_ = s.connection || 'idle';
-  const stateWord = {
-    idle: 'Not in a room',
-    joining: 'Joining the room',
-    connecting: 'Connecting',
-    connected: 'Connected',
-    reconnecting: 'Reconnecting',
-    failed: 'The connection failed',
-    leaving: 'Leaving',
-  }[state_] || 'Connected';
+  const stateWord = CONNECTION_STATES[state_] || CONNECTION_STATES.connected;
 
   const micBtn = el('button', {
     class: 'dock-btn dock-btn--round' + (s.muted ? ' is-off' : ''), type: 'button',

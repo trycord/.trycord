@@ -47,7 +47,7 @@ let started = false;
 // floor. Applied when the process next starts.
 function defaultWorkerCount() {
   try {
-    const settings = require('./services/settings');
+    const settings = require('./settings');
     if (settings.isLoaded()) {
       const saved = settings.get('cpu.worker_count');
       if (Number.isFinite(saved) && saved > 0) return Math.floor(saved);
@@ -72,7 +72,7 @@ function isoPlusMs(ms) {
 // set it keeps the value it set; it is the second choice, not the first.
 function defaultConcurrency() {
   try {
-    const settings = require('./services/settings');
+    const settings = require('./settings');
     if (settings.isLoaded()) {
       const saved = settings.get('cpu.concurrent_jobs');
       if (Number.isFinite(saved) && saved > 0) return Math.floor(saved);
@@ -254,5 +254,7 @@ module.exports = {
   stop,
   stats,
   started: startedFlag,
+  defaultWorkerCount,
+  defaultConcurrency,
   POLL_MS,
 };

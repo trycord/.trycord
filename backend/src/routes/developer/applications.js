@@ -15,8 +15,10 @@ const db = require('../../db');
 const { fail } = require('../../errors');
 const { visibleChannel } = require('../../util');
 const { hasChannelPermission } = require('../../services/permissions');
+const communityRoles = require('../../services/roles');
 
 const MAX_MEMBERS = 200;
+const MAX_MEMBER_OFFSET = 1000000;
 const MAX_MESSAGES = 100;
 
 async function getCommunity(req, res) {
@@ -40,13 +42,39 @@ async function getCommunity(req, res) {
 
 async function listMembers(req, res) {
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), MAX_MEMBERS);
-  const rows = await db.all(
-    'SELECT m.user_id AS userId, m.joined_at AS joinedAt, u.username, u.display_name AS displayName'
-    + ' FROM server_members m JOIN users u ON u.id = m.user_id'
-    + ' WHERE m.server_id = ? ORDER BY m.joined_at LIMIT ' + limit,
+  const requestedOffset = Number.parseInt(req.query.offset, 10);
+  const offset = Number.isFinite(requestedOffset)
+    ? Math.min(Math.max(requestedOffset, 0), MAX_MEMBER_OFFSET)
+    : 0;
+  const count = await db.get(
+    'SELECT COUNT(*) AS total FROM server_members WHERE server_id = ?',
     [req.server.id]
   );
-  res.json({ members: rows });
+  const rows = await db.all(
+    'SELECT m.user_id AS userId, m.joined_at AS joinedAt, u.username, u.display_name AS displayName'
+    + ', u.avatar_url AS avatarUrl, u.is_bot AS isBot'
+    + ' FROM server_members m JOIN users u ON u.id = m.user_id'
+    + ' WHERE m.server_id = ? ORDER BY m.joined_at, m.user_id LIMIT ' + limit + ' OFFSET ' + offset,
+    [req.server.id]
+  );
+  const total = Number((count && count.total) || 0);
+  res.json({
+    members: rows.map((member) => Object.assign({}, member, { isBot: !!member.isBot })),
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
+  });
+}
+
+async function getChannel(req, res) {
+  const channel = await visibleChannel(req.params.channelId, req.user.id, req.server.id);
+  if (!channel) return fail(res, 'NOT_FOUND', 'channel not found');
+  res.json({ channel });
+}
+
+async function listRoles(req, res) {
+  res.json({ roles: await communityRoles.list(req.server.id) });
 }
 
 function credentialShape(row) {
@@ -93,7 +121,7 @@ async function getApplication(req, res) {
   const app = await bots.getApp(req.params.applicationId, req.server.id);
   if (!app) return fail(res, 'NOT_FOUND', 'application not found');
   const credential = await developerBots.credentialOf(app.id);
-  res.json({ application: app, credential: credentialShape(credential) });
+  res.json({ application: bots.appShape(app), credential: credentialShape(credential) });
 }
 
 // Give an application its developer credential, or change the scopes it has.
@@ -127,15 +155,27 @@ async function revokeApplication(req, res) {
 }
 
 async function applicationHealth(req, res) {
+  if (!canReadApplicationTools(req)) return fail(res, 'PERMISSION_DENIED', 'you cannot inspect this application', 403);
   const out = await developerBots.health(req.params.applicationId, req.server.id);
   if (!out) return fail(res, 'NOT_FOUND', 'application not found');
   res.json(out);
 }
 
 async function listCommands(req, res) {
+  if (!canReadApplicationTools(req)) return fail(res, 'PERMISSION_DENIED', 'you cannot inspect this application', 403);
   const app = await bots.getApp(req.params.applicationId, req.server.id);
   if (!app) return fail(res, 'NOT_FOUND', 'application not found');
   res.json({ commands: await bots.listCommands(app.id) });
+}
+
+function canReadApplicationTools(req) {
+  const principal = req.principal || {};
+  if (principal.kind === 'bot') {
+    return String(principal.botApplicationId) === String(req.params.applicationId)
+      && String(principal.communityId) === String(req.server.id);
+  }
+  const permissions = (req.access && req.access.permissions) || [];
+  return permissions.includes('*') || permissions.includes('MANAGE_SERVER');
 }
 
 async function putCommand(req, res) {
@@ -155,11 +195,30 @@ async function listMessages(req, res) {
   const channel = await visibleChannel(req.params.channelId, req.user.id, req.server.id);
   if (!channel) return fail(res, 'NOT_FOUND', 'channel not found');
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), MAX_MESSAGES);
+  const before = req.query.before === undefined ? null : Number(req.query.before);
+  if (before !== null && (!Number.isSafeInteger(before) || before < 1)) {
+    return fail(res, 'VALIDATION_ERROR', 'before must be a positive message sequence', 400);
+  }
+  const params = [channel.id];
+  let cursorClause = '';
+  if (before !== null) {
+    cursorClause = ' AND seq < ?';
+    params.push(before);
+  }
   const rows = await db.all(
-    'SELECT * FROM messages WHERE channel_id = ? ORDER BY seq DESC LIMIT ' + limit,
-    [channel.id]
+    'SELECT * FROM messages WHERE channel_id = ?' + cursorClause
+      + ' ORDER BY seq DESC LIMIT ' + (limit + 1),
+    params
   );
-  res.json({ messages: rows.reverse() });
+  const hasMore = rows.length > limit;
+  const messages = rows.slice(0, limit).reverse();
+  res.json({
+    messages,
+    limit,
+    before,
+    hasMore,
+    nextBefore: hasMore && messages.length ? Number(messages[0].seq) : null,
+  });
 }
 
 // Post a message as an application.
@@ -357,7 +416,7 @@ const definitions = [
     path: '/communities/:serverId',
     auth: 'principal',
     scopes: ['communities:read'],
-    bots: false,
+    bots: true,
     community: 'member',
     tags: ['Communities'],
     summary: 'A community',
@@ -376,7 +435,7 @@ const definitions = [
     path: '/communities/:serverId/members',
     auth: 'principal',
     scopes: ['members:read'],
-    bots: false,
+    bots: true,
     community: 'member',
     tags: ['Communities'],
     summary: 'The members of a community',
@@ -384,14 +443,62 @@ const definitions = [
     parameters: [
       pathParam('serverId', 'The community id or its slug.'),
       queryParam('limit', 'How many members to return.', { type: 'integer' }),
+      queryParam('offset', 'How many members to skip.', { type: 'integer' }),
     ],
     responses: {
-      200: ok('The members.', { type: 'object', required: ['members'], properties: { members: { type: 'array', items: ref('Member') } } }),
+      200: ok('A page of members.', { type: 'object', required: ['members', 'total', 'limit', 'offset', 'hasMore'], properties: {
+        members: { type: 'array', items: ref('Member') },
+        total: { type: 'integer' },
+        limit: { type: 'integer' },
+        offset: { type: 'integer' },
+        hasMore: { type: 'boolean' },
+      } }),
       401: ERRORS.unauthenticated,
       403: ERRORS.forbidden,
       404: ERRORS.missing,
     },
     handler: listMembers,
+  },
+  {
+    method: 'get',
+    path: '/communities/:serverId/channels/:channelId',
+    auth: 'principal',
+    scopes: ['channels:read'],
+    bots: true,
+    community: 'member',
+    tags: ['Communities'],
+    summary: 'A channel',
+    description: 'The channel named by this community, for a member who can read channel details.',
+    parameters: [
+      pathParam('serverId', 'The community id or its slug.'),
+      pathParam('channelId', 'The channel id or its slug.'),
+    ],
+    responses: {
+      200: ok('The channel.', { type: 'object', required: ['channel'], properties: { channel: ref('Channel') } }),
+      401: ERRORS.unauthenticated,
+      403: ERRORS.forbidden,
+      404: ERRORS.missing,
+    },
+    handler: getChannel,
+  },
+  {
+    method: 'get',
+    path: '/communities/:serverId/roles',
+    auth: 'principal',
+    scopes: ['roles:read'],
+    bots: true,
+    community: 'member',
+    tags: ['Communities'],
+    summary: 'The roles of a community',
+    description: 'Role names, colors and permissions in the community the caller belongs to.',
+    parameters: [pathParam('serverId', 'The community id or its slug.')],
+    responses: {
+      200: ok('The roles.', { type: 'object', required: ['roles'], properties: { roles: { type: 'array', items: ref('Role') } } }),
+      401: ERRORS.unauthenticated,
+      403: ERRORS.forbidden,
+      404: ERRORS.missing,
+    },
+    handler: listRoles,
   },
 
   {
@@ -571,7 +678,7 @@ const definitions = [
     auth: 'principal',
     scopes: ['bots:read'],
     bots: true,
-    community: 'manage',
+    community: 'member',
     tags: ['Applications'],
     summary: 'Whether an application is working',
     description: 'Whether the application is configured, active or failing, and when it last failed.',
@@ -593,7 +700,7 @@ const definitions = [
     auth: 'principal',
     scopes: ['commands:read'],
     bots: true,
-    community: 'manage',
+    community: 'member',
     tags: ['Applications'],
     summary: 'The commands an application answers',
     description: 'The slash commands the application answers, with the options each one declares.',
@@ -680,9 +787,16 @@ const definitions = [
       pathParam('serverId', 'The community id or its slug.'),
       pathParam('channelId', 'The channel id or its slug.'),
       queryParam('limit', 'How many messages to return.', { type: 'integer' }),
+      queryParam('before', 'Return messages older than this message sequence.', { type: 'integer', minimum: 1 }),
     ],
     responses: {
-      200: ok('The messages.', { type: 'object', required: ['messages'], properties: { messages: { type: 'array', items: ref('Message') } } }),
+      200: ok('A page of messages.', { type: 'object', required: ['messages', 'limit', 'hasMore', 'nextBefore'], properties: {
+        messages: { type: 'array', items: ref('Message') },
+        limit: { type: 'integer' },
+        before: { type: ['integer', 'null'] },
+        hasMore: { type: 'boolean' },
+        nextBefore: { type: ['integer', 'null'] },
+      } }),
       401: ERRORS.unauthenticated,
       403: ERRORS.forbidden,
       404: ERRORS.missing,

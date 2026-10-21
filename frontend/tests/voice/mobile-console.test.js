@@ -34,11 +34,8 @@ const REPORT = {
       maxParticipants: 6,
       fields: [
         { key: 'voice.mesh.maxParticipants', name: 'maxParticipants', type: 'integer', label: 'Participants per mesh room', description: 'The room is small.', value: 6, source: 'default', legacy: null },
-        { key: 'voice.mesh.stunUrls', name: 'stunUrls', type: 'list', label: 'STUN servers for the mesh', description: 'Comma-separated.', value: [], source: 'default', legacy: null },
       ],
-      secrets: [
-        { key: 'voice.mesh.turnCredential', name: 'turnCredential', type: 'secret', label: 'TURN credential for the mesh', description: 'The password half of a static TURN credential.', set: false, source: 'default', legacy: null },
-      ],
+      secrets: [],
       check: { ok: true, detail: 'The address answered a binding request.', at: 1 },
     },
     {
@@ -62,8 +59,16 @@ const REPORT = {
   ],
 };
 
-function find(node, predicate, found = []) {
-  if (!node) return found;
+const CLOUDFLARE_REPORT = {
+  ...REPORT,
+  active: 'cloudflare',
+  providers: REPORT.providers.map((provider) => ({
+    ...provider,
+    inForce: provider.id === 'cloudflare',
+  })),
+};
+
+function find(node, predicate, found = []) {  if (!node) return found;
   if (node.tagName && predicate(node)) found.push(node);
   for (const child of node.children || []) find(child, predicate, found);
   return found;
@@ -92,27 +97,30 @@ test('the voice console on the phone', async () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
 
     const text = body.textContent || '';
-    assert.match(text, /STUN servers for the mesh/, 'the mesh\'s own fields are shown');
     assert.match(text, /Voice and video/, 'the shared switch is shown');
     assert.match(text, /Screen sharing/);
     assert.match(text, /Participants per channel/);
 
-    assert.ok(byName(body, 'voice.mesh.stunUrls'),
+    assert.ok(byName(body, 'voice.mesh.maxParticipants'),
       'the fields of the provider in force are shown');
+    assert.equal(byName(body, 'voice.mesh.stunUrls'), null,
+      'the built-in relay asks for no STUN server');
+    assert.equal(byName(body, 'voice.mesh.turnCredential'), null,
+      'the built-in relay needs no manual credentials');
     assert.equal(byName(body, 'voice.cloudflare.appId'), null,
       'the fields of a provider that is not in force are not shown');
   });
 
   await test('a credential is masked and can be replaced', async () => {
     const calls = installFetchStub({
-      'http://localhost/api/voice/providers': { json: REPORT },
+      'http://localhost/api/voice/providers': { json: CLOUDFLARE_REPORT },
       'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
     });
 
     const body = voiceBody();
     await new Promise((resolve) => setTimeout(resolve, 20));
 
-    const input = byName(body, 'voice.mesh.turnCredential');
+    const input = byName(body, 'voice.cloudflare.appSecret');
     assert.ok(input, 'the credential has a field');
     assert.equal(input.getAttribute('type'), 'password', 'the field is masked');
     assert.equal(input.value, '', 'the field holds no value');
@@ -125,7 +133,7 @@ test('the voice console on the phone', async () => {
 
     const saved = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1);
     assert.ok(saved.length, 'the replacement was saved');
-    assert.equal(saved[saved.length - 1].body['voice.mesh.turnCredential'], 'a-new-credential');
+    assert.equal(saved[saved.length - 1].body['voice.cloudflare.appSecret'], 'a-new-credential');
   });
 
   await test('the result of a connectivity check is shown', async () => {

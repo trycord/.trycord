@@ -6,10 +6,12 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import {
   AuthenticationError,
   Client,
   ConnectionError,
+  Gateway,
   HttpError,
   NotFoundError,
   RateLimitError,
@@ -174,6 +176,110 @@ test('the client', async (t) => {
     assert.equal(first.url, 'https://example.test/api/v1/communities/s1/channels/c1/messages');
     assert.equal((first.init.body as string), JSON.stringify({ content: 'hello' }));
   });
+
+  await t.test('resource helpers use the server routes and unwrap their responses', async () => {
+    const { fetchImpl, calls } = stubFetch([
+      { body: { community: { id: 's1', name: 'Garden' } } },
+      { body: { members: [{ userId: 'u1', username: 'ada' }], total: 3, limit: 1, offset: 1, hasMore: true } },
+      { body: { channel: { id: 'c1', server_id: 's1', name: 'general', type: 'text' } } },
+      { body: { roles: [{ id: 'r1', name: '@everyone', permissions: [] }] } },
+      { body: { messages: [{ id: 'm1', channel_id: 'c1', server_id: 's1', content: 'older', seq: 4 }], limit: 1, before: 5, hasMore: true, nextBefore: 4 } },
+    ]);
+    const client = new Client({ baseUrl: 'https://example.test', token: 'x' });
+    client.rest.fetchImpl = fetchImpl as never;
+
+    const community = await client.community('s1');
+    assert.equal(community.id, 's1');
+    assert.equal(community.name, 'Garden');
+
+    const members = await client.membersPage('s1', { limit: 1, offset: 1 });
+    assert.equal(members.items[0]!.userId, 'u1');
+    assert.equal(members.total, 3);
+    assert.equal(members.hasMore, true);
+    assert.equal(calls[1]!.url, 'https://example.test/api/v1/communities/s1/members?limit=1&offset=1');
+
+    const channel = await client.channel('s1', 'c1');
+    assert.equal(channel.id, 'c1');
+    const roles = await client.roles('s1');
+    assert.equal(roles[0]!.name, '@everyone');
+
+    const messages = await client.messagesPage('s1', 'c1', { limit: 1, before: 5 });
+    assert.equal(messages.items[0]!.seq, 4);
+    assert.equal(messages.hasMore, true);
+    assert.equal(messages.nextBefore, 4);
+    assert.equal(calls[4]!.url,
+      'https://example.test/api/v1/communities/s1/channels/c1/messages?limit=1&before=5');
+  });
+
+  await t.test('commands and health use their community-scoped routes', async () => {
+    const { fetchImpl, calls } = stubFetch([
+      { body: { application: { id: 'a1', name: 'helper' }, communityId: 's1' } },
+      { body: { commands: [{ id: 'cmd1', name: 'ping' }] } },
+      { body: { state: 'configured' } },
+    ]);
+    const client = new Client({ baseUrl: 'https://example.test', token: 'x' });
+    client.rest.fetchImpl = fetchImpl as never;
+
+    const commands = await client.commands();
+    assert.equal(commands[0]!.name, 'ping');
+    const health = await client.health();
+    assert.equal(health.state, 'configured');
+    assert.equal(calls.length, 3, 'the application identity is read once and reused');
+    assert.equal(calls[1]!.url,
+      'https://example.test/api/v1/communities/s1/applications/a1/commands');
+    assert.equal(calls[2]!.url,
+      'https://example.test/api/v1/communities/s1/applications/a1/health');
+  });
+});
+
+test('the CommonJS build can be required by Node', () => {
+  const require = createRequire(import.meta.url);
+  const sdk = require('../..') as typeof import('../src/index.js');
+  const client = new sdk.Client({ baseUrl: 'https://example.test' });
+  assert.equal(client.rest.baseUrl, 'https://example.test/api/v1');
+  assert.equal(sdk.Events.MessageCreated, 'message.created');
+});
+
+test('the gateway reports only the event subscriptions the server accepts', async () => {
+  let socket: import('../src/index.js').SocketLike;
+  const frames: Array<Record<string, unknown>> = [];
+  const createSocket = () => {
+    socket = {
+      send(data) {
+        const frame = JSON.parse(data) as Record<string, unknown>;
+        frames.push(frame);
+        if (frame.op === 'subscribe') {
+          const asked = Array.isArray(frame.events) ? frame.events : [];
+          const accepted = asked.filter((event) => event === Events.MessageCreated);
+          queueMicrotask(() => socket.onmessage?.({
+            data: JSON.stringify({ op: 'subscribed', events: accepted }),
+          }));
+        }
+      },
+      close() { socket.onclose?.({}); },
+      onopen: null,
+      onclose: null,
+      onerror: null,
+      onmessage: null,
+    };
+    queueMicrotask(() => socket.onopen?.({}));
+    return socket;
+  };
+  const rest = { request: async () => ({ ticket: 'one-use-ticket' }) } as unknown as REST;
+  const gateway = new Gateway(rest, {
+    baseUrl: 'https://example.test',
+    applicationId: 'a1',
+    events: [Events.MessageCreated],
+    createSocket,
+  });
+
+  await gateway.connect();
+  assert.equal(gateway.status, 'open');
+  assert.deepEqual(gateway.subscriptions, [Events.MessageCreated]);
+  assert.deepEqual(await gateway.subscribe([]), [], 'an empty list really means no events');
+  assert.deepEqual(gateway.subscriptions, []);
+  assert.deepEqual(frames.map((frame) => frame.op), ['subscribe', 'subscribe']);
+  gateway.close();
 });
 
 test('the commands', async (t) => {

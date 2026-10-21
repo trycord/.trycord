@@ -70,6 +70,49 @@ test('the migration ledger', async (t) => {
     }
   });
 
+  await t.test('legacy applications receive separate bot identities without losing their owners', async () => {
+    const { file } = tempDb();
+    const conn = await connect(file);
+    try {
+      await migrations.run(conn);
+      const now = new Date().toISOString();
+      await conn.run(
+        'INSERT INTO users (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)',
+        ['owner-1', 'owner_one', 'hash', now]
+      );
+      await conn.run(
+        'INSERT INTO servers (id, name, owner_id, join_code, created_at) VALUES (?, ?, ?, ?, ?)',
+        ['community-1', 'Garden', 'owner-1', 'invite-1', now]
+      );
+      await conn.run(
+        'INSERT INTO roles (id, server_id, name, position, permissions, is_default) VALUES (?, ?, ?, ?, ?, ?)',
+        ['role-1', 'community-1', '@everyone', 1, '["SEND_MESSAGES"]', 1]
+      );
+      await conn.run(
+        'INSERT INTO bot_applications (id, owner_user_id, server_id, name, status, token_hash, created_at, updated_at)'
+          + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ['app-1', 'owner-1', 'community-1', 'helper', 'active', 'hash', now, now]
+      );
+      await conn.run('DELETE FROM schema_migrations WHERE `version` = ?', [7]);
+
+      const migrated = await migrations.run(conn);
+      assert.equal(migrated.applied.some((entry) => entry.version === 7), true);
+      const application = await conn.get('SELECT owner_user_id, bot_user_id, token_hash FROM bot_applications WHERE id = ?', ['app-1']);
+      assert.ok(application.bot_user_id);
+      assert.notEqual(application.bot_user_id, application.owner_user_id);
+      assert.equal(application.token_hash, 'hash', 'the existing credential stays untouched');
+      const account = await conn.get('SELECT is_bot FROM users WHERE id = ?', [application.bot_user_id]);
+      assert.equal(Number(account.is_bot), 1);
+      assert.ok(await conn.get(
+        'SELECT 1 AS ok FROM server_members WHERE server_id = ? AND user_id = ?',
+        ['community-1', application.bot_user_id]
+      ));
+      assert.ok(await conn.get('SELECT id FROM users WHERE id = ?', ['owner-1']), 'the developer account remains');
+    } finally {
+      await conn.close();
+    }
+  });
+
   await t.test('a database a newer build wrote to is refused', async () => {
     const { file } = tempDb();
     const conn = await connect(file);

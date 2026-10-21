@@ -20,6 +20,8 @@ so there is one answer to "what does this scope allow".
 | `communities:read` | read a community the caller belongs to |
 | `communities:write` | change the developer configuration of a community: its applications, commands, webhooks and subscriptions |
 | `members:read` | list the members of a community |
+| `channels:read` | read channel names, topics and types in a community |
+| `roles:read` | read role names, colors and permissions in a community |
 | `bots:read` | list the bot applications of a community, read one, and read its health |
 | `bots:write` | create a bot application, give it its scopes, rotate its token and revoke it |
 | `commands:read` | list the slash commands an application answers |

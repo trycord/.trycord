@@ -74,6 +74,127 @@ test('bot applications', async (t) => {
       'and not to the developer who made it');
   });
 
+  await t.test('a bot reads community data as its own account with scoped pages', async () => {
+    const created = await createApplication([
+      'communities:read', 'members:read', 'channels:read', 'roles:read',
+      'bots:read', 'commands:read',
+    ]);
+    const bot = apiClient(base, created.token);
+
+    const communityInfo = await bot.get('/communities/' + communityId);
+    assert.equal(communityInfo.status, 200, JSON.stringify(communityInfo.data));
+    assert.equal(communityInfo.data.community.id, communityId);
+
+    const firstPage = await bot.get('/communities/' + communityId + '/members?limit=1&offset=0');
+    const secondPage = await bot.get('/communities/' + communityId + '/members?limit=1&offset=1');
+    assert.equal(firstPage.status, 200, JSON.stringify(firstPage.data));
+    assert.equal(firstPage.data.offset, 0);
+    assert.equal(firstPage.data.limit, 1);
+    assert.equal(firstPage.data.hasMore, true);
+    assert.equal(secondPage.data.offset, 1);
+    assert.notEqual(firstPage.data.members[0].userId, secondPage.data.members[0].userId,
+      'the offset selects a different member');
+
+    const complete = await bot.get('/communities/' + communityId + '/members?limit=200');
+    assert.equal(complete.data.total, complete.data.members.length);
+    const botMember = complete.data.members.find((member) => member.userId === created.application.botUserId);
+    assert.ok(botMember, 'the application has its own community membership');
+    assert.equal(botMember.isBot, true);
+    assert.notEqual(botMember.userId, session.user.id, 'the bot does not act as its creator');
+
+    const channelInfo = await bot.get('/communities/' + communityId + '/channels/' + channelId);
+    assert.equal(channelInfo.status, 200, JSON.stringify(channelInfo.data));
+    assert.equal(channelInfo.data.channel.id, channelId);
+
+    const roleList = await bot.get('/communities/' + communityId + '/roles');
+    assert.equal(roleList.status, 200, JSON.stringify(roleList.data));
+    assert.ok(roleList.data.roles.some((role) => role.name === '@everyone'));
+
+    const ownCommands = await bot.get('/communities/' + communityId + '/applications/'
+      + created.application.id + '/commands');
+    assert.equal(ownCommands.status, 200, JSON.stringify(ownCommands.data));
+    const ownHealth = await bot.get('/communities/' + communityId + '/applications/'
+      + created.application.id + '/health');
+    assert.equal(ownHealth.status, 200, JSON.stringify(ownHealth.data));
+
+    const other = await createApplication(['messages:write']);
+    const otherHealth = await bot.get('/communities/' + communityId + '/applications/'
+      + other.application.id + '/health');
+    assert.equal(otherHealth.status, 403, 'a bot cannot inspect another application');
+    assert.equal(otherHealth.data.error.code, 'PERMISSION_DENIED');
+
+    const unscoped = await createApplication([]);
+    const denied = await apiClient(base, unscoped.token).get('/communities/' + communityId);
+    assert.equal(denied.status, 403);
+    assert.equal(denied.data.error.code, 'INSUFFICIENT_SCOPE');
+
+    const openapi = await sessionApi.get('/openapi.json');
+    assert.equal(openapi.status, 200);
+    assert.ok(openapi.data.paths['/communities/{serverId}/channels/{channelId}']
+      .get, 'the channel read is described by the live contract');
+    assert.ok(openapi.data.paths['/communities/{serverId}/roles'].get,
+      'the role read is described by the live contract');
+    assert.ok(openapi.data.paths['/communities/{serverId}/members'].get.parameters
+      .some((parameter) => parameter.name === 'offset'), 'member pagination is in OpenAPI');
+    assert.ok(openapi.data.paths['/communities/{serverId}/channels/{channelId}/messages'].get.parameters
+      .some((parameter) => parameter.name === 'before'), 'message cursors are in OpenAPI');
+  });
+
+  await t.test('an older application gets a bot identity instead of borrowing its creator', async () => {
+    const created = await createApplication(['communities:read', 'members:read', 'bots:read']);
+    const oldBotId = created.application.botUserId;
+    await instance.db.run('UPDATE bot_applications SET bot_user_id = NULL WHERE id = ?', [created.application.id]);
+
+    const members = await apiClient(base, created.token)
+      .get('/communities/' + communityId + '/members?limit=200');
+    assert.equal(members.status, 200, JSON.stringify(members.data));
+
+    const stored = await sessionApi.get(
+      '/communities/' + communityId + '/applications/' + created.application.id
+    );
+    assert.equal(stored.status, 200, JSON.stringify(stored.data));
+    const botUserId = stored.data.application.botUserId;
+    assert.ok(botUserId);
+    assert.notEqual(botUserId, session.user.id, 'the creator is never used as the bot');
+    assert.notEqual(botUserId, oldBotId, 'a legacy account is not silently reused');
+    assert.ok(members.data.members.some((member) => member.userId === botUserId && member.isBot));
+    assert.equal('token_hash' in stored.data.application, false, 'the raw token hash is not returned');
+    assert.ok(await instance.db.get('SELECT id FROM users WHERE id = ?', [oldBotId]),
+      'the repair leaves the old account and its data intact');
+  });
+
+  await t.test('message history pages older messages with a sequence cursor', async () => {
+    const channel = await apiClient(instance.baseUrl, session.token)
+      .post('/api/servers/' + communityId + '/channels', { name: 'message-history' });
+    assert.equal(channel.status, 200, JSON.stringify(channel.data));
+    const created = await createApplication(['messages:read', 'messages:write']);
+    const bot = apiClient(base, created.token);
+    for (const content of ['page one', 'page two', 'page three']) {
+      const sent = await bot.post('/communities/' + communityId + '/channels/' + channel.data.id + '/messages', { content });
+      assert.equal(sent.status, 201, JSON.stringify(sent.data));
+    }
+
+    const recent = await bot.get('/communities/' + communityId + '/channels/' + channel.data.id
+      + '/messages?limit=2');
+    assert.equal(recent.status, 200, JSON.stringify(recent.data));
+    assert.equal(recent.data.messages.length, 2);
+    assert.equal(recent.data.hasMore, true);
+    assert.ok(recent.data.nextBefore);
+
+    const older = await bot.get('/communities/' + communityId + '/channels/' + channel.data.id
+      + '/messages?limit=2&before=' + recent.data.nextBefore);
+    assert.equal(older.status, 200, JSON.stringify(older.data));
+    assert.equal(older.data.messages.length, 1);
+    assert.equal(older.data.hasMore, false);
+    assert.equal(older.data.messages[0].content, 'page one');
+    assert.ok(older.data.messages[0].seq < recent.data.messages[0].seq);
+
+    const invalid = await bot.get('/communities/' + communityId + '/channels/' + channel.data.id
+      + '/messages?before=not-a-sequence');
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.data.error.code, 'VALIDATION_ERROR');
+  });
+
   await t.test('a token without the scope may not post', async () => {
     const created = await createApplication(['messages:read']);
     const res = await apiClient(base, created.token)

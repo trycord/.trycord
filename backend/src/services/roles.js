@@ -64,8 +64,8 @@ async function get(roleId) {
 
 // The community baseline role. Renamed from defaultRole() to say what it is:
 // the one role every member holds, whose permissions staff configure.
-async function baselineRole(serverId) {
-  return parseRow(await db.get('SELECT * FROM roles WHERE server_id = ? AND is_default = 1', [serverId]));
+async function baselineRole(serverId, conn = db) {
+  return parseRow(await conn.get('SELECT * FROM roles WHERE server_id = ? AND is_default = 1', [serverId]));
 }
 
 async function byName(serverId, name) {
@@ -235,7 +235,7 @@ async function unassign(serverId, userId, roleId, conn = db) {
 async function ensureBaseline(serverId, userId, conn = db) {
   const existing = await conn.get('SELECT 1 FROM member_roles WHERE server_id = ? AND user_id = ?', [serverId, userId]);
   if (existing) return;
-  const d = await baselineRole(serverId);
+  const d = await baselineRole(serverId, conn);
   if (d) await assign(serverId, userId, d.id, conn);
 }
 

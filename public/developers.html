@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Trycord">
+  <link rel="apple-touch-icon" href="/assets/app-icon.svg">
+  <title>Developers: build a bot for Trycord</title>
+  <meta name="description" content="Build a bot for Trycord: create an application, authenticate it, install it in a community, post messages, hear events over the gateway, and use the official trycord-botjs SDK.">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/design-tokens.css">
+  <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="wrap masthead">
+      <a class="brand" href="/">
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+          <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+          <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+          <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+        </svg>
+        <span class="brand-word">Trycord</span>
+      </a>
+
+      <button class="menu-toggle" type="button" data-menu-toggle aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
+        <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></svg>
+      </button>
+
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Product
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
+              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
+              <a href="/developers"><strong>Developers</strong><span>Build a bot with the API and the SDK.</span></a>
+              <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
+              <a href="/changelog"><strong>Changelog</strong><span>What's new in Trycord.</span></a>
+              <a href="/roadmap"><strong>Roadmap</strong><span>What's done and what's coming.</span></a>
+              <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
+            </div>
+            <div class="nav-menu-foot">
+              <p>Private, self-hostable community messaging.</p>
+              <a class="text-link" href="/demo">Try the demo</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Explore
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/communities"><strong>Communities</strong></a>
+            <a href="/instances"><strong>Instances</strong></a>
+            <a href="/demo"><strong>Demo</strong></a>
+            <a href="/status"><strong>Status</strong></a>
+          </div>
+        </div>
+
+        <a class="btn btn-sm" href="/app/" data-app-link>Open the app</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="page">
+    <div class="wrap">
+      <div class="page-head">
+        <p class="kicker">Developers</p>
+        <h1>Build a bot for Trycord</h1>
+        <p class="lede">
+          A Trycord bot is an <strong>application</strong>: an identity of its own,
+          with a token that is shown once, scopes that say what it may do, and a
+          gateway it holds open to hear what happens. This page is the whole
+          thing: how to make one, how to talk to it, and what to do when it does
+          not answer.
+        </p>
+      </div>
+
+      <div class="prose-layout">
+        <article class="prose">
+          <h2>What a bot is</h2>
+          <ul>
+            <li><strong>Not an account with a badge.</strong> Its messages are written by its own bot account, and that account is marked as a bot wherever an author is shown: in a message, in a member list, in a conversation list, on a profile.</li>
+            <li><strong>Not the developer.</strong> It posts with the rights the community gave it, and the developer cannot speak as it with their own session.</li>
+            <li><strong>Not a person.</strong> It has no password, so there is nothing to sign in with and nothing to guess.</li>
+          </ul>
+
+          <h2>Getting started</h2>
+          <h3>1. Create the application</h3>
+          <p>Inside the community it will live in, a community administrator creates an application:</p>
+          <pre><code>POST /api/v1/communities/{communityId}/applications
+Authorization: Bearer {a person with communities:write and bots:write}
+
+{ "name": "helper", "scopes": ["communities:read", "members:read", "channels:read", "roles:read", "messages:read", "messages:write"] }</code></pre>
+          <p>The answer carries the application, its token and its credential. <strong>The token is shown once.</strong> It is stored hashed, and it is not in any answer afterwards - not the application, not the credential, not the health report. If it is lost, rotate it:</p>
+          <pre><code>POST /api/v1/communities/{communityId}/applications/{applicationId}/rotate-token</code></pre>
+          <p>Rotating ends the old token at once.</p>
+
+          <h3>2. Keep the token safe</h3>
+          <p>Put it in the environment, never in the source and never in a URL:</p>
+          <pre><code>TRYCORD_BOT_TOKEN=trcd_bot_...</code></pre>
+          <p>A token is a credential. A URL ends up in access logs, proxy logs and referrer headers, so the token never rides in one - not even for the gateway, which is why the gateway has a ticket.</p>
+
+          <h3>3. Make the first request</h3>
+          <pre><code>curl -H "Authorization: Bearer $TRYCORD_BOT_TOKEN" \
+  https://your-instance.example/api/v1/communities/$COMMUNITY</code></pre>
+          <p>The answer is the community. Every route is under the instance's versioned API root, and the error envelope is the same everywhere:</p>
+          <pre><code>{ "error": { "code": "INSUFFICIENT_SCOPE", "message": "this credential lacks the scope: messages:write" } }</code></pre>
+
+          <h3>4. Send the first message</h3>
+          <pre><code>curl -X POST -H "Authorization: Bearer $TRYCORD_BOT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content":"Hello from the bot."}' \
+  https://your-instance.example/api/v1/communities/$COMMUNITY/channels/$CHANNEL/messages</code></pre>
+          <p>The message is written by the bot, and it says so everywhere it is read.</p>
+
+          <h2>Authentication and scopes</h2>
+          <p>One header, one kind of credential. A credential carries scopes, and a route checks them:</p>
+          <table>
+            <thead><tr><th>Scope</th><th>What it allows</th></tr></thead>
+            <tbody>
+              <tr><td><code>communities:read</code></td><td>read a community</td></tr>
+              <tr><td><code>members:read</code></td><td>list the members of a community</td></tr>
+              <tr><td><code>channels:read</code></td><td>read channel names, topics and types</td></tr>
+              <tr><td><code>roles:read</code></td><td>read role names, colors and permissions</td></tr>
+              <tr><td><code>communities:write</code></td><td>change the community's developer configuration</td></tr>
+              <tr><td><code>bots:read</code></td><td>list the applications, read one, read its health</td></tr>
+              <tr><td><code>bots:write</code></td><td>create an application, give it scopes, rotate and revoke it</td></tr>
+              <tr><td><code>commands:read</code></td><td>list the commands an application answers</td></tr>
+              <tr><td><code>commands:write</code></td><td>declare, change and remove those commands</td></tr>
+              <tr><td><code>messages:read</code></td><td>read the recent messages of a channel</td></tr>
+              <tr><td><code>messages:write</code></td><td>post a message in a channel</td></tr>
+              <tr><td><code>webhooks:manage</code></td><td>manage the community's webhooks</td></tr>
+            </tbody>
+          </table>
+          <p>A credential may only be created with scopes that are a subset of its own, so a key can never widen itself. The scopes are not the whole of the permission: a bot that may post still needs the community to let it.</p>
+
+          <h2>The API reference</h2>
+          <p>Every route this instance serves is described by an OpenAPI document, generated from the same definitions the server routes on:</p>
+          <pre><code>GET /api/v1/openapi.json</code></pre>
+          <p>The routes a bot uses:</p>
+          <table>
+            <thead><tr><th>Route</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>GET /api/v1/applications/self</code></td><td>which application this token belongs to, and its community</td></tr>
+              <tr><td><code>GET /api/v1/communities/{id}</code></td><td>the community</td></tr>
+              <tr><td><code>GET /api/v1/communities/{id}/members</code></td><td>a page of members with <code>limit</code> and <code>offset</code></td></tr>
+              <tr><td><code>GET /api/v1/communities/{id}/channels/{id}</code></td><td>channel details</td></tr>
+              <tr><td><code>GET /api/v1/communities/{id}/roles</code></td><td>role names, colors and permissions</td></tr>
+              <tr><td><code>GET /api/v1/communities/{id}/applications</code></td><td>the applications of the community</td></tr>
+              <tr><td><code>GET /api/v1/communities/{id}/applications/{app}/health</code></td><td>what the instance thinks of the application</td></tr>
+              <tr><td><code>GET /api/v1/communities/{id}/channels/{id}/messages</code></td><td>recent messages, with a cursor for older pages</td></tr>
+              <tr><td><code>POST /api/v1/communities/{id}/channels/{id}/messages</code></td><td>post a message as the application</td></tr>
+              <tr><td><code>GET /api/v1/communities/{id}/applications/{app}/commands</code></td><td>the commands the application answers</td></tr>
+              <tr><td><code>PUT /api/v1/communities/{id}/applications/{app}/commands</code></td><td>declare a command</td></tr>
+              <tr><td><code>POST /api/v1/applications/{app}/gateway-ticket</code></td><td>a ticket for the gateway</td></tr>
+            </tbody>
+          </table>
+
+          <h2>Events and the gateway</h2>
+          <p>An application that can post and cannot hear anything is a mail-merge. The gateway is the socket it holds open. Three steps:</p>
+          <pre><code>POST /api/v1/applications/{applicationId}/gateway-ticket
+
+wss://your-instance.example/api/v1/gateway?application={applicationId}&amp;ticket={ticket}
+
+{ "op": "subscribe", "events": ["message.created", "member.joined"] }</code></pre>
+          <p>The events are the same names the webhooks are handed, from the same dispatch, so a bot and a webhook cannot see different events:</p>
+          <ul>
+            <li><code>message.created</code> — a message was written.</li>
+            <li><code>member.joined</code> and <code>member.left</code> — somebody joined or left the community.</li>
+            <li><code>channel.created</code> and <code>channel.deleted</code>.</li>
+            <li><code>role.created</code>, <code>role.updated</code> and <code>role.deleted</code>.</li>
+            <li><code>command.created</code> — a command was declared.</li>
+          </ul>
+          <p>A connection that has not said which events it wants hears nothing, and an application only hears the events of the community it belongs to.</p>
+          <p><strong>What the gateway does not promise:</strong> an event is delivered while the socket is open. Nothing is replayed, and nothing is queued for a socket that was closed. A bot that was not connected missed what happened, and the messages it can read are still there when it comes back.</p>
+
+          <h2>Commands</h2>
+          <p>A command is declared in the community, so a member sees it there. The declaration needs a person's credential with <code>communities:write</code> and <code>commands:write</code> — the server refuses an application on that route, because a bot that could declare its own commands would be able to answer anything it liked.</p>
+          <pre><code>PUT /api/v1/communities/{communityId}/applications/{applicationId}/commands
+
+{ "name": "ping", "description": "Answers with a word.", "response": "Pong." }</code></pre>
+          <p>The response is a template, not a script. <code>{name}</code> is filled in with the argument of that name, and <code>{name:something}</code> with the argument or with <code>something</code> when the member left it out. Nothing else is substituted, and there is no expression evaluation anywhere on this path.</p>
+
+          <h2>The SDK: trycord-botjs</h2>
+          <p>The official client for everything above. It calls the routes this page describes and returns the shapes they return.</p>
+          <p><code>trycord-botjs</code> is not on npm yet. From a Trycord source checkout, install it with:</p>
+          <pre><code>npm install ./sdk/trycord-botjs</code></pre>
+          <pre><code>import { Client, Events } from 'trycord-botjs';
+
+const client = new Client({
+  token: process.env.TRYCORD_BOT_TOKEN!,
+  // A self-hosted instance is addressed by its own name.
+  baseUrl: process.env.TRYCORD_BASE_URL || 'https://trycord.dev',
+});
+
+client.on(Events.MessageCreated, async (event) => {
+  if (event.message?.content === '!ping') {
+    await client.send(event.serverId!, event.channelId!, 'Pong.');
+  }
+});
+
+await client.login();</code></pre>
+          <p>It is built in TypeScript, ships its own types, and the errors say which kind of thing went wrong: a refusal from the server, a rate limit with a number attached, a network that did not answer, or a mistake in the calling code. A request that writes something is never retried, so a message is not posted twice.</p>
+
+          <h2>Examples</h2>
+          <p>A ping bot, a command bot, and a self-hosted instance:</p>
+          <pre><code>// ping-bot.ts
+import { Client, Events } from 'trycord-botjs';
+
+const client = new Client({ token: process.env.TRYCORD_BOT_TOKEN! });
+
+client.on(Events.MessageCreated, async (event) => {
+  const message = event.message;
+  if (!message || message.author_is_bot) return;
+  if (message.content.trim().toLowerCase() !== '!ping') return;
+  await client.send(event.serverId!, event.channelId!, 'Pong.');
+});
+
+await client.login();</code></pre>
+          <p>The full set, with the tests, is in the repository under <code>sdk/trycord-botjs</code>.</p>
+
+          <h2>Rate limits and troubleshooting</h2>
+          <p>Every credential has a rate limit, enforced on every request it makes, with a <code>Retry-After</code> header when it is over. One bot cannot use up the instance's capacity for everybody else.</p>
+          <table>
+            <thead><tr><th>What you see</th><th>What it means</th></tr></thead>
+            <tbody>
+              <tr><td><code>401 API_KEY_INVALID</code></td><td>the token was revoked, or the application was deleted</td></tr>
+              <tr><td><code>403 INSUFFICIENT_SCOPE</code></td><td>the credential does not hold the scope the route asks for; the message names it</td></tr>
+              <tr><td><code>403 BOT_NOT_ALLOWED</code></td><td>the route is not for applications, or the application is disabled</td></tr>
+              <tr><td><code>403 PERMISSION_DENIED</code></td><td>the community does not let this bot post in this channel</td></tr>
+              <tr><td><code>404 NOT_FOUND</code></td><td>the application is gone, or the token is not one of its credentials</td></tr>
+              <tr><td>nothing arrives on the socket</td><td>the application has not subscribed, or it is not connected</td></tr>
+            </tbody>
+          </table>
+          <p>The health report says what the instance thinks of the application, and every number in it comes from a row this instance wrote:</p>
+          <pre><code>GET /api/v1/communities/{communityId}/applications/{applicationId}/health</code></pre>
+
+          <h2>Where the rest lives</h2>
+          <ul>
+            <li><a href="/docs">The self-hosting guide</a> — running your own instance.</li>
+            <li><a href="/features">What Trycord does</a> — the product, for a reader rather than a builder.</li>
+            <li><a href="https://github.com/trycord/.trycord">The source</a> — the API reference, the SDK and the tests.</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-cols">
+      <div class="footer-col footer-brand">
+        <a class="brand" href="/">
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+          </svg>
+          <span class="brand-word">Trycord</span>
+        </a>
+        <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
+        <a class="btn btn-sm" href="/app/" data-app-link>Open the app</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Product</h2>
+        <a href="/features">Features</a>
+        <a href="/docs">Documentation</a>
+        <a href="/developers">Developers</a>
+        <a href="/download">Download</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Explore</h2>
+        <a href="/communities">Communities</a>
+        <a href="/instances">Instances</a>
+        <a href="/demo">Demo</a>
+        <a href="/status">Status</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Project</h2>
+        <a href="/about">About</a>
+        <a href="/support">Support</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
+        <a href="/security">Security</a>
+      </div>
+      <div class="footer-col">
+        <h2 class="footer-heading">Legal</h2>
+        <a href="/terms">Terms of Service</a>
+        <a href="/instances-terms">Instance terms</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/trust-and-safety">Trust &amp; Safety</a>
+      </div>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>&copy; <span data-year>2026</span> Trycord</span>
+      <span class="muted">Your instance, your conversations, your rules.</span>
+    </div>
+  </footer>
+
+  <script src="/js/public-api.js"></script>
+  <script src="/js/site.js"></script>
+</body>
+</html>

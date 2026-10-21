@@ -158,6 +158,74 @@ for (const file of files) {
   checked++;
 }
 
+// A relative require that points at nothing.
+//
+// The voice service read its saved relay address through
+// `require('./settings')` from `services/voice/`, where there is no such
+// file. The call sat inside a try/catch, so the error was swallowed, the
+// address was never read, and the relay was published somewhere nobody had
+// chosen. The job service asked for `./services/settings` from inside
+// `services/`, so the operator's saved worker count was ignored too.
+//
+// A wrong path that fails quietly is worse than no path at all, so the path
+// is checked here rather than left to the reader of the catch.
+//
+//   node scripts/check-backend-names.mjs
+
+for (const file of files) {
+  const source = fs.readFileSync(file, 'utf8');
+  // The parse below already knows what is code and what is a comment, so the
+  // calls are collected from the tree rather than from the text: an example
+  // in a comment is not a call.
+  let ast;
+  try {
+    ast = acorn.parse(source.startsWith('#!') ? '//' + source.slice(2) : source, {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      locations: true,
+      allowReturnOutsideFunction: true,
+    });
+  } catch {
+    continue; // the parse is reported by the name check above.
+  }
+  const calls = [];
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { for (const child of node) visit(child); return; }
+    if (node.type === 'CallExpression'
+      && node.callee && node.callee.type === 'Identifier'
+      && node.callee.name === 'require'
+      && node.arguments.length === 1
+      && node.arguments[0].type === 'Literal'
+      && typeof node.arguments[0].value === 'string'
+      && node.arguments[0].value.startsWith('.')) {
+      calls.push({ request: node.arguments[0].value, line: node.loc ? node.loc.start.line : 0 });
+    }
+    for (const key of Object.keys(node)) {
+      if (key === 'loc' || key === 'range') continue;
+      visit(node[key]);
+    }
+  };
+  visit(ast);
+
+  for (const call of calls) {
+    const base = path.resolve(path.dirname(file), call.request);
+    const candidates = [
+      base,
+      base + '.js',
+      base + '.json',
+      path.join(base, 'index.js'),
+      path.join(base, 'index.json'),
+    ];
+    if (candidates.some((candidate) => fs.existsSync(candidate))) continue;
+    findings.push({
+      file: path.relative(BACKEND, file),
+      line: call.line,
+      name: call.request,
+      message: 'the path does not resolve to a file',
+    });
+  }
+}
 if (!findings.length) {
   console.log('the backend uses no name it does not have: ' + checked + ' modules checked');
   process.exit(0);

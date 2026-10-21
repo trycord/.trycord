@@ -2026,6 +2026,7 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 
 .rowtools { display: inline-flex; align-items: center; gap: 6px; }
 .chip--warn { border-color: var(--warning); color: var(--warning); }
+.chip--danger { border-color: var(--danger); color: var(--danger); }
 .badge--count {
   min-width: 20px; padding: 2px 7px; border-radius: 999px;
   background: var(--brand-fill); color: var(--brand-ink);

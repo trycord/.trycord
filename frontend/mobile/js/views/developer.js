@@ -11,6 +11,7 @@
 
 import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
+import { publicPath } from '../../../packages/nav.js';
 import { State, refreshServers } from '../../../packages/store.js';
 import { request } from '../../../packages/api.js';
 import { empty, failure, loading } from '../components.js';
@@ -628,11 +629,53 @@ async function applicationsSection(host, reload) {
   await paint();
 }
 
+// -- the documentation -----------------------------------------------------------
+
+// Where somebody reads about the API. The guide is a page of the public site,
+// the reference is the machine-readable document the server serves, and the
+// SDK is the client that saves writing the requests by hand.
+function documentationSection(host) {
+  clear(host);
+
+  function linkRow(title, note, href, external) {
+    return el('a', {
+      class: 'm-row', href,
+      target: external ? '_blank' : null,
+      rel: external ? 'noopener noreferrer' : null,
+    },
+    el('span', { class: 'm-row__lead' }, icon('book', { size: 17 })),
+    el('span', { class: 'm-row__body' },
+      el('span', { class: 'm-row__title truncate' }, title),
+      el('span', { class: 'm-row__sub truncate' }, note)),
+    el('span', { class: 'm-row__side' },
+      el('span', { class: 'm-chip' }, external ? 'External' : 'This site')));
+  }
+
+  const list = el('div', { class: 'm-list' },
+    linkRow('The developer guide', 'Make an application, post a message, hold the gateway open.',
+      publicPath('/developers'), false),
+    linkRow('The API reference', 'Every route and every scope, as a document.',
+      publicPath('/api/v1/openapi.json'), false),
+    linkRow('The SDK: trycord-botjs', 'The client library, with its types and examples.',
+      'https://github.com/trycord/.trycord/tree/main/sdk/trycord-botjs', true),
+    linkRow('Running your own instance', 'Install it, put it behind a proxy, back it up.',
+      publicPath('/docs'), false));
+
+  host.appendChild(notice({
+    tone: 'info',
+    title: 'Read before you build',
+    text: 'The guide walks through making an application, keeping its token and posting a first '
+      + 'message. The reference lists every route this instance serves.',
+  }));
+  host.appendChild(section('The documentation', list));
+}
+
 // -- the screen -------------------------------------------------------------------
 
 const SECTIONS = [
   { id: 'keys', label: 'API keys' },
   { id: 'applications', label: 'Applications' },
+  { id: 'documentation', label: 'Documentation' },
 ];
 
 export function renderDeveloper(ctx) {
@@ -661,7 +704,8 @@ export function renderDeveloper(ctx) {
     current = id;
     paintStrip();
     if (id === 'keys') await keysSection(host, () => show('keys'));
-    else await applicationsSection(host, () => show('applications'));
+    else if (id === 'applications') await applicationsSection(host, () => show('applications'));
+    else documentationSection(host);
   }
 
   const node = screen(

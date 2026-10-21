@@ -23,6 +23,14 @@ import { ALL_EVENTS, type EventName, type GatewayEnvelope } from './events.js';
 import type { REST } from './rest.js';
 import { sleep } from './rest.js';
 
+const SUBSCRIPTION_TIMEOUT_MS = 10_000;
+
+interface SubscriptionWaiter {
+  resolve: (events: string[]) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 /** The answer to a ticket request. */
 export interface Ticket {
   ticket: string;
@@ -82,6 +90,8 @@ export class Gateway {
   private handler: ((event: GatewayEnvelope) => void) | null = null;
   private errorHandler: ((error: Error) => void) | null = null;
   private stateHandler: ((state: GatewayState) => void) | null = null;
+  private acceptedSubscriptions: EventName[] | null = null;
+  private pendingSubscriptions: SubscriptionWaiter[] = [];
 
   constructor(rest: REST, options: GatewayOptions) {
     this.rest = rest;
@@ -96,6 +106,7 @@ export class Gateway {
 
   /** The events this connection has asked for. */
   get subscriptions(): EventName[] {
+    if (this.acceptedSubscriptions) return [...this.acceptedSubscriptions];
     return this.options.events ? [...this.options.events] : [...ALL_EVENTS];
   }
 
@@ -120,7 +131,7 @@ export class Gateway {
   /**
    * Open the socket.
    *
-   * It resolves when the socket is open and the subscription has been sent.
+   * It resolves when the server confirms the event subscription.
    */
   async connect(): Promise<void> {
     this.stopped = false;
@@ -131,6 +142,7 @@ export class Gateway {
   close(): void {
     this.stopped = true;
     this.clearHeartbeat();
+    this.failPendingSubscriptions(new ConnectionError('The gateway closed before confirming its subscription.'));
     if (this.socket) {
       try {
         this.socket.close(1000, 'the application closed the gateway');
@@ -142,12 +154,28 @@ export class Gateway {
     this.setState('closed');
   }
 
-  /** Say which events to hear. The answer from the server is the truth. */
+  /** Say which events to hear and return the list the server accepted. */
   async subscribe(events?: EventName[]): Promise<string[]> {
     if (!this.socket) throw new UsageError('The gateway is not open.');
-    const wanted = events && events.length ? events : this.subscriptions;
-    this.socket.send(JSON.stringify({ op: 'subscribe', events: wanted }));
-    return wanted;
+    const wanted = [...new Set(events === undefined ? this.subscriptions : events)];
+    return new Promise<string[]>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const at = this.pendingSubscriptions.indexOf(waiter);
+        if (at !== -1) this.pendingSubscriptions.splice(at, 1);
+        reject(new ConnectionError('The gateway did not confirm its event subscription.'));
+      }, SUBSCRIPTION_TIMEOUT_MS);
+      if (typeof timer.unref === 'function') timer.unref();
+      const waiter = { resolve, reject, timer };
+      this.pendingSubscriptions.push(waiter);
+      try {
+        this.socket!.send(JSON.stringify({ op: 'subscribe', events: wanted }));
+      } catch (error) {
+        const at = this.pendingSubscriptions.indexOf(waiter);
+        if (at !== -1) this.pendingSubscriptions.splice(at, 1);
+        clearTimeout(timer);
+        reject(new ConnectionError('The gateway could not send its event subscription.', error));
+      }
+    });
   }
 
   private async open(): Promise<void> {
@@ -180,13 +208,13 @@ export class Gateway {
     });
 
     this.attempts = 0;
-    this.setState('open');
 
     socket.onmessage = (event) => this.onMessage(event);
     socket.onclose = () => this.onClose();
     socket.onerror = () => { /* the close handler deals with it */ };
 
     await this.subscribe();
+    this.setState('open');
     this.startHeartbeat();
   }
 
@@ -221,7 +249,11 @@ export class Gateway {
     }
     this.debug(`a frame: ${frame && frame.event ? frame.event : (frame && frame.op) || 'unknown'}`);
     // The subscription answer and the heartbeat answer are not events.
-    if (frame && (frame.op === 'subscribed' || frame.op === 'pong' || frame.op === 'ping')) return;
+    if (frame && frame.op === 'subscribed') {
+      this.receiveSubscription(frame);
+      return;
+    }
+    if (frame && (frame.op === 'pong' || frame.op === 'ping')) return;
     if (frame && typeof frame.event === 'string' && this.handler) {
       try {
         this.handler(frame);
@@ -235,6 +267,7 @@ export class Gateway {
 
   private onClose(): void {
     this.clearHeartbeat();
+    this.failPendingSubscriptions(new ConnectionError('The gateway closed before confirming its event subscription.'));
     if (this.stopped) {
       this.setState('closed');
       return;
@@ -252,6 +285,24 @@ export class Gateway {
       if (this.stopped) return;
       this.open().catch((error) => this.report(error));
     }, pause);
+  }
+
+  private receiveSubscription(frame: GatewayEnvelope): void {
+    const accepted = Array.isArray(frame.events)
+      ? frame.events.filter((event): event is EventName => ALL_EVENTS.includes(event as EventName))
+      : [];
+    this.acceptedSubscriptions = accepted;
+    const waiter = this.pendingSubscriptions.shift();
+    if (!waiter) return;
+    clearTimeout(waiter.timer);
+    waiter.resolve([...accepted]);
+  }
+
+  private failPendingSubscriptions(error: Error): void {
+    for (const waiter of this.pendingSubscriptions.splice(0)) {
+      clearTimeout(waiter.timer);
+      waiter.reject(error);
+    }
   }
 
   private startHeartbeat(): void {

@@ -132,12 +132,12 @@ async function list(serverId, { limit = null, offset = 0, search = '' } = {}) {
   };
 }
 
-async function joinInner(serverId, userId, username, conn) {
+async function joinInner(serverId, userId, username, conn, { restore = false } = {}) {
   const srv = await conn.get('SELECT id, enforcement_state FROM servers WHERE id = ?', [serverId]);
   if (!srv) throw { code: 'SERVER_NOT_FOUND', message: 'Server not found' };
   // Trust & Safety: suspended servers are closed to new members. Existing
   // members are handled by the access chain (resolveServer).
-  if (srv.enforcement_state === 'suspended') {
+  if (srv.enforcement_state === 'suspended' && !restore) {
     throw { code: 'SERVER_SUSPENDED', message: 'Server is suspended' };
   }
   if (await get(serverId, userId, conn)) throw { code: 'ALREADY_MEMBER', message: 'Already a member' };
@@ -168,9 +168,14 @@ function invalidateMembership(serverId) {
 
 async function join(serverId, user) {
   const out = await db.transaction((t) => joinInner(serverId, user.id, user.username, t));
+  afterJoin(serverId);
+  return out;
+}
+
+// Run after a membership transaction commits.
+function afterJoin(serverId) {
   invalidateMembership(serverId);
   announceKeyChange(serverId, 'joined');
-  return out;
 }
 
 // A membership change means the conversation's key has to move.
@@ -198,6 +203,12 @@ async function joinByCode(code, user) {
 // Exposed for invite consumption inside the invite transaction.
 async function joinIn(serverId, user, conn) {
   return joinInner(serverId, user.id, user.username, conn);
+}
+
+// Restore a membership that belonged to an application already installed
+// before bot accounts existed. It is not a route for new community joins.
+async function restoreIn(serverId, user, conn) {
+  return joinInner(serverId, user.id, user.username, conn, { restore: true });
 }
 
 // Set or clear a member's per-community nickname. The route gates who may
@@ -385,6 +396,6 @@ async function isTimedOut(serverId, userId, conn = db) {
 }
 
 module.exports = {
-  get, list, join, joinByCode, joinIn, leave, kick, setNickname,
+  get, list, join, joinByCode, joinIn, restoreIn, afterJoin, leave, kick, setNickname,
   ban, unban, listBans, timeout, isTimedOut,
 };

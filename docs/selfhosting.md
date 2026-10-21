@@ -356,19 +356,11 @@ Both are read from the environment and never returned by any route. The App
 Secret stays on the server; a browser never sees it. They are configured in
 the voice console, not here - the console is where a provider is chosen.
 
-### A third-party relay
+### A third-party SFU
 
-An instance that would rather not run its own relay can name one. The
-credential it hands out is still minted per session by the backend, so a
-client that walks away with one does not carry standing TURN access, and it
-never appears in the capability response.
-
-```
-VOICE_VIDEO_STUN_URLS=stun:stun.example.com:3478
-VOICE_VIDEO_TURN_URL=turn:turn.example.com:3478
-VOICE_VIDEO_TURN_USERNAME=...
-VOICE_VIDEO_TURN_CREDENTIAL=...
-```
+The third-party SFU is optional. It must implement the session API in
+[`docs/voice.md`](voice.md); set its endpoint and bearer token in the voice
+console. Mesh does not use these settings.
 
 ### What a call carries
 
@@ -801,58 +793,47 @@ secret is the run's own.
 
 ## Voice and media
 
-### One supported provider
+### Mesh: built in
 
-Trycord's voice path is its own. `VOICE_VIDEO_PROVIDER=mesh` is a peer-to-peer
-WebRTC mesh: the server carries the signalling, the ICE candidates and the
-room state, and the media flows between the clients. Nothing about a call
-leaves the host, and no account with anybody else is needed.
+Mesh is the default provider. The instance runs its own STUN/TURN service in
+the `trycord-voice` process, issues short-lived TURN credentials to authorized
+sessions, and sends the ICE configuration to the joining client. Admins do not
+enter STUN/TURN URLs or relay credentials.
 
-It suits small rooms. Media is relayed between every participant, so a room of
-n people carries n×(n-1) streams; in practice that is a handful of people per
-channel. A stage with many listeners and a few speakers does not work this
-way, and this build says so rather than pretending otherwise.
+Mesh is peer-to-peer: signalling goes through Trycord, while media travels
+between participants or through the instance's TURN relay. Network traffic
+grows with the square of the room size; the default cap is six people. Use an
+SFU for larger rooms.
 
-This build used to offer a hosted SFU as a second choice. It no longer does: a
-self-hosted instance should not have to send its voice to somebody else's
-server. A deployment that is already configured for it keeps booting, with a
-warning at startup, and the setting in the admin configuration only offers the
-mesh.
-
-Voice needs a self-hosted STUN endpoint, and (for restrictive-network clients)
-a self-hosted TURN endpoint. There is NO default third-party Google STUN
-fallback; `VOICE_VIDEO_STUN_URLS` defaults to `[]` and voice will refuse to
-enable until it is set.
-
-### Self-hosted STUN/TURN (Coturn)
-
-```bash
-apt install coturn
-
-# /etc/turnserver.conf
-listening-port=3478
-tls-listening-port=5349
-lt-cred-mech
-user=trycord:STRONG_PASSWORD
-realm=trycord.yourdomain
-fingerprint
-no-multicast-peers
-no-cli
-max-allocate-lifetime=3600
-channel-lifetime=60
-cert=/etc/letsencrypt/live/yourdomain/fullchain.pem
-pkey=/etc/letsencrypt/live/yourdomain/privkey.pem
-
-# Run:
-turnserver -c /etc/turnserver.conf
-```
+The deployment does need a reachable voice address and open relay ports:
 
 ```env
-VOICE_VIDEO_STUN_URLS=stun:your-stun-host:3478
-VOICE_VIDEO_TURN_URL=turn:your-stun-host:3478
-VOICE_VIDEO_TURN_USERNAME=trycord
-VOICE_VIDEO_TURN_CREDENTIAL=STRONG_PASSWORD
+TRYCORD_TURN_HOST=::
+TRYCORD_TURN_PORT=3478
+TRYCORD_TURN_SECRET=<a long, private secret>
+TRYCORD_VOICE_PUBLIC_URL=voice.example.org
 ```
+
+`TRYCORD_VOICE_PUBLIC_URL` must resolve directly to this host, not through an
+HTTP proxy. Open UDP 3478 and the relay range (3479–3578 by default) in the
+host firewall and any upstream firewall or NAT. The TURN secret stays on the
+server; browsers receive short-lived credentials, never the secret.
+
+The service can generate a temporary secret if `TRYCORD_TURN_SECRET` is not
+set, but those credentials stop working when it restarts. Set a stable secret
+for production. If the host is behind NAT, forward the relay ports and publish
+the address clients can actually reach. An IPv4 address behind carrier-grade
+NAT is not reachable without a provider-side mapping.
+
+The admin's **Test connection** checks the published STUN/TURN addresses with a
+binding request. It proves that the addresses answered that probe; it does not
+replace a two-browser audio test or prove every NAT can allocate a TURN relay.
+
+### Other providers
+
+Cloudflare Realtime and a third-party SFU are optional alternatives. They send
+media through a media server and need their own credentials. Configure them in
+the voice console; their secrets never go to a browser.
 
 ### Connection quality and network requirements
 
@@ -862,27 +843,13 @@ VOICE_VIDEO_TURN_CREDENTIAL=STRONG_PASSWORD
   use relay (TURN) mode.
 - **Bandwidth**: ~64 kbps up/down per audio stream; video demands 1-3 Mbps per
   stream.
-- **CPU**: media encryption is handled by WebRTC in the browser for mesh; for
-  the SFU path, Cloudflare owns the SFU CPU cost.
+- **CPU**: media encryption is handled by WebRTC in the browser for mesh; an
+  SFU carries media on the provider or server.
 - **Relay bandwidth**: TURN-relayed streams consume 2× bandwidth at the host.
 
-Verify before enabling voice in production:
-```sh
-grep -rn "google.com\|stun.l" backend/ frontend/ public/ docs/
-```
-Must return no hits except legitimate upstream documentation. Then confirm a
-two-browser peer actually establishes media by recording a startup log: the
-server emits `[voice.mesh] ... joined channel ...` for each participant.
-
-### No mandatory external dependencies
-
-- `VOICE_VIDEO_STUN_URLS` default: `[]` — must be set explicitly.
-- `VOICE_VIDEO_TURN_URL` default: '' — no relay fallback unless configured.
-- `VOICE_VIDEO_PROVIDER` default: `mesh` — the in-house path. No account with
-  anybody else is needed for a call to work.
-- Signaling via Trycord's WebSocket gateway (first-party, server-owned).
-- All media routes (signaling, join, leave, state, credentials) defined in
-  `backend/src/routes/voice.js` — none delegate to a third-party control plane.
+The in-house mesh does not require an external provider account. Cloudflare
+Realtime and a third-party SFU do. Signalling and membership remain on the
+Trycord instance for every provider.
 
 License
 -------

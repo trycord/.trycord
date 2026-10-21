@@ -46,6 +46,16 @@ const SCOPES = [
     description: 'List the members of a community.',
   },
   {
+    name: 'channels:read',
+    group: 'communities',
+    description: 'Read channel names, topics and types in a community.',
+  },
+  {
+    name: 'roles:read',
+    group: 'communities',
+    description: 'Read role names, colors and permissions in a community.',
+  },
+  {
     name: 'bots:read',
     group: 'applications',
     description: 'List the bot applications of a community, read one, and read its health.',

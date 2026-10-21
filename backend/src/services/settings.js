@@ -46,21 +46,28 @@ const CANONICAL_INTERFACES = {
   'admin.voice': { id: 'admin.voice', label: 'Voice and video', route: '/admin/voice' },
 };
 
-// The settings the voice console owns. Every one of them, because the voice
-// console is where a person goes to make sense of the voice settings: the
-// provider, the credentials, the participants, the relay.
+// The voice console owns provider settings. Retired Mesh ICE keys stay owned
+// so the general settings route cannot turn them back into live controls.
 const VOICE_OWNED = [
   'voice.enabled', 'voice.provider', 'voice.screenSharing', 'voice.stageChannels',
   'voice.maxParticipants', 'voice.stunUrls', 'voice.turnUrl', 'voice.turnUsername',
-  'voice.turnCredential', 'voice.sfuAppId', 'voice.sfuAppSecret',
-  'voice.mesh.maxParticipants', 'voice.mesh.stunUrls', 'voice.mesh.turnUrl',
-  'voice.mesh.turnUsername', 'voice.mesh.turnCredential',
+  'voice.turnCredential', 'voice.sfuAppId', 'voice.sfuAppSecret', 'voice.publicUrl',
+  'voice.mesh.maxParticipants', 'voice.mesh.publicUrl', 'voice.mesh.stunUrls',
+  'voice.mesh.turnUrl', 'voice.mesh.turnUsername', 'voice.mesh.turnCredential',
   'voice.cloudflare.appId', 'voice.cloudflare.appSecret', 'voice.cloudflare.endpoint',
   'voice.cloudflare.maxParticipants',
   'voice.sfu.endpoint', 'voice.sfu.stunUrls', 'voice.sfu.turnUrl',
   'voice.sfu.turnUsername', 'voice.sfu.turnCredential', 'voice.sfu.maxParticipants',
   'voice.sfu.token',
 ];
+
+// Mesh no longer accepts manually supplied ICE servers. Old values stay in
+// storage for reference, but neither console nor runtime uses them.
+const RETIRED_MESH_SETTINGS = new Set([
+  'voice.mesh.stunUrls', 'voice.mesh.turnUrl', 'voice.mesh.turnUsername',
+  'voice.mesh.turnCredential', 'voice.stunUrls', 'voice.turnUrl',
+  'voice.turnUsername', 'voice.turnCredential',
+]);
 
 // The interface that owns a setting, or null when the general Configuration
 // page is where it is changed.
@@ -269,21 +276,27 @@ const SCHEMA = [
     min: 1, max: 200, live: true,
   },
   {
-    key: 'voice.mesh.stunUrls', env: 'VOICE_VIDEO_MESH_STUN_URLS', type: 'list', default: [],
-    category: 'voice-media', label: 'STUN servers for the mesh',
-    description: 'Comma-separated. Leave empty to use the STUN server this instance runs itself.',
+    key: 'voice.mesh.publicUrl', env: 'TRYCORD_VOICE_PUBLIC_URL', type: 'string', default: '',
+    category: 'voice-media', label: 'The address the relay is published at',
+    description: 'The address clients are given for the relay. It has to point straight at this instance - DNS only, not through a proxy that terminates TLS - and the relay ports have to be open to the internet.',
     live: true,
   },
   {
-    key: 'voice.mesh.turnUrl', env: 'VOICE_VIDEO_MESH_TURN_URL', type: 'string', default: '',
-    category: 'voice-media', label: 'TURN server for the mesh',
-    description: 'Relays media for a peer that cannot be reached directly. Leave empty to use the relay this instance runs itself.',
+    key: 'voice.mesh.stunUrls', env: null, type: 'list', default: [],
+    category: 'voice-media', label: 'Retired Mesh STUN setting',
+    description: 'Kept for upgrades; Mesh now always uses the STUN service this instance runs.',
     live: true,
   },
   {
-    key: 'voice.mesh.turnUsername', env: 'VOICE_VIDEO_MESH_TURN_USERNAME', type: 'string', default: '',
-    category: 'voice-media', label: 'TURN username for the mesh',
-    description: 'For a static TURN credential. Leave blank to use the short-lived credential this instance mints.',
+    key: 'voice.mesh.turnUrl', env: null, type: 'string', default: '',
+    category: 'voice-media', label: 'Retired Mesh TURN setting',
+    description: 'Kept for upgrades; Mesh now always uses this instance’s relay.',
+    live: true,
+  },
+  {
+    key: 'voice.mesh.turnUsername', env: null, type: 'string', default: '',
+    category: 'voice-media', label: 'Retired Mesh TURN username',
+    description: 'Kept for upgrades; Mesh credentials are minted for each session.',
     live: true,
   },
   {
@@ -337,11 +350,8 @@ const SCHEMA = [
 
   // ---- the settings the grouped ones replace.
   //
-  // These are the keys the previous release used. They still work: a value
-  // saved here is the value the matching new key takes, until the operator
-  // saves that provider's configuration and the new key takes over. They are
-  // not published in the catalogue, because the console edits the new keys and
-  // an operator should not be shown two fields for one value.
+  // These are keys from earlier releases. The Cloudflare id still migrates to
+  // its provider setting; old manual Mesh ICE values are retained but ignored.
   {
     key: 'voice.maxParticipants', env: 'VOICE_VIDEO_MAX_PARTICIPANTS', type: 'integer', default: 25,
     category: 'voice-legacy', label: 'Participants per channel (superseded)',
@@ -349,9 +359,15 @@ const SCHEMA = [
     min: 1, max: 200, live: true,
   },
   {
-    key: 'voice.stunUrls', env: 'VOICE_VIDEO_STUN_URLS', type: 'list', default: [],
-    category: 'voice-legacy', label: 'STUN servers (superseded)',
-    description: 'Replaced by the mesh\'s own STUN servers, because the mesh was the only path that could run.',
+    key: 'voice.publicUrl', env: null, type: 'string', default: '',
+    category: 'voice-legacy', label: 'The address the relay is published at (superseded)',
+    description: 'Replaced by the mesh\'s own published address.',
+    live: true,
+  },
+  {
+    key: 'voice.stunUrls', env: null, type: 'list', default: [],
+    category: 'voice-legacy', label: 'Retired STUN server list',
+    description: 'Kept for upgrades. Mesh ignores this value and uses its built-in STUN service.',
     live: true,
   },
   {
@@ -361,15 +377,15 @@ const SCHEMA = [
     live: true,
   },
   {
-    key: 'voice.turnUrl', env: 'VOICE_VIDEO_TURN_URL', type: 'string', default: '',
-    category: 'voice-legacy', label: 'TURN server URL (superseded)',
-    description: 'Replaced by the mesh\'s own TURN server.',
+    key: 'voice.turnUrl', env: null, type: 'string', default: '',
+    category: 'voice-legacy', label: 'Retired TURN server URL',
+    description: 'Kept for upgrades. Mesh ignores this value and uses its built-in relay.',
     live: true,
   },
   {
-    key: 'voice.turnUsername', env: 'VOICE_VIDEO_TURN_USERNAME', type: 'string', default: '',
-    category: 'voice-legacy', label: 'TURN username (superseded)',
-    description: 'Replaced by the mesh\'s own TURN username.',
+    key: 'voice.turnUsername', env: null, type: 'string', default: '',
+    category: 'voice-legacy', label: 'Retired TURN username',
+    description: 'Kept for upgrades. Mesh credentials are minted for each session.',
     live: true,
   },
   {
@@ -740,16 +756,16 @@ const SECRET_META = {
     description: 'Replaced by the Cloudflare application secret. Stored encrypted and never shown again.',
   },
   'voice.turnCredential': {
-    env: 'VOICE_VIDEO_TURN_CREDENTIAL',
-    label: 'TURN credential (superseded)',
+    env: null,
+    label: 'Retired TURN credential',
     category: 'voice-legacy',
-    description: 'Replaced by the mesh\'s own TURN credential. Stored encrypted and never shown again.',
+    description: 'Kept for upgrades; Mesh now mints short-lived credentials for its own relay.',
   },
   'voice.mesh.turnCredential': {
-    env: 'VOICE_VIDEO_MESH_TURN_CREDENTIAL',
-    label: 'TURN credential for the mesh',
+    env: null,
+    label: 'Retired Mesh TURN credential',
     category: 'voice-media',
-    description: 'The password half of a static TURN credential. Leave blank to use the short-lived credential this instance mints. Stored encrypted and never shown again.',
+    description: 'Kept for upgrades; Mesh now mints short-lived credentials for its own relay.',
   },
   'voice.cloudflare.appSecret': {
     env: 'VOICE_VIDEO_CLOUDFLARE_APP_SECRET',
@@ -1079,6 +1095,10 @@ async function save(entries, adminId, options) {
   for (const [key, raw] of Object.entries(entries)) {
     const entry = BY_KEY.get(key);
     if (!entry) { problems.push(key + ': unknown setting'); continue; }
+    if (RETIRED_MESH_SETTINGS.has(key)) {
+      problems.push(key + ': Mesh uses the relay this instance runs; manual ICE settings are no longer accepted');
+      continue;
+    }
 
     // A setting another interface owns is not written from here.
     //
@@ -1429,7 +1449,8 @@ function catalogue(secretState) {
   return CATEGORIES.map((cat) => ({
     id: cat.id,
     label: cat.label,
-    settings: SCHEMA.filter((s) => s.category === cat.id).map((s) => describeSetting(s, state)),
+    settings: SCHEMA.filter((s) => s.category === cat.id && !RETIRED_MESH_SETTINGS.has(s.key))
+      .map((s) => describeSetting(s, state)),
   })).filter((c) => c.settings.length);
 }
 
@@ -1444,7 +1465,7 @@ function catalogue(secretState) {
 function ownedSettings(owner, secretState) {
   const state = secretState || secretValues;
   return SCHEMA
-    .filter((s) => canonicalInterface(s.key) === owner)
+    .filter((s) => canonicalInterface(s.key) === owner && !RETIRED_MESH_SETTINGS.has(s.key))
     .map((s) => describeSetting(s, state));
 }
 
@@ -1499,6 +1520,7 @@ function read(key, fallback) {
 
 module.exports = {
   canonicalInterface,
+  RETIRED_MESH_SETTINGS,
   CANONICAL_INTERFACES,
   VOICE_OWNED,
   SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY, ownedSettings,

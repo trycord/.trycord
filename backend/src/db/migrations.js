@@ -267,6 +267,30 @@ const MIGRATIONS = [
       }
     },
   },
+  {
+    version: 7,
+    name: '5.5.1 separate bot accounts',
+    // Older applications posted as their creator. Give each one a bot
+    // identity without rewriting existing message authors.
+    transactional: true,
+    async up(conn) {
+      const bots = require('../services/bots');
+      const applications = await conn.all('SELECT * FROM bot_applications ORDER BY created_at, id');
+      for (const application of applications) {
+        await bots.ensureBotAccountIn(application, conn);
+      }
+    },
+    async verify(conn) {
+      const missing = await conn.get(
+        'SELECT COUNT(*) AS total FROM bot_applications a'
+          + ' LEFT JOIN users u ON u.id = a.bot_user_id'
+          + ' WHERE a.bot_user_id IS NULL OR a.bot_user_id = a.owner_user_id OR COALESCE(u.is_bot, 0) <> 1'
+      );
+      if (Number(missing && missing.total) > 0) {
+        throw new Error('some applications still lack a separate bot account');
+      }
+    },
+  },
 ];
 
 // The version this build knows about.

@@ -44,9 +44,15 @@ window to report over (60 by default, 1440 at most).
 | Route | Scopes | What it does |
 | --- | --- | --- |
 | `GET /communities/:serverId` | `communities:read` | the community: its name, its owner, how many members it has |
-| `GET /communities/:serverId/members` | `members:read` | the members of the community |
+| `GET /communities/:serverId/members` | `members:read` | a page of members, including avatar and bot identity |
+| `GET /communities/:serverId/channels/:channelId` | `channels:read` | a channel's details |
+| `GET /communities/:serverId/roles` | `roles:read` | role names, colors and permissions |
 
-`:serverId` is a community id or its slug. `GET .../members` takes `limit`.
+`:serverId` is a community id or its slug. `GET .../members` takes `limit`
+(50 by default, 200 at most) and `offset` (0 by default). Its response includes
+`total`, `limit`, `offset` and `hasMore`. Application tokens can use these
+reads only when they hold the matching scope and their bot account is still a
+member of the community.
 
 ## Applications
 
@@ -63,8 +69,9 @@ window to report over (60 by default, 1440 at most).
 `POST .../applications` takes `name`, `description`, `iconUrl`, `scopes` and
 `rateLimitPerMinute`. The answer carries `token`, which is shown once.
 
-An application needs the `MANAGE_SERVER` permission in the community, and so
-does every other route in this section: these are community resources.
+Managing applications requires `MANAGE_SERVER`. A bot may read its own health
+and command list with the matching scope, but cannot inspect another
+application. Other reads require community membership and their listed scope.
 
 ## Commands
 
@@ -82,15 +89,19 @@ with the bound arguments, and nothing else is evaluated.
 
 | Route | Scopes | What it does |
 | --- | --- | --- |
-| `GET /communities/:serverId/channels/:channelId/messages` | `messages:read` | the most recent messages of a channel |
-| `POST /communities/:serverId/channels/:channelId/messages` | `communities:write` + `messages:write` | posts a message in the application's name |
+| `GET /communities/:serverId/channels/:channelId/messages` | `messages:read` | a page of recent messages |
+| `POST /communities/:serverId/channels/:channelId/messages` | `messages:write` | posts a message in the application's name |
 
-`GET .../messages` takes `limit` (20 by default, 100 at most).
+`GET .../messages` takes `limit` (20 by default, 100 at most) and optional
+`before`, the sequence of the oldest message already seen. The response gives
+`hasMore` and `nextBefore`; pass that cursor as `before` to read the next older
+page.
 `POST .../messages` takes `content` and answers 201 with the message.
 
 Posting through this route requires an **application credential**: it posts as
 the application, and a person posting as themselves has the ordinary message
-API for that. The application may only post where its owner could post.
+API for that. Channel membership and send permission are checked against the
+bot's own account.
 
 ## Webhooks and subscriptions
 
@@ -130,8 +141,8 @@ with a named object, so a client never has to guess:
 { "subscriptions": [ ... ] }
 { "subscription": { ... } }
 { "deliveries": [ ... ] }
-{ "messages": [ ... ] }
-{ "members": [ ... ] }
+{ "messages": [ ... ], "hasMore": true, "nextBefore": 41 }
+{ "members": [ ... ], "total": 120, "limit": 50, "offset": 0, "hasMore": true }
 { "community": { ... } }
 ```
 

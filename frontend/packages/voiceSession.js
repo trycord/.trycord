@@ -16,6 +16,24 @@ import { on as onRealtime } from './realtime.js';
 
 const POLL_MS = 4000;
 
+/**
+ * The states a seat can be in, and what each of them is called.
+ *
+ * One list, so the dock on the desk and the sheet on the phone cannot
+ * disagree about what the call is doing. A state with no word is a state
+ * the reader cannot read.
+ */
+export const CONNECTION_STATES = {
+  idle: 'Not in a room',
+  joining: 'Joining the room',
+  connecting: 'Connecting',
+  connected: 'Connected',
+  alone: 'You are the only one here',
+  reconnecting: 'Reconnecting',
+  failed: 'The connection failed',
+  leaving: 'Leaving',
+};
+
 const state = {
   // The joined channel, or null while idle.
   channel: null,
@@ -487,7 +505,7 @@ function buildPeer(userId) {
     if (s === 'connected') row.connection = 'live';
     else if (s === 'connecting' || s === 'new') row.connection = 'connecting';
     else if (s === 'disconnected') row.connection = 'reconnecting';
-    else if (s === 'failed') destroyPeer(userId);
+    else if (s === 'failed') failPeer(userId);
     emit();
   };
 
@@ -514,6 +532,23 @@ function destroyPeer(userId) {
   try { peer.pc.close(); } catch { /* already closed */ }
   try { peer.audio.remove(); } catch { /* never attached */ }
   dropRow(userId);
+  emit();
+}
+
+// A connection that failed.
+//
+// The peer is closed, but the row stays. It used to be dropped, and a
+// dropped row says nothing: the state could never be "failed", so a call
+// that could not be made sat on "Connecting" for as long as the reader
+// looked at it.
+function failPeer(userId) {
+  const peer = peers.get(String(userId));
+  if (!peer) return;
+  peers.delete(String(userId));
+  try { peer.pc.close(); } catch { /* already closed */ }
+  try { peer.audio.remove(); } catch { /* never attached */ }
+  const row = state.participants.find((p) => String(p.userId) === String(userId));
+  if (row) row.connection = 'failed';
   emit();
 }
 
@@ -580,7 +615,10 @@ function onStatus(status) {
 function connectionState() {
   if (!state.joined) return state.connection === 'leaving' ? 'leaving' : 'idle';
   const rows = (state.participants || []).filter((row) => String(row.userId) !== myId());
-  if (!rows.length) return 'connecting';
+  // Nobody else is in the room, so there is no connection being made. The
+  // room said "Connecting" for as long as the reader looked at it, which
+  // reads as a fault rather than as an empty room.
+  if (!rows.length) return 'alone';
   if (rows.some((row) => row.connection === 'failed')) return 'failed';
   if (rows.some((row) => row.connection === 'live')) return 'connected';
   if (rows.some((row) => row.connection === 'reconnecting')) return 'reconnecting';

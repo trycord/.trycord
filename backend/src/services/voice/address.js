@@ -40,7 +40,10 @@ function publicHost(family) {
   // No family asked for means the primary address, whatever its family is.
   const wanted = family === 4 || family === 6 ? family : 0;
   const voiceUrl = String(
-    process.env.TRYCORD_VOICE_PUBLIC_URL || readSetting('voice.publicUrl', '') || '',
+    process.env.TRYCORD_VOICE_PUBLIC_URL
+    || readSetting('voice.mesh.publicUrl', '')
+    || readSetting('voice.publicUrl', '')
+    || '',
   ).trim();
   const voiceHost = voiceUrl ? hostOf(voiceUrl) : '';
   if (voiceHost) {
@@ -120,12 +123,20 @@ function hostOf(value) {
 // The settings are read inside the function and not at the top, because the
 // settings service and the voice configuration require each other in places
 // and a cycle at load time is a failure to start.
+//
+// The path is the settings service in the parent directory. It used to ask for
+// './settings', which is this directory, where there is no such file - and
+// the catch swallowed the error, so the saved address was never read and the
+// relay was published at an address nobody had chosen. A wrong path that fails
+// quietly is worse than no path at all: the setting was in the console, it
+// saved, and it did nothing.
 function readSetting(key, fallback) {
   try {
-    const settings = require('./settings');
+    const settings = require('../settings');
     const value = settings.read(key, fallback);
     return value === undefined || value === null ? fallback : value;
-  } catch {
+  } catch (e) {
+    console.warn('[voice] the saved address could not be read: ' + (e && e.message ? e.message : e));
     return fallback;
   }
 }

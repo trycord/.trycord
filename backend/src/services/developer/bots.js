@@ -53,18 +53,23 @@ async function credentialOf(applicationId) {
  */
 async function create({ serverId, ownerUserId, name, description, iconUrl, scopes, rateLimitPerMinute }) {
   const granted = normaliseScopes(scopes);
-  const app = await bots.createApp({ serverId, ownerUserId, name, description, iconUrl });
-  const created = await apiKeys.create({
-    ownerUserId,
-    name: app.name,
-    scopes: granted,
-    kind: 'bot',
-    botApplicationId: app.id,
-    communityId: serverId,
-    rateLimitPerMinute,
-    withoutSecret: true,
+  const created = await db.transaction(async (t) => {
+    const app = await bots.createApp({ serverId, ownerUserId, name, description, iconUrl }, t);
+    const credential = await apiKeys.create({
+      ownerUserId,
+      name: app.name,
+      scopes: granted,
+      kind: 'bot',
+      botApplicationId: app.id,
+      communityId: serverId,
+      rateLimitPerMinute,
+      withoutSecret: true,
+      conn: t,
+    });
+    return { app, credential };
   });
-  return { application: app, token: app.token, credential: created.key };
+  require('../memberships').afterJoin(serverId);
+  return { application: created.app, token: created.app.token, credential: created.credential.key };
 }
 
 /**

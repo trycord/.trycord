@@ -121,7 +121,8 @@ test('the application gateway', async (t) => {
     t.after(() => gateway.unregister(connection));
 
     // It asked for one event.
-    gateway.subscribe(connection, ['message.created']);
+    const accepted = gateway.subscribe(connection, ['message.created', 'not.a.real.event', 'message.created']);
+    assert.deepEqual(accepted, ['message.created'], 'the acknowledgement lists only unique supported events');
 
     const envelope = await events.dispatch({
       communityId: serverId,
