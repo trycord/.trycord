@@ -12,7 +12,8 @@
 // A minor update is a tenth rather than a hundredth because a release that
 // adds a feature is a tenth of a release, and a release that fixes a thing
 // is a hundredth of one. The minor number therefore runs 0 to 9 and then
-// carries into the next tenth, so 3.0.9 is the last tenth before 3.0.10.
+// carries into the next one, so 3.9.9 is the last tenth before 4.0.0 - and
+// that is why a tenth of a release after 5.9.x is 6.0.0 and not 5.10.0.
 //
 // The version is written in the package manifest and read from there by
 // everything that reports it, so there is one place to change.
@@ -88,6 +89,18 @@ function writeVersion(version) {
       parsed.packages[''].version = version;
     }
     fs.writeFileSync(lock, JSON.stringify(parsed, null, 2) + '\n');
+  }
+
+  // The desktop application is released with this one, and its manifest
+  // carries the version of the release it belongs to. It was left at the
+  // version of the last release that touched it, so a tag and the
+  // application built from it could say two different things.
+  const desktop = path.join(ROOT, 'trycord-desktop', 'package.json');
+  if (fs.existsSync(desktop)) {
+    const text = fs.readFileSync(desktop, 'utf8');
+    const parsed = JSON.parse(text);
+    parsed.version = version;
+    fs.writeFileSync(desktop, JSON.stringify(parsed, null, 2) + '\n');
   }
 }
 
