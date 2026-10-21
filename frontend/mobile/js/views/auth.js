@@ -62,6 +62,14 @@ async function afterSignIn(next) {
   navigate(next || '/home', { replace: true });
 }
 
+// Whether an address could be an instance.
+function looksLikeAnInstance(value) {
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+  return !!url.hostname;
+}
+
 function loginForm() {
   const username = textInput({ name: 'username', autocomplete: 'username' });
   const password = textInput({ name: 'password', type: 'password', autocomplete: 'current-password' });
@@ -69,10 +77,21 @@ function loginForm() {
   const mfaField = field({ label: 'Two-step code', control: code });
   mfaField.hidden = true;
 
+  // Which instance.
+  //
+  // An account on one instance is not an account on another, and a reader
+  // who keeps several of them cannot tell from a sign-in form which one they
+  // are signing in to. So the address is on the form, and it can be typed.
+  const instance = textInput({
+    name: 'instance', type: 'url', value: TrycordConfig.backendUrl(),
+    placeholder: 'https://the-instance.example', autocomplete: 'url',
+  });
+
   const form = el('form', { class: 'm-auth__form' },
     field({ label: 'Username or email', control: username }),
     field({ label: 'Password', control: password }),
     mfaField,
+    field({ label: 'Instance', control: instance }),
     el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Sign in'));
 
   let challenge = null;
@@ -80,6 +99,22 @@ function loginForm() {
     event.preventDefault();
     busy(form, true);
     try {
+      // A different instance is a different account, and the session belongs
+      // to the instance that issued it - so the address is settled before the
+      // sign-in, never after.
+      const wanted = String(instance.value || '').trim();
+      if (wanted && wanted !== TrycordConfig.backendUrl()) {
+        if (!looksLikeAnInstance(wanted)) {
+          showError(form, {
+            message: 'That does not look like an instance address. It is a web address, '
+              + 'like https://trycord.example',
+          });
+          return;
+        }
+        TrycordConfig.setApiUrl(wanted);
+        window.location.reload();
+        return;
+      }
       if (challenge) {
         const out = await Api.twoFactorVerify({ challengeToken: challenge, code: code.value.trim() });
         applyToken(out.token, out.user);
