@@ -15,7 +15,7 @@ import Api from '../../../packages/api.js';
 import { head, card, fold, hold, fault, memo } from '../../ui/page.js';
 import { fieldRow, switchControl, serverMark, bannerNode } from '../../ui/primitives.js';
 import {
-  checkImage, uploadCommunityPicture, removeCommunityPicture,
+  checkImage, prepareImage, uploadCommunityPicture, removeCommunityPicture,
 } from '../../../packages/profileMedia.js';
 import { copyText } from '../../ui/clipboard.js';
 import { refreshServer } from '../../../packages/store.js';
@@ -133,7 +133,10 @@ export function overviewSection(ctx) {
         return;
       }
       try {
-        await uploadCommunityPicture(serverId, kind, file);
+        // A community's picture is its own art, so it is made smaller but
+        // not cut to a shape it was not drawn in.
+        const prepared = await prepareImage(file, { size: 512, shape: 'none' });
+        await uploadCommunityPicture(serverId, kind, prepared || file);
         picturesReport.ok(kind === 'banner'
           ? 'The cover image was uploaded.'
           : 'The picture was uploaded.');

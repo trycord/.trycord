@@ -6,7 +6,7 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { State, loadSession } from '../../packages/store.js';
 import {
-  checkImage, previewOf, uploadProfilePicture, removeProfilePicture,
+  checkImage, previewOf, prepareImage, uploadProfilePicture, removeProfilePicture,
 } from '../../packages/profileMedia.js';
 import { avatar, bannerNode } from '../ui/primitives.js';
 import { head, card, fault, fold } from '../ui/page.js';
@@ -99,7 +99,12 @@ function paint(identity, user, reload) {
     }
     pictureNote.textContent = 'Uploading the picture…';
     try {
-      const updated = await uploadProfilePicture(kind, file);
+      // The picture is drawn small and square first, so what is uploaded is
+      // the picture the reader chose at a size a face can be drawn from.
+      const prepared = await prepareImage(file, kind === 'avatar'
+        ? { size: 512, shape: 'square' }
+        : { size: 1024, shape: 'wide' });
+      const updated = await uploadProfilePicture(kind, prepared || file);
       pictureNote.textContent = kind === 'banner'
         ? 'The cover image is up.'
         : 'The picture is up.';
