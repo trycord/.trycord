@@ -35,7 +35,10 @@ function showError(form, error, action) {
     box = el('div', { class: 'm-form-error', role: 'alert' });
     form.insertBefore(box, form.firstChild);
   }
-  box.replaceChildren(el('span', {}, message), action || null);
+  // The children are filtered rather than passed as they are: the DOM's own
+  // replaceChildren renders a null argument as the text "null", and a sign-in
+  // form that says "null" under the message is a bug somebody will report.
+  box.replaceChildren(...[el('span', {}, message), action || null].filter(Boolean));
 }
 
 function nextTarget() {

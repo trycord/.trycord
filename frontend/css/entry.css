@@ -30,6 +30,125 @@
   overflow-y: auto;
 }
 
+/* The two panes.
+   The form is on the left, where the eye goes first, and the panel that
+   says what this is is on the right. On a narrow screen there is one pane:
+   the form, and the panel becomes a line above it. */
+.auth-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  width: min(100%, 1000px);
+  margin: auto;
+  align-items: center;
+}
+
+.auth-pane { min-width: 0; }
+
+/* The panel. */
+.auth-pane--brand {
+  position: relative;
+  overflow: clip;
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  isolation: isolate;
+}
+
+/* The ember behind the panel, drifting. It is the one piece of movement on
+   a screen where somebody is about to type a password, so it is slow, it is
+   behind everything, and it stops for a reader who has asked for less
+   movement. */
+.auth-pane--brand::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  z-index: -1;
+  background:
+    radial-gradient(38% 42% at 18% 22%, color-mix(in srgb, var(--brand) 30%, transparent), transparent 70%),
+    radial-gradient(42% 38% at 82% 78%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 72%);
+  filter: blur(12px);
+  animation: gate-drift 22s ease-in-out infinite alternate;
+}
+
+@keyframes gate-drift {
+  from { transform: translate3d(-3%, -2%, 0) scale(1); }
+  to { transform: translate3d(4%, 3%, 0) scale(1.08); }
+}
+
+/* The panes arrive rather than being there. */
+@keyframes gate-pane-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.auth-pane--form { animation: gate-pane-in 420ms var(--ease-out) both; }
+.auth-pane--brand { animation: gate-pane-in 420ms var(--ease-out) 90ms both; }
+
+.auth-brand { display: flex; flex-direction: column; gap: var(--space-4); }
+.auth-brand-mark { display: flex; align-items: center; gap: var(--space-3); }
+.auth-brand-img { display: block; }
+.auth-brand-name {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  letter-spacing: var(--tracking-tight, -0.01em);
+  color: var(--text-1);
+}
+.auth-brand-line {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+.auth-brand-instance {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  width: fit-content;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-pill);
+  background: var(--panel-2);
+  color: var(--text-1);
+  font-size: var(--fs-sm);
+  font-weight: var(--weight-medium);
+}
+.auth-brand-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--brand);
+}
+
+@media (min-width: 860px) {
+  /* Two panes, side by side. The form is the one the reader came for, so it
+     takes the side the eye reaches first. */
+  .auth-panes { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); }
+  .auth-pane--form { order: 1; }
+  .auth-pane--brand { order: 2; }
+  .auth-page { padding: var(--space-8); }
+  .gate-card { margin: 0; }
+}
+
+@media (max-width: 859px) {
+  /* One pane: the form, and the panel as a line above it. A thumb does not
+     need a picture, and a narrow screen does not have room for one. */
+  .auth-pane--brand {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+  }
+  .auth-brand { flex-direction: row; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .auth-brand-line { display: none; }
+  .auth-brand-name { font-size: var(--fs-lg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A reader who has asked for less movement gets none of it. */
+  .auth-pane--form,
+  .auth-pane--brand { animation: none; }
+  .auth-pane--brand::before { animation: none; }
+}
+
 .gate-card {
   position: relative;
   width: min(100%, 400px);

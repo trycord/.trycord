@@ -29,12 +29,51 @@ export function gateCard() {
   );
 }
 
+// The gate, in two panes.
+//
+// A sign-in screen used to be one card in the middle of the screen, and the
+// middle of the screen is where the eye goes first - which is the wrong
+// place, because the reader came here to type something.
+//
+// So there are two panes: the form, and a panel that says what this is.
+// The panel is not decoration: it names the instance the reader is signing
+// in to, because an account on one instance is not an account on another,
+// and the reader is about to find out which one they are at.
+//
+// On a narrow screen the panel is a line above the form, because a thumb
+// does not need a picture.
 function gate(title, lede, body) {
   const card = gateCard();
   card.appendChild(el('h1', { class: 'gate-title' }, title));
   if (lede) card.appendChild(el('p', { class: 'gate-lede' }, lede));
   for (const child of [].concat(body)) card.appendChild(child);
-  return { raw: true, node: el('div', { class: 'auth-page' }, card), title };
+
+  return {
+    raw: true,
+    node: el('div', { class: 'auth-page' },
+      el('div', { class: 'auth-panes' },
+        el('div', { class: 'auth-pane auth-pane--brand' }, brandPane()),
+        el('div', { class: 'auth-pane auth-pane--form' }, card))),
+    title,
+  };
+}
+
+// The panel beside the form.
+//
+// It says what Trycord is and which instance this is, and it is the only
+// place the reader is told the second thing - so it is worth the space.
+function brandPane() {
+  const instance = State.instance || {};
+  const name = instance.name || 'Trycord';
+  return el('div', { class: 'auth-brand' },
+    el('div', { class: 'auth-brand-mark' },
+      el('img', { class: 'auth-brand-img', src: brandSymbolUrl, alt: '', width: '44', height: '44' }),
+      el('span', { class: 'auth-brand-name' }, 'Trycord')),
+    el('p', { class: 'auth-brand-line' },
+      'Private community messaging, on an instance you can run yourself.'),
+    el('p', { class: 'auth-brand-instance' },
+      el('span', { class: 'auth-brand-dot', 'aria-hidden': 'true' }),
+      name));
 }
 
 function input(name, options) {
@@ -118,6 +157,17 @@ function nextTarget() {
   return next;
 }
 
+// Whether an address could be an instance.
+//
+// An instance is a web address, and the reader is told so when the address
+// is not one rather than being sent to a page that cannot load.
+function looksLikeAnInstance(value) {
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+  return !!url.hostname;
+}
+
 function altLine(...parts) {
   return el('p', { class: 'gate-alt' }, ...parts);
 }
@@ -131,10 +181,27 @@ function loginGate() {
   const codeField = field('Two-step code', code);
   codeField.hidden = true;
 
+  // Which instance.
+  //
+  // An account on one instance is not an account on another, and a reader
+  // who keeps several of them cannot tell from a sign-in form which one they
+  // are signing in to. So the address is on the form, and it can be typed:
+  // the field is prefilled with the instance in force, and a reader who
+  // changes it is signing in somewhere else.
+  const instance = input('instance', {
+    type: 'url',
+    value: TrycordConfig.backendUrl(),
+    placeholder: 'https://the-instance.example',
+    autocomplete: 'url',
+  });
+  const instanceField = field('Instance', instance);
+  instanceField.classList.add('gate-field--instance');
+
   const form = gateForm([
     field('Username or email', username),
     field('Password', password),
     codeField,
+    instanceField,
   ], 'Sign in');
 
   let challenge = null;
@@ -144,6 +211,25 @@ function loginGate() {
     busy(form, true);
     clearError(form);
     try {
+      // A different instance is a different account, and the token belongs to
+      // the instance that issued it - so the address is settled before the
+      // sign-in, never after.
+      const wanted = String(instance.value || '').trim();
+      if (wanted && wanted !== TrycordConfig.backendUrl()) {
+        if (!looksLikeAnInstance(wanted)) {
+          showError(form, {
+            message: 'That does not look like an instance address. It is a web address, '
+              + 'like https://trycord.example',
+          });
+          return;
+        }
+        // The session belongs to the instance that issued it, and a session is
+        // kept under the address of that instance - so changing the address
+        // needs no carrying, and the page is loaded again against the new one.
+        TrycordConfig.setApiUrl(wanted);
+        window.location.reload();
+        return;
+      }
       if (challenge) {
         const out = await Api.twoFactorVerify({ challengeToken: challenge, code: code.value.trim() });
         applyToken(out.token, out.user);

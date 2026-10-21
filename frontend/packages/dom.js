@@ -34,16 +34,28 @@ function withoutNulls(children) {
 }
 
 function patchChildMethods() {
-  const proto = (typeof Node !== 'undefined' && Node.prototype) || null;
-  if (!proto || proto.__trycordChildRules) return;
-  for (const name of ['replaceChildren', 'append', 'prepend']) {
-    const native = proto[name];
-    if (typeof native !== 'function') continue;
-    proto[name] = function (...children) {
-      return native.apply(this, withoutNulls(children));
-    };
+  // The browser's own names, through the window, so the rule is about the
+  // platform and not about a name this file has to declare.
+  if (typeof window === 'undefined' || !window.Element) return;
+  if (window.Element.prototype.__trycordChildRules) return;
+  // The methods live on the things that can hold children, not on Node:
+  // `replaceChildren` is part of ParentNode, and ParentNode is mixed into
+  // Element, Document and DocumentFragment - and not into Node. A patch on
+  // Node.prototype would create a method nothing calls, and the rule would
+  // be in force nowhere.
+  const hosts = [window.Element, window.Document, window.DocumentFragment]
+    .filter((host) => host && host.prototype);
+  for (const host of hosts) {
+    const proto = host.prototype;
+    for (const name of ['replaceChildren', 'append', 'prepend']) {
+      const native = proto[name];
+      if (typeof native !== 'function') continue;
+      proto[name] = function (...children) {
+        return native.apply(this, withoutNulls(children));
+      };
+    }
+    proto.__trycordChildRules = true;
   }
-  proto.__trycordChildRules = true;
 }
 
 patchChildMethods();
