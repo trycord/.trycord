@@ -341,6 +341,43 @@ says the relay is published at an address no client can reach. That is a
 deployment fact and not a setting: the alternative is a port forward on the
 router, and the address a home connection has changes with the lease.
 
+3. **A stunkey, so the credentials have a source.** The credentials the
+   instance hands out are derived from a shared secret, and the secret is the
+   same thing Coturn calls a static auth secret. Without one, the instance
+   makes a secret of its own when the process starts, and the credentials it
+   issues are good only until it restarts.
+
+   ```
+   TRYCORD_TURN_STUNKEY=a-secret-of-your-own
+   TRYCORD_TURN_REALM=trycord-turn
+   ```
+
+   The derivation is the standard one - the username is an expiry and a name,
+   and the password is the 32-character hash of the username, the realm and
+   the stunkey - so a host that has the stunkey can mint credentials of its
+   own and the relay will take them. That is what makes the relay usable by
+   something other than this instance's own clients. The old name for the
+   variable, `TRYCORD_TURN_SECRET`, is still read when this one is not set.
+
+4. **The page that says whether it works.** The voice process has an
+   interface of its own, on the loopback of the machine and on nothing else:
+
+   ```
+   http://127.0.0.1:9973/
+   ```
+
+   It says **WORKING** or **NOT WORKING**, and when it says NOT WORKING it
+   says which half of the stack is at fault. The interface is on the loopback
+   by rule - the process refuses to start on any other address - while the
+   relay itself is published to the internet, which is the whole point of
+   it.
+
+   The same port carries the relay's configuration (`/config`) and a page
+   that mints a credential (`/credentials`). The configuration is the
+   instance's own setting: an administrator changes it in the voice console
+   in the application, and the port is only a second way in for the person
+   at the machine.
+
 ### The other providers
 
 The Cloudflare Realtime provider and the third-party SFU are there for an
@@ -395,6 +432,19 @@ so when it starts. That check is local: it says the service works *here*, not
 that a client on the internet can reach it. The console's stack section
 answers the second question, and the address it publishes is the one that has
 to be reachable.
+
+The process also has a page of its own, on the loopback:
+
+```
+curl http://127.0.0.1:9973/
+```
+
+It says **WORKING** or **NOT WORKING**, and when it says NOT WORKING it says
+which part of the stack is at fault - the configuration, the service, or the
+published address. The interface is on the loopback and the process refuses
+to start on any other address, so it cannot be reached from the network. The
+relay is the other half of the story and is published to the internet on
+purpose.
 
 A restart of the service drops the calls it was carrying. The clients notice
 - the room's membership is the server's, and a client that cannot poll it

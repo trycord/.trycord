@@ -16,8 +16,22 @@
 //   TRYCORD_TURN_HOST     listen host (default 0.0.0.0)
 //   TRYCORD_TURN_PORT     listen port (default 3478)
 //   TRYCORD_TURN_REALM    realm for long-term credentials (default trycord-turn)
-//   TRYCORD_TURN_SECRET   the secret the short-lived credentials are signed with
+//   TRYCORD_TURN_STUNKEY  the shared secret the credentials are minted under
+//                         (TRYCORD_TURN_SECRET is the older name for it)
 //   TRYCORD_TURN_RELAY_MIN / TRYCORD_TURN_RELAY_MAX   the ports a relayed call may use
+//
+// The credentials.
+//
+//   username = <expiry>:<name>
+//   password = MD5(username : realm : stunkey)
+//
+// That is the derivation Coturn uses for a static auth secret, and it is the
+// one every other TURN client implements. The consequence is the point of
+// it: a host that has the stunkey can mint a credential of its own - for its
+// own expiry, with its own name - and this relay will accept it. A relay
+// whose credentials only this instance's own API can mint is a relay that
+// only this instance's own clients can use, which is the opposite of what
+// "reachable from other hosts" means.
 //
 // HTTP API (mounted by routes/voice.js under /api/turn):
 //   GET /api/turn/credentials   issue short-term credentials for a username
@@ -301,6 +315,12 @@ allocationSweeper.unref();
 
 // The secret the credentials are made under.
 //
+// It is the "stunkey": a shared secret that both this instance and anything
+// else that has to reach the relay knows. The name is the one Coturn uses for
+// the same thing, because the derivation is the same too - so a credential
+// minted here is accepted by a Coturn relay, and a credential minted by a
+// Coturn relay is accepted here.
+//
 // There is deliberately no default. A default would be the same on every
 // instance in the world, so a credential minted against one instance would
 // verify against any other - and the credentials are what lets a client use
@@ -309,15 +329,41 @@ allocationSweeper.unref();
 // it.
 let generatedSecret = null;
 function sharedSecret() {
-  const configured = String(process.env.TRYCORD_TURN_SECRET || '').trim();
+  const configured = String(
+    process.env.TRYCORD_TURN_STUNKEY || process.env.TRYCORD_TURN_SECRET || ''
+  ).trim();
   if (configured) return configured;
+
+  // The instance's own saved key.
+  //
+  // The deployment's environment outranks it, as it outranks every other
+  // setting; and an administrator who has set one in the console has set it
+  // for the instance, which is the thing the credentials are minted for.
+  const saved = savedStunkey();
+  if (saved) return saved;
+
   if (!generatedSecret) {
     generatedSecret = crypto.randomBytes(32).toString('hex');
-    console.warn('[turn] TRYCORD_TURN_SECRET is not set, so the credentials this '
+    console.warn('[turn] TRYCORD_TURN_STUNKEY is not set, so the credentials this '
       + 'instance issues are good only until it restarts. Set it to a secret of '
       + 'your own to keep them.');
   }
   return generatedSecret;
+}
+
+// The key the instance saved, or nothing.
+//
+// The settings are read lazily and quietly: a process that has not connected
+// to the database has no saved key, and a key it cannot read is no reason to
+// refuse to work.
+function savedStunkey() {
+  try {
+    const settings = require('./settings');
+    const value = settings.secretValue('voice.mesh.stunkey');
+    return value ? String(value).trim() : '';
+  } catch (e) {
+    return '';
+  }
 }
 
 // The address a client is given.
@@ -359,18 +405,23 @@ function longTermKey(username, realm, password) {
 
 // The password a username is worth, right now.
 //
-// The credential this instance issues is `<expiry>:<name>` with a password
-// that is the HMAC of that string under the instance's secret. The check
-// here is the other half of the same thing: the same string, the same
-// secret, the same HMAC. A client that was given a credential this instance
-// issued can therefore be checked, and a client that was not cannot.
+// The derivation is Coturn's static-auth-secret one, which is the one everybody
+// else implements:
 //
-// The two halves used to disagree - the issuer produced an HMAC and the
-// checker looked for the shared secret itself - so no credential the server
-// issued would ever have verified.
-function passwordFor(username) {
-  const secret = Buffer.from(sharedSecret(), 'utf8');
-  return crypto.createHmac('sha1', secret).update(String(username)).digest('base64');
+//   password = MD5(username : realm : stunkey)
+//
+// The result is 32 characters of hex, and the client is given the username
+// and the password and nothing else. A host that has the stunkey can mint its
+// own credential for its own expiry, which is what makes the relay usable by
+// something other than this instance's own API.
+//
+// The check on the other side is the other half of the same thing: the same
+// username, the same realm, the same stunkey, and then the long-term key the
+// standard builds from them.
+function passwordFor(username, realm) {
+  return crypto.createHash('md5')
+    .update(`${username}:${realm || defaultRealm()}:${sharedSecret()}`, 'utf8')
+    .digest('hex');
 }
 
 // The name and the expiry inside a username, or null when it is not one of
@@ -449,7 +500,7 @@ function verifyAuth(parsed, rinfo) {
   if (parts.expiry * 1000 <= Date.now()) return null;
 
   const key = crypto.createHash('md5')
-    .update(`${username}:${realmStr}:${passwordFor(username)}`, 'utf8').digest();
+    .update(`${username}:${realmStr}:${passwordFor(username, realmStr)}`, 'utf8').digest();
 
   // The canonical message.
   //
@@ -703,11 +754,24 @@ function parseXorPeerAddress(buf, transactionId) {
 
 // ===== Credential issuance (HTTP API) =====
 
-function issueCredentials(username) {
-  const expiry = Math.floor(Date.now()/1000) + 3600;
-  const secret = Buffer.from(sharedSecret(), 'utf8');
-  const key = crypto.createHmac('sha1', secret).update(`${expiry}:${username}`).digest('base64');
-  return { username: `${expiry}:${username}`, password: key, ttl: 3600 };
+// The credential this instance issues.
+//
+// The username is the expiry and the name, separated by a colon, which is the
+// form Coturn uses and the form every TURN client understands. The password
+// is the 32-character hash of the username, the realm and the stunkey, so a
+// host that knows the stunkey can mint a credential of its own for as long as
+// it likes - which is what "reachable from other hosts" means.
+//
+// The lifetime is an hour unless somebody asks for another. It is in the
+// username, so the relay can refuse a credential that has run out without
+// having to keep a list of the ones it handed out.
+function issueCredentials(username, ttlSeconds) {
+  const ttl = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0
+    ? Math.floor(Number(ttlSeconds))
+    : 3600;
+  const expiry = Math.floor(Date.now() / 1000) + ttl;
+  const name = `${expiry}:${username}`;
+  return { username: name, password: passwordFor(name, defaultRealm()), ttl };
 }
 
 // ===== Server lifecycle =====

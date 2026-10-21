@@ -54,6 +54,7 @@ const VOICE_OWNED = [
   'voice.turnCredential', 'voice.sfuAppId', 'voice.sfuAppSecret', 'voice.publicUrl',
   'voice.mesh.maxParticipants', 'voice.mesh.publicUrl', 'voice.mesh.stunUrls',
   'voice.mesh.turnUrl', 'voice.mesh.turnUsername', 'voice.mesh.turnCredential',
+  'voice.mesh.turnPort', 'voice.mesh.turnHost', 'voice.mesh.turnRealm', 'voice.mesh.stunkey',
   'voice.cloudflare.appId', 'voice.cloudflare.appSecret', 'voice.cloudflare.endpoint',
   'voice.cloudflare.maxParticipants',
   'voice.sfu.endpoint', 'voice.sfu.stunUrls', 'voice.sfu.turnUrl',
@@ -279,6 +280,24 @@ const SCHEMA = [
     key: 'voice.mesh.publicUrl', env: 'TRYCORD_VOICE_PUBLIC_URL', type: 'string', default: '',
     category: 'voice-media', label: 'The address the relay is published at',
     description: 'The address clients are given for the relay. It has to point straight at this instance - DNS only, not through a proxy that terminates TLS - and the relay ports have to be open to the internet.',
+    live: true,
+  },
+  {
+    key: 'voice.mesh.turnPort', env: 'TRYCORD_TURN_PORT', type: 'integer', default: 3478,
+    category: 'voice-media', label: 'The port the relay listens on',
+    description: 'The port the in-house STUN and TURN service binds. It is the port the clients are given, so it has to be open on the network they are on.',
+    min: 1, max: 65535, live: false,
+  },
+  {
+    key: 'voice.mesh.turnHost', env: 'TRYCORD_TURN_HOST', type: 'string', default: '::',
+    category: 'voice-media', label: 'The address the relay listens on',
+    description: 'The address the relay binds. A wildcard - 0.0.0.0 or :: - means every interface, which is what a relay that has to be reached from outside wants.',
+    live: false,
+  },
+  {
+    key: 'voice.mesh.turnRealm', env: 'TRYCORD_TURN_REALM', type: 'string', default: 'trycord-turn',
+    category: 'voice-media', label: 'The realm the credentials are issued in',
+    description: 'The name the client is told to use. It has to match the realm the relay answers with, or a credential that is right is refused.',
     live: true,
   },
   {
@@ -692,6 +711,7 @@ const SECRETS = new Set([
   'voice.sfuAppSecret',
   'voice.turnCredential',
   'voice.mesh.turnCredential',
+  'voice.mesh.stunkey',
   'voice.cloudflare.appSecret',
   'voice.sfu.token',
   'voice.sfu.turnCredential',
@@ -784,6 +804,12 @@ const SECRET_META = {
     label: 'TURN credential for the third-party SFU',
     category: 'voice-media',
     description: 'The password half of a static TURN credential. Stored encrypted and never shown again.',
+  },
+  'voice.mesh.stunkey': {
+    env: 'TRYCORD_TURN_STUNKEY',
+    label: 'The stunkey the relay mints credentials under',
+    category: 'voice-media',
+    description: 'The shared secret the relay\'s credentials are derived from. It is the same thing Coturn calls a static auth secret, and the derivation is the same: the password is the 32-character hash of the username, the realm and this key. A host that has it can mint credentials of its own. Stored encrypted and never shown again.',
   },
 };
 

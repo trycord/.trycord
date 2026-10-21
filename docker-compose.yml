@@ -76,7 +76,12 @@ services:
       # The relay listens on every interface inside the container, and the
       # published address is the one in the .env.
       TRYCORD_TURN_HOST: "::"
-      TRYCORD_VOICE_PROCESS_HOST: 0.0.0.0
+      # The voice process's own interface - the page that says whether the
+      # stack works, and the health checks - is on the loopback and on nothing
+      # else. It is not a setting here on purpose: the process refuses to
+      # start on any other address, so a file that asked for one would only
+      # stop the service from coming up. The health check below runs inside
+      # this container, so the loopback is the address it wants.
     ports:
       - "${TRYCORD_TURN_PORT:-3478}:3478/udp"
     healthcheck:

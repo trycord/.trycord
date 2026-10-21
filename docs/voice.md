@@ -153,7 +153,7 @@ the peers are given:
 | `TRYCORD_TURN_HOST` | The address the relay listens on. A wildcard (`0.0.0.0` or `::`) means every interface. |
 | `TRYCORD_TURN_PORT` | The port, `3478` by default. |
 | `TRYCORD_TURN_REALM` | The realm used for the credential. |
-| `TRYCORD_TURN_SECRET` | The secret the credential is derived from. |
+| `TRYCORD_TURN_STUNKEY` | The shared secret the credential is derived from. The older name for it, `TRYCORD_TURN_SECRET`, is still read when this one is not set. |
 | `TRYCORD_VOICE_PUBLIC_URL` | The address the peers are given. It has to be an address a browser can reach, and it is a voice address: a hostname that points straight at this instance, DNS only and not proxied. The console writes the same value as `voice.mesh.publicUrl`. |
 | `TRYCORD_VOICE_PUBLIC_URL_V4` | The IPv4 address, when the voice URL is the IPv6 one and the instance has both. |
 | `TRYCORD_VOICE_PUBLIC_URL_V6` | The IPv6 address, when the voice URL is the IPv4 one and the instance has both. |
@@ -188,6 +188,90 @@ relay listens on, and a wildcard is not an address a peer can reach. `0.0.0.0`
 and `::` mean every interface, which is what a relay that has to be reached
 from outside wants; the address the peers are given then comes from the voice
 URL. When there is no voice URL either, the diagnostics say so.
+
+### The stunkey, and the hosts that mint their own credentials
+
+The secret is called a **stunkey**, because that is the name Coturn uses for
+the same thing and the derivation is the same too:
+
+```
+username = <expiry>:<name>
+password = MD5(username : realm : stunkey)
+```
+
+The password is the 32-character hash, and the long-term key the standard
+builds from it is `MD5(username : realm : password)`. That is the whole of it.
+
+The point of using the standard's derivation is that **the relay is then
+usable by something other than this instance's own API**. A host that has the
+stunkey - a SIP stack, a game server, a second Trycord, a coturn of its own -
+can mint a credential for its own name and its own expiry, and this relay
+will accept it:
+
+```sh
+# On the host that wants to use the relay
+STUNKEY='the same value as TRYCORD_TURN_STUNKEY'
+REALM='trycord-turn'
+EXPIRY=$(( $(date +%s) + 3600 ))
+USERNAME="${EXPIRY}:that-host"
+PASSWORD=$(printf '%s:%s:%s' "$USERNAME" "$REALM" "$STUNKEY" | md5sum | cut -d' ' -f1)
+
+# Then, in the client:
+#   turn:voice.trycord.dev:3478
+#   username: $USERNAME
+#   credential: $PASSWORD
+```
+
+The realm has to be the same on both sides: it is `TRYCORD_TURN_REALM`, and
+`trycord-turn` by default. The expiry has to be in the future, and the relay
+refuses a username whose expiry has passed - which is what stops a captured
+credential from being any good tomorrow.
+
+Nothing else is needed, and nothing else is accepted: a credential minted with
+the wrong stunkey, or with an expiry in the past, is refused, and both cases
+are in the test suite
+(`backend/tests/voice/turn-stack.test.js`).
+
+### The page on the loopback
+
+The voice process has an interface of its own, on the loopback and on nothing
+else:
+
+```
+http://127.0.0.1:9973/
+```
+
+The page says one word - **WORKING** or **NOT WORKING** - and when it says
+NOT WORKING it says why underneath: the configuration, the service, the
+published address, and what each of them answered. It is the first thing to
+open when a call will not connect, and it is the page that tells an operator
+which half of the problem they are looking at.
+
+Two more pages live on the same port:
+
+| Page | What it is for |
+|---|---|
+| `/config` | The relay's own configuration: the address it binds, the port, the address the clients are given, the realm, and the key. Saving it binds the relay again with the new values. |
+| `/credentials` | Minting a credential for the relay: the username and the password, shown once. |
+
+The configuration is the instance's own setting, and the voice console in the
+application is where an administrator changes it. The page on the loopback
+changes the same setting, and the same rule applies to both: the value the
+instance saved is the value in force, and the deployment's environment is
+what it falls back to.
+
+The interface carries the addresses the instance publishes and the checks the
+operator needs, so it is not on the internet. The process **refuses to start**
+on any address but the loopback: `TRYCORD_VOICE_PROCESS_HOST` set to anything
+else stops the voice service from coming up, with a message that says why.
+The relay is the other half of the story and is meant to be reachable - it
+listens on every interface and is published at the voice address.
+
+The API asks the voice process whether the relay is already running before it
+starts one of its own, so the two never fight over the port. The ICE
+configuration the clients are given is read from the same settings the voice
+process reads, so the address a client is given is the address the relay is
+published at.
 
 ### When the relay does not answer
 
