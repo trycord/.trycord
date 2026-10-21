@@ -10,6 +10,7 @@
 // realtime events through the apply* functions and owns the lifecycle.
 
 import { el } from '../../packages/dom.js';
+import { swipeToReply } from '../../packages/gestures.js';
 import { saveDraft, clearDraft, restoreDraft } from '../../packages/drafts.js';
 import { icon } from '../../packages/icons.js';
 import { avatar, spinner } from './primitives.js';
@@ -422,6 +423,16 @@ export function buildMessageRow(deps) {
       event.stopPropagation();
       openAt(event.clientX, event.clientY);
     });
+
+    // A swipe to the side replies to it.
+    //
+    // The menu offers the same reply, so the gesture is never the only way
+    // to do it - it is the way that is quicker when a reader knows it.
+    if (!m.pending) {
+      swipeToReply(row, () => {
+        try { composer.replyTo(m); } catch { /* the composer is not there */ }
+      });
+    }
     return row;
   };
 }

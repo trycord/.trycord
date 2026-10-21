@@ -305,6 +305,12 @@
   padding: 3px 8px; border-radius: var(--radius-md);
 }
 .msg:hover, .msg:focus-within { background: var(--hover); }
+
+/* A message under a finger that is swiping it.
+   It moves with the finger, so the reader can see what is about to happen
+   and can let go of it. */
+.msg.is-swiping { transition: none; will-change: transform; }
+.msg.is-swiping .msg-rail { transition: transform var(--dur-1) var(--ease); }
 .msg--continued { margin-top: 0; }
 .msg--own .msg-author { color: var(--brand); }
 .msg--pending { opacity: 0.72; }
