@@ -185,11 +185,12 @@ function secret(providerId, name, overlay) {
 function inHouseRelay() {
   // The relay's own configuration.
   //
-  // It is read through the settings service, so the deployment's environment
-  // outranks the instance's saved value and the saved value outranks the
-  // default - the same rule every other setting follows. Reading the
-  // environment directly, as this used to, meant an administrator who changed
-  // the port in the console was changing a number nobody read.
+  // It is read through the settings service, so the instance's saved value
+  // is the one in force and the deployment's environment is the seed for a
+  // value that has never been saved - the same rule every other setting
+  // follows. Reading the environment directly, as this used to, meant an
+  // administrator who changed the port in the console was changing a number
+  // nobody read.
   const host = String(settings.read('voice.mesh.turnHost', process.env.TRYCORD_TURN_HOST || '::')).trim();
   const port = Number(settings.read('voice.mesh.turnPort', process.env.TRYCORD_TURN_PORT || 3478));
   const realm = String(settings.read('voice.mesh.turnRealm', process.env.TRYCORD_TURN_REALM || 'trycord-turn')).trim();
