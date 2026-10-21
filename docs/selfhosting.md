@@ -263,7 +263,7 @@ disable something.
 | `WEBHOOKS_ENABLED` | on | Incoming webhooks. |
 | `PUSH_NOTIFICATIONS_ENABLED` | off | Browser push. Needs a push service and a public key. |
 
-The flags are read once, at startup, by `server/src/features.js`. Nothing
+The flags are read once, at startup, by `backend/src/features.js`. Nothing
 else in the server reads the environment for a feature decision, so the API
 routes, the realtime gateway and the client's capability discovery cannot
 disagree about what is available. Restarting with a different value takes
@@ -286,29 +286,66 @@ With the flag **off**: every voice route refuses with `FEATURE_DISABLED`, the
 capability response reports voice as unavailable with the reason `disabled`,
 the ICE server list is empty, and text chat is entirely unaffected.
 
-With the flag **on** but the infrastructure missing, the server **refuses to
-start**. The error names exactly what is absent — for example:
+With the flag **on**, the instance has everything it needs: it ships a
+STUN and TURN service, it mints the credentials, and it hands the clients the
+addresses to use. There is no STUN URL to write down, no TURN URL, no
+username, no password and no ICE array. Turning the flag on is the whole of
+the configuration.
 
-```
-VOICE_VIDEO_ENABLED is on, but voice cannot work:
-no STUN or TURN server is configured; VOICE_VIDEO_SFU_APP_ID is not set
-```
+### The mesh, and what the deployment has to provide
 
-That is deliberate. A configuration that cannot work is a startup error, not a
-runtime surprise discovered at the first join.
-
-### Provider
-
-There is exactly one provider: the **in-house mesh**. Set it explicitly or
-leave it unset — the value defaults to it.
+The default provider is the **in-house mesh**: the media goes from peer to
+peer, and the server carries the signalling and relays the bytes when a
+direct route cannot be made.
 
 ```
 VOICE_VIDEO_PROVIDER=mesh
 ```
-Trycord's own backend is the authority on who is a user, which community they
-belong to, and whether they may speak. It holds the room state, issues the
-signalling ticket, and relays the offers, answers and ICE candidates between
-the clients. The media itself goes from peer to peer.
+
+A mesh needs two things from the deployment, and they are about the network
+rather than about voice:
+
+1. **An address the clients can reach.** The relay is published there, and
+   the clients are given it. It must point straight at the instance - DNS
+   only, and not through a proxy that terminates TLS, because a proxy carries
+   HTTP and not the UDP a TURN service needs.
+
+   ```
+   TRYCORD_VOICE_PUBLIC_URL=https://voice.example.com
+   ```
+
+   The address is not the site's address unless the site is served directly.
+   An instance behind Cloudflare, nginx or anything else that terminates TLS
+   needs a name of its own for the voice stack.
+
+2. **The relay port open to the internet.** The service listens on 3478 by
+   default, and the relay uses the next hundred ports for the calls it
+   relays.
+
+   ```
+   TRYCORD_TURN_HOST=::            # every interface, IPv4 and IPv6
+   TRYCORD_TURN_PORT=3478
+   ```
+
+   The relay binds every interface, so the address it is published at and the
+   address it listens on are separate things: it listens on everything, and it
+   is published at the address above.
+
+An instance with a public IPv6 address and a NAT-ed IPv4 publishes both, and a
+client is given the address of its own family - a client on an IPv4-only
+network cannot route to an IPv6 address, and the other way round. A family
+with no published address is given none, and the console says so.
+
+Where an instance has no public address of either family, the voice console
+says the relay is published at an address no client can reach. That is a
+deployment fact and not a setting: the alternative is a port forward on the
+router, and the address a home connection has changes with the lease.
+
+### The other providers
+
+The Cloudflare Realtime provider and the third-party SFU are there for an
+instance that wants a server to carry the media rather than the peers to
+carry it between themselves. Both need credentials of their own:
 
 ```
 VOICE_VIDEO_SFU_APP_ID=...
@@ -316,12 +353,15 @@ VOICE_VIDEO_SFU_APP_SECRET=...
 ```
 
 Both are read from the environment and never returned by any route. The App
-Secret stays on the server; a browser never sees it.
+Secret stays on the server; a browser never sees it. They are configured in
+the voice console, not here - the console is where a provider is chosen.
 
-A peer-to-peer mode with no server-side routing does not exist. An earlier
-version of this document described one, and it was never implemented.
+### A third-party relay
 
-### Network
+An instance that would rather not run its own relay can name one. The
+credential it hands out is still minted per session by the backend, so a
+client that walks away with one does not carry standing TURN access, and it
+never appears in the capability response.
 
 ```
 VOICE_VIDEO_STUN_URLS=stun:stun.example.com:3478
@@ -330,14 +370,32 @@ VOICE_VIDEO_TURN_USERNAME=...
 VOICE_VIDEO_TURN_CREDENTIAL=...
 ```
 
-At least one STUN server or a TURN URL is required when voice is on. STUN is
-enough for most home networks; TURN is what gets a call through a symmetric NAT
-or a firewall that blocks UDP.
+### The voice service
 
-The TURN URL and username are handed to clients, because a client needs them
-to open a connection. The credential is minted per session by the backend —
-ask `POST /api/voice/credentials` — so a client that walks away with one does
-not carry standing TURN access, and it never appears in the capability response.
+The STUN and TURN service runs as a process of its own, `trycord-voice` in the
+pm2 ecosystem, because it fails differently from the application: the API can
+be restarting while a call is still being carried.
+
+```
+pm2 start ecosystem.config.js
+pm2 logs trycord-voice
+pm2 describe trycord-voice
+```
+
+It reads the same `backend/.env` as the API, so the two cannot disagree about
+the address or the secret, and it binds the relay port so the API does not
+bind it too.
+
+It answers a binding request on the host it runs on, and the log line says
+so when it starts. That check is local: it says the service works *here*, not
+that a client on the internet can reach it. The console's stack section
+answers the second question, and the address it publishes is the one that has
+to be reachable.
+
+A restart of the service drops the calls it was carrying. The clients notice
+- the room's membership is the server's, and a client that cannot poll it
+rejoins - and nobody is left in a room that claims to have people in it who
+are not there.
 
 ### Limits and sub-capabilities
 

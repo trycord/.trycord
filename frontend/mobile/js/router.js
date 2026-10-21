@@ -74,7 +74,7 @@ function paintError(route, error) {
   clearRaw();
   const box = failure(error, () => run());
   box.setAttribute('data-fault-origin', 'router');
-  setAppBar({ lead: 'back', title: 'Something went wrong' });
+  setAppBar({ lead: 'back', title: 'This page did not open' });
   setView(box);
   setComposer(null);
   setLayout('default');

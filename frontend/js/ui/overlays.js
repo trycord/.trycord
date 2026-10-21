@@ -49,7 +49,7 @@ export function toast(message, options) {
 }
 
 export function errorToast(error) {
-  const message = error && error.message ? error.message : 'Something went wrong.';
+  const message = error && error.message ? error.message : 'That did not work. Try again.';
   return toast(message, { type: 'error' });
 }
 

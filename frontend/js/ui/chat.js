@@ -762,7 +762,7 @@ export function conversationSurface(config) {
       textarea.placeholder = 'Edit your message';
     },
     clearError() { errorLine.hidden = true; errorLine.textContent = ''; },
-    setError(text) { errorLine.hidden = false; errorLine.textContent = text || 'Something went wrong.'; },
+    setError(text) { errorLine.hidden = false; errorLine.textContent = text || 'Your message was not sent. Try again.'; },
     focus() { textarea.focus(); },
     reset() { textarea.value = ''; resetContext(); },
   };

@@ -179,7 +179,7 @@ const SCHEMA = [
   {
     key: 'voice.enabled', env: 'VOICE_VIDEO_ENABLED', type: 'boolean', default: false,
     category: 'voice', label: 'Enable voice and video',
-    description: 'Off until a media server is configured. With it on but no server, the instance refuses to start.',
+    description: 'Whether this instance offers voice at all. On, the instance runs its own relay and hands the clients everything they need.',
     live: true, consequential: true,
   },
   {

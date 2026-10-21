@@ -189,11 +189,6 @@ export async function refreshDevices() {
   return state;
 }
 
-// The devices, read without waiting.
-export function currentDevices() {
-  return { inputs: state.inputs, outputs: state.outputs, canChooseOutput: state.canChooseOutput };
-}
-
 // A microphone, from a chosen device.
 //
 // The device is asked for by name, and a refusal falls back to the default
@@ -706,6 +701,5 @@ function levelOf(watch) {
 
 export default {
   subscribe, capabilities, join, leave, setMuted, setDeafened, enableMic,
-  pulse, setLocalUserId, state, refreshDevices, currentDevices,
-  setInputDevice, setOutputDevice,
+  pulse, setLocalUserId, state, refreshDevices, setInputDevice, setOutputDevice,
 };

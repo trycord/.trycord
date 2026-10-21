@@ -89,7 +89,7 @@ function paintError(route, error, ctx, page) {
   setStage(box);
   setComposer(null);
   setInspector(null);
-  setTitle('Something went wrong');
+  setTitle('This page did not open');
   setRoute(route);
 }
 
