@@ -336,9 +336,10 @@ function sharedSecret() {
 
   // The instance's own saved key.
   //
-  // The deployment's environment outranks it, as it outranks every other
-  // setting; and an administrator who has set one in the console has set it
-  // for the instance, which is the thing the credentials are minted for.
+  // The environment comes first, as it does for every secret: a secret the
+  // deployment set is the deployment's to rotate, and it stays locked there.
+  // A key an administrator has saved is the instance's own, and it is what the
+  // credentials are minted under when the deployment has said nothing.
   const saved = savedStunkey();
   if (saved) return saved;
 
