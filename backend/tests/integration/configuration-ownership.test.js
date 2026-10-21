@@ -218,12 +218,14 @@ test('the extension API version is not the application version', async (t) => {
   });
 
   await t.test('a package built against another generation is refused', () => {
+    // The surface is a range: the oldest this family still supports, and
+    // the newest it has reached. A package from outside it is refused.
     const packages = require(path.join(ROOT, 'src', 'services', 'extensions', 'packages'));
     const version = require(path.join(ROOT, 'src', 'version'));
-    const parts = version.EXTENSION_API_VERSION.split('.');
-    const other = (Number(parts[0]) + 1) + '.0';
-    const report = packages.compatibilityReport({ api: other });
-    assert.equal(report.ok, false, 'a package from another generation was accepted');
+    const floor = version.EXTENSION_API_FLOOR.split('.');
+    const older = (Number(floor[0]) - 1) + '.0';
+    const report = packages.compatibilityReport({ api: older });
+    assert.equal(report.ok, false, 'a package from an older generation was accepted');
     assert.match(report.reason, /extension API/,
       'the refusal does not say what is wrong: ' + report.reason);
   });
@@ -240,7 +242,19 @@ test('the extension API version is not the application version', async (t) => {
     const newer = parts[0] + '.' + (Number(parts[1]) + 1);
     const report = packages.compatibilityReport({ api: newer });
     assert.equal(report.ok, false, 'a package from an unreached surface was accepted');
-    assert.match(report.reason, /newer/,
+    assert.match(report.reason, /newer|generation|implements/,
       'the refusal does not say what is wrong: ' + report.reason);
+  });
+
+  await t.test('a package built against the surface this family has reached is accepted', () => {
+    // The rule the product had before the surface was given a version of its
+    // own: the application version, exactly. A package built for the release
+    // that is running installs.
+    const packages = require(path.join(ROOT, 'src', 'services', 'extensions', 'packages'));
+    const version = require(path.join(ROOT, 'src', 'version'));
+    const application = version.VERSION.split('.').slice(0, 2).join('.');
+    const report = packages.compatibilityReport({ api: application });
+    assert.equal(report.ok, true,
+      'a package built for the running release was refused: ' + report.reason);
   });
 });

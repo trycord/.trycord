@@ -1711,7 +1711,13 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   border-radius: var(--tc-radius-md);
   overflow: hidden;
 }
-.m-embed__image { display: block; max-width: 100%; max-height: 300px; object-fit: contain; }
+/* The space is reserved before the picture arrives, so the conversation does
+   not jump under the reader while they are reading it. */
+.m-embed__image {
+  display: block; width: 100%; max-width: 100%;
+  aspect-ratio: 16 / 10; max-height: 300px;
+  object-fit: contain; background: var(--panel-3);
+}
 .m-embed__video {
   display: block;
   width: 100%;

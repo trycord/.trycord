@@ -12,7 +12,7 @@
 
 const capabilities = require('./capabilities');
 const workflowTriggers = require('../workflows/triggers');
-const { VERSION, EXTENSION_API_VERSION } = require('../../version');
+const { VERSION, EXTENSION_API_VERSION, EXTENSION_API_FLOOR } = require('../../version');
 
 // The extension API version this build implements.
 //
@@ -147,17 +147,19 @@ function compatibilityReport(declared) {
   const maxInstance = compat.maxInstance ? String(compat.maxInstance).trim() : null;
 
   if (!api) return { ok: false, reason: 'the package does not declare which extension API version it targets' };
-  if (!sameGeneration(api, EXTENSION_API)) {
-    return {
-      ok: false,
-      reason: 'the package targets extension API ' + api + ' and this instance implements ' + EXTENSION_API,
-    };
-  }
-  if (compareApiVersions(api, newestSurface()) > 0) {
+  const newest = newestSurface();
+  if (compareApiVersions(api, newest) > 0) {
     return {
       ok: false,
       reason: 'the package targets extension API ' + api + ', which is newer than the '
-        + newestSurface() + ' this instance reaches',
+        + newest + ' this instance reaches',
+    };
+  }
+  if (compareApiVersions(api, EXTENSION_API_FLOOR) < 0) {
+    return {
+      ok: false,
+      reason: 'the package targets extension API ' + api + ', which is older than the '
+        + EXTENSION_API_FLOOR + ' this instance still supports',
     };
   }
   if (minInstance && compareVersions(VERSION, minInstance) < 0) {
