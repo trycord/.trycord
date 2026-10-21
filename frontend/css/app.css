@@ -917,6 +917,18 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 }
 .rail-community .avatar { width: 38px; height: 38px; }
 .rail-divider { width: 26px; height: 1px; background: var(--line); margin: 2px 0; }
+
+/* The communities that live on another instance, in a section of their own.
+   A community of this instance is here; a community on another one is a
+   reference, and the reader is told which it is. */
+.rail-divider--federated { margin-top: var(--space-3); }
+.rail-list--federated { padding-top: var(--space-1); }
+.rail-community--federated { position: relative; }
+.rail-community--federated .avatar {
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-sm);
+}
+.rail-community--federated.is-joined .avatar { border-style: solid; }
 .rail-add { border: 1px dashed var(--line-2); color: var(--text-3); }
 .rail-add:hover { border-color: var(--brand-line); color: var(--brand); }
 
@@ -2171,6 +2183,16 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 }
 .placecard-meta { color: var(--text-3); font-size: var(--fs-micro); }
 .placecard-go { color: var(--text-3); display: grid; place-items: center; transition: color var(--dur-1) ease, transform var(--dur-1) ease; }
+
+/* The places that live on another instance. A community of this instance is
+   here; a community on another one is a reference, and the section says so. */
+.places-heading {
+  margin: var(--space-3) 0 var(--space-1);
+  padding: 0 var(--space-3);
+  font-family: var(--mono); font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-3);
+}
+.placecard--federated .avatar { border: 1px dashed var(--line-2); }
 .placecard:hover .placecard-go { color: var(--brand); transform: translateX(2px); }
 
 /* -- quick paths ------------------------------------------------------------- */

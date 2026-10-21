@@ -21,6 +21,7 @@ import { renderDiscover } from './discover.js';
 import { renderInstances } from './instances.js';
 import { renderProfile } from './profile.js';
 import { renderCommunity, renderChannelView, renderMembers, renderRoles, renderInvites, renderCategories } from './community.js';
+import { renderFederatedCommunity } from './federatedCommunity.js';
 import { renderWorkspace } from './workspace.js';
 import { onboardingView as renderOnboarding } from './onboarding.js';
 import { renderSettings } from './settings.js';
@@ -77,6 +78,9 @@ export const RENDERERS = {
   'community.workspace.polls': (ctx) => renderWorkspace(ctx),
   'community.workspace.poll': (ctx) => renderWorkspace(ctx),
   'community.new': () => renderServerCreate(),
+
+  // A community that lives on another instance.
+  'federated.community': (ctx) => renderFederatedCommunity(ctx),
 
   // The community settings addresses resolve to the pages above through the
   // registry's router; these bindings exist so an address typed as a settings

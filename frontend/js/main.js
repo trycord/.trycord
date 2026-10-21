@@ -11,7 +11,7 @@ import { preferredEntry, siblingMount } from '../packages/chooser.js';
 import { TrycordConfig } from '../packages/config.js';
 import {
   State, on as onStore, loadInstance, loadLegal, loadSession, logout,
-  refreshServers, refreshDms, refreshFriends, refreshNotifications,
+  refreshServers, refreshFederated, refreshDms, refreshFriends, refreshNotifications,
   markConversationRead,
 } from '../packages/store.js';
 import { installLinkHandler, installPopStateHandler, navigate, BASE } from '../packages/nav.js';
@@ -67,6 +67,9 @@ function wireChrome() {
     else setConnection('offline', 'Offline - reconnecting');
   });
   onRealtime('presence-changed', () => { refreshChrome(); });
+  // The communities on other instances arrived, or changed. The rail has a
+  // section of its own for them.
+  onStore('federated', () => { refreshChrome(); });
   onRealtime(EVENTS.NOTIFICATION, () => {
     refreshNotifications().catch(() => { /* the bell catches up on the next open */ });
     refreshChrome();
@@ -170,7 +173,11 @@ async function boot() {
   try { await loadLocale(); } catch { /* the built-in language stands */ }
 
   if (State.user) {
-    await Promise.allSettled([refreshServers(), refreshDms(), refreshFriends(), refreshNotifications()]);
+    // The communities that live on another instance are asked for with the
+    // rest, and are kept apart from the ones that live here.
+    await Promise.allSettled([
+      refreshServers(), refreshFederated(), refreshDms(), refreshFriends(), refreshNotifications(),
+    ]);
     realtime.connect();
   }
 
