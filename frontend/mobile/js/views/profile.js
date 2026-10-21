@@ -65,17 +65,28 @@ export function renderProfile(ctx) {
     if (user.statusText) frag.appendChild(notice({ text: user.statusText }));
     if (user.bio) frag.appendChild(section('About', el('p', { class: 'm-lede' }, user.bio)));
 
-    const roles = (profile.roles || []).slice();
+    // The roles this person holds in this community.
+    //
+    // The answer carries them under the membership, and the profile read a
+    // field that was never there - so the roles were never shown on the
+    // phone, while the desk showed them.
+    const membership = profile.membership || {};
+    const roles = (membership.roles || []).slice();
     if (roles.length) {
       const list = el('div', { class: 'm-list' });
       for (const role of roles) {
         list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, el('span', { class: 'm-role-dot', style: role.color ? { background: role.color } : null })),
+          el('span', { class: 'm-row__lead' },
+            el('span', { class: 'm-role-dot', style: role.color ? { background: role.color } : null })),
           el('span', { class: 'm-row__body' },
             el('span', { class: 'm-row__title' }, role.name),
             (role.description || role.memberCount) ? el('span', { class: 'm-row__sub' }, role.description || (role.memberCount + ' members')) : null)));
       }
-      frag.appendChild(section('Roles', list, { note: profile.serverName || null }));
+      frag.appendChild(section('Roles', list, {
+        note: membership.joinedAt
+          ? 'Here since ' + new Date(membership.joinedAt).toLocaleDateString()
+          : (profile.serverName || null),
+      }));
     }
 
     return frag;

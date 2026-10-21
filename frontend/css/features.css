@@ -524,9 +524,16 @@
   border-radius: var(--radius-md); overflow: hidden; max-width: 100%;
 }
 .embed-media:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+/* The space is reserved before the picture arrives.
+   Without it the message jumps when the preview loads, and the reader is
+   reading one thing while the page moves under them. The picture is fitted
+   inside the box rather than stretched, so a portrait one is centred in it
+   rather than distorted. */
 .embed-image {
-  display: block; max-width: min(420px, 100%); max-height: 320px;
+  display: block; width: 100%; max-width: min(420px, 100%);
+  aspect-ratio: 16 / 10; max-height: 320px;
   object-fit: contain; border-radius: var(--radius-md); border: 1px solid var(--line-2);
+  background: var(--panel-3);
 }
 .embed-video {
   display: block; width: 100%; max-width: 480px; aspect-ratio: 16 / 9;

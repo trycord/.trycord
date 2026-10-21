@@ -50,10 +50,33 @@ const PROTOCOL_VERSION = 'trycord-continuum/1.0';
 //
 // So it is written down here, and it is changed by hand, and only when the
 // extension surface itself changes: a new capability, a changed event, a
-// changed host API. An extension built against 3.0 keeps working across
-// every application release until that surface changes.
+// changed host API.
+//
+// Within a generation the surface only grows, so a package built against an
+// earlier minor of this generation still installs.
+//
+// The **floor** is the oldest surface this family still supports, and it is
+// where a deliberate break is recorded: a release that changes what an
+// extension may ask the host to do moves the floor up, and a package built
+// against what came before it is refused. Nothing else moves it, so a
+// release that adds features, or fixes faults, or changes the interface the
+// application offers, leaves every installed extension working.
+//
+// The ceiling is the application version: the newest surface the family has
+// reached. A package built for something beyond it is asking for a surface
+// this instance cannot know about.
 const EXTENSION_API_VERSION = '3.0';
+
+// The oldest extension surface this family still supports.
+//
+// It is 3.0 because the surface has not broken: the 4.0 release changed
+// what the application does, and none of it is what an extension may ask
+// the host to do. A release that does change that moves this up, and the
+// packages built against what came before it are refused then.
+const EXTENSION_API_FLOOR = '3.0';
 
 const NAME = manifest.name === 'backend' ? 'Trycord' : manifest.name;
 
-module.exports = { VERSION, API_VERSION, PROTOCOL_VERSION, EXTENSION_API_VERSION, NAME };
+module.exports = {
+  VERSION, API_VERSION, PROTOCOL_VERSION, EXTENSION_API_VERSION, EXTENSION_API_FLOOR, NAME,
+};
