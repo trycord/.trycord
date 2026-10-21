@@ -80,6 +80,12 @@ belongs to a person, and it only acts in the community that owns it. See
   only create a key whose scopes are a subset of its own.
 - No account-wide "give me everything" scope.
 
+## The bots
+
+A bot is an application: a first-class identity of its own, with a token
+that is shown once, scopes that say what it may do, and a gateway it holds
+open to hear what happens. See [the bots' page](bots.md).
+
 ## The SDK
 
 `trycord-botjs` is the official client for this API. It calls the routes

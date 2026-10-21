@@ -102,6 +102,29 @@ test('a bot has an account of its own', async (t) => {
       'the application cannot create applications: ' + JSON.stringify(attempt.data));
   });
 
+  await t.test('an application can be switched off and on again', async () => {
+    const off = await sessionApi.patch('/communities/' + communityId + '/applications/' + application.id, {
+      status: 'disabled',
+    });
+    assert.equal(off.status, 200, JSON.stringify(off.data));
+    assert.equal(off.data.application.status, 'disabled');
+
+    // A disabled application is switched off, not merely quiet: the token
+    // still matches, so the status is checked at the door.
+    const refused = await apiClient(base, token).post(
+      '/communities/' + communityId + '/channels/' + channelId + '/messages',
+      { content: 'while it is off' },
+    );
+    assert.equal(refused.status, 403,
+      'a disabled application may not post: ' + JSON.stringify(refused.data));
+
+    const on = await sessionApi.patch('/communities/' + communityId + '/applications/' + application.id, {
+      status: 'active',
+    });
+    assert.equal(on.status, 200, JSON.stringify(on.data));
+    assert.equal(on.data.application.status, 'active');
+  });
+
   await t.test('deleting the application takes the bot out of the community', async () => {
     const botApi = apiClient(base, token);
     const before = await apiClient(instance.baseUrl, session.token)

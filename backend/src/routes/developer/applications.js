@@ -235,6 +235,20 @@ async function getSelf(req, res) {
   });
 }
 
+// PATCH /api/v1/communities/:serverId/applications/:applicationId
+//
+// Change an application: its name, its description, its picture, or whether
+// it is switched on.
+//
+// Switching an application off is not the same as deleting it. A disabled
+// application keeps its commands and its identity and comes back when it is
+// switched on; a deleted one is gone.
+async function updateApplication(req, res) {
+  const app = await bots.updateApp(req.params.applicationId, req.server.id, req.body || {});
+  if (!app) return fail(res, 'NOT_FOUND', 'application not found');
+  res.json({ application: app });
+}
+
 // DELETE /api/v1/communities/:serverId/applications/:applicationId
 //
 // Take the application away for good.
@@ -248,6 +262,44 @@ async function deleteApplication(req, res) {
 }
 
 const definitions = [
+  {
+    method: 'patch',
+    path: '/communities/:serverId/applications/:applicationId',
+    auth: 'principal',
+    scopes: ['communities:write', 'bots:write'],
+    bots: false,
+    community: 'manage',
+    tags: ['Applications'],
+    summary: 'Change a bot application',
+    description:
+      'Changes the name, the description, the picture, or whether the application is switched on.'
+      + ' A disabled application keeps its commands and comes back when it is switched on.',
+    parameters: [
+      pathParam('serverId', 'The community id or its slug.'),
+      pathParam('applicationId', 'The application id.'),
+    ],
+    requestBody: requestBody({
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        description: { type: 'string' },
+        iconUrl: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'disabled'] },
+      },
+    }, 'What to change.'),
+    responses: {
+      200: ok('The application.', {
+        type: 'object',
+        required: ['application'],
+        properties: { application: ref('Application') },
+      }),
+      400: ERRORS.badRequest,
+      401: ERRORS.unauthenticated,
+      403: ERRORS.forbidden,
+      404: ERRORS.missing,
+    },
+    handler: updateApplication,
+  },
   {
     method: 'delete',
     path: '/communities/:serverId/applications/:applicationId',
