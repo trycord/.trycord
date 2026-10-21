@@ -1117,8 +1117,8 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   flex-wrap: wrap;
 }
 .m-msg__author { font-weight: var(--weight-strong); color: var(--text-1); font-size: var(--fs-sm); }
-/* The mark that says a message was written by a bot. */
-.m-msg__botflag {
+/* The mark that says a bot is a bot. It is the same mark the desk uses. */
+.botflag {
   margin-left: 6px;
   font-size: var(--fs-micro);
   font-weight: 800;

@@ -203,6 +203,9 @@ export function memberRow(serverId, member, repaint) {
     nickname: member.nickname || null,
     avatarUrl: avatarUrlOf(member),
     statusText: member.status_text || null,
+    // Whether this member is a bot. The roster says so, and the row says it
+    // too: a member that is a bot is not a member.
+    isBot: !!(member.is_bot || member.isBot),
   };
   const status = presenceOf(member.id);
   const label = presenceLabel(status);
@@ -217,6 +220,8 @@ export function memberRow(serverId, member, repaint) {
     // The roster answered with the roles of every member, and the row read a
     // field that was never there - so a member's roles were never shown at
     // all, and the colour of a role was a colour nothing drew.
+    // The mark that says a bot is a bot, beside the name.
+    flag: user.isBot ? el('span', { class: 'botflag', title: 'This is a bot' }, 'BOT') : null,
     sub: roleChips(member) || (member.isOwner || member.is_owner
       ? 'Community owner' : '@' + (member.username || '')),
     meta: el('span', {

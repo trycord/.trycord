@@ -145,6 +145,10 @@ export function renderDms() {
             presence: peer ? presenceOf(peer.id) : 'offline',
           }),
         title: name,
+        // The mark that says a bot is a bot, beside the name.
+        flag: !group && peer && (peer.isBot || peer.is_bot)
+          ? el('span', { class: 'botflag', title: 'This is a bot' }, 'BOT')
+          : null,
         sub: group
           ? (String(dm.memberCount || 0) + ' people · ' + lastLine(dm))
           : lastLine(dm),

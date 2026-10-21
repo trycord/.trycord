@@ -2031,9 +2031,11 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 /* == settings surfaces ============================================================== */
 
 .settings-profile-top { display: flex; align-items: center; gap: 14px; }
-/* The mark that says a message was written by a bot. A reader should not
-   have to guess whether they are talking to a person. */
-.msg-botflag {
+/* The mark that says a bot is a bot. A reader should not have to guess
+   whether they are talking to a person, and the mark is used wherever a
+   bot's name is shown: in a message, in a member list, in a conversation
+   list and on a profile. */
+.botflag {
   font-size: var(--fs-micro);
   font-weight: 800;
   letter-spacing: .06em;

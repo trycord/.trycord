@@ -372,7 +372,7 @@ export function buildMessageRow(deps) {
 
     const meta = continued ? null : el('div', { class: 'msg-meta' },
       el('span', { class: 'msg-author' }, m.authorName),
-      m.authorIsBot ? el('span', { class: 'msg-botflag', title: 'This is a bot' }, 'BOT') : null,
+      m.authorIsBot ? el('span', { class: 'botflag', title: 'This is a bot' }, 'BOT') : null,
       when ? el('time', {
         class: 'msg-stamp',
         dateTime: when.toISOString(),

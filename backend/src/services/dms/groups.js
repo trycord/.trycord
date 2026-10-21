@@ -33,6 +33,11 @@ function publicUser(row) {
     id: row.id,
     username: row.username,
     displayName: row.display_name,
+    // The picture, and whether the person is a bot. The conversation list
+    // draws a face beside every conversation, and a bot's face says it is a
+    // bot.
+    avatarUrl: row.avatar_url || null,
+    isBot: !!row.is_bot,
     createdAt: row.created_at,
   };
 }
@@ -60,7 +65,7 @@ function displayName(conv, members) {
 async function members(conversationId, t) {
   const q = t || db;
   const rows = await q.all(
-    'SELECT u.id, u.username, u.display_name, u.created_at, dm.joined_at '
+    'SELECT u.id, u.username, u.display_name, u.created_at, u.avatar_url, u.is_bot, dm.joined_at '
     + 'FROM dm_members dm JOIN users u ON u.id = dm.user_id '
     + 'WHERE dm.conversation_id = ? ORDER BY dm.joined_at ASC',
     [conversationId]

@@ -213,7 +213,7 @@ function messageRow(message, previous, handlers) {
     main.appendChild(el('div', { class: 'm-msg__head' },
       el('button', { class: 'm-msg__author', type: 'button', onClick: () => handlers.openProfile(message.authorId) },
         message.authorDisplay || message.authorName || 'Unknown',
-        message.authorIsBot ? el('span', { class: 'm-msg__botflag', title: 'This is a bot' }, 'BOT') : null),
+        message.authorIsBot ? el('span', { class: 'botflag', title: 'This is a bot' }, 'BOT') : null),
       el('time', { class: 'm-msg__time', datetime: message.createdAt || '' }, timeOfDay(message.createdAt))));
   }
   if (message.content) {

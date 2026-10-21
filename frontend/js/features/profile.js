@@ -179,7 +179,12 @@ export function renderProfile(ctx) {
           avatar(profile, { size: 'lg', rounded: true, presence: profile.presence || 'offline' }),
           el('div', { class: 'profile-nameblock' },
             el('p', { class: 'pagehead-kicker' }, '@' + profile.username),
-            el('p', { class: 'profile-name' }, name),
+            el('p', { class: 'profile-name' }, name,
+              // The mark that says a bot is a bot. A profile that does not
+              // say so is a profile of somebody pretending.
+              profile.isBot
+                ? el('span', { class: 'botflag', title: 'This is a bot' }, 'BOT')
+                : null),
             profile.statusText ? el('p', { class: 'profile-status' }, profile.statusText) : null,
             roleChips
               ? el('p', { class: 'profile-roles' }, roleChips)

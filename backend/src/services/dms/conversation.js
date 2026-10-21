@@ -19,7 +19,16 @@ async function peerExists(id) {
 
 function publicPeer(row) {
   if (!row) return null;
-  return { id: row.id, username: row.username, displayName: row.display_name, createdAt: row.created_at };
+  return {
+    id: row.id,
+    username: row.username,
+    displayName: row.display_name,
+    // The picture, and whether the person is a bot: a conversation list
+    // draws a face beside every conversation, and a bot's face says it.
+    avatarUrl: row.avatar_url || null,
+    isBot: !!row.is_bot,
+    createdAt: row.created_at,
+  };
 }
 
 // The conversation row if userId belongs to it, else null. Takes an optional transaction
