@@ -1,0 +1,51 @@
+{
+  "name": "trycord-botjs",
+  "version": "0.1.0",
+  "description": "The official SDK for Trycord bots: the REST API, the application gateway, the core objects and the typed events.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:tests": "tsc -p tsconfig.test.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true});require('node:fs').rmSync('dist-tests',{recursive:true,force:true})\"",
+    "prepack": "npm run clean && npm run build",
+    "test": "npm run build && npm run build:tests && node --test dist-tests/tests/*.test.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": [
+    "trycord",
+    "bot",
+    "sdk",
+    "gateway",
+    "websocket"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trycord/.trycord.git",
+    "directory": "sdk/trycord-botjs"
+  }
+}
