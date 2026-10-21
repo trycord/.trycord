@@ -412,7 +412,11 @@ function memberRow(serverId, item, reload) {
   },
     el('span', { class: 'm-row__lead' }, avatar(user, { size: 'md', presence: true, decorative: true })),
     el('span', { class: 'm-row__body' },
-      el('span', { class: 'm-row__title truncate' }, nameOf(user)),
+      el('span', { class: 'm-row__title truncate' }, nameOf(user),
+        // The mark that says a bot is a bot.
+        item.is_bot || item.isBot
+          ? el('span', { class: 'botflag', title: 'This is a bot' }, 'BOT')
+          : null),
       el('span', { class: 'm-row__sub truncate' }, '@' + (user.username || '')
         + (roles.length ? ' \u00b7 ' + roles.join(', ') : (item.is_owner ? ' \u00b7 Owner' : '')))),
     el('span', { class: 'm-row__trailing' },

@@ -41,7 +41,10 @@ async function listMine(userId) {
   const [peerRows, lastRows] = await Promise.all([
     peerIds.length
       ? db.all(
-        `SELECT id, username, display_name, created_at FROM users WHERE id IN (${peerIds.map(() => '?').join(',')})`,
+        // The picture and the kind come with the person. A conversation
+        // list that shows a name and no face is a list of strangers.
+        `SELECT id, username, display_name, created_at, avatar_url, is_bot
+           FROM users WHERE id IN (${peerIds.map(() => '?').join(',')})`,
         peerIds
       )
       : [],

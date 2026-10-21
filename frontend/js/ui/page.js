@@ -84,7 +84,11 @@ export function row(options) {
   },
     opts.lead ? el('span', { class: 'cardrow-lead' }, opts.lead) : null,
     el('span', { class: 'cardrow-main' },
-      opts.title ? el('span', { class: 'cardrow-title' }, opts.title) : null,
+      // The title, and the mark that may sit beside it: a bot's name is
+      // marked, so a reader knows who they are talking to.
+      opts.title
+        ? el('span', { class: 'cardrow-title' }, opts.title, opts.flag || null)
+        : null,
       opts.sub ? el('span', { class: 'cardrow-sub' }, opts.sub) : null,
       // Anything else the line has to carry: the conversation a search hit
       // came from, for instance.

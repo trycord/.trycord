@@ -41,6 +41,26 @@ test('a group conversation', async (t) => {
     assert.equal(res.data.members.length, 3);
   });
 
+  await t.test('a conversation carries the faces of the people in it', async () => {
+    // A conversation list draws a face beside every conversation. The
+    // faces come from the server, and a list that shows a name and no face
+    // is a list of strangers.
+    const created = await ada.post('/api/dms/groups', {
+      name: 'The faces',
+      userIds: [grace.user.id, alan.user.id],
+    });
+    assert.equal(created.status, 201, JSON.stringify(created.data));
+
+    const list = await ada.get('/api/dms');
+    assert.equal(list.status, 200, JSON.stringify(list.data));
+    const conversation = (list.data || []).find((entry) => entry.id === created.data.id);
+    assert.ok(conversation, 'the conversation is in the list');
+    assert.equal(conversation.isGroup, true);
+    for (const member of conversation.members || []) {
+      assert.ok('avatarUrl' in member, 'every member carries a picture field');
+    }
+  });
+
   await t.test('a group needs a name and somebody else', async () => {
     const nameless = await ada.post('/api/dms/groups', { userIds: [grace.user.id] });
     assert.equal(nameless.status, 400, JSON.stringify(nameless.data));
