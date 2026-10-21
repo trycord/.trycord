@@ -1,6 +1,6 @@
 {
   "name": "trycord-desktop",
-  "version": "6.0.2",
+  "version": "6.0.3",
   "private": true,
   "description": "The Trycord desktop application: the same web client in a window of its own.",
   "license": "SEE LICENSE IN ../LICENSE",
