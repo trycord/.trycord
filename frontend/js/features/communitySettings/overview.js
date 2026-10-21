@@ -14,9 +14,11 @@ import { icon } from '../../../packages/icons.js';
 import Api from '../../../packages/api.js';
 import { head, card, fold, hold, fault, memo } from '../../ui/page.js';
 import { fieldRow, switchControl, serverMark, bannerNode } from '../../ui/primitives.js';
+import { openDialog } from '../../ui/overlays.js';
 import {
-  checkImage, prepareImage, uploadCommunityPicture, removeCommunityPicture,
+  checkImage, uploadCommunityPicture, removeCommunityPicture,
 } from '../../../packages/profileMedia.js';
+import { createCropper } from '../../../packages/imageCropper.js';
 import { copyText } from '../../ui/clipboard.js';
 import { refreshServer } from '../../../packages/store.js';
 import {
@@ -121,6 +123,41 @@ export function overviewSection(ctx) {
     iconPick.addEventListener('change', () => { uploadPicture('icon', iconPick); });
     bannerPick.addEventListener('change', () => { uploadPicture('banner', bannerPick); });
 
+    // The part of the picture to use.
+    //
+    // A community's picture is its own art, so the frame keeps whatever
+    // shape it was drawn in - but the administrator still chooses which part
+    // of the picture is the picture.
+    const choosePart = (file, kind) => new Promise((resolve) => {
+      createCropper(file, { shape: 'free', size: 512 }).then((cropper) => {
+        if (!cropper) {
+          resolve(file);
+          return;
+        }
+        const dialog = openDialog({
+          title: kind === 'banner' ? 'Choose the cover image' : 'Choose the picture',
+          sub: 'Drag the frame over the part of the picture to use.',
+          body: cropper.node,
+          foot: [
+            el('button', {
+              class: 'btn btn--default btn--sm', type: 'button',
+              onClick: () => { cropper.destroy(); dialog.close(); resolve(null); },
+            }, 'Cancel'),
+            el('button', {
+              class: 'btn btn--primary btn--sm', type: 'button',
+              onClick: async () => {
+                const cropped = await cropper.result();
+                cropper.destroy();
+                dialog.close();
+                resolve(cropped || file);
+              },
+            }, 'Use this picture'),
+          ],
+          onClose: () => { cropper.destroy(); resolve(null); },
+        });
+      }).catch(() => resolve(file));
+    });
+
     const uploadPicture = async (kind, input) => {
       const file = input.files && input.files[0];
       if (!file) return;
@@ -133,10 +170,12 @@ export function overviewSection(ctx) {
         return;
       }
       try {
-        // A community's picture is its own art, so it is made smaller but
-        // not cut to a shape it was not drawn in.
-        const prepared = await prepareImage(file, { size: 512, shape: 'none' });
-        await uploadCommunityPicture(serverId, kind, prepared || file);
+        const chosen = await choosePart(file, kind);
+        if (!chosen) {
+          input.value = '';
+          return;
+        }
+        await uploadCommunityPicture(serverId, kind, chosen);
         picturesReport.ok(kind === 'banner'
           ? 'The cover image was uploaded.'
           : 'The picture was uploaded.');

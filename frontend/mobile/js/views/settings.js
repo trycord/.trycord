@@ -11,7 +11,7 @@ import { icon } from '../../../packages/icons.js';
 import { avatar, empty, loading, failure } from '../components.js';
 import { State, loadSession, applyToken } from '../../../packages/store.js';
 import {
-  checkImage, prepareImage, uploadProfilePicture, removeProfilePicture,
+  checkImage, uploadProfilePicture, removeProfilePicture,
 } from '../../../packages/profileMedia.js';
 import Api from '../../../packages/api.js';
 import { TrycordConfig } from '../../../packages/config.js';
@@ -126,13 +126,14 @@ function profileBody() {
       }
       upload.disabled = true;
       try {
-        // The picture is drawn small and square first, so what is uploaded
-        // is the picture the reader chose at a size a face can be drawn
-        // from.
-        const prepared = await prepareImage(file, kind === 'avatar'
-        ? { size: 512, shape: 'square' }
-        : { size: 1024, shape: 'wide' });
-        await uploadProfilePicture(kind, prepared || file);
+        // The part of the picture to use is chosen first.
+        const chosen = await choosePart(file, kind);
+        if (!chosen) {
+          upload.disabled = false;
+          input.value = '';
+          return;
+        }
+        await uploadProfilePicture(kind, chosen);
         await loadSession();
         toast(kind === 'banner' ? 'The cover image was uploaded.' : 'The picture was uploaded.', { type: 'success' });
         paint();
