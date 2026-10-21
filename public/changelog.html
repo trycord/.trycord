@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Trycord">
   <link rel="apple-touch-icon" href="/assets/app-icon.svg">
   <title>Changelog: what changed in Trycord</title>
-  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 5.5.0, with development continuing on main.">
+  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 5.9.6, with development continuing on main.">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
@@ -115,13 +115,29 @@
         <h1>What changed, and when</h1>
         <p class="lede">
           This is curated from the repository's own history. Releases are listed
-          newest first. The current release is <strong>5.5.0</strong>, and the
+          newest first. The current release is <strong>5.9.6</strong>, and the
           entry above it is work on <code>main</code> that has not been cut into
           a release yet.
         </p>
       </div>
 
       <ol class="timeline">
+        <li>
+          <p class="when">5.9.6 &middot; 2026-10-21</p>
+          <h2>The bots' own account, the developer guide, and the settings that were read from nowhere</h2>
+          <ul>
+            <li><strong>Added</strong> — the developer guide is published, and the developer console links to it</li>
+            <li><strong>Added</strong> — a bot can read its community, its members, its channels and its roles</li>
+            <li><strong>Added</strong> — a group conversation can be made and managed on a phone</li>
+            <li><strong>Added</strong> — the SDK speaks CommonJS as well as ESM</li>
+            <li><strong>Fixed</strong> — a bot acted as the account that made it, instead of its own bot account</li>
+            <li><strong>Fixed</strong> — the route that reads one application handed out the stored token hash</li>
+            <li><strong>Fixed</strong> — the gateway told a bot it had subscribed to nothing</li>
+            <li><strong>Fixed</strong> — the relay address and the saved worker count were read through paths that did not exist</li>
+            <li><strong>Fixed</strong> — a cropper dismissed on a phone still uploaded the picture</li>
+            <li><strong>Fixed</strong> — a conversation left open could be marked read by a late answer</li>
+          </ul>
+        </li>
         <li>
           <p class="when">5.5.0 &middot; 2026-10-21</p>
           <h2>A face in the person sheet on a phone, and a switch for an application</h2>
