@@ -1,0 +1,67 @@
+# The desktop build.
+#
+# Two platforms are built: Windows as an installer and a portable file, and
+# Linux as an AppImage. macOS is built by hand - it needs a signed build for
+# the updater to work, and no signed build is published.
+#
+# The update source is the GitHub release of this repository. The updater reads
+# the channel from the reader's own preferences, so a reader on a prerelease
+# stays there.
+
+appId: dev.trycord.desktop
+productName: Trycord
+copyright: Copyright © Trycord
+
+directories:
+  output: dist
+  buildResources: build
+
+# The client is staged into client/ before the build, and it is what the
+# application serves from trycord://app.
+files:
+  - main.js
+  - preload.js
+  - launcher.js
+  - launcher-preload.js
+  - launcher.html
+  - updater.js
+  - client/**/*
+  - package.json
+
+extraResources:
+  - from: client/backend.json
+    to: backend.json
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  artifactName: trycord-${version}-${arch}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Network
+  artifactName: trycord-${version}-${arch}.AppImage
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64]
+  artifactName: trycord-${version}-${arch}.${ext}
+
+publish:
+  provider: github
+  owner: trycord
+  repo: .trycord
+  releaseType: release

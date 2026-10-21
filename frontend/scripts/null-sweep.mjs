@@ -13,7 +13,7 @@ import path from 'node:path';
 import * as acorn from 'acorn';
 import * as walkAst from 'acorn-walk';
 
-const client = '/home/ultim/trycord/.trycord/frontend';
+const client = path.join(path.dirname(new URL(import.meta.url).pathname), '..');
 const dirs = [path.join(client, 'js'), path.join(client, 'mobile', 'js'), path.join(client, 'packages')];
 
 function walk(dir, out = []) {
