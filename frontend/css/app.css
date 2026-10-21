@@ -2173,6 +2173,18 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 }
 .voice-dock__status { grid-column: 1 / -1; }
 
+/* A screen somebody is sharing.
+   The picture is carried peer to peer, so this is the stream the browser
+   sent rather than a picture of the dock's own. */
+.voice-dock__screens { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.voice-dock__screenwrap { display: grid; gap: 4px; }
+.voice-dock__screen {
+  width: 220px; max-width: 100%; aspect-ratio: 16 / 9;
+  object-fit: contain; background: var(--panel-3);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.voice-dock__screenwho { font-size: var(--fs-micro); color: var(--text-3); }
+
 /* The devices.
    The microphone and the speaker the reader chose, and the one speaker
    there is when there is only one. */

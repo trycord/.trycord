@@ -13,7 +13,7 @@ import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import Api from '../../../packages/api.js';
 import { head, card, fold, hold, fault, memo } from '../../ui/page.js';
-import { fieldRow, switchControl } from '../../ui/primitives.js';
+import { fieldRow, switchControl, serverMark, bannerNode } from '../../ui/primitives.js';
 import { copyText } from '../../ui/clipboard.js';
 import { refreshServer } from '../../../packages/store.js';
 import {
@@ -99,6 +99,71 @@ export function overviewSection(ctx) {
         identityReport.fail(error);
       }
     };
+
+    // -- the pictures ---------------------------------------------------------
+    //
+    // The face of the community and its cover. They are uploaded on their
+    // own rather than written with the name and the description, because
+    // they are images: choosing one replaces it at once, and the words
+    // beside them are saved when the operator says so.
+    const iconPick = el('input', {
+      type: 'file', class: 'visually-hidden', tabindex: '-1', accept: 'image/*',
+      'aria-label': 'Choose a picture for this community',
+    });
+    const bannerPick = el('input', {
+      type: 'file', class: 'visually-hidden', tabindex: '-1', accept: 'image/*',
+      'aria-label': 'Choose a cover image for this community',
+    });
+    const picturesReport = reporter();
+    iconPick.addEventListener('change', () => { uploadPicture('icon', iconPick); });
+    bannerPick.addEventListener('change', () => { uploadPicture('banner', bannerPick); });
+
+    const uploadPicture = async (kind, input) => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        await Api.setServerImage(serverId, kind, file);
+        picturesReport.ok(kind === 'banner'
+          ? 'The cover image was uploaded.'
+          : 'The picture was uploaded.');
+        await refreshServer(serverId).catch(() => {});
+      } catch (error) {
+        picturesReport.fail(error);
+      } finally {
+        // The same file can be chosen again after a change.
+        input.value = '';
+      }
+    };
+    const removePicture = async (kind) => {
+      try {
+        await Api.removeServerImage(serverId, kind);
+        picturesReport.ok(kind === 'banner'
+          ? 'The cover image was removed.'
+          : 'The picture was removed.');
+        await refreshServer(serverId).catch(() => {});
+      } catch (error) {
+        picturesReport.fail(error);
+      }
+    };
+
+    const iconUrl = community.icon_url || community.iconUrl || '';
+    const bannerUrl = community.banner_url || community.bannerUrl || '';
+    const pictureRow = (label, description, preview, kind, input, hasPicture) => fieldRow(
+      label, description,
+      el('span', { class: 'rowtools' },
+        preview,
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Upload ' + (kind === 'banner' ? 'a cover image' : 'a picture'),
+          onClick: () => input.click(),
+        }, icon('upload', { size: 14 }), 'Upload'),
+        hasPicture ? el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Remove the ' + (kind === 'banner' ? 'cover image' : 'picture'),
+          onClick: () => removePicture(kind),
+        }, 'Remove') : null,
+        input),
+    );
 
     // -- reach ---------------------------------------------------------------
     const publicToggle = switchControl(!!community.is_public, (on) => {
@@ -292,6 +357,18 @@ export function overviewSection(ctx) {
             class: 'btn btn--primary btn--sm', type: 'button', onClick: saveIdentity,
           }, 'Save identity'),
           identityReport.node,
+          // The cover as it stands now, drawn wide, because that is how it
+          // is seen everywhere else.
+          bannerUrl ? bannerNode(bannerUrl, 'settings-banner') : null,
+          pictureRow('Picture',
+            'The face of the community. It is drawn wherever the community is named.',
+            serverMark(community, { size: 'md' }), 'icon', iconPick, !!iconUrl),
+          pictureRow('Cover',
+            'A wide image above the community, on its profile and on the pages that show it.',
+            el('span', { class: 'settings-note' },
+              bannerUrl ? 'A cover image is set.' : 'No cover image yet.'),
+            'banner', bannerPick, !!bannerUrl),
+          picturesReport.node,
         ]),
       }),
       card({

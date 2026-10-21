@@ -59,7 +59,7 @@ function switchControl(initial, onChange, label) {
 function providerChoice(report, onChanged) {
   const list = el('div', { class: 'm-list', role: 'radiogroup', 'aria-label': 'Media provider' });
 
-  for (const provider of report.providers) {
+  for (const provider of (Array.isArray(report.providers) ? report.providers : [])) {
     const active = provider.inForce;
     list.appendChild(el('button', {
       class: 'm-row' + (active ? ' is-current' : ''),
@@ -184,10 +184,15 @@ function limitSection(report, onChanged) {
 
 // The fields of the provider in force, and nothing else.
 function providerFields(report, onChanged) {
-  const provider = report.providers.find((entry) => entry.inForce) || report.providers[0];
+  const providers = Array.isArray(report.providers) ? report.providers : [];
+  const provider = providers.find((entry) => entry.inForce) || providers[0] || null;
   const rows = [];
 
-  for (const item of provider.fields) {
+  if (!provider) {
+    return section('The provider in force', el('p', { class: 'm-lede' },
+      'The server named no provider, so there is nothing to configure here.'));
+  }
+  for (const item of (provider.fields || [])) {
     const control = textInput({
       type: item.type === 'integer' ? 'number' : 'text',
       value: item.value === null || item.value === undefined ? '' : String(item.value),
@@ -273,7 +278,7 @@ function providerFields(report, onChanged) {
 function diagnosticsSection(report, onChanged) {
   const rows = [];
 
-  for (const provider of report.providers) {
+  for (const provider of (Array.isArray(report.providers) ? report.providers : [])) {
     const described = stateOf(provider.state);
     rows.push(el('div', { class: 'm-row' },
       el('span', { class: 'm-row__body' },

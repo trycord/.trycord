@@ -43,7 +43,8 @@ export const ANSWERS = {
   // asks for /api/users/me and the phone for /api/me.
   'GET /api/users/me': {
     id: 'u1', username: 'ada', displayName: 'Ada', isAdmin: true,
-    avatarUrl: null, bannerUrl: null, bio: '', statusText: '',
+    avatarUrl: '/api/attachments/profile/pf-harness',
+    bannerUrl: null, bio: '', statusText: '',
     email: null, emailVerified: false, verificationRequired: false,
   },
   'GET /api/me': {
@@ -80,9 +81,13 @@ export const ANSWERS = {
   'GET /api/servers/s1/members': {
     items: [
       { id: 'u1', username: 'ada', displayName: 'Ada', nickname: null,
+        // A picture, so the roster is drawn with faces and not with
+        // initials: the path is the one the server serves pictures from.
+        avatarUrl: '/api/attachments/profile/pf-harness',
         roles: [{ id: 'r1', name: 'Maintainer', color: '#ff8a24' }],
         joinedAt: '2026-01-01T00:00:00.000Z' },
       { id: 'u2', username: 'grace', displayName: 'Grace', nickname: null,
+        avatarUrl: '/api/attachments/profile/pf-harness',
         roles: [{ id: 'r2', name: 'Member', color: null }],
         joinedAt: '2026-01-04T00:00:00.000Z' },
     ],
@@ -96,6 +101,9 @@ export const ANSWERS = {
   'GET /api/servers/s1/categories': [{ id: 'cat1', name: 'Text Channels', position: 1 }],
   'GET /api/users/u2': {
     id: 'u2', username: 'grace', displayName: 'Grace Hopper',
+    // A picture, so the checks can see whether a face is drawn from the
+    // server's reference or from the initials.
+    avatarUrl: '/api/attachments/profile/pf-harness',
     createdAt: '2024-02-11T09:00:00.000Z',
     bio: 'Compiler pioneer. Currently untangling a moth.',
     avatarUrl: null, bannerUrl: null, statusText: 'In the workshop',
@@ -358,6 +366,23 @@ export const STUB = `
     }
     window.__calls = window.__calls || [];
     window.__calls.push(method + ' ' + url);
+    // A picture is answered with picture bytes.
+    //
+    // The stub used to answer every request with an empty body, so a face
+    // drawn from the server was a broken image icon - and a check could not
+    // tell a drawn face from a broken one. The bytes here are a real PNG, so
+    // a check that looks at the picture sees one.
+    if (url.indexOf('/attachments/') !== -1) {
+      return Promise.resolve({
+        ok: true, status: 200, statusText: 'OK',
+        headers: { get: function (name) {
+          return String(name).toLowerCase() === 'content-type' ? 'image/png' : null;
+        } },
+        json: function () { return Promise.resolve({}); },
+        text: function () { return Promise.resolve(''); },
+        arrayBuffer: function () { return Promise.resolve(window.__trycordPixel); },
+      });
+    }
     var body = JSON.stringify(answer);
     return Promise.resolve({
       ok: true, status: 200, statusText: 'OK',
@@ -367,6 +392,14 @@ export const STUB = `
       arrayBuffer: function () { return Promise.resolve(new ArrayBuffer(0)); },
     });
   };
+  // One pixel of PNG, so a picture the stub serves is a picture the browser
+  // can decode.
+  window.__trycordPixel = (function () {
+    var binary = atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  })();
   window.addEventListener('error', function (event) {
     errors.push(String((event.error && event.error.stack) || event.message || 'an error'));
   });

@@ -16,6 +16,7 @@ import { State, nameOf } from '../../../packages/store.js';
 import {
   subscribe, current, join, leave, setMuted, setDeafened, enableMic,
   refreshDevices, setInputDevice, setOutputDevice,
+  canShareScreen, startScreenShare, stopScreenShare,
 } from '../../../packages/voiceSession.js';
 
 // The name of somebody in the room.
@@ -91,6 +92,17 @@ export async function joinVoiceCall(channel) {
         row.muted ? el('span', { class: 'm-row__trailing' }, icon('mic-off', { size: 16 })) : null));
     }
 
+    // The screen somebody is sharing, if anybody is.
+    const screens = el('div', { class: 'm-stack' });
+    for (const [userId, stream] of Object.entries(s.sharedScreens || {})) {
+      if (!stream) continue;
+      const video = el('video', {
+        class: 'm-video', autoplay: true, playsinline: true, muted: true,
+      });
+      video.srcObject = stream;
+      screens.appendChild(video);
+    }
+
     const controls = el('div', { class: 'm-stack' });
     const mic = el('button', {
       class: 'm-btn' + (s.muted ? ' m-btn--ghost' : ''), type: 'button',
@@ -109,6 +121,14 @@ export async function joinVoiceCall(channel) {
     controls.appendChild(mic);
     controls.appendChild(deaf);
     controls.appendChild(gone);
+    if (canShareScreen()) {
+      const share = el('button', {
+        class: 'm-btn' + (s.sharing ? ' m-btn--ghost' : ''), type: 'button',
+        'aria-pressed': String(!!s.sharing),
+        onClick: () => (s.sharing ? stopScreenShare() : startScreenShare()),
+      }, s.sharing ? 'Stop sharing' : 'Share your screen');
+      controls.appendChild(share);
+    }
     if (s.listenOnly) {
       const grant = el('button', {
         class: 'm-btn m-btn--primary', type: 'button',
@@ -146,7 +166,7 @@ export async function joinVoiceCall(channel) {
         el('span', { class: 'm-field__label' }, 'Speaker'), picker));
     }
 
-    replaceChildren(host, status, people, devices, controls);
+    replaceChildren(host, status, people, screens, devices, controls);
   };
 
   const unsubscribe = subscribe(paint);

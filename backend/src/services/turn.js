@@ -16,7 +16,8 @@
 //   TRYCORD_TURN_HOST     listen host (default 0.0.0.0)
 //   TRYCORD_TURN_PORT     listen port (default 3478)
 //   TRYCORD_TURN_REALM    realm for long-term credentials (default trycord-turn)
-//   TRYCORD_TURN_USERNAME / TRYCORD_TURN_PASSWORD   long-term credential pair
+//   TRYCORD_TURN_SECRET   the secret the short-lived credentials are signed with
+//   TRYCORD_TURN_RELAY_MIN / TRYCORD_TURN_RELAY_MAX   the ports a relayed call may use
 //
 // HTTP API (mounted by routes/voice.js under /api/turn):
 //   GET /api/turn/credentials   issue short-term credentials for a username
@@ -243,10 +244,11 @@ function indexOfBuf(haystack, needle) {
 
 function cfg() {
   return {
-    // The relay is a service of this instance. It listens on the loopback
-    // unless the operator says otherwise, because a service that is only for
-    // this instance has no business being on every interface.
-    host:   process.env.TRYCORD_TURN_HOST   || '127.0.0.1',
+    // The relay is a service of this instance and it is meant to be reached
+    // from outside it, so it listens on every interface unless the operator
+    // names one. A browser given the loopback resolves that to the reader's
+    // own machine, and a call can never be relayed through it.
+    host:   process.env.TRYCORD_TURN_HOST   || '0.0.0.0',
     port:   Number(process.env.TRYCORD_TURN_PORT) || 3478,
     realm:  process.env.TRYCORD_TURN_REALM   || 'trycord-turn',
     secret: sharedSecret(),

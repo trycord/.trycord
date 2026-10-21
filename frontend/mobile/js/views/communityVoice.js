@@ -16,6 +16,7 @@ import { empty, loading, failure } from '../components.js';
 import { navigate } from '../../../packages/nav.js';
 import { State, refreshServerTree, can, isOwner } from '../../../packages/store.js';
 import Api from '../../../packages/api.js';
+import { joinVoiceCall } from './voiceCall.js';
 
 // What the provider is called when it has a name.
 const PROVIDER_LABEL = {
@@ -62,17 +63,37 @@ export function voiceSection(serverId) {
       }));
     } else {
       for (const channel of channels) {
-        list.appendChild(el('button', {
-          class: 'm-row',
-          type: 'button',
-          onClick: () => navigate('/server/' + serverId + '/channel/' + channel.id),
-        },
-        el('span', { class: 'm-row__lead' }, icon('volume', { size: 17 })),
-        el('span', { class: 'm-row__body' },
+        // The room, and the way into it.
+        //
+        // The name opens the room, so a member can look at it first, and
+        // the button beside it joins the call straight away. Both are here
+        // because the two are different intentions, and a member who wants
+        // to talk should not have to walk through a page to get there.
+        list.appendChild(el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__lead' }, icon('volume', { size: 17 })),
+          el('button', {
+            class: 'm-row__body',
+            type: 'button',
+            onClick: () => navigate('/server/' + serverId + '/channel/' + channel.id),
+          },
           el('span', { class: 'm-row__title truncate' }, channel.name),
           el('span', { class: 'm-row__sub truncate' },
             (channel.type === 'stage' ? 'A stage' : 'A voice channel')
-            + (channel.topic ? ' · ' + channel.topic : '')))));
+            + (channel.topic ? ' · ' + channel.topic : ''))),
+          el('span', { class: 'm-row__actions' },
+            el('button', {
+              class: 'm-btn m-btn--sm m-btn--primary',
+              type: 'button',
+              'aria-label': 'Join ' + (channel.name || 'the room'),
+              onClick: () => {
+                joinVoiceCall({
+                  id: channel.id,
+                  serverId,
+                  name: channel.name,
+                  type: channel.type,
+                });
+              },
+            }, 'Join'))));
       }
     }
 

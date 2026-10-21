@@ -239,7 +239,10 @@ const SCHEMA = [
   {
     key: 'voice.screenSharing', env: 'VOICE_VIDEO_SCREEN_SHARING', type: 'boolean', default: true,
     category: 'voice', label: 'Allow screen sharing',
-    description: 'Cannot be on while voice itself is off.',
+    // The media never reaches this server, so this is a switch the clients
+    // honour rather than one the server refuses. It says so, because a
+    // switch nobody can see the enforcement of is a switch nobody trusts.
+    description: 'Whether a member may share their screen. The clients honour this one, and it cannot be on while voice itself is off.',
     live: true,
   },
   {

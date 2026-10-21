@@ -61,7 +61,16 @@ try {
     if (up) break;
     await wait(100);
   }
-  await wait(500);
+  // The column is drawn from the community's tree, so it arrives after the
+  // shell does. The check waits for it rather than measuring an empty one.
+  for (let i = 0; i < 60; i++) {
+    const drawn = await run.page.evaluate(
+      'return !!(document.querySelector(".context a[href]"));',
+    ).catch(() => false);
+    if (drawn) break;
+    await wait(100);
+  }
+  await wait(300);
 
   // Open the column if it is not open already.
   //

@@ -34,19 +34,39 @@ function paint(identity, user, reload) {
   // The words the reader already wrote are shown, so saving the page does not
   // quietly replace them with an empty box.
   about.value = user.bio || '';
-  let avatarFile = null;
-  let bannerFile = null;
 
+  // The pictures are uploaded the moment they are chosen.
+  //
+  // They used to be held until the profile was saved, so a reader who chose
+  // a picture and looked away saw nothing happen at all - the picture was
+  // chosen, it was on the disk, and the profile still showed the old one.
+  // A picture is not a draft: it is replaced when it is chosen, and the
+  // words beside it are the part that waits to be saved.
   const avatarPick = el('input', {
-    type: 'file', class: 'visually-hidden', tabindex: '-1',
+    type: 'file', class: 'visually-hidden', tabindex: '-1', accept: 'image/*',
     'aria-label': 'Choose a new avatar image',
   });
   const bannerPick = el('input', {
-    type: 'file', class: 'visually-hidden', tabindex: '-1',
+    type: 'file', class: 'visually-hidden', tabindex: '-1', accept: 'image/*',
     'aria-label': 'Choose a new banner image',
   });
-  avatarPick.addEventListener('change', () => { avatarFile = avatarPick.files[0] || null; });
-  bannerPick.addEventListener('change', () => { bannerFile = bannerPick.files[0] || null; });
+
+  const uploadPicture = async (kind, input) => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      await Api.uploadProfileImage(kind, file);
+      toast(kind === 'banner' ? 'The banner was uploaded.' : 'The picture was uploaded.');
+      reload();
+    } catch (e) {
+      errorToast(e);
+    } finally {
+      // The same file can be chosen again after a change.
+      input.value = '';
+    }
+  };
+  avatarPick.addEventListener('change', () => { uploadPicture('avatar', avatarPick); });
+  bannerPick.addEventListener('change', () => { uploadPicture('banner', bannerPick); });
 
   identity.replaceChildren(
     card({
@@ -104,8 +124,6 @@ function paint(identity, user, reload) {
                 statusText: status.value.trim(),
                 bio: about.value,
               });
-              if (avatarFile) await Api.uploadProfileImage('avatar', avatarFile);
-              if (bannerFile) await Api.uploadProfileImage('banner', bannerFile);
               toast('Saved');
               reload();
             } catch (e) { errorToast(e); }
