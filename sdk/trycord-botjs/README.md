@@ -4,8 +4,11 @@ The official SDK for Trycord bots. It talks to the routes the Trycord server
 really has, and it does not pretend to more.
 
 ```bash
-npm install trycord-botjs
+npm install /path/to/.trycord/sdk/trycord-botjs
 ```
+
+The package has not been published to npm yet. Once released, this becomes
+`npm install trycord-botjs`.
 
 ```ts
 import { Client, Events } from 'trycord-botjs';
@@ -49,8 +52,10 @@ The SDK is that call, and the answers are the server's own shapes.
 
 ```ts
 const community = await client.community('the-community');
-const members = await client.members(community.id, { limit: 50 });
-const messages = await client.messages(community.id, 'general', { limit: 20 });
+const memberPage = await client.membersPage(community.id, { limit: 50 });
+const members = memberPage.items;
+const recentPage = await client.messagesPage(community.id, 'general', { limit: 20 });
+const messages = recentPage.items;
 ```
 
 ### Writing
@@ -65,6 +70,11 @@ channel:
 ```ts
 const message = messages[0]!;
 await message.reply('And hello to you.');
+
+const older = await client.messagesPage(community.id, 'general', {
+  limit: 20,
+  before: recentPage.nextBefore ?? undefined,
+});
 ```
 
 ### Declaring a command

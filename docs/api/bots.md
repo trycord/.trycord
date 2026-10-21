@@ -30,7 +30,7 @@ community:
 POST /api/v1/communities/{communityId}/applications
 Authorization: Bearer {a person with communities:write and bots:write}
 
-{ "name": "helper", "scopes": ["messages:read", "messages:write"] }
+{ "name": "helper", "scopes": ["communities:read", "members:read", "channels:read", "roles:read", "messages:read", "messages:write"] }
 ```
 
 The answer carries the application, its token and its credential. **The
@@ -53,6 +53,8 @@ asks for is the scope that says what the route does:
 |---|---|
 | `communities:read` | read a community |
 | `members:read` | list the members of a community |
+| `channels:read` | read channel names, topics and types |
+| `roles:read` | read role names, colors and permissions |
 | `communities:write` | change the community's developer configuration |
 | `bots:read` | list the applications, read one, read its health |
 | `bots:write` | create an application, give it scopes, rotate and revoke it |
@@ -65,10 +67,9 @@ asks for is the scope that says what the route does:
 A credential may only be created with scopes that are a subset of its own,
 so a key can never widen itself.
 
-The scopes are not the whole of the permission. A bot that may post still
-needs the community to let it: it is a member, and the channel has to be one
-it can see. The server checks the bot's own account, not the account of the
-developer who made it.
+The scopes are not the whole of the permission. A bot that may post must be a
+community member and have `SEND_MESSAGES` in that channel. The server checks
+the bot's own account, not the developer who made it.
 
 ## The gateway
 

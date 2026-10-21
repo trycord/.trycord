@@ -207,8 +207,8 @@ const message = {
   required: ['id', 'channel_id', 'author_id', 'content'],
   properties: {
     id: { type: 'string' },
-    channel_id: { type: 'string' },
-    author_id: { type: 'string' },
+      channel_id: { type: 'string' },
+      author_id: { type: 'string' },
     content: { type: 'string' },
     created_at: { type: 'string', format: 'date-time' },
     seq: { type: 'integer' },
@@ -223,7 +223,36 @@ const member = {
     userId: { type: 'string' },
     username: { type: 'string' },
     displayName: { type: 'string' },
+    avatarUrl: { type: ['string', 'null'] },
+    isBot: { type: 'boolean' },
     joinedAt: { type: ['string', 'null'], format: 'date-time' },
+  },
+};
+
+const channel = {
+  type: 'object',
+  required: ['id', 'name', 'type'],
+  properties: {
+    id: { type: 'string' },
+    server_id: { type: 'string' },
+    name: { type: 'string' },
+    type: { type: 'string' },
+    topic: { type: ['string', 'null'] },
+    category_id: { type: ['string', 'null'] },
+    position: { type: 'integer' },
+    slow_mode: { type: 'integer' },
+  },
+};
+
+const role = {
+  type: 'object',
+  required: ['id', 'name'],
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    color: { type: ['string', 'null'] },
+    permissions: { type: 'array', items: { type: 'string' } },
+    position: { type: 'integer' },
   },
 };
 
@@ -241,6 +270,8 @@ module.exports = {
   Principal: principal,
   Message: message,
   Member: member,
+  Channel: channel,
+  Role: role,
   ScopeCatalogue: {
     type: 'object',
     required: ['groups'],

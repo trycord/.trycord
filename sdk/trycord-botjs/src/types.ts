@@ -58,7 +58,8 @@ export interface Channel {
 
 /** A member of a community. */
 export interface Member {
-  id: string;
+  id?: string;
+  userId?: string;
   serverId?: string;
   server_id?: string;
   username?: string;
@@ -215,8 +216,18 @@ export interface Page<T> {
   offset?: number;
 }
 
+/** A page of older messages, addressed by the last sequence seen. */
+export interface CursorPage<T> {
+  items: T[];
+  limit: number;
+  before: number | null;
+  hasMore: boolean;
+  nextBefore: number | null;
+}
+
 /** The answer to a health check. */
 export interface Health {
+  state?: 'configured' | 'active' | 'failing' | 'revoked' | 'disabled' | string;
   ok?: boolean;
   status?: string;
   detail?: string;

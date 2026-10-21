@@ -10,7 +10,7 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { EVENTS, on, joinDm, leaveDm } from '../../packages/realtime.js';
 import {
-  State, emit, nameOf, dmPeer, dmName, dmPeople, refreshDms, presenceOf, on as onStore,
+  State, emit, nameOf, dmPeer, dmName, dmPeople, refreshDms, refreshFriends, presenceOf, on as onStore,
 } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
 import { avatar } from '../ui/primitives.js';
@@ -18,7 +18,7 @@ import { head, card, row, blank, fault, fold, stamp } from '../ui/page.js';
 import { conversationSurface, asMessage } from '../ui/chat.js';
 import * as encrypted from '../ui/encrypted.js';
 import { personSheetEntries } from '../ui/person.js';
-import { errorToast, toast, openDialog } from '../ui/overlays.js';
+import { errorToast, toast, openDialog, confirmDialog } from '../ui/overlays.js';
 
 // -- the list -----------------------------------------------------------------
 
@@ -37,10 +37,14 @@ const lastLine = (dm) => {
 // the list offered here is the reader's friends. The server applies the
 // same gate again when the group is created, because the client is not the
 // authority on who may talk to whom.
-function newGroup() {
-  const friends = (State.friends || []).slice();
+async function newGroup() {
+  let friends = (State.friends || []).slice();
   if (!friends.length) {
-    toast('Open a friend first: a group is a conversation with more than one person in it.', { type: 'error' });
+    try { friends = await refreshFriends(); }
+    catch (error) { errorToast(error); return; }
+  }
+  if (!friends.length) {
+    toast('Add a friend before starting a group.', { type: 'error' });
     return;
   }
   const name = el('input', {
@@ -300,7 +304,24 @@ export function renderDmConversation(ctx) {
         el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
           onClick: () => addToGroup(dm),
-        }, icon('user-plus', { size: 15 }), 'Add somebody'))
+        }, icon('user-plus', { size: 15 }), 'Add somebody'),
+        el('button', {
+          class: 'btn btn--danger btn--sm', type: 'button',
+          onClick: async () => {
+            const yes = await confirmDialog({
+              title: 'Leave this group?',
+              body: 'You will stop receiving new messages here.',
+              confirmLabel: 'Leave group', danger: true,
+            });
+            if (!yes) return;
+            try {
+              await Api.leaveDmGroup(conversationId);
+              toast('You left the group.');
+              refreshDms().catch(() => {});
+              navigate('/dms');
+            } catch (error) { errorToast(error); }
+          },
+        }, 'Leave group'))
       : el('a', {
         class: 'btn btn--ghost btn--sm',
         href: peer ? path('/users/' + peer.id) : path('/friends'),

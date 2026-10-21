@@ -87,10 +87,12 @@ never sent to a browser.
 | Key | What it is |
 |---|---|
 | `voice.mesh.maxParticipants` | How many people one mesh room holds. |
-| `voice.mesh.stunUrls` | STUN servers, comma-separated. |
-| `voice.mesh.turnUrl` | The TURN relay. |
-| `voice.mesh.turnUsername` | The username for a static TURN credential. |
-| `voice.mesh.turnCredential` | The password half of a static TURN credential. A secret. |
+| `voice.mesh.publicUrl` | The address the relay is published at. It has to point straight at this instance. |
+
+The instance supplies its own STUN and TURN servers and mints a short-lived
+credential for each voice session. There are no Mesh URLs, usernames or
+passwords to enter in the console: the one thing an operator has to state is
+the address clients can reach the relay on.
 
 ### Cloudflare Realtime
 
@@ -117,39 +119,27 @@ The participant limit is shared in meaning and per-provider in value: each
 provider holds its own, and the console shows the one belonging to the provider
 in force.
 
-### The settings the previous release used
+### Settings from earlier releases
 
-The keys below are the ones the previous release saved. They still work, and an
-operator does not have to retype anything:
+Cloudflare IDs and the old participant limit still carry forward:
 
 | Old key | It is now |
 |---|---|
 | `voice.sfuAppId` | `voice.cloudflare.appId` |
 | `voice.sfuAppSecret` | `voice.cloudflare.appSecret` |
-| `voice.stunUrls` | `voice.mesh.stunUrls` |
-| `voice.turnUrl` | `voice.mesh.turnUrl` |
-| `voice.turnUsername` | `voice.mesh.turnUsername` |
-| `voice.turnCredential` | `voice.mesh.turnCredential` |
-| `voice.maxParticipants` | the limit of the provider in force |
+| `voice.maxParticipants` | `voice.mesh.maxParticipants` |
 
-The rule is one sentence: **the newer key wins; the older key is read only
-while the newer one has never been saved.** The first save of a provider's
-configuration writes the newer key, and from that moment the older one is not
-consulted again. The console says where a value came from - `saved here`, `from
-the environment`, `the default`, or `from the older setting voice.stunUrls` -
-so an operator can see which of the two is in force.
-
-The old keys are not shown in the configuration catalogue: the console edits the
-new ones, and showing two fields for one value would be a trap.
+Old manually entered Mesh STUN and TURN settings are left in storage, but the
+runtime no longer uses them. New writes are refused: Mesh always uses the
+instance's own relay, and its credentials are issued per session.
 
 ---
 
 ## The relay the instance runs itself
 
 The instance ships a STUN and TURN server (`backend/src/services/turn.js`) and
-nothing else starts it, so the voice subsystem does: with the mesh in force and
-no STUN or TURN address configured, the relay this instance runs is the one the
-peers are given.
+nothing else starts it, so the voice subsystem does. The relay this instance
+runs is the one the peers are given.
 
 There is nothing to write down. No STUN address, no TURN address, no
 username, no password: the instance starts the relay, publishes the address
@@ -164,7 +154,7 @@ the peers are given:
 | `TRYCORD_TURN_PORT` | The port, `3478` by default. |
 | `TRYCORD_TURN_REALM` | The realm used for the credential. |
 | `TRYCORD_TURN_SECRET` | The secret the credential is derived from. |
-| `TRYCORD_VOICE_PUBLIC_URL` | The address the peers are given. It has to be an address a browser can reach, and it is a voice address: a hostname that points straight at this instance, DNS only and not proxied. |
+| `TRYCORD_VOICE_PUBLIC_URL` | The address the peers are given. It has to be an address a browser can reach, and it is a voice address: a hostname that points straight at this instance, DNS only and not proxied. The console writes the same value as `voice.mesh.publicUrl`. |
 | `TRYCORD_VOICE_PUBLIC_URL_V4` | The IPv4 address, when the voice URL is the IPv6 one and the instance has both. |
 | `TRYCORD_VOICE_PUBLIC_URL_V6` | The IPv6 address, when the voice URL is the IPv4 one and the instance has both. |
 
@@ -174,7 +164,8 @@ How long the connectivity probe waits for an answer is
 The address the peers are given is chosen in this order, and the console says
 which one it used:
 
-1. `TRYCORD_VOICE_PUBLIC_URL` (or the `voice.publicUrl` setting).
+1. `TRYCORD_VOICE_PUBLIC_URL`, or the `voice.mesh.publicUrl` setting the
+   console writes.
 2. `TRYCORD_TURN_HOST`, when it is not a wildcard.
 3. `TRYCORD_PUBLIC_URL` - which is usually the address of a proxy that
    terminates TLS. A proxy carries HTTP and not the arbitrary UDP a TURN

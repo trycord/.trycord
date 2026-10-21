@@ -13,6 +13,7 @@ import { State, loadSession, applyToken } from '../../../packages/store.js';
 import {
   checkImage, uploadProfilePicture, removeProfilePicture,
 } from '../../../packages/profileMedia.js';
+import { createCropper } from '../../../packages/imageCropper.js';
 import Api from '../../../packages/api.js';
 import { TrycordConfig } from '../../../packages/config.js';
 import { path, publicPath } from '../../../packages/nav.js';
@@ -105,6 +106,55 @@ function profileBody() {
       toast('Profile saved.', { type: 'success' });
     } catch (error) { toast(error.message, { type: 'danger' }); }
     finally { save.disabled = false; }
+  });
+
+  // The part of the picture to use.
+  //
+  // The reader chooses: the picture is shown, a frame is dragged over the
+  // part of it they want, and that part is what is uploaded. A frame over
+  // the middle of a photograph is rarely the face in it.
+  const choosePart = (file, kind) => new Promise((resolve) => {
+    const shape = kind === 'avatar' ? 'square' : 'wide';
+    createCropper(file, { shape, size: kind === 'avatar' ? 512 : 1024 }).then((cropper) => {
+      if (!cropper) {
+        toast('This browser can’t crop pictures. The full image will be used.');
+        resolve(file);
+        return;
+      }
+      let settled = false;
+      let layer;
+      const finish = (picked) => {
+        if (settled) return;
+        settled = true;
+        cropper.destroy();
+        resolve(picked);
+        layer.close();
+      };
+      layer = sheet({
+        title: kind === 'avatar' ? 'Choose your picture' : 'Choose your cover',
+        body: el('div', { class: 'm-stack' },
+          el('p', { class: 'm-section__note' }, 'Drag the frame over the part of the picture to use.'),
+          cropper.node),
+        footer: el('div', { class: 'm-actions' },
+          el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => finish(null) }, 'Cancel'),
+          el('button', {
+            class: 'm-btn m-btn--sm m-btn--primary', type: 'button',
+            onClick: async () => {
+              try { finish(await cropper.result() || file); }
+              catch { toast('Couldn’t crop that picture. Try another image.'); }
+            },
+          }, 'Use this picture')),
+        onClose: () => {
+          if (settled) return;
+          settled = true;
+          cropper.destroy();
+          resolve(null);
+        },
+      });
+    }).catch(() => {
+      toast('Couldn’t open the cropper. The full image will be used.');
+      resolve(file);
+    });
   });
 
   function imageRow(title, hint, url, kind, label) {

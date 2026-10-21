@@ -31,6 +31,7 @@ import type {
   Command,
   CommandOption,
   Community,
+  CursorPage,
   Health,
   Member,
   Message,
@@ -64,6 +65,13 @@ export interface ClientOptions {
 
 type Listener = (event: GatewayEnvelope) => void | Promise<void>;
 
+interface ApplicationIdentity {
+  application?: Application;
+  communityId?: string;
+  serverId?: string;
+  server_id?: string;
+}
+
 /** The default instance address. */
 export const DEFAULT_BASE_URL = 'https://trycord.dev';
 
@@ -79,6 +87,7 @@ export class Client {
 
   private readonly options: ClientOptions;
   private readonly listeners = new Map<string, Set<Listener>>();
+  private identityRequest: Promise<ApplicationIdentity> | null = null;
   private gateway: Gateway | null = null;
   private ready = false;
 
@@ -192,14 +201,8 @@ export class Client {
    * application is asked for its own and its community is read.
    */
   async communities(): Promise<CommunityObject[]> {
-    const applications = await this.applications();
-    const out: CommunityObject[] = [];
-    for (const application of applications) {
-      const communityId = application.serverId || application.server_id;
-      if (!communityId) continue;
-      out.push(await this.community(communityId));
-    }
-    return out;
+    const communityId = await this.applicationCommunityId();
+    return communityId ? [await this.community(communityId)] : [];
   }
 
   /**
@@ -228,11 +231,29 @@ export class Client {
    * @param options How many, and from where.
    */
   async members(communityId: string, options: { limit?: number; offset?: number } = {}): Promise<Member[]> {
-    const data = await this.rest.request<{ members?: Member[] } | Member[]>({
+    return (await this.membersPage(communityId, options)).items;
+  }
+
+  /** Read one page of community members. */
+  async membersPage(communityId: string, options: { limit?: number; offset?: number } = {}) {
+    const data = await this.rest.request<{
+      members?: Member[]; total?: number; limit?: number; offset?: number;
+      hasMore?: boolean; has_more?: boolean;
+    } | Member[]>({
       path: `/communities/${encodeURIComponent(communityId)}/members`,
       query: { limit: options.limit, offset: options.offset },
     });
-    return Array.isArray(data) ? data : (data.members || []);
+    const items = Array.isArray(data) ? data : (data.members || []);
+    if (Array.isArray(data)) {
+      return { items, total: items.length, limit: options.limit ?? 50, offset: options.offset ?? 0, hasMore: false };
+    }
+    return {
+      items,
+      total: data.total ?? items.length,
+      limit: data.limit ?? options.limit ?? 50,
+      offset: data.offset ?? options.offset ?? 0,
+      hasMore: data.hasMore ?? data.has_more ?? false,
+    };
   }
 
   /**
@@ -250,13 +271,9 @@ export class Client {
    * @param communityId The community's id or slug.
    */
   async applications(communityId?: string): Promise<Application[]> {
-    const id = communityId || (await this.findApplicationId());
-    if (!id) return [];
-    // The list is per community, so the application's own community is used
-    // when the caller did not name one.
-    const community = communityId || (await this.applicationCommunityId());
-    if (!community) return [];
-    return listApplications(this.rest, community);
+    if (communityId) return listApplications(this.rest, communityId);
+    const data = await this.selfApplication();
+    return data ? [data] : [];
   }
 
   /**
@@ -267,8 +284,9 @@ export class Client {
    */
   async commands(applicationId?: string): Promise<Command[]> {
     const id = applicationId || this.options.applicationId || (await this.findApplicationId());
-    if (!id) return [];
-    return listCommands(this.rest, id);
+    const communityId = await this.applicationCommunityId();
+    if (!id || !communityId) return [];
+    return listCommands(this.rest, communityId, id);
   }
 
   /**
@@ -320,8 +338,11 @@ export class Client {
    */
   async health(applicationId?: string): Promise<Health> {
     const id = applicationId || this.options.applicationId || (await this.findApplicationId());
-    if (!id) throw new UsageError('The SDK does not know which application to ask about.');
-    return this.rest.request<Health>({ path: `/applications/${encodeURIComponent(id)}/health` });
+    const communityId = await this.applicationCommunityId();
+    if (!id || !communityId) throw new UsageError('The SDK does not know which application and community to ask about.');
+    return this.rest.request<Health>({
+      path: `/communities/${encodeURIComponent(communityId)}/applications/${encodeURIComponent(id)}/health`,
+    });
   }
 
   /**
@@ -345,33 +366,71 @@ export class Client {
   async messages(
     communityId: string,
     channelId: string,
-    options: { limit?: number } = {},
+    options: { limit?: number; before?: number } = {},
   ): Promise<MessageObject[]> {
-    const data = await this.rest.request<{ messages?: Message[] } | Message[]>({
+    return (await this.messagesPage(communityId, channelId, options)).items;
+  }
+
+  /** Read one page of recent messages or older messages before a sequence. */
+  async messagesPage(
+    communityId: string,
+    channelId: string,
+    options: { limit?: number; before?: number } = {},
+  ): Promise<CursorPage<MessageObject>> {
+    const data = await this.rest.request<{
+      messages?: Message[]; limit?: number; before?: number | null;
+      hasMore?: boolean; nextBefore?: number | null;
+    } | Message[]>({
       path: `/communities/${encodeURIComponent(communityId)}/channels/${encodeURIComponent(channelId)}/messages`,
-      query: { limit: options.limit },
+      query: { limit: options.limit, before: options.before },
     });
     const rows = Array.isArray(data) ? data : (data.messages || []);
-    return rows.map((row) => new MessageObject(row, this.rest));
+    const items = rows.map((row) => new MessageObject(row, this.rest));
+    if (Array.isArray(data)) {
+      return {
+        items,
+        limit: options.limit ?? 20,
+        before: options.before ?? null,
+        hasMore: false,
+        nextBefore: null,
+      };
+    }
+    return {
+      items,
+      limit: data.limit ?? options.limit ?? 20,
+      before: data.before ?? options.before ?? null,
+      hasMore: data.hasMore ?? false,
+      nextBefore: data.nextBefore ?? null,
+    };
+  }
+
+  private async selfApplication(): Promise<Application | null> {
+    const data = await this.applicationIdentity();
+    return data?.application || null;
   }
 
   private async findApplicationId(): Promise<string | null> {
     if (this.options.applicationId) return this.options.applicationId;
-    // The token knows the application: the server says so when the client
-    // asks who it is.
-    const data = await this.rest.request<{ application?: { id?: string }; id?: string }>({
-      path: '/applications/self',
-      idempotent: true,
-    });
-    return data?.application?.id || data?.id || null;
+    const data = await this.applicationIdentity();
+    return data?.application?.id || null;
   }
 
   private async applicationCommunityId(): Promise<string | null> {
-    const data = await this.rest.request<{ communityId?: string; serverId?: string; server_id?: string }>({
-      path: '/applications/self',
-      idempotent: true,
-    });
+    const data = await this.applicationIdentity();
     return data?.communityId || data?.serverId || data?.server_id || null;
+  }
+
+  private async applicationIdentity(): Promise<ApplicationIdentity> {
+    if (!this.identityRequest) {
+      this.identityRequest = this.rest.request<ApplicationIdentity>({
+        path: '/applications/self',
+        idempotent: true,
+      }).catch((error) => {
+        this.identityRequest = null;
+        throw error;
+      });
+    }
+    return this.identityRequest;
   }
 
   private dispatch(event: GatewayEnvelope): void {

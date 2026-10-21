@@ -16,7 +16,7 @@ import { State } from '../../../packages/store.js';
 import {
   subscribe, current, join, leave, setMuted, setDeafened, enableMic,
   refreshDevices, setInputDevice, setOutputDevice,
-  canShareScreen, startScreenShare, stopScreenShare,
+  canShareScreen, startScreenShare, stopScreenShare, CONNECTION_STATES,
 } from '../../../packages/voiceSession.js';
 
 // The name of somebody in the room.
@@ -47,15 +47,7 @@ function personOf(participant, serverId) {
 }
 
 // The state of the connection, in a word.
-const STATE_WORD = {
-  idle: 'Not in a room',
-  joining: 'Joining the room',
-  connecting: 'Connecting',
-  connected: 'Connected',
-  reconnecting: 'Reconnecting',
-  failed: 'The connection failed',
-  leaving: 'Leaving',
-};
+
 
 /**
  * Join a voice channel and show the call.
@@ -83,7 +75,7 @@ export async function joinVoiceCall(channel) {
     const status = el('div', { class: 'm-notice m-notice--info', role: 'status' },
       el('span', { class: 'm-notice__icon' }, icon('info', { size: 18 })),
       el('div', { class: 'm-notice__main' },
-        el('div', { class: 'm-notice__text' }, STATE_WORD[state] || 'Connected')));
+        el('div', { class: 'm-notice__text' }, CONNECTION_STATES[state] || CONNECTION_STATES.connected)));
 
     const people = el('div', { class: 'm-list' });
     const rows = (s.participants || []);

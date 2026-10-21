@@ -43,8 +43,10 @@ function rosterRow(participant, serverId, { small } = {}) {
   const label = person.nickname || person.displayName || person.username || 'Someone';
   const side = participant.connection === 'reconnecting'
     ? el('span', { class: 'chip chip--warn' }, 'Reconnecting')
-    : participant.connection === 'connecting'
-      ? el('span', { class: 'chip chip--quiet' }, 'Connecting')
+    : participant.connection === 'failed'
+      ? el('span', { class: 'chip chip--danger' }, 'The connection failed')
+      : participant.connection === 'connecting'
+        ? el('span', { class: 'chip chip--quiet' }, 'Connecting')
       : participant.muted
         ? el('span', { class: 'voice-room__muteflag' }, icon('mic-off', { size: 13 }))
         : null;

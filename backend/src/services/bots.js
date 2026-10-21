@@ -188,11 +188,11 @@ function botUsername(label) {
 
 // A username nobody has taken. The bot's name is a suggestion; a collision
 // with a real account must not stop a developer from making their bot.
-async function freeBotUsername(label) {
+async function freeBotUsername(label, conn = db) {
   const base = botUsername(label);
   for (let attempt = 0; attempt < 50; attempt++) {
     const candidate = attempt === 0 ? base : base.slice(0, BOT_USERNAME_MAX - 5) + '_' + attempt;
-    const taken = await db.get('SELECT id FROM users WHERE username = ?', [candidate]);
+    const taken = await conn.get('SELECT id FROM users WHERE username = ?', [candidate]);
     if (!taken) return candidate;
   }
   return base + '_' + crypto.randomBytes(3).toString('hex');
@@ -203,20 +203,48 @@ async function freeBotUsername(label) {
 // The account has no password: it cannot sign in, and there is nothing to
 // guess. The membership is an ordinary one, so the bot gets the rights the
 // community gives a member and not the rights of the developer who made it.
-async function createBotAccount(app, label) {
-  const username = await freeBotUsername(label);
+async function createBotAccount(app, label, conn = db, { restore = false } = {}) {
+  const username = await freeBotUsername(label, conn);
   const userId = uuid();
-  await db.run(
+  await conn.run(
     'INSERT INTO users (id, username, display_name, password_hash, created_at, is_bot, avatar_url)'
     + ' VALUES (?, ?, ?, ?, ?, ?, ?)',
     [userId, username, label, 'bot:' + crypto.randomBytes(24).toString('hex'), now(), 1, app.icon_url || null]
   );
   const memberships = require('./memberships');
-  await memberships.join(app.server_id, { id: userId, username });
+  const member = { id: userId, username };
+  if (restore) await memberships.restoreIn(app.server_id, member, conn);
+  else await memberships.joinIn(app.server_id, member, conn);
   return userId;
 }
 
-async function createApp({ serverId, ownerUserId, name, description, iconUrl }) {
+async function ensureBotAccountIn(app, conn) {
+  const existing = app.bot_user_id
+    ? await conn.get('SELECT id, username, is_bot FROM users WHERE id = ?', [app.bot_user_id])
+    : null;
+  const separateBot = existing
+    && String(existing.id) !== String(app.owner_user_id)
+    && Number(existing.is_bot) === 1;
+
+  if (separateBot) return { userId: existing.id, created: false };
+
+  const userId = await createBotAccount(app, app.name, conn, { restore: true });
+  await conn.run('UPDATE bot_applications SET bot_user_id = ? WHERE id = ?', [userId, app.id]);
+  return { userId, created: true };
+}
+
+async function ensureBotIdentity(app) {
+  const result = await db.transaction(async (t) => {
+    const current = await t.get('SELECT * FROM bot_applications WHERE id = ?', [app.id]);
+    if (!current) return null;
+    return ensureBotAccountIn(current, t);
+  });
+  if (!result) return null;
+  if (result.created) require('./memberships').afterJoin(app.server_id);
+  return getApp(app.id);
+}
+
+async function createApp({ serverId, ownerUserId, name, description, iconUrl }, conn = null) {
   const label = String(name || '').trim();
   if (!label || label.length > 64) bad('name must be 1-64 characters');
   const desc = description == null ? null : String(description).trim().slice(0, 500) || null;
@@ -230,19 +258,24 @@ async function createApp({ serverId, ownerUserId, name, description, iconUrl }) 
   const id = uuid();
   const token = TOKEN_PREFIX + crypto.randomBytes(24).toString('hex');
   const ts = now();
-  await db.run(
-    'INSERT INTO bot_applications'
-    + ' (id, owner_user_id, server_id, name, description, icon_url, status, token_hash, created_at, updated_at)'
-    + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, ownerUserId, serverId, label, desc, icon, 'active', hashToken(token), ts, ts]
-  );
-  const row = await getApp(id, serverId);
-  // The bot's account is created with the application, so the two are born
-  // together and an application is never left without an identity.
-  const botUserId = await createBotAccount(row, label);
-  await db.run('UPDATE bot_applications SET bot_user_id = ? WHERE id = ?', [botUserId, id]);
+  const create = async (t) => {
+    await t.run(
+      'INSERT INTO bot_applications'
+      + ' (id, owner_user_id, server_id, name, description, icon_url, status, token_hash, created_at, updated_at)'
+      + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, ownerUserId, serverId, label, desc, icon, 'active', hashToken(token), ts, ts]
+    );
+    // The bot's account is created with the application, so the two are born
+    // together and an application is never left without an identity.
+    const app = { id, server_id: serverId, owner_user_id: ownerUserId, icon_url: icon };
+    const botUserId = await createBotAccount(app, label, t);
+    await t.run('UPDATE bot_applications SET bot_user_id = ? WHERE id = ?', [botUserId, id]);
+    return t.get('SELECT * FROM bot_applications WHERE id = ?', [id]);
+  };
+  const row = conn ? await create(conn) : await db.transaction(create);
+  if (!conn) require('./memberships').afterJoin(serverId);
   // The token is the only time it exists in plaintext.
-  return Object.assign(appShape(await getApp(id, serverId)), { token });
+  return Object.assign(appShape(row), { token });
 }
 
 async function updateApp(appId, serverId, patch) {
@@ -374,6 +407,12 @@ async function appByToken(token) {
   const got = String(row.token_hash || '');
   if (got.length !== want.length) return null;
   if (!crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want))) return null;
+  const botUser = row.bot_user_id
+    ? await db.get('SELECT id, is_bot FROM users WHERE id = ?', [row.bot_user_id])
+    : null;
+  if (!botUser || Number(botUser.is_bot) !== 1 || String(botUser.id) === String(row.owner_user_id)) {
+    return ensureBotIdentity(row);
+  }
   return row;
 }
 
@@ -432,13 +471,9 @@ async function refuseIfEncrypted(channelRow, reason) {
   throw e;
 }
 
-// The account the application acts as.
-//
-// The bot's own account where it has one. An application made before the
-// column existed has none, and acts as its owner until it is saved again -
-// the old behaviour, kept working rather than breaking.
+// The account the application acts as. It is never the developer's account.
 function botUserIdOf(app) {
-  return (app && app.bot_user_id) || (app && app.owner_user_id) || null;
+  return (app && app.bot_user_id) || null;
 }
 
 async function postAsApp(app, channelRow, content, { kind } = {}) {
@@ -517,6 +552,7 @@ module.exports = {
   listApps, getApp, createApp, removeApp,
   listCommands, setCommand, removeCommand,
   appByToken, resolveCommand, postAsApp, respond, hashToken, appShape, commandShape, bad,
+  createBotAccount, ensureBotAccountIn, ensureBotIdentity,
   refuseIfEncrypted,
   updateApp, normaliseOptions, bindArguments, readOptions,
   MAX_RESPONSE, OPTION_TYPES, substitute,

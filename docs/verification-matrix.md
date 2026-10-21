@@ -15,9 +15,16 @@ column on the right says which test does it.
 
 ```
 cd backend && npm test                    # everything
-cd .. && node --test frontend/tests/      # the client
-cd .. && node --test public/tests/       # the public website
+cd ../frontend && node --test "tests/**/*.test.js"   # the client
+cd ../public && node --test "tests/**/*.test.js"     # the public website
+cd ../sdk/trycord-botjs && npm test                  # the SDK
+cd ../frontend && node scripts/browser-sweep.mjs     # every route, in a browser
 ```
+
+The browser sweep is a real Chromium, real CSS and real pixels. The instance's
+answers are stubbed, because the browser in this environment cannot reach the
+network; the layout, the clipping, the touch targets, the accessible names
+and the console errors are all real.
 
 Where a surface depends on another subsystem, the test exercises that one too:
 the federation relay is proved between two independently running instances with
@@ -28,6 +35,7 @@ separate databases and separate keys, not against a mock.
 | Home | `/home` | `features/home.js` | `features/home.js` reads the feed, the places and the announcements |
 | Direct messages | `/dms` | `features/dms.js` | `tests/integration/` — a conversation is opened, a message is sent and read back |
 | A conversation | `/dms/:id` | `features/dms.js` + `ui/chat.js` | `tests/e2ee/` — an envelope is stored and opened by the recipient's ratchet |
+| A group conversation | `/dms/:id` | `features/dms.js`, `mobile/js/views/dms.js` | `frontend/tests/dm-groups.test.js` and `frontend/tests/mobile-dm-groups.test.js` — a group is created, named, and its members listed |
 | Notifications | `/notifications` | `features/inbox.js` | `features/inbox.js` and the `dm:read` event in `tests/e2ee/messaging.test.js` |
 | Discover | `/discover` | `features/discover.js` | `public/tests/directory.test.js` — the public directory resolves its icons and its links |
 | Friends | `/friends` | `features/friends.js` | `tests/integration/` — a request, an acceptance, a removal |
@@ -46,6 +54,8 @@ separate databases and separate keys, not against a mock.
 | Appearance | `/settings/appearance` | `features/settingsClient.js` | `frontend/tests/layout.test.js` — the widths, the regions and the density |
 | Connection | `/settings/backend` | `features/settingsClient.js` | `public/tests/resolver*.test.js` — the address is resolved once and used for everything |
 | Updates | `/settings/updates` | `features/settingsClient.js` | reads the version the **server** reports, not one written into the client |
+| The developer console | `/developer` | `features/developer.js`, `mobile/js/views/developer.js` | `backend/tests/developer/applications.test.js` — the scopes, the token, the identity and the pagination a bot sees |
+| The SDK | `sdk/trycord-botjs` | `sdk/trycord-botjs/` | `sdk/trycord-botjs/tests/` — the routes it calls, the events it accepts and the CommonJS build |
 | Admin overview | `/admin` | `features/adminSurfaces.js` | `frontend/tests/studios.test.js` — every rail entry opens a section with content |
 | Admin people | `/admin/users` | `features/adminSurfaces.js` | `frontend/tests/studios.test.js` |
 | Admin approvals | `/admin/approvals` | `features/adminSurfaces.js` | `frontend/tests/renderers.test.js` — every registry page has a renderer in both modules |
@@ -83,22 +93,30 @@ recorded. These are verified by their own suites.
 | The developer platform | `tests/developer/` | The scopes, the rotation, the OpenAPI document against the routes that serve it |
 | Both dashboard modes | `tests/dashboard/` | The two modes are different code paths, and the separate service holds no database and no worker |
 | The collaboration workspace | `tests/workspace/` | Spaces, documents with conflict detection, boards with version preconditions, events, polls |
-| The migrations | `tests/integration/migrations.test.js` | The ledger, the ordering, the refusal of a database a newer build wrote to |
+| The migrations | `tests/integration/migrations.test.js` | The ledger, the ordering, the refusal of a database a newer build wrote to, and the separate identity every application gets |
+| The voice relay | `tests/voice/turn-stack.test.js`, `tests/voice/mesh.test.js` | The STUN binding request, the TURN allocate, the credential that is issued per session, and the refusal of a relay that does not answer |
 | The schema's portability | `tests/integration/schema.test.js` | Every declared column is legal on MySQL, and every table is declared after the tables it points at |
 | The outbound guard | `tests/integration/netguard.test.js` | A private address is refused, and the function the callers import exists |
 | The environment template | `tests/integration/environment-template.test.js` | Every variable the code reads is documented, and every variable documented is read |
 | The provider catalogue | `tests/integration/providers.test.js` | The console and the service cannot disagree about what a provider is |
 | Push devices | `tests/integration/push.test.js` | The registry, the ownership, and the erasure taking it with the account |
 | The native client | `native/scripts/check-native.mjs` | Every import resolves and every configuration file parses. **It was not compiled, run or put on a device** — there is no toolchain for it here |
+| The names and the paths | `backend/scripts/check-backend-names.mjs`, `frontend/scripts/check-client-names.mjs` | Every name a module reads is declared, and every relative path it asks for resolves to a file. Two bugs of this kind had shipped: a relay address read through a path that did not exist, and a saved worker count read the same way |
 
 ## What is not verified here, and why
 
-- **Nothing was verified by looking at it.** Chromium cannot complete a network
-  request in this environment, so there is no visual check of any surface, no
-  real focus-trap exercise, and no screen-reader pass. The client is verified
-  by driving it in Node against a stub DOM, and the two contracts that matter
-  most — the account and the recovery — are verified against a real running
-  instance over HTTP.
+- **Nothing was verified by looking at it.** Chromium cannot reach the network
+  in this environment, so the browser sweep runs against a stubbed instance:
+  the layout, the clipping, the touch targets and the accessible names are
+  real, and the answers behind them are not. There is no visual check of any
+  surface, no real focus-trap exercise, and no screen-reader pass. The client
+  is verified by driving it in Node against a stub DOM, and the two contracts
+  that matter most — the account and the recovery — are verified against a
+  real running instance over HTTP.
+- **Two browsers were never put in a call.** No microphone, no camera and no
+  second machine: the voice tests prove the signalling, the credential, the
+  ICE list and the relay, and the WebRTC media path itself was not exercised
+  end to end.
 - **The native client was never built.** No JDK, Gradle, Android SDK, Xcode or
   macOS. `native/VERIFICATION.md` states item by item what is and is not
   checked.

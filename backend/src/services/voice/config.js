@@ -1,9 +1,7 @@
 // The effective voice configuration.
 //
-// Every provider owns its own settings, so choosing a different one cannot
-// erase what the operator saved for the one before it. This module is the one
-// place that turns those settings - and the older keys they replace - into the
-// values the runtime uses.
+// Each provider keeps its own settings. Only a few older values still migrate;
+// the Mesh now always uses the relay this instance runs.
 //
 // Three rules make that work:
 //
@@ -16,9 +14,8 @@
 //      configuration says whether a secret is set; the value itself is read
 //      only by the code that has to authenticate with it.
 //
-// The fallback is why an operator does not have to retype anything after the
-// upgrade: the value they saved under the old key is the value the new key
-// takes, until they save the provider's configuration.
+// The remaining fallbacks keep Cloudflare credentials and the old room limit
+// working without making one setting a second source of truth.
 
 'use strict';
 
@@ -32,14 +29,11 @@ const turn = require('../turn');
 const GROUPS = {
   mesh: {
     prefix: 'voice.mesh.',
-    settings: ['maxParticipants', 'stunUrls', 'turnUrl', 'turnUsername'],
-    secrets: ['turnCredential'],
+    settings: ['maxParticipants', 'publicUrl'],
+    secrets: [],
     legacy: {
       maxParticipants: 'voice.maxParticipants',
-      stunUrls: 'voice.stunUrls',
-      turnUrl: 'voice.turnUrl',
-      turnUsername: 'voice.turnUsername',
-      turnCredential: 'voice.turnCredential',
+      publicUrl: 'voice.publicUrl',
     },
   },
   cloudflare: {
@@ -282,40 +276,17 @@ function iceServers(providerId, options) {
   const out = [];
 
   if (provider === 'mesh') {
-    const stun = value('mesh', 'stunUrls');
-    const list = Array.isArray(stun.value) ? stun.value : [];
-    const turnUrl = String(value('mesh', 'turnUrl').value || '');
-    if (!list.length && !turnUrl) {
-      // Nothing is configured, so the instance's own relay is used.
-      //
-      // This is the turnkey path: the administrator enables the mesh and the
-      // instance supplies the STUN server, the TURN server and a credential
-      // minted for this caller and nobody else. There is nothing to write
-      // down and nothing to fill in.
-      const relay = inHouseRelay();
-      out.push({ urls: relay.stunUrls.length ? relay.stunUrls : relay.stunUrl });
-      if (opts.credentials && opts.userId) {
-        const minted = turn.issueCredentials(String(opts.userId));
-        out.push({
-          urls: relay.turnUrls.length ? relay.turnUrls : relay.turnUrl,
-          username: minted.username,
-          credential: minted.password,
-        });
-      } else {
-        out.push({ urls: relay.turnUrls.length ? relay.turnUrls : relay.turnUrl });
-      }
-      return out;
-    }
-    for (const url of list) out.push({ urls: url });
-    if (turnUrl) {
-      const entry = { urls: turnUrl };
-      if (opts.credentials) {
-        const username = String(value('mesh', 'turnUsername').value || '');
-        const credential = secret('mesh', 'turnCredential');
-        if (username) entry.username = username;
-        if (credential.set) entry.credential = credential.value;
-      }
-      out.push(entry);
+    const relay = inHouseRelay();
+    out.push({ urls: relay.stunUrls.length ? relay.stunUrls : relay.stunUrl });
+    if (opts.credentials && opts.userId) {
+      const minted = turn.issueCredentials(String(opts.userId));
+      out.push({
+        urls: relay.turnUrls.length ? relay.turnUrls : relay.turnUrl,
+        username: minted.username,
+        credential: minted.password,
+      });
+    } else {
+      out.push({ urls: relay.turnUrls.length ? relay.turnUrls : relay.turnUrl });
     }
     return out;
   }

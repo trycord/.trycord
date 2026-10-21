@@ -184,7 +184,7 @@ function clampOverlap(value) {
  */
 async function create({
   ownerUserId, name, scopes, expiresAt, rateLimitPerMinute, communityId, kind, botApplicationId,
-  withoutSecret,
+  withoutSecret, conn = db,
 }) {
   const label = String(name || '').trim();
   if (!label || label.length > 64) bad('name must be 1-64 characters');
@@ -200,7 +200,7 @@ async function create({
   const keyId = newKeyId();
   const secret = withoutSecret ? null : newSecret();
   const ts = now();
-  await db.run(
+  await conn.run(
     'INSERT INTO developer_api_keys'
     + ' (id, key_id, owner_user_id, name, kind, bot_application_id, community_id, scopes,'
     + ' secret_hash, status, rate_limit_per_minute, created_at, expires_at)'
@@ -210,7 +210,7 @@ async function create({
       JSON.stringify(granted), secret ? hashSecret(secret) : null, 'active', limit, ts, expiry,
     ]
   );
-  const row = await db.get('SELECT * FROM developer_api_keys WHERE id = ?', [id]);
+  const row = await conn.get('SELECT * FROM developer_api_keys WHERE id = ?', [id]);
   return { key: shape(row), secret: secret ? formatToken(id, secret) : null };
 }
 

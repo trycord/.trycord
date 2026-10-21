@@ -165,7 +165,7 @@ function createGateway(server) {
             try {
               ws.send(JSON.stringify({
                 op: 'subscribed',
-                events: Array.from(events),
+                events,
                 application: application.applicationId,
                 community: application.communityId,
               }));

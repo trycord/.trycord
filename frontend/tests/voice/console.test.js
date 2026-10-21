@@ -35,12 +35,8 @@ const REPORT = {
       maxParticipants: 6,
       fields: [
         { key: 'voice.mesh.maxParticipants', name: 'maxParticipants', type: 'integer', label: 'Participants per mesh room', description: 'The room is small.', value: 6, source: 'default', legacy: null },
-        { key: 'voice.mesh.stunUrls', name: 'stunUrls', type: 'list', label: 'STUN servers for the mesh', description: 'Comma-separated.', value: [], source: 'default', legacy: null },
-        { key: 'voice.mesh.turnUrl', name: 'turnUrl', type: 'string', label: 'TURN server for the mesh', description: 'Relays media.', value: '', source: 'default', legacy: null },
       ],
-      secrets: [
-        { key: 'voice.mesh.turnCredential', name: 'turnCredential', type: 'secret', label: 'TURN credential for the mesh', description: 'The password half of a static TURN credential.', set: false, source: 'default', legacy: null },
-      ],
+      secrets: [],
       check: { ok: true, detail: 'The address answered a binding request.', at: 1 },
     },
     {
@@ -83,6 +79,15 @@ const REPORT = {
   ],
 };
 
+const CLOUDFLARE_REPORT = {
+  ...REPORT,
+  active: 'cloudflare',
+  providers: REPORT.providers.map((provider) => ({
+    ...provider,
+    inForce: provider.id === 'cloudflare',
+  })),
+};
+
 function find(node, predicate, found = []) {
   if (!node) return found;
   if (node.tagName && predicate(node)) found.push(node);
@@ -114,8 +119,13 @@ test('the voice console', async () => {
     const body = text(view.node);
 
     // The fields of the provider in force.
-    assert.match(body, /STUN servers for the mesh/, 'the mesh\'s own fields are shown');
-    assert.match(body, /TURN server for the mesh/);
+    assert.ok(byLabel(view.node, 'Participants per mesh room'), 'the room limit is configurable');
+    assert.equal(byLabel(view.node, 'STUN servers for the mesh'), null,
+      'the built-in relay asks for no STUN server');
+    assert.equal(byLabel(view.node, 'TURN server for the mesh'), null,
+      'the built-in relay asks for no TURN server');
+    assert.equal(byLabel(view.node, 'New value for TURN credential for the mesh'), null,
+      'the built-in relay needs no manual credentials');
 
     // The shared controls.
     assert.match(body, /Voice and video/, 'the shared switch is shown');
@@ -127,7 +137,7 @@ test('the voice console', async () => {
       'the fields of a provider that is not in force are not shown');
     assert.equal(byLabel(view.node, 'Third-party SFU endpoint'), null,
       'the fields of a provider that is not in force are not shown');
-    assert.ok(byLabel(view.node, 'STUN servers for the mesh'),
+    assert.ok(byLabel(view.node, 'Participants per mesh room'),
       'the fields of the provider in force are shown');
 
     // The provider is chosen first, and the choice is offered.
@@ -137,7 +147,7 @@ test('the voice console', async () => {
 
   await test('a credential is masked, and can be replaced and cleared', async () => {
     const calls = installFetchStub({
-      'http://localhost/api/voice/providers': { json: REPORT },
+      'http://localhost/api/voice/providers': { json: CLOUDFLARE_REPORT },
       'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
     });
 
@@ -145,27 +155,27 @@ test('the voice console', async () => {
     await view.onMount();
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    const input = byLabel(view.node, 'New value for TURN credential for the mesh');
+    const input = byLabel(view.node, 'New value for Cloudflare application secret');
     assert.ok(input, 'the credential has a field');
     assert.equal(input.getAttribute('type'), 'password', 'the field is masked');
     assert.equal(input.value, '', 'the field holds no value: a saved secret is never sent to the client');
 
-    assert.ok(byLabel(view.node, 'Replace TURN credential for the mesh'), 'the credential can be replaced');
-    assert.ok(byLabel(view.node, 'Clear TURN credential for the mesh'), 'the credential can be cleared');
+    assert.ok(byLabel(view.node, 'Replace Cloudflare application secret'), 'the credential can be replaced');
+    assert.ok(byLabel(view.node, 'Clear Cloudflare application secret'), 'the credential can be cleared');
 
     // Replacing it writes the new value and nothing else.
     input.value = 'a-new-credential';
-    byLabel(view.node, 'Replace TURN credential for the mesh').click();
+    byLabel(view.node, 'Replace Cloudflare application secret').click();
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     const saved = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1);
     assert.ok(saved.length, 'the replacement was saved');
     const body = saved[saved.length - 1].body;
-    assert.equal(body['voice.mesh.turnCredential'], 'a-new-credential');
+    assert.equal(body['voice.cloudflare.appSecret'], 'a-new-credential');
 
     // Clearing it is a deliberate act, and it is confirmed before it happens.
     const before = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1).length;
-    byLabel(view.node, 'Clear TURN credential for the mesh').click();
+    byLabel(view.node, 'Clear Cloudflare application secret').click();
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     const dialog = document.body.querySelector('.dialog');
@@ -177,7 +187,7 @@ test('the voice console', async () => {
 
     const after = calls.filter((call) => call.url.indexOf('/api/admin/voice/settings') !== -1);
     assert.ok(after.length > before, 'the clear was saved');
-    assert.equal(after[after.length - 1].body['voice.mesh.turnCredential'], null,
+    assert.equal(after[after.length - 1].body['voice.cloudflare.appSecret'], null,
       'the clear is written as an explicit removal');
   });
 

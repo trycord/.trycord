@@ -59,7 +59,8 @@ const PLATFORM = new Set([
   // The media classes a voice session names: the element a speaker is chosen
   // on, and the streams and tracks the call is made of.
   'HTMLMediaElement', 'HTMLAudioElement', 'HTMLVideoElement', 'MediaStream',
-  'MediaStreamTrack', 'RTCPeerConnection', 'AudioContext',
+  'MediaStreamTrack', 'RTCPeerConnection', 'AudioContext', 'createImageBitmap',
+  'OffscreenCanvas', 'ImageBitmap',
   'scrollTo', 'scrollBy', 'alert', 'confirm', 'prompt', 'open', 'close',
   'isSecureContext', 'origin', 'parent', 'top', 'self', 'frames', 'name',
   'encodeURIComponent', 'decodeURIComponent', 'encodeURI', 'decodeURI',
@@ -178,6 +179,27 @@ for (const [area, dir] of AREAS) {
       });
     }
     checked++;
+
+    // A relative import that points at nothing.
+    //
+    // The browser answers a bad import with a 404 and a console error, so
+    // the module that asked for it never runs - and the page it was going to
+    // draw is missing rather than broken, which is harder to notice and
+    // easier to mistake for a design decision.
+    for (const node of ast.body) {
+      if (node.type !== 'ImportDeclaration') continue;
+      const request = node.source && node.source.value;
+      if (typeof request !== 'string' || !request.startsWith('.')) continue;
+      const base = path.resolve(path.dirname(file), request);
+      const candidates = [base, base + '.js', path.join(base, 'index.js')];
+      if (candidates.some((candidate) => fs.existsSync(candidate))) continue;
+      findings.push({
+        file: path.relative(ROOT, file),
+        line: node.loc ? node.loc.start.line : 0,
+        name: request,
+        message: 'the path does not resolve to a module',
+      });
+    }
   }
 }
 

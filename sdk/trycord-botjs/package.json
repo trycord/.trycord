@@ -4,18 +4,21 @@
   "description": "The official SDK for Trycord bots: the REST API, the application gateway, the core objects and the typed events.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist-cjs/index.js",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
+      "require": "./dist-cjs/index.js",
       "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
+    "dist-cjs",
     "examples",
     "README.md",
     "CHANGELOG.md",
@@ -25,9 +28,11 @@
     "node": ">=18.17"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc -p tsconfig.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/mark-cjs.mjs",
     "build:tests": "tsc -p tsconfig.test.json",
-    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true});require('node:fs').rmSync('dist-tests',{recursive:true,force:true})\"",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true});require('node:fs').rmSync('dist-cjs',{recursive:true,force:true});require('node:fs').rmSync('dist-tests',{recursive:true,force:true})\"",
     "prepack": "npm run clean && npm run build",
     "test": "npm run build && npm run build:tests && node --test dist-tests/tests/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"

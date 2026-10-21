@@ -84,6 +84,7 @@ export type {
   CommandOption,
   Community,
   Credential,
+  CursorPage,
   Embed,
   Health,
   Member,

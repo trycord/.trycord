@@ -375,9 +375,12 @@ export function renderConversation(ctx, scope) {
   let scroller = ctx.scroller || null;
   let atBottom = true;
   let loadingOlder = false;
+  let mounted = false;
+  let loadGeneration = 0;
   const isDm = scope.kind === 'dm';
 
   function paint() {
+    if (!mounted) return;
     const stick = atBottom;
     clear(list);
     if (!state.messages.length) {
@@ -407,19 +410,24 @@ export function renderConversation(ctx, scope) {
   }
 
   async function load() {
+    const mine = ++loadGeneration;
     try {
-      state.messages = await readPage(scope, { limit: 50 });
+      const messages = await readPage(scope, { limit: 50 });
+      if (!mounted || mine !== loadGeneration) return;
+      state.messages = messages;
       paint();
       requestAnimationFrame(scrollBottom);
       if (isDm) Api.dmRead(scope.id).catch(() => {});
     } catch (error) {
+      if (!mounted || mine !== loadGeneration) return;
       clear(list);
       list.appendChild(empty({ title: 'Could not load this conversation', text: error && error.message ? error.message : 'Try again in a moment.' }));
     }
   }
 
   async function loadOlder() {
-    if (loadingOlder || !state.messages.length) return;
+    if (!mounted || loadingOlder || !state.messages.length) return;
+    const mine = loadGeneration;
     const oldest = state.messages[0].seq;
     if (oldest === undefined || oldest === null) return;
     loadingOlder = true;
@@ -427,6 +435,7 @@ export function renderConversation(ctx, scope) {
     const anchorTop = scroller ? scroller.scrollTop : 0;
     try {
       const rows = await readPage(scope, { before: oldest, limit: 50 });
+      if (!mounted || mine !== loadGeneration) return;
       const known = new Set(state.messages.map((m) => m.id));
       const older = rows.filter((m) => !known.has(m.id));
       if (older.length) {
@@ -435,6 +444,7 @@ export function renderConversation(ctx, scope) {
         if (scroller) scroller.scrollTop = scroller.scrollHeight - anchorHeight + anchorTop;
       }
     } catch (error) {
+      if (!mounted || mine !== loadGeneration) return;
       toast(error && error.message ? error.message : 'Could not load earlier messages.', { type: 'danger' });
     } finally {
       loadingOlder = false;
@@ -442,6 +452,8 @@ export function renderConversation(ctx, scope) {
   }
 
   async function catchUp() {
+    if (!mounted) return;
+    const mine = loadGeneration;
     let highest = 0;
     for (const message of state.messages) {
       const value = Number(message.seq);
@@ -450,6 +462,7 @@ export function renderConversation(ctx, scope) {
     if (!highest) return;
     try {
       const rows = await readPage(scope, { after: highest, limit: 200 });
+      if (!mounted || mine !== loadGeneration) return;
       if (!rows.length) return;
       const known = new Set(state.messages.map((m) => m.id));
       const fresh = rows.filter((m) => !known.has(m.id));
@@ -460,13 +473,13 @@ export function renderConversation(ctx, scope) {
   }
 
   function onScroll() {
-    if (!scroller) return;
+    if (!mounted || !scroller) return;
     atBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 160;
     if (scroller.scrollTop < 200) loadOlder();
   }
 
   function upsert(message) {
-    if (!message) return;
+    if (!mounted || !message) return;
     const index = state.messages.findIndex((m) => m.id === message.id);
     if (index === -1) state.messages.push(message);
     else state.messages[index] = message;
@@ -477,6 +490,7 @@ export function renderConversation(ctx, scope) {
   function find(id) { return state.messages.find((m) => m.id === id) || null; }
 
   function remove(id) {
+    if (!mounted) return;
     state.messages = state.messages.filter((m) => m.id !== id);
     paint();
   }
@@ -685,6 +699,9 @@ export function renderConversation(ctx, scope) {
     node,
     composer: composer.form,
     onMount() {
+      if (mounted) return;
+      mounted = true;
+      loadGeneration += 1;
       scroller = ctx.scroller || scroller || node.parentElement;
       if (scroller) scroller.addEventListener('scroll', onScroll, { passive: true });
       subscribe();
@@ -693,6 +710,8 @@ export function renderConversation(ctx, scope) {
       load();
     },
     cleanup() {
+      mounted = false;
+      loadGeneration += 1;
       if (scroller) scroller.removeEventListener('scroll', onScroll);
       for (const off of offs) off();
       offs.length = 0;

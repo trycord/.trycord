@@ -25,6 +25,7 @@
 
 const crypto = require('crypto');
 const db = require('../../db');
+const { EVENTS: SUPPORTED_EVENTS } = require('../webhooks');
 
 // How long a ticket is good for, and how many sockets one application may
 // hold open.
@@ -75,11 +76,15 @@ async function applicationFor(ticket) {
   const record = consumeTicket(ticket);
   if (!record) return null;
   const row = await db.get(
-    'SELECT id, server_id, name, status FROM bot_applications WHERE id = ?',
+    'SELECT id, server_id, name, status, bot_user_id FROM bot_applications WHERE id = ?',
     [record.applicationId],
   );
   if (!row) return null;
   if (String(row.status || 'active') !== 'active') return null;
+  if (!row.bot_user_id || !(await db.get(
+    'SELECT 1 AS ok FROM server_members WHERE server_id = ? AND user_id = ?',
+    [row.server_id, row.bot_user_id]
+  ))) return null;
   return { applicationId: row.id, communityId: row.server_id, name: row.name };
 }
 
@@ -130,9 +135,11 @@ function unregister(connection) {
  * allowed to hear.
  */
 function subscribe(connection, events) {
-  const list = Array.isArray(events) ? events : [];
-  connection.events = new Set(list.map((type) => String(type || '').trim()).filter(Boolean));
-  return connection.events.size;
+  const requested = Array.isArray(events) ? events : [];
+  connection.events = new Set(requested
+    .map((type) => String(type || '').trim())
+    .filter((type) => SUPPORTED_EVENTS.includes(type)));
+  return Array.from(connection.events);
 }
 
 /**

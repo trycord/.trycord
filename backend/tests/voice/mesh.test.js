@@ -56,12 +56,24 @@ test('the mesh', async (t) => {
     assert.ok(!/appSecret|sfuAppSecret/.test(serialised), 'no SFU credential is in the answer');
   });
 
-  await t.test('the instance\'s own relay is used when nothing is configured', async () => {
+  await t.test('Mesh ignores old manual ICE values and uses the instance relay', async () => {
     const port = await closedPort();
     const { instance, owner } = await voiceInstance({
-      env: { TRYCORD_TURN_HOST: '127.0.0.1', TRYCORD_TURN_PORT: String(port) },
+      env: {
+        TRYCORD_TURN_HOST: '127.0.0.1',
+        TRYCORD_TURN_PORT: String(port),
+        VOICE_VIDEO_MESH_STUN_URLS: 'stun:legacy.example:3478',
+        VOICE_VIDEO_MESH_TURN_URL: 'turn:legacy.example:3478',
+        VOICE_VIDEO_STUN_URLS: 'stun:older.example:3478',
+      },
     });
     t.after(() => instance.stop());
+
+    const refused = await saveSettings(owner, {
+      'voice.mesh.stunUrls': ['stun:manual.example:3478'],
+      'voice.mesh.turnUrl': 'turn:manual.example:3478',
+    });
+    assert.equal(refused.status, 400, JSON.stringify(refused.data));
 
     const caps = await owner.get('/api/voice/capabilities');
     assert.equal(caps.status, 200, JSON.stringify(caps.data));
@@ -71,6 +83,28 @@ test('the mesh', async (t) => {
       'the in-house STUN address is offered: ' + JSON.stringify(ice));
     assert.ok(ice.indexOf('turn:127.0.0.1:' + port) !== -1,
       'the in-house TURN address is offered: ' + JSON.stringify(ice));
+    assert.equal(ice.some((url) => /legacy|older|manual/.test(url)), false,
+      'old or hand-entered URLs do not replace the built-in relay');
+    const voiceSettings = await owner.get('/api/admin/voice/settings');
+    assert.equal(voiceSettings.status, 200, JSON.stringify(voiceSettings.data));
+    assert.equal(voiceSettings.data.settings.some((field) => /mesh\.(stunUrls|turnUrl|turnUsername|turnCredential)$/.test(field.key)), false,
+      'the console does not ask an administrator to enter relay details');
+  });
+
+  await t.test('the published address is the one the console names', async () => {
+    const relay = await startRelay();
+    const { instance, owner } = await voiceInstance({
+      env: { TRYCORD_TURN_HOST: '127.0.0.1', TRYCORD_TURN_PORT: String(relay.port) },
+    });
+    t.after(async () => { relay.close(); await instance.stop(); });
+
+    const saved = await saveSettings(owner, { 'voice.mesh.publicUrl': 'voice.example.org' });
+    assert.equal(saved.status, 200, JSON.stringify(saved.data));
+
+    const caps = await owner.get('/api/voice/capabilities');
+    const ice = urlsOf(caps.data.features.voiceVideo.iceServers);
+    assert.ok(ice.some((url) => url.indexOf('voice.example.org') !== -1),
+      'the clients are given the published address: ' + JSON.stringify(ice));
   });
 
   await t.test('a relay that does not answer stops a session', async () => {
@@ -164,8 +198,6 @@ test('the mesh', async (t) => {
     const mesh = providerOf(report, 'mesh');
     assert.ok(mesh, 'the mesh is one of the providers');
     assert.deepEqual(mesh.missing, [], 'the mesh is not waiting for anything');
-    assert.deepEqual(mesh.secrets.map((secret) => secret.key), ['voice.mesh.turnCredential'],
-      'the mesh has one credential, and it is the TURN one it may not need');
-    assert.equal(mesh.secrets[0].set, false, 'the TURN credential is not required');
+    assert.deepEqual(mesh.secrets, [], 'the mesh has no secret the operator has to enter');
   });
 });

@@ -15,27 +15,35 @@ npm test        # the tests, against the built package
 npm run build   # the package, with its type declarations
 ```
 
-The package is ready to be published. Publishing it needs an npm account
-with the name, which is the operator's business and not the repository's:
+The package builds and passes its tests, but it has not been published to npm.
+Until it is released, install it from a local checkout:
 
 ```bash
-npm publish --access public
+npm install /path/to/.trycord/sdk/trycord-botjs
 ```
+
+Publishing requires the maintainer's npm account and explicit release approval.
 
 ## What it covers
 
 | The API | The SDK |
 |---|---|
 | `GET /api/v1/communities/:id` | `client.community(id)` |
-| `GET /api/v1/communities/:id/members` | `client.members(id)` |
-| `GET /api/v1/communities/:id/applications` | `client.applications(id)` |
+| `GET /api/v1/communities/:id/members` | `client.members(id)`, `client.membersPage(id)` |
+| `GET /api/v1/communities/:id/channels/:channelId` | `client.channel(id, channelId)` |
+| `GET /api/v1/communities/:id/roles` | `client.roles(id)` |
+| `GET /api/v1/communities/:id/applications` | `client.applications(id)` (an operator credential with `bots:read`) |
 | `GET|POST /api/v1/communities/:id/channels/:id/messages` | `client.messages(...)`, `client.send(...)` |
-| `GET /api/v1/applications/:id/commands` | `client.commands()` |
-| `GET /api/v1/applications/:id/health` | `client.health()` |
+| `GET /api/v1/communities/:id/applications/:applicationId/commands` | `client.commands()` |
+| `GET /api/v1/communities/:id/applications/:applicationId/health` | `client.health()` |
 | `POST /api/v1/applications/:id/gateway-ticket` | `client.login()` |
 | the application socket | `Gateway` |
 
 The quick start is in the package's own README.
+
+`membersPage` returns the total and whether another page exists. `messagesPage`
+uses the server's sequence cursor to fetch older messages without rescanning a
+channel.
 
 ## What it does not do
 

@@ -14,6 +14,7 @@ import type {
   Command,
   Community,
   Credential,
+  CursorPage,
   Health,
   Member,
   Message,
@@ -101,6 +102,7 @@ export class MessageObject implements Message {
   readonly content: string;
   readonly createdAt?: string;
   readonly created_at?: string;
+  readonly seq?: number | null;
   readonly editedAt?: string | null;
   readonly replyCount?: number;
   readonly reply_count?: number;
@@ -126,6 +128,7 @@ export class MessageObject implements Message {
     this.content = raw.content;
     this.createdAt = raw.createdAt;
     this.created_at = raw.created_at;
+    this.seq = raw.seq;
     this.editedAt = raw.editedAt;
     this.replyCount = raw.replyCount;
     this.reply_count = raw.reply_count;
@@ -202,11 +205,27 @@ export class CommunityObject implements Community {
 
   /** The members of this community. */
   async members(options: { limit?: number; offset?: number } = {}): Promise<Member[]> {
-    const data = await this.rest.request<{ members?: Member[] } | Member[]>({
+    return (await this.membersPage(options)).items;
+  }
+
+  /** Read one page of members. */
+  async membersPage(options: { limit?: number; offset?: number } = {}): Promise<Page<Member>> {
+    const data = await this.rest.request<{
+      members?: Member[]; total?: number; limit?: number; offset?: number;
+      hasMore?: boolean; has_more?: boolean;
+    } | Member[]>({
       path: `/communities/${encodeURIComponent(this.id)}/members`,
       query: { limit: options.limit, offset: options.offset },
     });
-    return Array.isArray(data) ? data : (data.members || []);
+    const items = Array.isArray(data) ? data : (data.members || []);
+    if (Array.isArray(data)) return page(items, items.length, options);
+    return {
+      items,
+      total: data.total ?? items.length,
+      hasMore: data.hasMore ?? data.has_more ?? false,
+      limit: data.limit ?? options.limit ?? 50,
+      offset: data.offset ?? options.offset ?? 0,
+    };
   }
 
   /** The applications of this community. */
@@ -262,15 +281,39 @@ export class ChannelObject implements Channel {
    *
    * @param options How many, and from where.
    */
-  async messages(options: { limit?: number } = {}): Promise<MessageObject[]> {
+  async messages(options: { limit?: number; before?: number } = {}): Promise<MessageObject[]> {
+    return (await this.messagesPage(options)).items;
+  }
+
+  /** Read one page of recent messages or older messages before a sequence. */
+  async messagesPage(options: { limit?: number; before?: number } = {}): Promise<CursorPage<MessageObject>> {
     const community = this.communityId;
     if (!community) throw new Error('This channel does not say which community it is in.');
-    const data = await this.rest.request<{ messages?: Message[] } | Message[]>({
+    const data = await this.rest.request<{
+      messages?: Message[]; limit?: number; before?: number | null;
+      hasMore?: boolean; nextBefore?: number | null;
+    } | Message[]>({
       path: `/communities/${encodeURIComponent(community)}/channels/${encodeURIComponent(this.id)}/messages`,
-      query: { limit: options.limit },
+      query: { limit: options.limit, before: options.before },
     });
     const rows = Array.isArray(data) ? data : (data.messages || []);
-    return rows.map((row) => new MessageObject(row, this.rest));
+    const items = rows.map((row) => new MessageObject(row, this.rest));
+    if (Array.isArray(data)) {
+      return {
+        items,
+        limit: options.limit ?? 20,
+        before: options.before ?? null,
+        hasMore: false,
+        nextBefore: null,
+      };
+    }
+    return {
+      items,
+      limit: data.limit ?? options.limit ?? 20,
+      before: data.before ?? options.before ?? null,
+      hasMore: data.hasMore ?? false,
+      nextBefore: data.nextBefore ?? null,
+    };
   }
 }
 
@@ -291,17 +334,23 @@ export async function sendMessage(
 
 /** Read a community. */
 export async function fetchCommunity(rest: REST, communityId: string): Promise<CommunityObject> {
-  const community = await rest.request<Community>({
+  const data = await rest.request<{ community?: Community } | Community>({
     path: `/communities/${encodeURIComponent(communityId)}`,
   });
+  const community = data && typeof data === 'object' && 'community' in data
+    ? (data as { community: Community }).community
+    : data as Community;
   return new CommunityObject(community, rest);
 }
 
 /** Read a channel. */
 export async function fetchChannel(rest: REST, communityId: string, channelId: string): Promise<ChannelObject> {
-  const channel = await rest.request<Channel>({
+  const data = await rest.request<{ channel?: Channel } | Channel>({
     path: `/communities/${encodeURIComponent(communityId)}/channels/${encodeURIComponent(channelId)}`,
   });
+  const channel = data && typeof data === 'object' && 'channel' in data
+    ? (data as { channel: Channel }).channel
+    : data as Channel;
   return new ChannelObject(channel, rest);
 }
 
@@ -314,26 +363,26 @@ export async function listApplications(rest: REST, communityId: string): Promise
 }
 
 /** The commands an application declares. */
-export async function listCommands(rest: REST, applicationId: string): Promise<Command[]> {
+export async function listCommands(rest: REST, communityId: string, applicationId: string): Promise<Command[]> {
   const data = await rest.request<{ commands?: Command[] } | Command[]>({
-    path: `/applications/${encodeURIComponent(applicationId)}/commands`,
+    path: `/communities/${encodeURIComponent(communityId)}/applications/${encodeURIComponent(applicationId)}/commands`,
   });
   return Array.isArray(data) ? data : (data.commands || []);
 }
 
 /** The credential of an application. */
-export async function fetchCredential(rest: REST, applicationId: string): Promise<Credential | null> {
+export async function fetchCredential(rest: REST, communityId: string, applicationId: string): Promise<Credential | null> {
   const data = await rest.request<{ credential?: Credential } | Credential>({
-    path: `/applications/${encodeURIComponent(applicationId)}/credential`,
+    path: `/communities/${encodeURIComponent(communityId)}/applications/${encodeURIComponent(applicationId)}`,
   });
   if (data && typeof data === 'object' && 'credential' in data) return (data as { credential: Credential }).credential;
   return (data as Credential) || null;
 }
 
 /** The health of an application. */
-export async function fetchHealth(rest: REST, applicationId: string): Promise<Health> {
+export async function fetchHealth(rest: REST, communityId: string, applicationId: string): Promise<Health> {
   return rest.request<Health>({
-    path: `/applications/${encodeURIComponent(applicationId)}/health`,
+    path: `/communities/${encodeURIComponent(communityId)}/applications/${encodeURIComponent(applicationId)}/health`,
   });
 }
 
@@ -346,6 +395,6 @@ export async function listRoles(rest: REST, communityId: string): Promise<Role[]
 }
 
 /** A page of results. */
-export function page<T>(items: T[], total?: number): Page<T> {
-  return { items, total };
+export function page<T>(items: T[], total?: number, options: { limit?: number; offset?: number } = {}): Page<T> {
+  return { items, total, limit: options.limit, offset: options.offset, hasMore: false };
 }

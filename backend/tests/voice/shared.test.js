@@ -25,7 +25,6 @@ test('what the providers share', async (t) => {
 
     await saveSettings(owner, {
       'voice.mesh.maxParticipants': 4,
-      'voice.mesh.stunUrls': 'stun:mesh.example:3478',
     });
     await saveSettings(owner, {
       'voice.cloudflare.appId': 'cloudflare-application',
@@ -49,10 +48,9 @@ test('what the providers share', async (t) => {
     assert.equal(providerOf(report, 'mesh').maxParticipants, 4);
     assert.equal(providerOf(report, 'cloudflare').maxParticipants, 12);
 
-    const meshStun = providerOf(report, 'mesh').fields
-      .find((field) => field.key === 'voice.mesh.stunUrls');
-    assert.deepEqual(meshStun.value, ['stun:mesh.example:3478'],
-      'the mesh kept its own STUN servers');
+    assert.deepEqual(providerOf(report, 'mesh').fields.map((field) => field.key),
+      ['voice.mesh.maxParticipants', 'voice.mesh.publicUrl'],
+      'Mesh asks for the room limit and the published address, and nothing else');
     const cloudflareApp = providerOf(report, 'cloudflare').fields
       .find((field) => field.key === 'voice.cloudflare.appId');
     assert.equal(cloudflareApp.value, 'cloudflare-application',
@@ -167,16 +165,13 @@ test('what the providers share', async (t) => {
     assert.match(refused.data.error.message, /application id is not set/);
   });
 
-  await t.test('the settings the previous release used still work', async () => {
+  await t.test('Cloudflare settings migrate and retired Mesh settings are refused', async () => {
     const { instance, owner } = await voiceInstance();
     t.after(() => instance.stop());
 
     // The old keys, saved as an older console would have saved them.
     const saved = await saveSettings(owner, {
       'voice.sfuAppId': 'the-old-application-id',
-      'voice.stunUrls': 'stun:legacy.example:3478',
-      'voice.turnUrl': 'turn:legacy.example:3478',
-      'voice.turnUsername': 'the-old-username',
       'voice.maxParticipants': 9,
     });
     assert.equal(saved.status, 200, JSON.stringify(saved.data));
@@ -191,14 +186,13 @@ test('what the providers share', async (t) => {
     assert.equal(appId.legacy, 'voice.sfuAppId');
 
     const mesh = providerOf(report, 'mesh');
-    const stun = mesh.fields.find((field) => field.key === 'voice.mesh.stunUrls');
-    assert.deepEqual(stun.value, ['stun:legacy.example:3478'],
-      'the old STUN servers are the mesh\'s own');
-    const turn = mesh.fields.find((field) => field.key === 'voice.mesh.turnUrl');
-    assert.equal(turn.value, 'turn:legacy.example:3478');
-    const username = mesh.fields.find((field) => field.key === 'voice.mesh.turnUsername');
-    assert.equal(username.value, 'the-old-username');
     assert.equal(mesh.maxParticipants, 9, 'the old participant limit is the one in force');
+    assert.deepEqual(mesh.fields.map((field) => field.key),
+      ['voice.mesh.maxParticipants', 'voice.mesh.publicUrl']);
+
+    const retired = await saveSettings(owner, { 'voice.mesh.turnUrl': 'turn:legacy.example:3478' });
+    assert.equal(retired.status, 400);
+    assert.match(retired.data.error.message, /built-in relay|manual ICE/i);
 
     // The first save of the provider's own configuration takes over.
     const written = await saveSettings(owner, { 'voice.cloudflare.appId': 'a-new-application-id' });
