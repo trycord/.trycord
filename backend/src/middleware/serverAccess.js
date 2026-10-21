@@ -89,4 +89,48 @@ function requirePerm(perm) {
   };
 }
 
-module.exports = { resolveServer, requireMember, requireOwner, requirePerm, getOwnerId };
+// The gate for the things that moderation covers.
+//
+// Some of them are not one permission but a family: a note about a member,
+// a timeout and a removal are all moderation, and any one of them means the
+// person may moderate here. So the gate takes the family and lets anybody
+// who holds one of them through.
+//
+// The same rule as requirePerm: a name that is not a permission compares
+// equal to nothing a role holds, so a misspelled name would quietly refuse
+// everybody. Throwing at boot is the only moment the route's author is
+// still looking at it.
+function requireAnyPerm(perms) {
+  const names = Array.isArray(perms) ? perms : [perms];
+  for (const perm of names) {
+    if (!isKnown(perm)) {
+      throw new Error(
+        'requireAnyPerm(' + JSON.stringify(names) + ') names a permission that is not in '
+        + 'services/permissions.js. Add it there first, so it can be granted to a role.'
+      );
+    }
+  }
+
+  return async (req, res, next) => {
+    try {
+      if (!req.server) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
+      if (req.server.owner_id === req.user.id) {
+        req.access = { isOwner: true, permissions: ['*'] };
+        return next();
+      }
+      if (!(await isMember(req.user.id, req.server.id))) {
+        return fail(res, 'NOT_A_MEMBER', 'you are not a member of this server');
+      }
+      const perms = await effectivePermissionsFor(req.server.owner_id, req.user.id, req.server.id);
+      if (!names.some((perm) => perms.has('*') || perms.has(perm))) {
+        return fail(res, 'PERMISSION_DENIED', 'requires one of: ' + names.join(', '));
+      }
+      req.access = { isOwner: false, permissions: [...perms] };
+      next();
+    } catch (e) { next(e); }
+  };
+}
+
+module.exports = {
+  resolveServer, requireMember, requireOwner, requirePerm, requireAnyPerm, getOwnerId,
+};

@@ -28,9 +28,10 @@ import { on as onRealtime, EVENTS } from '../../packages/realtime.js';
 import { avatarUrlOf } from '../../packages/identity.js';
 import { roleChips } from '../../packages/roles.js';
 import { avatar } from './primitives.js';
-import { row, blank, fault, hold } from './page.js';
+import { icon } from '../../packages/icons.js';
+import { row, blank, card, fault, fold, hold } from './page.js';
 import { personSheet, personContextMenu } from './person.js';
-import { confirmDialog, errorToast, toast } from './overlays.js';
+import { confirmDialog, errorToast, toast, openDialog } from './overlays.js';
 
 const PAGE_SIZE = 50;
 
@@ -79,6 +80,18 @@ export function memberActions(serverId, member, repaint) {
       },
     });
   }
+  // What may this person actually do here?
+  //
+  // The moderation family: somebody who may remove a member, ban one, or run
+  // the community may look at anybody's authority. It is the same family that
+  // opens the notes, so the two go together.
+  if (can(serverId, 'KICK_MEMBERS') || can(serverId, 'BAN_MEMBERS')
+    || can(serverId, 'MANAGE_SERVER') || isOwner(serverId)) {
+    items.push({
+      label: 'What may they do here?', icon: 'shield',
+      onSelect: () => showPermissions(serverId, member, name),
+    });
+  }
   if (can(serverId, 'BAN_MEMBERS') && !isOwner(serverId)) {
     items.push({
       label: 'Ban from community', icon: 'ban', danger: true,
@@ -98,6 +111,95 @@ export function memberActions(serverId, member, repaint) {
     });
   }
   return items;
+}
+
+// What a member may actually do in a community.
+//
+// The answer has three parts, and the third is the one that matters: the
+// roles they hold, what those roles give, and the places where an override
+// makes the community different from the default. A person who may post
+// everywhere except in the quiet channel is not a person who may post
+// everywhere, and only the override says so.
+export async function showPermissions(serverId, member, name) {
+  const host = el('div', { class: 'fold' });
+  const dialog = openDialog({
+    title: 'What ' + (name || 'this person') + ' may do here',
+    body: host,
+  });
+  host.replaceChildren(hold('Reading what this person may do'));
+  let preview;
+  try {
+    preview = await Api.memberPermissions(serverId, member.id);
+  } catch (error) {
+    host.replaceChildren(fault(error, null));
+    return;
+  }
+
+  // The roles they hold.
+  const roles = el('div', { class: 'rowlist' });
+  if (!preview.roles.length) {
+    roles.replaceChildren(blank({
+      glyph: 'shield',
+      title: 'No roles',
+      text: 'This person holds no role in this community.',
+    }));
+  } else {
+    roles.replaceChildren(...preview.roles.map((role) => row({
+      lead: el('span', { class: 'role-dot' }, icon('shield', { size: 15 })),
+      title: role.name,
+      sub: role.permissions.length
+        ? role.permissions.join(' · ')
+        : 'Grants nothing on its own',
+    })));
+  }
+
+  // What the roles give, across the community.
+  const wide = el('div', { class: 'rowlist' });
+  if (preview.isOwner) {
+    wide.replaceChildren(blank({
+      glyph: 'crown',
+      title: 'They hold everything',
+      text: 'The owner of a community may do everything in it.',
+    }));
+  } else if (!preview.permissions.length) {
+    wide.replaceChildren(blank({
+      glyph: 'shield',
+      title: 'Nothing',
+      text: 'Their roles grant nothing across the community.',
+    }));
+  } else {
+    wide.replaceChildren(...preview.permissions.map((permission) => row({
+      lead: el('span', { class: 'role-dot' }, icon('check', { size: 15 })),
+      title: permission,
+      sub: 'Across the community',
+    })));
+  }
+
+  // Where the community is different from that.
+  const over = el('div', { class: 'rowlist' });
+  if (!preview.overrides.length) {
+    over.replaceChildren(blank({
+      glyph: 'hash',
+      title: 'Nowhere different',
+      text: 'No channel or category here changes what they may do.',
+    }));
+  } else {
+    over.replaceChildren(...preview.overrides.map((entry) => row({
+      lead: el('span', { class: 'role-dot' }, icon('hash', { size: 15 })),
+      title: entry.channelName,
+      sub: entry.changed
+        .map((change) => change.permission + ' ' + (change.effect === 'deny' ? 'is refused here' : 'is allowed here'))
+        .join(' · '),
+    })));
+  }
+
+  host.replaceChildren(fold([
+    el('p', { class: 'lede' },
+      'These are the permissions the server enforces for this person right now.'),
+    card({ label: 'The roles they hold', glyph: 'shield', body: roles, flush: true }),
+    card({ label: 'What that gives', glyph: 'check', body: wide, flush: true }),
+    card({ label: 'Where it is different', glyph: 'hash', body: over, flush: true }),
+  ]));
 }
 
 // One member, drawn. The presence is written twice - as the dot on the face and

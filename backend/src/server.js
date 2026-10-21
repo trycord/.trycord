@@ -518,6 +518,8 @@ async function boot(options = {}) {
   app.use('/api/servers/:serverId/roles', require('./routes/roles'));
   app.use('/api/servers/:serverId/invites', inviteRoutes.managed);
   app.use('/api/servers/:serverId/communityMemory', require('./routes/communityMemory'));
+  // The notes a community's moderators keep about the people in it.
+  app.use('/api/servers/:serverId/notes', require('./routes/memberNotes'));
   // Community onboarding: the welcome, the rules, the questions, and the
   // answers a member gives.
   app.use('/api/servers/:serverId/onboarding', require('./routes/communityOnboarding'));

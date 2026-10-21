@@ -271,6 +271,10 @@ export function channelActions(serverId, channel, reload) {
   if (canManageChannels(serverId)) {
     items.push({ separator: true });
     items.push({ label: 'Edit channel', icon: 'edit', onSelect: () => openChannelEditor(serverId, channel, reload) });
+    items.push({
+      label: 'Copy channel', icon: 'copy',
+      onSelect: () => copyChannel(serverId, channel, reload),
+    });
     items.push({ label: 'Move up', icon: 'arrow-up', onSelect: () => moveChannelBy(serverId, channel, -1) });
     items.push({ label: 'Move down', icon: 'arrow-down', onSelect: () => moveChannelBy(serverId, channel, 1) });
     items.push({
@@ -283,6 +287,26 @@ export function channelActions(serverId, channel, reload) {
     });
   }
   return items;
+}
+
+/**
+ * A copy of a channel.
+ *
+ * The copy carries the settings over - the topic, the type, the category and
+ * the slow mode - and it carries no messages, so it is a fresh channel with
+ * the shape of the old one.
+ */
+export async function copyChannel(serverId, channel, reload) {
+  try {
+    const copy = await Api.duplicateChannel(serverId, channel.id);
+    toast('The server answered: ' + copy.name + ' was created.', { type: 'success' });
+    await refreshServerTree(serverId, { force: true });
+    if (reload) await reload();
+    return copy;
+  } catch (error) {
+    toast((error && error.message) || 'That did not go through.', { type: 'danger' });
+    return null;
+  }
 }
 
 /** Mute or unmute a channel. The state is the server's, so it is read. */
@@ -349,5 +373,5 @@ export default {
   iconFor, canManageChannels, openChannelEditor, deleteChannel, openCategoryEditor,
   deleteCategory, channelActions, categoryActions, channelSheet, attachChannelMenu,
   openMoveSheet, moveChannelBy, moveChannelToCategory, reorderChannels, reorderCategories,
-  toggleMute,
+  toggleMute, copyChannel,
 };

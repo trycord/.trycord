@@ -117,7 +117,7 @@ async function list(serverId) {
   return { categories: cats, channels };
 }
 
-async function create(serverId, { name, topic, categoryId, type }) {
+async function create(serverId, { name, topic, categoryId, type, slowMode }) {
   let cat = null;
   if (categoryId) {
     cat = await db.get('SELECT * FROM categories WHERE id = ? AND server_id = ?', [categoryId, serverId]);
@@ -128,14 +128,63 @@ async function create(serverId, { name, topic, categoryId, type }) {
   const id = uuid();
   const clean = cleanName(name);
   await db.run(
-    'INSERT INTO channels (id, server_id, category_id, name, topic, type, position, slug) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO channels (id, server_id, category_id, name, topic, type, position, slug, slow_mode) '
+    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [id, serverId, cat ? cat.id : null, clean, String(topic || '').slice(0, 200), kind, pos.p,
-      await slugs.forChannel(clean, serverId)]
+      await slugs.forChannel(clean, serverId), cleanSlowMode(slowMode)]
   );
   return db.get('SELECT * FROM channels WHERE id = ?', [id]);
 }
 
-async function update(channel, { name, topic, categoryId, type }) {
+// How slow a channel is, in seconds.
+//
+// Zero is no slow mode, which is the default. The longest is an hour:
+// past that it is not a slow mode any more, it is a channel nobody can talk
+// in, and that is a different mistake.
+function cleanSlowMode(value) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+  return Math.min(Math.floor(seconds), 3600);
+}
+
+// A copy of a channel.
+//
+// Copying a channel is how a community sets up a variant of a channel it
+// already has: a second voice room, a channel that is like this one but for
+// another subject. The copy carries the settings over - the topic, the type,
+// the category it sits in and the slow mode - and it carries nothing else:
+// the messages stay where they were.
+//
+// The copy is named so that a person can tell it apart from the original:
+// "general" becomes "general copy", and if there is already a "general copy"
+// then "general copy 2", and so on.
+async function duplicate(serverId, channel) {
+  const taken = await db.all('SELECT name FROM channels WHERE server_id = ?', [serverId]);
+  const names = new Set(taken.map((row) => String(row.name || '').toLowerCase()));
+  const base = cleanName(String(channel.name || 'channel') + ' copy');
+  let name = base;
+  let count = 1;
+  while (names.has(name.toLowerCase())) {
+    count += 1;
+    name = cleanName(base + ' ' + count);
+  }
+
+  const pos = await db.get(
+    'SELECT COALESCE(MAX(position), -1) + 1 AS p FROM channels WHERE server_id = ?',
+    [serverId]
+  );
+  const id = uuid();
+  await db.run(
+    'INSERT INTO channels (id, server_id, category_id, name, topic, type, position, slug, slow_mode) '
+    + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, serverId, channel.category_id || null, name, channel.topic || null,
+      channel.type, pos.p, await slugs.forChannel(name, serverId),
+      Number(channel.slow_mode) || 0]
+  );
+  return db.get('SELECT * FROM channels WHERE id = ?', [id]);
+}
+
+async function update(channel, { name, topic, categoryId, type, slowMode }) {
   const sets = [];
   const vals = [];
   if (name !== undefined) {
@@ -177,6 +226,10 @@ async function update(channel, { name, topic, categoryId, type }) {
       vals.push(null);
     }
   }
+  if (slowMode !== undefined) {
+    sets.push('slow_mode = ?');
+    vals.push(cleanSlowMode(slowMode));
+  }
   if (!sets.length) throw { code: 'VALIDATION_ERROR', message: 'Nothing to update' };
   vals.push(channel.id);
   await db.run(`UPDATE channels SET ${sets.join(', ')} WHERE id = ?`, vals);
@@ -194,4 +247,4 @@ async function remove(serverId, channelId) {
   });
 }
 
-module.exports = { categories, createCategory, renameCategory, reorderCategories, deleteCategory, list, create, update, remove, reorderChannels, CHANNEL_TYPES };
+module.exports = { categories, createCategory, renameCategory, reorderCategories, deleteCategory, list, create, update, duplicate, remove, reorderChannels, CHANNEL_TYPES };

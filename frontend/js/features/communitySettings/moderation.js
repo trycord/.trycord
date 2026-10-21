@@ -50,6 +50,18 @@ export function moderationSection(ctx) {
   let bans = [];
   let members = [];
 
+  // The notes the community's moderators keep about the people in it.
+  let notes = [];
+
+  // The selection for the bulk actions.
+  //
+  // Several members at once is a real job - a raid, a wave of spam, a room
+  // that needs clearing - and doing it one person at a time is slow enough
+  // that people give up half way. The selection is a plain set of ids, and it
+  // is only ever shown to somebody who may act on the members in it.
+  let selecting = false;
+  const selected = new Set();
+
   const report = reporter();
 
   const load = async () => {
@@ -57,12 +69,14 @@ export function moderationSection(ctx) {
     const canBan = canModerate();
     const canKick = canRemove();
     try {
-      const [banRows, page] = await Promise.all([
+      const [banRows, page, noteRows] = await Promise.all([
         canBan ? Api.bans(serverId) : Promise.resolve([]),
         Api.serverMembers(serverId, { limit: 200 }),
+        mayWriteNotes() ? Api.memberNotes(serverId) : Promise.resolve([]),
       ]);
       bans = Array.isArray(banRows) ? banRows : (banRows && banRows.items) || [];
       members = (page && page.items) || [];
+      notes = (noteRows && noteRows.notes) || [];
       paint();
     } catch (error) {
       host.replaceChildren(fold([fault(error, load)]));
@@ -78,6 +92,15 @@ export function moderationSection(ctx) {
   function canRemove() {
     return can(serverId, 'KICK_MEMBERS') || isOwner(serverId);
   }
+  // The notes are the moderation family's own: somebody who may remove a
+  // member or run the community may keep notes about the people in it.
+  function mayWriteNotes() {
+    return can(serverId, 'BAN_MEMBERS') || can(serverId, 'KICK_MEMBERS')
+      || can(serverId, 'MANAGE_SERVER') || isOwner(serverId);
+  }
+
+  // The note about a member, if there is one.
+  const noteFor = (memberId) => notes.find((note) => String(note.userId) === String(memberId)) || null;
 
   const paint = () => {
     const banBody = el('div', { class: 'rowlist' });
@@ -171,11 +194,34 @@ export function moderationSection(ctx) {
         text: 'Removing somebody from the community takes a permission this account does not hold.',
       }));
     } else {
-      removalBody.replaceChildren(...members.map((member) => row({
+      removalBody.replaceChildren(...members.map((member) => {
+        // A member with a note says so, so a moderator knows there is
+        // something to read before they act.
+        const note = noteFor(member.id);
+        const about = member.is_owner || member.isOwner
+          ? 'Community owner'
+          : '@' + (member.username || '');
+        return row({
         lead: el('span', { class: 'role-dot' }, icon('user', { size: 15 })),
         title: memberName(member),
-        sub: member.is_owner || member.isOwner ? 'Community owner' : '@' + (member.username || ''),
+        sub: note ? about + ' · has a note' : about,
         side: el('span', { class: 'rowtools' },
+          selecting ? el('input', {
+            type: 'checkbox',
+            'aria-label': 'Select ' + memberName(member),
+            checked: selected.has(String(member.id)) ? 'checked' : null,
+            onChange: (event) => {
+              const on = event.target.checked;
+              if (on) selected.add(String(member.id));
+              else selected.delete(String(member.id));
+              paint();
+            },
+          }) : null,
+          mayWriteNotes() ? el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            'aria-label': (note ? 'Read the note about ' : 'Write a note about ') + memberName(member),
+            onClick: () => editNote(member, note),
+          }, icon('edit', { size: 14 })) : null,
           el('button', {
             class: 'btn btn--ghost btn--sm', type: 'button',
             'aria-label': 'Rename ' + memberName(member) + ' in this community',
@@ -201,8 +247,39 @@ export function moderationSection(ctx) {
               }
             },
           }, 'Remove')),
-      })));
+        });
+      }));
     }
+
+    // -- several at a time ----------------------------------------------------
+    //
+    // The bar that appears when members are picked. It says how many are
+    // picked, and it does the thing to all of them at once - and it says what
+    // happened, including the ones it could not do.
+    const selectionBar = () => {
+      if (!selecting || !selected.size) return null;
+      const names = members
+        .filter((member) => selected.has(String(member.id)))
+        .map((member) => memberName(member));
+      const count = names.length;
+      return el('div', { class: 'fold fold--tight' },
+        el('p', { class: 'form-note' },
+          count + (count === 1 ? ' member is picked' : ' members are picked')
+          + ': ' + names.join(', ') + '.'),
+        el('div', { class: 'rowtools' },
+          canModerate() ? el('button', {
+            class: 'btn btn--default btn--sm', type: 'button',
+            onClick: () => bulkTimeout(names),
+          }, icon('clock', { size: 14 }), 'Time them out') : null,
+          el('button', {
+            class: 'btn btn--danger btn--sm', type: 'button',
+            onClick: () => bulkRemove(names),
+          }, 'Remove them'),
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            onClick: () => { selected.clear(); paint(); },
+          }, 'Pick none')));
+    };
 
     host.replaceChildren(fold([
       report.node,
@@ -214,8 +291,68 @@ export function moderationSection(ctx) {
           canModerate() ? timeoutForm() : null,
         ]),
       }),
-      card({ label: 'Removal', glyph: 'logout', body: removalBody, flush: true }),
+      card({
+        label: 'Removal', glyph: 'logout',
+        actions: canRemove() ? el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-pressed': selecting ? 'true' : 'false',
+          onClick: () => {
+            selecting = !selecting;
+            if (!selecting) selected.clear();
+            paint();
+          },
+        }, selecting ? 'Done' : 'Pick several') : null,
+        body: fold([removalBody, selectionBar()]),
+        flush: true,
+      }),
     ]));
+  };
+
+  // Several members at a time.
+  //
+  // The server is asked once per member, because the server is the only
+  // thing that knows whether it will. So the answer is counted and reported
+  // honestly: if four of five could not be timed out, the report says so
+  // rather than claiming that five were.
+  const bulk = async (names, act, described) => {
+    const done = [];
+    const refused = [];
+    for (const name of names) {
+      const member = members.find((m) => memberName(m) === name);
+      if (!member) { refused.push(name + ' (no longer here)'); continue; }
+      try {
+        await act(member);
+        done.push(name);
+      } catch (error) {
+        refused.push(name + ' (' + ((error && error.message) || 'refused') + ')');
+      }
+    }
+    selected.clear();
+    selecting = false;
+    if (refused.length) {
+      report.fail({
+        message: described + ': ' + done.length + ' of ' + names.length
+          + ' went through. Not: ' + refused.join(', ') + '.',
+      });
+    } else {
+      report.answered('The server answered: ' + described + ' for '
+        + done.length + (done.length === 1 ? ' member.' : ' members.'));
+    }
+    await load();
+  };
+
+  const bulkTimeout = (names) => bulk(names, (member) => Api.timeoutMember(serverId, member.id, 60),
+    'They are timed out for an hour');
+
+  const bulkRemove = async (names) => {
+    const yes = await confirmDialog({
+      title: names.length === 1 ? 'Remove ' + names[0] + '?' : 'Remove ' + names.length + ' members?',
+      body: names.join(', ') + ' leave the community. They can come back if there is a place for them.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!yes) return;
+    await bulk(names, (member) => Api.kickMember(serverId, member.id), 'They were removed');
   };
 
   // The form that times somebody out.
@@ -253,6 +390,61 @@ export function moderationSection(ctx) {
       who,
       how,
       el('div', { class: 'rowtools' }, run));
+  };
+
+  // The note about a member.
+  //
+  // A note is a moderator's private record of what they think of somebody:
+  // what was said, what was tried, what to watch for. So it is written here
+  // and nowhere else, and the member it is about never sees it - the server
+  // refuses to hand it to anybody who cannot moderate here.
+  const editNote = async (member, note) => {
+    const body = el('textarea', {
+      class: 'textarea',
+      'aria-label': 'The note about ' + memberName(member),
+      placeholder: 'What should the next moderator know?',
+      maxlength: '2000',
+    });
+    body.value = note ? note.body : '';
+
+    const dialog = openDialog({
+      title: 'A note about ' + memberName(member),
+      body: el('form', {
+        class: 'fold',
+        onSubmit: async (event) => {
+          event.preventDefault();
+          try {
+            await Api.setMemberNote(serverId, member.id, body.value.trim());
+            report.answered('The server answered: the note about ' + memberName(member) + ' was saved.');
+            dialog.close();
+            await load();
+          } catch (error) {
+            report.fail(error);
+          }
+        },
+      },
+        el('p', { class: 'form-note' },
+          'Only the moderators of this community can read this. '
+          + 'The member it is about never sees it.'),
+        body,
+        el('div', { class: 'rowtools' },
+          note ? el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            'aria-label': 'Take the note about ' + memberName(member) + ' away',
+            onClick: async () => {
+              try {
+                await Api.deleteMemberNote(serverId, member.id);
+                report.answered('The server answered: the note about ' + memberName(member) + ' was taken away.');
+                dialog.close();
+                await load();
+              } catch (error) {
+                report.fail(error);
+              }
+            },
+          }, 'Take it away') : null,
+          el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save the note'))),
+    });
+    body.focus();
   };
 
   // A member's name in this community.

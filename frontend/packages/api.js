@@ -351,6 +351,28 @@ const Api = {
   timeoutMember: (id, userId, minutes) =>
     request('POST', '/api/servers/' + encodeURIComponent(id) + '/timeout', { body: { userId, minutes } }),
 
+  // What a member can actually do in a community.
+  memberPermissions: (serverId, userId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/members/' + encodeURIComponent(userId) + '/permissions'),
+
+  // The notes a community's moderators keep about the people in it.
+  memberNotes: (serverId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/notes'),
+  memberNote: (serverId, userId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/notes/' + encodeURIComponent(userId)),
+  setMemberNote: (serverId, userId, body) =>
+    request('PUT', '/api/servers/' + encodeURIComponent(serverId) + '/notes/' + encodeURIComponent(userId), { body: { body } }),
+  deleteMemberNote: (serverId, userId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/notes/' + encodeURIComponent(userId)),
+
+  // The words a community refuses.
+  blockedTerms: (serverId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/blocked-terms'),
+  addBlockedTerm: (serverId, term) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/blocked-terms', { body: { term } }),
+  removeBlockedTerm: (serverId, term) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/blocked-terms/' + encodeURIComponent(term)),
+
   channels: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/channels'),
   createChannel: (serverId, body) =>
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels', { body }),
@@ -358,6 +380,8 @@ const Api = {
     request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId), { body }),
   deleteChannel: (serverId, channelId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId)),
+  duplicateChannel: (serverId, channelId) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels/' + encodeURIComponent(channelId) + '/duplicate'),
   reorderChannels: (serverId, orderedIds) =>
     request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/channels/reorder', { body: { orderedIds } }),
 
