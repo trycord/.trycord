@@ -1986,7 +1986,9 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 
 /* -- a person ---------------------------------------------------------------- */
 .m-person { display: flex; flex-direction: column; gap: 2px; padding-bottom: 10px; }
+.m-person__face { margin-bottom: 8px; }
 .m-person__name { font-size: var(--fs-lg); font-weight: var(--weight-strong); color: var(--text-1); }
+.m-person__kind { margin-top: 4px; }
 .m-person__handle { font-size: var(--fs-sm); color: var(--text-3); }
 .m-person__status { font-size: var(--fs-sm); color: var(--text-2); }
 

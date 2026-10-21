@@ -1069,6 +1069,21 @@ function integrationsSection(serverId) {
         el('span', { class: 'm-row__actions' },
           el('button', {
             class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
+            'aria-label': (app.status === 'active' ? 'Switch off ' : 'Switch on ')
+              + 'the application ' + (app.name || ''),
+            onClick: async () => {
+              const on = app.status !== 'active';
+              try {
+                await communityApi.updateApp(serverId, app.id, { status: on ? 'active' : 'disabled' });
+                status.say(on
+                  ? 'The application is switched on.'
+                  : 'The application is switched off. Its token still works, and it cannot post.');
+                await load();
+              } catch (error) { status.fail(error); }
+            },
+          }, app.status === 'active' ? 'Switch off' : 'Switch on'),
+          el('button', {
+            class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
             'aria-label': 'The commands of ' + (app.name || 'the application'),
             onClick: () => appCommands(serverId, app, status),
           }, 'Commands'),
