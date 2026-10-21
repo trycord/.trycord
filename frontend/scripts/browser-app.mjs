@@ -70,7 +70,10 @@ function layoutOf(route) {
 const report = [];
 let failures = 0;
 
-const run = await harness(await freePort(PORT));
+// The gates are only seen by a reader with no session.
+const SIGNED_OUT = arg('signed-out', 'no') !== 'no';
+
+const run = await harness(await freePort(PORT), { signedOut: SIGNED_OUT });
 const { page, nameRoute } = run;
 
 try {

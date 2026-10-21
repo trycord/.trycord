@@ -180,9 +180,17 @@ export const STUB = `
   }
   void realStorage;
   try {
-    window.localStorage.setItem('trycord.token.', 'harness-token');
-    window.localStorage.setItem('trycord.token.https://api.trycord.dev', 'harness-token');
-    window.localStorage.setItem('trycord.token.http://localhost:9971', 'harness-token');
+    if (window.__trycordSignedOut) {
+      // The gates are seen signed out: a reader who has no session sees the
+      // sign-in screen, and a harness that always signs in never sees it.
+      window.localStorage.removeItem('trycord.token.');
+      window.localStorage.removeItem('trycord.token.https://api.trycord.dev');
+      window.localStorage.removeItem('trycord.token.http://localhost:9971');
+    } else {
+      window.localStorage.setItem('trycord.token.', 'harness-token');
+      window.localStorage.setItem('trycord.token.https://api.trycord.dev', 'harness-token');
+      window.localStorage.setItem('trycord.token.http://localhost:9971', 'harness-token');
+    }
   } catch (e) { /* the client will be signed out */ }
 
   // The history, on a document off disk.
@@ -251,6 +259,19 @@ export const STUB = `
       if (best) answer = answers[method + ' ' + best];
     }
     if (answer === undefined) answer = {};
+    // A reader with no session is told so, whatever the stub would answer.
+    if (window.__trycordSignedOut && /\/api\/(me|users\/me)$/.test(url)) {
+      answer = { error: { code: 'AUTH_REQUIRED', message: 'not signed in' } };
+      window.__calls = window.__calls || [];
+      window.__calls.push(method + ' ' + url);
+      return Promise.resolve({
+        ok: false, status: 401, statusText: 'Unauthorized',
+        headers: { get: function () { return null; } },
+        json: function () { return Promise.resolve(answer); },
+        text: function () { return Promise.resolve(JSON.stringify(answer)); },
+        arrayBuffer: function () { return Promise.resolve(new ArrayBuffer(0)); },
+      });
+    }
     window.__calls = window.__calls || [];
     window.__calls.push(method + ' ' + url);
     var body = JSON.stringify(answer);
@@ -410,7 +431,8 @@ export async function freePort(preferred) {
   throw new Error('no free port for the browser');
 }
 
-export async function harness(port) {
+export async function harness(port, options) {
+  const opts = options || {};
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'trycord-app-'));
   // A run that is interrupted leaves the browser's profile behind, and a
   // hundred of those fill the disk the browser is run on. It is taken away
@@ -457,7 +479,9 @@ export async function harness(port) {
   const page = new Page(socket);
   await page.send('Page.enable');
   await page.send('Runtime.enable');
-  const registration = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: STUB });
+  const registration = await page.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: (opts.signedOut ? 'window.__trycordSignedOut = true;' : '') + STUB,
+  });
   if (!registration || !registration.identifier) {
     chrome.kill('SIGKILL');
     throw new Error('the browser would not take the stub, so the harness would be '
