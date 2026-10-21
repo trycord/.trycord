@@ -73,11 +73,34 @@ export function openImageSheet(images, startIndex) {
   const picture = el('img', { class: 'm-lightbox__image', alt: '' });
   const caption = el('p', { class: 'm-lightbox__caption' });
   const counter = el('span', { class: 'm-lightbox__count' });
+
+  // The picture is read two ways: fitted to the phone, and at its own size
+  // so the detail in it can be read. The frame scrolls when the picture is
+  // bigger than the phone, so nothing is cut off.
+  const frame = el('div', { class: 'm-lightbox__frame' });
+  let zoomed = false;
+  const setZoom = (on) => {
+    zoomed = !!on;
+    frame.classList.toggle('is-zoomed', zoomed);
+    zoomButton.setAttribute('aria-label', zoomed
+      ? 'Fit the picture to the screen'
+      : 'Read the picture at its own size');
+    zoomButton.setAttribute('aria-pressed', String(zoomed));
+  };
+  const zoomButton = el('button', {
+    class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
+    'aria-label': 'Read the picture at its own size',
+    'aria-pressed': 'false',
+    onClick: () => setZoom(!zoomed),
+  }, icon('maximize', { size: 16 }));
+
+  frame.appendChild(picture);
   const body = el('div', { class: 'm-lightbox' },
-    picture,
+    frame,
     el('div', { class: 'm-lightbox__bar' },
       caption,
       counter,
+      zoomButton,
       list.length > 1 ? el('div', { class: 'm-lightbox__nav' },
         el('button', {
           class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
