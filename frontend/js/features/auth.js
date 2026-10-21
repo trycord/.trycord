@@ -119,7 +119,7 @@ function showError(form, error, action) {
   // form that says "null" under the message is a bug somebody will report.
   node.replaceChildren(
     ...[
-      el('span', {}, (error && error.message) || 'Something went wrong.'),
+      el('span', {}, (error && error.message) || 'That did not work. Try again.'),
       action || null,
     ].filter(Boolean),
   );

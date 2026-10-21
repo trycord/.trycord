@@ -93,7 +93,7 @@ function providerChoice(report, onChanged) {
     el('span', { class: 'm-row__actions' }, chip(stateOf(provider.state).label))));
   }
 
-  return section('Provider', list, { note: 'Each provider keeps its own settings.' });
+  return section('The provider', list, { note: 'Each provider keeps its own settings.' });
 }
 
 // The controls every provider shares.
@@ -139,6 +139,17 @@ function sharedSection(report, onChanged) {
         }, control.label))));
   }
 
+  return section('What voice offers', el('div', { class: 'm-stack' }, rows));
+}
+
+// The participant limit.
+//
+// It belongs to the provider in force rather than to the instance, so it
+// sits with the provider's own fields and not with the three switches every
+// provider shares.
+function limitSection(report, onChanged) {
+  const rows = [];
+
   const limitKey = 'voice.' + report.active + '.maxParticipants';
   const limit = textInput({
     type: 'number',
@@ -168,7 +179,7 @@ function sharedSection(report, onChanged) {
     }, { sm: true }),
   ]));
 
-  return section('Shared by every provider', el('div', { class: 'm-stack' }, rows));
+  return section('Participants per channel', el('div', { class: 'm-stack' }, rows));
 }
 
 // The fields of the provider in force, and nothing else.
@@ -299,11 +310,23 @@ export function voiceBody() {
     host.replaceChildren(loading('Reading the voice configuration'));
     try {
       const report = await readProviders();
+      // The main section has four things in it: which provider carries the
+      // calls, whether this instance offers voice, whether a member may
+      // share a screen, and whether a community has stages. The rest - the
+      // participant limit, the provider's own fields and the diagnostics -
+      // is under "The details", so an administrator who only wants voice on
+      // has four things to decide and not a page of networking.
+      const details = el('details', { class: 'm-details' },
+        el('summary', { class: 'm-details__summary' }, 'The details'),
+        el('div', { class: 'm-stack' },
+          limitSection(report, load),
+          providerFields(report, load),
+          diagnosticsSection(report, load)));
+
       host.replaceChildren(
         providerChoice(report, load),
         sharedSection(report, load),
-        providerFields(report, load),
-        diagnosticsSection(report, load),
+        details,
       );
     } catch (error) {
       host.replaceChildren(failure(error, load));

@@ -207,6 +207,20 @@ function sharedSection(report, onSaved) {
         }, control.label))));
   }
 
+  return card({
+    label: 'What voice offers', glyph: 'settings',
+    body: el('div', { class: 'fold' }, rows),
+  });
+}
+
+// The participant limit.
+//
+// It is a setting of the provider in force rather than of the instance, so
+// it belongs with the provider's own fields and not with the three switches
+// every provider shares.
+function limitSection(report, onSaved) {
+  const rows = [];
+
   const limitKey = 'voice.' + report.active + '.maxParticipants';
   const limitInput = el('input', {
     class: 'input', type: 'number', min: '1', max: '200',
@@ -239,7 +253,10 @@ function sharedSection(report, onSaved) {
         },
       }, 'Save'))));
 
-  return card({ label: 'Shared by every provider', glyph: 'settings', body: el('div', { class: 'fold' }, rows) });
+  return card({
+    label: 'Participants per channel', glyph: 'users',
+    body: el('div', { class: 'fold' }, rows),
+  });
 }
 
 // The fields of the provider in force, and nothing else.
@@ -432,9 +449,26 @@ export function adminVoice() {
 
     const inForce = report.providers.find((provider) => provider.inForce) || report.providers[0];
 
+    // The main section has four things in it: whether this instance offers
+    // voice, which provider carries it, whether a member may share a screen,
+    // and whether a community has stages. Everything else - the participant
+    // limit, the provider's own fields, the relay itself, the diagnostics -
+    // is behind "The details", so an administrator who only wants voice on
+    // has four things to decide and not a page of networking.
+    const details = el('details', { class: 'details' },
+      el('summary', { class: 'details__summary' }, 'The details'),
+      el('div', { class: 'details__body fold' },
+        limitSection(report, refresh),
+        providerSection(inForce, refresh),
+        stackSection(report),
+        diagnosticsSection(report, lastCheck, (answer) => {
+          lastCheck = answer;
+          paint();
+        })));
+
     stage.replaceChildren(
       card({
-        label: 'Provider',
+        label: 'The provider',
         glyph: 'volume',
         note: inForce ? inForce.label : '',
         body: el('div', { class: 'fold' },
@@ -445,12 +479,7 @@ export function adminVoice() {
             : null),
       }),
       sharedSection(report, refresh),
-      providerSection(inForce, refresh),
-      stackSection(report),
-      diagnosticsSection(report, lastCheck, (answer) => {
-        lastCheck = answer;
-        paint();
-      }),
+      details,
     );
   };
 

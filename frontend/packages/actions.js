@@ -56,17 +56,6 @@ export const ACTION_MATRIX = {
 };
 
 /**
- * The action with this id, in this table.
- *
- * @param {object[]} table
- * @param {string} id
- * @returns {object|null}
- */
-export function actionOf(table, id) {
-  return (table || []).find((action) => action.id === id) || null;
-}
-
-/**
  * The ids in a table, in order.
  *
  * @param {object[]} table
@@ -77,5 +66,5 @@ export function actionIds(table) {
 }
 
 export default {
-  CHANNEL_ACTIONS, CATEGORY_ACTIONS, MEMBER_ACTIONS, ACTION_MATRIX, actionOf, actionIds,
+  CHANNEL_ACTIONS, CATEGORY_ACTIONS, MEMBER_ACTIONS, ACTION_MATRIX, actionIds,
 };

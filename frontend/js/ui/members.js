@@ -27,6 +27,7 @@ import {
 import { on as onRealtime, EVENTS } from '../../packages/realtime.js';
 import { avatarUrlOf } from '../../packages/identity.js';
 import { roleChips } from '../../packages/roles.js';
+import { MEMBER_ACTIONS } from '../../packages/actions.js';
 import { avatar } from './primitives.js';
 import { icon } from '../../packages/icons.js';
 import { row, blank, card, fault, fold, hold } from './page.js';
@@ -52,63 +53,52 @@ export function presenceLabel(status) {
 export function memberActions(serverId, member, repaint) {
   const items = [];
   const name = nameOf(member) || member.username;
-  if (can(serverId, 'TIMEOUT_MEMBERS')) {
-    items.push({
-      label: 'Timeout for 10 minutes', icon: 'clock',
-      onSelect: () => {
-        Api.timeoutMember(serverId, member.id, 10)
-          .then(() => { toast('Timed out for 10 minutes.', { type: 'success' }); repaint(); })
+
+  // What each action does, on this shell. The table says which actions there
+  // are and what they are called; this says what they do here.
+  const handlers = {
+    timeout: () => {
+      Api.timeoutMember(serverId, member.id, 10)
+        .then(() => { toast('Timed out for 10 minutes.', { type: 'success' }); repaint(); })
+        .catch((e) => errorToast(e));
+    },
+    kick: () => {
+      confirmDialog({
+        title: 'Remove ' + name + '?',
+        body: 'They can come back if there is a place for them.',
+        confirmLabel: 'Remove',
+        danger: true,
+      }).then((yes) => {
+        if (!yes) return;
+        Api.kickMember(serverId, member.id)
+          .then(() => { toast('Removed.', { type: 'success' }); repaint(); })
           .catch((e) => errorToast(e));
-      },
-    });
-  }
-  if (can(serverId, 'KICK_MEMBERS')) {
-    items.push({
-      label: 'Remove from community', icon: 'logout', danger: true,
-      onSelect: () => {
-        confirmDialog({
-          title: 'Remove ' + name + '?',
-          body: 'They can come back if there is a place for them.',
-          confirmLabel: 'Remove',
-          danger: true,
-        }).then((yes) => {
-          if (!yes) return;
-          Api.kickMember(serverId, member.id)
-            .then(() => { toast('Removed.', { type: 'success' }); repaint(); })
-            .catch((e) => errorToast(e));
-        });
-      },
-    });
-  }
-  // What may this person actually do here?
-  //
-  // The moderation family: somebody who may remove a member, ban one, or run
-  // the community may look at anybody's authority. It is the same family that
-  // opens the notes, so the two go together.
-  if (can(serverId, 'KICK_MEMBERS') || can(serverId, 'BAN_MEMBERS')
-    || can(serverId, 'MANAGE_SERVER') || isOwner(serverId)) {
-    items.push({
-      label: 'What may they do here?', icon: 'shield',
-      onSelect: () => showPermissions(serverId, member, name),
-    });
-  }
-  if (can(serverId, 'BAN_MEMBERS') && !isOwner(serverId)) {
-    items.push({
-      label: 'Ban from community', icon: 'ban', danger: true,
-      onSelect: () => {
-        confirmDialog({
-          title: 'Ban ' + name + '?',
-          body: 'A ban keeps them out until it is lifted on purpose.',
-          confirmLabel: 'Ban',
-          danger: true,
-        }).then((yes) => {
-          if (!yes) return;
-          Api.banMember(serverId, member.id, '')
-            .then(() => { toast('Banned.', { type: 'success' }); repaint(); })
-            .catch((e) => errorToast(e));
-        });
-      },
-    });
+      });
+    },
+    ban: () => {
+      confirmDialog({
+        title: 'Ban ' + name + '?',
+        body: 'A ban keeps them out until it is lifted on purpose.',
+        confirmLabel: 'Ban',
+        danger: true,
+      }).then((yes) => {
+        if (!yes) return;
+        Api.banMember(serverId, member.id, '')
+          .then(() => { toast('Banned.', { type: 'success' }); repaint(); })
+          .catch((e) => errorToast(e));
+      });
+    },
+    permissions: () => showPermissions(serverId, member, name),
+  };
+
+  for (const action of MEMBER_ACTIONS) {
+    if (action.needs && !can(serverId, action.needs)) continue;
+    // The owner cannot be timed out, kicked or banned by the menu.
+    if ((action.id === 'kick' || action.id === 'ban' || action.id === 'timeout')
+      && (member.isOwner || member.is_owner)) continue;
+    const handler = handlers[action.id];
+    if (!handler) continue;
+    items.push({ label: action.label, icon: action.icon, onSelect: handler, danger: action.danger });
   }
   return items;
 }

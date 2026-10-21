@@ -13,6 +13,7 @@
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { can, isOwner, isMuted, refreshMutes, refreshServerTree, channelsOf, categoriesOf } from '../../packages/store.js';
+import { CHANNEL_ACTIONS, CATEGORY_ACTIONS } from '../../packages/actions.js';
 import { navigate, path } from '../../packages/nav.js';
 import Api from '../../packages/api.js';
 import { sheet, confirm, toast, menu, attachLongPress } from './ui.js';
@@ -261,30 +262,36 @@ export async function deleteCategory(serverId, category, reload) {
 export function channelActions(serverId, channel, reload) {
   const items = [];
   const route = '/server/' + serverId + '/channel/' + channel.id;
-  items.push({ label: 'Open', icon: 'arrow-right', onSelect: () => navigate(route) });
-  items.push({ label: 'Copy link', icon: 'link', onSelect: () => copyText(window.location.origin + path(route), 'Link') });
-  items.push({
-    label: isMuted(channel.id) ? 'Unmute channel' : 'Mute channel',
-    icon: isMuted(channel.id) ? 'bell' : 'volume-off',
-    onSelect: () => toggleMute(channel),
-  });
-  if (canManageChannels(serverId)) {
-    items.push({ separator: true });
-    items.push({ label: 'Edit channel', icon: 'edit', onSelect: () => openChannelEditor(serverId, channel, reload) });
-    items.push({
-      label: 'Copy channel', icon: 'copy',
-      onSelect: () => copyChannel(serverId, channel, reload),
-    });
-    items.push({ label: 'Move up', icon: 'arrow-up', onSelect: () => moveChannelBy(serverId, channel, -1) });
-    items.push({ label: 'Move down', icon: 'arrow-down', onSelect: () => moveChannelBy(serverId, channel, 1) });
-    items.push({
-      label: 'Move to category', icon: 'folder',
-      onSelect: () => openMoveSheet(serverId, channel, reload),
-    });
-    items.push({
-      label: 'Delete channel', icon: 'trash', danger: true,
-      onSelect: () => deleteChannel(serverId, channel, reload),
-    });
+  const muted = isMuted(channel.id);
+
+  // What each action does, on this shell. The table says which actions
+  // there are and what they are called; this says what they do here.
+  const handlers = {
+    open: () => navigate(route),
+    'copy-link': () => copyText(window.location.origin + path(route), 'Link'),
+    mute: () => toggleMute(channel),
+    unmute: () => toggleMute(channel),
+    'copy-topic': () => copyText(channel.topic || '', 'Topic'),
+    edit: () => openChannelEditor(serverId, channel, reload),
+    copy: () => copyChannel(serverId, channel, reload),
+    'move-up': () => moveChannelBy(serverId, channel, -1),
+    'move-down': () => moveChannelBy(serverId, channel, 1),
+    'move-to-category': () => openMoveSheet(serverId, channel, reload),
+    settings: () => navigate('/server/' + serverId + '/settings/channels'),
+    delete: () => deleteChannel(serverId, channel, reload),
+  };
+
+  for (const action of CHANNEL_ACTIONS) {
+    // The mute and the unmute are one action with two names.
+    if (action.id === 'mute' && muted) continue;
+    if (action.id === 'unmute' && !muted) continue;
+    if (action.id === 'copy-topic' && !channel.topic) continue;
+    if (action.needs === 'MANAGE_CHANNELS' && !canManageChannels(serverId)) continue;
+    const handler = handlers[action.id];
+    if (!handler) continue;
+    items.push({ label: action.label, icon: action.icon, onSelect: handler, danger: action.danger });
+    // The management actions are set apart from the ordinary ones.
+    if (action.id === 'copy-topic') items.push({ separator: true });
   }
   return items;
 }
@@ -327,14 +334,18 @@ export async function toggleMute(channel) {
 /** The actions on a category. */
 export function categoryActions(serverId, category, reload) {
   const items = [{ header: category.name }];
-  if (canManageChannels(serverId)) {
-    items.push({ label: 'Create a channel here', icon: 'plus', onSelect: () => openChannelEditor(serverId, null, reload) });
-    items.push({ separator: true });
-    items.push({ label: 'Rename category', icon: 'edit', onSelect: () => openCategoryEditor(serverId, category, reload) });
-    items.push({
-      label: 'Delete category', icon: 'trash', danger: true,
-      onSelect: () => deleteCategory(serverId, category, reload),
-    });
+  const handlers = {
+    'create-channel': () => openChannelEditor(serverId, null, reload),
+    rename: () => openCategoryEditor(serverId, category, reload),
+    delete: () => deleteCategory(serverId, category, reload),
+  };
+  for (const action of CATEGORY_ACTIONS) {
+    if (action.needs === 'MANAGE_CHANNELS' && !canManageChannels(serverId)) continue;
+    const handler = handlers[action.id];
+    if (!handler) continue;
+    items.push({ label: action.label, icon: action.icon, onSelect: handler, danger: action.danger });
+    // The creation is set apart from the two that change the category.
+    if (action.id === 'create-channel') items.push({ separator: true });
   }
   return items;
 }

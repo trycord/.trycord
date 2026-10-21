@@ -815,6 +815,20 @@
  * it names, the people audible in it, and the three acts that matter. Idle it
  * costs nothing; live it carries nothing the session has not said for itself. */
 
+/* A disclosure.
+   The details are there for the person who wants them and out of the way for
+   the person who does not. */
+.details { border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--panel-2); }
+.details__summary {
+  cursor: pointer; padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-sm); font-weight: var(--weight-strong); color: var(--text-2);
+  list-style: none;
+}
+.details__summary::-webkit-details-marker { display: none; }
+.details__summary::before { content: '\203A'; display: inline-block; margin-right: 8px; transition: transform var(--dur-1) var(--ease); }
+.details[open] .details__summary::before { transform: rotate(90deg); }
+.details__body { padding: 0 var(--space-4) var(--space-4); }
+
 .voice-dock { display: grid; gap: var(--space-3); padding: var(--space-4); }
 .voice-dock__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .voice-dock__lead { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }

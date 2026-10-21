@@ -409,7 +409,7 @@ export function renderConversation(ctx, scope) {
       if (isDm) Api.dmRead(scope.id).catch(() => {});
     } catch (error) {
       clear(list);
-      list.appendChild(empty({ title: 'Could not load this conversation', text: error && error.message ? error.message : 'Something went wrong.' }));
+      list.appendChild(empty({ title: 'Could not load this conversation', text: error && error.message ? error.message : 'Try again in a moment.' }));
     }
   }
 

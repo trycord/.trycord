@@ -30,6 +30,7 @@ import { screen, notice, stat } from './util.js';
 import { renderConversation } from './messages.js';
 import { voiceSection } from './communityVoice.js';
 import { joinVoiceCall } from './voiceCall.js';
+import { MEMBER_ACTIONS } from '../../../packages/actions.js';
 import { current as voiceCurrent } from '../../../packages/voiceSession.js';
 
 export function isVoiceType(type) {
@@ -285,28 +286,25 @@ export function renderChannelPins(ctx) {
 // knows nothing about communities, so the community adds its own entries.
 function memberActions(serverId, item, user, reload) {
   const items = [];
-  if (can(serverId, 'MANAGE_ROLES') && !item.is_owner) {
-    items.push({ label: 'Edit roles', icon: 'shield', onSelect: () => openMemberRoles(serverId, item, user, reload) });
-  }
-  if (can(serverId, 'TIMEOUT_MEMBERS') && !item.is_owner) {
-    items.push({ label: 'Timeout', icon: 'clock', onSelect: () => openTimeout(serverId, user, reload) });
-  }
-  if (can(serverId, 'KICK_MEMBERS') && !item.is_owner) {
-    items.push({ label: 'Kick', icon: 'logout', danger: true, onSelect: () => kickMember(serverId, user, reload) });
-  }
-  if (can(serverId, 'BAN_MEMBERS') && !item.is_owner) {
-    items.push({ label: 'Ban', icon: 'ban', danger: true, onSelect: () => banMember(serverId, user, reload) });
-  }
-  // What may this person actually do here?
-  //
-  // The moderation family: somebody who may remove a member, ban one, or run
-  // the community may look at anybody's authority.
-  if (can(serverId, 'KICK_MEMBERS') || can(serverId, 'BAN_MEMBERS')
-    || can(serverId, 'MANAGE_SERVER') || isOwner(serverId)) {
-    items.push({
-      label: 'What may they do here?', icon: 'shield',
-      onSelect: () => showPermissions(serverId, item, user),
-    });
+
+  // What each action does, on this shell. The table says which actions there
+  // are and what they are called; this says what they do here.
+  const handlers = {
+    roles: () => openMemberRoles(serverId, item, user, reload),
+    timeout: () => openTimeout(serverId, user, reload),
+    kick: () => kickMember(serverId, user, reload),
+    ban: () => banMember(serverId, user, reload),
+    permissions: () => showPermissions(serverId, item, user),
+  };
+
+  for (const action of MEMBER_ACTIONS) {
+    if (action.needs && !can(serverId, action.needs)) continue;
+    // The owner cannot be timed out, kicked or banned by the menu.
+    if ((action.id === 'kick' || action.id === 'ban' || action.id === 'timeout')
+      && (item.is_owner || item.isOwner)) continue;
+    const handler = handlers[action.id];
+    if (!handler) continue;
+    items.push({ label: action.label, icon: action.icon, onSelect: handler, danger: action.danger });
   }
   return items;
 }
