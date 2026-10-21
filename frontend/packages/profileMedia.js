@@ -70,6 +70,82 @@ export function previewOf(file) {
 }
 
 /**
+ * The picture the reader chose, drawn small and square.
+ *
+ * A photograph of a holiday is several megabytes, and a face is drawn in
+ * thirty-eight pixels. The browser can do the work: the picture is drawn
+ * into a canvas, cropped to a square the way every face is cropped, and
+ * handed back as a small file. What is uploaded is then the picture the
+ * reader chose, at a size a face can be drawn from, and not the camera
+ * roll's original.
+ *
+ * The crop is the middle of the picture. A reader who wants a different
+ * part of it has the whole picture in the editor they cropped it in.
+ *
+ * @param {File} file
+ * @param {object} [options]
+ * @param {number} [options.size] The longest side, in pixels.
+ * @param {'square'|'wide'|'none'} [options.shape] What the picture is cut
+ *   to. A face is square; a cover is wide; a community's picture is
+ *   whatever the community drew, so it is not cut at all.
+ * @returns {Promise<Blob|null>} The picture, or null when the browser
+ *   cannot draw it - in which case the original file is uploaded as it is.
+ */
+export async function prepareImage(file, options = {}) {
+  const size = Number(options.size) > 0 ? Number(options.size) : 512;
+  const shape = options.shape || 'square';
+  if (!file || typeof createImageBitmap !== 'function') return null;
+  let bitmap = null;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    // A browser that cannot read the file cannot draw it either, and the
+    // server sniffs the bytes anyway.
+    return null;
+  }
+  try {
+    // The part of the picture that is kept.
+    let width = bitmap.width;
+    let height = bitmap.height;
+    if (shape === 'square') {
+      width = height = Math.min(bitmap.width, bitmap.height);
+    } else if (shape === 'wide') {
+      // A cover is a wide picture: it is cut to a wide shape and never to a
+      // square one, because half a banner is not a banner.
+      const wanted = 16 / 9;
+      if (bitmap.width / bitmap.height > wanted) {
+        width = Math.round(bitmap.height * wanted);
+      } else {
+        height = Math.round(bitmap.width / wanted);
+      }
+    }
+    const scale = Math.min(1, size / Math.max(width, height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.drawImage(
+      bitmap,
+      Math.round((bitmap.width - width) / 2),
+      Math.round((bitmap.height - height) / 2),
+      width,
+      height,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    return blob || null;
+  } catch {
+    return null;
+  } finally {
+    if (typeof bitmap.close === 'function') bitmap.close();
+  }
+}
+
+/**
  * Upload a person's picture or cover.
  *
  * The server answers with the whole person, so the caller can put the new
@@ -127,7 +203,7 @@ export async function removeCommunityPicture(serverId, kind) {
 }
 
 export default {
-  checkImage, previewOf,
+  checkImage, previewOf, prepareImage,
   uploadProfilePicture, removeProfilePicture,
   uploadCommunityPicture, removeCommunityPicture,
 };
