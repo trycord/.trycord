@@ -554,10 +554,20 @@ export async function harness(port, options) {
   // A run that is interrupted leaves the browser's profile behind, and a
   // hundred of those fill the disk the browser is run on. It is taken away
   // when the process goes, whatever happened to it.
+  //
+  // The exit handler alone is not enough: a process killed with a signal does
+  // not run it, and the profile of every interrupted run stays on the disk.
+  // The signals are handled as well, and the profile goes with them.
+  let forgotten = false;
   const forgetProfile = () => {
+    if (forgotten) return;
+    forgotten = true;
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* already gone */ }
   };
   process.on('exit', forgetProfile);
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    process.on(signal, () => { forgetProfile(); process.exit(1); });
+  }
   const chrome = spawn(CHROME, [
     '--headless=new',
     '--no-sandbox',

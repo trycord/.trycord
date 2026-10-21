@@ -67,6 +67,41 @@ export function closeTopOverlay() {
   return !!top;
 }
 
+// The buttons at the foot of a dialog.
+//
+// `actions` is a list of { label, primary, danger, onSelect }. The primary one
+// is the answer; the others are the ways out. An action with no handler closes
+// the dialog, which is what a Cancel button is.
+//
+// It used to be ignored: the dialog drew no buttons at all, so the two
+// dialogs that asked for one - making a group and renaming one - had no way
+// to be finished. A dialog with no way out is a dead end, and it looked like
+// the feature was there.
+//
+// A button is disabled while its own action runs, so a second click cannot
+// send the request twice.
+function dialogFoot(opts, close) {
+  if (opts.foot) return opts.foot;
+  if (!Array.isArray(opts.actions) || !opts.actions.length) return null;
+  return opts.actions.map((action) => {
+    const button = el('button', {
+      class: 'btn ' + (action.danger ? 'btn--danger' : action.primary ? 'btn--primary' : 'btn--ghost'),
+      type: 'button',
+      onClick: async () => {
+        if (!action.onSelect) { close(undefined); return; }
+        button.disabled = true;
+        try {
+          await action.onSelect();
+        } catch (error) {
+          button.disabled = false;
+          throw error;
+        }
+      },
+    }, action.label);
+    return button;
+  });
+}
+
 // A dialog is a promise about focus and Escape, so every dialog goes through
 // here. `render` receives a close callback and returns the dialog element.
 export function openDialog(options) {
@@ -132,7 +167,8 @@ export function openDialog(options) {
         }, icon('x', { size: 16 }))));
   }
   if (opts.body) dialog.appendChild(el('div', { class: 'dialog-body' }, opts.body));
-  if (opts.foot) dialog.appendChild(el('div', { class: 'dialog-foot' }, opts.foot));
+  const foot = dialogFoot(opts, close);
+  if (foot) dialog.appendChild(el('div', { class: 'dialog-foot' }, foot));
 
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);

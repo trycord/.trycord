@@ -67,16 +67,23 @@ async function newGroup() {
     footer: el('div', { class: 'm-actions' },
       el('button', {
         class: 'm-btn m-btn--sm m-btn--primary', type: 'button',
-        onClick: async () => {
+        onClick: async (event) => {
+          const button = event.currentTarget;
           if (!name.value.trim()) { toast('Give the group a name.'); return; }
           if (!chosen.size) { toast('Choose at least one person.'); return; }
+          // The button is disabled while the request is in flight: a second
+          // tap would make a second group.
+          button.disabled = true;
           try {
             const group = await Api.createDmGroup({ name: name.value.trim(), userIds: [...chosen] });
             layer.close();
             try { await refreshDms(); } catch { /* the conversation can load itself */ }
             toast('Group created.');
             navigate('/dms/' + group.id);
-          } catch (error) { showError(error); }
+          } catch (error) {
+            showError(error);
+            button.disabled = false;
+          }
         },
       }, 'Create group')),
   });
@@ -271,8 +278,7 @@ export function renderDm(ctx) {
               layer.close();
               if (await updateGroup()) toast('Group renamed.');
             } catch (error) { showError(error); }
-          },
-        }, 'Save name')),
+          },        }, 'Save name')),
     });
   }
 
@@ -288,12 +294,17 @@ export function renderDm(ctx) {
     });
     rows.replaceChildren(...candidates.map((friend) => el('button', {
       class: 'm-row', type: 'button',
-      onClick: async () => {
+      onClick: async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
         try {
           await Api.addDmGroupMember(id, friend.id);
           layer.close();
           if (await updateGroup()) toast(nameOf(friend) + ' joined the group.');
-        } catch (error) { showError(error); }
+        } catch (error) {
+          showError(error);
+          button.disabled = false;
+        }
       },
     },
     el('span', { class: 'm-row__lead' }, avatar(friend, { size: 'sm', decorative: true })),

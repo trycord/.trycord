@@ -31,6 +31,7 @@
     "voice": "node src/voice/index.js",
     "check:names": "node ../frontend/scripts/check-client-names.mjs",
     "check:names:backend": "node scripts/check-backend-names.mjs",
+    "check:contract": "node scripts/check-api-contract.mjs",
     "db:restore": "node scripts/db-restore.js",
     "test": "node --test \"tests/**/*.test.js\"",
     "test:unit": "node --test \"tests/unit/**/*.test.js\"",
