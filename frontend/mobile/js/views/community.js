@@ -271,7 +271,108 @@ function memberActions(serverId, item, user, reload) {
   if (can(serverId, 'BAN_MEMBERS') && !item.is_owner) {
     items.push({ label: 'Ban', icon: 'ban', danger: true, onSelect: () => banMember(serverId, user, reload) });
   }
+  // What may this person actually do here?
+  //
+  // The moderation family: somebody who may remove a member, ban one, or run
+  // the community may look at anybody's authority.
+  if (can(serverId, 'KICK_MEMBERS') || can(serverId, 'BAN_MEMBERS')
+    || can(serverId, 'MANAGE_SERVER') || isOwner(serverId)) {
+    items.push({
+      label: 'What may they do here?', icon: 'shield',
+      onSelect: () => showPermissions(serverId, item, user),
+    });
+  }
   return items;
+}
+
+// What a member may actually do in a community.
+//
+// The answer has three parts, and the third is the one that matters: the
+// roles they hold, what those roles give, and the places where an override
+// makes the community different from the default. A person who may post
+// everywhere except in the quiet channel is not a person who may post
+// everywhere, and only the override says so.
+async function showPermissions(serverId, item, user) {
+  const body = el('div', { class: 'm-stack' });
+  const layer = sheet({
+    title: 'What ' + nameOf(user) + ' may do here',
+    body,
+  });
+  body.appendChild(loading('Reading what this person may do'));
+  let preview;
+  try {
+    preview = await Api.memberPermissions(serverId, item.id);
+  } catch (error) {
+    replaceChildren(body, failure(error, null));
+    return;
+  }
+
+  const section = (title, rows) => el('section', { class: 'm-section' },
+    el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, title)),
+    rows);
+
+  // The roles they hold.
+  const roleRows = el('div', { class: 'm-list' });
+  if (!preview.roles.length) {
+    roleRows.appendChild(empty({
+      icon: 'shield', title: 'No roles', text: 'This person holds no role in this community.',
+    }));
+  }
+  for (const role of preview.roles) {
+    roleRows.appendChild(el('div', { class: 'm-row' },
+      el('span', { class: 'm-row__lead' }, icon('shield', { size: 17 })),
+      el('span', { class: 'm-row__body' },
+        el('span', { class: 'm-row__title truncate' }, role.name),
+        el('span', { class: 'm-row__sub truncate' },
+          role.permissions.length ? role.permissions.join(' · ') : 'Grants nothing on its own'))));
+  }
+
+  // What the roles give, across the community.
+  const wideRows = el('div', { class: 'm-list' });
+  if (preview.isOwner) {
+    wideRows.appendChild(empty({
+      icon: 'crown', title: 'They hold everything',
+      text: 'The owner of a community may do everything in it.',
+    }));
+  } else if (!preview.permissions.length) {
+    wideRows.appendChild(empty({
+      icon: 'shield', title: 'Nothing', text: 'Their roles grant nothing across the community.',
+    }));
+  }
+  for (const permission of preview.permissions) {
+    wideRows.appendChild(el('div', { class: 'm-row' },
+      el('span', { class: 'm-row__lead' }, icon('check', { size: 17 })),
+      el('span', { class: 'm-row__body' },
+        el('span', { class: 'm-row__title truncate' }, permission),
+        el('span', { class: 'm-row__sub' }, 'Across the community'))));
+  }
+
+  // Where the community is different from that.
+  const overrideRows = el('div', { class: 'm-list' });
+  if (!preview.overrides.length) {
+    overrideRows.appendChild(empty({
+      icon: 'hash', title: 'Nowhere different',
+      text: 'No channel or category here changes what they may do.',
+    }));
+  }
+  for (const entry of preview.overrides) {
+    overrideRows.appendChild(el('div', { class: 'm-row' },
+      el('span', { class: 'm-row__lead' }, icon('hash', { size: 17 })),
+      el('span', { class: 'm-row__body' },
+        el('span', { class: 'm-row__title truncate' }, entry.channelName),
+        el('span', { class: 'm-row__sub truncate' },
+          entry.changed
+            .map((change) => change.permission + ' ' + (change.effect === 'deny' ? 'is refused here' : 'is allowed here'))
+            .join(' · ')))));
+  }
+
+  replaceChildren(body,
+    el('p', { class: 'm-lede' },
+      'These are the permissions the server enforces for this person right now.'),
+    section('The roles they hold', roleRows),
+    section('What that gives', wideRows),
+    section('Where it is different', overrideRows),
+  );
 }
 
 // One member, drawn. The presence is written twice - as the dot on the face and
@@ -766,6 +867,7 @@ const SETTINGS_SECTIONS = [
   ['roles', 'Roles', 'shield'],
   ['invites', 'Invites', 'mail'],
   ['moderation', 'Moderation', 'flag'],
+  ['rules', 'Rules', 'shield'],
   ['voice', 'Voice and video', 'mic'],
   ['onboarding', 'Onboarding', 'help'],
   ['integrations', 'Integrations', 'rocket'],
@@ -1134,9 +1236,19 @@ function ownershipSection(serverId) {
 export function renderCommunityHome(ctx) {
   const serverId = ctx.serverId;
   const host = el('div', { class: 'm-stack' });
+  const community = serverById(serverId) || {};
+  // The identity of the community: its mark, its name, and what it is for in
+  // the community's own words - and only when it has said them.
+  const identity = el('div', { class: 'm-identity' },
+    el('span', { class: 'm-identity__mark' }, serverMark(community, { size: 'md' })),
+    el('span', { class: 'm-identity__words' },
+      el('span', { class: 'm-identity__name' }, community.name || 'Community'),
+      community.description
+        ? el('span', { class: 'm-identity__about' }, community.description)
+        : null));
   const node = screen(
     el('div', { class: 'm-hero m-hero--quiet' },
-      el('h1', { class: 'm-hero__title' }, serverById(serverId) ? serverById(serverId).name : 'Community'),
+      identity,
       el('div', { class: 'm-hero__sub' }, 'Choose a channel.')),
     host);
   return { node, head: { lead: 'back', title: 'Channels' }, onMount() { paint(); } };

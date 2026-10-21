@@ -121,8 +121,25 @@ module.exports = (engine) => [
       topic       TEXT,
       type        VARCHAR(16) NOT NULL DEFAULT 'text',
       position    INTEGER NOT NULL DEFAULT 0,
+      -- Slow mode: the shortest gap between two messages from the same
+      -- person, in seconds. Zero, which is the default, is no slow mode.
+      slow_mode   INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+    )${engine}`,
+
+  // The words a community refuses.
+  //
+  // A community decides what may be said in it, and the list is the
+  // community's own: a word is refused here and nowhere else, and the
+  // refusal names the word rather than saying the message was not allowed.
+  `CREATE TABLE IF NOT EXISTS blocked_terms (
+      id         VARCHAR(64) PRIMARY KEY,
+      server_id  VARCHAR(64) NOT NULL,
+      term       VARCHAR(128) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      UNIQUE (server_id, term),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     )${engine}`,
 
   `CREATE TABLE IF NOT EXISTS category_permission_overrides (

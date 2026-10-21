@@ -63,6 +63,10 @@ export const COMMUNITY_SECTIONS = [
     blurb: 'Bans, timeouts and removing a member',
   },
   {
+    id: 'rules', label: 'Rules', icon: 'shield', group: 'Safety',
+    blurb: 'Slow mode and the words that may not be used',
+  },
+  {
     id: 'voice', label: 'Voice and video', icon: 'mic', group: 'Structure',
     blurb: 'The voice channels of this community',
   },
@@ -134,10 +138,23 @@ export const COMMUNITY_ROUTES = [
   { id: 'servers.bans', method: 'GET', path: '/api/servers/:id/bans', call: 'bans', surfaces: ['moderation'] },
   { id: 'servers.timeout', method: 'POST', path: '/api/servers/:id/timeout', call: 'timeoutMember', surfaces: ['moderation'] },
 
+  // The notes the community's moderators keep about its members.
+  { id: 'servers.memberPermissions', method: 'GET', path: '/api/servers/:serverId/members/:userId/permissions', call: 'memberPermissions', surfaces: ['members'] },
+  { id: 'servers.notesRead', method: 'GET', path: '/api/servers/:serverId/notes', call: 'memberNotes', surfaces: ['moderation'] },
+  { id: 'servers.noteRead', method: 'GET', path: '/api/servers/:serverId/notes/:userId', call: 'memberNote', surfaces: ['moderation'] },
+  { id: 'servers.noteWrite', method: 'PUT', path: '/api/servers/:serverId/notes/:userId', call: 'setMemberNote', surfaces: ['moderation'] },
+  { id: 'servers.noteRemove', method: 'DELETE', path: '/api/servers/:serverId/notes/:userId', call: 'deleteMemberNote', surfaces: ['moderation'] },
+
+  // The words the community refuses.
+  { id: 'servers.blockedTermsRead', method: 'GET', path: '/api/servers/:id/blocked-terms', call: 'blockedTerms', surfaces: ['rules'] },
+  { id: 'servers.blockedTermsWrite', method: 'POST', path: '/api/servers/:id/blocked-terms', call: 'addBlockedTerm', surfaces: ['rules'] },
+  { id: 'servers.blockedTermsRemove', method: 'DELETE', path: '/api/servers/:id/blocked-terms/:term', call: 'removeBlockedTerm', surfaces: ['rules'] },
+
   // The channels.
   { id: 'channels.read', method: 'GET', path: '/api/servers/:serverId/channels', call: 'channels', surfaces: ['channels', 'categories'] },
   { id: 'channels.create', method: 'POST', path: '/api/servers/:serverId/channels', call: 'createChannel', surfaces: ['channels'] },
   { id: 'channels.update', method: 'PATCH', path: '/api/servers/:serverId/channels/:channelId', call: 'updateChannel', surfaces: ['channels'] },
+  { id: 'channels.duplicate', method: 'POST', path: '/api/servers/:serverId/channels/:channelId/duplicate', call: 'duplicateChannel', surfaces: ['channels'] },
   { id: 'channels.reorder', method: 'POST', path: '/api/servers/:serverId/channels/reorder', call: 'reorderChannels', surfaces: ['channels'] },
   { id: 'channels.remove', method: 'DELETE', path: '/api/servers/:serverId/channels/:channelId', call: 'deleteChannel', surfaces: ['channels'] },
   { id: 'channels.overridesRead', method: 'GET', path: '/api/servers/:serverId/channels/:channelId/overrides', call: 'channelOverrides', surfaces: ['roles', 'channels'] },

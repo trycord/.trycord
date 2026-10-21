@@ -27,10 +27,11 @@ installDomStub();
 const { communitySettingsSections } = await import('../js/features/communitySettings.js');
 const { SETTINGS_SECTIONS } = await import('../js/views/settings-sections.js').catch(() => ({ SETTINGS_SECTIONS: null }));
 
-// The twelve sections the console offers.
+// The thirteen sections the console offers.
 const SECTIONS = [
   'overview', 'appearance', 'channels', 'categories', 'members', 'roles',
-  'invites', 'moderation', 'voice', 'ownership', 'analytics', 'integrations',
+  'invites', 'moderation', 'rules', 'voice', 'ownership', 'analytics',
+  'integrations',
 ];
 
 // A context the sections can be drawn with. The permission system answers

@@ -207,6 +207,66 @@ const MIGRATIONS = [
       }
     },
   },
+  {
+    version: 5,
+    name: '4.3.0 community moderation',
+    // Slow mode on a channel, and the words a community refuses.
+    //
+    // The baseline creates both for a fresh database; this is for the
+    // database that already existed, where the baseline's CREATE TABLE IF NOT
+    // EXISTS is a no-op.
+    //
+    // Not transactional: MySQL commits DDL implicitly, so a transaction
+    // around it would promise an atomicity the engine does not give. Every
+    // statement is safe to run twice.
+    transactional: false,
+    async up(conn) {
+      const tables = require('./tables');
+      const engine = conn.dialect === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+      for (const statement of tables(engine)) {
+        if (/blocked_terms/.test(statement)) await conn.exec(statement);
+      }
+      const columns = await tableColumns(conn, 'channels');
+      if (!columns.includes('slow_mode')) {
+        await conn.exec('ALTER TABLE channels ADD COLUMN slow_mode INTEGER NOT NULL DEFAULT 0');
+      }
+    },
+    async verify(conn) {
+      const columns = await tableColumns(conn, 'channels');
+      if (!columns.includes('slow_mode')) {
+        throw new Error('the slow mode column is missing');
+      }
+      if (!(await tableExists(conn, 'blocked_terms'))) {
+        throw new Error('the blocked terms table is missing');
+      }
+    },
+  },
+  {
+    version: 6,
+    name: '4.3.0 member notes',
+    // The notes a community's moderators keep about the people in it.
+    //
+    // The baseline creates the table for a fresh database; this is for the
+    // database that already existed, where the baseline's CREATE TABLE IF NOT
+    // EXISTS is a no-op.
+    //
+    // Not transactional: MySQL commits DDL implicitly, so a transaction
+    // around it would promise an atomicity the engine does not give. The
+    // statement is safe to run twice.
+    transactional: false,
+    async up(conn) {
+      const tables = require('./tables');
+      const engine = conn.dialect === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+      for (const statement of tables(engine)) {
+        if (/member_notes/.test(statement)) await conn.exec(statement);
+      }
+    },
+    async verify(conn) {
+      if (!(await tableExists(conn, 'member_notes'))) {
+        throw new Error('the member notes table is missing');
+      }
+    },
+  },
 ];
 
 // The version this build knows about.

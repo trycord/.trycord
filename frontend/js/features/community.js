@@ -27,6 +27,7 @@ import { communitySettingsSections } from './communitySettings.js';
 import { roleDot, roleColourField, memberRoleDot, roleChips } from '../../packages/roles.js';
 import { renderVoiceRoom } from '../voice/room.js';
 import { errorToast, toast, openDialog } from '../ui/overlays.js';
+import { communityIdentity } from '../ui/communityIdentity.js';
 
 function renderSettingsSection(ctx, section) {
   const table = communitySettingsSections();
@@ -73,6 +74,9 @@ export function renderChannelView(ctx) {
   const makeHead = () => {
     const room = channel && (channel.type === 'voice' || channel.type === 'stage');
     return head({
+      // Which community this is. The channel is where the conversation is, and
+      // the community is the place it happens, so the place says its name.
+      identity: communityIdentity(server),
       kicker: server.name,
       title: channelTitlePrefix + (channel ? channel.name : 'channel'),
       lede: channel && channel.topic

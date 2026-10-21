@@ -36,6 +36,7 @@ import {
 } from '../community/manage.js';
 import { overviewSection } from './communitySettings/overview.js';
 import { moderationSection } from './communitySettings/moderation.js';
+import { rulesSection } from './communitySettings/rules.js';
 import { integrationsSection } from './communitySettings/integrations.js';
 import { voiceSection } from './communitySettings/voice.js';
 import { onboardingSection } from './communitySettings/onboarding.js';
@@ -182,6 +183,22 @@ function appearanceSection(ctx) {
 // same reordering - so the two surfaces cannot disagree about what a channel
 // is or what creating one does.
 
+// A copy of a channel.
+//
+// The copy carries the settings over - the topic, the type, the category and
+// the slow mode - and it carries no messages, so it is a fresh channel with
+// the shape of the old one.
+async function copyChannel(serverId, channel, done) {
+  try {
+    const copy = await Api.duplicateChannel(serverId, channel.id);
+    toast('The server answered: ' + copy.name + ' was created.');
+    await refreshServerTree(serverId, { force: true });
+    if (done) done();
+  } catch (error) {
+    errorToast(error);
+  }
+}
+
 function channelsSection(ctx) {
   const serverId = ctx.serverId;
   const body = el('div', { class: 'rowlist' });
@@ -221,6 +238,14 @@ function channelsSection(ctx) {
             'aria-label': 'Edit ' + channel.name,
             onClick: (event) => { event.stopPropagation(); renameChannel(serverId, channel); },
           }, icon('edit', { size: 14 })),
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            'aria-label': 'Copy ' + channel.name,
+            onClick: (event) => {
+              event.stopPropagation();
+              copyChannel(serverId, channel, read);
+            },
+          }, 'Copy'),
           el('button', {
             class: 'btn btn--danger btn--sm', type: 'button',
             'aria-label': 'Delete ' + channel.name,
@@ -400,6 +425,7 @@ export function communitySettingsSections() {
     ['roles', rolesSection],
     ['invites', invitesSection],
     ['moderation', moderationSection],
+    ['rules', rulesSection],
     ['voice', voiceSection],
     ['onboarding', onboardingSection],
     ['ownership', ownershipSection],

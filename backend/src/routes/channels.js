@@ -9,6 +9,7 @@ const events = require('../services/events');
 const slugs = require('../services/slugs');
 const permissions = require('../services/permissions');
 const webhooks = require('../services/webhooks');
+const rateLimit = require('../middleware/ratelimit');
 
 const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
@@ -41,9 +42,9 @@ router.get('/', requireMember, async (req, res, next) => {
 
 router.post('/', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
-    const { name, topic, categoryId, type } = req.body || {};
+    const { name, topic, categoryId, type, slowMode } = req.body || {};
     if (!name || !String(name).trim()) return fail(res, 'VALIDATION_ERROR', 'name required');
-    const ch = await channels.create(req.server.id, { name, topic, categoryId, type });
+    const ch = await channels.create(req.server.id, { name, topic, categoryId, type, slowMode });
     events.emit(req.server.id, 'channel_created', { channel: ch });
     webhooks.emit(req.server.id, 'channel.created', { serverId: req.server.id, channelId: String(ch.id), name: ch.name }).catch(() => {});
     res.json(ch);
@@ -54,12 +55,27 @@ router.patch('/:channelId', auth.requireVerified, requirePerm('MANAGE_CHANNELS')
   try {
     const ch = await resolveChannelParam(req, res);
     if (!ch) return;
-    const { name, topic, categoryId, type } = req.body || {};
-    const updated = await channels.update(ch, { name, topic, categoryId, type });
+    const { name, topic, categoryId, type, slowMode } = req.body || {};
+    const updated = await channels.update(ch, { name, topic, categoryId, type, slowMode });
     events.emit(req.server.id, 'channel_updated', { channel: updated });
     res.json(updated);
   } catch (e) { serviceError(res, e); }
 });
+
+// A copy of a channel.
+//
+// The copy carries the settings over - the topic, the type, the category and
+// the slow mode - and nothing else: the messages stay where they were.
+router.post('/:channelId/duplicate', auth.requireVerified, requirePerm('MANAGE_CHANNELS'),
+  rateLimit({ windowMs: 60000, max: 30 }), async (req, res, next) => {
+    try {
+      const ch = await resolveChannelParam(req, res);
+      if (!ch) return;
+      const copy = await channels.duplicate(req.server.id, ch);
+      events.emit(req.server.id, 'channel_created', { channel: copy });
+      res.status(201).json(copy);
+    } catch (e) { serviceError(res, e); }
+  });
 
 router.post('/reorder', auth.requireVerified, requirePerm('MANAGE_CHANNELS'), async (req, res, next) => {
   try {
@@ -87,7 +103,6 @@ router.delete('/:channelId', auth.requireVerified, requirePerm('MANAGE_CHANNELS'
 // MANAGE_MESSAGES; reading needs membership.
 const { visibleChannel } = require('../util');
 const { hasPermission } = require('../services/permissions');
-const rateLimit = require('../middleware/ratelimit');
 const uploads = require('../services/uploads');
 const reactions = require('../services/reactions');
 const { now } = require('../util');

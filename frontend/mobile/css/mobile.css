@@ -379,6 +379,21 @@ a:hover { text-decoration: underline; }
   margin: 18px 2px 8px;
 }
 .m-lede { color: var(--text-2); font-size: var(--fs-sm); margin: -4px 2px 12px; }
+
+/* The identity of a community.
+   The mark, the name, and what the community is for - the community's own
+   words, and only when it has said them. */
+.m-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.m-identity__mark { display: inline-grid; place-items: center; flex: 0 0 auto; }
+.m-identity__words { display: flex; flex-direction: column; min-width: 0; }
+.m-identity__name {
+  font-size: var(--fs-h3); font-weight: var(--weight-black); color: var(--text-1);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.m-identity__about {
+  font-size: var(--fs-sm); color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .m-eyebrow {
   font-size: var(--fs-micro);
   text-transform: uppercase;

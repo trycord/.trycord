@@ -229,6 +229,29 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
       return fail(res, 'VALIDATION_ERROR', 'content or an attachment is required');
     }
 
+    // What the community refuses.
+    //
+    // Slow mode and the blocked words are the community's own rules, and the
+    // server applies them: a rule the client applies is a rule a reader can
+    // turn off. Both refuse with a sentence that says what happened.
+    const rules = require('../services/communityRules');
+    // A moderator is not held by slow mode. Slow mode is there to slow a
+    // conversation down, not to slow the people who keep it in order.
+    const moderates = await hasChannelPermission(req.user.id, ch.server_id, ch.id, 'MANAGE_MESSAGES');
+    const slow = moderates ? { ok: true } : await rules.checkSlowMode(ch, req.user.id);
+    if (!slow.ok) {
+      return fail(res, 'SLOW_MODE', slow.reason, 429, { waitSeconds: slow.waitSeconds });
+    }
+    if (!carriesEnvelopes) {
+      // An encrypted message is an envelope, so its words are not here to be
+      // read - the community's words cannot be checked against it, and the
+      // server says so rather than pretending it checked.
+      const terms = await rules.checkTerms(ch.server_id, content);
+      if (!terms.ok) {
+        return fail(res, 'BLOCKED_TERM', terms.reason, 400, { term: terms.term });
+      }
+    }
+
     // A reply to something that is not in this channel is refused rather than
     // quietly posted flat, which would look like the app had lost the message.
     let threadRootId = null;

@@ -4,7 +4,7 @@ const express = require('express');
 const db = require('../db');
 const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
-const { resolveServer, requireMember, requireOwner, requirePerm } = require('../middleware/serverAccess');
+const { resolveServer, requireMember, requireOwner, requirePerm, requireAnyPerm } = require('../middleware/serverAccess');
 const { fail, serviceError } = require('../errors');
 const servers = require('../services/servers');
 const memberships = require('../services/memberships');
@@ -245,6 +245,61 @@ for (const kind of SERVER_MEDIA_KINDS) {
   router.post('/:id/' + kind, resolveServer, requirePerm('MANAGE_SERVER'), singleImage, serverMediaRoute(kind));
   router.delete('/:id/' + kind, resolveServer, requirePerm('MANAGE_SERVER'), serverMediaDelete(kind));
 }
+
+// ---- the words a community refuses -----------------------------------------
+// MANAGE_SERVER, and declared before the '/:id' handlers so these paths are
+// not captured as an id.
+router.get('/:id/blocked-terms', resolveServer, requirePerm('MANAGE_SERVER'), async (req, res, next) => {
+  try {
+    const rules = require('../services/communityRules');
+    res.json({ terms: await rules.blockedTerms(req.server.id) });
+  } catch (e) { serviceError(res, e); }
+});
+
+router.post('/:id/blocked-terms', resolveServer, requirePerm('MANAGE_SERVER'),
+  rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
+    try {
+      const term = String(((req.body || {}).term) || '').trim().toLowerCase();
+      if (!term) return fail(res, 'VALIDATION_ERROR', 'a word is needed');
+      if (term.length > 128) return fail(res, 'VALIDATION_ERROR', 'that word is too long');
+      const { uuid, now } = require('../util');
+      await db.run(
+        'INSERT INTO blocked_terms (id, server_id, term, created_at) VALUES (?, ?, ?, ?)',
+        [uuid(), req.server.id, term, now()]
+      ).catch((e) => {
+        // The same word twice is not an error: it is the same word.
+        if (!/UNIQUE|unique|ER_DUP_ENTRY|SQLITE_CONSTRAINT_UNIQUE/i.test(String(e && e.message))) throw e;
+      });
+      const rules = require('../services/communityRules');
+      res.status(201).json({ ok: true, terms: await rules.blockedTerms(req.server.id) });
+    } catch (e) { serviceError(res, e); }
+  });
+
+router.delete('/:id/blocked-terms/:term', resolveServer, requirePerm('MANAGE_SERVER'),
+  rateLimit({ windowMs: 60000, max: 60 }), async (req, res, next) => {
+    try {
+      const term = String(req.params.term || '').trim().toLowerCase();
+      await db.run('DELETE FROM blocked_terms WHERE server_id = ? AND term = ?', [req.server.id, term]);
+      const rules = require('../services/communityRules');
+      res.json({ ok: true, terms: await rules.blockedTerms(req.server.id) });
+    } catch (e) { serviceError(res, e); }
+  });
+
+// ---- what a member can actually do here ------------------------------------
+// The moderation family: somebody who may remove a member, ban one, or run
+// the community may look at what anybody in it can do.
+router.get('/:id/members/:userId/permissions', resolveServer, requireAnyPerm(
+  ['KICK_MEMBERS', 'BAN_MEMBERS', 'MANAGE_SERVER']), async (req, res, next) => {
+  try {
+    const target = String(req.params.userId || '');
+    const { isMember } = require('../util');
+    if (!(await isMember(target, req.server.id))) {
+      return fail(res, 'NOT_A_MEMBER', 'that person is not in this community');
+    }
+    const preview = require('../services/community/effectivePermissions');
+    res.json(await preview.preview(req.server, target));
+  } catch (e) { serviceError(res, e); }
+});
 
 router.get('/:id/members', resolveServer, requireMember, async (req, res, next) => {
   try {

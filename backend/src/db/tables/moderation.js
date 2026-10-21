@@ -68,6 +68,26 @@ module.exports = (engine) => [
       FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
 
+  // A moderator's note about a member.
+  //
+  // One note per member per community, so a moderator who writes again
+  // replaces the earlier note rather than leaving a pile of them to read.
+  //
+  // The note belongs to the community's moderators and to nobody else: the
+  // member it is about never sees it, and the server only hands it to a
+  // reader who can moderate here.
+  `CREATE TABLE IF NOT EXISTS member_notes (
+      id         VARCHAR(64) PRIMARY KEY,
+      server_id  VARCHAR(64) NOT NULL,
+      user_id    VARCHAR(64) NOT NULL,
+      author_id  VARCHAR(64) NOT NULL,
+      body       TEXT NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      updated_at VARCHAR(64) NOT NULL,
+      UNIQUE (server_id, user_id),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
+    )${engine}`,
+
   // A report about activity on another instance.
   //
   // The row is the record of what was sent, and it deliberately holds a

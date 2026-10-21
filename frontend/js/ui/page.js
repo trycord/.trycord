@@ -21,6 +21,10 @@ export function head(options) {
   const opts = options || {};
   return el('header', { class: 'pagehead' },
     el('div', { class: 'pagehead-main' },
+      // The identity of the place, when the page belongs to one. It is a node
+      // and not a word, because a community says who it is with its mark as
+      // much as with its name.
+      opts.identity || null,
       opts.kicker ? el('p', { class: 'pagehead-kicker' }, opts.kicker) : null,
       opts.title ? el('h1', { class: 'pagehead-title' }, opts.title) : null,
       opts.lede ? el('p', { class: 'pagehead-lede' }, opts.lede) : null),

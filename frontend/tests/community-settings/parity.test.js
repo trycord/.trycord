@@ -40,6 +40,7 @@ const MOUNTS = [
   { file: 'roles', mount: '/api/servers/:serverId/roles', router: 'router' },
   { file: 'invites', mount: '/api/servers/:serverId/invites', router: 'managed' },
   { file: 'integrations', mount: '/api/servers/:serverId', router: 'router' },
+  { file: 'memberNotes', mount: '/api/servers/:serverId/notes', router: 'router' },
 ];
 
 // The community routers that are not about configuring a community.
