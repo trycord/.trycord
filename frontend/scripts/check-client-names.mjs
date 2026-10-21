@@ -200,19 +200,66 @@ for (const [area, dir] of AREAS) {
         message: 'the path does not resolve to a module',
       });
     }
+    // An option an overlay does not read.
+    //
+    // The dialog that makes a group asked for its buttons with `actions`,
+    // and the dialog did not read that option - so it drew no buttons, and
+    // the group could not be made. The feature was there and could not be
+    // used.
+    //
+    // An option nobody reads is a silent no-op, and the caller cannot tell.
+    // So the options each overlay understands are listed here, and a call
+    // that passes one it does not is reported.
+    const overlayOptions = {
+      openDialog: new Set([
+        'title', 'sub', 'body', 'foot', 'actions', 'head', 'dismissable',
+        'class', 'wide', 'overlayClass', 'onClose',
+      ]),
+      sheet: new Set(['title', 'body', 'footer', 'onClose']),
+      menu: new Set(['title', 'items', 'class']),
+      confirm: new Set(['title', 'text', 'body', 'confirmLabel', 'cancelLabel', 'danger']),
+    };
+    const visit = (node) => {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node)) { for (const child of node) visit(child); return; }
+      if (node.type === 'CallExpression'
+        && node.callee && node.callee.type === 'Identifier'
+        && overlayOptions[node.callee.name]
+        && node.arguments.length
+        && node.arguments[0].type === 'ObjectExpression') {
+        const keys = node.arguments[0].properties
+          .filter((property) => property.type === 'Property' && !property.computed)
+          .map((property) => (property.key.type === 'Identifier' ? property.key.name : property.key.value));
+        const unknown = keys.filter((key) => !overlayOptions[node.callee.name].has(key));
+        if (unknown.length) {
+          findings.push({
+            file: path.relative(ROOT, file),
+            line: node.loc ? node.loc.start.line : 0,
+            name: node.callee.name + '(' + unknown.join(', ') + ')',
+            message: 'the overlay does not read that option, so it is ignored',
+          });
+        }
+      }
+      for (const key of Object.keys(node)) {
+        if (key === 'loc' || key === 'range') continue;
+        visit(node[key]);
+      }
+    };
+    visit(ast);
   }
 }
 
 if (!findings.length) {
   console.log('the client uses no name it does not have: '
     + checked + ' modules checked');
-  process.exit(0);
+} else {
+  console.log('these names are used and never declared:\n');
+  for (const finding of findings) {
+    console.log('  ' + finding.file + ':' + finding.line + '  ' + finding.name
+      + '  (' + finding.message + ')');
+  }
+  console.log('\n' + findings.length + ' finding(s) in ' + checked + ' modules.');
+  // The exit code is set rather than the process ended: ending it here would
+  // cut the last line off when the output is a pipe.
+  process.exitCode = 1;
 }
-
-console.log('these names are used and never declared:\n');
-for (const finding of findings) {
-  console.log('  ' + finding.file + ':' + finding.line + '  ' + finding.name
-    + '  (' + finding.message + ')');
-}
-console.log('\n' + findings.length + ' finding(s) in ' + checked + ' modules.');
-process.exit(1);

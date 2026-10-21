@@ -126,10 +126,18 @@ async function subscribe(userId, channelId, messageId) {
     [userId, messageId]
   );
   if (existing) return { subscribed: true, messageId };
-  await db.run(
-    'INSERT INTO forum_subscriptions (id, user_id, channel_id, message_id, created_at) VALUES (?, ?, ?, ?, ?)',
-    [uuid(), userId, channelId, messageId, now()]
-  );
+  try {
+    await db.run(
+      'INSERT INTO forum_subscriptions (id, user_id, channel_id, message_id, created_at) VALUES (?, ?, ?, ?, ?)',
+      [uuid(), userId, channelId, messageId, now()]
+    );
+  } catch (error) {
+    // Two follows at once raced the check above, and the second insert was
+    // refused by the uniqueness that keeps one subscription per reader per
+    // topic. The subscription the first one made is the subscription.
+    if (db.isUniqueViolation(error)) return { subscribed: true, messageId };
+    throw error;
+  }
   return { subscribed: true, messageId };
 }
 

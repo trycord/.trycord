@@ -239,28 +239,48 @@ async function liveSession(channelId, userId) {
 // not, and the insert was refused by the very uniqueness that was meant to
 // keep one row per person. The refusal came back as a duplicate key, and the
 // join failed with it.
+//
+// And two joins at the same time - a double tap, a retry after a timeout -
+// raced the same way: both read "no row", and the second insert was refused.
+// The row the first one made is the row, so it is read back and brought up to
+// date rather than the join failing with a duplicate key.
 async function recordParticipant({ channelId, userId, roomId, sessionId, provider }) {
-  const existing = await db.get(
-    'SELECT * FROM voice_participants WHERE channel_id = ? AND user_id = ?',
-    [channelId, userId]
-  );
-  let participantId = existing ? existing.id : uuid();
+  const participantId = await writeParticipantRow({ channelId, userId, roomId, sessionId });
+  await recordProviderSession(channelId, userId, provider);
+  return participantId;
+}
 
-  if (existing) {
+async function writeParticipantRow({ channelId, userId, roomId, sessionId }) {
+  const update = async (id) => {
     await db.run(
       'UPDATE voice_participants SET room_id = ?, session_id = ?, joined_at = ?, left_at = NULL WHERE id = ?',
-      [roomId, sessionId, now(), participantId]
+      [roomId, sessionId, now(), id]
     );
-  } else {
+    return id;
+  };
+
+  const existing = await db.get(
+    'SELECT id FROM voice_participants WHERE channel_id = ? AND user_id = ?',
+    [channelId, userId]
+  );
+  if (existing) return update(existing.id);
+
+  const participantId = uuid();
+  try {
     await db.run(
       `INSERT INTO voice_participants (id, room_id, channel_id, user_id, session_id, joined_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [participantId, roomId, channelId, userId, sessionId, now()]
     );
+    return participantId;
+  } catch (error) {
+    const again = await db.get(
+      'SELECT id FROM voice_participants WHERE channel_id = ? AND user_id = ?',
+      [channelId, userId]
+    );
+    if (!again || !db.isUniqueViolation(error)) throw error;
+    return update(again.id);
   }
-
-  await recordProviderSession(channelId, userId, provider);
-  return participantId;
 }
 
 // Which provider carries each live session.
@@ -270,24 +290,38 @@ async function recordParticipant({ channelId, userId, roomId, sessionId, provide
 // what lets a room that is already running keep its provider while the
 // instance is configured to use another one.
 async function recordProviderSession(channelId, userId, provider) {
+  const update = async (id) => {
+    await db.run(
+      'UPDATE voice_provider_sessions SET provider = ?, joined_at = ?, left_at = NULL WHERE id = ?',
+      [provider, now(), id]
+    );
+    return id;
+  };
+
   const existing = await db.get(
     'SELECT id FROM voice_provider_sessions WHERE channel_id = ? AND user_id = ?',
     [channelId, userId]
   );
-  if (existing) {
-    await db.run(
-      'UPDATE voice_provider_sessions SET provider = ?, joined_at = ?, left_at = NULL WHERE id = ?',
-      [provider, now(), existing.id]
-    );
-    return existing.id;
-  }
+  if (existing) return update(existing.id);
+
   const id = uuid();
-  await db.run(
-    `INSERT INTO voice_provider_sessions (id, channel_id, user_id, provider, joined_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [id, channelId, userId, provider, now()]
-  );
-  return id;
+  try {
+    await db.run(
+      `INSERT INTO voice_provider_sessions (id, channel_id, user_id, provider, joined_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [id, channelId, userId, provider, now()]
+    );
+    return id;
+  } catch (error) {
+    // The same race as the participant row: the row the other join made is
+    // the row.
+    const again = await db.get(
+      'SELECT id FROM voice_provider_sessions WHERE channel_id = ? AND user_id = ?',
+      [channelId, userId]
+    );
+    if (!again || !db.isUniqueViolation(error)) throw error;
+    return update(again.id);
+  }
 }
 
 // The provider carrying the call in this channel, or null when nobody is in one.

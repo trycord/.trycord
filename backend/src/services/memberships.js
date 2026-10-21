@@ -144,10 +144,21 @@ async function joinInner(serverId, userId, username, conn, { restore = false } =
   const ban = await conn.get('SELECT * FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, userId]);
   if (isActive(ban)) throw { code: 'BANNED', message: 'You are banned from this community.' };
   if (ban) await conn.run('DELETE FROM server_bans WHERE server_id = ? AND user_id = ?', [serverId, userId]);
-  await conn.run(
-    'INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)',
-    [uuid(), userId, serverId, username, now()]
-  );
+  try {
+    await conn.run(
+      'INSERT INTO server_members (id, user_id, server_id, nickname, joined_at) VALUES (?, ?, ?, ?, ?)',
+      [uuid(), userId, serverId, username, now()]
+    );
+  } catch (error) {
+    // Two joins at once - a double tap on the join button - raced the check
+    // above, and the second insert was refused by the uniqueness that keeps
+    // one membership per person. The membership the first one made is the
+    // membership, so the answer is the same refusal a second join gives.
+    if (db.isUniqueViolation(error) && (await get(serverId, userId, conn))) {
+      throw { code: 'ALREADY_MEMBER', message: 'Already a member' };
+    }
+    throw error;
+  }
   await roles.ensureBaseline(serverId, userId, conn);
   await recordEvent(serverId, userId, 'joined', null, conn);
   // Best-effort: a community's webhook endpoint being down must not stop someone

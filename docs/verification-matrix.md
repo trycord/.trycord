@@ -21,6 +21,14 @@ cd ../sdk/trycord-botjs && npm test                  # the SDK
 cd ../frontend && node scripts/browser-sweep.mjs     # every route, in a browser
 ```
 
+The checks that are not tests run on their own:
+
+```
+cd backend && npm run check:names        # the client: names, paths, overlay options
+cd backend && npm run check:names:backend  # the backend: the same, and the route definitions
+cd backend && npm run check:contract      # the paths the client asks for, against the routes there are
+```
+
 The browser sweep is a real Chromium, real CSS and real pixels. The instance's
 answers are stubbed, because the browser in this environment cannot reach the
 network; the layout, the clipping, the touch targets, the accessible names
@@ -42,6 +50,7 @@ separate databases and separate keys, not against a mock.
 | Command | `/menu` | `features/everything.js` | `frontend/tests/` — the palette's results carry their own menu |
 | Profile | `/users/:id` | `features/profile.js` | `features/profile.js` — the person sheet and the person menu |
 | Community | `/c/:slug` | `features/community.js` | `tests/integration/community.test.js` |
+| Joining a community | `POST /api/servers/join/:code` | `services/memberships.js` | `tests/integration/join-race.test.js` — two joins at once are answered with the same refusal as one |
 | Channel members | `/server/:id/members` | `ui/members.js` | `frontend/tests/members.test.js` — the presence, the paging and the search |
 | Channel roles | `/server/:id/roles` | `features/community.js` | `tests/integration/community.test.js` — a role grants one permission and not another |
 | Channel invites | `/server/:id/invites` | `features/community.js` | `tests/integration/community.test.js` — a join and a leave |
@@ -94,14 +103,15 @@ recorded. These are verified by their own suites.
 | Both dashboard modes | `tests/dashboard/` | The two modes are different code paths, and the separate service holds no database and no worker |
 | The collaboration workspace | `tests/workspace/` | Spaces, documents with conflict detection, boards with version preconditions, events, polls |
 | The migrations | `tests/integration/migrations.test.js` | The ledger, the ordering, the refusal of a database a newer build wrote to, and the separate identity every application gets |
-| The voice relay | `tests/voice/turn-stack.test.js`, `tests/voice/mesh.test.js` | The STUN binding request, the TURN allocate, the credential that is issued per session, and the refusal of a relay that does not answer |
+| The voice relay | `tests/voice/turn-stack.test.js`, `tests/voice/mesh.test.js`, `tests/voice/join-race.test.js` | The STUN binding request, the TURN allocate, the credential that is issued per session, the refusal of a relay that does not answer, and two joins at once leaving one participant row |
 | The schema's portability | `tests/integration/schema.test.js` | Every declared column is legal on MySQL, and every table is declared after the tables it points at |
 | The outbound guard | `tests/integration/netguard.test.js` | A private address is refused, and the function the callers import exists |
 | The environment template | `tests/integration/environment-template.test.js` | Every variable the code reads is documented, and every variable documented is read |
 | The provider catalogue | `tests/integration/providers.test.js` | The console and the service cannot disagree about what a provider is |
 | Push devices | `tests/integration/push.test.js` | The registry, the ownership, and the erasure taking it with the account |
 | The native client | `native/scripts/check-native.mjs` | Every import resolves and every configuration file parses. **It was not compiled, run or put on a device** — there is no toolchain for it here |
-| The names and the paths | `backend/scripts/check-backend-names.mjs`, `frontend/scripts/check-client-names.mjs` | Every name a module reads is declared, and every relative path it asks for resolves to a file. Two bugs of this kind had shipped: a relay address read through a path that did not exist, and a saved worker count read the same way |
+| The names and the paths | `backend/scripts/check-backend-names.mjs`, `frontend/scripts/check-client-names.mjs` | Every name a module reads is declared, every relative path it asks for resolves to a file, every route definition is read by the router, and every option an overlay is given is one the overlay reads. Four bugs of this kind had shipped: a relay address read through a path that did not exist, a saved worker count read the same way, a dialog whose buttons were never drawn, and a bot that was told it was hearing events it was not |
+| The client and the server agree | `backend/scripts/check-api-contract.mjs` | Every path the client and the SDK ask for is a route the server registers. The SDK had this fault: its command and health helpers asked for routes that do not exist |
 
 ## What is not verified here, and why
 

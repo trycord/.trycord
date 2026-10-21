@@ -324,26 +324,35 @@ async function vote(serverId, pollId, actorId, { choices }) {
     fail('VALIDATION_ERROR', `this poll takes at most ${poll.max_choices} choices`);
   }
   const ts = now();
-  await db.transaction(async (t) => {
-    await t.run('DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?', [poll.id, actorId]);
-    await t.run('DELETE FROM poll_ballots WHERE poll_id = ? AND user_id = ?', [poll.id, actorId]);
-    if (poll.scoring === 'ranked') {
-      let rank = 1;
-      for (const optionId of picked) {
-        await t.run(
-          'INSERT INTO poll_ballots (id, poll_id, option_id, user_id, `rank`, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [uuid(), poll.id, optionId, actorId, rank++, ts]
-        );
+  try {
+    await db.transaction(async (t) => {
+      await t.run('DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?', [poll.id, actorId]);
+      await t.run('DELETE FROM poll_ballots WHERE poll_id = ? AND user_id = ?', [poll.id, actorId]);
+      if (poll.scoring === 'ranked') {
+        let rank = 1;
+        for (const optionId of picked) {
+          await t.run(
+            'INSERT INTO poll_ballots (id, poll_id, option_id, user_id, `rank`, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [uuid(), poll.id, optionId, actorId, rank++, ts]
+          );
+        }
+      } else {
+        for (const optionId of picked) {
+          await t.run(
+            'INSERT INTO poll_votes (id, poll_id, option_id, user_id, created_at) VALUES (?, ?, ?, ?, ?)',
+            [uuid(), poll.id, optionId, actorId, ts]
+          );
+        }
       }
-    } else {
-      for (const optionId of picked) {
-        await t.run(
-          'INSERT INTO poll_votes (id, poll_id, option_id, user_id, created_at) VALUES (?, ?, ?, ?, ?)',
-          [uuid(), poll.id, optionId, actorId, ts]
-        );
-      }
-    }
-  });
+    });
+  } catch (error) {
+    // Two votes at once - a double tap on the choice - raced each other, and
+    // the second one was refused by the uniqueness that keeps one vote per
+    // person per option. The other vote is the vote, so the poll is read back
+    // and the reader sees their ballot rather than an error.
+    if (db.isUniqueViolation(error)) return get(serverId, poll.id);
+    throw error;
+  }
   return get(serverId, poll.id);
 }
 

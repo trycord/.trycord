@@ -230,10 +230,21 @@ async function addMember(conversationId, readerId, userId) {
     error.code = gate.code;
     throw error;
   }
-  await db.run(
-    'INSERT INTO dm_members (conversation_id, user_id, joined_at, last_read_at) VALUES (?, ?, ?, ?)',
-    [conversationId, wanted, now(), null]
-  );
+  try {
+    await db.run(
+      'INSERT INTO dm_members (conversation_id, user_id, joined_at, last_read_at) VALUES (?, ?, ?, ?)',
+      [conversationId, wanted, now(), null]
+    );
+  } catch (error) {
+    // Two adds at once - a double tap on the button - raced the check above,
+    // and the second insert was refused by the uniqueness that keeps one
+    // membership per person. The membership the first one made is the
+    // membership, so the answer is the same refusal a second add gives.
+    if (db.isUniqueViolation(error)) {
+      throw { code: 'CONFLICT', message: 'They are already in it.' };
+    }
+    throw error;
+  }
   await db.run('UPDATE dm_conversations SET updated_at = ? WHERE id = ?', [now(), conversationId]);
   return describe(conversationId, readerId);
 }

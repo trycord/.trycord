@@ -1,6 +1,6 @@
 {
   "name": "trycord-botjs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The official SDK for Trycord bots: the REST API, the application gateway, the core objects and the typed events.",
   "license": "AGPL-3.0-or-later",
   "type": "module",

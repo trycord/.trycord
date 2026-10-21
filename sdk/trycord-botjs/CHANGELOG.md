@@ -4,6 +4,31 @@ All notable changes to `trycord-botjs` are written here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 uses [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.0
+
+### Added
+
+- A CommonJS build. `require('trycord-botjs')` works, and the package's
+  `exports` map points at it; the ESM build is unchanged.
+- `client.membersPage()` and `client.messagesPage()`, which return the page
+  and the way to the next one: the total, whether another page exists, and
+  the cursor for the messages before the ones read.
+- `client.community()`, `client.channel()` and `client.roles()`, which read
+  the routes the API actually has.
+
+### Fixed
+
+- The resource helpers used the wrong paths. `client.community()` asked for
+  `/communities/:id` and read the answer as if it were the community itself,
+  while the server answers `{ "community": { ... } }` - so every one of them
+  returned undefined fields. `client.commands()` and `client.health()` asked
+  for `/applications/:id/...`, which is not a route; the commands and the
+  health of an application live under its community.
+- The gateway said it was subscribed to whatever it asked for. The server
+  answers with the list of events it accepted, and a bot that did not wait for
+  that answer could believe it was hearing something it was not. It waits now,
+  and it reports what the server accepted.
+
 ## 0.1.0
 
 ### Added

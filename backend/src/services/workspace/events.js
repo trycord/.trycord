@@ -241,11 +241,23 @@ async function rsvp(serverId, eventId, actorId, status) {
       [answer, ts, existing.id]
     );
   } else {
-    await db.run(
-      'INSERT INTO event_rsvps (id, event_id, server_id, user_id, status, created_at, updated_at)'
-      + ' VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [uuid(), event.id, serverId, actorId, answer, ts, ts]
-    );
+    try {
+      await db.run(
+        'INSERT INTO event_rsvps (id, event_id, server_id, user_id, status, created_at, updated_at)'
+        + ' VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [uuid(), event.id, serverId, actorId, answer, ts, ts]
+      );
+    } catch (error) {
+      // Two answers at once - a double tap on the button - raced the check
+      // above, and the second insert was refused by the uniqueness that keeps
+      // one answer per person per event. The answer the first one made is the
+      // answer.
+      if (!db.isUniqueViolation(error)) throw error;
+      await db.run(
+        'UPDATE event_rsvps SET status = ?, updated_at = ? WHERE event_id = ? AND user_id = ?',
+        [answer, ts, event.id, actorId]
+      );
+    }
   }
   const row = await db.get('SELECT * FROM event_rsvps WHERE event_id = ? AND user_id = ?', [event.id, actorId]);
   return shapeRsvp(row);

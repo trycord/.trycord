@@ -4,6 +4,9 @@ const db = require('../db');
 const { uuid } = require('../util');
 const { isKnown } = require('./permissions');
 
+// The uniqueness refusal, asked of the module that knows the dialects.
+const isUniqueViolation = db.isUniqueViolation;
+
 // Exactly one seeded role, and it is not a convenience preset.
 //
 // @everyone is the community's baseline: every member holds it, and its
@@ -70,10 +73,6 @@ async function baselineRole(serverId, conn = db) {
 
 async function byName(serverId, name) {
   return parseRow(await db.get('SELECT * FROM roles WHERE server_id = ? AND name = ?', [serverId, name]));
-}
-function isUniqueViolation(e) {
-  const msg = String((e && e.message) || '');
-  return /UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) || e.code === 'ER_DUP_ENTRY' || e.code === 'SQLITE_CONSTRAINT_UNIQUE';
 }
 
 // Where a new custom role lands: the lowest slot that is still ABOVE @everyone.

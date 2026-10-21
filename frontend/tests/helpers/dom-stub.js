@@ -263,7 +263,12 @@ function makeElement(doc, tagName) {
     if (set) set.delete(handler);
   };
   node.dispatch = (type, event) => {
-    const payload = Object.assign({ type, target: node, preventDefault() {}, stopPropagation() {} }, event || {});
+    // currentTarget is the node the listener is on while it runs. The DOM
+    // provides it and a lot of the client reads it to know which button was
+    // pressed, so the stub provides it too.
+    const payload = Object.assign({
+      type, target: node, currentTarget: node, preventDefault() {}, stopPropagation() {},
+    }, event || {});
     for (const handler of Array.from(node.listeners.get(type) || [])) handler(payload);
     return payload;
   };

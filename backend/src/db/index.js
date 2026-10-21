@@ -235,6 +235,25 @@ module.exports = {
   newRef: (column) => (conn && conn.dialect === 'mysql'
     ? `VALUES(${column})`
     : `excluded.${column}`),
+  /**
+   * Whether an error is a uniqueness refusal.
+   *
+   * One rule, in the module that knows the dialects, because the two engines
+   * spell it differently and the code that has to answer it should not have
+   * to know that. A caller that gets this right turns a race into the answer
+   * it would have given anyway; a caller that gets it wrong answers "internal
+   * error" for something that was never an error at all.
+   *
+   * @param {Error} error
+   * @returns {boolean}
+   */
+  isUniqueViolation: (error) => {
+    const message = String((error && error.message) || '');
+    return /UNIQUE|unique|ER_DUP_ENTRY/i.test(message)
+      || error.code === 'ER_DUP_ENTRY'
+      || error.code === 'SQLITE_CONSTRAINT_UNIQUE'
+      || error.code === 'SQLITE_CONSTRAINT_PRIMARYKEY';
+  },
   get: (...args) => active().get(...args),
   all: (...args) => active().all(...args),
   run: (...args) => active().run(...args),

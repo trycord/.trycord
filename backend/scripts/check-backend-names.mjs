@@ -226,15 +226,79 @@ for (const file of files) {
     });
   }
 }
-if (!findings.length) {
-  console.log('the backend uses no name it does not have: ' + checked + ' modules checked');
-  process.exit(0);
+// An option a route definition does not read.
+//
+// The developer API is built from one list of definitions, and the router and
+// the OpenAPI document are made from it. A definition that carries a field
+// neither of them reads is a rule nobody enforces - and the field that looks
+// like a rule is the one that matters: a scope that is spelled differently
+// from the rest is a route with no scope check.
+//
+// The fields the two readers understand are listed here, and a definition
+// that carries another one is reported.
+
+const ROUTE_DEFINITION_FIELDS = new Set([
+  'method', 'path', 'auth', 'bots', 'scopes', 'community', 'tags', 'summary',
+  'description', 'parameters', 'requestBody', 'responses', 'handler',
+]);
+
+function routeDefinitionFindings() {
+  const out = [];
+  const dir = path.join(BACKEND, 'src', 'routes', 'developer');
+  for (const file of walk(dir)) {
+    const source = fs.readFileSync(file, 'utf8');
+    let ast;
+    try {
+      ast = acorn.parse(source, {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+        locations: true,
+      });
+    } catch {
+      continue; // the parse is reported by the name check.
+    }
+    const visit = (node) => {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node)) { for (const child of node) visit(child); return; }
+      if (node.type === 'ObjectExpression') {
+        const keys = node.properties
+          .filter((property) => property.type === 'Property' && !property.computed)
+          .map((property) => (property.key.type === 'Identifier' ? property.key.name : property.key.value));
+        // A route definition is an object with a method and a path.
+        if (keys.includes('method') && keys.includes('path')) {
+          const unknown = keys.filter((key) => !ROUTE_DEFINITION_FIELDS.has(key));
+          if (unknown.length) {
+            out.push({
+              file: path.relative(BACKEND, file),
+              line: node.loc ? node.loc.start.line : 0,
+              name: unknown.join(', '),
+              message: 'the route definition is read by nobody, so the field does nothing',
+            });
+          }
+        }
+      }
+      for (const key of Object.keys(node)) {
+        if (key === 'loc' || key === 'range') continue;
+        visit(node[key]);
+      }
+    };
+    visit(ast);
+  }
+  return out;
 }
 
-console.log('these names are used and never declared:\n');
-for (const finding of findings) {
-  console.log('  ' + finding.file + ':' + finding.line + '  ' + finding.name
-    + '  (' + finding.message + ')');
+findings.push(...routeDefinitionFindings());
+
+if (!findings.length) {
+  console.log('the backend uses no name it does not have: ' + checked + ' modules checked');
+} else {
+  console.log('these names are used and never declared:\n');
+  for (const finding of findings) {
+    console.log('  ' + finding.file + ':' + finding.line + '  ' + finding.name
+      + '  (' + finding.message + ')');
+  }
+  console.log('\n' + findings.length + ' finding(s) in ' + checked + ' modules.');
+  // The exit code is set rather than the process ended: ending it here would
+  // cut the last line off when the output is a pipe.
+  process.exitCode = 1;
 }
-console.log('\n' + findings.length + ' finding(s) in ' + checked + ' modules.');
-process.exit(1);
