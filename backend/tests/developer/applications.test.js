@@ -33,6 +33,17 @@ test('bot applications', async (t) => {
     return res.data;
   }
 
+  await t.test('an application can ask what it is', async () => {
+    const created = await createApplication(['messages:read']);
+    const bot = apiClient(base, created.token);
+    const self = await bot.get('/applications/self');
+    assert.equal(self.status, 200, JSON.stringify(self.data));
+    assert.equal(self.data.application.id, created.application.id,
+      'the answer names the application the token belongs to');
+    assert.equal(self.data.communityId, communityId, 'and the community it was made in');
+    assert.ok(!('token' in self.data), 'the token is not in the answer');
+  });
+
   await t.test('an application is created with a token and a credential', async () => {
     const created = await createApplication(['messages:write', 'messages:read']);
     assert.ok(created.application.id, 'the application has an id');

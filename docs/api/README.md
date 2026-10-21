@@ -79,3 +79,10 @@ belongs to a person, and it only acts in the community that owns it. See
 - No way for a key to grant itself a scope it does not have. A credential may
   only create a key whose scopes are a subset of its own.
 - No account-wide "give me everything" scope.
+
+## The SDK
+
+`trycord-botjs` is the official client for this API. It calls the routes
+below and returns the shapes below, and it lives in its own package under
+`sdk/trycord-botjs`. See [the SDK's page](sdk.md) for what it covers and how
+to build it.

@@ -210,7 +210,57 @@ async function postMessage(req, res) {
   });
 }
 
+// GET /api/v1/applications/self
+//
+// Which application the token belongs to.
+//
+// A program that has only the token needs to know what it is before it can
+// open the gateway - the handshake names the application - and the answer is
+// the application and its community. The token is not in it: the token is
+// what the caller already has, and a route that answers "here is your
+// token" is a route that writes secrets into logs.
+async function getSelf(req, res) {
+  const principal = req.principal;
+  const applicationId = principal.botApplicationId || principal.id;
+  const application = await bots.getApp(applicationId, principal.communityId);
+  if (!application) return fail(res, 'NOT_FOUND', 'no such application', 404);
+  const community = await db.get('SELECT id, name FROM servers WHERE id = ?', [application.server_id]);
+  res.json({
+    application: bots.appShape(application),
+    communityId: application.server_id,
+    communityName: community ? community.name : null,
+  });
+}
+
 const definitions = [
+  {
+    method: 'get',
+    path: '/applications/self',
+    auth: 'principal',
+    // No scope is needed to ask a credential what it is: the token is the
+    // proof, and the answer holds nothing the caller did not already have.
+    scopes: [],
+    bots: true,
+    tags: ['Applications'],
+    summary: 'The application this token belongs to',
+    description:
+      'The application the token belongs to, and the community it was made in.'
+      + ' The token itself is never in the answer.',
+    responses: {
+      200: ok('The application.', {
+        type: 'object',
+        required: ['application'],
+        properties: {
+          application: ref('Application'),
+          communityId: { type: 'string' },
+          communityName: { type: 'string' },
+        },
+      }),
+      401: ERRORS.unauthenticated,
+      404: ERRORS.missing,
+    },
+    handler: getSelf,
+  },
   {
     method: 'get',
     path: '/communities/:serverId',
