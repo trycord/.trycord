@@ -4,7 +4,7 @@
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
-import { State } from '../../packages/store.js';
+import { State, loadSession } from '../../packages/store.js';
 import {
   checkImage, previewOf, uploadProfilePicture, removeProfilePicture,
 } from '../../packages/profileMedia.js';
@@ -109,7 +109,7 @@ function paint(identity, user, reload) {
         // shows the new picture and not the old one.
         State.user = Object.assign({}, State.user || {}, updated);
       }
-      reload();
+      await reload();
     } catch (e) {
       pictureNote.textContent = (e && e.message) || 'The picture was not uploaded.';
       errorToast(e);
@@ -139,7 +139,7 @@ function paint(identity, user, reload) {
       if (updated && updated.id) {
         State.user = Object.assign({}, State.user || {}, updated);
       }
-      reload();
+      await reload();
     } catch (e) {
       errorToast(e);
     }
@@ -207,8 +207,10 @@ export function profileView() {
 
   const reload = async () => {
     try {
-      const me = await Api.me();
-      State.user = Object.assign({}, State.user || {}, me || {});
+      // The session is read through the store, so the account everywhere else
+      // - the button in the corner, the list of conversations - sees the new
+      // picture at once and not on the next page.
+      await loadSession();
       paint(identity, State.user || {}, reload);
     } catch (e) {
       identity.replaceChildren(fold([fault(e, null)]));

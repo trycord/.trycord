@@ -1908,9 +1908,21 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .dialog--lightbox { max-width: min(1100px, 94vw); width: 94vw; background: transparent; }
 .dialog--lightbox .dialog-body { padding: 0; }
 .lightbox { display: flex; flex-direction: column; gap: 8px; }
+/* The frame holds the picture and scrolls when the picture is read at its own
+   size. Nothing is cut off: the picture is the one thing in a message that
+   cannot be shrunk without losing what it says. */
+.lightbox-frame {
+  display: flex; justify-content: center;
+  max-height: 74vh; overflow: auto;
+  border-radius: var(--radius-md); background: var(--panel-3);
+}
+.lightbox-frame.is-zoomed { justify-content: flex-start; }
 .lightbox-image {
   display: block; max-width: 100%; max-height: 74vh; margin: 0 auto;
   object-fit: contain; border-radius: var(--radius-md); background: var(--panel-3);
+}
+.lightbox-frame.is-zoomed .lightbox-image {
+  max-width: none; max-height: none; margin: 0; border-radius: 0;
 }
 .lightbox-bar { display: flex; align-items: center; gap: 10px; }
 .lightbox-caption {
@@ -1918,6 +1930,13 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .lightbox-count { color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.lightbox-zoom {
+  display: grid; place-items: center; width: 36px; height: 36px; flex: none;
+  border: 1px solid var(--line-2); border-radius: var(--radius-md);
+  background: var(--panel-2); color: var(--text-2);
+}
+.lightbox-zoom:hover { background: var(--hover); color: var(--text-1); }
+.lightbox-zoom[aria-pressed="true"] { background: var(--brand-fill); color: var(--brand-ink); }
 .lightbox-close, .lightbox-nav {
   display: grid; place-items: center; width: 36px; height: 36px; flex: none;
   border: 1px solid var(--line-2); border-radius: var(--radius-md);

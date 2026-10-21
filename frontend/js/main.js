@@ -70,6 +70,10 @@ function wireChrome() {
   // The communities on other instances arrived, or changed. The rail has a
   // section of its own for them.
   onStore('federated', () => { refreshChrome(); });
+  // The reader's own account changed - a new picture, a new name. The
+  // account button in the corner shows it, so it is redrawn rather than
+  // waiting for the reader to go somewhere else and come back.
+  onStore('user', () => { refreshChrome(); });
   onRealtime(EVENTS.NOTIFICATION, () => {
     refreshNotifications().catch(() => { /* the bell catches up on the next open */ });
     refreshChrome();

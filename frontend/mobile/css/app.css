@@ -1916,6 +1916,15 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 
 /* The image opened from a message, read large in a sheet. */
 .m-lightbox { display: flex; flex-direction: column; gap: 8px; }
+/* The frame holds the picture and scrolls when the picture is read at its
+   own size. Nothing is cut off: the picture is the one thing in a message
+   that cannot be shrunk without losing what it says. */
+.m-lightbox__frame {
+  display: flex; justify-content: center;
+  max-height: 60vh; overflow: auto;
+  border-radius: var(--radius-md); background: var(--panel-3);
+}
+.m-lightbox__frame.is-zoomed { justify-content: flex-start; }
 .m-lightbox__image {
   display: block;
   width: 100%;
@@ -1934,6 +1943,9 @@ textarea.m-input { min-height: 96px; resize: vertical; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.m-lightbox__frame.is-zoomed .m-lightbox__image {
+  width: auto; max-width: none; max-height: none; margin: 0;
 }
 .m-lightbox__count { color: var(--text-3); font-size: var(--fs-micro); }
 .m-lightbox__nav { display: flex; gap: 6px; }

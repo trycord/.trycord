@@ -86,6 +86,27 @@ export function openLightbox(images, startIndex) {
   const caption = el('p', { class: 'lightbox-caption' });
   const counter = el('span', { class: 'lightbox-count' });
 
+  // The image is read two ways: fitted to the window, which is how most
+  // pictures are best read, and at its own size, which is how a picture with
+  // detail in it is best read. The frame scrolls when the picture is bigger
+  // than the window, so nothing is cut off either way.
+  const frame = el('div', { class: 'lightbox-frame' });
+  let zoomed = false;
+  const setZoom = (on) => {
+    zoomed = !!on;
+    frame.classList.toggle('is-zoomed', zoomed);
+    zoomButton.setAttribute('aria-label', zoomed
+      ? 'Fit the picture to the window'
+      : 'Read the picture at its own size');
+    zoomButton.setAttribute('aria-pressed', String(zoomed));
+  };
+  const zoomButton = el('button', {
+    class: 'lightbox-zoom', type: 'button',
+    'aria-label': 'Read the picture at its own size',
+    'aria-pressed': 'false',
+    onClick: () => setZoom(!zoomed),
+  }, icon('maximize', { size: 16 }));
+
   const previous = el('button', {
     class: 'lightbox-nav lightbox-nav--prev', type: 'button', 'aria-label': 'The previous image',
     onClick: () => step(-1),
@@ -96,11 +117,13 @@ export function openLightbox(images, startIndex) {
     onClick: () => step(1),
   }, icon('chevron-right', { size: 24 }));
 
+  frame.appendChild(picture);
   const body = el('div', { class: 'lightbox' },
-    picture,
+    frame,
     el('div', { class: 'lightbox-bar' },
       caption,
       counter,
+      zoomButton,
       el('button', {
         class: 'lightbox-close', type: 'button', 'aria-label': 'Close the image',
         onClick: () => dialog.close(),
@@ -136,6 +159,8 @@ export function openLightbox(images, startIndex) {
   dialog.element.addEventListener('keydown', (event) => {
     if (event.key === 'ArrowLeft') { event.preventDefault(); step(-1); }
     else if (event.key === 'ArrowRight') { event.preventDefault(); step(1); }
+    else if (event.key === '0') { event.preventDefault(); setZoom(false); }
+    else if (event.key === '+' || event.key === '=') { event.preventDefault(); setZoom(true); }
   });
 
   paint();
