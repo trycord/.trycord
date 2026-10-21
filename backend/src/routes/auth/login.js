@@ -30,7 +30,20 @@ router.post('/login', (req, res, next) => loginLimit()(req, res, next), async (r
   try {
     const { username, password } = req.body || {};
     if (!username || !password) return fail(res, 'VALIDATION_ERROR', 'username and password required');
-    const user = await db.get('SELECT * FROM users WHERE username = ?', [String(username).trim()]);
+    // A name or an address.
+    //
+    // The form says "Username or email", and the server read the name only:
+    // a reader who typed the address they were given was told their
+    // credentials were invalid, which is the same answer as a wrong password
+    // and tells them nothing about what to do about it.
+    const wanted = String(username).trim();
+    const user = await db.get(
+      'SELECT * FROM users WHERE username = ? LIMIT 1',
+      [wanted]
+    ) || await db.get(
+      'SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1',
+      [wanted.toLowerCase()]
+    );
     if (!user) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
 
     // Lockout is checked after the lookup but before the password comparison, so

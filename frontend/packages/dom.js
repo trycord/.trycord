@@ -4,8 +4,49 @@
 // setAttribute / appendChild by hand makes every view twice as long and hides
 // its structure. Children may be nodes, strings, arrays or null, so a view can
 // inline a conditional without a guard at each one.
+//
+// "Null means absent" is the rule of this module, and the DOM does not share
+// it: `replaceChildren(null)` and `append(null)` put the text "null" on the
+// screen. So a page that renders a conditional - a banner, a button that is
+// only there sometimes, a fact that is only there for some people - printed
+// the word "null" where a person expected nothing.
+//
+// Rather than guard three hundred call sites, the rule is put where the
+// methods are: the DOM is told what null means here, once, and every view
+// that uses it is right by construction. The house rule and the platform
+// finally agree.
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+
+// What a nullish child means: nothing.
+//
+// The DOM's own methods turn a null into the text "null", so a view that
+// renders a conditional with one of them prints the word where a person
+// expected nothing. The methods are told what null means, once, so that
+// every view is right by construction rather than by remembering.
+function withoutNulls(children) {
+  const out = [];
+  for (const child of children) {
+    if (child === null || child === undefined) continue;
+    out.push(child);
+  }
+  return out;
+}
+
+function patchChildMethods() {
+  const proto = (typeof Node !== 'undefined' && Node.prototype) || null;
+  if (!proto || proto.__trycordChildRules) return;
+  for (const name of ['replaceChildren', 'append', 'prepend']) {
+    const native = proto[name];
+    if (typeof native !== 'function') continue;
+    proto[name] = function (...children) {
+      return native.apply(this, withoutNulls(children));
+    };
+  }
+  proto.__trycordChildRules = true;
+}
+
+patchChildMethods();
 
 export const SVG_NAMESPACE = SVG_NS;
 

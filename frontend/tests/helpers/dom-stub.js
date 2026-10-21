@@ -181,10 +181,16 @@ function makeElement(doc, tagName) {
     if (child) child.parentNode = null;
     return child;
   };
+  // The DOM's own methods turn a null into the text "null"; the application
+  // tells them otherwise, and the stub tells them the same way, so a page
+  // that prints "null" in the tests prints it in the browser too.
   node.replaceChildren = (...children) => {
     for (const child of node.children) if (child) child.parentNode = null;
     node.children = [];
-    for (const child of children) node.appendChild(child);
+    for (const child of children) {
+      if (child === null || child === undefined) continue;
+      node.appendChild(child);
+    }
   };
   // The DOM's own names for the same thing: childNodes is children, and
   // append() is appendChild() over several children at once.

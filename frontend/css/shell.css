@@ -445,7 +445,14 @@
 @media (max-width: 860px) {
   .cmdbar-nav { display: inline-grid; }
   .context {
-    position: absolute; top: var(--cmdbar-h); bottom: 0; left: var(--rail-w); z-index: var(--z-nav);
+    position: absolute; top: var(--cmdbar-h); bottom: 0; left: var(--rail-w);
+    /* Above the scrim, not below it.
+       The scrim is there to close the column when the reader taps outside
+       it, and it is drawn over the page - so a column underneath it could
+       not be touched at all: the column appeared, and every one of its
+       links did nothing. The column is a drawer here, and a drawer is
+       above the thing that dims it. */
+    z-index: var(--z-drawer);
     width: min(var(--context-w), calc(100vw - var(--rail-w)));
     box-shadow: var(--shadow-3);
     transform: translateX(-16px); opacity: 0; visibility: hidden;
