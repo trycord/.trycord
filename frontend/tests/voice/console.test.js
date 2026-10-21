@@ -220,6 +220,35 @@ test('the voice console', async () => {
     assert.match(said, /Nothing answered a binding request/, 'the detail is shown: ' + said);
   });
 
+  await test('the voice page on the machine is opened with a ticket', async () => {
+    // The page on the loopback can change the instance and mint a
+    // credential, so it is opened with a ticket. The ticket comes from the
+    // API, which is behind the platform-admin gate - and the console is the
+    // place that asks for it.
+    const calls = installFetchStub({
+      'http://localhost/api/voice/providers': { json: REPORT },
+      'http://localhost/api/admin/voice/settings': { json: { ok: true, changed: [] } },
+      'http://localhost/api/admin/voice/settings/local-ticket': {
+        json: { ticket: 'a-ticket', expiresIn: 120, url: 'http://127.0.0.1:9973/?ticket=a-ticket' },
+      },
+    });
+
+    const view = adminVoice();
+    await view.onMount();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const button = find(view.node, (node) => node.tagName === 'BUTTON'
+      && text(node).indexOf('Open the voice page') !== -1);
+    assert.ok(button.length, 'the console offers the page on the machine');
+    button[0].click();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const asked = calls.filter((call) => call.url.indexOf('/local-ticket') !== -1);
+    assert.ok(asked.length, 'a ticket was asked for');
+    assert.match(asked[asked.length - 1].url, /local-ticket/,
+      'the ticket did not come from the console');
+  });
+
   await test('choosing a provider is confirmed, and the save says so', async () => {
     // The provider is a consequential setting: it decides where the media of
     // every call travels, and the server refuses a save that does not say
