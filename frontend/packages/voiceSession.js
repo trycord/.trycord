@@ -11,8 +11,8 @@
 // pattern, so a microphone granted after the join, or refused entirely, still
 // reaches the room through the same offer path.
 
-import Api from '../../packages/api.js';
-import { on as onRealtime } from '../../packages/realtime.js';
+import Api from './api.js';
+import { on as onRealtime } from './realtime.js';
 
 const POLL_MS = 4000;
 
@@ -24,10 +24,36 @@ const state = {
   deafened: false,
   // True when the browser could not supply a microphone; the seat stays and hears.
   listenOnly: false,
+  // The devices the reader can choose from, and the ones chosen.
+  //
+  // The list is what the browser says it has - not a list the instance
+  // guesses at - and a device that is unplugged afterwards is gone from the
+  // list rather than chosen silently.
+  inputs: [],
+  outputs: [],
+  inputDeviceId: '',
+  outputDeviceId: '',
+  // What the browser can do about the output: some browsers do not let a
+  // page choose the speaker, and the dock says so rather than offering a
+  // picker that does nothing.
+  canChooseOutput: false,
   // [{ userId, speaking, connection: 'connecting' | 'live' | 'reconnecting', muted }]
   participants: [],
   // A room-level note the room view and the dock show as they are.
   note: '',
+  // The state of this seat's connection, as the reader should see it:
+  //
+  //   idle          not in a room
+  //   joining       the seat is being taken
+  //   connecting    the peers are being connected
+  //   connected     somebody is there and the media is flowing
+  //   reconnecting  the connection was lost and is being made again
+  //   failed        the connection could not be made
+  //   leaving       the seat is being given up
+  //
+  // It is worked out from the peers rather than set by hand, so it cannot
+  // say "connected" while every peer is trying.
+  connection: 'idle',
 };
 
 const subscribers = new Set();
@@ -37,6 +63,9 @@ export function subscribe(fn) {
 }
 
 function emit() {
+  // The connection state is worked out here, so every surface that listens
+  // hears the same one.
+  try { state.connection = connectionState(); } catch { /* the room is not ready */ }
   for (const fn of Array.from(subscribers)) {
     try { fn(state); } catch { /* a listener must not break the room */ }
   }
@@ -110,6 +139,173 @@ function signalTo(peerId, kind, payload) {
   if (!state.channel) return Promise.resolve();
   return Api.voiceMeshSignal(state.channel.id, { to: String(peerId), kind, payload })
     .catch(() => {}); // a lost signal is retried by renegotiation
+}
+
+// ---- the devices -------------------------------------------------------------
+
+// Whether the browser can be asked for its devices at all.
+function devicesSupported() {
+  return typeof navigator !== 'undefined'
+    && !!(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices);
+}
+
+// The devices the reader can choose from.
+//
+// The list is what the browser reports, and the labels are only there after
+// the microphone has been granted: a browser does not name a device before
+// the reader has allowed one, and a list of "Default" is the truth before
+// that.
+async function readDevices() {
+  if (!devicesSupported()) return { inputs: [], outputs: [] };
+  let list = [];
+  try {
+    list = await navigator.mediaDevices.enumerateDevices();
+  } catch {
+    return { inputs: [], outputs: [] };
+  }
+  const inputs = [];
+  const outputs = [];
+  for (const device of list) {
+    if (device.kind === 'audioinput') {
+      inputs.push({ id: device.deviceId, label: device.label || 'Microphone' });
+    } else if (device.kind === 'audiooutput') {
+      outputs.push({ id: device.deviceId, label: device.label || 'Speaker' });
+    }
+  }
+  return { inputs, outputs };
+}
+
+// The devices, read and kept.
+export async function refreshDevices() {
+  const found = await readDevices();
+  state.inputs = found.inputs;
+  state.outputs = found.outputs;
+  // A browser that will not let a page choose the speaker says so with the
+  // absence of the method, and the dock does not offer a picker that does
+  // nothing.
+  state.canChooseOutput = typeof HTMLMediaElement !== 'undefined'
+    && typeof HTMLMediaElement.prototype.setSinkId === 'function';
+  emit();
+  return state;
+}
+
+// The devices, read without waiting.
+export function currentDevices() {
+  return { inputs: state.inputs, outputs: state.outputs, canChooseOutput: state.canChooseOutput };
+}
+
+// A microphone, from a chosen device.
+//
+// The device is asked for by name, and a refusal falls back to the default
+// one rather than leaving the reader with no microphone at all.
+async function openMicrophone(deviceId) {
+  const constraints = { audio: deviceId ? { deviceId: { exact: deviceId } } : true };
+  try {
+    return await navigator.mediaDevices.getUserMedia(constraints);
+  } catch {
+    return navigator.mediaDevices.getUserMedia({ audio: true });
+  }
+}
+
+// The track the reader is speaking with.
+function localTrack() {
+  if (!localStream) return null;
+  return localStream.getAudioTracks()[0] || null;
+}
+
+// The track the peers are hearing, replaced when the device changes.
+//
+// The track is replaced on the connection and not by renegotiating, so
+// changing the microphone does not make every peer offer and answer again.
+function replaceLocalTrack(track) {
+  if (!track) return;
+  for (const peer of peers.values()) {
+    for (const sender of peer.pc.getSenders ? peer.pc.getSenders() : []) {
+      if (sender.track && sender.track.kind === 'audio') {
+        sender.replaceTrack(track).catch(() => { /* renegotiation covers it */ });
+      }
+    }
+  }
+}
+
+/**
+ * Choose the microphone.
+ *
+ * The new device is asked for first, and only when it has actually been
+ * granted is the old one given up: a device that cannot be opened leaves
+ * the reader with the microphone they had.
+ */
+export async function setInputDevice(deviceId) {
+  if (!devicesSupported()) return state;
+  const wanted = String(deviceId || '');
+  let stream = null;
+  try {
+    stream = await openMicrophone(wanted);
+  } catch {
+    note('That microphone could not be opened; the one you had is still in use.');
+    emit();
+    return state;
+  }
+  const track = stream && stream.getAudioTracks()[0];
+  if (!track) {
+    note('That microphone offered no audio; the one you had is still in use.');
+    emit();
+    return state;
+  }
+  const old = localStream;
+  localStream = stream;
+  state.inputDeviceId = wanted;
+  state.listenOnly = false;
+  track.enabled = !state.muted;
+  replaceLocalTrack(track);
+  if (old) {
+    for (const oldTrack of old.getTracks()) {
+      try { oldTrack.stop(); } catch { /* already stopped */ }
+    }
+  }
+  selfWatch = speakingOf(stream);
+  await refreshDevices();
+  note('');
+  emit();
+  return state;
+}
+
+/**
+ * Choose the speaker.
+ *
+ * The choice is the browser's, not the page's: where a browser does not let
+ * a page choose the speaker, the dock says so and the browser's own
+ * settings are the way.
+ */
+export async function setOutputDevice(deviceId) {
+  const wanted = String(deviceId || '');
+  if (!state.canChooseOutput) {
+    note('This browser chooses the speaker itself; change it in the browser settings.');
+    emit();
+    return state;
+  }
+  let applied = false;
+  for (const peer of peers.values()) {
+    try {
+      if (typeof peer.audio.setSinkId === 'function') {
+        await peer.audio.setSinkId(wanted);
+        applied = true;
+      }
+    } catch { /* the browser refused this device */ }
+  }
+  state.outputDeviceId = applied ? wanted : '';
+  note(applied ? '' : 'That speaker could not be used; the one you had is still in use.');
+  emit();
+  return state;
+}
+
+// The devices, watched.
+//
+// A device that is unplugged while a call is running is gone from the list,
+// and the list says so rather than offering a device that is not there.
+function watchDevices() {
+  if (!devicesSupported() || !navigator.mediaDevices.ondevicechange) return;
+  navigator.mediaDevices.ondevicechange = () => { refreshDevices().catch(() => {}); };
 }
 
 // ---- one peer ----------------------------------------------------------------
@@ -268,6 +464,20 @@ function onStatus(status) {
   emit();
 }
 
+// The state of this seat, from the peers.
+//
+// A seat with no peers is not connected to anybody, so it is connecting
+// rather than connected: the difference is what the reader is told.
+function connectionState() {
+  if (!state.joined) return state.connection === 'leaving' ? 'leaving' : 'idle';
+  const rows = (state.participants || []).filter((row) => String(row.userId) !== myId());
+  if (!rows.length) return 'connecting';
+  if (rows.some((row) => row.connection === 'failed')) return 'failed';
+  if (rows.some((row) => row.connection === 'live')) return 'connected';
+  if (rows.some((row) => row.connection === 'reconnecting')) return 'reconnecting';
+  return 'connecting';
+}
+
 // ---- the room poll ------------------------------------------------------------
 
 async function refreshRoom() {
@@ -332,6 +542,7 @@ export async function join(channel) {
     state.channel = { id: channel.id, serverId: channel.serverId, name: channel.name, type: channel.type };
     state.participants = [];
     state.joined = true;
+    state.connection = 'connecting';
     state.listenOnly = false;
     state.muted = false;
     state.deafened = false;
@@ -341,7 +552,7 @@ export async function join(channel) {
     // listen-only seat rather than a failed join, because hearing people is
     // still worth something when your own mic is off the table.
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await openMicrophone(state.inputDeviceId);
       localStream = stream;
       state.listenOnly = !(stream && stream.getAudioTracks().length);
       if (state.listenOnly) note('The microphone offered no audio; you are listening only.');
@@ -350,6 +561,10 @@ export async function join(channel) {
       state.listenOnly = true;
       note('The microphone was not granted; you are listening only. Speak from the dock once it is granted.');
     }
+    // The devices are read once the microphone has been granted, because a
+    // browser does not name a device before that.
+    await refreshDevices();
+    watchDevices();
 
     if (!audioContext) {
       try { audioContext = new window.AudioContext(); } catch { audioContext = null; }
@@ -387,6 +602,7 @@ export async function join(channel) {
 }
 
 export async function leave() {
+  state.connection = 'leaving';
   const channel = state.channel;
   if (channel) {
     for (const peerId of peers.keys()) await signalTo(peerId, 'leave', {});
@@ -405,6 +621,7 @@ export async function leave() {
   destroyPeers();
   state.channel = null;
   state.joined = false;
+  state.connection = 'idle';
   state.participants = [];
   state.muted = false;
   state.deafened = false;
@@ -445,7 +662,7 @@ export function enableMic() {
   // A refused microphone becomes a granted one without leaving the room; the
   // added track triggers each peer's renegotiation through the same offer path.
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.resolve(state);
-  return navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+  return openMicrophone(state.inputDeviceId).then((stream) => {
     const track = stream && stream.getAudioTracks()[0];
     if (!track) return state;
     localStream = stream;
@@ -489,5 +706,6 @@ function levelOf(watch) {
 
 export default {
   subscribe, capabilities, join, leave, setMuted, setDeafened, enableMic,
-  pulse, setLocalUserId, state,
+  pulse, setLocalUserId, state, refreshDevices, currentDevices,
+  setInputDevice, setOutputDevice,
 };

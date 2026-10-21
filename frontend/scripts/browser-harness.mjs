@@ -135,6 +135,72 @@ export const ANSWERS = {
   'GET /api/reports/mine': [],
   'GET /api/me/preferences': { locale: 'en', theme: 'trycord' },
   'GET /api/voice/capabilities': { voiceVideo: { available: true, provider: 'mesh', detail: '' } },
+  // The voice console's own answer: the provider in force, the shared
+  // controls and every provider with its own fields and secrets.
+  //
+  // The shape is the one the service really returns, because a stub that
+  // answers with a different shape measures a page the instance never draws.
+  'GET /api/voice/providers': {
+    enabled: true,
+    active: 'mesh',
+    screenSharing: true,
+    stageChannels: true,
+    maxParticipants: 6,
+    providers: [
+      {
+        id: 'mesh', label: 'Mesh',
+        summary: 'The in-house peer-to-peer path.',
+        note: 'The media travels between every participant.',
+        inForce: true, state: 'active', missing: [], problems: [],
+        fields: [
+          { key: 'voice.mesh.maxParticipants', label: 'Participants per mesh room',
+            description: 'Six keeps the CPU predictable.', name: 'maxParticipants',
+            type: 'integer', value: 6, source: 'instance', legacy: 'voice.maxParticipants' },
+          { key: 'voice.mesh.stunUrls', label: 'STUN servers for the mesh',
+            description: 'Comma-separated.', name: 'stunUrls',
+            type: 'list', value: [], source: 'default', legacy: 'voice.stunUrls' },
+        ],
+        secrets: [
+          { key: 'voice.mesh.turnCredential', label: 'TURN credential for the mesh',
+            description: 'Signed by this instance.', name: 'turnCredential',
+            type: 'secret', set: false, source: 'default', legacy: 'voice.turnCredential' },
+        ],
+        maxParticipants: 6, check: { ok: true, detail: 'The relay answered.', at: '2026-01-01T00:00:00.000Z' },
+      },
+      {
+        id: 'cloudflare', label: 'Cloudflare Realtime',
+        summary: 'The Cloudflare SFU.', note: 'The application secret is used to create a session.',
+        inForce: false, state: 'configured', missing: [], problems: [],
+        fields: [
+          { key: 'voice.cloudflare.appId', label: 'Cloudflare application id',
+            description: 'The id of the application.', name: 'appId',
+            type: 'string', value: '', source: 'default', legacy: 'voice.sfuAppId' },
+        ],
+        secrets: [
+          { key: 'voice.cloudflare.appSecret', label: 'Cloudflare application secret',
+            description: 'Never sent to a browser.', name: 'appSecret',
+            type: 'secret', set: false, source: 'default', legacy: 'voice.sfuAppSecret' },
+        ],
+        maxParticipants: 25, check: null,
+      },
+      {
+        id: 'sfu', label: 'Third-party SFU',
+        summary: 'A media server the operator runs.', note: 'It speaks the documented session API.',
+        inForce: false, state: 'configured', missing: [], problems: [],
+        fields: [
+          { key: 'voice.sfu.endpoint', label: 'The media server',
+            description: 'The base URL of the media server.', name: 'endpoint',
+            type: 'string', value: '', source: 'default', legacy: null },
+        ],
+        secrets: [
+          { key: 'voice.sfu.token', label: 'The media server token',
+            description: 'Used by this server only.', name: 'token',
+            type: 'secret', set: false, source: 'default', legacy: null },
+        ],
+        maxParticipants: 25, check: null,
+      },
+    ],
+  },
 };
 
 // The stub.

@@ -29,6 +29,8 @@ import Api from '../../../packages/api.js';
 import { screen, notice, stat } from './util.js';
 import { renderConversation } from './messages.js';
 import { voiceSection } from './communityVoice.js';
+import { joinVoiceCall } from './voiceCall.js';
+import { current as voiceCurrent } from '../../../packages/voiceSession.js';
 
 export function isVoiceType(type) {
   const clean = String(type || '').toLowerCase();
@@ -160,14 +162,38 @@ export function renderChannel(ctx) {
   }
 
   if (isVoiceType(channel.type)) {
-    const node = screen(el('div', { class: 'm-state' },
+    // The room, and the way into it.
+    //
+    // The call is the same call the desktop makes - the same engine, the
+    // same server, the same permissions - and it opens in a sheet over the
+    // page, because a phone has no room for a floating panel.
+    const room = el('div', { class: 'm-state' },
       el('span', { class: 'm-state__icon' }, icon('volume', { size: 24 })),
       el('div', { class: 'm-state__title' }, channel.name + ' is a ' + channel.type + ' channel'),
-      el('div', { class: 'm-state__text' }, 'Voice rooms run in the desktop site for now. Opening it there keeps the same permission and the same server.'),
-      el('button', {
-        class: 'm-btn m-btn--primary', type: 'button',
-        onClick: () => { setOverride('desktop'); window.location.assign(siblingMount('mobile', BASE) + '/'); },
-      }, 'Open the desktop site')));
+      el('div', { class: 'm-state__text' },
+        'Join the room to talk to the people who are in it. Your browser will ask for the microphone.'));
+    const join = el('button', {
+      class: 'm-btn m-btn--primary', type: 'button',
+      onClick: () => {
+        joinVoiceCall({
+          id: channel.id,
+          serverId,
+          name: channel.name,
+          type: channel.type,
+        });
+      },
+    }, 'Join the room');
+    room.appendChild(join);
+
+    // The room the reader is already in, if it is this one.
+    const current_ = voiceCurrent();
+    if (current_ && current_.joined && current_.channel
+      && String(current_.channel.id) === String(channel.id)) {
+      room.appendChild(el('p', { class: 'm-section__note' },
+        'You are in this room. Open the call to see who is here.'));
+    }
+
+    const node = screen(room);
     return {
       head: { lead: 'back', title: channel.name, sub: 'Voice', mark: el('span', { class: 'm-mark' }, icon('volume', { size: 18 })),
         actions: [el('button', { class: 'm-iconbtn', type: 'button', 'aria-label': 'Community menu', onClick: () => sharedState(serverId).openSheet() }, icon('menu', { size: 20 }))] },

@@ -103,6 +103,88 @@ function parseStun(buf) {
   return { type, length: len, txId, attrs, raw: buf };
 }
 
+// The address of a peer, in the form the protocol asks for.
+//
+// The port is the same for both families: it is the port with the high
+// sixteen bits of the magic cookie XORed into it.
+//
+// The address is the one the client already has, with the magic cookie (and,
+// for IPv6, the transaction id as well) XORed into it - so that the address
+// on the wire is not the address of the peer in the clear.
+//
+// The family is in the first byte: 1 for IPv4 and 2 for IPv6. An IPv6
+// address is sixteen bytes, and it is the transaction id that makes the XOR
+// different from the IPv4 one - which is why the transaction id is needed
+// here and not only in the header.
+function xorAddress(address, port, transactionId) {
+  const isV6 = String(address || '').indexOf(':') !== -1;
+  const raw = isV6 ? ipv6Bytes(address) : ipv4Bytes(address);
+  const mask = isV6
+    ? Buffer.concat([Buffer.from(MAGIC), Buffer.from(transactionId || [])])
+    : Buffer.from(MAGIC);
+  const value = Buffer.alloc(isV6 ? 20 : 8);
+  value[0] = 0;
+  value[1] = isV6 ? 0x02 : 0x01;
+  value.writeUInt16BE((port & 0xffff) ^ (STUN_MAGIC >>> 16), 2);
+  for (let i = 0; i < raw.length; i += 1) value[4 + i] = raw[i] ^ mask[i];
+  return value;
+}
+
+// The address the other way: the peer's address and port, read out of the
+// value the protocol carries.
+function parseXorAddress(buf, transactionId) {
+  if (!buf || buf.length < 8) return null;
+  const family = buf[1];
+  const port = (buf.readUInt16BE(2) ^ (STUN_MAGIC >>> 16)) & 0xffff;
+  if (family === 0x02) {
+    if (buf.length < 20) return null;
+    const mask = Buffer.concat([Buffer.from(MAGIC), Buffer.from(transactionId || [])]);
+    const bytes = Buffer.alloc(16);
+    for (let i = 0; i < 16; i += 1) bytes[i] = buf[4 + i] ^ mask[i];
+    return { ip: ipv6Text(bytes), port, family: 6 };
+  }
+  const bytes = [buf[4] ^ 0x21, buf[5] ^ 0x12, buf[6] ^ 0xa4, buf[7] ^ 0x42];
+  return { ip: bytes.join('.'), port, family: 4 };
+}
+
+// The four bytes of an IPv4 address.
+function ipv4Bytes(address) {
+  return Buffer.from(String(address || '0.0.0.0').split('.').map((part) => (Number(part) || 0) & 0xff));
+}
+
+// The sixteen bytes of an IPv6 address.
+//
+// The address is written in the usual eight groups of hexadecimal, and a
+// "::" stands for the run of zero groups it replaces - so the address is
+// expanded first and the groups are read out of it.
+function ipv6Bytes(address) {
+  const text = String(address || '').trim().replace(/^\[|\]$/g, '');
+  let head = text;
+  let tail = '';
+  const gap = text.indexOf('::');
+  if (gap !== -1) {
+    head = text.slice(0, gap);
+    tail = text.slice(gap + 2);
+  }
+  const headGroups = head ? head.split(':').filter(Boolean) : [];
+  const tailGroups = tail ? tail.split(':').filter(Boolean) : [];
+  const missing = 8 - headGroups.length - tailGroups.length;
+  const groups = headGroups.concat(new Array(Math.max(0, missing)).fill('0')).concat(tailGroups);
+  const out = Buffer.alloc(16);
+  for (let i = 0; i < 8; i += 1) {
+    const part = parseInt(groups[i] || '0', 16);
+    out.writeUInt16BE(Number.isFinite(part) ? part : 0, i * 2);
+  }
+  return out;
+}
+
+// The text of sixteen bytes of an IPv6 address.
+function ipv6Text(bytes) {
+  const groups = [];
+  for (let i = 0; i < 8; i += 1) groups.push(bytes.readUInt16BE(i * 2).toString(16));
+  return groups.join(':');
+}
+
 function buildAttr(aType, valueBuf) {
   const pad = valueBuf.length % 4 === 0 ? 0 : 4 - (valueBuf.length % 4);
   const b = Buffer.alloc(4 + valueBuf.length + pad);
@@ -122,12 +204,17 @@ function buildHeader(type, txId, bodyLen) {
 }
 
 // XOR-mapped address encoding (RFC 5389 §15.2).
-function xorMappedAddress(ip, port) {
-  const b = Buffer.alloc(8);
-  b[0] = 0; b[1] = 0x01; // IPv4
-  b.writeUInt16BE(port ^ (STUN_MAGIC >>> 16), 2);
-  ip.split('.').forEach((o, i) => b[4 + i] = (Number(o) || 0) ^ MAGIC[i]);
-  return b;
+// The address a client was seen at.
+//
+// The same encoding as the other addresses, and for the same reason: the
+// address is not written on the wire in the clear. An IPv6 address is XORed
+// with the magic cookie and the transaction id, as the protocol asks.
+//
+// It used to be IPv4 only, so an IPv6 client was told it had been seen at a
+// four-byte address that was made of the first two groups of its own - and
+// ICE, which believes what a STUN server tells it, believed it.
+function xorMappedAddress(ip, port, transactionId) {
+  return xorAddress(ip, port, transactionId);
 }
 
 function hmacSha1(key, data) {
@@ -237,14 +324,12 @@ function sharedSecret() {
 // address a client can reach: "0.0.0.0" is a wildcard, not a place. The
 // address the peers are given has to be the one they can use - the one the
 // instance publishes, or the one the operator named.
-function publicHost() {
-  const named = String(process.env.TRYCORD_TURN_HOST || '').trim();
-  if (named && named !== '0.0.0.0' && named !== '::' && named !== '[::]') return named;
-  const publicUrl = String(process.env.TRYCORD_PUBLIC_URL || '').trim();
-  if (publicUrl) {
-    try { return new URL(publicUrl).hostname; } catch { /* not a usable address */ }
-  }
-  return named || '127.0.0.1';
+// The address the relay is published at.
+//
+// It is the shared one, so the relay and the ICE configuration a client is
+// given cannot disagree about it.
+function publicHost(family) {
+  return require('./voice/address').publicHost(family);
 }
 
 // The range the relay ports are taken from.
@@ -458,7 +543,7 @@ function handlePacket(socket, buf, rinfo) {
 }
 
 function handleBinding(socket, parsed, rinfo) {
-  const xma = xorMappedAddress(rinfo.address, rinfo.port);
+  const xma = xorMappedAddress(rinfo.address, rinfo.port, parsed.txId);
   const body = buildAttr(ATTR.XOR_MAPPED_ADDRESS, xma);
   const header = buildHeader(STYPE.BINDING_RESPONSE, parsed.txId, body.length);
   const out = Buffer.concat([header, body]);
@@ -475,13 +560,20 @@ function handleAllocate(socket, parsed, rinfo) {
   const prior = allocations.get(key);
   if (prior) { try { prior.relaySocket.close(); } catch {} allocations.delete(key); }
 
-  const relay = dgram.createSocket('udp4');
+  // The socket family follows the family of the client that asked for the
+  // allocation.
+  //
+  // It used to be IPv4 whatever the client was, so an IPv6 client's media
+  // was relayed from an IPv4 socket: the bytes went nowhere, and the call
+  // that was relayed silently carried no sound.
+  const family = String(rinfo.address || '').indexOf(':') !== -1 ? 'udp6' : 'udp4';
+  const relay = dgram.createSocket({ type: family, ipv6Only: false });
   const range = relayPortRange();
   // The relay port is taken from the range, so the ports a client has to
   // open are a known set rather than whatever the operating system happens
   // to hand out.
   const wanted = range.from + (allocations.size % Math.max(1, range.to - range.from + 1));
-  relay.bind(wanted, '0.0.0.0', () => {
+  relay.bind(wanted, family === 'udp6' ? '::' : '0.0.0.0', () => {
     const inf = relay.address();
     const alloc = {
       id: crypto.randomBytes(12).toString('hex'),
@@ -489,7 +581,11 @@ function handleAllocate(socket, parsed, rinfo) {
       clientPort: rinfo.port,
       // The address the client is told is the one it can reach, not the
       // wildcard this socket happens to be bound to.
-      relayIp: publicHost(),
+      //
+      // It is the address of the client's own family: an IPv4 client cannot
+      // route to an IPv6 address, so telling it one would leave it waiting
+      // for a relay that could never answer.
+      relayIp: publicHost(String(rinfo.address || '').indexOf(':') === -1 ? 4 : 6),
       relayPort: inf.port,
       relaySocket: relay,
       lifetime: 600,
@@ -503,10 +599,7 @@ function handleAllocate(socket, parsed, rinfo) {
       // Forward inbound packet from remote peer to our client via DataIndication.
       if (!allocations.has(key)) return;
       if (alloc.peers.size > 0 && !alloc.peers.has(peerInfo.address + ':' + peerInfo.port)) return;
-      const xpeer = Buffer.alloc(8);
-      xpeer[0] = 0; xpeer[1] = 0x01;
-      xpeer.writeUInt16BE(peerInfo.port ^ (STUN_MAGIC >>> 16), 2);
-      peerInfo.address.split('.').forEach((o, i) => xpeer[4 + i] = (Number(o) || 0) ^ MAGIC[i]);
+      const xpeer = xorAddress(peerInfo.address, peerInfo.port, parsed.txId);
       const body = Buffer.concat([
         buildAttr(ATTR.XOR_PEER_ADDRESS, xpeer),
         buildAttr(ATTR.DATA, data),
@@ -522,10 +615,7 @@ function handleAllocate(socket, parsed, rinfo) {
     relay.on('error', () => {});
 
     const lifetimeBuf = Buffer.alloc(4); lifetimeBuf.writeUInt32BE(alloc.lifetime, 0);
-    const xra = Buffer.alloc(8);
-    xra[0] = 0; xra[1] = 0x01;
-    xra.writeUInt16BE(alloc.relayPort ^ (STUN_MAGIC >>> 16), 2);
-    alloc.relayIp.split('.').forEach((o, i) => xra[4+i] = (Number(o) || 0) ^ MAGIC[i]);
+    const xra = xorAddress(alloc.relayIp, alloc.relayPort, parsed.txId);
     const body = Buffer.concat([
       buildAttr(ATTR.LIFETIME, lifetimeBuf),
       buildAttr(ATTR.XOR_RELAYED_ADDRESS, xra),
@@ -563,7 +653,7 @@ function handleCreatePermission(socket, parsed, rinfo) {
   if (!alloc) { sendError(socket, parsed.txId, 437, rinfo); return; }
   const peerBuf = parsed.attrs.get(ATTR.XOR_PEER_ADDRESS);
   if (!peerBuf) { sendError(socket, parsed.txId, 400, rinfo); return; }
-  const peer = parseXorPeerAddress(peerBuf.value);
+  const peer = parseXorPeerAddress(peerBuf.value, parsed.txId);
   if (peer) alloc.peers.add(peer.ip + ':' + peer.port);
   const out = Buffer.alloc(20);
   out.writeUInt16BE(STYPE.CREATE_PERM_RESPONSE, 0);
@@ -580,7 +670,7 @@ function handleChannelBind(socket, parsed, rinfo) {
   const peerBuf = parsed.attrs.get(ATTR.XOR_PEER_ADDRESS);
   if (!chanBuf || !peerBuf) { sendError(socket, parsed.txId, 400, rinfo); return; }
   const channelNum = chanBuf.value.readUInt16BE(0);
-  const peer = parseXorPeerAddress(peerBuf.value);
+  const peer = parseXorPeerAddress(peerBuf.value, parsed.txId);
   if (peer) alloc.channels.set(channelNum, peer.ip + ':' + peer.port);
   const out = Buffer.alloc(20);
   out.writeUInt16BE(STYPE.CHANNEL_BIND_RESPONSE, 0);
@@ -596,17 +686,17 @@ function handleSendIndication(socket, parsed, rinfo) {
   const peerBuf = parsed.attrs.get(ATTR.XOR_PEER_ADDRESS);
   const dataBuf = parsed.attrs.get(ATTR.DATA);
   if (!peerBuf || !dataBuf) return;
-  const peer = parseXorPeerAddress(peerBuf.value);
+  const peer = parseXorPeerAddress(peerBuf.value, parsed.txId);
   if (alloc.peers.size > 0 && !alloc.peers.has(peer.ip + ':' + peer.port)) return;
   if (alloc.relaySocket) {
     alloc.relaySocket.send(dataBuf.value, 0, dataBuf.value.length, peer.port, peer.ip);
   }
 }
 
-function parseXorPeerAddress(buf) {
-  const portXor = buf.readUInt16BE(2) ^ (STUN_MAGIC >>> 16);
-  const ip = [buf[4]^0x21, buf[5]^0x12, buf[6]^0xa4, buf[7]^0x42].join('.');
-  return { ip, port: portXor };
+function parseXorPeerAddress(buf, transactionId) {
+  const parsedAddress = parseXorAddress(buf, transactionId);
+  if (!parsedAddress) return null;
+  return { ip: parsedAddress.ip, port: parsedAddress.port };
 }
 
 // ===== Credential issuance (HTTP API) =====
@@ -626,7 +716,12 @@ let activeSweeper = null;
 
 function startServer(config) {
   const host = (config && config.host) || '127.0.0.1';
-  const port = (config && config.port) || 3478;
+  // A port of zero is a port: it asks the operating system for an ephemeral
+  // one. It used to be read as "no port", and the service bound 3478
+  // whatever it was asked for - so a caller that wanted a port of its own
+  // was refused the one it had asked for.
+  const asked = Number(config && config.port);
+  const port = Number.isFinite(asked) && asked >= 0 ? asked : 3478;
 
   // The socket is kept, so that stopServer() can close it.
   //
@@ -639,7 +734,15 @@ function startServer(config) {
     server = null;
   }
 
-  const socket = dgram.createSocket('udp4');
+  // The socket family follows the address the relay listens on.
+  //
+  // It used to be IPv4 whatever the address was, so a relay published at an
+  // IPv6 address was a relay that no IPv6 client could reach: the socket
+  // was listening on the IPv4 side of the host while the clients were given
+  // the IPv6 one. A wildcard binds both families, and an IPv6 literal binds
+  // the IPv6 one.
+  const family = host === '::' || host === '[::]' || host.indexOf(':') !== -1 ? 'udp6' : 'udp4';
+  const socket = dgram.createSocket({ type: family, ipv6Only: false });
   socket.on('message', (buf, rinfo) => {
     // A packet that cannot be handled is logged, not swallowed. The silent
     // catch is what hid the missing magic-cookie bytes for as long as this
@@ -655,7 +758,11 @@ function startServer(config) {
   });
   socket.on('error', (e) => console.error('[turn] socket error', e && e.message));
   socket.bind(port, host, () => {
-    console.log('[turn] STUN/TURN server listening on ' + host + ':' + port);
+    // The port the socket actually got, which is not the one that was asked
+    // for when the one that was asked for was zero.
+    const bound = socket.address();
+    console.log('[turn] STUN/TURN server listening on '
+      + (bound ? bound.address : host) + ':' + (bound ? bound.port : port));
   });
   // The same sweep, started again for the running server. The module-level one
   // is already doing this work, so this is redundant - but the server's own

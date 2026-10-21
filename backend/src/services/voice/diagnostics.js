@@ -131,6 +131,14 @@ async function report(options) {
     active,
     screenSharing: !!settings.read('voice.screenSharing', true),
     stageChannels: !!settings.read('voice.stageChannels', true),
+    // The instance's own STUN and TURN stack.
+    //
+    // It is in the report because the console has to report reality: an
+    // operator looking at the mesh needs to see where the relay is published
+    // and whether a client can reach it there, and a report that left that
+    // out made a working relay look like a broken one - and a relay published
+    // at the loopback look like a working one.
+    stack: registry.stackState(),
     // The participant limit is shared in meaning and per-provider in value:
     // the number here is the one the provider in force enforces.
     maxParticipants: inForce ? inForce.maxParticipants : config.limit(active),

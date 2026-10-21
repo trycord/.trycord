@@ -255,6 +255,14 @@ function stackState() {
     // The address the clients are given, and whether it is one they can
     // reach.
     publishedIsLocal: advertised === '127.0.0.1' || advertised === 'localhost',
+    // Whether the published address is one a client outside this instance can
+    // reach at all.
+    //
+    // A browser given `turn:127.0.0.1:3478` resolves that to the reader's
+    // own machine, so the call can never be relayed - and a console that
+    // said only "the service is listening" would be saying that about a
+    // service nobody can reach.
+    publishedIsReachable: config.addressIsReachable(advertised),
     // The relay port range, so an operator knows which ports to open.
     relayPorts: relayPortRange(),
     secretSet: !!String(process.env.TRYCORD_TURN_SECRET || '').trim(),
@@ -295,4 +303,4 @@ async function check(providerId, overlay) {
   }
 }
 
-module.exports = { PROVIDERS, find, describe, check };
+module.exports = { PROVIDERS, find, describe, check, stackState };

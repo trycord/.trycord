@@ -1569,6 +1569,11 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-notice__actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .m-notice.m-notice--danger { border-color: var(--m-brand-line); background: var(--m-brand-soft); }
 .m-notice.m-notice--danger .m-notice__icon { color: var(--m-danger); }
+/* Somebody who is speaking.
+   The glow follows the audio: it is on while there is sound and off when
+   there is not, and it is never on for anybody who is not speaking. */
+.m-row.is-speaking { box-shadow: inset 0 0 0 1px var(--m-brand); }
+
 .m-notice.m-notice--warning { border-color: color-mix(in srgb, var(--m-warning) 45%, transparent); }
 .m-notice.m-notice--warning .m-notice__icon { color: var(--m-warning); }
 .m-notice.m-notice--success { border-color: color-mix(in srgb, var(--m-success) 45%, transparent); }

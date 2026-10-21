@@ -21,7 +21,7 @@ import { bind } from '../packages/registry.js';
 import { RENDERERS } from './features/index.js';
 import { mountVoiceDock } from './voice/dock.js';
 import * as encrypted from './ui/encrypted.js';
-import { setLocalUserId, leave as voiceLeave } from './voice/session.js';
+import { setLocalUserId, leave as voiceLeave } from '../packages/voiceSession.js';
 import { run } from './router.js';
 
 function mount() {

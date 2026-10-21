@@ -293,8 +293,15 @@ function stackSection(report) {
       text: stack.running ? 'Listening' : 'Not listening',
     }, 'It listens on ' + stack.listenHost + ':' + stack.listenPort + '.'),
     row('The published address', {
-      ok: !stack.publishedIsLocal,
-      text: stack.advertised,
+      // Whether a client outside this instance can reach the address the
+      // clients are given.
+      //
+      // A browser given `turn:127.0.0.1:3478` resolves that to the reader's
+      // own machine, so the call can never be relayed - and a console that
+      // said only "the service is listening" would be saying that about a
+      // service nobody can reach.
+      ok: stack.publishedIsReachable !== false,
+      text: stack.advertised + (stack.publishedIsReachable === false ? ' (not reachable from a client)' : ''),
     }, 'The address the clients are given. It has to point straight at this '
       + 'instance: a proxy that terminates TLS carries HTTP and not the '
       + 'arbitrary UDP a STUN or TURN service needs, so a relayed address '

@@ -14,7 +14,7 @@ import Api from '../../packages/api.js';
 import { card, blank, hold } from '../ui/page.js';
 import {
   subscribe, current, capabilities, currentCaps, join, leave, setMuted, setDeafened, enableMic,
-} from './session.js';
+} from '../../packages/voiceSession.js';
 
 let capsReady = false;
 
