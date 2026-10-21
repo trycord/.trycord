@@ -262,8 +262,15 @@ function limitSection(report, onSaved) {
 // The fields of the provider in force, and nothing else.
 function providerSection(provider, onSaved) {
   const rows = [];
-  for (const field of provider.fields) rows.push(fieldRow(field, onSaved));
-  for (const secret of provider.secrets) rows.push(secretRow(secret, onSaved));
+  if (!provider) {
+    return card({
+      label: 'The provider in force', glyph: 'volume',
+      body: el('p', { class: 'settings-note' },
+        'The server named no provider, so there is nothing to configure here.'),
+    });
+  }
+  for (const field of provider.fields || []) rows.push(fieldRow(field, onSaved));
+  for (const secret of provider.secrets || []) rows.push(secretRow(secret, onSaved));
 
   return card({
     label: provider.label,
@@ -356,7 +363,7 @@ function diagnosticsSection(report, lastCheck, onChecked) {
 
   const paint = () => {
     const rows = [];
-    for (const provider of report.providers) {
+    for (const provider of (Array.isArray(report.providers) ? report.providers : [])) {
       const described = stateOf(provider.state);
       rows.push(el('div', { class: 'settings-item' },
         el('div', { class: 'settings-item-main' },
@@ -364,11 +371,11 @@ function diagnosticsSection(report, lastCheck, onChecked) {
             stateChip(provider.state),
             provider.inForce ? el('span', { class: 'chip chip--quiet' }, 'in force') : null),
           el('p', { class: 'settings-note' }, described.meaning),
-          provider.missing.length
+          (provider.missing || []).length
             ? el('p', { class: 'settings-note' }, 'Missing: ' + provider.missing.join('; ') + '.')
             : null,
           provider.check
-            ? el('p', { class: 'settings-note' }, provider.check.detail)
+            ? el('p', { class: 'settings-note' }, provider.check.detail || '')
             : null),
         el('div', { class: 'settings-item-control' },
           el('button', {
@@ -416,7 +423,7 @@ export function adminVoice() {
     if (!report) return;
 
     const picker = el('div', { class: 'segmented', role: 'group', 'aria-label': 'Media provider' });
-    for (const provider of report.providers) {
+    for (const provider of (Array.isArray(report.providers) ? report.providers : [])) {
       picker.appendChild(el('button', {
         class: 'segmented-item',
         type: 'button',
@@ -447,7 +454,8 @@ export function adminVoice() {
       }, provider.label));
     }
 
-    const inForce = report.providers.find((provider) => provider.inForce) || report.providers[0];
+    const providers = Array.isArray(report.providers) ? report.providers : [];
+    const inForce = providers.find((provider) => provider.inForce) || providers[0] || null;
 
     // The main section has four things in it: whether this instance offers
     // voice, which provider carries it, whether a member may share a screen,

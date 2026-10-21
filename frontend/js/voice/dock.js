@@ -18,6 +18,7 @@ import { State, nameOf } from '../../packages/store.js';
 import {
   subscribe, current, setMuted, setDeafened, leave, enableMic,
   refreshDevices, setInputDevice, setOutputDevice,
+  canShareScreen, startScreenShare, stopScreenShare,
 } from '../../packages/voiceSession.js';
 
 let paintFn = null;
@@ -51,7 +52,8 @@ function structureSignature() {
   const s = current();
   if (!s.joined) return '';
   return JSON.stringify([
-    s.channel && s.channel.id, s.muted, s.deafened, s.listenOnly, s.connection,
+    s.channel && s.channel.id, s.muted, s.deafened, s.listenOnly, s.connection, s.sharing,
+    Object.keys(s.sharedScreens || {}),
     s.inputDeviceId, s.outputDeviceId, s.canChooseOutput,
     (s.inputs || []).map((device) => device.id),
     (s.outputs || []).map((device) => device.id),
@@ -163,12 +165,40 @@ function dockNode() {
   const peers = el('div', { class: 'voice-dock__peers' },
     (s.participants || []).slice(0, 6).map((p) => chip(p, s.channel && s.channel.serverId)));
 
+  // The screen somebody is sharing, if anybody is.
+  //
+  // The picture is carried peer to peer like the sound is, so the dock shows
+  // the stream the browser sent rather than a picture of its own.
+  const screens = el('div', { class: 'voice-dock__screens' });
+  for (const [userId, stream] of Object.entries(s.sharedScreens || {})) {
+    if (!stream) continue;
+    const video = el('video', {
+      class: 'voice-dock__screen', autoplay: true, playsinline: true, muted: true,
+    });
+    video.srcObject = stream;
+    screens.appendChild(el('div', { class: 'voice-dock__screenwrap' },
+      video,
+      el('span', { class: 'voice-dock__screenwho' },
+        (personOf(userId, s.channel && s.channel.serverId) || {}).displayName || 'A screen')));
+  }
+
+  // Sharing this seat's screen.
+  const shareButton = canShareScreen()
+    ? el('button', {
+      class: 'btn btn--default btn--sm', type: 'button',
+      'aria-pressed': String(!!s.sharing),
+      onClick: () => (s.sharing ? stopScreenShare() : startScreenShare()),
+    }, s.sharing ? 'Stop sharing' : 'Share your screen')
+    : null;
+
   return el('div', { class: 'voice-dock', role: 'complementary', 'aria-label': 'Voice session' },
     el('div', { class: 'voice-dock__top' }, lead,
       el('span', { class: 'voice-dock__state', 'data-state': state_ }, stateWord)),
     peers,
+    screens,
     status,
     devices,
+    shareButton ? el('div', { class: 'voice-dock__controls' }, shareButton) : null,
     controls);
 }
 

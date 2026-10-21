@@ -131,19 +131,49 @@ async function checkMesh(cfg) {
     return { ok: false, detail: 'The mesh has no STUN server and no TURN relay.' };
   }
 
-  // The STUN and the TURN address of the in-house relay are the same address,
-  // so it is asked once.
-  const addresses = Array.from(new Set(servers));
-  const results = await Promise.all(addresses.map((url) => relay.probeAddress(url)));
+  // The addresses to ask.
+  //
+  // An entry can carry one address or several, and the STUN and the TURN
+  // address of the in-house relay are the same one, so they are flattened
+  // and asked once each.
+  const addresses = Array.from(new Set(
+    servers.flat().map((url) => String(url || '').trim()).filter(Boolean),
+  ));
+  if (!addresses.length) {
+    return { ok: false, detail: 'The mesh has no STUN server and no TURN relay.' };
+  }
+
+  // The published addresses are the ones the clients are given, so those are
+  // the ones that have to answer. A client is given the published address
+  // and no other, so an answer from somewhere else is not an answer for it.
+  //
+  // The local address is asked as well, but only to say what is wrong when
+  // the published one does not answer: a relay that answers here and not
+  // there is a working relay and an unreachable address, and those two have
+  // different fixes. It never makes the check pass on its own - any process
+  // on this host can be listening on the local port, and one that has
+  // nothing to do with voice must not be taken for the relay.
+  const local = relay.localAddress();
+  const localUrl = local ? 'stun:' + local + ':' + relay.localPort() : null;
+  const asked = localUrl && addresses.indexOf(localUrl) === -1
+    ? [localUrl].concat(addresses)
+    : addresses;
+  const probed = await Promise.all(asked.map((url) => relay.probeAddress(url)));
+  const localAnswer = localUrl ? probed.find((result) => result.url === localUrl) : null;
+  const results = probed.filter((result) => result.url !== localUrl);
   const answered = results.filter((result) => result.ok);
 
   if (!answered.length) {
     const inHouse = relay.inHouseState();
     const detail = results.map((result) => result.detail).join(' ');
-    const extra = inHouse && inHouse.running
+    let extra = inHouse && inHouse.running
       ? ' The relay this instance runs is listening on ' + inHouse.host + ':' + inHouse.port
         + ', so it is running but not answering.'
       : '';
+    if (localAnswer && localAnswer.ok) {
+      extra += ' Something answered a binding request at ' + localAnswer.host + ':' + localAnswer.port
+        + ', so the relay is running here, but the address the clients are given is not reachable.';
+    }
     return { ok: false, detail: detail + extra + ' ' + wildcardNote(inHouse) };
   }
 

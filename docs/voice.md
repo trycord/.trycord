@@ -151,17 +151,40 @@ nothing else starts it, so the voice subsystem does: with the mesh in force and
 no STUN or TURN address configured, the relay this instance runs is the one the
 peers are given.
 
-The address comes from the deployment:
+There is nothing to write down. No STUN address, no TURN address, no
+username, no password: the instance starts the relay, publishes the address
+it listens on, and mints a credential for the caller that asked.
+
+The deployment decides two things - where the relay listens, and the address
+the peers are given:
 
 | Variable | What it is |
 |---|---|
-| `TRYCORD_TURN_HOST` | The address the relay listens on, and the one peers are given. |
+| `TRYCORD_TURN_HOST` | The address the relay listens on. A wildcard (`0.0.0.0` or `::`) means every interface. |
 | `TRYCORD_TURN_PORT` | The port, `3478` by default. |
 | `TRYCORD_TURN_REALM` | The realm used for the credential. |
 | `TRYCORD_TURN_SECRET` | The secret the credential is derived from. |
+| `TRYCORD_VOICE_PUBLIC_URL` | The address the peers are given. It has to be an address a browser can reach, and it is a voice address: a hostname that points straight at this instance, DNS only and not proxied. |
+| `TRYCORD_VOICE_PUBLIC_URL_V4` | The IPv4 address, when the voice URL is the IPv6 one and the instance has both. |
+| `TRYCORD_VOICE_PUBLIC_URL_V6` | The IPv6 address, when the voice URL is the IPv4 one and the instance has both. |
 
 How long the connectivity probe waits for an answer is
 `TRYCORD_VOICE_PROBE_TIMEOUT_MS`, two and a half seconds by default.
+
+The address the peers are given is chosen in this order, and the console says
+which one it used:
+
+1. `TRYCORD_VOICE_PUBLIC_URL` (or the `voice.publicUrl` setting).
+2. `TRYCORD_TURN_HOST`, when it is not a wildcard.
+3. `TRYCORD_PUBLIC_URL` - which is usually the address of a proxy that
+   terminates TLS. A proxy carries HTTP and not the arbitrary UDP a TURN
+   service needs, so a relay published at the site's address is a relay nobody
+   can reach. The diagnostics say so rather than handing out an address that
+   cannot work.
+
+Both families are published when the instance has both, because a peer on an
+IPv6-only network cannot reach an IPv4 address and the other way round. The
+browser tries the list, so one list carries both.
 
 The credential is derived from the secret and is minted for one session and one
 caller. **The secret itself never leaves the process**: it is not in the
@@ -169,46 +192,46 @@ capability answer, not in a diagnostic, and not in a log. A client asks
 `POST /api/voice/credentials` for it, and that route only answers for a
 session that belongs to the caller.
 
-Two things an operator should know:
+One thing an operator should know: `TRYCORD_TURN_HOST` is the address the
+relay listens on, and a wildcard is not an address a peer can reach. `0.0.0.0`
+and `::` mean every interface, which is what a relay that has to be reached
+from outside wants; the address the peers are given then comes from the voice
+URL. When there is no voice URL either, the diagnostics say so.
 
-- `TRYCORD_TURN_HOST` has to be an address a browser can reach. `0.0.0.0` is a
-  listen address, not a reachable one; the diagnostics say so when it is set to
-  a wildcard and the instance has no public URL to fall back on.
-- The relay the instance ships does not currently answer. See
-  *The relay is not answering* below.
+### When the relay does not answer
 
-### The relay is not answering
+The relay answers a STUN binding request, and it answers a TURN allocate with
+a credential it issued itself - both are covered by the test suite
+(`backend/tests/voice/turn-stack.test.js`).
 
-`services/turn.js` is complete on the page and does not work. Four defects stop
-it answering a single packet:
+The check in the console asks the relay for real, and says what it found:
 
-1. The `STUN_*` names the request handler switches on (`STUN_BIND_REQUEST` and
-   the rest) do not exist. The constants are `STYPE.BINDING_REQUEST` and the
-   rest, so every case throws a `ReferenceError` before the packet is handled.
-2. `xorMappedAddress` reads `MAGIC[i]`, and no `MAGIC` is declared. The
-   constant it means is the magic cookie's bytes, `[0x21, 0x12, 0xa4, 0x42]`.
-3. `handleBinding` reads `body.length` in the call that declares `body`, which
-   is a temporal dead zone error, and it builds the response without the
-   XOR-mapped-address attribute.
-4. `parseStun` does not return the raw buffer, and `verifyAuth` needs it to
-   find the message-integrity attribute - so the TURN allocate path throws
-   before it can answer.
+> 2 of 2 ICE addresses answered a binding request. The relay listens on every
+> interface and is published as [2001:db8::1], which is the address the clients
+> are given.
 
-The voice subsystem does not work around any of this. It probes the relay for
-real, and the diagnostic says exactly what it found:
+The addresses it asks are the **published** ones - the addresses the clients
+are given - because those are the ones that have to answer. A peer that is
+handed an address that does not answer waits for it to time out.
 
-> Nothing answered a binding request at 127.0.0.1:3478. The relay this instance
-> runs is listening on 127.0.0.1:3478, so it is running but not answering.
+The local address is asked as well, but only to explain a failure. A relay
+that answers here and not there is a working relay and an unreachable
+address, and those two have different fixes, so the console says which one it
+is:
+
+> Nothing answered a binding request at [2001:db8::1]:3478. The relay this
+> instance runs is listening on :::3478, so it is running but not answering.
+> Something answered a binding request at 127.0.0.1:3478, so the relay is
+> running here, but the address the clients are given is not reachable.
+
+An answer from the local address never makes the check pass on its own. Any
+process on the host can be listening on the local port, and one that has
+nothing to do with voice must not be taken for the relay.
 
 A mesh whose relay does not answer **refuses to start a session**, because a
-call that cannot connect is worse than a refusal. The way out is to configure a
-STUN server for the mesh (`voice.mesh.stunUrls`), or to fix the four defects
-above.
-
-There is a second, smaller mismatch: `issueCredentials` mints a short-lived
-credential from the secret, and `verifyAuth` expects the secret itself. The
-credential the voice subsystem hands out is the one `issueCredentials` mints, so
-the two agree with each other and not with the verifier.
+call that cannot connect is worse than a refusal. The way out is to publish
+the relay at an address a browser can reach - `TRYCORD_VOICE_PUBLIC_URL` - or
+to configure a STUN server for the mesh (`voice.mesh.stunUrls`).
 
 ---
 

@@ -99,7 +99,14 @@ function probeAddress(url, timeoutMs) {
   const timeout = timeoutMs || probeTimeout();
 
   return new Promise((resolve) => {
-    const socket = dgram.createSocket('udp4');
+    // The socket family follows the address being asked.
+    //
+    // It used to be IPv4 whatever the address was, so a probe of an IPv6
+    // relay was refused by the kernel before a byte was sent - the answer
+    // said "send EINVAL" and the console read that as "the relay is not
+    // answering", which is a different fault entirely.
+    const family = String(target.host || '').indexOf(':') === -1 ? 'udp4' : 'udp6';
+    const socket = dgram.createSocket({ type: family, ipv6Only: false });
     const transactionId = crypto.randomBytes(12);
     let settled = false;
 
@@ -280,6 +287,25 @@ async function ensureInHouse() {
   return starting;
 }
 
+// The address the relay listens on here, and the port it listens on.
+//
+// It is the address the probe asks when it wants to know whether the relay
+// works on this host, whatever the address it is published at.
+function localAddress() {
+  const inHouse = inHouseState();
+  if (inHouse && inHouse.host && inHouse.host !== '0.0.0.0' && inHouse.host !== '::') {
+    return inHouse.host;
+  }
+  // A wildcard bind: the local address is the loopback, which is where the
+  // relay is certainly answering.
+  return '127.0.0.1';
+}
+
+function localPort() {
+  const inHouse = inHouseState();
+  return inHouse && inHouse.port ? inHouse.port : 3478;
+}
+
 function inHouseState() {
   if (!inHouse) return null;
   return {
@@ -312,6 +338,8 @@ function stopInHouse() {
 }
 
 module.exports = {
+  localAddress,
+  localPort,
   parseIceUrl,
   probeAddress,
   ensureInHouse,

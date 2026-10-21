@@ -545,6 +545,18 @@ a:hover { text-decoration: underline; }
 
 .m-row__lead { display: grid; place-items: center; }
 .m-row__body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* A row whose body is a button: the name opens the room and the button
+   beside it joins the call. The button carries no chrome of its own, so the
+   row still reads as one row. */
+button.m-row__body {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .m-row__title {
   font-size: var(--fs-body);
   font-weight: var(--weight-medium);
@@ -1257,6 +1269,15 @@ textarea.m-input { min-height: 96px; resize: vertical; }
 .m-notice__actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .m-notice.m-notice--danger { border-color: var(--m-brand-line); background: var(--m-brand-soft); }
 .m-notice.m-notice--danger .m-notice__icon { color: var(--m-danger); }
+/* A shared screen.
+   The picture is carried peer to peer, so this is the stream the browser
+   sent rather than a picture of the phone's own. */
+.m-video {
+  width: 100%; aspect-ratio: 16 / 9; object-fit: contain;
+  background: var(--panel-3); border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+}
+
 /* A disclosure.
    The details are there for the person who wants them and out of the way for
    the person who does not. */

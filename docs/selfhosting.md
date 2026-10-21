@@ -370,6 +370,18 @@ VOICE_VIDEO_TURN_USERNAME=...
 VOICE_VIDEO_TURN_CREDENTIAL=...
 ```
 
+### What a call carries
+
+Audio, and - when the room allows it - a screen. There is no video calling:
+a camera is not a part of a voice channel, and nothing in the interface
+pretends otherwise. The screen is a picture sent to the peers, the same way
+the sound is, and the browser's own bar is where the reader stops it.
+
+`VOICE_VIDEO_SCREEN_SHARING` is a switch the clients honour rather than one
+the server refuses, because the media never reaches the server. The limit on
+the room, the permission to join it and the authority to end a call are all
+enforced by the server, and those are the ones that matter.
+
 ### The voice service
 
 The STUN and TURN service runs as a process of its own, `trycord-voice` in the
