@@ -45,6 +45,37 @@ export function renderInvite(ctx) {
   const host = el('div', { class: 'm-stack' });
   const node = screen(host);
 
+  // The ways an invitation can be dead, in the same words the desk says -
+  // one refusal cannot mean two things across the two clients. Anything
+  // that is not one of these keeps the form, because the invitation may be
+  // fine and the network may not be.
+  const ENDINGS = {
+    INVITE_INVALID: {
+      title: 'This invite is not right',
+      body: 'The link may have been copied with a piece missing. Check you have the whole link, or ask whoever sent it to send it again.',
+    },
+    INVITE_EXPIRED: {
+      title: 'This invite has expired',
+      body: 'Invitations here do not stay open forever. Ask whoever sent it for a fresh one.',
+    },
+    INVITE_REVOKED: {
+      title: 'This invite was pulled back',
+      body: 'The community took this invitation down. If they still want you in, they can send a new one.',
+    },
+    INVITE_EXHAUSTED: {
+      title: 'This invite has been used up',
+      body: 'It let a set number of people in, and that number has arrived. Ask for a new invitation.',
+    },
+  };
+
+  function showEnding(code) {
+    const ending = ENDINGS[code];
+    if (!ending) return;
+    host.replaceChildren(el('div', { class: 'm-stack' },
+      notice({ title: ending.title, text: ending.body }),
+      el('a', { class: 'm-btn m-btn--block', href: path('/home') }, 'Back to Trycord')));
+  }
+
   async function load() {
     host.replaceChildren();
     if (!State.user) {
@@ -53,6 +84,7 @@ export function renderInvite(ctx) {
         el('a', { class: 'm-btn m-btn--primary', href: path('/login?next=' + encodeURIComponent('/invite/' + code)) }, 'Sign in')));
       return;
     }
+    const invitation = notice({ title: 'An invitation to join', text: code });
     const button = el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'button' }, 'Join community');
     button.addEventListener('click', async () => {
       button.disabled = true;
@@ -62,10 +94,22 @@ export function renderInvite(ctx) {
         await refreshServers();
         toast('Joined.', { type: 'success' });
         navigate(server && server.id ? '/server/' + server.id : '/home');
-      } catch (error) { toast(error.message, { type: 'danger' }); button.disabled = false; }
+      } catch (error) {
+        if (ENDINGS[error && error.code]) { showEnding(error.code); return; }
+        toast(error.message, { type: 'danger' });
+        button.disabled = false;
+      }
     });
-    host.appendChild(el('div', { class: 'm-stack' },
-      notice({ title: 'An invitation to join', text: code }), button));
+    host.appendChild(el('div', { class: 'm-stack' }, invitation, button));
+    // The preview names the community on the button, and a dead invitation
+    // says so now rather than when the button is pressed and refused.
+    Api.invitePreview(code).then((p) => {
+      if (p && (p.name || p.serverName || p.communityName)) {
+        invitation.querySelector('.m-notice__title').textContent = 'An invitation to join ' + (p.name || p.serverName || p.communityName);
+      }
+    }).catch((error) => {
+      if (ENDINGS[error && error.code]) showEnding(error.code);
+    });
   }
 
   return { node, head: { lead: 'back', title: 'Invitation' }, onMount: load };

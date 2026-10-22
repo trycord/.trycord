@@ -73,6 +73,29 @@ export function renderInvite(ctx) {
   const code = ctx.params.code;
   const host = el('div', { class: 'fold fold--tight' });
 
+  // The ways an invitation can be dead, in the words the reader needs. Each
+  // one is a real refusal the API answers with its own code - nothing here
+  // guesses. A failure that is not one of these (a network that dropped)
+  // keeps the form, because the invitation may be fine.
+  const ENDINGS = {
+    INVITE_INVALID: {
+      title: 'This invite is not right',
+      body: 'The link may have been copied with a piece missing. Check you have the whole link, or ask whoever sent it to send it again.',
+    },
+    INVITE_EXPIRED: {
+      title: 'This invite has expired',
+      body: 'Invitations here do not stay open forever. Ask whoever sent it for a fresh one.',
+    },
+    INVITE_REVOKED: {
+      title: 'This invite was pulled back',
+      body: 'The community took this invitation down. If they still want you in, they can send a new one.',
+    },
+    INVITE_EXHAUSTED: {
+      title: 'This invite has been used up',
+      body: 'It let a set number of people in, and that number has arrived. Ask for a new invitation.',
+    },
+  };
+
   const node = fold([
     head({
       kicker: 'Invitation',
@@ -81,6 +104,23 @@ export function renderInvite(ctx) {
     }),
     host,
   ]);
+  const titleEl = node.querySelector('.pagehead-title');
+  const ledeEl = node.querySelector('.pagehead-lede');
+
+  function showEnding(code) {
+    const ending = ENDINGS[code];
+    if (!ending) return;
+    titleEl.textContent = ending.title;
+    ledeEl.textContent = ending.body;
+    host.replaceChildren(card({
+      label: 'This invitation',
+      glyph: 'mail',
+      body: [
+        el('div', { class: 'actionline' },
+          el('a', { class: 'btn btn--default', href: path('/home') }, 'Back to Trycord')),
+      ],
+    }));
+  }
 
   function showJoin() {
     const button = el('button', { class: 'btn btn--primary btn--lg', type: 'button' }, 'Join community');
@@ -94,7 +134,11 @@ export function renderInvite(ctx) {
         toast('Joined.', { type: 'success' });
         if (server && server.id) navigate('/server/' + server.id);
         else navigate('/home');
-      } catch (error) { errorToast(error); button.disabled = false; }
+      } catch (error) {
+        if (ENDINGS[error && error.code]) { showEnding(error.code); return; }
+        errorToast(error);
+        button.disabled = false;
+      }
     });
     host.replaceChildren(card({
       label: 'This invite',
@@ -109,7 +153,11 @@ export function renderInvite(ctx) {
       if (p && (p.name || p.serverName || p.communityName)) {
         title.textContent = 'Join ' + (p.name || p.serverName || p.communityName) + '.';
       }
-    }).catch(() => {});
+    }).catch((error) => {
+      // A dead invitation says so now, in its own words, instead of waiting
+      // for the join button to be pressed and refused.
+      if (ENDINGS[error && error.code]) showEnding(error.code);
+    });
   }
 
   function load() {
