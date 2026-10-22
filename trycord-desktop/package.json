@@ -28,5 +28,15 @@
   },
   "dependencies": {
     "electron-updater": "^6.6.0"
+  },
+  "desktopName": "trycord-desktop",
+  "build": {
+    "appId": "dev.trycord.desktop",
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Network",
+      "icon": "../frontend/assets/trycord-assets/brand/trycord-logo.png",
+      "syncDesktopName": true
+    }
   }
 }
