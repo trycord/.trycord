@@ -15,7 +15,7 @@ import { installDomStub } from './helpers/dom-stub.js';
 
 installDomStub();
 
-const { PAGES, pageById, bind, rendererFor, renderPage } = await import('../packages/registry.js');
+const { PAGES, pageById, bind, rendererFor, renderPage, matchRoute } = await import('../packages/registry.js');
 const { RENDERERS: DESKTOP } = await import('../js/features/index.js');
 const { RENDERERS: MOBILE } = await import('../mobile/js/views/index.js');
 
@@ -83,4 +83,25 @@ test('the pages that were unbound are bound', () => {
     assert.equal(typeof DESKTOP[id], 'function', id + ' has no desktop renderer');
     assert.equal(typeof MOBILE[id], 'function', id + ' has no mobile renderer');
   }
+});
+
+test('the sections of the developer console answer to addresses of their own', () => {
+  // /developer opens the console; /developer/applications opens the same
+  // console on the applications section, so a link can name the place it
+  // means. The bare address is still the bare page: no name in it, no
+  // section forced by it.
+  const cases = [
+    ['/developer/keys', 'keys'],
+    ['/developer/applications', 'applications'],
+    ['/developer/documentation', 'documentation'],
+  ];
+  for (const [route, wanted] of cases) {
+    const match = matchRoute(route);
+    assert.ok(match, route + ' resolves to a page');
+    assert.equal(match.page.id, 'developer.' + wanted, route + ' is the ' + wanted + ' page');
+    assert.equal(typeof DESKTOP[match.page.id], 'function', route + ' has no desktop renderer');
+    assert.equal(typeof MOBILE[match.page.id], 'function', route + ' has no mobile renderer');
+  }
+  const bare = matchRoute('/developer');
+  assert.equal(bare.page.id, 'developer', 'the bare address is still the bare page');
 });

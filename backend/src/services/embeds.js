@@ -153,7 +153,12 @@ function absolute(raw, base) {
   const text = String(raw == null ? '' : raw).trim();
   if (!text) return null;
   try {
-    const u = new URL(text, base);
+    // An absent base is absent. Passing `null` straight on would send a
+    // nonsense base named "null" into the parser, and an input that is
+    // already absolute - which is what the callers that have no page to
+    // resolve against always give it - would be refused for the base's
+    // sake rather than its own.
+    const u = new URL(text, base || undefined);
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
     return u.toString();
   } catch { return null; }

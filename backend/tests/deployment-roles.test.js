@@ -144,19 +144,38 @@ test('the backend role serves the API and no documents', async (t) => {
   const healthBody = await apiHealth.json();
   assert.equal(healthBody.db, 'ok', 'the database still answers on the API server');
 
-  // The origin root is not a document any more. It must not come back as
-  // the app shell, and it must not come back as an HTML page at all: an
-  // HTML answer from an API-only origin is a lie about what lives there.
-  const root = await fetch(instance.baseUrl + '/');
-  assert.equal(root.status, 404);
-  assert.ok(!String(await root.text()).includes('<html'),
-    'the root of an API-only instance answered with an HTML document');
+  // The origin root is not a document any more — and it is not a dead JSON
+  // wall either. A browser that lands here gets an honest maintenance page:
+  // it says what this origin is, that the client lives elsewhere in a split
+  // deployment, and where the server's real state can be read. The status is
+  // 503 because "nothing behind this path" is a service answer, and a proxy
+  // in front of this origin can then answer a reader with something true
+  // instead of a bare 502 while it waits for the frontend to come up.
+  const root = await fetch(instance.baseUrl + '/', {
+    headers: { accept: 'text/html' },
+  });
+  assert.equal(root.status, 503);
+  const rootText = String(await root.text());
+  assert.ok(rootText.includes('<html'), 'the root answers a browser with a page');
+  assert.match(rootText, /api/i, 'the page says what this origin is');
+  assert.match(rootText, /start:frontend/, 'the page explains where the client lives');
+  assert.equal(root.headers.get('retry-after'), '60',
+    'the page tells a caller when it may be worth looking again');
 
-  // Application routes are documents too. The app's own route must not be
-  // served here, whatever a deep link into it hoped for.
-  const app = await fetch(instance.baseUrl + '/home');
-  assert.equal(app.status, 404);
-  assert.ok(!String(await app.text()).includes('<html'), '/home was served as a document');
+  // Application routes answer the same way: same page, same status.
+  const app = await fetch(instance.baseUrl + '/home', {
+    headers: { accept: 'text/html' },
+  });
+  assert.equal(app.status, 503);
+  assert.ok(String(await app.text()).includes('<html'), '/home answers a browser with the same page');
+
+  // A caller that asked for JSON is not a browser. It keeps the envelope all
+  // the API paths use - the page is for the reader who followed a link, not
+  // for a client that parsed an address.
+  const jsonCaller = await fetch(instance.baseUrl + '/');
+  assert.equal(jsonCaller.status, 404);
+  const callerBody = await jsonCaller.json();
+  assert.equal(callerBody.error.code, 'NOT_FOUND');
 
   // Unmatched API paths keep their envelope, unchanged.
   const missing = await fetch(instance.baseUrl + '/api/no-such-route');

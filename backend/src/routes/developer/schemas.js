@@ -181,9 +181,40 @@ const health = {
   properties: {
     state: { type: 'string', enum: ['configured', 'active', 'failing', 'revoked', 'disabled'] },
     usage: { type: ['object', 'null'], additionalProperties: true },
+    routes: {
+      type: 'array',
+      description: 'What the recent window was spent on, busiest first. '
+        + 'Only routes that were actually used appear.',
+      items: {
+        type: 'object',
+        required: ['route', 'requests'],
+        properties: {
+          route: { type: 'string' },
+          requests: { type: 'integer' },
+          succeeded: { type: 'integer' },
+          clientErrors: { type: 'integer' },
+          serverErrors: { type: 'integer' },
+        },
+      },
+    },
     lastFailure: { type: ['object', 'null'], additionalProperties: true },
     lastUsedAt: { type: ['string', 'null'], format: 'date-time' },
     rateLimitPerMinute: { type: ['integer', 'null'] },
+  },
+};
+
+// The member account an application posts as. The username is what the rest
+// of Trycord shows wherever the bot appears, so it is part of the answer
+// wherever the application itself is.
+const botAccount = {
+  type: 'object',
+  description: 'The member account an application posts as.',
+  required: ['id', 'username', 'isBot'],
+  properties: {
+    id: { type: 'string' },
+    username: { type: 'string' },
+    displayName: { type: 'string' },
+    isBot: { type: 'boolean' },
   },
 };
 
@@ -262,6 +293,7 @@ module.exports = {
   Credential: credential,
   Application: application,
   Command: command,
+  BotAccount: botAccount,
   Webhook: webhook,
   Subscription: subscription,
   Delivery: delivery,

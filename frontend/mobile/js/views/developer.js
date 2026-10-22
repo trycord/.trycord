@@ -11,7 +11,7 @@
 
 import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
-import { publicPath } from '../../../packages/nav.js';
+import { publicPath, replaceAddress } from '../../../packages/nav.js';
 import { State, refreshServers } from '../../../packages/store.js';
 import { request } from '../../../packages/api.js';
 import { empty, failure, loading } from '../components.js';
@@ -631,6 +631,8 @@ function applicationHealthSheet(serverId, application) {
   body.appendChild(loading('Reading the state'));
   applicationHealth(serverId, application.id).then((report) => {
     const answer = report || {};
+    const usage = answer.usage || null;
+    const routes = (answer.routes || []).filter((route) => Number(route.requests) > 0);
     clear(body);
     body.appendChild(el('div', { class: 'm-stat-row' },
       el('div', { class: 'm-stat' },
@@ -642,6 +644,33 @@ function applicationHealthSheet(serverId, application) {
       el('div', { class: 'm-stat' },
         el('div', { class: 'm-stat__value' }, answer.lastUsedAt ? String(answer.lastUsedAt) : 'never'),
         el('div', { class: 'm-stat__label' }, 'Last used'))));
+    if (usage) {
+      body.appendChild(el('div', { class: 'm-stat-row' },
+        el('div', { class: 'm-stat' },
+          el('div', { class: 'm-stat__value' }, String(usage.requests || 0)),
+          el('div', { class: 'm-stat__label' }, 'Calls, last hour')),
+        el('div', { class: 'm-stat' },
+          el('div', { class: 'm-stat__value' }, String(usage.succeeded || 0)),
+          el('div', { class: 'm-stat__label' }, 'Answered')),
+        el('div', { class: 'm-stat' },
+          el('div', { class: 'm-stat__value' },
+            String((usage.clientErrors || 0) + (usage.serverErrors || 0))),
+          el('div', { class: 'm-stat__label' }, 'Refused'))));
+    }
+    if (routes.length) {
+      // One line is one kind of ask, with what became of the calls it took.
+      body.appendChild(el('div', { class: 'm-list' }, routes.map((route) => {
+        const refused = (route.clientErrors || 0) + (route.serverErrors || 0);
+        return el('div', { class: 'm-row' },
+          el('div', { class: 'm-row__body' },
+            el('div', { class: 'm-row__title' }, route.route),
+            el('div', { class: 'm-row__sub' },
+              String(route.requests) + ' calls · ' + String(route.succeeded || 0) + ' fine'
+                + (refused ? ' · ' + String(refused) + ' refused' : ''))));
+      })));
+    } else {
+      body.appendChild(el('p', { class: 'm-lede' }, 'It has not asked for anything recently.'));
+    }
     if (answer.lastFailure) {
       body.appendChild(notice({
         tone: 'warning',
@@ -722,6 +751,31 @@ function applicationSheet(serverId, application, onDone) {
     text: 'An application posts as itself. It has no login, no session and no password - its token '
       + 'is its credential, and the scopes on that credential say what it may do.',
   }));
+
+  // Who it is: the id that outlives every rename, and the member of the
+  // community it speaks for. The id is already in the list; the account is
+  // read from the one application, and its row is updated when the answer
+  // comes back.
+  const memberNote = el('span', { class: 'm-row__sub' }, 'Reading it…');
+  body.appendChild(el('p', { class: 'm-eyebrow' }, 'What it is'));
+  body.appendChild(el('div', { class: 'm-list' },
+    el('div', { class: 'm-row' },
+      el('span', { class: 'm-row__body' },
+        el('span', { class: 'm-row__title' }, application.id),
+        el('span', { class: 'm-row__sub' },
+          'The id that stays the same when the application is renamed or given a new token.'))),
+    el('div', { class: 'm-row' },
+      el('span', { class: 'm-row__body' },
+        el('span', { class: 'm-row__title' }, 'It posts as'),
+        memberNote))));
+  readApplication(serverId, application.id).then((fresh) => {
+    const account = fresh && fresh.account;
+    memberNote.textContent = account && account.username
+      ? '@' + account.username + ' — the member account this application speaks for.'
+      : 'The member account this application speaks for.';
+  }).catch(() => {
+    memberNote.textContent = 'Its member account could not be read just now.';
+  });
 
   const list = el('div', { class: 'm-list' });
   for (const scope of scopes) {
@@ -835,6 +889,8 @@ async function applicationsSection(host, reload) {
   });
   pickerControl.value = communities[0].id;
   const list = el('div', { class: 'm-list' });
+  // The one-line account of what this community has, read from the list itself.
+  const summary = el('p', { class: 'm-lede' }, '');
 
   async function paint() {
     clear(list);
@@ -842,9 +898,16 @@ async function applicationsSection(host, reload) {
     try {
       const answer = await readApplications(pickerControl.value);
       const applications = (answer && answer.applications) || [];
+      const active = applications.filter((application) => application.status === 'active').length;
+      const off = applications.length - active;
+      summary.textContent = applications.length
+        ? String(applications.length) + ' application' + (applications.length === 1 ? '' : 's')
+          + ' · ' + String(active) + ' active'
+          + (off ? ' · ' + String(off) + ' switched off' : '')
+        : 'It has no applications yet.';
       clear(list);
       if (!applications.length) {
-        list.appendChild(el('p', { class: 'm-lede' }, 'It has no applications yet.'));
+        // The summary line says there is nothing here; the list stays empty.
         return;
       }
       for (const application of applications) {
@@ -870,6 +933,7 @@ async function applicationsSection(host, reload) {
   clear(host);
   host.appendChild(section('The applications of this community', el('div', { class: 'm-stack' },
     field({ label: 'The community', control: pickerControl }),
+    summary,
     list), {
     action: el('button', {
       class: 'm-btn m-btn--sm m-btn--primary', type: 'button',
@@ -928,6 +992,8 @@ function documentationSection(host) {
       publicPath('/developers'), false),
     linkRow('The API reference', 'Every route and every scope, as a document.',
       publicPath('/api/v1/openapi.json'), false),
+    linkRow('The event vocabulary', 'Every event an application may be told about, by name and shape.',
+      '/api/v1/events', false),
     linkRow('The SDK: trycord-botjs', 'The client library, with its types and examples.',
       'https://github.com/trycord/.trycord/tree/main/sdk/trycord-botjs', true),
     linkRow('Running your own instance', 'Install it, put it behind a proxy, back it up.',
@@ -938,6 +1004,13 @@ function documentationSection(host) {
     title: 'Read before you build',
     text: 'The guide walks through making an application, keeping its token and posting a first '
       + 'message. The reference lists every route this instance serves.',
+  }));
+  host.appendChild(notice({
+    tone: 'info',
+    title: 'How an application is installed',
+    text: 'There is no install page to visit and no list to be admitted to. Creating the application '
+      + 'in the community is the installation: it names the bot, scopes its credential, and puts its '
+      + 'account in the community as an ordinary member. Whoever manages the community makes it.',
   }));
   host.appendChild(el('p', { class: 'm-lede' },
     'Create an application, keep the token it shows you once, and give these lines to it. '
@@ -960,10 +1033,15 @@ export function renderDeveloper(ctx) {
   const host = el('div', { class: 'm-stack' });
   const strip = el('div', { class: 'm-seg m-seg--scroll', role: 'tablist', 'aria-label': 'Developer console sections' });
 
-  // The section may be named in the address, so that a particular one can be
-  // linked to and a reader can come back to it.
+  // The section the reader asked for. The address may name it
+  // (/developer/applications), which is how a particular one can be linked
+  // to; the older ?section=… spelling says the same thing and still counts.
+  // An address that names neither opens on the keys.
+  const id = ctx && ctx.page ? String(ctx.page.id || '') : '';
+  const named = id && id !== 'developer' ? id : '';
   const asked = ctx && ctx.query ? String(ctx.query.get('section') || '') : '';
-  let current = SECTIONS.some((section) => section.id === asked) ? asked : 'keys';
+  const choice = [named, asked].find((value) => SECTIONS.some((section) => section.id === value));
+  let current = choice || 'keys';
 
   function paintStrip() {
     clear(strip);
@@ -973,7 +1051,13 @@ export function renderDeveloper(ctx) {
         type: 'button', role: 'tab',
         'aria-selected': section.id === current ? 'true' : 'false',
         'aria-label': 'Show the ' + section.label.toLowerCase() + ' section',
-        onClick: () => show(section.id),
+        // The switch is a tab switch, not a move between pages: the address
+        // follows so the copy of it carries the state, and the screen stays
+        // where it is.
+        onClick: () => {
+          replaceAddress('/developer/' + section.id);
+          show(section.id);
+        },
       }, section.label));
     }
   }

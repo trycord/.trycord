@@ -121,7 +121,11 @@ async function getApplication(req, res) {
   const app = await bots.getApp(req.params.applicationId, req.server.id);
   if (!app) return fail(res, 'NOT_FOUND', 'application not found');
   const credential = await developerBots.credentialOf(app.id);
-  res.json({ application: bots.appShape(app), credential: credentialShape(credential) });
+  // The account the application posts as is part of the answer, because the
+  // id alone does not tell a developer which member of the community is
+  // theirs; the username is what the rest of Trycord shows.
+  const account = await bots.botAccountOf(app);
+  res.json({ application: bots.appShape(app), credential: credentialShape(credential), account });
 }
 
 // Give an application its developer credential, or change the scopes it has.
@@ -575,10 +579,14 @@ const definitions = [
       pathParam('applicationId', 'The application id.'),
     ],
     responses: {
-      200: ok('The application.', {
+      200: ok('The application, the credential it is under, and the account it posts as.', {
         type: 'object',
         required: ['application'],
-        properties: { application: ref('Application'), credential: ref('Credential') },
+        properties: {
+          application: ref('Application'),
+          credential: ref('Credential'),
+          account: ref('BotAccount'),
+        },
       }),
       401: ERRORS.unauthenticated,
       403: ERRORS.forbidden,
