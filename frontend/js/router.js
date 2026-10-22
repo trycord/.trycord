@@ -7,7 +7,8 @@
 // has somewhere to unsubscribe.
 
 import { matchRoute, renderPage } from '../packages/registry.js';
-import { currentRoute, currentQuery, navigate } from '../packages/nav.js';
+import { currentRoute, currentQuery, navigate, path } from '../packages/nav.js';
+import { el } from '../packages/dom.js';
 import {
   State, serverById, channelById, refreshServer, refreshServers, refreshServerTree,
   signedIn,
@@ -16,7 +17,7 @@ import {
   shellRoot, setStage, setStageHead, setComposer, setInspector, setContextPage,
   setTitle, refreshChrome,
 } from './shell.js';
-import { fault } from './ui/page.js';
+import { fault, blank } from './ui/page.js';
 import { renderNotFound } from './features/documents.js';
 
 let activeCleanup = null;
@@ -80,10 +81,57 @@ function paintNotFound(route) {
 // A fault is never allowed to blank the place column: the reader is still
 // somewhere, and the spine still has to say where. The column is repainted from
 // the page that was being opened, falling back to the reader's own scope.
+// A route-level failure, answered in the shape of what went wrong rather than
+// one fault for every cause. The shapes are the API's own distinctions - no
+// guessing at a cause the server did not name:
+//
+//   - no connection is not a fault at all: the page is fine, the wire is not,
+//   - a session that ended mid-flight asks for a sign-in, not a retry,
+//   - a 403 is a refusal the reader can sometimes fix by leaving (never by
+//     retrying the same address),
+//   - a server error is the one case where trying again is the honest move.
+function errorState(error, retry) {
+  const status = error && error.status;
+  const code = error && error.code;
+  if (code === 'NETWORK') {
+    return blank({
+      glyph: 'wifi-off',
+      title: 'No connection',
+      text: 'Trycord cannot reach the instance right now. Check your connection and try again.',
+      action: el('button', { class: 'btn btn--default btn--sm', type: 'button', onClick: retry }, 'Try again'),
+    });
+  }
+  if (status === 401) {
+    return blank({
+      glyph: 'shield-alert',
+      title: 'Your session has ended',
+      text: 'The instance asked you to sign in again. Nothing was changed; sign in to continue.',
+      action: el('a', { class: 'btn btn--default btn--sm', href: path('/login') }, 'Sign in'),
+    });
+  }
+  if (status === 403) {
+    return blank({
+      glyph: 'shield',
+      title: 'This page is closed to you',
+      text: (error && error.message) || 'The instance refused this page for your account.',
+      action: el('a', { class: 'btn btn--default btn--sm', href: path('/home') }, 'Back to your places'),
+    });
+  }
+  if (status >= 500) {
+    return blank({
+      glyph: 'alert',
+      title: 'This page broke on the server',
+      text: 'The instance answered with an error rather than the page. It may be mid-restart; try again in a moment.',
+      action: el('button', { class: 'btn btn--default btn--sm', type: 'button', onClick: retry }, 'Try again'),
+    });
+  }
+  return fault(error, retry);
+}
+
 function paintError(route, error, ctx, page) {
   clearRaw();
   setContextPage(page && page.sidebar ? page.sidebar : 'home', ctx, page);
-  const box = fault(error, () => run());
+  const box = errorState(error, () => run());
   box.setAttribute('data-fault-origin', 'router');
   setStageHead();
   setStage(box);
