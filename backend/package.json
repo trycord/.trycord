@@ -21,6 +21,7 @@
   "author": "Trycord",
   "scripts": {
     "start": "node src/server.js",
+    "start:frontend": "node src/serve-frontend.js",
     "status-monitor": "node src/status-monitor/index.js",
     "turn": "node src/services/turn.js",
     "db:backup": "node scripts/db-backup.js",

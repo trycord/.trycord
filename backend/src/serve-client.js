@@ -81,6 +81,76 @@ function candidatePaths(serverDir, asked) {
   return out;
 }
 
+// Where a request arrived from, as a bare origin (scheme + host + port), or
+// null when it did not arrive over http(s) from a well-formed host. The
+// client and the site both repoint their backend.json at this, so it is
+// shared rather than owned by the entry that happened to define it first.
+//
+// Behind a proxy the host header is the one the browser used, which is the
+// one we want: it is the origin the client is really talking to.
+//
+// req.protocol already honours X-Forwarded-Proto when - and only when -
+// Express is told to trust the proxy (TRUST_PROXY=1, loopback only). Reading
+// the header directly here skipped that gate, so a plain http caller could
+// send X-Forwarded-Proto: https and have backend.json hand the client an
+// https origin.
+function originOf(req) {
+  const host = req.headers && req.headers.host;
+  if (!host || !/^[^\s/]+$/.test(String(host))) return null;
+  const proto = req.protocol === 'https' ? 'https' : 'http';
+  return proto + '://' + host;
+}
+
+/**
+ * Reduce a configured API location to the origin the client should talk to.
+ *
+ * Returns '' when the value is not a usable http(s) URL, so a typo does not
+ * become a pinned value the client will believe.
+ */
+function apiOriginOnly(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    if (!/^https?:$/.test(u.protocol)) return '';
+    return u.origin;
+  } catch {
+    return '';
+  }
+}
+
+// The API origin a deployment names explicitly, reduced to a bare origin or
+// '' when it names nothing usable.
+//
+// Three channels tell the browser where its API lives: the site's pages
+// (meta tag and backend.json), the client's backend.json, and
+// /runtime-config.js. All three were meant to follow the same precedence -
+// an explicitly configured address wins over the serving origin - and the
+// site carried it while the client's copy did not, so a deployment that
+// named its API and served no public website had a client that talked to
+// the server it came from instead. One helper, three callers, one rule.
+function configuredApiBase() {
+  return apiOriginOnly(process.env.TRYCORD_API_URL || process.env.API_URL || '');
+}
+
+// The one envelope /runtime-config.js is served in, on either server. Only
+// safe public keys ever reach it: API origins and an instance label, never
+// paths or secrets.
+//
+// The values are passed in rather than read here, because the two servers
+// legitimately resolve them differently: the API server falls back to its
+// own public address, the frontend server has validated that an API address
+// exists and passes only what it validated. The format is the shared part,
+// not the bindings.
+function runtimeConfigRoute(cfg) {
+  return (req, res) => {
+    res.type('application/javascript').set('Cache-Control', 'no-store').send(
+      'window.TRYCORD_CONFIG = Object.assign(window.TRYCORD_CONFIG || {}, ' +
+      JSON.stringify(cfg) + ');'
+    );
+  };
+}
+
 // Serves the Mobile module's own entry document, with its base rewritten to wherever
 // that module is mounted.
 //
@@ -154,6 +224,16 @@ function mountClient(app, opts) {
     // api.trycord.dev while sitting on their own API. Repointing the file here makes
     // the rule one line: a client served by a backend talks to that backend. It holds
     // for the official deployment too, with no domain written into the client.
+    //
+    // There is one case where "that backend" is not the serving origin: the split
+    // deployment. The frontend server serves the client and has no API at all -
+    // following the rule literally would hand every browser its own address as the
+    // API, and every request it made would come back to a server that cannot answer
+    // it. A deployment that names its API explicitly (TRYCORD_API_URL, or the older
+    // API_URL) knows better, and its address wins - the same precedence the public
+    // site's copy already followed, so one rule now covers both files. The serving
+    // origin keeps meaning the API whenever nothing is named, which is the unified
+    // case, end to end and unchanged.
     const sendBackendJson = (relative) => (req, res, next) => {
       fs.readFile(path.join(candidate, relative), 'utf8', (err, raw) => {
         if (err) return next();
@@ -164,12 +244,25 @@ function mountClient(app, opts) {
         // Compare against what the file said before overwriting it, so the test below
         // is "is this the instance these backups belong to".
         const wasPinned = cspOriginOf(json.backendUrl);
-        json.backendUrl = self;
-        // Backup origins are spare capacity for the instance they were built for. When
-        // we are that instance, keeping them is failover worth having. When we are
-        // somebody else's - a self-hoster running this repository - they would quietly
-        // walk the client onto the official network, so they go.
-        if (wasPinned !== self) delete json.fallbackUrls;
+        const named = configuredApiBase();
+        const fallback = apiOriginOnly(process.env.API_BACKUP_URL);
+        if (named) {
+          json.backendUrl = named;
+          // A deployment that names a failover origin is telling the client where to
+          // fail over, and the channel that already carried backups (runtime-config)
+          // says the same thing. Without the name, the shipped backups are somebody
+          // else's: they would quietly walk a split client onto the official network,
+          // so they go - same as always.
+          if (fallback) json.fallbackUrls = [fallback];
+          else delete json.fallbackUrls;
+        } else {
+          json.backendUrl = self;
+          // Backup origins are spare capacity for the instance they were built for.
+          // When we are that instance, keeping them is failover worth having. When we
+          // are somebody else's - a self-hoster running this repository - they would
+          // quietly walk the client onto the official network, so they go.
+          if (wasPinned !== self) delete json.fallbackUrls;
+        }
         res.set('Cache-Control', 'no-store')
           .type('json')
           .send(JSON.stringify(json, null, 2) + '\n');
@@ -261,13 +354,8 @@ function mountPublicSite(app, opts) {
   // ignored rather than obeyed, so a typo in a setting cannot become an
   // address the site's pages start asking.
   const apiBaseFor = (req) => {
-    const configured = String(process.env.TRYCORD_API_URL || process.env.API_URL || '').trim();
-    if (configured) {
-      try {
-        const u = new URL(configured);
-        if (u.protocol === 'http:' || u.protocol === 'https:') return u.origin;
-      } catch { /* not an address; fall through to the serving origin */ }
-    }
+    const named = configuredApiBase();
+    if (named) return named;
     return siteOrigin(req) || '';
   };
 
@@ -596,4 +684,12 @@ function mountSpaFallback(app, opts) {
   }
 }
 
-module.exports = { mountClient, mountPublicSite, mountSpaFallback };
+module.exports = {
+  mountClient,
+  mountPublicSite,
+  mountSpaFallback,
+  originOf,
+  apiOriginOnly,
+  configuredApiBase,
+  runtimeConfigRoute,
+};
