@@ -23,8 +23,8 @@ function statusWord(status) {
     RESOLVED: 'Resolved',
     DISMISSED: 'Dismissed',
     UNDER_REVIEW: 'Under review',
-    UPHELD: 'Upheld',
-    REJECTED: 'Rejected',
+    APPROVED: 'Approved',
+    DENIED: 'Denied',
   };
   return words[status] || String(status || '').replace(/_/g, ' ');
 }
@@ -510,17 +510,8 @@ export function adminReports() {
   };
 }
 
-// The actions on one appeal and one data request. The row's buttons and its
-// context menu offer the same things, so they are written once.
-async function decideAppeal(appeal, decision, refresh) {
-  try {
-    await Api.adminDecideAppeal(appeal.id, decision, decision === 'approve'
-      ? 'Approved by an administrator' : 'Denied by an administrator');
-    toast(decision === 'approve' ? 'Approved' : 'Denied');
-    refresh();
-  } catch (e) { errorToast(e); }
-}
-
+// The actions on one data request. The row's buttons and its context menu
+// offer the same things, so they are written once.
 async function reviewRequest(request, decision, refresh) {
   try {
     await Api.adminReviewGdprRequest(request.id, decision, decision === 'approve'
@@ -532,38 +523,137 @@ async function reviewRequest(request, decision, refresh) {
 
 // -- appeals -----------------------------------------------------------------
 
+// -- appeals: the queue and the review ------------------------------------------------
+
+const APPEAL_FILTERS = [
+  ['', 'All'],
+  ['OPEN', 'Open'],
+  ['UNDER_REVIEW', 'Under review'],
+  ['APPROVED', 'Approved'],
+  ['DENIED', 'Denied'],
+];
+
 export function adminAppeals() {
   const list = el('div', { class: 'rowlist' });
+  const chips = el('div', { class: 'filterchips', role: 'group', 'aria-label': 'Filter appeals by status' });
+  let status = '';
+  let selected = null;
+
+  const paintChips = () => {
+    chips.replaceChildren(...APPEAL_FILTERS.map(([value, label]) => el('button', {
+      class: 'chip' + (status === value ? ' chip--on' : ''), type: 'button',
+      'aria-pressed': String(status === value),
+      onClick: () => { status = value; paintChips(); paint(); },
+    }, label)));
+  };
+  paintChips();
 
   const paint = async () => {
     list.replaceChildren(hold('Reading the appeals'));
     try {
-      const rows = await Api.adminAppeals({ limit: '50' });
+      const rows = await Api.adminAppeals(Object.assign({ limit: '100' }, status ? { status } : {}));
       const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
-      list.replaceChildren(...(items.length ? items.map((a) => row({
+      list.replaceChildren(...(items.length ? items.map((appeal) => row({
         lead: el('span', { class: 'role-dot' }, icon('mail', { size: 15 })),
-        title: a.username || 'An appeal',
-        sub: a.reason || '',
-        side: el('span', { class: 'rowtools' },
-          el('button', {
-            class: 'btn btn--primary btn--sm', type: 'button',
-            onClick: () => decideAppeal(a, 'approve', paint),
-          }, 'Approve'),
-          el('button', {
-            class: 'btn btn--ghost btn--sm', type: 'button',
-            onClick: () => decideAppeal(a, 'deny', paint),
-          }, 'Deny')),
-        menu: () => [
-          { label: 'Approve the appeal', icon: 'check', onSelect: () => decideAppeal(a, 'approve', paint) },
-          { label: 'Deny the appeal', icon: 'x', danger: true, onSelect: () => decideAppeal(a, 'deny', paint) },
-        ],
+        title: appeal.user_name || 'An appeal',
+        sub: String(appeal.action_type || 'An enforcement').replace(/_/g, ' ')
+          + ' · ' + statusWord(appeal.status),
+        side: el('span', { class: 'chip chip--quiet' }, statusWord(appeal.status)),
+        onClick: () => {
+          selected = appeal;
+          setInspector(SPEC);
+        },
       })) : [blank({
-        glyph: 'mail', title: 'No appeals',
-        text: 'Requests to reconsider an enforcement land here.',
+        glyph: 'mail',
+        title: status ? 'Nothing in this state' : 'No appeals',
+        text: status
+          ? 'No appeal is in this state. The other filters have the rest.'
+          : 'A request to reconsider an enforcement lands here.',
       })]));
     } catch (e) {
       list.replaceChildren(fold([fault(e, paint)]));
     }
+  };
+
+  // The review: the person's own words, the enforcement they are appealing,
+  // and the decision. The decision is the server's vocabulary - APPROVED or
+  // DENIED - and it is recorded with the reviewer and the audit entry. An
+  // approval lifts the original enforcement on the server's side.
+  const casePanel = () => {
+    const body = el('div', { class: 'fold fold--tight' });
+
+    const paintCase = async () => {
+      if (!selected) {
+        body.replaceChildren(blank({
+          glyph: 'mail',
+          title: 'Pick an appeal',
+          text: 'The review opens here when you choose one from the list.',
+        }));
+        return;
+      }
+      body.replaceChildren(hold('Opening the review'));
+      try {
+        const appeal = await Api.adminAppeal(selected.id);
+        const decided = String(appeal.status || '').toUpperCase() === 'APPROVED'
+          || String(appeal.status || '').toUpperCase() === 'DENIED';
+
+        const decide = async (decision) => {
+          const approving = decision === 'APPROVED';
+          const yes = await confirmDialog({
+            title: approving ? 'Approve the appeal?' : 'Deny the appeal?',
+            body: approving
+              ? 'The original enforcement is lifted, and the decision is recorded with your name and this review.'
+              : 'The enforcement stays, and the decision is recorded with your name and this review.',
+            confirmLabel: approving ? 'Approve and lift' : 'Deny the appeal',
+            danger: true,
+          });
+          if (!yes) return;
+          try {
+            await Api.adminDecideAppeal(appeal.id, decision);
+            toast(approving ? 'The appeal is approved and the enforcement lifted.' : 'The appeal is denied.');
+            await paintCase();
+            await paint();
+          } catch (e) { errorToast(e); }
+        };
+
+        body.replaceChildren(
+          facts([
+            { value: statusWord(appeal.status), label: 'Status' },
+            { value: appeal.decision ? statusWord(appeal.decision) : '—', label: 'Decision' },
+          ]),
+          card({
+            label: 'What the person wrote', glyph: 'mail',
+            body: el('p', { class: 'lede' }, appeal.reason || 'No statement was given.'),
+          }),
+          card({
+            label: 'The enforcement being appealed', glyph: 'shield-alert',
+            body: el('p', { class: 'lede' },
+              String(selected.action_type || 'An enforcement').replace(/_/g, ' ')
+              + (selected.action_reason ? ' — ' + selected.action_reason : '')),
+          }),
+          decided ? card({
+            label: 'The decision', glyph: 'shield-check',
+            body: el('p', { class: 'lede' },
+              'Decided: ' + statusWord(appeal.decision) + '. The record and the audit entry stand.'),
+          }) : card({
+            label: 'The decision', glyph: 'shield',
+            body: el('div', { class: 'actionline' },
+              el('button', { class: 'btn btn--primary btn--sm', type: 'button', onClick: () => decide('APPROVED') }, 'Approve and lift'),
+              el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onClick: () => decide('DENIED') }, 'Deny')),
+          }),
+        );
+      } catch (e) {
+        body.replaceChildren(fold([fault(e, paintCase)]));
+      }
+    };
+
+    paintCase();
+    return body;
+  };
+
+  const SPEC = {
+    kind: 'admin-appeals',
+    tabs: [{ id: 'review', label: 'Review', icon: 'mail', render: () => casePanel() }],
   };
 
   return {
@@ -571,12 +661,16 @@ export function adminAppeals() {
       head({
         kicker: 'Moderation',
         title: 'Appeals',
-        lede: 'Requests to reconsider an enforcement.',
+        lede: 'Requests to reconsider an enforcement. Pick one to open its review.',
       }),
+      chips,
       card({ label: 'Appeals', glyph: 'mail', body: list, flush: true }),
     ]),
-    onMount: paint,
-    cleanup() {},
+    onMount: () => {
+      setInspector(SPEC);
+      paint();
+    },
+    cleanup() { setInspector(null); },
   };
 }
 

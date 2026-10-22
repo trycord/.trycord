@@ -579,6 +579,7 @@ const Api = {
   adminReport: (id) => request('GET', '/api/admin/reports/' + encodeURIComponent(id)),
   adminUpdateReport: (id, body) => request('PATCH', '/api/admin/reports/' + encodeURIComponent(id), { body }),
   adminAppeals: (opts) => request('GET', '/api/admin/appeals?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
+  adminAppeal: (id) => request('GET', '/api/admin/appeals/' + encodeURIComponent(id)),
   adminDecideAppeal: (id, decision, reason) => request('PATCH', '/api/admin/appeals/' + encodeURIComponent(id), { body: { decision, reason } }),
   adminAudit: (opts) => request('GET', '/api/admin/audit?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
   adminGdprRequests: (opts) => request('GET', '/api/admin/gdpr/requests?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
