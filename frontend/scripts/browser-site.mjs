@@ -64,6 +64,17 @@ function stagePages() {
   return SCRATCH;
 }
 
+// Whether the page has finished loading.
+async function settled(page) {
+  for (let i = 0; i < 50; i++) {
+    const ready = await page.evaluate('return document.readyState === "complete";')
+      .catch(() => false);
+    if (ready) { await wait(120); return true; }
+    await wait(100);
+  }
+  return false;
+}
+
 function arg(name, fallback) {
   const at = process.argv.indexOf('--' + name);
   if (at === -1) return fallback;
@@ -197,7 +208,10 @@ try {
       process.stdout.write('      ' + name + '...');
 
       await run.page.send('Page.navigate', { url: 'file://' + file });
-      await wait(350);
+      // Wait for the page to finish rather than for a fixed time. A slow
+      // load used to be measured half-loaded, and the check then blamed the
+      // page for a fault that was the check's own timing.
+      await settled(run.page);
 
       const faults = [];
       try {
@@ -282,7 +296,7 @@ try {
       const faults = [];
       try {
         await run.page.send('Page.navigate', { url: 'file://' + file });
-        await wait(300);
+        await settled(run.page);
         // The theme is set by a script in the head, so it is set the way a
         // reader sets it: through the page's own switch.
         await run.page.evaluate(`
