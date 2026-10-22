@@ -1,18 +1,21 @@
 /* ==========================================================================
    Trycord public website.
 
-   This file owns the public site's composition and nothing else. Every colour,
-   type size, space, radius, shadow, duration and easing comes from the canonical
-   design tokens in css/design-tokens.css, generated from the asset library the
-   application is built from. No value is declared here that the library owns.
+   The composition is built from one idea, the ember plane: charcoal surfaces
+   with a thin seam of flame light where two of them meet. The brand's own login
+   artwork is that idea at full strength, so the home page uses it. The rest of
+   the site carries the seam instead.
 
-   The composition is a numbered plate system, not the application's three
-   columns and a rail. The marketing pages read like a field guide: a masthead
-   carries a constant ember rule, every section is addressed by an index number
-   in its own gutter, prose runs down a single reading column beside a generated
-   contents list, and the home page leads with a ruled fact strip rather than a
-   grid of icon cards. The palette, type scale and motion are the product's; the
-   page structure is this site's own.
+   Orange is a signal, not a background. It marks the one action on a screen,
+   the word a headline turns on, the seam under the masthead and above the
+   footer, the edge of a code block, and the page a reader is on. Surfaces carry
+   everything else. A card is a solid plane with a hairline edge. Glass is kept
+   for what floats over the page: the masthead, its menus, the product window,
+   and the paired panels.
+
+   Every colour, type size, space, radius, shadow, duration and easing comes from
+   css/design-tokens.css, which is generated from the asset library. This file
+   declares the composition and nothing the library owns.
 
    Load order: design-tokens.css, then this file.
    ========================================================================== */
@@ -50,24 +53,36 @@
 :root {
   color-scheme: dark;
 
-  /* Composition, which is this site's own business: how wide the page reads, how
-     tall the header is, the width of the plate index gutter, and the display
-     sizes the marketing pages need. These are not in the library because they
-     are not the product's. */
+  /* Composition: how wide the page reads, how tall the masthead is, and the
+     display sizes the marketing pages need. These belong to this site, not to
+     the library. */
   --header-h: 68px;
-  --content-w: 1160px;
-  --prose-w: 74ch;
+  --content-w: 1180px;
+  --prose-w: 70ch;
 
-  --display-xl: clamp(2.4rem, 4.6vw, 3.5rem);
-  --display-lg: clamp(2.05rem, 3.6vw, 2.9rem);
-  --display-md: clamp(1.55rem, 2.8vw, 2.15rem);
-  --display-sm: clamp(1.2rem, 2vw, 1.5rem);
+  --display-2xl: clamp(2.6rem, 6vw, 4.5rem);
+  --display-xl: clamp(2.2rem, 4.4vw, 3.4rem);
+  --display-lg: clamp(2rem, 3.4vw, 2.7rem);
+  --display-md: clamp(1.5rem, 2.6vw, 2rem);
+  --display-sm: clamp(1.2rem, 1.9vw, 1.45rem);
 
-  --glow-a: color-mix(in srgb, var(--color-accent) 16%, transparent);
-  --glow-b: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  /* The page's rhythm. The library owns the scale a component is built from;
+     how much air a section carries is this site's own decision, so the size of
+     that air is declared here rather than taken from a token that does not
+     exist. */
+  --section-pad: clamp(var(--space-9), 7vw, 6rem);
+  --page-pad: clamp(var(--space-9), 6vw, 5rem);
+  --block-pad: clamp(var(--space-8), 5vw, 4.5rem);
+
+  --glow-a: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  --glow-b: color-mix(in srgb, var(--color-accent) 8%, transparent);
   --tint: color-mix(in srgb, var(--color-accent) 10%, transparent);
   --tint-strong: color-mix(in srgb, var(--color-accent) 18%, transparent);
   --hairline: color-mix(in srgb, var(--color-border) 70%, transparent);
+  --seam: linear-gradient(90deg,
+    var(--color-accent) 0%,
+    color-mix(in srgb, var(--color-accent) 30%, transparent) 46%,
+    transparent 100%);
 
   --cutout: var(--color-background);
 }
@@ -93,7 +108,7 @@ body { margin: 0; }
 
 body {
   background:
-    radial-gradient(1100px 520px at 80% -8%, var(--glow-a), transparent 60%),
+    radial-gradient(900px 480px at 86% -10%, var(--glow-a), transparent 60%),
     var(--color-background);
   background-attachment: fixed;
   color: var(--color-text-primary);
@@ -118,7 +133,12 @@ select:focus-visible {
   border-radius: var(--radius-sm);
 }
 
-h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
+h1, h2, h3 {
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+p { text-wrap: pretty; }
 
 .display {
   font-weight: 800;
@@ -138,8 +158,9 @@ h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
 .center { text-align: center; }
 .meta { color: var(--color-text-muted); font-size: var(--text-xs); }
 .mt-5 { margin-top: var(--space-5); }
+.mono { font-family: var(--font-mono); font-size: 0.92em; overflow-wrap: anywhere; }
 .plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
-.plain-list a { color: var(--color-text); display: inline-block; padding-block: var(--space-1); }
+.plain-list a { color: var(--color-text-primary); display: inline-block; padding-block: var(--space-1); }
 .plain-list a:hover { color: var(--color-accent); }
 
 .sr-only {
@@ -200,6 +221,10 @@ h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
 }
 
 
+/* ==========================================================================
+   The masthead and its menus
+   ========================================================================== */
+
 .site-header {
   position: sticky;
   top: 0;
@@ -207,10 +232,23 @@ h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
   padding-top: env(safe-area-inset-top, 0px);
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
-  border-bottom: 1px solid var(--hairline);
-  background: color-mix(in srgb, var(--color-background) 92%, transparent);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--color-background) 80%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  box-shadow: inset 0 -1px 0 0 var(--hairline);
+}
+/* The seam under the masthead: the one place the signal runs the full width
+   of every page. */
+.site-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--seam);
+  opacity: 0.85;
+  pointer-events: none;
 }
 
 .masthead {
@@ -244,6 +282,7 @@ h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
 .nav-group { position: relative; }
 
 .nav-trigger {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -258,7 +297,22 @@ h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
   cursor: pointer;
   white-space: nowrap;
 }
+/* A menu that is open, or one being hovered, shows its place with the seam. */
+.nav-trigger::after {
+  content: "";
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: 0;
+  height: 2px;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
 .nav-trigger:hover { color: var(--color-text-primary); }
+.nav-trigger:hover::after,
+.nav-trigger[aria-expanded="true"]::after { transform: scaleX(1); }
 .nav-trigger .chevron { width: 14px; height: 14px; transition: transform var(--duration-fast) var(--ease-out); }
 .nav-trigger[aria-expanded="true"] { color: var(--color-text-primary); }
 .nav-trigger[aria-expanded="true"] .chevron { transform: rotate(180deg); }
@@ -266,15 +320,17 @@ h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
 .nav-menu {
   display: none;
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   left: 0;
   z-index: var(--z-popover);
   min-width: 240px;
   padding: var(--space-2);
-  background: var(--color-surface-elevated);
+  background: color-mix(in srgb, var(--color-surface-elevated) 84%, transparent);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-pop);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
 }
 .nav-trigger[aria-expanded="true"] + .nav-menu { display: block; }
 
@@ -313,8 +369,8 @@ h1, h2, h3 { letter-spacing: var(--tracking-tight); overflow-wrap: break-word; }
   flex: 0 0 auto;
 }
 
-/* The actions that only make sense on a narrow screen: the masthead keeps
-   one button there, and the rest live in the menu that opens under it. */
+/* The actions that only make sense on a narrow screen: the masthead keeps one
+   button there, and the rest live in the menu that opens under it. */
 .nav-mobile-actions { display: none; }
 
 @media (max-width: 700px) {
@@ -367,6 +423,10 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 .menu-toggle .icon { width: 20px; height: 20px; }
 
 
+/* ==========================================================================
+   Buttons and links
+   ========================================================================== */
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -408,79 +468,436 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   padding-block: var(--space-1);
   margin-block: calc(-1 * var(--space-1));
 }
+.text-link:hover { text-decoration: underline; text-underline-offset: 4px; }
 
 
+/* ==========================================================================
+   The home page: the hero
+   ========================================================================== */
+
+/* The brand's login artwork, mirrored so its ember planes stand on the right,
+   behind the product window. The artwork has its wordmark baked into it. It is
+   drawn at 230% of this box, and the box is 58% of the hero, so only its left
+   planes are in frame and the wordmark is not. A mask fades the edges into the
+   page. It is shown on wide screens only, because the image is a megabyte. */
 .hero {
   position: relative;
-  padding: clamp(var(--space-10), 7vw, var(--space-12)) 0 clamp(var(--space-10), 6vw, var(--space-12));
+  isolation: isolate;
   overflow: hidden;
+  padding: clamp(var(--space-9), 8vw, 6.5rem) 0 clamp(var(--space-9), 6vw, 5rem);
+  border-bottom: 1px solid var(--hairline);
 }
 .hero::before {
   content: "";
   position: absolute;
-  inset: -30% -10% auto -10%;
-  height: 120%;
-  background:
-    radial-gradient(720px 400px at 22% 0%, var(--glow-b), transparent 70%),
-    radial-gradient(620px 360px at 88% 24%, var(--tint), transparent 70%);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 58%;
+  z-index: -1;
+  background: url("/assets/trycord-assets/brand/trycord-login-bg.png") left center / 230% auto no-repeat;
+  transform: scaleX(-1);
+  opacity: 0.9;
+  -webkit-mask-image:
+    linear-gradient(to right, #000 52%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, #000 52%, transparent 100%),
+    linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  mask-composite: intersect;
   pointer-events: none;
 }
-.hero .wrap { position: relative; }
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(620px 340px at 74% 40%, var(--glow-a), transparent 70%),
+    radial-gradient(480px 280px at 6% 100%, var(--glow-b), transparent 70%);
+  pointer-events: none;
+}
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 1.08fr);
-  gap: clamp(var(--space-8), 5vw, var(--space-12));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: clamp(var(--space-8), 5vw, var(--space-11));
   align-items: center;
 }
 
 .hero h1 {
-  font-size: var(--display-xl);
-  line-height: 1.06;
+  font-size: var(--display-2xl);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
   margin: 0 0 var(--space-5);
-  max-width: 22ch;
+  max-width: 13ch;
 }
 .hero h1 em { font-style: normal; color: var(--color-accent); }
 .hero .lede {
   font-size: var(--text-lg);
   line-height: var(--leading-relaxed);
   color: var(--color-text-secondary);
-  max-width: 52ch;
+  max-width: 50ch;
   margin: 0 0 var(--space-6);
 }
-.hero .cta { margin-bottom: var(--space-6); }
+.hero .cta { margin-bottom: 0; }
 
-.hero-points {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.hero-stage { position: relative; min-width: 0; }
+@media (min-width: 1000px) {
+  /* The window is turned a few degrees into the page, the way a product shot
+     is held, and stays flat on a narrow screen where it has no room to turn. */
+  .hero-stage .app-window {
+    transform: perspective(1600px) rotateY(-9deg) rotateX(3deg);
+    transform-origin: 30% 50%;
+  }
+}
+
+/* The three facts sit on a hairline and start with a short ember tick, so they
+   read as a row of statements rather than three boxes. */
+.fact-strip {
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-6);
+  margin-top: clamp(var(--space-8), 6vw, var(--space-10));
+  border-top: 1px solid var(--hairline);
 }
-.hero-points li {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
+@media (max-width: 700px) {
+  .fact-strip { grid-template-columns: 1fr; gap: 0; }
+  .fact { padding-block: var(--space-4) !important; }
 }
-.hero-points li::before {
+.fact {
+  position: relative;
+  padding: var(--space-4) var(--space-4) 0 0;
+}
+.fact::before {
   content: "";
-  flex: 0 0 auto;
-  width: 6px; height: 6px;
-  margin-top: 0.45em;
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 32px;
+  height: 2px;
+  background: var(--color-accent);
+}
+.fact b {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+.fact span {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  max-width: 36ch;
+}
+
+
+/* ==========================================================================
+   Sections
+   ========================================================================== */
+
+main { counter-reset: section; }
+
+.section {
+  counter-increment: section;
+  position: relative;
+  padding: var(--section-pad) 0;
+  border-top: 1px solid var(--hairline);
+}
+.section:first-of-type { border-top: 0; }
+
+/* A plane is a full-width band of the deeper surface. It is used for the one
+   section that argues for the server, so the page changes register there and
+   comes back to the charcoal afterwards. */
+.section--plane {
+  background: var(--color-surface-sunken);
+  border-top: 0;
+}
+.section--plane::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--seam);
+}
+
+/* The head of a section: the number in the margin, the title beside it, and the
+   explanation on the right. The children are placed by hand rather than by
+   their order, so they sit where they belong whatever order the page was
+   written in. */
+.section-head {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1.15fr) minmax(0, 1fr);
+  column-gap: clamp(var(--space-4), 3vw, var(--space-7));
+  row-gap: var(--space-2);
+  align-items: end;
+  margin: 0 0 var(--space-8);
+}
+.section-head::before {
+  content: counter(section, decimal-leading-zero);
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: start;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+}
+.section-head .kicker { grid-column: 2; grid-row: 1; margin-bottom: 0; }
+.section-head h2 { grid-column: 2; grid-row: 2; font-size: var(--display-lg); line-height: 1.1; margin: 0; }
+.section-head > p:not(.kicker) {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: end;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+}
+/* A section with nothing to explain has no third column, so the title takes the
+   whole width. */
+.section-head:not(:has(> p:not(.kicker))) h2 { grid-column: 2 / -1; }
+
+/* A statement head puts a long sentence across the page, with its explanation
+   underneath it, rather than beside it. */
+.section-head--statement h2 {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  font-size: var(--display-xl);
+  line-height: 1.04;
+  max-width: 20ch;
+}
+.section-head--statement > p:not(.kicker) {
+  grid-column: 2 / -1;
+  grid-row: 3;
+  align-self: start;
+  max-width: 60ch;
+  margin-top: var(--space-5);
+}
+
+@media (max-width: 900px) {
+  .section-head {
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    align-items: start;
+  }
+  .section-head::before { grid-row: 1 / span 2; }
+  .section-head .kicker { grid-column: 2; grid-row: 1; }
+  .section-head h2 { grid-column: 2; grid-row: 2; }
+  .section-head > p:not(.kicker) { grid-column: 2; grid-row: 3; margin-top: var(--space-2); }
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--block-pad);
+  align-items: center;
+}
+/* The pair where one half is a code sample. The sample gets the wider half, so
+   a line of code is not cut off at the edge of its column. */
+.split--code { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); }
+
+/* A feature list is ruled rows, not boxes. The icon is a small square on the
+   right, so the text keeps the room. */
+.features { display: grid; border-top: 1px solid var(--hairline); }
+.feature {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  gap: var(--space-6);
+  align-items: center;
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.feature-copy { min-width: 0; }
+.feature-copy h3 { margin: 0 0 var(--space-2); font-size: var(--text-xl); }
+.feature-copy p { margin: 0; color: var(--color-text-secondary); max-width: 62ch; }
+.feature-copy .text-link { margin-top: var(--space-2); }
+.feature-icon {
+  width: 48px;
+  height: 48px;
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: var(--tint);
+}
+.feature-icon .icon { width: 22px; height: 22px; color: var(--color-accent); }
+
+.steps { display: grid; counter-reset: step; border-top: 1px solid var(--hairline); }
+.step {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: baseline;
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.step::before {
+  counter-increment: step;
+  content: counter(step, decimal-leading-zero);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.step h3 { margin: 0 0 var(--space-1); font-size: var(--text-lg); }
+.step p { margin: 0; color: var(--color-text-secondary); max-width: 64ch; }
+
+/* A code callout: the sample on the right, its caption above it, and a seam
+   down its left edge so it reads as a specimen, not as page text. */
+.code-callout { margin: 0; min-width: 0; }
+.code-callout figcaption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.code-callout figcaption::before {
+  content: "";
+  width: 8px;
+  height: 8px;
   border-radius: var(--radius-circle);
   background: var(--color-accent);
 }
+.code-callout pre { margin: 0; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
+/* A group of four is two by two, and a group of three is three across, so no
+   group is left with one card on its own row. */
+.cards--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cards--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .cards--2, .cards--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .cards, .cards--2, .cards--3 { grid-template-columns: 1fr; }
+}
+
+/* A card is a solid plane with a hairline edge and a faint seam along its top.
+   The cards are content, not controls, so they do not lift on hover. */
+.card {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-5);
+  overflow: hidden;
+}
+.card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--seam);
+  opacity: 0.3;
+}
+.card .feature-icon { width: 48px; height: 48px; justify-self: start; margin-bottom: var(--space-4); }
+.card .feature-icon .icon { width: 22px; height: 22px; }
+.card h3 { margin: 0 0 var(--space-2); font-size: var(--text-lg); }
+.card p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-relaxed); }
+.card .tag {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+.tag--shipped { background: var(--color-success-muted); color: var(--color-success); }
+.tag--progress { background: var(--color-warning-muted); color: var(--color-warning); }
+.tag--planned { background: var(--color-info-muted); color: var(--color-info); }
+.tag--unavailable { background: var(--color-danger-muted); color: var(--color-danger); }
+
+/* The closing band: a charcoal plane, not an orange slab. The orange is kept
+   for the one button that asks the reader to do something. */
+.band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xl);
+  padding: var(--block-pad);
+  background: var(--color-surface-sunken);
+}
+.band::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--seam);
+  z-index: 1;
+}
+.band::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(560px 260px at 100% 0%, var(--glow-a), transparent 70%);
+  pointer-events: none;
+}
+.band h2 { font-size: var(--display-lg); margin: 0 0 var(--space-3); max-width: 22ch; }
+.band p { margin: 0 0 var(--space-6); max-width: 62ch; font-size: var(--text-lg); color: var(--color-text-secondary); }
+
+.pill-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
 
 
+/* ==========================================================================
+   The product window, and the miniature client that goes in it
+   ========================================================================== */
+
+/* The product window is the one place the glass does real work: the page's glow
+   is behind it, and its chrome is a pane in front of that. It carries the same
+   ember seam as the masthead, along its top edge. */
 .app-window {
   position: relative;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--glass-edge, var(--color-border-strong));
   border-radius: var(--radius-xl);
-  background: var(--color-surface-sunken);
-  box-shadow: var(--shadow-pop);
+  background: color-mix(in srgb, var(--color-surface-elevated) 84%, transparent);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen, transparent),
+    0 40px 90px -50px rgba(0, 0, 0, 0.85);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
   overflow: hidden;
+}
+.app-window::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--seam);
+  z-index: 1;
 }
 .app-titlebar {
   display: flex;
@@ -488,7 +905,7 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--hairline);
-  background: color-mix(in srgb, var(--color-surface) 60%, var(--color-surface-sunken));
+  background: color-mix(in srgb, var(--color-surface-elevated) 55%, transparent);
 }
 .app-titlebar .dot { width: 10px; height: 10px; border-radius: var(--radius-circle); background: var(--color-border-strong); }
 .app-titlebar .app-url {
@@ -616,8 +1033,8 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  /* The list scrolls, and a scroll area that cuts a message in half looks
-     broken. A soft edge says there is more below. */
+  /* The list scrolls, and a scroll area that cuts a message in half looks broken.
+     A soft edge says there is more below. */
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent 100%);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent 100%);
   padding: var(--space-4) var(--space-5);
@@ -724,6 +1141,10 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 
+/* ==========================================================================
+   The demo page's controls, and the panels beside them
+   ========================================================================== */
+
 .demo-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
@@ -784,191 +1205,42 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 .switch input:focus-visible + .track { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
 
-.section { padding: clamp(var(--space-10), 7vw, var(--space-12)) 0; border-top: 1px solid var(--hairline); }
-.section:first-of-type { border-top: 0; }
-/* The head of a section: the number in the margin, the title beside it, and
-   the explanation on the right. One column of text in a wide page leaves
-   half the page empty.
-
-   The children are placed by hand rather than by their order, so the title
-   and the explanation sit where they belong whatever order the page was
-   written in. */
-.section-head {
-  display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1.15fr) minmax(0, 1fr);
-  column-gap: clamp(var(--space-4), 3vw, var(--space-7));
-  row-gap: var(--space-2);
-  align-items: end;
-  margin: 0 0 var(--space-8);
-}
-.section-head::before {
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  align-self: start;
-  margin-top: var(--space-2);
-}
-.section-head .kicker { grid-column: 2; grid-row: 1; margin-bottom: 0; }
-.section-head h2 { grid-column: 2; grid-row: 2; font-size: var(--display-lg); line-height: 1.1; margin: 0; }
-.section-head > p:not(.kicker) {
-  grid-column: 3;
-  grid-row: 1 / span 2;
-  align-self: end;
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--text-lg);
-  line-height: var(--leading-relaxed);
-}
-/* A section with nothing to explain has no third column, so the title takes
-   the whole width. */
-.section-head:not(:has(> p:not(.kicker))) h2 { grid-column: 2 / -1; }
-@media (max-width: 900px) {
-  .section-head {
-    grid-template-columns: 3.5rem minmax(0, 1fr);
-    align-items: start;
-  }
-  .section-head::before { grid-row: 1 / span 2; }
-  .section-head .kicker { grid-column: 2; grid-row: 1; }
-  .section-head h2 { grid-column: 2; grid-row: 2; }
-  .section-head > p:not(.kicker) { grid-column: 2; grid-row: 3; margin-top: var(--space-2); }
-}
-
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(var(--space-8), 5vw, var(--space-12));
-  align-items: center;
-}
-
-.features { display: grid; border-top: 1px solid var(--hairline); }
-.feature {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px;
-  gap: var(--space-6);
-  align-items: center;
-  padding: var(--space-6) 0;
-  border-bottom: 1px solid var(--hairline);
-}
-.feature-copy { min-width: 0; }
-.feature-copy h3 { margin: 0 0 var(--space-2); font-size: var(--text-xl); }
-.feature-copy p { margin: 0; color: var(--color-text-secondary); max-width: 62ch; }
-.feature-copy .text-link { margin-top: var(--space-2); }
-.feature-icon {
-  width: 72px; height: 72px;
-  justify-self: end;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg);
-  background: var(--tint);
-}
-.feature-icon .icon { width: 30px; height: 30px; color: var(--color-accent); }
-
-.steps { display: grid; counter-reset: step; border-top: 1px solid var(--hairline); }
-.step {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: var(--space-6);
-  align-items: baseline;
-  padding: var(--space-6) 0;
-  border-bottom: 1px solid var(--hairline);
-}
-.step::before {
-  counter-increment: step;
-  content: counter(step, decimal-leading-zero);
-  font-size: var(--display-sm);
-  font-weight: 800;
-  color: var(--color-accent);
-  opacity: 0.55;
-}
-.step h3 { margin: 0 0 var(--space-1); font-size: var(--text-lg); }
-.step p { margin: 0; color: var(--color-text-secondary); max-width: 64ch; }
-
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
-/* A group of four is two by two, and a group of three is three across, so no
-   group is left with one card on its own row. */
-.cards--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.cards--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 900px) {
-  .cards--2, .cards--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (max-width: 620px) {
-  .cards, .cards--2, .cards--3 { grid-template-columns: 1fr; }
-}
-.card {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  padding: var(--space-5);
-}
-.card .feature-icon { width: 48px; height: 48px; justify-self: start; margin-bottom: var(--space-4); }
-.card .feature-icon .icon { width: 22px; height: 22px; }
-.card h3 { margin: 0 0 var(--space-2); font-size: var(--text-lg); }
-.card p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-relaxed); }
-.card .tag {
-  display: inline-block;
-  margin-bottom: var(--space-3);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-}
-.tag--shipped { background: var(--color-success-muted); color: var(--color-success); }
-.tag--progress { background: var(--color-warning-muted); color: var(--color-warning); }
-.tag--planned { background: var(--color-info-muted); color: var(--color-info); }
-.tag--unavailable { background: var(--color-danger-muted); color: var(--color-danger); }
-
-.band {
-  border-radius: var(--radius-xl);
-  padding: clamp(var(--space-8), 6vw, var(--space-12));
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-}
-.band .kicker { color: var(--color-on-accent); opacity: 0.92; }
-.band .kicker::before { background: var(--color-on-accent); }
-.band h2 { font-size: var(--display-lg); margin: 0 0 var(--space-3); color: inherit; }
-.band p { margin: 0 0 var(--space-6); color: var(--color-on-accent); opacity: 0.92; max-width: 66ch; font-size: var(--text-lg); }
-.band .btn { background: var(--color-background); color: var(--color-accent); border-color: transparent; }
-.band .btn-ghost { background: transparent; color: var(--color-on-accent); border-color: color-mix(in srgb, var(--color-on-accent) 45%, transparent); }
-.band .btn:hover { background: var(--color-background); color: var(--color-accent); }
-.band .btn-ghost:hover { background: color-mix(in srgb, var(--color-on-accent) 12%, transparent); color: var(--color-on-accent); }
-
-.pill-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: var(--text-sm);
-}
-
 /* ==========================================================================
    Pages and prose
    ========================================================================== */
 
-.page { padding-bottom: clamp(var(--space-10), 6vw, var(--space-12)); }
+.page { padding-bottom: var(--section-pad); }
 
+/* The head of a page. A short ember tick sits on its bottom rule, which is the
+   only decoration a document page carries. */
 .page-head {
-  padding: clamp(var(--space-10), 6vw, var(--space-12)) 0 var(--space-8);
+  position: relative;
+  padding: var(--page-pad) 0 var(--space-8);
   border-bottom: 1px solid var(--hairline);
   margin-bottom: var(--space-9);
 }
+.page-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 64px;
+  height: 2px;
+  background: var(--color-accent);
+}
 .page-head h1 {
   font-size: var(--display-lg);
-  line-height: 1.08;
-  margin: 0 0 var(--space-3);
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+  margin: 0 0 var(--space-4);
+  max-width: 22ch;
 }
 .page-head .lede {
   margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--text-lg);
   line-height: var(--leading-relaxed);
-  max-width: 68ch;
+  max-width: 64ch;
 }
 
 .prose-layout {
@@ -978,15 +1250,25 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   align-items: start;
 }
 .prose { max-width: var(--prose-w); min-width: 0; }
+.prose > :first-child { margin-top: 0; }
 .prose h2 {
   font-size: var(--display-sm);
+  line-height: 1.25;
   margin: var(--space-10) 0 var(--space-3);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--hairline);
   scroll-margin-top: var(--space-6);
 }
-.prose h3 { font-size: var(--text-xl); margin: var(--space-8) 0 var(--space-2); scroll-margin-top: var(--space-6); }
-.prose p, .prose li { color: var(--color-text-secondary); }
+/* A section of a document opens with a short ember tick, so a long page has
+   landmarks without boxes. */
+.prose h2::before {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 2px;
+  margin-bottom: var(--space-4);
+  background: var(--color-accent);
+}
+.prose h3 { font-size: var(--text-lg); margin: var(--space-8) 0 var(--space-2); scroll-margin-top: var(--space-6); }
+.prose p, .prose li { color: var(--color-text-secondary); font-size: var(--text-lg); line-height: 1.7; }
 .prose p { margin: 0 0 var(--space-4); }
 .prose ul, .prose ol { padding-left: var(--space-6); display: grid; gap: var(--space-2); margin: 0 0 var(--space-4); }
 code {
@@ -1001,6 +1283,7 @@ code {
 pre {
   background: var(--color-surface-sunken);
   border: 1px solid var(--color-border);
+  border-left: 2px solid var(--color-accent);
   border-radius: var(--radius-md);
   padding: var(--space-4) var(--space-5);
   margin: 0 0 var(--space-5);
@@ -1008,11 +1291,14 @@ pre {
   min-width: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  font-size: var(--text-base);
+  line-height: 1.6;
 }
 pre code {
   background: none;
   border: 0;
   padding: 0;
+  font-size: 1em;
   white-space: pre;
   overflow-wrap: normal;
 }
@@ -1056,9 +1342,9 @@ pre.has-copy:focus-within .copy-button { opacity: 1; }
   .copy-button { min-height: 40px; }
 }
 
-/* A finger is bigger than a cursor.
-   The controls that are small on a desk are as tall as a thumb on a phone, and
-   the ones that are already large enough are left alone. */
+/* A finger is bigger than a cursor. The controls that are small on a desk are as
+   tall as a thumb on a phone, and the ones that are already large enough are left
+   alone. */
 @media (max-width: 700px) {
   .btn-sm { min-height: 40px; }
   .mini-channel { min-height: 44px; }
@@ -1087,11 +1373,14 @@ pre.has-copy:focus-within .copy-button { opacity: 1; }
 
 .pager {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
   margin-top: var(--space-10);
   padding-top: var(--space-6);
   border-top: 1px solid var(--hairline);
+}
+@media (max-width: 700px) {
+  .pager { grid-template-columns: 1fr; }
 }
 .pager__link {
   display: grid;
@@ -1109,13 +1398,18 @@ pre.has-copy:focus-within .copy-button { opacity: 1; }
 .pager__label { font-size: var(--text-xs); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .pager__title { font-weight: 600; color: var(--color-text); }
 .pager__link--next { text-align: right; }
-/* The project's own contact points, in a legal page.
-   They are written out rather than left as a field, so the page says who to
-   write to. An operator running their own instance replaces them. */
+
+/* The project's own contact points, in a legal page. They are written out rather
+   than left as a field, so the page says who to write to. An operator running
+   their own instance replaces them.
+
+   The line is allowed to wrap - it holds a label and an address, and on a phone
+   the two of them do not fit on one line - but the address is not broken across
+   lines, so it stays copyable. */
 .op-contact {
   color: var(--color-text-primary);
   font-weight: var(--weight-medium);
-  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 
 .prose .draft-note {
@@ -1133,9 +1427,8 @@ pre.has-copy:focus-within .copy-button { opacity: 1; }
   color: var(--color-text-secondary);
 }
 
-/* A table in a document. The reader gets the same table on a phone as on a
-   desk: it scrolls sideways inside its own box rather than pushing the page
-   wide. */
+/* A table in a document. The reader gets the same table on a phone as on a desk:
+   it scrolls sideways inside its own box rather than pushing the page wide. */
 .prose table {
   width: 100%;
   border-collapse: collapse;
@@ -1186,8 +1479,8 @@ table.plain th, table.plain td { text-align: left; padding: var(--space-2) var(-
 table.plain th { color: var(--color-text-primary); }
 table.plain td { color: var(--color-text-secondary); }
 
-/* The licence table. The dependency list is the one thing on this page that
-   people actually read to find out what they are shipping. */
+/* The licence table. The dependency list is the one thing on this page that people
+   actually read to find out what they are shipping. */
 .licence-table { width: 100%; border-collapse: collapse; margin: var(--space-4) 0; font-size: var(--text-sm); }
 .licence-table th, .licence-table td {
   text-align: left;
@@ -1241,9 +1534,8 @@ table.plain td { color: var(--color-text-secondary); }
 .status-table tr:last-child th, .status-table tr:last-child td { border-bottom: 0; }
 .status-when { margin: var(--space-4) 0 0; color: var(--color-text-muted); font-size: var(--text-xs); }
 
-/* The incident timeline.
-   What the operator wrote, and nothing else - no invented uptime, no
-   "everything is fine" banner that nobody wrote. */
+/* The incident timeline. What the operator wrote, and nothing else - no invented
+   uptime, no "everything is fine" banner that nobody wrote. */
 .status-incidents { margin-top: var(--space-8); }
 .status-incidents h2 { margin-bottom: var(--space-2); }
 .incident-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
@@ -1296,6 +1588,10 @@ table.plain td { color: var(--color-text-secondary); }
   .status-table td:last-child { padding-top: var(--space-3); }
 }
 
+
+/* ==========================================================================
+   The community directory
+   ========================================================================== */
 
 .dir-bar {
   display: flex;
@@ -1388,6 +1684,10 @@ select.dir-control { width: auto; cursor: pointer; }
 .dir-pager .page-of { color: var(--color-text-secondary); font-size: var(--text-sm); }
 
 
+/* ==========================================================================
+   The changelog timeline
+   ========================================================================== */
+
 .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-8); }
 .timeline > li { position: relative; padding-left: var(--space-8); }
 .timeline > li::before {
@@ -1410,14 +1710,30 @@ select.dir-control { width: auto; cursor: pointer; }
 .timeline h2, .timeline h3 { margin: var(--space-1) 0 var(--space-3); font-size: var(--text-xl); }
 .timeline ul { margin: 0; padding-left: var(--space-5); display: grid; gap: var(--space-2); color: var(--color-text-secondary); }
 
+
 /* ==========================================================================
-   Footer
+   The footer
    ========================================================================== */
 
-.site-footer { border-top: 1px solid var(--color-border); background: var(--color-surface-sunken); margin-top: auto; }
+/* The footer is a plane of the deeper surface, with the seam along its top edge
+   to match the masthead's. Its groups match the masthead's: the brand, then the
+   six groups in three columns. */
+.site-footer {
+  position: relative;
+  margin-top: auto;
+  background: var(--color-surface-sunken);
+  border-top: 1px solid var(--hairline);
+}
+.site-footer::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  background: var(--seam);
+}
 
-/* The footer's groups match the masthead's: the brand, then the six groups
-   in three columns. The brand takes the whole height of the two rows. */
 .footer-grid {
   display: grid;
   grid-template-columns: 2.4fr repeat(3, minmax(0, 1fr));
@@ -1427,7 +1743,7 @@ select.dir-control { width: auto; cursor: pointer; }
 }
 .footer-brand { grid-row: span 2; }
 .footer-brand p { max-width: 320px; margin: var(--space-4) 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
-.footer-brand .btn { justify-self: start; }
+.footer-brand .btn { align-self: flex-start; }
 .footer-heading {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
@@ -1452,11 +1768,35 @@ select.dir-control { width: auto; cursor: pointer; }
 }
 
 
-.error-hero { padding: clamp(var(--space-10), 12vw, 160px) 0; display: grid; place-items: center; text-align: center; }
+/* ==========================================================================
+   Not found, and the other recovery pages
+   ========================================================================== */
+
+.error-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(var(--space-10), 12vw, 160px) 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+.error-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(620px 340px at 50% 30%, var(--glow-a), transparent 70%);
+  pointer-events: none;
+}
 .error-hero .kicker { justify-content: center; }
 .error-hero h1 { font-size: var(--display-xl); margin: 0 0 var(--space-4); }
 .error-hero .lede { margin: 0 auto var(--space-8); max-width: 46ch; color: var(--color-text-secondary); font-size: var(--text-lg); line-height: var(--leading-relaxed); }
 .error-hero .cta { justify-content: center; }
+/* The two lists under the recovery buttons are read as lists, so they are left
+   aligned even though the page is centred. */
+.error-hero .split { text-align: left; max-width: 720px; margin: var(--space-9) auto 0; }
+
 
 /* ==========================================================================
    Responsive
@@ -1471,6 +1811,7 @@ select.dir-control { width: auto; cursor: pointer; }
 }
 
 @media (max-width: 1000px) {
+  .hero::before { display: none; }
   .hero-grid { grid-template-columns: 1fr; }
   .hero h1 { max-width: none; }
 
@@ -1497,8 +1838,9 @@ select.dir-control { width: auto; cursor: pointer; }
   .site-header[data-menu-open="true"] .site-nav { display: flex; }
   .nav-group { width: 100%; border-bottom: 1px solid var(--hairline); }
   .nav-trigger { width: 100%; justify-content: space-between; padding: var(--space-4) var(--space-2); font-size: var(--text-lg); text-transform: none; }
+  .nav-trigger::after { left: var(--space-2); right: var(--space-2); }
   .nav-menu,
-  .nav-menu--wide { position: static; transform: none; min-width: 0; box-shadow: none; border: 0; background: none; padding: 0 0 var(--space-3) var(--space-4); }
+  .nav-menu--wide { position: static; transform: none; min-width: 0; box-shadow: none; border: 0; background: none; padding: 0 0 var(--space-3) var(--space-4); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .nav-menu a { padding: var(--space-2) var(--space-2); }
   .nav-menu--wide .nav-menu-grid { grid-template-columns: 1fr; }
   .nav-menu-foot { display: none; }
@@ -1506,11 +1848,15 @@ select.dir-control { width: auto; cursor: pointer; }
   .masthead-actions { margin-left: 0; }
 }
 
+@media (max-width: 900px) {
+  .fact-strip { gap: var(--space-4); }
+}
+
 @media (max-width: 760px) {
   .split { grid-template-columns: 1fr; }
   .feature { grid-template-columns: 1fr; gap: var(--space-4); }
-  .feature-icon { justify-self: start; width: 56px; height: 56px; }
-  .feature-icon .icon { width: 24px; height: 24px; }
+  .feature-icon { justify-self: start; width: 44px; height: 44px; }
+  .feature-icon .icon { width: 22px; height: 22px; }
   .step { grid-template-columns: 48px minmax(0, 1fr); }
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .footer-brand { grid-column: 1 / -1; }
@@ -1525,12 +1871,15 @@ select.dir-control { width: auto; cursor: pointer; }
   .mini-members { display: none; }
   .mini-main { min-height: 320px; }
   .app-window--tall .mini-client { height: auto; }
+  .band { padding: var(--space-8) var(--space-6); }
 }
 
 @media (max-width: 480px) {
-  /* The headline keeps shrinking as the screen gets narrower - the old value
-     made it bigger on a phone than on a tablet. */
-  :root { --display-xl: clamp(2.1rem, 8.6vw, 2.4rem); }
+  /* The headline keeps shrinking as the screen gets narrower. */
+  :root {
+    --display-2xl: clamp(2.1rem, 10.5vw, 2.5rem);
+    --display-xl: clamp(2rem, 9vw, 2.3rem);
+  }
   .footer-grid { grid-template-columns: 1fr; }
 }
 
@@ -1541,246 +1890,54 @@ select.dir-control { width: auto; cursor: pointer; }
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
-/* The glass layer: see-through panels with a blurred background, a thin
-   edge and a light along the top. Used over the page's own colours, where
-   there is something behind them to blur. Where a browser cannot blur, the
-   panels are solid. */
 
-:root {
-  --glass-blur: 18px;
-  --glass-saturation: 140%;
-  /* The panel itself: the surface, thinned until the page behind it shows. */
-  --glass-bg: color-mix(in srgb, var(--color-surface) 66%, transparent);
-  --glass-bg-strong: color-mix(in srgb, var(--color-surface-elevated) 84%, transparent);
-  --glass-bg-quiet: color-mix(in srgb, var(--color-surface) 46%, transparent);
-  --glass-edge: color-mix(in srgb, var(--color-border-strong) 62%, transparent);
-  /* The light that catches the top edge of a pane of glass. */
-  --glass-sheen: color-mix(in srgb, white 14%, transparent);
-  --glass-shadow: 0 24px 60px -32px rgba(0, 0, 0, 0.75);
-}
+/* ==========================================================================
+   Glass fallback
+   ========================================================================== */
 
-:root[data-theme="light"] {
-  --glass-bg: color-mix(in srgb, white 74%, transparent);
-  --glass-bg-strong: color-mix(in srgb, white 90%, transparent);
-  --glass-bg-quiet: color-mix(in srgb, white 56%, transparent);
-  --glass-edge: color-mix(in srgb, var(--color-border-strong) 70%, transparent);
-  --glass-sheen: color-mix(in srgb, white 70%, transparent);
-  --glass-shadow: 0 24px 60px -34px rgba(24, 25, 29, 0.35);
-}
-
-/* The panel itself.
-   One class, used by the cards, the menus, the window and the hero's copy
-   block, so they are the same material everywhere. */
-.glass {
-  position: relative;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-edge);
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-sheen),
-    var(--glass-shadow);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-}
-
-/* A browser that cannot frost a panel gets a solid one. */
+/* A browser that cannot frost a pane gets a solid one. The panes are the
+   masthead, the menus, the product window, the theme toggle and the split panels. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass {
+  .site-header,
+  .nav-menu,
+  .app-window,
+  .split .panel {
     background: var(--color-surface);
-    box-shadow: inset 0 1px 0 0 var(--glass-sheen);
   }
 }
 
-/* ---- the masthead ---------------------------------------------------------
-   It was already glass; it is now the same recipe as the rest of the site,
-   and it is a little more transparent, so the page's gradient shows through
-   as the reader scrolls. */
-.site-header {
-  background: var(--glass-bg-quiet);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  box-shadow: inset 0 -1px 0 0 var(--glass-edge);
+/* The split panels are the paired halves of a section: glass over the page's
+   glow, so they are the one place the glass appears outside the masthead and
+   the product window. */
+:root {
+  --glass-edge: color-mix(in srgb, var(--color-border-strong) 62%, transparent);
+  --glass-sheen: color-mix(in srgb, white 14%, transparent);
 }
-.site-header::after {
-  /* The ember rule the masthead has always carried. */
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: linear-gradient(90deg,
-    var(--color-accent),
-    color-mix(in srgb, var(--color-accent) 20%, transparent) 62%,
-    transparent);
-  opacity: 0.85;
-  pointer-events: none;
+:root[data-theme="light"] {
+  --glass-edge: color-mix(in srgb, var(--color-border-strong) 70%, transparent);
+  --glass-sheen: color-mix(in srgb, white 70%, transparent);
 }
 
-/* ---- the menus ------------------------------------------------------------
-   A menu is a pane of glass over the page, so it is frosted and it casts a
-   shadow onto the content under it. */
-.nav-menu {
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-edge);
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-sheen),
-    var(--glass-shadow);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-}
-
-/* ---- the cards ------------------------------------------------------------
-   The cards on the marketing pages sit over the page's gradient, so they can
-   be glass. The hover lifts them a little, and the border catches the light
-   as they do. */
-.card {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-edge);
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-sheen),
-    0 18px 40px -34px rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  transition: border-color var(--duration-fast) ease, transform var(--duration-fast) ease;
-}
-.card:hover {
-  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--glass-edge));
-  transform: translateY(-2px);
-}
-@media (prefers-reduced-motion: reduce) {
-  .card:hover { transform: none; }
-}
-
-/* ---- the window the product is shown in ------------------------------------
-   The mockup is the one place on the site where the glass is doing real
-   work: the page's glow is behind the window, and the window's own chrome
-   is a pane in front of it. */
-.app-window {
-  background: var(--glass-bg-strong);
-  border: 1px solid var(--glass-edge);
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-sheen),
-    0 40px 90px -50px rgba(0, 0, 0, 0.85);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-}
-.app-titlebar {
-  background: color-mix(in srgb, var(--color-surface-elevated) 55%, transparent);
-  border-bottom: 1px solid var(--glass-edge);
-}
-
-/* ---- the footer ------------------------------------------------------------
-   The foot of the page is a pane of glass over the page's own background,
-   and the rule above it is the same hairline the masthead carries. */
-.site-footer {
-  background: var(--glass-bg-quiet);
-  border-top: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-}
-
-/* ---- the theme toggle ------------------------------------------------------
-   It is a small piece of glass in the masthead, and it is the same piece on
-   every page. */
-.theme-toggle {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-edge);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-}
-
-/* ---- the hero --------------------------------------------------------------
-   The copy block is a pane of glass over the hero's glow, so the headline
-   sits on something with depth behind it rather than on flat colour. */
-.hero-copy {
-  position: relative;
-  padding: clamp(var(--space-5), 2.4vw, var(--space-7));
-  border-radius: var(--radius-xl);
-  background: var(--glass-bg-quiet);
-  border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px 0 0 var(--glass-sheen);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-}
-
-/* ---- the fact strip --------------------------------------------------------
-   The home page's strip of what the product is: four chips of glass, each
-   one a sentence. */
-.fact-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-4);
-  margin-top: clamp(var(--space-6), 4vw, var(--space-9));
-}
-@media (max-width: 700px) {
-  .fact-strip { grid-template-columns: 1fr; }
-}
-.fact {
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px 0 0 var(--glass-sheen);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-}
-.fact b {
-  display: block;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-bold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-1);
-}
-.fact span {
-  display: block;
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
-  line-height: var(--leading-relaxed);
-}
-
-/* The section numbers. The document pages have their own heads and are left
-   alone. */
-main { counter-reset: section; }
-.section { counter-increment: section; }
-.section-head::before {
-  content: counter(section, decimal-leading-zero);
-  display: block;
-  margin-bottom: var(--space-2);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.12em;
-  color: var(--color-text-muted);
-}
-
-/* The two halves of a split section are glass. The panels on the demo page
-   are not split halves, and they keep the small heading they had. */
 .split .panel {
   padding: clamp(var(--space-6), 3vw, var(--space-8));
   border-radius: var(--radius-xl);
-  background: var(--glass-bg);
+  background: color-mix(in srgb, var(--color-surface) 66%, transparent);
   border: 1px solid var(--glass-edge);
   box-shadow:
     inset 0 1px 0 0 var(--glass-sheen),
     0 18px 40px -34px rgba(0, 0, 0, 0.6);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
 }
 .split .panel h2 { font-size: var(--display-md); margin: 0 0 var(--space-3); }
 .split .panel p { color: var(--color-text-secondary); }
 .split .panel .kicker { margin-bottom: var(--space-2); }
 
-/* The band at the foot of the homepage is the accent panel, and it is glass
-   too. */
-.band {
-  background:
-    linear-gradient(135deg,
-      color-mix(in srgb, var(--color-accent) 92%, transparent),
-      color-mix(in srgb, var(--color-accent) 72%, transparent));
-  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
-  box-shadow:
-    inset 0 1px 0 0 color-mix(in srgb, white 22%, transparent),
-    0 30px 70px -40px color-mix(in srgb, var(--color-accent) 60%, transparent);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+/* The theme toggle is a small piece of the same material, so it sits with the
+   masthead rather than apart from it. */
+.theme-toggle {
+  background: color-mix(in srgb, var(--color-surface) 66%, transparent);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }

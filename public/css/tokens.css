@@ -95,6 +95,7 @@
   --space-9: var(--tc-space-12);
   --space-10: var(--tc-space-12);
   --space-11: var(--tc-space-12);
+  --space-12: var(--tc-space-12);
 
   /* -- shape ------------------------------------------------------------ */
   --radius-sm: var(--tc-radius-sm);
