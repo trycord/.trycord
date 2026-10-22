@@ -643,6 +643,111 @@ in the file permanently.
 
 ---
 
+## Split deployment (two servers)
+
+One server that does all of it is the normal shape, and stays the default
+(`TRYCORD_DEPLOYMENT_ROLE` unset means `unified`). When static traffic and
+API traffic want different machines - a client server near your readers, an
+API server that owns the database and the uploads - the two roles make the
+split explicit:
+
+| Role | Set by | Serves | Needs |
+|---|---|---|---|
+| `unified` | nothing (default) | API, gateway, jobs, client, site | one server |
+| `backend` | `TRYCORD_DEPLOYMENT_ROLE=backend` | API, gateway, jobs only | `CLIENT_ORIGIN` including the frontend origin |
+| `frontend` | `npm run start:frontend` | client and site only | `TRYCORD_API_URL` pointing at the API server |
+
+There is no third process and no shared database between them: the frontend
+server has no database at all, which is why its settings live entirely in
+the environment and why the roles are read from the environment rather than
+the dashboard.
+
+### Server A: the API
+
+In Server A's `.env`, set the role and make sure the frontend's address is
+in the CORS allowlist, because the browsers it serves talk to A directly,
+from B's origin, with their bearer token in a header (authentication is not
+cookie-based, so no SameSite configuration is involved):
+
+```env
+TRYCORD_DEPLOYMENT_ROLE=backend
+CLIENT_ORIGIN=https://chat.example.com,trycord://app
+```
+
+`trycord://app` is the desktop app's origin, listed exactly as it would be
+in the single-server layout - the split does not change who the API answers.
+Everything else about Server A is the manual setup above: same `.env`
+requirements, same proxy choice, same backups. What changes is that `GET /`
+no longer answers with a document: an API-only origin answers unmatched
+paths with the same JSON envelope its API errors use.
+
+`/health` and `/ready` keep their meanings there, and `/api/health` still
+reports the database - it is the readiness signal for the API traffic.
+
+### Server B: the client
+
+Server B runs a second process from the same checkout. It needs no database
+configuration, no mail, no uploads directory:
+
+```bash
+cd /opt/trycord/backend
+npm ci --omit=dev
+TRYCORD_API_URL=https://api.example.com npm run start:frontend
+```
+
+`TRYCORD_API_URL` is the one required setting: it is the public origin of
+Server A, and it is what `/backend.json` and `/runtime-config.js` hand the
+browser - which is why no client rebuild is involved. Pointing B at a new
+API server is an environment change and a restart. A value with a path on
+it is refused at start-up, since the client builds its own `/api/...`
+requests and a path would double up.
+
+Anything else you would set on a client server:
+
+```env
+PORT=9972
+TRYCORD_PUBLIC_URL=https://chat.example.com
+TRYCORD_APP_MOUNT=/app
+```
+
+`TRYCORD_APP_MOUNT` is only needed if a proxy strips a prefix before the
+request arrives, or you want B to serve the app under a prefix itself. The
+public site is served from the same tree as always; if B has no `frontend/`
+build alongside it, it says so at boot instead of serving 404s silently.
+
+`/health` answers there too, and reports `role: frontend`. There is no
+`/ready`, because there is nothing to become ready for: no database, no
+gateway.
+
+### What moves where
+
+- **Sign-in and every API call** go to `https://api.example.com` in a
+  browser from B's origin, allowed by A's `CLIENT_ORIGIN`.
+- **The WebSocket gateway** is on the API server, same as the API: the
+  client derives the gateway address from its API origin, and the
+  handshake is the short-lived ticket the client fetches from `/api/...`.
+  No proxy rules for B are involved.
+- **Uploads and avatars** are served by the API server through the
+  authenticated attachment routes. B never touches files.
+- **CSP** on B's responses names the API origins, from the same
+  configuration A reads - the policy is shared code, not a second copy.
+
+### Checking the pair
+
+```bash
+curl -fsS https://api.example.com/api/health     # {"ok":true,"db":"ok",...}
+curl -fsS https://api.example.com/               # {"error":{"code":"NOT_FOUND",...}}
+curl -fsS https://chat.example.com/health        # {"ok":true,"role":"frontend",...}
+curl -fsS https://chat.example.com/backend.json  # {"backendUrl":"https://api.example.com",...}
+```
+
+Then in a browser: open B's address, sign in, send a message, and see it in
+a second window. Every failure at this point is a CORS answer from A, an
+origin typo in `TRYCORD_API_URL`, or a proxy between the two servers - and
+each of the three says so in its own access log.
+
+---
+
 ## Storing files off the local disk
 
 By default, avatars, community icons and message attachments are written under

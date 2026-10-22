@@ -32,23 +32,15 @@ const retention = require('./services/retention');
 const searchIndex = require('./services/search-index');
 const { VERSION, API_VERSION, PROTOCOL_VERSION } = require('./version');
 
-/**
- * Reduce a configured API location to the origin the client should talk to.
- *
- * Returns '' when the value is not a usable http(s) URL, so a typo does not
- * become a pinned value the client will believe.
- */
-function apiOriginOnly(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  try {
-    const u = new URL(raw);
-    if (!/^https?:$/.test(u.protocol)) return '';
-    return u.origin;
-  } catch {
-    return '';
-  }
-}
+// Where the shared pieces live. The security-headers policy and the origin
+// reducers are defined in their named modules - headers.js and
+// serve-client.js - because the frontend server of a split deployment has to
+// run the same code rather than a copy nobody diffed. The pointers here keep
+// the call sites below readable; the ones that read like globals are the
+// module locals, and every definition is one require away.
+const headers = require('./headers');
+const originOf = serveClient.originOf;
+const cspOriginOf = headers.cspOriginOf;
 
 // What a first start falls back to, before the configuration centre has been read.
 //
@@ -209,12 +201,20 @@ async function boot(options = {}) {
     : '[info] signing secret: ' + secretFilePath());
   const inst = instanceConfig();
 
-  // The dashboard mode is resolved before anything else is opened, because an
-  // unusable value has to stop the boot rather than be discovered on the first
-  // request. The mode is a deployment fact: the separate dashboard service has
-  // no database of its own, so it cannot read a stored value, and the two
-  // processes must not be able to disagree about which one is in force.
+  // The dashboard mode and the deployment role are both resolved before
+  // anything is opened, because an unusable value has to stop the boot
+  // rather than be discovered on the first request. Both are deployment
+  // facts: the separate dashboard service and the frontend server of a split
+  // deployment have no database of their own, so neither of the two values
+  // can come from a store, and two processes that are not allowed to
+  // disagree must each read their own fact from their own environment.
   require('./dashboard/mode').currentMode();
+  const deploymentRole = require('./deployment-role').currentBackendRole();
+  console.log('[info] deployment role: ' + deploymentRole + (deploymentRole === 'unified'
+    ? ' - one server for the API, the gateway, the jobs, the web client and the site.'
+    : ' - the API, the gateway and the jobs are served here. No web client and no site: '
+      + 'point the frontend server\u2019s TRYCORD_API_URL at this origin and list its '
+      + 'address in CLIENT_ORIGIN.'));
 
   // The desktop app cannot be inferred the way a browser origin can: it is a
   // custom scheme, so it has to be allowlisted explicitly, and a backend that
@@ -303,103 +303,13 @@ async function boot(options = {}) {
     next();
   });
 
-  // Security headers. Hardens the app surface without breaking the
-  // documented cross-instance feature (the client can be pointed at another
-  // API origin at runtime), so CSP connect/src origins are derived from
-  // runtime config plus a per-instance allowlist knob (CSP_CONNECT_ORIGINS
-  // in .env, comma-separated). The real app page has no inline scripts, so
-  // script-src is strict; the static showcase gallery is dev-only and
-  // exempted from that one rule.
-  // These are scheme-sources and host-sources and are emitted verbatim, so
-  // anything that means "this origin" has to carry its own quotes. An unquoted
-  // 'self' is not a valid source expression: the browser discards the directive
-  // it appears in, which for connect-src means every API call is refused and the
-  // application boots signed out with no error to explain it.
-  const cspConnect = ["'self'", 'ws:', 'wss:'];
-  const cspImg = ["'self'", 'data:', 'blob:'];
-  // The API the client talks to, and the one it falls back to. API_URL is the
-  // deployment's own name for that primary; TRYCORD_API_URL is the older name
-  // and still wins if set, so an existing deployment keeps its behaviour.
-  const apiOrigin = ((process.env.TRYCORD_API_URL || process.env.API_URL || '').trim() || inst.publicUrl || '');
-  const apiBackup = (process.env.API_BACKUP_URL || '').trim();
-  const addCspOrigin = (o) => {
-    try { const origin = new URL(o).origin; cspConnect.push(origin, origin.replace(/^http:/i, 'ws:').replace(/^https:/i, 'wss:')); cspImg.push(origin); } catch { /* ignore unparseable */ }
-  };
-  // Reduce a candidate to a bare origin string (scheme + host + port) or
-  // null. Origins cannot carry spaces, quotes, or semicolons, so the
-  // result is always safe to interpolate into the CSP header.
-  const cspOriginOf = (o) => {
-    try {
-      const u = new URL(String(o || '').trim());
-      if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
-      return u.origin;
-    } catch { return null; }
-  };
-  // The backup has to be allowed here as well as the primary. A failover the
-  // policy then refuses presents as an empty application rather than as a
-  // switch, which is the same symptom as having no failover at all.
-  [apiOrigin, apiBackup, inst.publicUrl, inst.globalUrl].forEach((o) => o && addCspOrigin(o));
-  // The two loopback origins, because an operator developing against this instance reaches
-  // it from there. Nothing else is here by default.
-  //
-  // https://trycord.dev used to be in this list, which meant every self-hosted instance
-  // shipped a Content-Security-Policy naming the official network - a client served from
-  // somebody's own server was permitted to send its traffic to it. Self-hosting is a
-  // property of the architecture, so an origin that has nothing to do with the operator's
-  // instance does not belong in the operator's policy. If they do want it, they set
-  // CSP_CONNECT_ORIGINS, which is what that setting is for.
-  ['http://localhost:9971', 'http://127.0.0.1:9971'].forEach(addCspOrigin);
-  String(process.env.CSP_CONNECT_ORIGINS || '')
-    .split(',').map((s) => s.trim()).filter(Boolean).forEach(addCspOrigin);
-  // The scheme and host a request arrived on, or null when it did not arrive
-  // over http(s). Behind a proxy the host header is the one the browser used,
-  // which is the one we want: it is the origin the client is really talking to.
-  function originOf(req) {
-    const host = req.headers && req.headers.host;
-    if (!host || !/^[^\s/]+$/.test(String(host))) return null;
-    // req.protocol already honours X-Forwarded-Proto when - and only when - Express
-    // is told to trust the proxy (TRUST_PROXY=1, loopback only). Reading the header
-    // directly here skipped that gate, so a plain http caller could send
-    // X-Forwarded-Proto: https and have backend.json hand the client an https origin.
-    const proto = req.protocol === 'https' ? 'https' : 'http';
-    return proto + '://' + host;
-  }
-
-  const buildCsp = (allowInlineScripts) => {
-    const connect = [...new Set(cspConnect)];
-    return [
-      "default-src 'self'",
-      `connect-src ${connect.join(' ')}`,
-      allowInlineScripts ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
-      `img-src ${[...new Set(cspImg)].join(' ')}`,
-      "font-src 'self' data:",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-    ].join('; ');
-  };
-  app.use((req, res, next) => {
-    // The policy is built from configured origins and nothing else - never from
-    // request input. The client can be pointed at another API origin at runtime
-    // through backend.json or the settings selector, both of which the operator
-    // controls, but a query parameter must not be able to authorize one: an
-    // attacker link carrying ?api=<their origin> would otherwise be granted the
-    // exact connect-src allowance it needs to receive the reader's bearer-carrying
-    // requests, which is the policy defeating the thing it exists for. An origin
-    // the operator has not configured stays refused by the browser.
-    res.setHeader('Content-Security-Policy', req.path.indexOf('showcase') !== -1 ? buildCsp(true) : buildCsp(false));
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    // Only over TLS: browsers ignore the header on a plain-http response, and keying
-    // it off the request's own scheme keeps it correct behind a terminating proxy.
-    if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
-    res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
-    next();
-  });
+  // Security headers, from the shared policy module. The origins named in
+  // the CSP are the configured ones - the configured API, its failover, the
+  // instance's own addresses, the loopback pair, and whatever the operator
+  // adds by name - and the policy explains itself there. A caller that asked
+  // for no client still gets the headers: they harden every response this
+  // server produces, API answers included.
+  app.use(headers.securityHeaders({ inst }));
 
   // Attachments are never mounted as a public static directory, whether they
   // live on local disk or in an object store: every read goes through the
@@ -478,27 +388,17 @@ async function boot(options = {}) {
   // Runtime client configuration for browsers served by this server.
   // Only safe public keys; TRYCORD_API_URL wins, else the public URL (if set).
   // Lets a deployment pin the API origin without editing client files.
-  app.get('/runtime-config.js', (req, res) => {
-    const cfg = {};
-    const configured = (process.env.TRYCORD_API_URL || process.env.API_URL || '').trim() || inst.publicUrl;
+  app.get('/runtime-config.js', serveClient.runtimeConfigRoute({
     // The client treats this as an origin and appends /api/... to every request
     // itself, so a value carrying the path produces /api/api/users/me - a 404 the
     // client reads as "not signed in", which signs the reader out and looks like
     // a session problem rather than a configuration one. Operators reasonably
     // write the API path here, so it is dropped rather than obeyed.
-    const apiUrl = apiOriginOnly(configured);
-    if (apiUrl) cfg.API_URL = apiUrl;
-    // Shipped so a browser that has no backend.json still knows where the backup
-    // is. The client only ever moves to it after the primary fails to answer,
-    // and it says so in the interface when it does.
-    if (apiBackup) cfg.API_BACKUP_URL = apiBackup;
-    if (inst.instanceId) cfg.instanceId = inst.instanceId;
-    if (inst.globalUrl) cfg.globalUrl = inst.globalUrl;
-    res.type('application/javascript').set('Cache-Control', 'no-store').send(
-      'window.TRYCORD_CONFIG = Object.assign(window.TRYCORD_CONFIG || {}, ' +
-      JSON.stringify(cfg) + ');'
-    );
-  });
+    API_URL: serveClient.apiOriginOnly(headers.apiOrigin(inst)) || undefined,
+    API_BACKUP_URL: headers.apiBackup() || undefined,
+    instanceId: inst.instanceId || undefined,
+    globalUrl: inst.globalUrl || undefined,
+  }));
 
   // Public legal document versions (no auth): the client shows these exact
   // versions at registration and records acceptance against them.
@@ -610,19 +510,28 @@ async function boot(options = {}) {
   //
   // A caller that asked for no public site gets an origin root that the client
   // answers, which is the shape an API-only instance wants.
-  const publicDir = options.publicSite === false ? null : serveClient.mountPublicSite(app, {
-    serverDir: __dirname,
-    clientDir: null,
-    pages,
-    originOf,
-  });
+  //
+  // The backend role forces both off no matter what a caller asked for. The
+  // role is the deployment's own statement - "no client documents are served
+  // from this origin" - and the options are the caller's convenience for
+  // partial boots in tests and verification runs; a process told by its
+  // deployment that it is the API server must not serve an HTML document, so
+  // the role is not something a caller can switch back on.
+  const publicDir = options.publicSite === false || deploymentRole === 'backend' ? null
+    : serveClient.mountPublicSite(app, {
+      serverDir: __dirname,
+      clientDir: null,
+      pages,
+      originOf,
+    });
 
-  const clientDir = options.client === false ? null : serveClient.mountClient(app, {
-    serverDir: __dirname,
-    appMount: listen.mount,
-    originOf,
-    cspOriginOf,
-  });
+  const clientDir = options.client === false || deploymentRole === 'backend' ? null
+    : serveClient.mountClient(app, {
+      serverDir: __dirname,
+      appMount: listen.mount,
+      originOf,
+      cspOriginOf,
+    });
 
 
   const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer } = createGateway(server);
@@ -748,6 +657,26 @@ async function boot(options = {}) {
       },
     });
   });
+
+  // On a backend-only deployment there is nothing behind any other path
+  // either - no website, no client shell, nothing HTML anywhere on the
+  // origin. Express's own default would answer a request to the root with
+  // "Cannot GET /", which is a document: an origin that says it serves only
+  // the API should say so in the envelope every API path already uses, not
+  // in a page a browser renders and a client cannot parse. The unified role
+  // is untouched: there the static mounts and the site's 404 page have the
+  // final say, exactly as they always did.
+  if (deploymentRole === 'backend') {
+    app.use((req, res, next) => {
+      if (res.headersSent) return next();
+      res.status(404).json({
+        error: {
+          code: 'NOT_FOUND',
+          message: `No API route for ${req.method} ${req.path}`,
+        },
+      });
+    });
+  }
 
   // Consistent error envelope for anything that escapes routes.
   // eslint-disable-next-line no-unused-vars
