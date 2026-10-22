@@ -36,6 +36,10 @@ export const RENDERERS = {
   home: () => renderHome(),
   notifications: () => renderInbox(),
   menu: () => renderMenu(),
+  // The phone carries /communities as a hub of its own; the desk shows the
+  // same places in its rail, so the address is answered by the finder, which
+  // lists them all and everything beside them.
+  communities: () => renderMenu(),
   extensions: lazy('./extensions.js', 'renderExtensions'),
   developer: lazy('./developer.js', 'renderDeveloper'),
   'developer.keys': lazy('./developer.js', 'renderDeveloper'),
