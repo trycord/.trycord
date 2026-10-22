@@ -1,17 +1,18 @@
 /* ==========================================================================
    Trycord public website.
 
-   The composition is built from one idea, the ember plane: charcoal surfaces
-   with a thin seam of flame light where two of them meet. The brand's own login
-   artwork is that idea at full strength, so the home page uses it. The rest of
-   the site carries the seam instead.
+   The composition is built from depth. Charcoal planes sit at different
+   distances from the reader - some flat on the page, some tilted and
+   overlapping, some framed inside a device - and flame light runs along the
+   edges where the planes meet. The backgrounds in assets/backgrounds are the
+   brand's own art: the geometry of the mark, the eclipse, and the horizon, so
+   the site is lit by the same pictures the product is.
 
    Orange is a signal, not a background. It marks the one action on a screen,
-   the word a headline turns on, the seam under the masthead and above the
-   footer, the edge of a code block, and the page a reader is on. Surfaces carry
-   everything else. A card is a solid plane with a hairline edge. Glass is kept
-   for what floats over the page: the masthead, its menus, the product window,
-   and the paired panels.
+   the word a headline turns on, the light along an edge, the edge of a code
+   block, and the page a reader is on. Surfaces carry everything else. Glass is
+   kept for what floats over the page: the masthead, its menus, the product
+   window, and the paired panels.
 
    Every colour, type size, space, radius, shadow, duration and easing comes from
    css/design-tokens.css, which is generated from the asset library. This file
@@ -66,6 +67,11 @@
   --display-md: clamp(1.5rem, 2.6vw, 2rem);
   --display-sm: clamp(1.2rem, 1.9vw, 1.45rem);
 
+  /* Monumental type: the size a poster is set at. It is used where a section
+     wants to be read from across the room, and nowhere else. */
+  --display-monument: clamp(2.6rem, 6.6vw, 5.2rem);
+  --display-monument-sm: clamp(2.3rem, 5.2vw, 3.8rem);
+
   /* The page's rhythm. The library owns the scale a component is built from;
      how much air a section carries is this site's own decision, so the size of
      that air is declared here rather than taken from a token that does not
@@ -73,6 +79,14 @@
   --section-pad: clamp(var(--space-9), 7vw, 6rem);
   --page-pad: clamp(var(--space-9), 6vw, 5rem);
   --block-pad: clamp(var(--space-8), 5vw, 4.5rem);
+
+  /* The brand's own backgrounds. They are pictures, so they are named here
+     once and used by path everywhere else. */
+  --bg-planes: url("/assets/backgrounds/app-default.jpg");
+  --bg-horizon: url("/assets/backgrounds/login.jpg");
+  --bg-eclipse: url("/assets/backgrounds/ambient-eclipse.jpg");
+  --bg-glyph: url("/assets/backgrounds/chat.jpg");
+  --bg-curves: url("/assets/backgrounds/settings.jpg");
 
   --glow-a: color-mix(in srgb, var(--color-accent) 14%, transparent);
   --glow-b: color-mix(in srgb, var(--color-accent) 8%, transparent);
@@ -83,6 +97,9 @@
     var(--color-accent) 0%,
     color-mix(in srgb, var(--color-accent) 30%, transparent) 46%,
     transparent 100%);
+  /* The light that runs along an edge. It is the flame, thinned. */
+  --wave-ember: color-mix(in srgb, var(--color-accent) 34%, transparent);
+  --wave-warm: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface-sunken));
 
   --cutout: var(--color-background);
 }
@@ -475,128 +492,240 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
    The home page: the hero
    ========================================================================== */
 
-/* The brand's login artwork, mirrored so its ember planes stand on the right,
-   behind the product window. The artwork has its wordmark baked into it. It is
-   drawn at 230% of this box, and the box is 58% of the hero, so only its left
-   planes are in frame and the wordmark is not. A mask fades the edges into the
-   page. It is shown on wide screens only, because the image is a megabyte. */
+/* The hero is the brand's own geometry, at the size of a page: the planes of
+   the mark laid out flat, with the flame along their edges. The picture sits
+   behind everything and the headline is set over the quiet part of it. */
 .hero {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(var(--space-9), 8vw, 6.5rem) 0 clamp(var(--space-9), 6vw, 5rem);
+  padding: clamp(var(--space-9), 7vw, 6rem) 0 clamp(var(--space-10), 7vw, 6.5rem);
   border-bottom: 1px solid var(--hairline);
 }
 .hero::before {
   content: "";
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 58%;
-  z-index: -1;
-  background: url("/assets/trycord-assets/brand/trycord-login-bg.png") left center / 230% auto no-repeat;
-  transform: scaleX(-1);
+  inset: 0;
+  z-index: -2;
+  background: var(--bg-planes) right center / cover no-repeat;
   opacity: 0.9;
-  -webkit-mask-image:
-    linear-gradient(to right, #000 52%, transparent 100%),
-    linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    linear-gradient(to right, #000 52%, transparent 100%),
-    linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
-  mask-composite: intersect;
-  pointer-events: none;
 }
-/* The artwork is a dark, cinematic piece. On the light theme it would be a
-   black plate on a white page, so the light theme keeps the warm wash the
-   glow gives it and leaves the planes to the dark theme. */
-:root[data-theme="light"] .hero::before { display: none; }
-
+/* The darkening that keeps the type readable over the picture. */
 .hero::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(620px 340px at 74% 40%, var(--glow-a), transparent 70%),
-    radial-gradient(480px 280px at 6% 100%, var(--glow-b), transparent 70%);
+    linear-gradient(90deg, var(--color-background) 6%, color-mix(in srgb, var(--color-background) 72%, transparent) 46%, transparent 82%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-background) 55%, transparent), transparent 40%);
   pointer-events: none;
 }
+/* The pictures are dark. The light theme keeps the surfaces and the light. */
+:root[data-theme="light"] .hero::before { display: none; }
 
 .hero-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  gap: clamp(var(--space-8), 5vw, var(--space-11));
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: clamp(var(--space-8), 4vw, var(--space-10));
   align-items: center;
 }
 
+/* The headline is set like a poster: large, tight, and in capitals. One word
+   carries the flame, and the rest is the page's own white. */
 .hero h1 {
-  font-size: var(--display-2xl);
-  line-height: 1.02;
-  letter-spacing: -0.03em;
-  margin: 0 0 var(--space-5);
-  max-width: 13ch;
+  font-size: var(--display-monument);
+  font-weight: 800;
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  margin: 0 0 var(--space-6);
+  max-width: 12ch;
 }
 .hero h1 em { font-style: normal; color: var(--color-accent); }
 .hero .lede {
   font-size: var(--text-lg);
   line-height: var(--leading-relaxed);
   color: var(--color-text-secondary);
-  max-width: 50ch;
-  margin: 0 0 var(--space-6);
+  max-width: 46ch;
+  margin: 0 0 var(--space-7);
 }
-.hero .cta { margin-bottom: 0; }
+.hero .cta { margin-bottom: var(--space-6); }
 
-.hero-stage { position: relative; min-width: 0; }
-@media (min-width: 1000px) {
-  /* The window is turned a few degrees into the page, the way a product shot
-     is held, and stays flat on a narrow screen where it has no room to turn. */
-  .hero-stage .app-window {
-    transform: perspective(1600px) rotateY(-9deg) rotateX(3deg);
-    transform-origin: 30% 50%;
-  }
+/* The small marks under the actions: the page's own index, in the way a
+   gallery shows where it is. */
+.marks { display: flex; align-items: center; gap: var(--space-3); }
+.marks__line {
+  width: 56px;
+  height: 1px;
+  background: var(--color-border-strong);
 }
+.marks__dots { display: flex; gap: 6px; }
+.marks__dots span {
+  width: 6px; height: 6px;
+  border-radius: var(--radius-circle);
+  background: var(--color-border-strong);
+}
+.marks__dots span:first-child { background: var(--color-accent); }
 
-/* The three facts sit on a hairline and start with a short ember tick, so they
-   read as a row of statements rather than three boxes. */
-.fact-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-6);
-  margin-top: clamp(var(--space-8), 6vw, var(--space-10));
-  border-top: 1px solid var(--hairline);
-}
-@media (max-width: 700px) {
-  .fact-strip { grid-template-columns: 1fr; gap: 0; }
-  .fact { padding-block: var(--space-4) !important; }
-}
-.fact {
+/* The framed composition of overlapping previews.
+   A thin rectangle sits behind the cards, the way a mount frames a picture,
+   and the cards themselves are turned a few degrees so they read as objects
+   on a table rather than as boxes on a page. */
+.stack {
   position: relative;
-  padding: var(--space-4) var(--space-4) 0 0;
+  min-width: 0;
+  min-height: 540px;
+  padding: var(--space-6) 0 var(--space-8);
 }
-.fact::before {
-  content: "";
+.stack__frame {
   position: absolute;
-  top: -1px;
+  inset: 0 var(--space-2) var(--space-4) var(--space-6);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xl);
+  pointer-events: none;
+}
+.stack__card {
+  position: absolute;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-pop);
+}
+.stack__card--back {
+  right: -6px;
+  top: -6px;
+  z-index: 1;
+  transform: rotate(4deg);
+}
+.stack__card--front {
   left: 0;
-  width: 32px;
-  height: 2px;
-  background: var(--color-accent);
+  bottom: 0;
+  z-index: 2;
+  width: 80%;
+  transform: rotate(-2.5deg);
 }
-.fact b {
-  display: block;
-  font-size: var(--text-md);
+
+/* A device: a frame around a screen. The desktop one is the product window;
+   the phone one is the mobile module, which the product ships as its own
+   composition rather than a narrow copy of the desk. */
+.device { position: relative; }
+.device--phone {
+  width: 196px;
+  padding: 8px;
+  border-radius: 28px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-sunken);
+}
+.device--phone .device__screen {
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--color-background);
+  border: 1px solid var(--hairline);
+}
+.device--desktop { width: 100%; }
+
+/* The phone's own chrome: the app bar the mobile module puts on every screen,
+   a list of channels, and the bar of destinations along the bottom. */
+.mock-speaker {
+  width: 44px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+  margin: 0 auto var(--space-2);
+}
+.mock-appbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--color-surface);
+}
+.mock-appbar .mark { width: 18px; height: 18px; color: var(--color-accent); flex: 0 0 auto; }
+.mock-appbar__name { font-size: var(--text-xs); font-weight: var(--weight-bold); line-height: 1.2; }
+.mock-appbar__sub { font-size: 9px; color: var(--color-text-muted); line-height: 1.2; }
+.mock-body { padding: var(--space-2) 0; min-height: 168px; }
+.mock-label {
+  font-size: 9px;
   font-weight: var(--weight-bold);
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-1);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-3) var(--space-1);
 }
-.fact span {
+.mock-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+.mock-row .hash { color: var(--color-text-muted); }
+.mock-row--active { background: var(--tint-strong); color: var(--color-text-primary); font-weight: var(--weight-semibold); }
+.mock-badge {
+  margin-left: auto;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 9px;
+  font-weight: var(--weight-bold);
+  text-align: center;
+}
+.mock-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid var(--hairline);
+  background: var(--color-surface);
+}
+.mock-tabs span {
+  display: grid;
+  place-items: center;
+  padding: var(--space-2) 0;
+  color: var(--color-text-muted);
+}
+.mock-tabs .icon { width: 16px; height: 16px; }
+.mock-tabs .is-active { color: var(--color-accent); }
+
+/* The wide strip that sits under the hero. Its columns are divided by rules
+   rather than by gaps, and it carries facts, not numbers. */
+.strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.strip__cell {
+  padding: var(--space-6);
+  border-left: 1px solid var(--hairline);
+}
+.strip__cell:first-child { border-left: 0; }
+.strip__cell b {
+  display: block;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  margin-bottom: var(--space-2);
+}
+.strip__cell span {
   display: block;
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: var(--leading-relaxed);
-  max-width: 36ch;
+}
+.strip__cell .kicker { margin-bottom: var(--space-3); }
+
+@media (max-width: 900px) {
+  .strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .strip__cell:nth-child(3) { border-left: 0; }
+  .strip__cell:nth-child(n + 3) { border-top: 1px solid var(--hairline); }
+}
+@media (max-width: 560px) {
+  .strip { grid-template-columns: 1fr; }
+  .strip__cell { border-left: 0; }
+  .strip__cell:nth-child(n + 2) { border-top: 1px solid var(--hairline); }
 }
 
 
@@ -707,6 +836,9 @@ main { counter-reset: section; }
 /* The pair where one half is a code sample. The sample gets the wider half, so
    a line of code is not cut off at the edge of its column. */
 .split--code { grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); }
+
+/* A headline inside a split reads as a statement, not a chapter title. */
+.split h2 { font-size: var(--display-lg); line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 var(--space-3); }
 
 /* A feature list is ruled rows, not boxes. The icon is a small square on the
    right, so the text keeps the room. */
@@ -858,8 +990,297 @@ main { counter-reset: section; }
   background: radial-gradient(560px 260px at 100% 0%, var(--glow-a), transparent 70%);
   pointer-events: none;
 }
+/* The closing band carries the brand's eclipse behind it, so the last thing on
+   the page is a picture of the brand rather than a slab of colour. */
+.band--eclipse {
+  background: var(--color-surface-sunken) no-repeat;
+  background-image: var(--bg-eclipse);
+  background-size: cover;
+  background-position: center;
+  border-color: var(--hairline);
+}
+.band--eclipse::after {
+  background:
+    radial-gradient(560px 260px at 100% 0%, var(--glow-a), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-background) 35%, transparent), color-mix(in srgb, var(--color-background) 78%, transparent));
+}
+:root[data-theme="light"] .band--eclipse { background-image: none; }
+
 .band h2 { font-size: var(--display-lg); margin: 0 0 var(--space-3); max-width: 22ch; }
 .band p { margin: 0 0 var(--space-6); max-width: 62ch; font-size: var(--text-lg); color: var(--color-text-secondary); }
+
+/* A pill is the shape the brand's own wordmark has, so the one action on a
+   page is sometimes set in it. */
+.btn--pill {
+  border-radius: var(--radius-pill);
+  padding-inline: var(--space-8);
+}
+
+
+/* ==========================================================================
+   The cinematic band
+   ========================================================================== */
+
+/* A full-width band with the type set like a poster and the product floating
+   in front of it. The picture behind it is the brand's own horizon, darkened
+   so the type stays readable. */
+.cinema {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+  padding: clamp(var(--space-10), 8vw, 7rem) 0;
+}
+.cinema::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--bg-horizon) center center / cover no-repeat;
+}
+/* The darkening over the picture. It is heavy on the left, where the type
+   sits, and light on the right, where the cards float. */
+.cinema::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(100deg, color-mix(in srgb, var(--color-background) 88%, transparent) 12%, color-mix(in srgb, var(--color-background) 62%, transparent) 52%, color-mix(in srgb, var(--color-background) 78%, transparent) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-background) 45%, transparent), transparent 30%, color-mix(in srgb, var(--color-background) 70%, transparent));
+  pointer-events: none;
+}
+:root[data-theme="light"] .cinema::before { display: none; }
+
+.cinema__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
+  gap: clamp(var(--space-6), 4vw, var(--space-10));
+  align-items: end;
+  margin-bottom: clamp(var(--space-8), 5vw, var(--space-11));
+}
+.cinema__head h2 {
+  font-size: var(--display-monument-sm);
+  font-weight: 800;
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.cinema__head h2 em { font-style: normal; color: var(--color-accent); }
+.cinema__head p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+}
+
+/* The floating cards. Each one is a different height and a different depth,
+   and they lean on each other the way objects on a table do. */
+.floaters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+.floater {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.floater:nth-child(2) { margin-top: var(--space-8); }
+.floater:nth-child(3) { margin-top: var(--space-4); }
+.floater__screen {
+  padding: var(--space-4);
+  background: var(--color-surface-sunken);
+  border-bottom: 1px solid var(--hairline);
+}
+/* The cards hold the client's own interface, at the size a card can carry. */
+.floater__screen .mini-channel-group { padding: 0; }
+.floater__screen .mini-channel { padding: 3px var(--space-2); font-size: var(--text-xs); }
+.floater__screen .mini-channel-label { font-size: 9px; padding: 0 var(--space-2) var(--space-2); }
+.floater__screen .mini-messages { padding: 0; gap: var(--space-3); }
+.floater__screen .mini-msg { grid-template-columns: 22px minmax(0, 1fr); gap: var(--space-2); }
+.floater__screen .mini-avatar { width: 22px; height: 22px; font-size: 10px; }
+.floater__screen .mini-msg-head .who { font-size: var(--text-xs); }
+.floater__screen .mini-msg p { font-size: 10px; line-height: 1.4; }
+.floater__screen .mini-members { padding: 0; background: none; border-left: 0; }
+.floater__screen .mini-member { padding: 2px 0; }
+.floater__screen .mini-member .who { font-size: var(--text-xs); }
+.floater__screen .mini-member .role { font-size: 9px; }
+.floater__body { padding: var(--space-4); }
+.floater__body h3 { margin: 0 0 var(--space-1); font-size: var(--text-md); }
+.floater__body p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+/* The small round control in the corner of a card, the way a gallery carries
+   one. */
+.floater__control {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  width: 30px; height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-circle);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+.floater__control .icon { width: 15px; height: 15px; }
+
+@media (max-width: 760px) {
+  .cinema__head { grid-template-columns: 1fr; }
+  .floaters { grid-template-columns: 1fr; }
+  .floater:nth-child(2), .floater:nth-child(3) { margin-top: 0; }
+}
+
+
+/* ==========================================================================
+   The framed product sheet
+   ========================================================================== */
+
+/* The large preview: a browser-like frame around what is really there. It is
+   the biggest object on the page and it is meant to be looked at. */
+.showcase {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.showcase__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--color-surface-sunken);
+}
+.showcase__dots { display: flex; gap: 6px; }
+.showcase__dots span {
+  width: 9px; height: 9px;
+  border-radius: var(--radius-circle);
+  background: var(--color-border-strong);
+}
+.showcase__url {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  padding: 2px var(--space-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+.showcase__body { background: var(--color-surface-sunken); }
+.showcase__body pre { margin: 0; border: 0; border-radius: 0; background: transparent; }
+
+
+/* ==========================================================================
+   Light that runs along the edge
+   ========================================================================== */
+
+/* The flame, wrapped around a section's edge rather than laid across it. */
+.streak {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(42px);
+  opacity: 0.5;
+  z-index: -1;
+}
+.streak--ember { background: var(--wave-ember); }
+.streak--warm { background: var(--wave-warm); }
+
+
+/* ==========================================================================
+   Editorial pages
+   ========================================================================== */
+
+/* Oversized type, set in lines that are broken by hand rather than by the
+   width of a column. The space around it does the work. */
+.editorial__type {
+  font-size: var(--display-monument-sm);
+  font-weight: 800;
+  line-height: 0.94;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.editorial__type span { display: block; }
+.editorial__type em { font-style: normal; color: var(--color-accent); }
+.editorial__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(var(--space-8), 5vw, var(--space-11));
+  align-items: start;
+}
+.editorial__copy { max-width: 46ch; }
+.editorial__copy p { color: var(--color-text-secondary); font-size: var(--text-lg); line-height: var(--leading-relaxed); }
+
+/* The asymmetric arrangement: a tall phone rises above a wider window, and
+   the two overlap rather than sitting in a grid. */
+.asym {
+  position: relative;
+  min-height: 380px;
+}
+.asym__item { position: absolute; }
+.asym__item--phone { right: 4%; top: 0; z-index: 2; }
+.asym__item--wide { left: 0; bottom: 0; z-index: 1; width: 78%; }
+
+@media (max-width: 900px) {
+  .editorial__body { grid-template-columns: 1fr; }
+  .asym { min-height: 0; display: grid; gap: var(--space-5); }
+  .asym__item { position: static; width: auto !important; }
+}
+
+
+/* ==========================================================================
+   A row of figures
+   ========================================================================== */
+
+/* The strip of figures. The groups are separated by rules, not by gaps, so the
+   row reads as one instrument panel. */
+.figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.figures__cell {
+  padding: var(--space-7) var(--space-6);
+  border-left: 1px solid var(--hairline);
+}
+.figures__cell:first-child { border-left: 0; padding-left: 0; }
+.figures__cell b {
+  display: block;
+  font-size: var(--display-md);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: var(--space-2);
+}
+.figures__cell b em { font-style: normal; color: var(--color-accent); }
+.figures__cell span {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  max-width: 26ch;
+}
+@media (max-width: 900px) {
+  .figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .figures__cell:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .figures__cell:nth-child(n + 3) { border-top: 1px solid var(--hairline); }
+}
+@media (max-width: 560px) {
+  .figures { grid-template-columns: 1fr; }
+  .figures__cell { border-left: 0; padding-left: 0; }
+  .figures__cell:nth-child(n + 2) { border-top: 1px solid var(--hairline); }
+}
 
 .pill-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .pill {
@@ -1217,7 +1638,8 @@ main { counter-reset: section; }
 .page { padding-bottom: var(--section-pad); }
 
 /* The head of a page. A short ember tick sits on its bottom rule, which is the
-   only decoration a document page carries. */
+   only decoration a document page carries. The title is set large and in
+   capitals, the way a section of a long document announces itself. */
 .page-head {
   position: relative;
   padding: var(--page-pad) 0 var(--space-8);
@@ -1234,18 +1656,32 @@ main { counter-reset: section; }
   background: var(--color-accent);
 }
 .page-head h1 {
-  font-size: var(--display-lg);
-  line-height: 1.06;
-  letter-spacing: -0.025em;
-  margin: 0 0 var(--space-4);
-  max-width: 22ch;
+  font-size: var(--display-monument-sm);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  margin: 0 0 var(--space-5);
+  max-width: 18ch;
 }
 .page-head .lede {
   margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--text-lg);
   line-height: var(--leading-relaxed);
-  max-width: 64ch;
+  max-width: 62ch;
+}
+
+/* The legal pages are read, not looked at. Their titles are set the way a
+   document sets a title - in sentence case, at a document's size - and the
+   page carries no picture and no cinema. */
+[data-crumbs="Legal"] .page-head h1 {
+  font-size: var(--display-lg);
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.05;
+  max-width: 26ch;
 }
 
 .prose-layout {
@@ -1786,6 +2222,19 @@ select.dir-control { width: auto; cursor: pointer; }
   place-items: center;
   text-align: center;
 }
+/* The brand's eclipse behind the missing page: a picture, not a colour field,
+   so the error still belongs to the site. The glow in front of it keeps the
+   type readable. */
+.error-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--bg-eclipse) center / cover no-repeat;
+  opacity: 0.32;
+  pointer-events: none;
+}
+:root[data-theme="light"] .error-hero::before { display: none; }
 .error-hero::after {
   content: "";
   position: absolute;
@@ -1855,6 +2304,13 @@ select.dir-control { width: auto; cursor: pointer; }
 
 @media (max-width: 900px) {
   .fact-strip { gap: var(--space-4); }
+  /* The framed composition is a picture on a wide screen and a pair of
+     pictures on a narrow one. The cards stop overlapping and take turns. */
+  .stack { display: grid; gap: var(--space-5); padding: 0; min-height: 0; }
+  .stack__frame { display: none; }
+  .stack__card { position: static; transform: none; }
+  .stack__card--front { order: 1; width: auto; }
+  .stack__card--back { order: 2; display: flex; justify-content: center; }
 }
 
 @media (max-width: 760px) {

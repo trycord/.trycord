@@ -134,6 +134,83 @@
         </p>
       </div>
 
+      <!--
+        The one place this page uses a product preview instead of a card: the
+        same layered window the home page uses, mounted from the demo client,
+        so the page shows the product rather than only naming its parts.
+      -->
+      <section class="section">
+        <div class="wrap">
+          <div class="split">
+            <div>
+              <p class="kicker">The interface</p>
+              <h2>One window runs every conversation</h2>
+              <p>
+                Channels and roles, direct messages, search, files, moderation and
+                the appeals that follow it, all in the same client. What is on the
+                right is the product itself; the demo runs it live.
+              </p>
+              <div class="cta mt-5">
+                <a class="btn btn-primary btn--pill" href="/demo">Open the demo</a>
+                <a class="btn btn-ghost btn--pill" href="/app/" data-app-link>Open the app</a>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="stack__frame" aria-hidden="true"></div>
+
+              <div class="stack__card stack__card--back">
+                <div class="device device--phone">
+                  <div class="device__screen">
+                    <div class="mock-speaker" aria-hidden="true"></div>
+                    <div class="mock-appbar">
+                      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+                        <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+                        <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+                        <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+                        <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+                      </svg>
+                      <div>
+                        <div class="mock-appbar__name">Studio Twelve</div>
+                        <div class="mock-appbar__sub">128 members &middot; 4 channels</div>
+                      </div>
+                    </div>
+                    <div class="mock-body">
+                      <p class="mock-label">Channels</p>
+                      <div class="mock-row mock-row--active"><span class="hash">#</span> general <span class="mock-badge">3</span></div>
+                      <div class="mock-row"><span class="hash">#</span> showcase</div>
+                      <div class="mock-row"><span class="hash">#</span> feedback</div>
+                      <div class="mock-row"><span class="hash">#</span> off-topic</div>
+                    </div>
+                    <nav class="mock-tabs" aria-hidden="true">
+                      <span class="is-active"><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></g></svg></span>
+                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></g></svg></span>
+                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></g></svg></span>
+                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></g></svg></span>
+                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></g></svg></span>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stack__card stack__card--front">
+                <div class="device device--desktop">
+                  <div class="app-window">
+                    <div class="app-titlebar">
+                      <span class="dot" aria-hidden="true"></span>
+                      <span class="dot" aria-hidden="true"></span>
+                      <span class="dot" aria-hidden="true"></span>
+                      <span class="app-url">Trycord</span>
+                    </div>
+                    <div data-demo="compact"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="section">
         <div class="section-head">
           <p class="kicker">Conversations</p>
@@ -383,6 +460,8 @@
   </footer>
 
   <script src="/js/public-api.js"></script>
+  <script src="/js/sample-data.js"></script>
+  <script src="/js/demo.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>

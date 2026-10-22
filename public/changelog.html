@@ -139,7 +139,7 @@
       <ol class="timeline">
         <li>
           <p class="when">6.1.3 &middot; 2026-10-22</p>
-          <h2>The public site gets a new shape</h2>
+          <h2>The public site is redesigned</h2>
           <ul>
             <li><strong>Added</strong> — the public site has a new composition - the brand's own artwork in the hero, an ember seam through the pages, and a homepage rebuilt around the live client</li>
             <li><strong>Fixed</strong> — the reading measure was silently broken - a missing token dropped the padding of every section, the gap between the halves of a split, and the padding of the band</li>
@@ -149,14 +149,14 @@
         </li>
         <li>
           <p class="when">6.0.10 &middot; 2026-10-22</p>
-          <h2>The status page says whether calls will work</h2>
+          <h2>Voice checks work from outside the host</h2>
           <ul>
             <li><strong>Fixed</strong> — the voice stack could only be checked from the loopback</li>
           </ul>
         </li>
         <li>
           <p class="when">6.0.9 &middot; 2026-10-22</p>
-          <h2>The navigation, the contact points, and the homepage that says less</h2>
+          <h2>Navigation regrouped; legal pages carry real contacts</h2>
           <ul>
             <li><strong>Fixed</strong> — the documentation and the developers were buried inside Product</li>
             <li><strong>Fixed</strong> — the legal pages published empty contact fields</li>
@@ -164,7 +164,7 @@
         </li>
         <li>
           <p class="when">6.0.7 &middot; 2026-10-22</p>
-          <h2>The pages fill the page, and the FAQ tells the truth</h2>
+          <h2>Page width restored; the FAQ describes the hosted version</h2>
           <ul>
             <li><strong>Fixed</strong> — the pages left half the width empty, and the type did not follow the screen</li>
             <li><strong>Fixed</strong> — the FAQ said there was no hosted version, and there is one</li>
@@ -172,22 +172,24 @@
         </li>
         <li>
           <p class="when">6.0.5 &middot; 2026-10-22</p>
-          <h2>The pages get their glass, and the feed stops failing</h2>
+          <h2>Feed failure fixed; status checks corrected; the glass styling went in</h2>
           <ul>
             <li><strong>Fixed</strong> — the feed failed on every pass because a column name is a reserved word</li>
             <li><strong>Fixed</strong> — the voice and jobs checks were watching the wrong things</li>
+            <li><strong>Changed</strong> — several surfaces use the glass styling</li>
           </ul>
         </li>
         <li>
           <p class="when">6.0.3 &middot; 2026-10-21</p>
-          <h2>The voice page asks for an administrator, and the console says who</h2>
+          <h2>Voice settings require an administrator; the console names the actor</h2>
           <ul>
             <li><strong>Fixed</strong> — the voice page could change the instance without an administrator</li>
+            <li><strong>Fixed</strong> — the developer console did not say which account performed an action</li>
           </ul>
         </li>
         <li>
           <p class="when">6.0.2 &middot; 2026-10-21</p>
-          <h2>The relay other hosts can use, and the pages that stopped showing what they should not</h2>
+          <h2>Voice relay setup and status pages; leftover attributes removed</h2>
           <ul>
             <li><strong>Added</strong> — the voice process has a page that says whether the stack is working, and pages to configure the relay and to mint a credential</li>
             <li><strong>Fixed</strong> — the credentials the relay issued could fail the relay's own check</li>
@@ -196,7 +198,7 @@
         </li>
         <li>
           <p class="when">5.9.6 &middot; 2026-10-21</p>
-          <h2>The bots' own account, the developer guide, and the settings that were read from nowhere</h2>
+          <h2>The developer guide, bot reading routes, and read-path fixes</h2>
           <ul>
             <li><strong>Added</strong> — the developer guide is published, and the developer console links to it</li>
             <li><strong>Added</strong> — a bot can read its community, its members, its channels and its roles</li>
@@ -212,114 +214,120 @@
         </li>
         <li>
           <p class="when">5.5.0 &middot; 2026-10-21</p>
-          <h2>A face in the person sheet on a phone, and a switch for an application</h2>
+          <h2>Person sheet avatar on mobile; application switch</h2>
           <ul>
-            <li><strong>Added</strong> — a face in the person sheet on a phone, and a switch for an application</li>
+            <li><strong>Added</strong> — the person sheet on a phone shows the person's avatar, and applications have a switch in the community's integration settings</li>
           </ul>
         </li>
         <li>
           <p class="when">5.4.0 &middot; 2026-10-21</p>
-          <h2>The reader chooses the part of the picture that is the picture</h2>
+          <h2>Picture cropper on upload</h2>
           <ul>
-            <li><strong>Added</strong> — the reader chooses the part of the picture that is the picture</li>
+            <li><strong>Added</strong> — uploads can be cropped before they are sent: you choose which part of the picture is kept</li>
           </ul>
         </li>
         <li>
           <p class="when">5.3.0 &middot; 2026-10-21</p>
-          <h2>The bots' page, and a switch that switches an application off</h2>
+          <h2>A page for bots, and an application off-switch</h2>
           <ul>
-            <li><strong>Added</strong> — the bots' page, and a switch that switches an application off</li>
+            <li><strong>Added</strong> — a page that manages bots, and a switch that turns an application off</li>
           </ul>
         </li>
         <li>
           <p class="when">5.2.0 &middot; 2026-10-21</p>
-          <h2>A bot that posts as itself, and a scope that says what it means</h2>
+          <h2>Bots post as themselves; scopes state what they allow</h2>
           <ul>
-            <li><strong>Added</strong> — a bot that posts as itself, and a scope that says what it means</li>
+            <li><strong>Added</strong> — a bot can post as itself rather than as the account that made it, and a scope's statement says what it allows</li>
           </ul>
         </li>
         <li>
           <p class="when">5.1.0 &middot; 2026-10-21</p>
-          <h2>A picture at its own size, and an account that keeps up with itself</h2>
+          <h2>Picture viewer at full size; profile picture applies at once</h2>
           <ul>
-            <li><strong>Added</strong> — a picture at its own size, and an account that keeps up with itself</li>
+            <li><strong>Added</strong> — a picture opened from a message can be read fitted to the window or at its own size; the frame scrolls either way, and the keyboard does it too</li>
+            <li><strong>Fixed</strong> — a newly chosen profile picture reaches the rest of the application at once; the account button in the corner is redrawn immediately rather than after you leave the page and come back</li>
           </ul>
         </li>
         <li>
           <p class="when">5.0.0 &middot; 2026-10-21</p>
-          <h2>The SDK: trycord-botjs, for the API this server already has</h2>
+          <h2>The bot SDK, trycord-botjs</h2>
           <ul>
-            <li><strong>Added</strong> — the SDK: trycord-botjs, for the API this server already has</li>
+            <li><strong>Added</strong> — the SDK, trycord-botjs: typed access to the routes this server already has</li>
           </ul>
         </li>
         <li>
           <p class="when">4.9.0 &middot; 2026-10-21</p>
-          <h2>A bot is a bot, and not the developer who made it</h2>
+          <h2>Bot accounts are separate from their developers</h2>
           <ul>
-            <li><strong>Added</strong> — a bot is a bot, and not the developer who made it</li>
+            <li><strong>Added</strong> — a bot has its own account: a message a bot sends comes from the bot, not from the developer who made it</li>
           </ul>
         </li>
         <li>
           <p class="when">4.8.0 &middot; 2026-10-21</p>
-          <h2>The relay answers where the clients are given, and a picture is a picture</h2>
+          <h2>Voice room occupants; relay checks what clients receive</h2>
           <ul>
-            <li><strong>Added</strong> — the relay answers where the clients are given, and a picture is a picture</li>
+            <li><strong>Added</strong> — a voice room lists the people in it, and a channel list can be joined on a phone without the trip through the room's page</li>
+            <li><strong>Fixed</strong> — the relay's reachability check asked an IPv6 address over an IPv4 socket, so every probe failed and read as "the relay is not answering"; the socket now speaks the family of the address it asks, and it checks the published addresses the clients are given</li>
+            <li><strong>Fixed</strong> — the desktop can set a community's face, and a personal picture uploads the moment it is chosen rather than waiting for the profile to be saved</li>
           </ul>
         </li>
         <li>
           <p class="when">4.7.0 &middot; 2026-10-21</p>
-          <h2>One table of what can be done to a thing, and the truth in the voice console</h2>
+          <h2>A permissions table for communities; the voice console reports the real stack</h2>
           <ul>
-            <li><strong>Added</strong> — one table of what can be done to a thing, and the truth in the voice console</li>
+            <li><strong>Added</strong> — one table lists what each part of a community may do</li>
+            <li><strong>Changed</strong> — the voice console reports what the voice stack is actually doing rather than what its configuration implies</li>
           </ul>
         </li>
         <li>
           <p class="when">4.6.0 &middot; 2026-10-21</p>
-          <h2>The mesh is turnkey, and the relay answers where a client can reach it</h2>
+          <h2>Voice relay configuration and the addresses it answers on</h2>
           <ul>
-            <li><strong>Added</strong> — the mesh is turnkey, and the relay answers where a client can reach it</li>
+            <li><strong>Added</strong> — the relay can be configured end to end from the environment, and the server tells a client the address the relay answers on</li>
           </ul>
         </li>
         <li>
           <p class="when">4.5.0 &middot; 2026-10-21</p>
-          <h2>The sidebar glides, the layers are one band, and the browser harness stops lying</h2>
+          <h2>Sidebar animation, one shell layer band, and a harness that measures</h2>
           <ul>
-            <li><strong>Added</strong> — the sidebar glides, and the browser harness stops lying</li>
+            <li><strong>Fixed</strong> — the browser harness's stub carried a syntax error, so the sweep measured a sign-in screen 148 times and reported every page clean; the stub now announces itself, and a sweep without it is a fault</li>
+            <li><strong>Added</strong> — the sidebar and the mobile drawer animate their movement, and the shell's panels share one layer band that sits below the menus, toasts and dialogs</li>
+            <li><strong>Added</strong> — pages without a column of their own carry the reader's places, the search answer carries the conversation each hit came from, and a phone in landscape takes the desktop's columns</li>
           </ul>
         </li>
         <li>
           <p class="when">4.4.0 &middot; 2026-10-21</p>
-          <h2>The community's own rules, its notes, and what its members may do</h2>
+          <h2>Community rules, notes, and member permissions</h2>
           <ul>
             <li><strong>Added</strong> — a community's rules, its notes, and what its members may do</li>
           </ul>
         </li>
         <li>
           <p class="when">4.3.0 &middot; 2026-10-21</p>
-          <h2>A message can be swiped to reply to</h2>
+          <h2>Swipe to reply</h2>
           <ul>
-            <li><strong>Added</strong> — a message can be swiped to reply to</li>
+            <li><strong>Added</strong> — a message can be swiped on to reply to it</li>
           </ul>
         </li>
         <li>
           <p class="when">4.2.0 &middot; 2026-10-21</p>
-          <h2>The gates in two panes, and the instance on the form</h2>
+          <h2>Sign-in and registration in two panes</h2>
           <ul>
-            <li><strong>Added</strong> — the gates are in two panes, with the instance named on the form</li>
+            <li><strong>Added</strong> — the sign-in and registration pages have two panes, and the form names the instance</li>
           </ul>
         </li>
         <li>
           <p class="when">4.1.2 &middot; 2026-10-21</p>
-          <h2>The gates have two panes, and the sign-in says which instance</h2>
+          <h2>The gated pages in two panes, the sign-in's instance, and a stray null</h2>
           <ul>
-            <li><strong>Added</strong> — the gates are in two panes, with the instance named</li>
+            <li><strong>Added</strong> — the gated pages are in two panes, with the instance named</li>
             <li><strong>Fixed</strong> — the null was still printed, because the rule was put on an object nothing calls</li>
             <li><strong>Fixed</strong> — the sign-in did not say which instance a reader was signing in to</li>
           </ul>
         </li>
         <li>
           <p class="when">4.0.3 &middot; 2026-10-21</p>
-          <h2>The extension surface is a range</h2>
+          <h2>Extension API version range, and three small fixes</h2>
           <ul>
             <li><strong>Fixed</strong> — the extension surface was one number, and only a package built against the running release installed</li>
             <li><strong>Fixed</strong> — the phone never showed the roles of a person in a community</li>
@@ -328,7 +336,7 @@
         </li>
         <li>
           <p class="when">4.0.0 &middot; 2026-10-21</p>
-          <h2>The sidebar could be tapped, and nothing printed null</h2>
+          <h2>Pressable sidebar, a stray null printed, and host-side account recovery</h2>
           <ul>
             <li><strong>Fixed</strong> — the sidebar was drawn under the scrim, so none of its links could be pressed</li>
             <li><strong>Fixed</strong> — a page that rendered a conditional printed the word null where there was nothing</li>
@@ -338,28 +346,28 @@
         </li>
         <li>
           <p class="when">3.9.0 &middot; 2026-10-21</p>
-          <h2>Every route measured, and a profile that says who somebody is</h2>
+          <h2>Touch targets, an audited route surface, and a writable profile</h2>
           <ul>
             <li><strong>Fixed</strong> — the control that creates a channel was twenty pixels square</li>
             <li><strong>Fixed</strong> — the way back on the public pages was forty pixels tall</li>
             <li><strong>Fixed</strong> — a segmented item was a pixel short of a finger</li>
-            <li><strong>Fixed</strong> — the profile said Profile rather than the name of the person</li>
+            <li><strong>Fixed</strong> — the profile page said Profile rather than the name of the person</li>
             <li><strong>Fixed</strong> — the profile said the date of the membership twice</li>
             <li><strong>Added</strong> — the profile can be written to, and the roles are chips in their colours</li>
           </ul>
         </li>
         <li>
           <p class="when">3.8.0 &middot; 2026-10-21</p>
-          <h2>A conversation of more than two people</h2>
+          <h2>Group conversations</h2>
           <ul>
-            <li><strong>Added</strong> — a conversation of more than two people: it has a name, it can be started, and it can be changed</li>
+            <li><strong>Added</strong> — a conversation of more than two people: it has a name, and it can be started and changed</li>
           </ul>
         </li>
         <li>
           <p class="when">3.7.3 &middot; 2026-10-21</p>
-          <h2>The communities that live on another instance, and a sweep of every route</h2>
+          <h2>Remote communities listed; test cleanups</h2>
           <ul>
-            <li><strong>Added</strong> — the communities that live on another instance are listed in a section of their own, with a page of their own</li>
+            <li><strong>Added</strong> — communities on another instance are listed in a section of their own, with a page of their own</li>
             <li><strong>Fixed</strong> — the place column could not be drawn and said nothing about why</li>
             <li><strong>Fixed</strong> — the tests left a database behind every time they were interrupted</li>
             <li><strong>Fixed</strong> — the browser harness left its profile behind and filled the disk</li>
@@ -367,7 +375,7 @@
         </li>
         <li>
           <p class="when">3.6.20 &middot; 2026-10-20</p>
-          <h2>The roles in their colours, and a harness that measures this product</h2>
+          <h2>Role colours, roster and profile fixes, and honest checks</h2>
           <ul>
             <li><strong>Fixed</strong> — the role colours were never drawn, because no rule read the colour</li>
             <li><strong>Fixed</strong> — the roster never showed the roles, because the row read a field the roster does not send</li>
@@ -381,7 +389,7 @@
         </li>
         <li>
           <p class="when">3.6.12 &middot; 2026-10-20</p>
-          <h2>The pictures, the previews, and the phone</h2>
+          <h2>Picture cache, link previews, and mobile tap sizes</h2>
           <ul>
             <li><strong>Fixed</strong> — a picture that was replaced did not change, because the media cache was never emptied</li>
             <li><strong>Fixed</strong> — the picture was looked for under a different name on every surface, and the wrong one showed initials</li>
@@ -393,7 +401,7 @@
         </li>
         <li>
           <p class="when">3.6.6 &middot; 2026-10-20</p>
-          <h2>Six faults, found by running the suites</h2>
+          <h2>Six bugs, found by running the suites</h2>
           <ul>
             <li><strong>Fixed</strong> — the enforcement actions on an account were refused, so the menu items did nothing</li>
             <li><strong>Fixed</strong> — every installed extension was broken, because the extension API version was the application version</li>
@@ -405,114 +413,115 @@
         </li>
         <li>
           <p class="when">3.6.0 &middot; 20 October 2026</p>
-          <h2>The voice stack that answers, the bots that listen, and the settings that have one owner</h2>
+          <h2>The voice process, bot events, onboarding, and one version owner</h2>
           <ul>
-            <li><strong>Fixed</strong> — the context menu closed when it was scrolled, and a closed menu left a handler behind that closed live menus.</li>
-            <li><strong>Fixed</strong> — the poll editor threw on every click, so the whole poll surface was unreachable.</li>
-            <li><strong>Fixed</strong> — removing your own picture threw, because the account settings called a function that was not in scope.</li>
-            <li><strong>Fixed</strong> — the phone threw on a poll that had a voter, and on the poll editor.</li>
-            <li><strong>Fixed</strong> — the instance answered every STUN request with nothing, because the encoder used a constant that was never defined and the handler threw the error away.</li>
-            <li><strong>Fixed</strong> — the document editor refused a heading written with a single hash, and accused the writer of using two or three.</li>
-            <li><strong>Fixed</strong> — the place column disappeared at 125% zoom, because the width it turned at was a laptop width and not a phone width.</li>
-            <li><strong>Fixed</strong> — the registration form had no place to accept the documents, and the button said nothing about why it was closed.</li>
-            <li><strong>Fixed</strong> — the voice settings could be changed in two places at once, and the two could disagree.</li>
-            <li><strong>Fixed</strong> — the instance directory did not exist, and the register page linked to it.</li>
-            <li><strong>Fixed</strong> — the community settings mount swallowed the route a reader uses to join a community.</li>
-            <li><strong>Added</strong> — the voice subsystem is a process of its own, with its own health and its own diagnostics.</li>
-            <li><strong>Added</strong> — an application can listen: the gateway hands a bot the same events a webhook is handed.</li>
-            <li><strong>Added</strong> — community onboarding: the welcome, the rules, and the questions, and what an answer does.</li>
-            <li><strong>Added</strong> — the instance directory is a page of the public site.</li>
-            <li><strong>Added</strong> — the workspace uses the width it is given, and the card head stops clipping its button.</li>
-            <li><strong>Added</strong> — the client and the backend are checked for the names they use and do not have.</li>
-            <li>The sign-in and registration pages now stand alone. The shell that was meant to hide was not hiding: a component that sets its own display beats the browser's rule for the hidden attribute, so the empty shell kept the viewport and pushed the page below it.</li>
-            <li>The demo and the community directory reach the instance again. The public site and the API are different origins in a real deployment, and the pages were asking for a relative path that the site cannot answer; they now resolve the address the same way the application does.</li>
-            <li>The deployment build was shipping an old tree: it fetched the newest source and then checked out the branch it already had. It now deploys what it fetched.</li>
-            <li>Instance discovery, per-instance sessions, an in-house search index, backups with a restore path, housekeeping, and one honest report per subsystem all land in this release.</li>
-            <li>The version is reported by the server, the API and the application, and all of them say the same thing.</li>
+            <li><strong>Fixed</strong> — the context menu closed when it was scrolled, and a closed menu left a handler behind that closed live menus</li>
+            <li><strong>Fixed</strong> — the poll editor threw on every click, so the whole poll surface was unreachable</li>
+            <li><strong>Fixed</strong> — removing your own picture threw, because the account settings called a function that was not in scope</li>
+            <li><strong>Fixed</strong> — the phone threw on a poll that had a voter, and on the poll editor</li>
+            <li><strong>Fixed</strong> — the instance answered every STUN request with nothing, because the encoder used a constant that was never defined and the handler threw the error away</li>
+            <li><strong>Fixed</strong> — the document editor refused a heading written with a single hash, and accused the writer of using two or three</li>
+            <li><strong>Fixed</strong> — the place column disappeared at 125% zoom, because the width it turned at was a laptop width and not a phone width</li>
+            <li><strong>Fixed</strong> — the registration form had no place to accept the documents, and the button said nothing about why it was closed</li>
+            <li><strong>Fixed</strong> — the voice settings could be changed in two places at once, and the two could disagree</li>
+            <li><strong>Fixed</strong> — the instance directory did not exist, and the register page linked to it</li>
+            <li><strong>Fixed</strong> — the community settings mount swallowed the route a reader uses to join a community</li>
+            <li><strong>Added</strong> — the voice subsystem is a process of its own, with its own health and its own diagnostics</li>
+            <li><strong>Added</strong> — an application can listen: the gateway hands a bot the same events a webhook is handed</li>
+            <li><strong>Added</strong> — community onboarding: the welcome, the rules, and the questions, and what an answer does</li>
+            <li><strong>Added</strong> — the instance directory is a page of the public site</li>
+            <li><strong>Added</strong> — the workspace uses the width it is given, and the card head stops clipping its button</li>
+            <li><strong>Added</strong> — the client and the backend are checked for the names they use and do not have</li>
+            <li><strong>Fixed</strong> — the sign-in and registration pages stood in an empty shell that was meant to hide but did not: a component that sets its own display beats the browser's rule for the hidden attribute, so the empty shell kept the viewport and pushed the page below it. They now stand alone</li>
+            <li><strong>Fixed</strong> — the demo and the community directory could not reach the instance: the public site and the API are different origins in a real deployment, and the pages were asking for a relative path the site cannot answer. They now resolve the address the same way the application does</li>
+            <li><strong>Fixed</strong> — the deployment build was shipping an old tree: it fetched the newest source and then checked out the branch it already had. It now deploys what it fetched</li>
+            <li><strong>Added</strong> — instance discovery, per-instance sessions, an in-house search index, backups with a restore path, housekeeping, and one honest report per subsystem</li>
+            <li><strong>Changed</strong> — the version is reported by the server, the API and the application, and all of them say the same thing</li>
           </ul>
         </li>
         <li>
           <p class="when">2.5.0 &middot; 19 October 2026</p>
-          <h2>One backend, a chosen instance, and a machine that is not fighting itself</h2>
+          <h2>One backend, one asset library, and the self-hosting paths</h2>
           <ul>
-            <li>The backend was consolidated on <code>backend/</code>: the features and tables that lived only in the legacy <code>server/</code> package were merged in, and a production instance now runs one backend instead of the split that had drifted.</li>
-            <li>The application was put on the canonical asset library: one generated set of design tokens that the app, the themes and the website all read.</li>
-            <li>A configuration centre was added where every setting shown actually does something, and mail gained a provider registry with an admin console.</li>
-            <li>Registration approval was added, with the migration parity check that had been missing.</li>
-            <li>Realtime naming was made consistent across the gateway and the client, kept in agreement by a check rather than by discipline.</li>
-            <li>This public site was rebuilt as its own composition, with a working demo and a public community directory, instead of a smaller copy of the app's layout.</li>
-            <li>Registration now takes an instance: browse the instances an instance knows about, or give the address of one you run. The address is checked against that instance before it is accepted, and a session belongs to the instance that issued it, so switching never carries a token across.</li>
-            <li>Search became an in-house index that works on every database this runs on, and the permission check lives inside it: a message from a community you are not in cannot answer a query.</li>
-            <li>Backups can be taken from the administration page and put back with a command that verifies the dump first and asks for the database name before it replaces anything.</li>
-            <li>The administration pages grew a rail, so every settings door and every moderation queue is one click away, and a diagnostics page that reports each subsystem as it really is rather than as its configuration implies.</li>
-            <li>The voice path is the in-house one, and an administrator's saved choice is what takes effect: the provider used to be read from the environment, which meant a setting that saved and changed nothing.</li>
-            <li>Housekeeping came with the jobs: expired sessions, old notifications and finished work are cleaned up on a rhythm that survives a restart.</li>
-            <li>The automated check suite was removed. It booted whole instances and started browsers, and on a small host it was more load than the product was worth; verification is now a real journey against a running instance.</li>
-            <li>Plain-language passes on error messages, settings and navigation.</li>
+            <li><strong>Changed</strong> — the backend was consolidated on <code>backend/</code>: the features and tables that lived only in the legacy <code>server/</code> package were merged in, and a production instance now runs one backend instead of the split that had drifted</li>
+            <li><strong>Changed</strong> — the application was put on the canonical asset library: one generated set of design tokens that the app, the themes and the website all read</li>
+            <li><strong>Added</strong> — a configuration centre where every setting shown actually does something, and mail with a provider registry and an admin console</li>
+            <li><strong>Added</strong> — registration approval, with the migration parity check that had been missing</li>
+            <li><strong>Changed</strong> — realtime naming is consistent across the gateway and the client, kept in agreement by a check rather than by discipline</li>
+            <li><strong>Added</strong> — this public site was rebuilt as its own composition, with a working demo and a public community directory, instead of a smaller copy of the app's layout</li>
+            <li><strong>Added</strong> — registration takes an instance: browse the instances an instance knows about, or give the address of one you run. The address is checked against that instance before it is accepted, and a session belongs to the instance that issued it, so switching never carries a token across</li>
+            <li><strong>Added</strong> — search is an in-house index that works on every database this runs on, and the permission check lives inside it: a message from a community you are not in cannot answer a query</li>
+            <li><strong>Added</strong> — backups can be taken from the administration page and put back with a command that verifies the dump first and asks for the database name before it replaces anything</li>
+            <li><strong>Added</strong> — the administration pages have a rail, so every settings page and every moderation queue is one click away, and a diagnostics page that reports each subsystem as it really is rather than as its configuration implies</li>
+            <li><strong>Fixed</strong> — the voice path is the in-house one, and an administrator's saved choice is what takes effect: the provider used to be read from the environment, which meant a setting that saved and changed nothing</li>
+            <li><strong>Added</strong> — housekeeping came with the jobs: expired sessions, old notifications and finished work are cleaned up on a rhythm that survives a restart</li>
+            <li><strong>Changed</strong> — the automated check suite was removed. It booted whole instances and started browsers, and on a small host it was more load than the product was worth; verification is now a real journey against a running instance</li>
+            <li><strong>Changed</strong> — error messages, settings and navigation went through a plain-language pass</li>
           </ul>
         </li>
         <li>
           <p class="when">1.6.4 &middot; 3 October 2026</p>
           <h2>Attachments, replies, and a release step that runs anywhere</h2>
           <ul>
-            <li>Attachments in direct messages as well as communities, a tray you can see and undo, and a full-screen lightbox.</li>
-            <li>Replies, with a badge that follows the message it answers.</li>
-            <li>Rich link previews with a per-message opt-out, and an endpoint that declares its arguments instead of guessing.</li>
-            <li>Embeds, analytics and webhooks, and bot applications, behind a single permission gate.</li>
-            <li>The client is told its own server: a self-hosted instance stops advertising someone else's backend, and the server can find the client next to itself.</li>
-            <li>Release verification moved to bash so it runs on every platform, and the browser checks were brought into the repository.</li>
+            <li><strong>Added</strong> — attachments in direct messages as well as communities, with an upload tray you can see and undo, and a full-screen lightbox</li>
+            <li><strong>Added</strong> — replies, with a badge that follows the message it answers</li>
+            <li><strong>Added</strong> — rich link previews with a per-message opt-out, and an endpoint that declares its arguments instead of guessing them</li>
+            <li><strong>Changed</strong> — embeds, analytics and webhooks, and bot applications sit behind a single permission gate</li>
+            <li><strong>Fixed</strong> — the client is told its own server: a self-hosted instance stops advertising someone else's backend, and the server finds the client next to itself</li>
+            <li><strong>Changed</strong> — release verification moved to bash so it runs on every platform, and the browser checks were brought into the repository</li>
           </ul>
         </li>
         <li>
           <p class="when">1.6.3 &middot; 27 September 2026</p>
-          <h2>One seeded role, and the owner inherits everything</h2>
+          <h2>One baseline role, and an owner who inherits everything</h2>
           <ul>
-            <li><code>@everyone</code> is the only seeded role and the community baseline. The owner inherits every permission from ownership rather than from a role, so no Admin or Moderator roles are created for them.</li>
-            <li>Fixed a bug that made the baseline role unconfigurable, and removed self-assignable roles end to end.</li>
-            <li>Context menus added for notifications, friends, invites and search results.</li>
-            <li>The render-crash watchdog no longer mistakes a valid sign-in screen for a hang, and the desktop app gained CORS diagnostics for its own scheme.</li>
+            <li><strong>Changed</strong> — <code>@everyone</code> is the only seeded role and the community baseline. The owner inherits every permission from ownership rather than from a role, so no Admin or Moderator roles are created for the owner</li>
+            <li><strong>Fixed</strong> — a bug made the baseline role unconfigurable, and self-assignable roles were removed end to end</li>
+            <li><strong>Added</strong> — context menus for notifications, friends, invites and search results</li>
+            <li><strong>Fixed</strong> — the render-crash watchdog no longer mistakes a valid sign-in screen for a hang</li>
+            <li><strong>Added</strong> — the desktop app carries CORS diagnostics for its own scheme</li>
           </ul>
         </li>
         <li>
           <p class="when">1.6.2 &middot; 26 September 2026</p>
           <h2>Contextual navigation and a full-width workspace</h2>
           <ul>
-            <li>Navigation rebuilt around contextual shells: a home sidebar and a menu page, with the mobile drawer removed.</li>
-            <li>The workspace layout rebuilt around a full-width chat view, with loading and empty states and a hover bar.</li>
-            <li>A theme system overhaul, including a client that heals itself instead of rendering a blank window when a render crashes.</li>
-            <li>One uniform template across every static public page.</li>
+            <li><strong>Changed</strong> — navigation rebuilt around contextual shells: a home sidebar and a menu page, with the mobile drawer removed</li>
+            <li><strong>Changed</strong> — the workspace layout rebuilt around a full-width chat view, with loading and empty states and a hover bar</li>
+            <li><strong>Changed</strong> — a theme system overhaul, including a client that heals itself instead of rendering a blank window when a render crashes</li>
+            <li><strong>Added</strong> — one uniform template across every static public page</li>
           </ul>
         </li>
         <li>
           <p class="when">1.6.1 &middot; 25 September 2026</p>
-          <h2>Desktop publishing and the portable build</h2>
+          <h2>Desktop builds published</h2>
           <ul>
-            <li>Desktop builds published to the project repository, with the portable Windows build named TrycordPTB.</li>
+            <li><strong>Added</strong> — desktop builds published to the project repository, with the portable Windows build named TrycordPTB</li>
           </ul>
         </li>
         <li>
           <p class="when">1.6.0 and 1.5.0 &middot; 23 September 2026</p>
-          <h2>Themes, and the design system reconciled</h2>
+          <h2>Themes, and a design system that matches the code</h2>
           <ul>
-            <li>A seven-theme ecosystem: token-override themes and a custom palette derivation.</li>
-            <li>The appearance interface with persistence, and the theme restored at boot.</li>
-            <li>The written design system was reconciled with the code so the two could not quietly disagree.</li>
+            <li><strong>Added</strong> — a seven-theme ecosystem: token-override themes and a custom palette derivation</li>
+            <li><strong>Added</strong> — the appearance interface with persistence, and the theme restored at boot</li>
+            <li><strong>Changed</strong> — the written design system was reconciled with the code so the two could not quietly disagree</li>
           </ul>
         </li>
         <li>
           <p class="when">1.0.1 &middot; 20 September 2026</p>
-          <h2>No more blank page on an updated client</h2>
+          <h2>No blank page after a client update</h2>
           <ul>
-            <li>The server never serves a stale client bundle; it shows a reload notice instead of a blank page.</li>
+            <li><strong>Fixed</strong> — the server never serves a stale client bundle; it shows a reload notice instead of a blank page</li>
           </ul>
         </li>
         <li>
           <p class="when">0.5.0 &middot; 19 September 2026</p>
           <h2>Self-hosting, and a configurable database</h2>
           <ul>
-            <li>The client serve path, runtime configuration, and instance state.</li>
-            <li>MySQL and SQLite adapters behind one interface, with a validated boot.</li>
-            <li>CORS origins and the <code>/api/instance</code> endpoint other client work depends on.</li>
+            <li><strong>Added</strong> — the client serve path, runtime configuration, and instance state</li>
+            <li><strong>Added</strong> — MySQL and SQLite adapters behind one interface, with a validated boot</li>
+            <li><strong>Added</strong> — CORS origins and the <code>/api/instance</code> endpoint other client work depends on</li>
           </ul>
         </li>
       </ol>
