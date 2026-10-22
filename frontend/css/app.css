@@ -2567,6 +2567,9 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
   .adminframe-stage { padding: 12px; }
 }
 
+/* The administration frame's filter row: status chips over a queue. */
+.filterchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+
 /* -- the studio rail --------------------------------------------------------- */
 /* Settings and administration: the door list beside the page, grouped the way
  * the registry groups them, current door marked. Collapses to a horizontal
