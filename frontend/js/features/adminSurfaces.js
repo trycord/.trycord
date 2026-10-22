@@ -9,6 +9,7 @@ import Api from '../../packages/api.js';
 import { head, card, row, blank, fault, fold, facts, hold } from '../ui/page.js';
 import { errorToast, toast, confirmDialog, openMenu } from '../ui/overlays.js';
 import { readPrefs, patchPrefs, OVERVIEW_WIDGETS } from '../prefs.js';
+import { setInspector } from '../shell.js';
 
 // -- overview ----------------------------------------------------------------
 
@@ -344,33 +345,151 @@ export function adminCommunities() {
 
 // -- reports -----------------------------------------------------------------
 
+// -- reports: the queue and the case -------------------------------------------------
+
+// The queue's filters are the server's own statuses, so a filter can never
+// ask for a state the server does not have.
+const REPORT_FILTERS = [
+  ['', 'All'],
+  ['OPEN', 'Open'],
+  ['INVESTIGATING', 'Investigating'],
+  ['RESOLVED', 'Resolved'],
+  ['DISMISSED', 'Dismissed'],
+];
+
+// What moving a case to each status means, in the words of the person doing
+// it. The server records every move in the audit log; the words here say
+// what is about to be recorded.
+const REPORT_MOVES = {
+  OPEN: 'Reopen',
+  INVESTIGATING: 'Take it on',
+  RESOLVED: 'Resolve',
+  DISMISSED: 'Dismiss',
+};
+
 export function adminReports() {
   const list = el('div', { class: 'rowlist' });
+  const chips = el('div', { class: 'filterchips', role: 'group', 'aria-label': 'Filter reports by status' });
+  let status = '';
+  let selectedId = null;
+
+  const paintChips = () => {
+    chips.replaceChildren(...REPORT_FILTERS.map(([value, label]) => el('button', {
+      class: 'chip' + (status === value ? ' chip--on' : ''), type: 'button',
+      'aria-pressed': String(status === value),
+      onClick: () => { status = value; paintChips(); paint(); },
+    }, label)));
+  };
+  paintChips();
 
   const paint = async () => {
     list.replaceChildren(hold('Reading the reports'));
     try {
-      const rows = await Api.adminReports({ limit: '50' });
+      const rows = await Api.adminReports(Object.assign({ limit: '100' }, status ? { status } : {}));
       const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
-      list.replaceChildren(...(items.length ? items.map((r) => row({
+      list.replaceChildren(...(items.length ? items.map((report) => row({
         lead: el('span', { class: 'role-dot' }, icon('flag', { size: 15 })),
-        title: r.reason || 'A report',
-        sub: (r.reporterUsername ? 'by ' + r.reporterUsername : '') + (r.targetType ? ' · ' + r.targetType : ''),
-        side: el('button', {
-          class: 'btn btn--ghost btn--sm', type: 'button',
-          'aria-label': 'Update the report',
-          onClick: () => resolveReport(r, paint),
-        }, 'Resolve'),
-        menu: () => [
-          { label: 'Resolve the report', icon: 'check', onSelect: () => resolveReport(r, paint) },
-        ],
+        title: report.reason || 'A report',
+        sub: (report.reporter_name ? 'by ' + report.reporter_name : 'an account')
+          + (report.target_type ? ' · ' + String(report.target_type).replace(/_/g, ' ') : ''),
+        side: el('span', { class: 'chip chip--quiet' }, statusWord(report.status)),
+        onClick: () => {
+          selectedId = report.id;
+          // The case is the panel's, and the panel is rebuilt for it: the
+          // operator's last case is not shown under a new number.
+          setInspector(SPEC);
+        },
       })) : [blank({
-        glyph: 'flag', title: 'No reports',
-        text: 'Reports raised by members appear here.',
+        glyph: 'flag',
+        title: status ? 'Nothing in this state' : 'No reports',
+        text: status
+          ? 'No report is in this state. The other filters have the rest.'
+          : 'A filed report lands here, newest first.',
       })]));
     } catch (e) {
       list.replaceChildren(fold([fault(e, paint)]));
     }
+  };
+
+  // The case: what was reported, who reported it, what is reported, and the
+  // decision. The facts and the allegation are shown as what they are - the
+  // server's record and the reporter's words - and every move is recorded by
+  // the server, never only by this panel.
+  const casePanel = () => {
+    const body = el('div', { class: 'fold fold--tight' });
+
+    const paintCase = async () => {
+      if (!selectedId) {
+        body.replaceChildren(blank({
+          glyph: 'flag',
+          title: 'Pick a report',
+          text: 'The case opens here when you choose one from the list.',
+        }));
+        return;
+      }
+      body.replaceChildren(hold('Opening the case'));
+      try {
+        const report = await Api.adminReport(selectedId);
+        const target = report.targetUser || null;
+        const moves = REPORT_FILTERS.map(([value]) => value)
+          .filter((value) => value && value !== String(report.status || '').toUpperCase())
+          .map((value) => el('button', {
+            class: 'btn btn--default btn--sm', type: 'button',
+            onClick: async () => {
+              // A resolution is a verdict; it is asked for twice, and the
+              // reason travels to the audit log with the move.
+              if (value === 'RESOLVED' || value === 'DISMISSED') {
+                const yes = await confirmDialog({
+                  title: REPORT_MOVES[value] + ' the report?',
+                  body: 'The move is recorded in the audit log with the reason below.',
+                  confirmLabel: REPORT_MOVES[value],
+                  danger: value === 'DISMISSED',
+                });
+                if (!yes) return;
+              }
+              try {
+                await Api.adminUpdateReport(report.id, { status: value });
+                toast(REPORT_MOVES[value] + '. The move is in the audit log.');
+                await paintCase();
+                await paint();
+              } catch (e) { errorToast(e); }
+            },
+          }, REPORT_MOVES[value]));
+
+        body.replaceChildren(
+          facts([
+            { value: statusWord(report.status), label: 'Status' },
+            { value: report.reporter_name || 'An account', label: 'Reported by' },
+            { value: String(report.target_type || '').replace(/_/g, ' ') || '—', label: 'What is reported' },
+            { value: report.resolution || '—', label: 'Resolution' },
+          ]),
+          card({
+            label: 'What was reported', glyph: 'flag',
+            body: el('p', { class: 'lede' }, report.reason || 'No reason was given.'),
+          }),
+          target ? card({
+            label: 'The reported account', glyph: 'user-plus',
+            body: el('p', { class: 'lede' },
+              (target.display_name || target.username || 'An account')
+              + (target.username ? ' @' + target.username : '')),
+          }) : null,
+          card({
+            label: 'The decision', glyph: 'shield',
+            body: el('div', { class: 'actionline' }, moves),
+          }),
+        );
+      } catch (e) {
+        body.replaceChildren(fold([fault(e, paintCase)]));
+      }
+    };
+
+    paintCase();
+    return body;
+  };
+
+  const SPEC = {
+    kind: 'admin-reports',
+    tabs: [{ id: 'case', label: 'Case', icon: 'flag', render: () => casePanel() }],
   };
 
   return {
@@ -378,26 +497,21 @@ export function adminReports() {
       head({
         kicker: 'Moderation',
         title: 'Reports',
-        lede: 'Reports raised by members.',
+        lede: 'What people have flagged, newest first. Pick one to open its case.',
       }),
+      chips,
       card({ label: 'Reports', glyph: 'flag', body: list, flush: true }),
     ]),
-    onMount: paint,
-    cleanup() {},
+    onMount: () => {
+      setInspector(SPEC);
+      paint();
+    },
+    cleanup() { setInspector(null); },
   };
 }
 
-// The actions on one report, one appeal and one data request. The row's
-// buttons and its context menu offer the same things, so they are written
-// once.
-async function resolveReport(report, refresh) {
-  try {
-    await Api.adminUpdateReport(report.id, { status: 'resolved' });
-    toast('Report updated');
-    refresh();
-  } catch (e) { errorToast(e); }
-}
-
+// The actions on one appeal and one data request. The row's buttons and its
+// context menu offer the same things, so they are written once.
 async function decideAppeal(appeal, decision, refresh) {
   try {
     await Api.adminDecideAppeal(appeal.id, decision, decision === 'approve'
