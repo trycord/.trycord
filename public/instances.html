@@ -44,11 +44,8 @@
           <div class="nav-menu nav-menu--wide">
             <div class="nav-menu-grid">
               <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
-              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
-              <a href="/developers"><strong>Developers</strong><span>Build a bot with the API and the SDK.</span></a>
               <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
-              <a href="/changelog"><strong>Changelog</strong><span>What's new in Trycord.</span></a>
-              <a href="/roadmap"><strong>Roadmap</strong><span>What's done and what's coming.</span></a>
+              <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
               <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
             </div>
           </div>
@@ -56,13 +53,29 @@
 
         <div class="nav-group" data-nav-group>
           <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
-            Explore
+            Docs
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
+              <a href="/install"><strong>Install</strong><span>The short version of the install.</span></a>
+              <a href="/faq"><strong>FAQ</strong><span>The questions people ask most.</span></a>
+              <a href="/support"><strong>Support</strong><span>Get help and reach the project.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Developers
             <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
           </button>
           <div class="nav-menu">
-            <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
-            <a href="/instances"><strong>Instances</strong><span>Find an instance to join.</span></a>
-            <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
+            <a href="/developers"><strong>Developer guide</strong><span>Build a bot with the API and the SDK.</span></a>
+            <a href="/developers#the-api-reference"><strong>API reference</strong><span>The routes a bot uses.</span></a>
+            <a href="/developers#the-sdk-trycord-botjs"><strong>SDK</strong><span>The client for those routes.</span></a>
+            <a href="https://github.com/trycord/.trycord" target="_blank" rel="noopener"><strong>Source code</strong><span>The whole repository.</span></a>
           </div>
         </div>
 
@@ -73,9 +86,9 @@
           </button>
           <div class="nav-menu nav-menu--wide">
             <div class="nav-menu-grid">
-              <a href="/support"><strong>Support</strong><span>Get help and reach the project.</span></a>
+              <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
+              <a href="/instances"><strong>Instances</strong><span>Find an instance to join.</span></a>
               <a href="https://discord.gg/dSF7eqsJuP" target="_blank" rel="noopener"><strong>Discord</strong><span>Join the community chat.</span></a>
-              <a href="/security"><strong>Security</strong><span>How to report a vulnerability.</span></a>
               <a href="/trust-and-safety"><strong>Trust and safety</strong><span>Rules, reporting, and appeals.</span></a>
             </div>
           </div>
@@ -88,10 +101,9 @@
           </button>
           <div class="nav-menu">
             <a href="/about"><strong>About Trycord</strong><span>Why Trycord exists and how it's built.</span></a>
-            <a href="/faq"><strong>FAQ</strong><span>The questions people ask most.</span></a>
-            <a href="/install"><strong>Install</strong><span>Run your own instance.</span></a>
             <a href="/changelog"><strong>Changelog</strong><span>What's shipped recently.</span></a>
             <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
+            <a href="/security"><strong>Security</strong><span>How to report a vulnerability.</span></a>
           </div>
         </div>
 
@@ -177,30 +189,35 @@
         <a href="/features">Features</a>
         <a href="/download">Desktop app</a>
         <a href="/demo">Demo</a>
-        <a href="/changelog">Changelog</a>
-        <a href="/roadmap">Roadmap</a>
         <a href="/status">Status</a>
       </nav>
-      <nav class="footer-col" aria-label="Documentation">
-        <h2 class="footer-heading">Documentation</h2>
+      <nav class="footer-col" aria-label="Docs">
+        <h2 class="footer-heading">Docs</h2>
         <a href="/docs">Self-hosting guide</a>
         <a href="/install">Install</a>
         <a href="/faq">FAQ</a>
         <a href="/support">Support</a>
-        <a href="/security">Security</a>
       </nav>
       <nav class="footer-col" aria-label="Developers">
         <h2 class="footer-heading">Developers</h2>
         <a href="/developers">Developer guide</a>
         <a href="/developers#the-api-reference">API reference</a>
         <a href="/developers#the-sdk-trycord-botjs">SDK</a>
-      </nav>
-      <nav class="footer-col" aria-label="Open source">
-        <h2 class="footer-heading">Open source</h2>
         <a href="https://github.com/trycord/.trycord" rel="noopener">Source code</a>
-        <a href="/licenses">Licences</a>
-        <a href="/about">About the project</a>
+      </nav>
+      <nav class="footer-col" aria-label="Community">
+        <h2 class="footer-heading">Community</h2>
+        <a href="/communities">Communities</a>
+        <a href="/instances">Instances</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
         <a href="/trust-and-safety">Trust and safety</a>
+      </nav>
+      <nav class="footer-col" aria-label="About">
+        <h2 class="footer-heading">About</h2>
+        <a href="/about">About the project</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+        <a href="/licenses">Licences</a>
       </nav>
       <nav class="footer-col" aria-label="Legal">
         <h2 class="footer-heading">Legal</h2>
@@ -209,6 +226,7 @@
         <a href="/cookies">Cookies</a>
         <a href="/instances-terms">Instance terms</a>
         <a href="/community-guidelines">Community rules</a>
+        <a href="/security">Security</a>
       </nav>
     </div>
     <div class="wrap footer-bottom">

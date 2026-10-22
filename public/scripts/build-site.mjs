@@ -89,33 +89,37 @@ const HEADER = `<header class="site-header">
       <nav class="site-nav" id="site-nav" aria-label="Primary">
 ${group('Product', [
   ['/features', 'Features', 'Channels, roles, moderation and more.'],
-  ['/docs', 'Documentation', 'Run and configure your own instance.'],
-  ['/developers', 'Developers', 'Build a bot with the API and the SDK.'],
   ['/download', 'Download', 'Get the desktop app for your computer.'],
-  ['/changelog', 'Changelog', "What's new in Trycord."],
-  ['/roadmap', 'Roadmap', "What's done and what's coming."],
+  ['/demo', 'Demo', 'Try Trycord without an account.'],
   ['/status', 'Status', 'Live health for this instance.'],
 ], true)}
 
-${group('Explore', [
-  ['/communities', 'Communities', 'Browse public communities.'],
-  ['/instances', 'Instances', 'Find an instance to join.'],
-  ['/demo', 'Demo', 'Try Trycord without an account.'],
+${group('Docs', [
+  ['/docs', 'Documentation', 'Run and configure your own instance.'],
+  ['/install', 'Install', 'The short version of the install.'],
+  ['/faq', 'FAQ', 'The questions people ask most.'],
+  ['/support', 'Support', 'Get help and reach the project.'],
+], true)}
+
+${group('Developers', [
+  ['/developers', 'Developer guide', 'Build a bot with the API and the SDK.'],
+  ['/developers#the-api-reference', 'API reference', 'The routes a bot uses.'],
+  ['/developers#the-sdk-trycord-botjs', 'SDK', 'The client for those routes.'],
+  ['https://github.com/trycord/.trycord', 'Source code', 'The whole repository.'],
 ], false)}
 
 ${group('Community', [
-  ['/support', 'Support', 'Get help and reach the project.'],
+  ['/communities', 'Communities', 'Browse public communities.'],
+  ['/instances', 'Instances', 'Find an instance to join.'],
   ['https://discord.gg/dSF7eqsJuP', 'Discord', 'Join the community chat.'],
-  ['/security', 'Security', 'How to report a vulnerability.'],
   ['/trust-and-safety', 'Trust and safety', 'Rules, reporting, and appeals.'],
 ], true)}
 
 ${group('About', [
   ['/about', 'About Trycord', "Why Trycord exists and how it's built."],
-  ['/faq', 'FAQ', 'The questions people ask most.'],
-  ['/install', 'Install', 'Run your own instance.'],
   ['/changelog', 'Changelog', "What's shipped recently."],
   ['/roadmap', 'Roadmap', 'Where the project is going.'],
+  ['/security', 'Security', 'How to report a vulnerability.'],
 ], false)}
 
         <div class="nav-mobile-actions">
@@ -151,30 +155,35 @@ const FOOTER = `<footer class="site-footer">
         <a href="/features">Features</a>
         <a href="/download">Desktop app</a>
         <a href="/demo">Demo</a>
-        <a href="/changelog">Changelog</a>
-        <a href="/roadmap">Roadmap</a>
         <a href="/status">Status</a>
       </nav>
-      <nav class="footer-col" aria-label="Documentation">
-        <h2 class="footer-heading">Documentation</h2>
+      <nav class="footer-col" aria-label="Docs">
+        <h2 class="footer-heading">Docs</h2>
         <a href="/docs">Self-hosting guide</a>
         <a href="/install">Install</a>
         <a href="/faq">FAQ</a>
         <a href="/support">Support</a>
-        <a href="/security">Security</a>
       </nav>
       <nav class="footer-col" aria-label="Developers">
         <h2 class="footer-heading">Developers</h2>
         <a href="/developers">Developer guide</a>
         <a href="/developers#the-api-reference">API reference</a>
         <a href="/developers#the-sdk-trycord-botjs">SDK</a>
-      </nav>
-      <nav class="footer-col" aria-label="Open source">
-        <h2 class="footer-heading">Open source</h2>
         <a href="https://github.com/trycord/.trycord" rel="noopener">Source code</a>
-        <a href="/licenses">Licences</a>
-        <a href="/about">About the project</a>
+      </nav>
+      <nav class="footer-col" aria-label="Community">
+        <h2 class="footer-heading">Community</h2>
+        <a href="/communities">Communities</a>
+        <a href="/instances">Instances</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
         <a href="/trust-and-safety">Trust and safety</a>
+      </nav>
+      <nav class="footer-col" aria-label="About">
+        <h2 class="footer-heading">About</h2>
+        <a href="/about">About the project</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+        <a href="/licenses">Licences</a>
       </nav>
       <nav class="footer-col" aria-label="Legal">
         <h2 class="footer-heading">Legal</h2>
@@ -183,6 +192,7 @@ const FOOTER = `<footer class="site-footer">
         <a href="/cookies">Cookies</a>
         <a href="/instances-terms">Instance terms</a>
         <a href="/community-guidelines">Community rules</a>
+        <a href="/security">Security</a>
       </nav>
     </div>
     <div class="wrap footer-bottom">
