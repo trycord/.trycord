@@ -1109,6 +1109,15 @@ pre.has-copy:focus-within .copy-button { opacity: 1; }
 .pager__label { font-size: var(--text-xs); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .pager__title { font-weight: 600; color: var(--color-text); }
 .pager__link--next { text-align: right; }
+/* The project's own contact points, in a legal page.
+   They are written out rather than left as a field, so the page says who to
+   write to. An operator running their own instance replaces them. */
+.op-contact {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
 .prose .draft-note {
   background: var(--color-surface);
   border: 1px solid color-mix(in srgb, var(--color-warning) 55%, transparent);
@@ -1407,14 +1416,18 @@ select.dir-control { width: auto; cursor: pointer; }
 
 .site-footer { border-top: 1px solid var(--color-border); background: var(--color-surface-sunken); margin-top: auto; }
 
+/* The footer's groups match the masthead's: the brand, then the six groups
+   in three columns. The brand takes the whole height of the two rows. */
 .footer-grid {
   display: grid;
-  grid-template-columns: 2.4fr 1fr 1fr 1fr 1fr;
-  gap: var(--space-6);
+  grid-template-columns: 2.4fr repeat(3, minmax(0, 1fr));
+  gap: var(--space-8) var(--space-6);
   padding-top: var(--space-10);
   padding-bottom: var(--space-8);
 }
+.footer-brand { grid-row: span 2; }
 .footer-brand p { max-width: 320px; margin: var(--space-4) 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
+.footer-brand .btn { justify-self: start; }
 .footer-heading {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);

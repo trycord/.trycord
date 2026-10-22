@@ -161,6 +161,20 @@ test('operator placeholders are marked up the way the editor expects', () => {
   }
 });
 
+test('the pages say who to write to', () => {
+  // The address fields used to be empty, waiting for an operator to fill
+  // them in, and the hosted site published them that way. They name the
+  // project's contact points now, and a page must not go back to an empty
+  // address field.
+  const emptyAddress = /OPERATOR:\s*(the (address|contact)[^<]{0,60})/i;
+  for (const name of LEGAL_PAGES) {
+    const html = page(name);
+    const at = html.search(emptyAddress);
+    assert.equal(at, -1, name + ' has an empty address field: '
+      + html.slice(at, at + 90).replace(/\s+/g, ' '));
+  }
+});
+
 test('the version lines match the server\'s legal versions', () => {
   const legal = fs.readFileSync(path.join(REPO_DIR, 'backend', 'src', 'legal.js'), 'utf8');
   const terms = /TERMS_VERSION:\s*'([^']+)'/.exec(legal);
