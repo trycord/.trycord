@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Trycord">
   <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
   <title>Changelog: what changed in Trycord</title>
-  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 6.6.0, with development continuing on main.">
+  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 7.2.0, with development continuing on main.">
   <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
@@ -130,13 +130,25 @@
         <h1>What changed, and when</h1>
         <p class="lede">
           This is curated from the repository's own history. Releases are listed
-          newest first. The current release is <strong>6.6.0</strong>. Anything
+          newest first. The current release is <strong>7.2.0</strong>. Anything
           above it is work on <code>main</code> that has not been cut into a
           release yet.
         </p>
       </div>
 
       <ol class="timeline">
+        <li>
+          <p class="when">7.2.0 &middot; 2026-10-22</p>
+          <h2>Sign-in and invitations say what happened, and the shell opens a quarter lighter</h2>
+          <ul>
+            <li><strong>Added</strong> — the developer portal's routes and the instance admin answer on the origin, with a page for a backend-only boot</li>
+            <li><strong>Added</strong> — sign-in, reset and two-step say what actually happened, in one set of words on both clients</li>
+            <li><strong>Added</strong> — a dead invitation says so in its own words instead of waiting to be refused</li>
+            <li><strong>Added</strong> — the mounted auth links are answered where they are asked for, so the sign-in page cannot redirect in a circle</li>
+            <li><strong>Added</strong> — the shell opens without loading the pages nobody opens, and its assets cache for a minute instead of revalidating on every load</li>
+            <li><strong>Added</strong> — a relay published at an address the host does not carry says so</li>
+          </ul>
+        </li>
         <li>
           <p class="when">6.6.0 &middot; 2026-10-22</p>
           <h2>The whole of an application is managed in one place, and one server can become two</h2>
