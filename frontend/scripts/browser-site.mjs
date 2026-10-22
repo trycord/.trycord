@@ -92,6 +92,32 @@ const measure = `
   if (!document.querySelector('.site-footer')) problems.push('there is no footer');
   if (!document.querySelector('#main')) problems.push('there is no main region');
 
+  // The landmarks a screen reader navigates by.
+  var landmarks = {
+    banner: document.querySelectorAll('header, [role="banner"]').length,
+    main: document.querySelectorAll('main, [role="main"]').length,
+    contentinfo: document.querySelectorAll('footer, [role="contentinfo"]').length,
+    nav: document.querySelectorAll('nav, [role="navigation"]').length,
+  };
+  if (landmarks.main !== 1) problems.push('the page has ' + landmarks.main + ' main regions');
+  if (landmarks.banner !== 1) problems.push('the page has ' + landmarks.banner + ' banner regions');
+  if (landmarks.contentinfo !== 1) problems.push('the page has ' + landmarks.contentinfo + ' content regions');
+  if (landmarks.nav < 2) problems.push('the page has ' + landmarks.nav + ' navigation regions');
+
+  // The headings, in order. A level that is skipped is a heading a screen
+  // reader reader hears as the wrong thing.
+  var levels = Array.prototype.map.call(
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6'),
+    function (h) { return Number(h.tagName.slice(1)); }
+  );
+  if (levels.length && levels[0] !== 1) problems.push('the page starts at heading level ' + levels[0]);
+  for (var i = 1; i < levels.length; i++) {
+    if (levels[i] - levels[i - 1] > 1) {
+      problems.push('a heading jumps from level ' + levels[i - 1] + ' to ' + levels[i]);
+      break;
+    }
+  }
+
   // Text that is cut short without saying it continues.
   var texts = root.querySelectorAll('span, p, h1, h2, h3, h4, a, button, strong, em, label, li');
   for (var i = 0; i < texts.length && problems.length < 12; i++) {
@@ -236,6 +262,57 @@ try {
           path.join(SHOTS, name.replace(/\.html$/, '') + '-' + width + '.png'),
           Buffer.from(shot.data, 'base64'),
         );
+      }
+    }
+  }
+
+  // The light theme.
+  //
+  // The site has two looks and the reader can pick either. The light one is
+  // checked on a few pages - the homepage, a page of cards, a document and a
+  // legal page - because it is the same stylesheet with a different set of
+  // colours, and the things that break in it are the ones that depend on a
+  // colour: the text on a pale panel, the accent on the page, the hairlines.
+  const LIGHT_PAGES = ['home.html', 'features.html', 'faq.html', 'developers.html'];
+  for (const width of [1280]) {
+    console.log('\n--- light theme, ' + width + 'px ---');
+    for (const name of LIGHT_PAGES) {
+      const file = path.join(staged, name);
+      process.stdout.write('      ' + name + '...');
+      const faults = [];
+      try {
+        await run.page.send('Page.navigate', { url: 'file://' + file });
+        await wait(300);
+        // The theme is set by a script in the head, so it is set the way a
+        // reader sets it: through the page's own switch.
+        await run.page.evaluate(`
+          localStorage.setItem('trycord.publicTheme', 'light');
+          document.documentElement.setAttribute('data-theme', 'light');
+          return true;
+        `);
+        await wait(200);
+        const measured = await run.page.evaluate(measure.replace('${MIN_TARGET}', '24'));
+        for (const problem of measured.problems) faults.push(problem);
+        const painted = await run.page.evaluate(`
+          var body = getComputedStyle(document.body);
+          return body.backgroundColor + '|' + getComputedStyle(document.querySelector('.kicker') || document.body).color;
+        `).catch(() => '');
+        if (painted && !painted.startsWith('rgba(0, 0, 0, 0)')) {
+          // The light theme paints a pale page. A page that is still dark in
+          // the light theme means the switch did not take.
+          const dark = /rgb\((\d+), (\d+), (\d+)\)/.exec(painted.split('|')[0] || '');
+          if (dark && Number(dark[1]) < 100) faults.push('the page is still dark in the light theme');
+        }
+      } catch (error) {
+        faults.push('the page would not hold still long enough to be measured');
+      }
+      process.stdout.write(' ' + (faults.length ? 'FAIL' : 'ok') + '\n');
+      if (faults.length) {
+        failures += faults.length;
+        console.log('  FAIL  light ' + width + 'px ' + name);
+        for (const fault of faults) console.log('          ' + fault);
+      } else {
+        console.log('  ok    light ' + width + 'px ' + name);
       }
     }
   }

@@ -245,7 +245,7 @@
       /* channels */
       var channels = el('div', { class: 'mini-channels' });
       channels.appendChild(el('div', { class: 'mini-community' }, [
-        el('h3', { text: server.name }),
+        el('p', { class: 'mini-title', text: server.name }),
         el('p', { text: plural(server.member_count || 0, 'member') + ' · ' + plural((server.channels || []).length, 'channel') }),
       ]));
       var group = el('div', { class: 'mini-channel-group' });
@@ -267,7 +267,7 @@
       /* main */
       var main = el('div', { class: 'mini-main' });
       main.appendChild(el('div', { class: 'mini-main-head' }, [
-        el('h3', { text: channel ? '#' + channel.name : server.name }),
+        el('p', { class: 'mini-title', text: channel ? '#' + channel.name : server.name }),
         channel && channel.topic ? el('p', { text: channel.topic }) : null,
       ]));
       var messages = el('div', { class: 'mini-messages', role: 'log', 'aria-label': 'Simulated messages' });

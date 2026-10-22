@@ -435,10 +435,10 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 }
 
 .hero h1 {
-  font-size: var(--display-xl);
-  line-height: 1.04;
+  font-size: var(--display-lg);
+  line-height: 1.08;
   margin: 0 0 var(--space-5);
-  max-width: 16ch;
+  max-width: 22ch;
 }
 .hero h1 em { font-style: normal; color: var(--color-accent); }
 .hero .lede {
@@ -501,6 +501,7 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 .mini-client {
   display: grid;
   grid-template-columns: 56px 200px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 420px;
   background: var(--color-surface-sunken);
   color: var(--color-text-primary);
@@ -565,7 +566,7 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   border-bottom: 1px solid var(--hairline);
   min-width: 0;
 }
-.mini-community h3 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-community .mini-title { margin: 0; font-size: var(--text-md); font-weight: var(--weight-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-community p { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--color-text-muted); }
 .mini-channel-group { padding: var(--space-3) var(--space-2); overflow-y: auto; }
 .mini-channel-label {
@@ -609,11 +610,16 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   border-bottom: 1px solid var(--hairline);
   min-width: 0;
 }
-.mini-main-head h3 { margin: 0; font-size: var(--text-md); font-weight: var(--weight-bold); }
+.mini-main-head .mini-title { margin: 0; font-size: var(--text-md); font-weight: var(--weight-bold); }
 .mini-main-head p { margin: 0; font-size: var(--text-sm); color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-messages {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  /* The list scrolls, and a scroll area that cuts a message in half looks
+     broken. A soft edge says there is more below. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent 100%);
   padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
@@ -835,7 +841,7 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 .step h3 { margin: 0 0 var(--space-1); font-size: var(--text-lg); }
 .step p { margin: 0; color: var(--color-text-secondary); max-width: 64ch; }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-4); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
 .card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -1462,4 +1468,244 @@ select.dir-control { width: auto; cursor: pointer; }
   .js .reveal { opacity: 1; transform: none; }
   .btn:active { transform: none; }
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* The glass layer: see-through panels with a blurred background, a thin
+   edge and a light along the top. Used over the page's own colours, where
+   there is something behind them to blur. Where a browser cannot blur, the
+   panels are solid. */
+
+:root {
+  --glass-blur: 18px;
+  --glass-saturation: 140%;
+  /* The panel itself: the surface, thinned until the page behind it shows. */
+  --glass-bg: color-mix(in srgb, var(--color-surface) 66%, transparent);
+  --glass-bg-strong: color-mix(in srgb, var(--color-surface-elevated) 84%, transparent);
+  --glass-bg-quiet: color-mix(in srgb, var(--color-surface) 46%, transparent);
+  --glass-edge: color-mix(in srgb, var(--color-border-strong) 62%, transparent);
+  /* The light that catches the top edge of a pane of glass. */
+  --glass-sheen: color-mix(in srgb, white 14%, transparent);
+  --glass-shadow: 0 24px 60px -32px rgba(0, 0, 0, 0.75);
+}
+
+:root[data-theme="light"] {
+  --glass-bg: color-mix(in srgb, white 74%, transparent);
+  --glass-bg-strong: color-mix(in srgb, white 90%, transparent);
+  --glass-bg-quiet: color-mix(in srgb, white 56%, transparent);
+  --glass-edge: color-mix(in srgb, var(--color-border-strong) 70%, transparent);
+  --glass-sheen: color-mix(in srgb, white 70%, transparent);
+  --glass-shadow: 0 24px 60px -34px rgba(24, 25, 29, 0.35);
+}
+
+/* The panel itself.
+   One class, used by the cards, the menus, the window and the hero's copy
+   block, so they are the same material everywhere. */
+.glass {
+  position: relative;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+/* A browser that cannot frost a panel gets a solid one. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--color-surface);
+    box-shadow: inset 0 1px 0 0 var(--glass-sheen);
+  }
+}
+
+/* ---- the masthead ---------------------------------------------------------
+   It was already glass; it is now the same recipe as the rest of the site,
+   and it is a little more transparent, so the page's gradient shows through
+   as the reader scrolls. */
+.site-header {
+  background: var(--glass-bg-quiet);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  box-shadow: inset 0 -1px 0 0 var(--glass-edge);
+}
+.site-header::after {
+  /* The ember rule the masthead has always carried. */
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg,
+    var(--color-accent),
+    color-mix(in srgb, var(--color-accent) 20%, transparent) 62%,
+    transparent);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* ---- the menus ------------------------------------------------------------
+   A menu is a pane of glass over the page, so it is frosted and it casts a
+   shadow onto the content under it. */
+.nav-menu {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+/* ---- the cards ------------------------------------------------------------
+   The cards on the marketing pages sit over the page's gradient, so they can
+   be glass. The hover lifts them a little, and the border catches the light
+   as they do. */
+.card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    0 18px 40px -34px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  transition: border-color var(--duration-fast) ease, transform var(--duration-fast) ease;
+}
+.card:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--glass-edge));
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card:hover { transform: none; }
+}
+
+/* ---- the window the product is shown in ------------------------------------
+   The mockup is the one place on the site where the glass is doing real
+   work: the page's glow is behind the window, and the window's own chrome
+   is a pane in front of it. */
+.app-window {
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    0 40px 90px -50px rgba(0, 0, 0, 0.85);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+.app-titlebar {
+  background: color-mix(in srgb, var(--color-surface-elevated) 55%, transparent);
+  border-bottom: 1px solid var(--glass-edge);
+}
+
+/* ---- the footer ------------------------------------------------------------
+   The foot of the page is a pane of glass over the page's own background,
+   and the rule above it is the same hairline the masthead carries. */
+.site-footer {
+  background: var(--glass-bg-quiet);
+  border-top: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+/* ---- the theme toggle ------------------------------------------------------
+   It is a small piece of glass in the masthead, and it is the same piece on
+   every page. */
+.theme-toggle {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* ---- the hero --------------------------------------------------------------
+   The copy block is a pane of glass over the hero's glow, so the headline
+   sits on something with depth behind it rather than on flat colour. */
+.hero-copy {
+  position: relative;
+  padding: clamp(var(--space-5), 2.4vw, var(--space-7));
+  border-radius: var(--radius-xl);
+  background: var(--glass-bg-quiet);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 0 var(--glass-sheen);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+
+/* ---- the fact strip --------------------------------------------------------
+   The home page's strip of what the product is: four chips of glass, each
+   one a sentence. */
+.fact-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+}
+.fact {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 0 var(--glass-sheen);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+.fact b {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+.fact span {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+/* The section numbers. The document pages have their own heads and are left
+   alone. */
+main { counter-reset: section; }
+.section { counter-increment: section; }
+.section-head::before {
+  content: counter(section, decimal-leading-zero);
+  display: block;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+}
+
+/* The two halves of a split section are glass. */
+.panel {
+  padding: clamp(var(--space-6), 3vw, var(--space-8));
+  border-radius: var(--radius-xl);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    0 18px 40px -34px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+.panel h2 { font-size: var(--display-md); margin: 0 0 var(--space-3); }
+.panel p { color: var(--color-text-secondary); }
+.panel .kicker { margin-bottom: var(--space-2); }
+
+/* The band at the foot of the homepage is the accent panel, and it is glass
+   too. */
+.band {
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--color-accent) 92%, transparent),
+      color-mix(in srgb, var(--color-accent) 72%, transparent));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in srgb, white 22%, transparent),
+    0 30px 70px -40px color-mix(in srgb, var(--color-accent) 60%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
