@@ -6,7 +6,9 @@
 // mobile shell from the renderer's answer.
 
 import { matchRoute, renderPage } from '../../packages/registry.js';
-import { currentRoute, currentQuery, navigate } from '../../packages/nav.js';
+import { currentRoute, currentQuery, navigate, path } from '../../packages/nav.js';
+import { el } from '../../packages/dom.js';
+import { icon } from '../../packages/icons.js';
 import {
   State, serverById, channelById, refreshServer, refreshServers, refreshServerTree, signedIn,
 } from '../../packages/store.js';
@@ -70,9 +72,46 @@ function paintNotFound(route) {
   setRoute(route);
 }
 
+// A route-level failure, answered in the shape of what went wrong rather than
+// one fault for every cause - the same shapes the desk answers with, in the
+// mobile state container. A refusal and a dead wire are different news.
+function errorState(error, retry) {
+  const status = error && error.status;
+  const code = error && error.code;
+  if (code === 'NETWORK') {
+    return el('div', { class: 'm-state', 'data-failed': 'true' },
+      el('span', { class: 'm-state__icon' }, icon('wifi-off', { size: 24 })),
+      el('div', { class: 'm-state__title' }, 'No connection'),
+      el('div', { class: 'm-state__text' }, 'Trycord cannot reach the instance right now. Check your connection and try again.'),
+      el('button', { class: 'm-btn m-btn--sm', type: 'button', onClick: retry }, 'Try again'));
+  }
+  if (status === 401) {
+    return el('div', { class: 'm-state', 'data-failed': 'true' },
+      el('span', { class: 'm-state__icon' }, icon('shield-alert', { size: 24 })),
+      el('div', { class: 'm-state__title' }, 'Your session has ended'),
+      el('div', { class: 'm-state__text' }, 'The instance asked you to sign in again. Nothing was changed; sign in to continue.'),
+      el('a', { class: 'm-btn m-btn--sm', href: path('/login') }, 'Sign in'));
+  }
+  if (status === 403) {
+    return el('div', { class: 'm-state', 'data-failed': 'true' },
+      el('span', { class: 'm-state__icon' }, icon('shield', { size: 24 })),
+      el('div', { class: 'm-state__title' }, 'This page is closed to you'),
+      el('div', { class: 'm-state__text' }, (error && error.message) || 'The instance refused this page for your account.'),
+      el('a', { class: 'm-btn m-btn--sm', href: path('/home') }, 'Back to your places'));
+  }
+  if (status >= 500) {
+    return el('div', { class: 'm-state', 'data-failed': 'true' },
+      el('span', { class: 'm-state__icon' }, icon('alert', { size: 24 })),
+      el('div', { class: 'm-state__title' }, 'This page broke on the server'),
+      el('div', { class: 'm-state__text' }, 'The instance answered with an error rather than the page. It may be mid-restart; try again in a moment.'),
+      el('button', { class: 'm-btn m-btn--sm', type: 'button', onClick: retry }, 'Try again'));
+  }
+  return failure(error, retry);
+}
+
 function paintError(route, error) {
   clearRaw();
-  const box = failure(error, () => run());
+  const box = errorState(error, () => run());
   box.setAttribute('data-fault-origin', 'router');
   setAppBar({ lead: 'back', title: 'This page did not open' });
   setView(box);

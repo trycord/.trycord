@@ -21,7 +21,7 @@
   window.__trycordErrors = window.__trycordErrors || [];
 
   function record(message, reason) {
-    window.__trycordErrors.push(String(message || 'Unknown error')
+    window.__trycordErrors.push(String(message || 'The application stopped.')
       + (reason ? ' — ' + String(reason) : ''));
   }
 
@@ -93,7 +93,7 @@
       + 'border-radius:var(--tc-radius-md,8px);padding:12px;font-size:.78rem;'
       + 'color:var(--tc-text-muted,#A4A7B0);font-family:var(--tc-font-mono,ui-monospace,monospace);'
       + 'max-height:240px;overflow:auto;';
-    detail.textContent = String(message || 'Unknown error') + (reason ? '\n\n' + reason : '');
+    detail.textContent = String(message || 'The application stopped.') + (reason ? '\n\n' + reason : '');
 
     var toggle = document.createElement('button');
     toggle.textContent = 'Show details';
@@ -128,9 +128,9 @@
       }
       return;
     }
-    record(event && event.message ? event.message : 'Unexpected error',
+    record(event && event.message ? event.message : 'The interface stopped.',
       event && event.filename ? event.filename + ':' + event.lineno : '');
-    render(event && event.message ? event.message : 'Unexpected error',
+    render(event && event.message ? event.message : 'The interface stopped.',
       event && event.filename ? event.filename + ':' + event.lineno : '');
   }, true);
 
@@ -138,9 +138,9 @@
     var reason = event && event.reason;
     // A cancelled fetch is routine during navigation and is not a crash.
     if (reason && (reason.name === 'AbortError' || reason.code === 'ABORTED')) return;
-    record('Something went wrong handling a response.',
+    record('A background request failed.',
       reason && reason.stack ? reason.stack : String(reason || ''));
-    render('Something went wrong handling a response.',
+    render('A background request failed.',
       reason && reason.stack ? reason.stack : String(reason || ''));
   });
 })();
