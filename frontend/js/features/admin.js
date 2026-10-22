@@ -19,10 +19,8 @@ import { adminConfiguration } from './adminCfg.js';
 import { adminIncidents } from './adminIncidents.js';
 import { adminFederation } from './adminFederation.js';
 import { adminVoice } from './voice.js';
-import { scopeNav } from '../../packages/registry.js';
-import { icon } from '../../packages/icons.js';
+import { adminFrame } from './adminFrame.js';
 import { el } from '../../packages/dom.js';
-import { path } from '../../packages/nav.js';
 
 const LAYOUTS = new Map([
   ['admin', () => adminOverview()],
@@ -44,39 +42,21 @@ const LAYOUTS = new Map([
   ['admin.federation', () => adminFederation()],
 ]);
 
-// Same rail as the settings studio, one scope over; the registry owns the
-// labels and the grouping.
-function studioRail(activeId, heading) {
-  const rail = el('nav', { class: 'studionav', 'aria-label': heading });
-  for (const group of scopeNav('admin')) {
-    rail.appendChild(el('p', { class: 'studionav-group' }, group.group));
-    for (const item of group.items) {
-      rail.appendChild(el('a', {
-        class: 'studionav-link' + (item.id === activeId ? ' studionav-link--active' : ''),
-        href: path(item.route),
-        'aria-current': item.id === activeId ? 'page' : null,
-      },
-      icon(item.icon || 'circle-dot', { size: 16 }),
-      el('span', { class: 'studionav-label' }, item.label)));
-    }
-  }
-  return rail;
-}
-
+// The console frames every page in the administration shell - the masthead,
+// the grouped doors with their live counts, and the page inside. The pages
+// keep their own lifecycle ({ node, onMount, cleanup }); the frame hosts
+// them without swallowing it.
 export function renderAdmin(ctx) {
   const view = LAYOUTS.get(ctx.page.id);
   if (!view) return null;
-  // The studio pages keep their own lifecycle ({ node, onMount, cleanup }); the
-  // rail frames them without swallowing it.
   const page = view();
   const node = page && page.node ? page.node : page;
-  const framed = el('div', { class: 'studio' },
-    studioRail(ctx.page.id, 'Administration sections'),
-    el('div', { class: 'studio-stage' }, node));
+  const frame = adminFrame(ctx.page.id);
+  frame.stage.appendChild(node);
   if (page && page.node) {
-    return { node: framed, onMount: page.onMount, cleanup: page.cleanup };
+    return { node: frame.root, onMount: page.onMount, cleanup: page.cleanup };
   }
-  return framed;
+  return frame.root;
 }
 
 export default { renderAdmin };
