@@ -44,7 +44,7 @@
     unknown: 'The monitor has not reported yet.'
   };
 
-  var states = { site: 'unknown', api: 'unknown', db: 'unknown', app: 'unknown' };
+  var states = { site: 'unknown', api: 'unknown', db: 'unknown', app: 'unknown', voice: 'unknown' };
 
   function set(key, state) {
     states[key] = state;
@@ -100,7 +100,7 @@
   }
 
   function summarizeLocal() {
-    var vals = [states.site, states.api, states.db, states.app];
+    var vals = [states.site, states.api, states.db, states.app, states.voice];
     if (vals.indexOf('bad') !== -1) return 'One or more checks failed.';
     if (vals.indexOf('warn') !== -1) return 'The instance is running, but a component is degraded.';
     if (vals.indexOf('unknown') !== -1) return 'Some checks could not be completed from your browser.';
@@ -113,6 +113,7 @@
     set('api', 'unknown');
     set('db', 'unknown');
     set('app', 'unknown');
+    set('voice', 'unknown');
 
     return apiBase().then(function (base) {
       var api = String(base || '').replace(/\/+$/, '');
@@ -120,11 +121,13 @@
         probeSite(),
         probe(api + '/health'),
         probe(api + '/api/health'),
+        probe(api + '/api/voice/relay'),
       ]);
     }).then(function (out) {
       var site = out[0];
       var health = out[1];
       var detail = out[2];
+      var relay = out[3];
 
       if (!site.reached) set('site', 'unknown');
       else if (site.ok) set('site', 'ok');
@@ -146,6 +149,13 @@
         else if (detail.data.client === false) set('app', 'warn');
         else set('app', 'unknown');
       }
+
+      // The relay. The address is public - it is in the configuration the
+      // clients are given - and whether it answers is a fact about the
+      // instance, so the page can be asked without a session.
+      if (!relay.reached || !relay.data) set('voice', 'unknown');
+      else if (relay.data.ok === true) set('voice', 'ok');
+      else set('voice', 'bad');
 
       var stamp = localTime(new Date());
       if (summaryEl) summaryEl.textContent = summarizeLocal();
@@ -177,6 +187,7 @@
     set('api', 'unknown');
     set('db', 'unknown');
     set('app', 'unknown');
+    set('voice', 'unknown');
   }
 
   function renderMonitor(report) {
