@@ -53,6 +53,17 @@ export const PAGES = [
     nav: { label: 'Menu', short: 'Menu', icon: 'menu', mobile: true, tabOrder: 5 },
   }),
 
+  // The communities the reader belongs to, as a destination of the phone's
+  // bottom bar. The wide phone draws the same list as a rail beside the
+  // conversation; the narrow one needs it as a screen of its own, because
+  // communities are the centre of the product and a finder that hides them
+  // hid the centre too.
+  p('communities', '/communities', {
+    layout: 'plain',
+    sidebar: 'home',
+    nav: { label: 'Communities', short: 'Communities', icon: 'globe', mobile: true, tabOrder: 6 },
+  }),
+
   // ---- what the reader keeps, and what happened to the instance.
   //
   // These are the reader's own destinations: the search that carries the
