@@ -58,10 +58,10 @@
   --content-w: 1160px;
   --prose-w: 74ch;
 
-  --display-xl: clamp(2.7rem, 6.2vw, 4.5rem);
-  --display-lg: clamp(2.2rem, 4.6vw, 3.2rem);
-  --display-md: clamp(1.6rem, 3vw, 2.3rem);
-  --display-sm: clamp(1.25rem, 2.2vw, 1.6rem);
+  --display-xl: clamp(2.4rem, 4.6vw, 3.5rem);
+  --display-lg: clamp(2.05rem, 3.6vw, 2.9rem);
+  --display-md: clamp(1.55rem, 2.8vw, 2.15rem);
+  --display-sm: clamp(1.2rem, 2vw, 1.5rem);
 
   --glow-a: color-mix(in srgb, var(--color-accent) 16%, transparent);
   --glow-b: color-mix(in srgb, var(--color-accent) 10%, transparent);
@@ -435,8 +435,8 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 }
 
 .hero h1 {
-  font-size: var(--display-lg);
-  line-height: 1.08;
+  font-size: var(--display-xl);
+  line-height: 1.06;
   margin: 0 0 var(--space-5);
   max-width: 22ch;
 }
@@ -786,9 +786,51 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 
 .section { padding: clamp(var(--space-10), 7vw, var(--space-12)) 0; border-top: 1px solid var(--hairline); }
 .section:first-of-type { border-top: 0; }
-.section-head { max-width: 760px; margin: 0 0 var(--space-8); }
-.section-head h2 { font-size: var(--display-lg); margin: 0 0 var(--space-3); }
-.section-head p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-lg); line-height: var(--leading-relaxed); }
+/* The head of a section: the number in the margin, the title beside it, and
+   the explanation on the right. One column of text in a wide page leaves
+   half the page empty.
+
+   The children are placed by hand rather than by their order, so the title
+   and the explanation sit where they belong whatever order the page was
+   written in. */
+.section-head {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1.15fr) minmax(0, 1fr);
+  column-gap: clamp(var(--space-4), 3vw, var(--space-7));
+  row-gap: var(--space-2);
+  align-items: end;
+  margin: 0 0 var(--space-8);
+}
+.section-head::before {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: start;
+  margin-top: var(--space-2);
+}
+.section-head .kicker { grid-column: 2; grid-row: 1; margin-bottom: 0; }
+.section-head h2 { grid-column: 2; grid-row: 2; font-size: var(--display-lg); line-height: 1.1; margin: 0; }
+.section-head > p:not(.kicker) {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: end;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-lg);
+  line-height: var(--leading-relaxed);
+}
+/* A section with nothing to explain has no third column, so the title takes
+   the whole width. */
+.section-head:not(:has(> p:not(.kicker))) h2 { grid-column: 2 / -1; }
+@media (max-width: 900px) {
+  .section-head {
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    align-items: start;
+  }
+  .section-head::before { grid-row: 1 / span 2; }
+  .section-head .kicker { grid-column: 2; grid-row: 1; }
+  .section-head h2 { grid-column: 2; grid-row: 2; }
+  .section-head > p:not(.kicker) { grid-column: 2; grid-row: 3; margin-top: var(--space-2); }
+}
 
 .split {
   display: grid;
@@ -842,6 +884,16 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
 .step p { margin: 0; color: var(--color-text-secondary); max-width: 64ch; }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-4); }
+/* A group of four is two by two, and a group of three is three across, so no
+   group is left with one card on its own row. */
+.cards--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cards--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .cards--2, .cards--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .cards, .cards--2, .cards--3 { grid-template-columns: 1fr; }
+}
 .card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -906,7 +958,11 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   border-bottom: 1px solid var(--hairline);
   margin-bottom: var(--space-9);
 }
-.page-head h1 { font-size: var(--display-xl); margin: 0 0 var(--space-3); }
+.page-head h1 {
+  font-size: var(--display-lg);
+  line-height: 1.08;
+  margin: 0 0 var(--space-3);
+}
 .page-head .lede {
   margin: 0;
   color: var(--color-text-secondary);
@@ -1459,7 +1515,9 @@ select.dir-control { width: auto; cursor: pointer; }
 }
 
 @media (max-width: 480px) {
-  :root { --display-xl: clamp(2.35rem, 10vw, 2.7rem); }
+  /* The headline keeps shrinking as the screen gets narrower - the old value
+     made it bigger on a phone than on a tablet. */
+  :root { --display-xl: clamp(2.1rem, 8.6vw, 2.4rem); }
   .footer-grid { grid-template-columns: 1fr; }
 }
 
@@ -1637,9 +1695,12 @@ select.dir-control { width: auto; cursor: pointer; }
    one a sentence. */
 .fact-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
-  gap: var(--space-3);
-  margin-top: var(--space-8);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: clamp(var(--space-6), 4vw, var(--space-9));
+}
+@media (max-width: 700px) {
+  .fact-strip { grid-template-columns: 1fr; }
 }
 .fact {
   padding: var(--space-4);
