@@ -23,18 +23,18 @@ export const PAGES = [
   // them the phone tab bar as well.
   p('home', '/home', {
     sidebar: 'home',
-    nav: { label: 'Home', short: 'Home', icon: 'home', global: true, mobile: true, tabOrder: 1 },
+    nav: { label: 'Home', short: 'Home', icon: 'home', global: true },
   }),
   p('dms', '/dms', {
     sidebar: 'dms',
-    nav: { label: 'Direct messages', short: 'Messages', icon: 'message', global: true, mobile: true, tabLabel: 'DMs', tabOrder: 2 },
+    nav: { label: 'Chats', short: 'Chats', icon: 'message', global: true, mobile: true, tabLabel: 'Chats', tabOrder: 1 },
   }),
   // /dms/:id is the same place as /dms with a conversation open. Highlighting is
   // by prefix, so it needs no parent field.
   p('dms.conversation', '/dms/:id', { sidebar: 'dms', nav: null }),
   p('notifications', '/notifications', {
     sidebar: 'notifications',
-    nav: { label: 'Notifications', short: 'Alerts', icon: 'bell', global: true, mobile: true, tabOrder: 4 },
+    nav: { label: 'Notifications', short: 'Alerts', icon: 'bell', global: true },
   }),
   p('discover', '/discover', {
     access: 'public',
@@ -43,14 +43,14 @@ export const PAGES = [
   }),
   p('friends', '/friends', {
     sidebar: 'friends',
-    nav: { label: 'Friends', short: 'Friends', icon: 'users', global: true, mobile: true, tabOrder: 3 },
+    nav: { label: 'Friends', short: 'Friends', icon: 'users', global: true },
   }),
   // The directory: every community and channel. It lists them itself, so it takes
   // no sidebar.
   p('menu', '/menu', {
     layout: 'plain',
     sidebar: 'home',
-    nav: { label: 'Menu', short: 'Menu', icon: 'menu', mobile: true, tabOrder: 5 },
+    nav: { label: 'Menu', short: 'Menu', icon: 'menu' },
   }),
 
   // The communities the reader belongs to, as a destination of the phone's
@@ -61,7 +61,17 @@ export const PAGES = [
   p('communities', '/communities', {
     layout: 'plain',
     sidebar: 'home',
-    nav: { label: 'Communities', short: 'Communities', icon: 'globe', mobile: true, tabOrder: 6 },
+    nav: { label: 'Communities', short: 'Communities', icon: 'globe', mobile: true, tabOrder: 2 },
+  }),
+
+  // The reader's own hub: profile, friends, alerts and settings behind one
+  // door. The phone's bar carries three places - the conversations, the
+  // communities, and the reader - and everything that belongs to the reader
+  // lives behind the third.
+  p('you', '/you', {
+    layout: 'plain',
+    sidebar: 'home',
+    nav: { label: 'You', short: 'You', icon: 'settings', mobile: true, tabOrder: 3 },
   }),
 
   // ---- what the reader keeps, and what happened to the instance.

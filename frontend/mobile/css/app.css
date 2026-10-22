@@ -548,6 +548,46 @@ a:hover { text-decoration: underline; }
 
 /* The column of communities. */
 .m-rail { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+/* The narrow phone's rail, as an overlay. The same list the wide phone draws
+   as a column; here it slides over the conversation, and the conversation is
+   still there when it closes. */
+.m-railoverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: stretch;
+}
+.m-railoverlay__backdrop {
+  flex: 1;
+  border: 0;
+  background: rgb(0 0 0 / 0.55);
+  animation: m-fade-in 180ms var(--ease) both;
+}
+.m-railoverlay__panel {
+  width: min(84px, 30vw);
+  padding: calc(var(--m-appbar-h) + 12px) 8px 12px;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-start;
+  animation: m-rail-in 220ms var(--ease) both;
+  outline: none;
+}
+.m-railoverlay__panel .m-rail { align-items: center; }
+@keyframes m-rail-in {
+  from { transform: translateX(-16px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes m-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-railoverlay__backdrop,
+  .m-railoverlay__panel { animation: none; }
+}
 .m-rail__item {
   display: grid; place-items: center;
   width: 44px; height: 44px; border-radius: 14px;
@@ -628,7 +668,7 @@ a:hover { text-decoration: underline; }
 
 .m-appbar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 4px;
   min-height: var(--m-appbar-h);
@@ -639,6 +679,21 @@ a:hover { text-decoration: underline; }
   top: 0;
   z-index: 20;
 }
+
+/* The bell is a door, not a screen: it carries its badge on the bar and the
+   screen keeps its own actions beside it. */
+.m-appbar__bell { position: relative; }
+.m-appbar__bell .m-tab__badge {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+}
+
+/* The rail button exists only on the narrow phone. It still needs this rule:
+   .m-iconbtn sets display:grid, and an explicit display beats the hidden
+   attribute - a hidden button that stays visible is exactly what the wide
+   phone must not have. */
+.m-appbar__railbtn[hidden] { display: none; }
 
 .m-appbar__title {
   display: flex;

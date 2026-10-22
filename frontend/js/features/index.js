@@ -118,6 +118,10 @@ export const RENDERERS = {
   'settings.backend': (ctx) => renderSettings(ctx),
   'settings.updates': (ctx) => renderSettings(ctx),
 
+  // The phone's You hub is the desk's settings studio: the same reader, one
+  // door on the phone and the studio rail on the desk.
+  you: (ctx) => renderSettings(ctx),
+
   admin: lazy('./admin.js', 'renderAdmin'),
   'admin.users': lazy('./admin.js', 'renderAdmin'),
   'admin.approvals': lazy('./admin.js', 'renderAdmin'), // TEMP-CHECK

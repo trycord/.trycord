@@ -66,7 +66,7 @@ test('the phone has its own composition choices', () => {
   assert.ok(mobilePrefs.TABS.length > 0, 'the phone has no bottom bar to arrange');
   assert.ok(mobilePrefs.DENSITIES.length > 0, 'the phone has no density to choose');
   assert.ok(desktopPrefs.REGIONS.length > 0, 'the desktop has no regions to arrange');
-  assert.equal(mobilePrefs.rememberTabs(['home', 'dms']).tabs.join(','), 'home,dms');
+  assert.equal(mobilePrefs.rememberTabs(['dms', 'communities']).tabs.join(','), 'dms,communities');
 });
 
 test('each module draws its own preview card', () => {
