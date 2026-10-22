@@ -32,6 +32,11 @@ export const STAGE_MAX = 1920;
 // inspector holds the panel beside the stage.
 export const REGIONS = ['rail', 'column', 'inspector'];
 
+// The overview's widgets, and the order they are offered in. The reader may
+// keep any subset of them; an overview with nothing on it falls back to the
+// whole set, because a blank console is worse than a default one.
+export const OVERVIEW_WIDGETS = ['queue', 'reports', 'appeals', 'audit'];
+
 const DEFAULTS = {
   density: 'cozy',
   contextWidth: 276,
@@ -46,6 +51,8 @@ const DEFAULTS = {
   inspectorTabs: {},
   // Screen kinds whose inspector was left open when the reader navigated away.
   inspectorOpen: [],
+  // Which overview widgets the reader keeps, in the order of the list above.
+  overviewWidgets: OVERVIEW_WIDGETS.slice(),
 };
 
 let cache = null;
@@ -95,6 +102,12 @@ function normalise(raw) {
       ? Object.assign({}, source.inspectorTabs)
       : {},
     inspectorOpen: Array.isArray(source.inspectorOpen) ? source.inspectorOpen.slice(0, 12) : [],
+    overviewWidgets: (() => {
+      const wanted = Array.isArray(source.overviewWidgets)
+        ? source.overviewWidgets.filter((id) => OVERVIEW_WIDGETS.indexOf(id) !== -1)
+        : OVERVIEW_WIDGETS.slice();
+      return wanted.length ? wanted : OVERVIEW_WIDGETS.slice();
+    })(),
   };
 }
 

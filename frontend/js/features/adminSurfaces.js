@@ -8,41 +8,148 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { head, card, row, blank, fault, fold, facts, hold } from '../ui/page.js';
 import { errorToast, toast, confirmDialog, openMenu } from '../ui/overlays.js';
+import { readPrefs, patchPrefs, OVERVIEW_WIDGETS } from '../prefs.js';
 
 // -- overview ----------------------------------------------------------------
 
+// The names the server reports for a report or appeal, in the words a reader
+// reads. The server's statuses are kept - they are the ones the queues are
+// filtered by - and only the presentation is spelled out.
+function statusWord(status) {
+  const words = {
+    OPEN: 'Open',
+    INVESTIGATING: 'Being investigated',
+    RESOLVED: 'Resolved',
+    DISMISSED: 'Dismissed',
+    UNDER_REVIEW: 'Under review',
+    UPHELD: 'Upheld',
+    REJECTED: 'Rejected',
+  };
+  return words[status] || String(status || '').replace(/_/g, ' ');
+}
+
+// One distribution of statuses (reports or appeals) as fact cells. The counts
+// are the overview's own; a status the instance has never seen simply does
+// not appear rather than pretending to be zero.
+function statusFacts(list) {
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) return null;
+  return facts(items.map((entry) => ({
+    value: String(entry.n),
+    label: statusWord(entry.status),
+  })));
+}
+
 export function adminOverview() {
-  const body = el('div', { class: 'anticipation-line' });
+  const body = el('div', { class: 'fold fold--tight' });
+  const arrange = el('button', { class: 'btn btn--ghost btn--sm', type: 'button' }, icon('grid', { size: 15 }), 'Widgets');
+
+  const WIDGET_LABELS = {
+    queue: ['The queues', 'activity'],
+    reports: ['Reports by status', 'flag'],
+    appeals: ['Appeals by status', 'inbox'],
+    audit: ['Recent audit', 'clock'],
+  };
+
+  arrange.addEventListener('click', (event) => {
+    openMenu({
+      anchor: event.currentTarget,
+      items: OVERVIEW_WIDGETS.map((id) => ({
+        label: WIDGET_LABELS[id][0], icon: WIDGET_LABELS[id][1],
+        checked: readPrefs().overviewWidgets.indexOf(id) !== -1,
+        onSelect: () => {
+          const current = readPrefs().overviewWidgets;
+          const next = current.indexOf(id) === -1 ? current.concat([id]) : current.filter((entry) => entry !== id);
+          patchPrefs({ overviewWidgets: next.length ? next : OVERVIEW_WIDGETS.slice() });
+          paint();
+        },
+      })),
+    });
+  });
+
+  // The overview itself: the queues at the top - the work, before the
+  // scenery - then the two status distributions, then the last few audit
+  // entries. Every number is the endpoint's; nothing here is computed by
+  // guessing, and a widget the reader switched off simply is not drawn.
+  const paint = async () => {
+    const wanted = readPrefs().overviewWidgets;
+    body.replaceChildren(hold('Reading the instance'));
+    try {
+      const data = await Api.adminOverview();
+      const widgets = [];
+
+      if (wanted.indexOf('queue') !== -1) {
+        widgets.push(card({
+          label: 'The queues', glyph: 'activity',
+          body: facts([
+            { value: String(data.users), label: 'Accounts' },
+            { value: String(data.servers), label: 'Communities' },
+            { value: String(data.enforcedUsers), label: 'Enforced accounts' },
+            { value: String(data.openReports), label: 'Open reports' },
+            { value: String(data.openAppeals), label: 'Open appeals' },
+          ]),
+        }));
+      }
+
+      if (wanted.indexOf('reports') !== -1) {
+        const distribution = statusFacts(data.reports);
+        widgets.push(card({
+          label: 'Reports by status', glyph: 'flag',
+          body: distribution || blank({
+            glyph: 'flag',
+            title: 'No reports yet',
+            text: 'A filed report lands here with its status.',
+          }),
+        }));
+      }
+
+      if (wanted.indexOf('appeals') !== -1) {
+        const distribution = statusFacts(data.appeals);
+        widgets.push(card({
+          label: 'Appeals by status', glyph: 'inbox',
+          body: distribution || blank({
+            glyph: 'inbox',
+            title: 'No appeals yet',
+            text: 'An appeal against an enforcement lands here with its status.',
+          }),
+        }));
+      }
+
+      if (wanted.indexOf('audit') !== -1) {
+        const entries = Array.isArray(data.recentAudit) ? data.recentAudit : [];
+        widgets.push(card({
+          label: 'Recent audit', glyph: 'clock',
+          body: entries.length
+            ? el('div', { class: 'rowlist' },
+              entries.map((entry) => row({
+                title: entry.action,
+                sub: entry.targetType + (entry.targetId ? ' · ' + entry.targetId : ''),
+              })))
+            : blank({
+              glyph: 'clock',
+              title: 'Nothing recorded yet',
+              text: 'Administrative actions land here as they happen.',
+            }),
+        }));
+      }
+
+      body.replaceChildren(...widgets);
+    } catch (e) {
+      body.replaceChildren(fold([fault(e, paint)]));
+    }
+  };
 
   return {
     node: fold([
       head({
         kicker: 'Instance',
         title: 'Overview',
-        lede: 'Health, counts and what changed lately.',
+        lede: 'The work waiting, the state of the queues, and what changed lately.',
+        actions: arrange,
       }),
-      card({ label: 'Snapshot', glyph: 'activity', body }),
+      body,
     ]),
-    onMount: async () => {
-      try {
-        const data = await Api.adminOverview();
-        const entries = (data && typeof data === 'object' && !Array.isArray(data))
-          ? Object.entries(data).filter(([, v]) => typeof v !== 'object' || v === null)
-          : [];
-        body.replaceChildren(
-          facts(entries.slice(0, 8).map(([key, value]) => ({
-            value: String(value === undefined || value === null ? '—' : value),
-            label: String(key).replace(/_/g, ' '),
-          }))),
-          blank({
-            glyph: 'activity',
-            title: 'The instance at a glance',
-            text: 'Counts and recent activity land here from the live store.',
-          }));
-      } catch (e) {
-        body.replaceChildren(fold([fault(e, null)]));
-      }
-    },
+    onMount: paint,
     cleanup() {},
   };
 }
