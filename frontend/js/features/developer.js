@@ -46,7 +46,20 @@ const keyHealth = (keyId, minutes) => request('GET', V1 + '/keys/' + pathId(keyI
 const readScopes = () => request('GET', V1 + '/scopes');
 
 const readApplications = (serverId) => request('GET', V1 + '/communities/' + pathId(serverId) + '/applications');
+const readApplication = (serverId, applicationId) => {
+  return request('GET', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId));
+};
 const createApplication = (serverId, body) => request('POST', V1 + '/communities/' + pathId(serverId) + '/applications', { body });
+const updateApplication = (serverId, applicationId, body) => {
+  return request('PATCH', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId), { body });
+};
+const deleteApplication = (serverId, applicationId) => {
+  return request('DELETE', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId));
+};
+const setApplicationCredential = (serverId, applicationId, body) => {
+  return request('PUT', V1 + '/communities/' + pathId(serverId) + '/applications/'
+    + pathId(applicationId) + '/credential', { body });
+};
 const rotateApplicationToken = (serverId, applicationId) => request('POST', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/rotate-token');
 const revokeApplication = (serverId, applicationId, body) => request('POST', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/revoke', { body });
 const applicationHealth = (serverId, applicationId) => request('GET', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/health');
@@ -614,7 +627,308 @@ function openApplicationHealth(serverId, application) {
   return dialog;
 }
 
+// Changing an application: its name, what it does, and its picture.
+//
+// The identity is not the credential: a changed name keeps the token, the
+// scopes and the id, so changing it cannot break the integration behind it.
+function openEditApplication(serverId, application, onDone) {
+  const holder = el('div', { class: 'fold' });
+  const status = el('p', { class: 'form-error', role: 'status' });
+  const save = el('button', { class: 'btn btn--primary btn--sm', type: 'button' }, 'Save it');
+  const dialog = openDialog({
+    title: 'Change ' + application.name,
+    sub: 'The name, what it does and its picture. Its token, its scopes and its id stay as they are.',
+    body: el('div', { class: 'fold' }, holder, status),
+    foot: [
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onClick: () => dialog.close() }, 'Cancel'),
+      save,
+    ],
+  });
+
+  const name = el('input', {
+    class: 'input', type: 'text', 'aria-label': 'The name of the application',
+    value: application.name || '',
+  });
+  const description = el('input', {
+    class: 'input', type: 'text', 'aria-label': 'What the application does',
+    value: application.description || '',
+  });
+  const picture = el('input', {
+    class: 'input', type: 'url', 'aria-label': 'The address of its picture, or none',
+    placeholder: 'https://', value: application.iconUrl || '',
+  });
+
+  holder.replaceChildren(el('div', { class: 'form-stack' },
+    el('label', { class: 'field' },
+      el('span', { class: 'field-label' }, 'Name'),
+      name),
+    el('label', { class: 'field' },
+      el('span', { class: 'field-label' }, 'What it does'),
+      description),
+    el('label', { class: 'field' },
+      el('span', { class: 'field-label' }, 'The address of its picture'),
+      picture)));
+
+  save.addEventListener('click', async () => {
+    if (!name.value.trim()) {
+      status.textContent = 'An application needs a name.';
+      return;
+    }
+    save.disabled = true;
+    status.textContent = '';
+    try {
+      await updateApplication(serverId, application.id, {
+        name: name.value.trim(),
+        description: description.value.trim() || null,
+        iconUrl: picture.value.trim() || null,
+      });
+      dialog.close();
+      toast('Saved');
+      if (onDone) onDone();
+    } catch (error) {
+      status.textContent = (error && error.message) || 'The application was not changed.';
+      save.disabled = false;
+    }
+  });
+
+  return dialog;
+}
+
+// The credential of one application: the scopes it carries and the limit it
+// is under. Both may change after the fact - an application that grew into
+// more work than its scopes allow does not have to be made again for it.
+function openApplicationScopes(serverId, application, onDone) {
+  const body = el('div', { class: 'fold' });
+  const status = el('p', { class: 'form-error', role: 'status' });
+  const save = el('button', { class: 'btn btn--primary btn--sm', type: 'button', disabled: true }, 'Save it');
+  const dialog = openDialog({
+    title: 'The credential of ' + application.name,
+    sub: 'The scopes its token carries, and the requests a minute it may make.',
+    body: el('div', { class: 'fold' }, body, status),
+    foot: [
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onClick: () => dialog.close() }, 'Cancel'),
+      save,
+    ],
+  });
+
+  const credential = application.credential || {};
+  const carried = Array.isArray(credential.scopes) ? credential.scopes : [];
+  const limit = el('input', {
+    class: 'input', type: 'number', min: '1',
+    'aria-label': 'Requests per minute the application may make',
+    value: credential.rateLimitPerMinute ? String(credential.rateLimitPerMinute) : '',
+  });
+
+  let boxes = new Map();
+  body.replaceChildren(hold('Reading the scopes'));
+  readScopes().then((answer) => {
+    const picker = scopePicker((answer && answer.groups) || []);
+    boxes = picker.boxes;
+    // What it carries now is what the boxes start from, so a caretaker sees
+    // the current state rather than an empty form.
+    for (const scope of carried) {
+      if (boxes.has(scope)) boxes.get(scope).checked = true;
+    }
+    body.replaceChildren(el('div', { class: 'form-stack' },
+      el('p', { class: 'form-note' }, 'The scopes it carries:'),
+      picker.list,
+      el('label', { class: 'field' },
+        el('span', { class: 'field-label' }, 'Requests per minute'),
+        limit)));
+    save.disabled = false;
+  }).catch((error) => {
+    body.replaceChildren(fault(error, null));
+  });
+
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    status.textContent = '';
+    try {
+      await setApplicationCredential(serverId, application.id, {
+        scopes: chosenScopes(boxes),
+        rateLimitPerMinute: limit.value ? Number(limit.value) : undefined,
+      });
+      dialog.close();
+      toast('Saved');
+      if (onDone) onDone();
+    } catch (error) {
+      status.textContent = (error && error.message) || 'The credential was not saved.';
+      save.disabled = false;
+    }
+  });
+
+  return dialog;
+}
+
+// One application, in one place.
+//
+// The row in the list carries one button for the common case. Everything else
+// lives here: what the application is, what its credential allows, the tools
+// it answers with, and the acts that take it away. Switching it off and on is
+// undone by doing the other, so neither asks twice; revoking, issuing a new
+// token and deleting are the acts with no undo, and they are the ones that
+// ask.
+function openApplication(serverId, application, onDone) {
+  let live = application;
+  const holder = el('div', { class: 'fold fold--tight' });
+  const dialog = openDialog({
+    title: application.name,
+    sub: 'What it is, what it may do, and the acts that take it away.',
+    body: holder,
+    foot: [
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onClick: () => dialog.close() }, 'Close'),
+    ],
+  });
+
+  async function refresh() {
+    try {
+      const answer = await readApplication(serverId, application.id);
+      live = (answer && answer.application) || live;
+      paint();
+    } catch (error) {
+      holder.replaceChildren(fault(error, refresh));
+    }
+  }
+
+  function item(label, note, button) {
+    return el('div', { class: 'settings-item' },
+      el('div', { class: 'settings-item-main' },
+        el('p', { class: 'settings-item-label' }, label),
+        el('p', { class: 'settings-note' }, note)),
+      el('div', { class: 'settings-item-control' }, button));
+  }
+
+  function act(label, note, buttonLabel, go) {
+    return item(label, note, el('button', {
+      class: 'btn btn--ghost btn--sm', type: 'button',
+      'aria-label': buttonLabel + ' for ' + live.name,
+      onClick: go,
+    }, buttonLabel));
+  }
+
+  function paint() {
+    const active = live.status === 'active';
+    const credential = live.credential || {};
+    const scopes = Array.isArray(credential.scopes) ? credential.scopes : [];
+
+    holder.replaceChildren(...[
+      facts([
+        { value: active ? 'Active' : 'Switched off', label: 'Its state' },
+        { value: scopes.length || 0, label: 'Scopes' },
+        { value: credential.rateLimitPerMinute || '—', label: 'Requests a minute' },
+      ]),
+      el('p', { class: 'form-note' },
+        live.description || 'It posts as itself, with no account behind it.'),
+      act('Change it',
+        'The name, what it does and its picture. Its token, its scopes and its id stay as they are.',
+        'Change', () => openEditApplication(serverId, live, refresh)),
+      act('Scopes and limit',
+        'What its credential may do, and how much of it a minute.',
+        'Scopes', () => openApplicationScopes(serverId, live, refresh)),
+      act('Commands',
+        'The slash commands it answers.',
+        'Commands', () => openCommands(serverId, live, refresh)),
+      act('The gateway',
+        'Whether it hears this community, and a ticket to connect with.',
+        'Gateway', () => openApplicationGateway(serverId, live)),
+      act('Whether it is working',
+        'Whether the application is working, and when it last was not.',
+        'Its work', () => openApplicationHealth(serverId, live)),
+      act('A new token',
+        'The old one stops working when the new one is issued.',
+        'New token', async () => {
+          const yes = await confirmDialog({
+            title: 'Issue a new token?',
+            body: 'The application holds one token. The old one stops working at once, so the '
+              + 'integration has to be given the new one before it is next used.',
+            confirmLabel: 'Issue it',
+          });
+          if (!yes) return;
+          try {
+            const answer = await rotateApplicationToken(serverId, live.id);
+            showSecret(answer && answer.token, {
+              title: 'The new token of ' + live.name,
+              sub: 'This is the only time the token is shown. The previous one has stopped working.',
+            });
+            await refresh();
+            if (onDone) onDone();
+          } catch (error) { errorToast(error); }
+        }),
+      live.status === 'active'
+        ? item('Switch it off',
+          'A switched-off application keeps its commands and its identity, and comes back when '
+            + 'it is switched on.',
+          el('button', {
+            class: 'btn btn--default btn--sm', type: 'button',
+            'aria-label': 'Switch off ' + live.name,
+            onClick: async () => {
+              try {
+                await updateApplication(serverId, live.id, { status: 'disabled' });
+                toast('Switched off');
+                await refresh();
+                if (onDone) onDone();
+              } catch (error) { errorToast(error); }
+            },
+          }, 'Switch off'))
+        : null,
+      live.status === 'active'
+        ? item('Withdraw it',
+          'The token is burned at once and the application is disabled. It cannot be brought back '
+            + 'with the same token.',
+          el('button', {
+            class: 'btn btn--danger btn--sm', type: 'button',
+            'aria-label': 'Revoke ' + live.name,
+            onClick: async () => {
+              const yes = await confirmDialog({
+                title: 'Revoke this application?',
+                body: 'Its token is burned at once and the application is disabled. It cannot be '
+                  + 'brought back with the same token.',
+                confirmLabel: 'Revoke it',
+                danger: true,
+              });
+              if (!yes) return;
+              try {
+                await revokeApplication(serverId, live.id, { reason: 'revoked by an operator' });
+                toast('Revoked');
+                await refresh();
+                if (onDone) onDone();
+              } catch (error) { errorToast(error); }
+            },
+          }, 'Revoke'))
+        : null,
+      item('Delete it',
+        'The application is gone for good: its token stops working at once and its bot leaves the '
+          + 'community. The messages it wrote stay where they are.',
+        el('button', {
+          class: 'btn btn--danger btn--sm', type: 'button',
+          'aria-label': 'Delete ' + live.name,
+          onClick: async () => {
+            const yes = await confirmDialog({
+              title: 'Delete ' + live.name + '?',
+              body: 'The application is gone for good: its token stops working at once and its bot '
+                + 'leaves the community. The messages it wrote stay where they are. This cannot '
+                + 'be undone.',
+              confirmLabel: 'Delete it',
+              danger: true,
+            });
+            if (!yes) return;
+            try {
+              await deleteApplication(serverId, live.id);
+              dialog.close();
+              toast('Deleted');
+              if (onDone) onDone();
+            } catch (error) { errorToast(error); }
+          },
+        }, 'Delete')),
+    ]);
+  }
+
+  paint();
+  return dialog;
+}
+
 // Making an application: its name and the scopes its credential carries.
+
 function openCreateApplication(serverId, onDone) {
   const body = el('div', { class: 'fold' });
   const status = el('p', { class: 'form-error', role: 'status' });
@@ -737,20 +1051,10 @@ function applicationsSection() {
         : el('span', { class: 'chip chip--warn' }, String(application.status || 'disabled')),
       side: el('div', { class: 'cardrow-side' },
         el('button', {
-          class: 'btn btn--ghost btn--sm', type: 'button',
-          'aria-label': 'See whether ' + application.name + ' is working',
-          onClick: () => openApplicationHealth(serverId, application),
-        }, 'Its work'),
-        el('button', {
-          class: 'btn btn--ghost btn--sm', type: 'button',
-          'aria-label': 'See the commands of ' + application.name,
-          onClick: () => openCommands(serverId, application, paint),
-        }, 'Commands'),
-        el('button', {
-          class: 'btn btn--ghost btn--sm', type: 'button',
-          'aria-label': 'See the gateway of ' + application.name,
-          onClick: () => openApplicationGateway(serverId, application),
-        }, 'Gateway'),
+          class: 'btn btn--default btn--sm', type: 'button',
+          'aria-label': 'Manage ' + application.name,
+          onClick: () => openApplication(serverId, application, paint),
+        }, 'Manage'),
         application.status === 'active' ? el('button', {
           class: 'btn btn--default btn--sm', type: 'button',
           'aria-label': 'Issue a new token for ' + application.name,
@@ -771,26 +1075,17 @@ function applicationsSection() {
               paint();
             } catch (error) { errorToast(error); }
           },
-        }, 'New token') : null,
-        application.status === 'active' ? el('button', {
-          class: 'btn btn--danger btn--sm', type: 'button',
-          'aria-label': 'Revoke ' + application.name,
+        }, 'New token') : el('button', {
+          class: 'btn btn--default btn--sm', type: 'button',
+          'aria-label': 'Switch on ' + application.name,
           onClick: async () => {
-            const yes = await confirmDialog({
-              title: 'Revoke this application?',
-              body: 'Its token is burned at once and the application is disabled. It cannot be brought '
-                + 'back with the same token.',
-              confirmLabel: 'Revoke it',
-              danger: true,
-            });
-            if (!yes) return;
             try {
-              await revokeApplication(serverId, application.id, { reason: 'revoked by an operator' });
-              toast('Revoked');
+              await updateApplication(serverId, application.id, { status: 'active' });
+              toast('Switched on');
               paint();
             } catch (error) { errorToast(error); }
           },
-        }, 'Revoke') : null),
+        }, 'Switch on')),
     });
   }
 
@@ -854,6 +1149,28 @@ function applicationsSection() {
 
 // -- the documentation ------------------------------------------------------------
 
+// The first program, in the form the SDK's own guide gives it. The guide
+// carries the full version; a copy close to the buttons that make the token
+// saves the trip.
+function hoistExample() {
+  return [
+    'import { Client, Events } from \'trycord-botjs\';',
+    '',
+    'const client = new Client({',
+    '  token: process.env.TRYCORD_BOT_TOKEN,',
+    '  baseUrl: \'https://trycord.dev\',',
+    '});',
+    '',
+    'client.on(Events.MessageCreated, async (event) => {',
+    '  if (event.message?.content === \'!ping\') {',
+    '    await client.send(event.serverId, event.channelId, \'Pong.\');',
+    '  }',
+    '});',
+    '',
+    'await client.login();',
+  ].join('\n');
+}
+
 // Where somebody reads about the API. The guide is a page of the public site,
 // the reference is the machine-readable document the server serves, and the
 // SDK is the client that saves writing the requests by hand.
@@ -880,6 +1197,17 @@ function documentationSection() {
         text: 'The guide walks through making an application, keeping its token, posting a first '
           + 'message and hearing events. The reference lists every route this instance serves, and '
           + 'the SDK calls them for you.',
+      }),
+      card({
+        label: 'From token to working bot',
+        glyph: 'code',
+        note: 'the routes this console configures, called by a running application',
+        body: el('div', { class: 'fold fold--tight' },
+          el('p', { class: 'form-note' },
+            'Create an application above and keep the token it shows you once. Give these lines '
+            + 'to it, and it hears the community and answers. A self-hosted instance points the '
+            + 'client at its own address; the address below is only the default.'),
+          el('code', { class: 'keyblock' }, hoistExample())),
       }),
       card({
         label: 'The documentation',

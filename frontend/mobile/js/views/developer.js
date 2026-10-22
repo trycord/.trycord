@@ -34,9 +34,32 @@ const revokeKey = (keyId, body) => request('POST', V1 + '/keys/' + pathId(keyId)
 const keyUsage = (keyId) => request('GET', V1 + '/keys/' + pathId(keyId) + '/usage?minutes=1440');
 const readScopes = () => request('GET', V1 + '/scopes');
 const readApplications = (serverId) => request('GET', V1 + '/communities/' + pathId(serverId) + '/applications');
+const readApplication = (serverId, applicationId) => {
+  return request('GET', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId));
+};
 const createApplication = (serverId, body) => request('POST', V1 + '/communities/' + pathId(serverId) + '/applications', { body });
+const updateApplication = (serverId, applicationId, body) => {
+  return request('PATCH', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId), { body });
+};
+const deleteApplication = (serverId, applicationId) => {
+  return request('DELETE', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId));
+};
+const setApplicationCredential = (serverId, applicationId, body) => {
+  return request('PUT', V1 + '/communities/' + pathId(serverId) + '/applications/'
+    + pathId(applicationId) + '/credential', { body });
+};
 const rotateApplicationToken = (serverId, applicationId) => request('POST', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/rotate-token');
 const revokeApplication = (serverId, applicationId, body) => request('POST', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/revoke', { body });
+const applicationHealth = (serverId, applicationId) => {
+  return request('GET', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/health');
+};
+const readGateway = (serverId, applicationId) => {
+  return request('GET', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/gateway');
+};
+const issueGatewayTicket = (serverId, applicationId) => {
+  return request('POST', V1 + '/communities/' + pathId(serverId) + '/applications/'
+    + pathId(applicationId) + '/gateway-ticket', { body: {} });
+};
 const readCommands = (serverId, applicationId) => request('GET', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/commands');
 const putCommand = (serverId, applicationId, body) => request('PUT', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/commands', { body });
 const deleteCommand = (serverId, applicationId, commandId) => request('DELETE', V1 + '/communities/' + pathId(serverId) + '/applications/' + pathId(applicationId) + '/commands/' + pathId(commandId));
@@ -499,6 +522,194 @@ function createApplicationSheet(serverId, onDone) {
   return layer;
 }
 
+// Changing an application: the name, what it does and its picture. The token,
+// the scopes and the id stay as they are, so nothing behind it breaks.
+function editApplicationSheet(serverId, application, onDone) {
+  const holder = el('div', { class: 'm-stack' });
+  const status = el('p', { class: 'm-form-error', role: 'status' });
+  const save = el('button', { class: 'm-btn m-btn--block m-btn--primary', type: 'button' }, 'Save it');
+  const layer = sheet({
+    title: 'Change ' + application.name,
+    body: el('div', { class: 'm-stack' }, holder, status),
+    footer: el('div', { class: 'm-actions' }, save),
+  });
+
+  const nameControl = textInput({ value: application.name || '' });
+  const descriptionControl = textInput({ value: application.description || '' });
+  const pictureControl = textInput({ type: 'url', value: application.iconUrl || '' });
+
+  holder.appendChild(el('div', { class: 'm-stack' },
+    field({ label: 'The name of the application', control: nameControl }),
+    field({ label: 'What it does', control: descriptionControl }),
+    field({ label: 'The address of its picture, or none', control: pictureControl })));
+
+  save.addEventListener('click', async () => {
+    if (!nameControl.value.trim()) {
+      status.textContent = 'An application needs a name.';
+      return;
+    }
+    save.disabled = true;
+    status.textContent = '';
+    try {
+      await updateApplication(serverId, application.id, {
+        name: nameControl.value.trim(),
+        description: descriptionControl.value.trim() || null,
+        iconUrl: pictureControl.value.trim() || null,
+      });
+      layer.close();
+      toast('Saved');
+      if (onDone) onDone();
+    } catch (error) {
+      status.textContent = (error && error.message) || 'The application was not changed.';
+      save.disabled = false;
+    }
+  });
+
+  return layer;
+}
+
+// The credential of one application, after the fact. An application that grew
+// into more work than its scopes allow does not have to be made again for it.
+function applicationScopesSheet(serverId, application, onDone) {
+  const body = el('div', { class: 'm-stack' });
+  const status = el('p', { class: 'm-form-error', role: 'status' });
+  const save = el('button', { class: 'm-btn m-btn--block m-btn--primary', type: 'button', disabled: true }, 'Save it');
+  const layer = sheet({
+    title: 'The credential of ' + application.name,
+    body: el('div', { class: 'm-stack' }, body, status),
+    footer: el('div', { class: 'm-actions' }, save),
+  });
+
+  const credential = application.credential || {};
+  const carried = Array.isArray(credential.scopes) ? credential.scopes : [];
+  const limitControl = textInput({ type: 'number' });
+  if (credential.rateLimitPerMinute) limitControl.value = String(credential.rateLimitPerMinute);
+
+  let boxes = new Map();
+  body.appendChild(loading('Reading the scopes'));
+  readScopes().then((answer) => {
+    const picker = scopeChoices((answer && answer.groups) || []);
+    boxes = picker.boxes;
+    for (const scope of carried) {
+      if (picker.boxes.has(scope)) picker.boxes.get(scope).checked = true;
+    }
+    clear(body);
+    body.appendChild(el('div', { class: 'm-stack' },
+      el('p', { class: 'm-eyebrow' }, 'The scopes it carries'),
+      picker.list,
+      field({ label: 'Requests a minute the application may make', control: limitControl })));
+    save.disabled = false;
+  }).catch((error) => {
+    clear(body);
+    body.appendChild(failure(error, null));
+  });
+
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    status.textContent = '';
+    try {
+      await setApplicationCredential(serverId, application.id, {
+        scopes: chosenScopes(boxes),
+        rateLimitPerMinute: limitControl.value ? Number(limitControl.value) : undefined,
+      });
+      layer.close();
+      toast('Saved');
+      if (onDone) onDone();
+    } catch (error) {
+      status.textContent = (error && error.message) || 'The credential was not saved.';
+      save.disabled = false;
+    }
+  });
+
+  return layer;
+}
+
+// Whether an application is working, and when it last was not.
+function applicationHealthSheet(serverId, application) {
+  const body = el('div', { class: 'm-stack' });
+  sheet({ title: application.name + ' at work', body });
+  body.appendChild(loading('Reading the state'));
+  applicationHealth(serverId, application.id).then((report) => {
+    const answer = report || {};
+    clear(body);
+    body.appendChild(el('div', { class: 'm-stat-row' },
+      el('div', { class: 'm-stat' },
+        el('div', { class: 'm-stat__value' }, String(answer.state || 'unknown')),
+        el('div', { class: 'm-stat__label' }, 'Its state')),
+      el('div', { class: 'm-stat' },
+        el('div', { class: 'm-stat__value' }, String(answer.rateLimitPerMinute || '—')),
+        el('div', { class: 'm-stat__label' }, 'Requests a minute')),
+      el('div', { class: 'm-stat' },
+        el('div', { class: 'm-stat__value' }, answer.lastUsedAt ? String(answer.lastUsedAt) : 'never'),
+        el('div', { class: 'm-stat__label' }, 'Last used'))));
+    if (answer.lastFailure) {
+      body.appendChild(notice({
+        tone: 'warning',
+        title: 'Its last failure',
+        text: (answer.lastFailure.route || 'a route') + ' · ' + (answer.lastFailure.errors || 0) + ' errors',
+      }));
+    }
+    const scopes = Array.isArray(answer.scopes) ? answer.scopes : [];
+    body.appendChild(el('p', { class: 'm-lede' },
+      'The scopes it carries: ' + (scopes.join(', ') || 'none') + '.'));
+  }).catch((error) => {
+    clear(body);
+    body.appendChild(failure(error, null));
+  });
+}
+
+// The gateway of one application: whether it hears the community, and the
+// ticket a bot needs to connect with.
+function gatewaySheet(serverId, application) {
+  const body = el('div', { class: 'm-stack' });
+  sheet({ title: application.name + ' and the gateway', body });
+
+  const paint = (report) => {
+    clear(body);
+    const gateway = (report && report.application) || {};
+    body.appendChild(el('div', { class: 'm-stat-row' },
+      el('div', { class: 'm-stat' },
+        el('div', { class: 'm-stat__value' }, gateway.connected ? 'Connected' : 'Not connected'),
+        el('div', { class: 'm-stat__label' }, 'The gateway')),
+      el('div', { class: 'm-stat' },
+        el('div', { class: 'm-stat__value' }, String(gateway.sockets || 0)),
+        el('div', { class: 'm-stat__label' }, 'Sockets open')),
+      el('div', { class: 'm-stat' },
+        el('div', { class: 'm-stat__value' }, String((gateway.events || []).length)),
+        el('div', { class: 'm-stat__label' }, 'Events it asked for'))));
+    body.appendChild(el('p', { class: 'm-lede' },
+      'A bot asks for a ticket, opens the socket with it, and says which events it wants. '
+        + 'The ticket is good for one connection and for a minute.'));
+    body.appendChild(actions([
+      primaryButton('Issue a ticket', () => {
+        issueGatewayTicket(serverId, application.id).then((ticket) => {
+          sheet({
+            title: 'A ticket for the gateway',
+            body: el('div', { class: 'm-stack' },
+              el('p', { class: 'm-lede' }, 'Give this to the bot, and it opens the socket with it.'),
+              el('code', { class: 'm-secret' }, ticket.ticket)),
+          });
+        }).catch((error) => toast(error.message, { type: 'error' }));
+      }),
+      ghostButton('Check again', () => {
+        readGateway(serverId, application.id).then(paint).catch((error) => {
+          clear(body);
+          body.appendChild(failure(error, null));
+        });
+      }),
+    ]));
+    body.appendChild(el('p', { class: 'm-lede' },
+      'The events it asked for: ' + ((gateway.events || []).join(', ')
+        || 'none yet - a bot subscribes once it is connected')));
+  };
+
+  body.appendChild(loading('Reading the gateway'));
+  readGateway(serverId, application.id).then(paint).catch((error) => {
+    clear(body);
+    body.appendChild(failure(error, null));
+  });
+}
+
 function applicationSheet(serverId, application, onDone) {
   const body = el('div', { class: 'm-stack' });
   const layer = sheet({ title: application.name, body });
@@ -521,9 +732,14 @@ function applicationSheet(serverId, application, onDone) {
   body.appendChild(el('p', { class: 'm-eyebrow' }, 'The scopes it carries'));
   body.appendChild(scopes.length ? list : el('p', { class: 'm-lede' }, 'None.'));
 
-  const buttons = [ghostButton('Commands', () => commandsSheet(serverId, application, onDone))];
-  if (application.status === 'active') {
-    buttons.push(ghostButton('New token', async () => {
+  const active = application.status === 'active';
+  const buttons = [
+    ghostButton('Its work', () => applicationHealthSheet(serverId, application)),
+    ghostButton('Change', () => editApplicationSheet(serverId, application, onDone)),
+    ghostButton('Scopes', () => applicationScopesSheet(serverId, application, onDone)),
+    ghostButton('Commands', () => commandsSheet(serverId, application, onDone)),
+    ghostButton('Gateway', () => gatewaySheet(serverId, application)),
+    active ? ghostButton('New token', async () => {
       const yes = await confirm({
         title: 'Issue a new token?',
         text: 'The application holds one token. The old one stops working at once, so the integration '
@@ -537,8 +753,23 @@ function applicationSheet(serverId, application, onDone) {
           'This is the only time the token is shown. The previous one has stopped working.');
         onDone();
       } catch (error) { toast(error.message, { type: 'error' }); }
-    }));
-    buttons.push(el('button', {
+    }) : ghostButton('Switch on', async () => {
+      try {
+        await updateApplication(serverId, application.id, { status: 'active' });
+        toast('Switched on');
+        layer.close();
+        onDone();
+      } catch (error) { toast(error.message, { type: 'error' }); }
+    }),
+    active ? ghostButton('Switch off', async () => {
+      try {
+        await updateApplication(serverId, application.id, { status: 'disabled' });
+        toast('Switched off');
+        layer.close();
+        onDone();
+      } catch (error) { toast(error.message, { type: 'error' }); }
+    }) : null,
+    active ? el('button', {
       class: 'm-btn m-btn--block m-btn--danger', type: 'button',
       'aria-label': 'Revoke ' + application.name,
       onClick: async () => {
@@ -557,8 +788,28 @@ function applicationSheet(serverId, application, onDone) {
           onDone();
         } catch (error) { toast(error.message, { type: 'error' }); }
       },
-    }, 'Revoke it'));
-  }
+    }, 'Revoke it') : el('button', {
+      class: 'm-btn m-btn--block m-btn--danger', type: 'button',
+      'aria-label': 'Delete ' + application.name,
+      onClick: async () => {
+        const yes = await confirm({
+          title: 'Delete ' + application.name + '?',
+          text: 'The application is gone for good: its token stops working at once and its bot '
+            + 'leaves the community. The messages it wrote stay where they are. This cannot '
+            + 'be undone.',
+          confirmLabel: 'Delete it',
+          danger: true,
+        });
+        if (!yes) return;
+        try {
+          await deleteApplication(serverId, application.id);
+          toast('Deleted');
+          layer.close();
+          onDone();
+        } catch (error) { toast(error.message, { type: 'error' }); }
+      },
+    }, 'Delete it'),
+  ];
   body.appendChild(el('div', { class: 'm-actions m-actions--wrap' }, buttons));
   return layer;
 }
@@ -631,6 +882,27 @@ async function applicationsSection(host, reload) {
 
 // -- the documentation -----------------------------------------------------------
 
+// The first program, in the form the SDK's own guide gives it. A copy close to
+// the buttons that make the token saves the trip; the guide carries the rest.
+function hoistExample() {
+  return [
+    'import { Client, Events } from \'trycord-botjs\';',
+    '',
+    'const client = new Client({',
+    '  token: process.env.TRYCORD_BOT_TOKEN,',
+    '  baseUrl: \'https://trycord.dev\',',
+    '});',
+    '',
+    'client.on(Events.MessageCreated, async (event) => {',
+    '  if (event.message?.content === \'!ping\') {',
+    '    await client.send(event.serverId, event.channelId, \'Pong.\');',
+    '  }',
+    '});',
+    '',
+    'await client.login();',
+  ].join('\n');
+}
+
 // Where somebody reads about the API. The guide is a page of the public site,
 // the reference is the machine-readable document the server serves, and the
 // SDK is the client that saves writing the requests by hand.
@@ -667,6 +939,12 @@ function documentationSection(host) {
     text: 'The guide walks through making an application, keeping its token and posting a first '
       + 'message. The reference lists every route this instance serves.',
   }));
+  host.appendChild(el('p', { class: 'm-lede' },
+    'Create an application, keep the token it shows you once, and give these lines to it. '
+    + 'A self-hosted instance points the client at its own address; the address below is only '
+    + 'the default.'));
+  host.appendChild(section('From token to working bot',
+    el('code', { class: 'm-secret' }, hoistExample())));
   host.appendChild(section('The documentation', list));
 }
 

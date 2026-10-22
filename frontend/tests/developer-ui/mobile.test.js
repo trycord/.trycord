@@ -70,6 +70,13 @@ function fieldControl(node, label) {
   return findAll(fields[0], (entry) => entry.tagName === 'INPUT' || entry.tagName === 'TEXTAREA')[0] || null;
 }
 
+// A button found by the words written on it. The phone's smaller actions have
+// no label of their own: their text is their name.
+function buttonWith(node, text) {
+  return findAll(node, (entry) => entry.tagName === 'BUTTON'
+    && String(entry.textContent || '').trim() === text)[0] || null;
+}
+
 function tabOf(view, name) {
   const button = byLabel(view.node, 'Show the ' + name.toLowerCase() + ' section')[0];
   assert.ok(button, 'the console has no ' + name + ' section');
@@ -290,4 +297,138 @@ test('the phone shows an application token once', async () => {
   const posted = await waitFor(() => calls.find((call) => call.options.method === 'POST'
     && call.url === V1 + '/communities/s1/applications'));
   assert.ok(posted, 'the application was never created');
+});
+
+// -- the application lifecycle ----------------------------------------------------
+//
+// The phone's sheet is the one place an application is managed, so the acts
+// the desk offers are the acts the phone offers, reached from the row itself.
+
+function applicationListRoutes(extra) {
+  const state = Object.assign({}, APPLICATION);
+  return Object.assign({
+    [V1 + '/communities/s1/applications']: () => {
+      return { json: { applications: state.deleted ? [] : [Object.assign({}, state)] } };
+    },
+    [V1 + '/communities/s1/applications/app1']: (body) => {
+      if (body) {
+        Object.assign(state, body);
+        return { json: { application: Object.assign({}, state) } };
+      }
+      return { json: { applications: state.deleted ? [] : [Object.assign({}, state)] } };
+    },
+  }, extra || {});
+}
+
+// Open the application's sheet by waiting for the row that reads the wanted
+// state, so an act and the list that follows it are never confused: a row
+// that still reads the old state is not the one to act on.
+async function openListedApplication(view, status) {
+  const row = await waitFor(() => findAll(view.node, (node) => node.tagName === 'BUTTON'
+    && /Night owl/.test(String(node.textContent || ''))
+    && (!status || String(node.textContent || '').indexOf(status) !== -1))[0]);
+  assert.ok(row, 'the application is not listed' + (status ? ' as ' + status : ''));
+  row.click();
+  // The sheet that just closed stays in the tree until its leaving animation
+  // ends, so the newest sheet that matches is the one to read.
+  return waitFor(() => {
+    const found = sheets().filter((node) => String(node.textContent || '')
+      .indexOf('The scopes it carries') !== -1);
+    return found.length ? found[found.length - 1] : null;
+  });
+}
+
+test('the phone changes an application without a new token', async () => {
+  installDomStub();
+  State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
+  const calls = installFetchStub(baseRoutes(applicationListRoutes()));
+
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+  tabOf(view, 'Applications');
+
+  const sheet = await openListedApplication(view, 'active');
+
+  const change = buttonWith(sheet, 'Change');
+  assert.ok(change, 'the phone offered no way to change an application');
+  change.click();
+
+  const form = await waitFor(() => sheetWith('Change Night owl'));
+  assert.ok(form, 'changing an application did not open a form');
+  fieldControl(form, 'The name of the application').value = 'Night owl II';
+  buttonWith(form, 'Save it').click();
+
+  const sent = await waitFor(() => calls.find((call) => call.options.method === 'PATCH'
+    && call.url === V1 + '/communities/s1/applications/app1'));
+  assert.ok(sent, 'the application was never changed');
+  assert.equal(sent.body.name, 'Night owl II');
+  assert.ok(!calls.some((call) => /rotate/.test(call.url)),
+    'changing an application issued a token');
+});
+
+test('the phone switches an application off and on', async () => {
+  installDomStub();
+  State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
+  const calls = installFetchStub(baseRoutes(applicationListRoutes()));
+
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+  tabOf(view, 'Applications');
+
+  let sheet = await openListedApplication(view, 'active');
+  const off = buttonWith(sheet, 'Switch off');
+  assert.ok(off, 'there is no way to switch an application off');
+  off.click();
+
+  const lowered = await waitFor(() => calls.find((call) => call.options.method === 'PATCH'
+    && call.url === V1 + '/communities/s1/applications/app1'));
+  assert.ok(lowered, 'the application was never switched off');
+  assert.equal(lowered.body.status, 'disabled');
+
+  sheet = await openListedApplication(view, 'disabled');
+  const on = buttonWith(sheet, 'Switch on');
+  assert.ok(on, 'a switched-off application had no way back');
+  on.click();
+
+  const raised = await waitFor(() => calls.find((call) => call.options.method === 'PATCH'
+    && call.url === V1 + '/communities/s1/applications/app1' && call.body.status === 'active'));
+  assert.ok(raised, 'the application was never switched on');
+});
+
+test('the phone deletes a switched-off application for good', async () => {
+  installDomStub();
+  State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
+  const calls = installFetchStub(baseRoutes({
+    [V1 + '/communities/s1/applications']: () => {
+      return { json: { applications: [Object.assign({}, APPLICATION, { status: 'disabled' })] } };
+    },
+    [V1 + '/communities/s1/applications/app1']: () => ({ json: { ok: true } }),
+  }));
+
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+  tabOf(view, 'Applications');
+
+  const sheet = await openListedApplication(view, 'disabled');
+  assert.ok(/It is disabled/.test(String(sheet.textContent || '')),
+    'the sheet did not say the application is switched off');
+
+  const remove = byLabel(sheet, 'Delete Night owl')[0];
+  assert.ok(remove, 'there is no way to delete a switched-off application');
+  remove.click();
+
+  const asked = await waitFor(() => {
+    const found = sheets().filter((node) => String(node.textContent || '').indexOf('Delete Night owl?') !== -1)[0];
+    if (!found) return null;
+    return findAll(found, classed('m-btn--danger'))[0];
+  });
+  assert.ok(asked, 'deleting an application asked nothing');
+  const said = sheets().filter((node) => String(node.textContent || '').indexOf('Delete Night owl?') !== -1)[0];
+  assert.match(said.textContent, /The messages it wrote stay/,
+    'the deletion did not say what happens to what the application wrote');
+  asked.click();
+
+  const sent = await waitFor(() => calls.find((call) => call.options.method === 'DELETE'
+    && call.url === V1 + '/communities/s1/applications/app1'));
+  assert.ok(sent, 'the application was never deleted');
 });
