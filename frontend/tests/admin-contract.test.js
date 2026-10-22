@@ -57,3 +57,26 @@ test('a report move travels in the server\u2019s vocabulary', async () => {
     globalThis.fetch = original;
   }
 });
+
+test('a deletion review travels in the server\u2019s vocabulary', async () => {
+  let seen = null;
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    seen = {
+      url: String(url),
+      body: options && options.body ? JSON.parse(options.body) : null,
+    };
+    return {
+      status: 200, statusText: 'ok',
+      headers: { get: () => null }, ok: true,
+      async json() { return { ok: true }; },
+    };
+  };
+  try {
+    await Api.adminReviewGdprRequest('request-2', 'REJECT', 'Rejected by an administrator');
+    assert.equal(seen.body.decision, 'REJECT',
+      'the review is APPROVE or REJECT, never a word the server does not know');
+  } finally {
+    globalThis.fetch = original;
+  }
+});

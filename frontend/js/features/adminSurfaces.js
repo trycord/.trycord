@@ -514,9 +514,12 @@ export function adminReports() {
 // offer the same things, so they are written once.
 async function reviewRequest(request, decision, refresh) {
   try {
-    await Api.adminReviewGdprRequest(request.id, decision, decision === 'approve'
-      ? 'Approved by an administrator' : 'Denied by an administrator');
-    toast(decision === 'approve' ? 'Approved' : 'Denied');
+    // The server's vocabulary for a review is APPROVE or REJECT. Approving
+    // moves the request to under review; rejecting closes it with the reason
+    // recorded. The words travel as the server spells them.
+    await Api.adminReviewGdprRequest(request.id, decision,
+      decision === 'REJECT' ? 'Rejected by an administrator' : '');
+    toast(decision === 'REJECT' ? 'Rejected' : 'Approved');
     refresh();
   } catch (e) { errorToast(e); }
 }
@@ -726,8 +729,12 @@ export function adminGdpr() {
         side: el('span', { class: 'rowtools' },
           el('button', {
             class: 'btn btn--ghost btn--sm', type: 'button',
-            onClick: () => reviewRequest(r, 'approve', paint),
+            onClick: () => reviewRequest(r, 'APPROVE', paint),
           }, 'Approve'),
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            onClick: () => reviewRequest(r, 'REJECT', paint),
+          }, 'Reject'),
           el('button', {
             class: 'btn btn--ghost btn--sm', type: 'button',
             onClick: async () => {
@@ -739,7 +746,8 @@ export function adminGdpr() {
             },
           }, 'Process')),
         menu: () => [
-          { label: 'Approve the request', icon: 'check', onSelect: () => reviewRequest(r, 'approve', paint) },
+          { label: 'Approve the request', icon: 'check', onSelect: () => reviewRequest(r, 'APPROVE', paint) },
+          { label: 'Reject the request', icon: 'x', danger: true, onSelect: () => reviewRequest(r, 'REJECT', paint) },
           {
             label: 'Process the request', icon: 'zap', danger: true,
             onSelect: async () => {
