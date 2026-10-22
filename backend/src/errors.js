@@ -3,6 +3,10 @@
 const Codes = {
   AUTH_REQUIRED: 401,
   SESSION_REVOKED: 401,
+  // A second-factor challenge that outlived its five minutes. 401 like the
+  // sign-in refusals, but a code of its own so the client can restart the
+  // sign-in instead of blaming the code the reader typed.
+  CHALLENGE_EXPIRED: 401,
   BAD_PASSWORD: 400,
   // Login throttling. 429 so a client can show a countdown and so a caller can
   // tell "locked out" from "wrong password" without parsing prose.

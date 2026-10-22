@@ -15,6 +15,44 @@ import { withLegalVersions, isStaleLegalError } from '../../../packages/legal.js
 import { connect } from '../../../packages/realtime.js';
 import { toast } from '../ui.js';
 import { textInput, field } from './util.js';
+import { waitPhrase, passwordIsOverTheCeiling, signInRefusalWords } from '../../../packages/authwords.js';
+
+// The sentences a refused sign-in answers with are shared with the desk, and
+// this file draws them on the phone: the two clients must never say two
+// different things about the same failure.
+function refusalAction(action, restartCallback) {
+  if (!action) return null;
+  if (action.kind === 'restart') {
+    return el('button', {
+      class: 'm-btn m-btn--default', type: 'button', onClick: restartCallback,
+    }, 'Start again');
+  }
+  if (action.kind === 'support') {
+    return el('a', { class: 'm-btn m-btn--default', href: path(action.href) }, 'How to reach support');
+  }
+  return null;
+}
+
+// The waiting screen for an account that still needs an administrator's yes.
+// On an approval-gated instance the account exists from registration on, but
+// every authenticated path refuses it - entering the workspace is not what
+// happens next. Nothing is promised about when this ends, because nothing
+// here knows.
+function approvalWaiting() {
+  const signOut = el('button', {
+    class: 'm-btn m-btn--ghost m-btn--block', type: 'button',
+    onClick: async () => {
+      try { await logout(); } catch { /* dropped locally either way */ }
+      navigate('/login', { replace: true });
+    },
+  }, 'Sign out');
+  return [
+    el('p', { class: 'm-auth__sub' },
+      'Your account is created. This instance asks an administrator to approve new '
+      + 'accounts before they are opened, so every part of Trycord stays closed '
+      + 'until that happens.'),
+    signOut];
+}
 
 function lockup() {
   return el('div', { class: 'm-auth__lockup' },
@@ -130,7 +168,28 @@ function loginForm() {
       }
       applyToken(out.token, out.user);
       await afterSignIn(nextTarget());
-    } catch (error) { showError(form, error); }
+    } catch (error) {
+      // An approval-gated instance issues the session and then refuses
+      // everything the session can reach with it. There is nothing to fix in
+      // the form, so the waiting screen takes its place.
+      if (error && error.code === 'ACCOUNT_PENDING') {
+        toast('Your account is waiting for an administrator to approve it. Nothing opens until then.', { type: 'info' });
+        form.replaceChildren(...approvalWaiting());
+        return;
+      }
+      // The sentence is the shared one, and what was typed stays in the
+      // fields: a form that empties itself on a wrong password empties the
+      // reader's attention with it.
+      const restart = challenge !== null ? () => {
+        challenge = null;
+        mfaField.hidden = true;
+        code.required = false;
+        code.value = '';
+      } : null;
+      const said = signInRefusalWords(error, restart);
+      if (said) showError(form, said.message, refusalAction(said.action, restart));
+      else showError(form, error);
+    }
     finally { busy(form, false); }
   });
 
@@ -196,10 +255,10 @@ function registerForm() {
     el('p', { class: 'm-auth__instance' },
       'Joining ', el('strong', {}, TrycordConfig.backendUrl())),
     legal.block,
-    field({ label: 'Username', control: username }),
+    field({ label: 'Username', control: username, note: '2 to 32 characters: letters, numbers, _ or .' }),
     field({ label: 'Display name', control: display }),
     field({ label: 'Email (optional)', control: email }),
-    field({ label: 'Password', control: password }),
+    field({ label: 'Password', control: password, note: 'At least 8 characters. A long passphrase works well.' }),
     submit);
 
   // The form cannot be sent until the documents are accepted, and the button
@@ -224,6 +283,14 @@ function registerForm() {
       return;
     }
     busy(form, true);
+    // Long passphrases are welcome up to the ceiling the storage can keep;
+    // refused here, the passphrase is still on screen and nothing typed in
+    // the other fields has been spent.
+    if (passwordIsOverTheCeiling(password.value)) {
+      showError(form, 'That passphrase is longer than passwords here can be. Trim it a little and try again.');
+      busy(form, false);
+      return;
+    }
     try {
       // The versions come from the instance, never from this file.
       if (!State.legal) {
@@ -242,6 +309,14 @@ function registerForm() {
       }, State.legal));
       if (out && out.token) {
         applyToken(out.token, out.user);
+        // An approval-gated instance hands out the session and then refuses
+        // every authenticated path with it: the waiting screen is what comes
+        // next, not a workspace that will refuse the reader everywhere.
+        if (out.pendingApproval) {
+          toast('Account created.', { type: 'success' });
+          form.replaceChildren(...approvalWaiting());
+          return;
+        }
         await afterSignIn('/home');
       } else {
         toast('Account created. Check your email to continue.', { type: 'success' });
@@ -268,13 +343,16 @@ function forgotForm() {
   const email = textInput({ name: 'email', type: 'email' });
   const form = el('form', { class: 'm-auth__form' },
     field({ label: 'Email address', control: email }),
+    el('p', { class: 'm-field__note' }, 'If the link does not arrive, look in the spam folder.'),
     el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Send reset link'));
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     busy(form, true);
     try {
       await Api.forgotPassword({ email: email.value.trim() });
-      toast('If that address exists, a reset link is on its way.', { type: 'success' });
+      // "On its way" rather than "sent": the request went out, and nothing
+      // here has seen a delivery.
+      toast('If that address is on an account here, a reset link is on its way.', { type: 'info' });
       navigate('/login');
     } catch (error) { showError(form, error); }
     finally { busy(form, false); }
@@ -286,12 +364,22 @@ function resetForm(token) {
   const next = textInput({ name: 'newPassword', type: 'password', autocomplete: 'new-password' });
   const confirm = textInput({ name: 'confirmPassword', type: 'password', autocomplete: 'new-password' });
   const form = el('form', { class: 'm-auth__form' },
-    field({ label: 'New password', control: next }),
+    field({ label: 'New password', control: next, note: 'At least 8 characters. A long passphrase works well.' }),
     field({ label: 'Confirm new password', control: confirm }),
     el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Set new password'));
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     busy(form, true);
+    if (next.value !== confirm.value) {
+      showError(form, 'The two passwords do not match. Type them again and try once more.');
+      busy(form, false);
+      return;
+    }
+    if (passwordIsOverTheCeiling(next.value)) {
+      showError(form, 'That passphrase is longer than passwords here can be. Trim it a little and try again.');
+      busy(form, false);
+      return;
+    }
     try {
       const out = await Api.resetPassword({ token, newPassword: next.value, confirmPassword: confirm.value });
       // An account with a second factor gets a challenge rather than a session:
@@ -300,7 +388,21 @@ function resetForm(token) {
         ? 'Password set. Sign in with your two-step code.'
         : 'Password set. Sign in with it.', { type: 'success' });
       navigate('/login', { replace: true });
-    } catch (error) { showError(form, error); }
+    } catch (error) {
+      // A spent reset link is not a mistake the password fields can fix - the
+      // link itself is gone. The way back is a new link, and it is offered
+      // here rather than left to be figured out.
+      if (error && error.code === 'AUTH_REQUIRED') {
+        showError(form, (error && error.message)
+          || 'This reset link is no longer valid. Request a new one to continue.',
+        el('button', {
+          class: 'm-btn m-btn--default', type: 'button',
+          onClick: () => navigate('/forgot'),
+        }, 'Request a new link'));
+      } else {
+        showError(form, error);
+      }
+    }
     finally { busy(form, false); }
   });
   return [form, el('p', { class: 'm-auth__alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
@@ -315,8 +417,30 @@ function verifyPanel(token) {
       status.textContent = 'Your email is verified.';
       form.appendChild(el('a', { class: 'm-btn m-btn--primary m-btn--block', href: path('/login') }, 'Sign in'));
     } catch (error) {
-      status.textContent = error && error.message ? error.message : 'That link did not work.';
-      form.appendChild(el('a', { class: 'm-btn m-btn--block', href: path('/login') }, 'Go to sign in'));
+      // The raw reason first, then the paths that exist from here: a fresh
+      // link for signed-in readers - the account knows its own address - and
+      // sign-in for everyone else.
+      const mine = (State.user || {}).email;
+      status.textContent = (error && error.message) || 'That link did not work.';
+      if (mine) {
+        const resend = el('button', {
+          class: 'm-btn m-btn--default m-btn--block', type: 'button',
+          onClick: async () => {
+            resend.disabled = true;
+            try {
+              await Api.verifyEmailResend({ email: mine });
+              status.textContent = 'The link is on its way to ' + mine + '. If it does not arrive, look in the spam folder.';
+            } catch (resendError) {
+              status.textContent = (resendError && resendError.message) || 'That did not work. Try again.';
+              resend.disabled = false;
+            }
+          },
+        }, 'Send a new link to the address on your account');
+        form.appendChild(resend);
+        form.appendChild(el('a', { class: 'm-btn m-btn--block', href: path('/home') }, 'Continue to Trycord'));
+      } else {
+        form.appendChild(el('a', { class: 'm-btn m-btn--block', href: path('/login') }, 'Go to sign in'));
+      }
     }
   })();
   return [status, form];
@@ -339,7 +463,11 @@ function twoStepPanel() {
         const out = await Api.twoFactorSetup({ password: password.value });
         saved.password = password.value;
         swap(codeStep(out && out.secret ? out.secret : ''));
-      } catch (error) { showError(form, error); }
+      } catch (error) {
+        showError(form, (error && error.code === 'ACCOUNT_LOCKED')
+          ? 'Too many tries in a row. ' + waitPhrase(error.details && error.details.retryAfterSeconds)
+          : (error && error.message) || 'That did not work. Try again.');
+      }
       finally { busy(form, false); }
     });
     return form;
@@ -358,7 +486,11 @@ function twoStepPanel() {
       try {
         const out = await Api.twoFactorEnable({ password: saved.password, code: code.value.trim() });
         swap(codesStep(out && out.recoveryCodes ? out.recoveryCodes : []));
-      } catch (error) { showError(form, error); }
+      } catch (error) {
+        showError(form, (error && error.code === 'ACCOUNT_LOCKED')
+          ? 'Too many tries in a row. ' + waitPhrase(error.details && error.details.retryAfterSeconds)
+          : (error && error.message) || 'That did not work. Try again.');
+      }
       finally { busy(form, false); }
     });
     return form;

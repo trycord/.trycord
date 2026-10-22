@@ -34,7 +34,7 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
     // stuck unable to post.
     if (features.current.emailVerificationRequired && !email) {
       return fail(res, 'VALIDATION_ERROR',
-        'this instance requires a verified email address, so an address is required');
+        'This instance requires a verified email address for every account, so the Email field is needed here.');
     }
     // Terms acceptance is recorded with the exact versions shown at signup.
     // Existing (pre-policy) accounts have NULL columns and are unaffected.
@@ -43,11 +43,11 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
     }
     const name = String(username).trim();
     if (!/^[A-Za-z0-9_.]{2,32}$/.test(name)) {
-      return fail(res, 'VALIDATION_ERROR', 'username must be 2-32 chars: letters, numbers, _ or .');
+      return fail(res, 'VALIDATION_ERROR', 'A username is 2 to 32 characters: letters, numbers, _ or .');
     }
     if (email) {
       const taken = await db.get('SELECT id FROM users WHERE email = ?', [email]);
-      if (taken) return fail(res, 'CONFLICT', 'that email is already in use');
+      if (taken) return fail(res, 'CONFLICT', 'That email is already on an account here. Try signing in with it, or register with another address.');
     }
     const id = uuid();
     const hash = await bcrypt.hash(String(password), BCRYPT_COST);
@@ -63,7 +63,7 @@ router.post('/register', rateLimit({ windowMs: 60000, max: 20 }), async (req, re
           PRIVACY_VERSION, now(), email, awaitingApproval ? null : now()]
       );
     } catch (e) {
-      if (isUniqueViolation(e)) return fail(res, 'CONFLICT', 'username taken');
+      if (isUniqueViolation(e)) return fail(res, 'CONFLICT', 'That username is already taken. Try another one, or sign in if it is yours.');
       throw e;
     }
     if (email) recovery.requestVerification(id, email).catch(() => {});

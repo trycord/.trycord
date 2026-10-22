@@ -14,10 +14,11 @@ import { brandSymbolUrl } from '../../packages/brand.js';
 import Api from '../../packages/api.js';
 import TrycordConfig from '../../packages/config.js';
 import { currentQuery, navigate, publicPath } from '../../packages/nav.js';
-import { State, applyToken, loadLegal, loadSession, refreshServers } from '../../packages/store.js';
+import { State, applyToken, loadLegal, loadSession, logout, refreshServers } from '../../packages/store.js';
 import { withLegalVersions, isStaleLegalError } from '../../packages/legal.js';
 import { connect } from '../../packages/realtime.js';
 import { toast } from '../ui/overlays.js';
+import { waitPhrase, passwordIsOverTheCeiling, signInRefusalWords } from '../../packages/authwords.js';
 
 // -- the gate frame -----------------------------------------------------------
 
@@ -90,8 +91,13 @@ function input(name, options) {
   return node;
 }
 
-function field(label, control) {
-  return el('label', { class: 'field' }, el('span', { class: 'field-label' }, label), control);
+function field(label, control, hint) {
+  const node = el('label', { class: 'field' }, el('span', { class: 'field-label' }, label), control);
+  // A hint says what the field wants before the request is refused for not
+  // having it. It is a span, not a note below the form, so it reads as
+  // belonging to this field.
+  if (hint) node.appendChild(el('span', { class: 'field-hint' }, hint));
+  return node;
 }
 
 function gateForm(fields, submitLabel) {
@@ -114,13 +120,18 @@ function showError(form, error, action) {
   const node = form.querySelector('.form-error');
   if (!node) return;
   node.hidden = false;
+  // The refusal may arrive as { message, action } - the shaped answer
+  // signInRefusal builds - or as a bare error, with the action handed in
+  // beside it. Both carry an optional control, because some refusals need an
+  // action (start the sign-in over) and not only a sentence.
+  const control = action || (error && error.action) || null;
   // The children are filtered rather than passed as they are:
   // `replaceChildren` renders a null argument as the text "null", and a sign-in
   // form that says "null" under the message is a bug somebody will report.
   node.replaceChildren(
     ...[
       el('span', {}, (error && error.message) || 'That did not work. Try again.'),
-      action || null,
+      control,
     ].filter(Boolean),
   );
 }
@@ -132,7 +143,58 @@ function clearError(form) {
   node.replaceChildren();
 }
 
+// -- what a refusal says ------------------------------------------------------
+
+// The sentences live in the shared module - the phone has to say exactly
+// what the desk says, and one copy of the words cannot drift into two
+// truths. This file draws them: the action descriptions become the controls
+// the desk has.
+export { waitPhrase, passwordIsOverTheCeiling } from '../../packages/authwords.js';
+
+// The desk's drawing of a refusal: the shared sentences arrive as words and
+// action descriptions; this turns an action into its control.
+function signInRefusal(error, restartChallenge) {
+  const restart = typeof restartChallenge === 'function' ? restartChallenge : null;
+  const said = signInRefusalWords(error, restart);
+  if (!said || !said.action) return said;
+  return {
+    message: said.message,
+    action: said.action.kind === 'restart'
+      ? el('button', {
+        class: 'btn btn--default btn--sm', type: 'button', onClick: restart,
+      }, 'Start again')
+      : said.action.kind === 'support'
+        ? el('a', { class: 'btn btn--default btn--sm', href: publicPath(said.action.href) }, 'How to reach support')
+        : null,
+  };
+}
+
 // -- landing after a sign-in --------------------------------------------------
+
+// The waiting screen for an account that still needs an administrator's yes.
+//
+// On an instance with approval required, the account exists from the moment
+// of registration but every authenticated path refuses it until the yes.
+// After signing in there is no workspace to land in - the token is issued and
+// then refused everywhere, which used to mean an error on the form and a
+// session that opened nothing. This says the fact where the reader is
+// standing: created, waiting, nothing promised about when it ends, because
+// nothing here knows that.
+export function approvalWaiting() {
+  return [
+    el('p', { class: 'gate-note' },
+      'Your account is created. This instance asks an administrator to approve new '
+      + 'accounts before they are opened, so every part of Trycord stays closed '
+      + 'until that happens.'),
+    el('button', {
+      class: 'btn btn--default btn--block', type: 'button',
+      onClick: async () => {
+        try { await logout(); } catch { /* the token is dropped locally either way */ }
+        navigate('/login', { replace: true });
+      },
+    }, 'Sign out'),
+  ];
+}
 
 async function afterSignIn(next) {
   let user;
@@ -252,7 +314,32 @@ function loginGate() {
       toast('Signed in.', { type: 'success' });
       await afterSignIn(nextTarget());
     } catch (error) {
-      showError(form, error);
+      // An approval-gated instance hands out the session and then refuses
+      // everything the session can reach with it. Telling that inside the form
+      // is not enough - there is nothing to fix in the form - so the waiting
+      // screen takes the form's place.
+      if (error && error.code === 'ACCOUNT_PENDING') {
+        toast('Your account is waiting for an administrator to approve it. Nothing opens until then.', { type: 'info' });
+        form.replaceChildren(...approvalWaiting());
+        return;
+      }
+      // A refused sign-in is answered in the words above, with the actions
+      // some refusals call for; anything else keeps the server's own
+      // message. What was typed stays in the fields either way, because a
+      // form that empties itself on a wrong password empties the reader's
+      // attention with it.
+      // The way back from a stale code challenge is a function rather than a
+      // flag: it exists exactly while the reader is in the code step, and it
+      // clears only the challenge handoff - five minutes and six digits do
+      // not survive an expiry, but the name and password the reader meant
+      // were never wrong.
+      const refusal = signInRefusal(error, challenge !== null ? () => {
+        challenge = null;
+        codeField.hidden = true;
+        code.required = false;
+        code.value = '';
+      } : null);
+      showError(form, refusal || error);
     } finally {
       busy(form, false);
     }
@@ -357,10 +444,10 @@ export function registerGate() {
   const legal = legalAcceptance();
 
   const form = gateForm([
-    field('Username', username),
+    field('Username', username, '2 to 32 characters: letters, numbers, _ or .'),
     field('Display name (optional)', display),
     field('Email (optional)', email),
-    field('Password', password),
+    field('Password', password, 'At least 8 characters. A long passphrase works well.'),
     field('Confirm password (optional)', confirm),
   ], 'Create account');
   form.insertBefore(instanceNote, form.firstChild);
@@ -393,7 +480,15 @@ export function registerGate() {
     busy(form, true);
     clearError(form);
     if (confirm.value !== password.value) {
-      showError(form, { message: 'Passwords do not match.' });
+      showError(form, { message: 'The two passwords do not match. Type them again and try once more.' });
+      busy(form, false);
+      return;
+    }
+    // Long passphrases are welcome up to the ceiling the storage can keep.
+    // Refused here, the passphrase is still on screen and nothing typed in
+    // the other fields has been spent.
+    if (passwordIsOverTheCeiling(password.value)) {
+      showError(form, { message: 'That passphrase is longer than passwords here can be. Trim it a little and try again.' });
       busy(form, false);
       return;
     }
@@ -418,6 +513,15 @@ export function registerGate() {
       }, State.legal));
       if (out && out.token) {
         applyToken(out.token, out.user);
+        // An approval-gated instance issues the session and then refuses
+        // every authenticated path with it. Entering the workspace cannot be
+        // what happens next: the waiting screen is, in the gate the reader
+        // is standing in.
+        if (out.pendingApproval) {
+          toast('Account created.', { type: 'success' });
+          form.replaceChildren(...approvalWaiting());
+          return;
+        }
         toast('Account created.', { type: 'success' });
         await afterSignIn(nextTarget());
       } else {
@@ -457,7 +561,7 @@ function forgotGate() {
   const email = input('email', { type: 'email', autocomplete: 'email' });
   const form = gateForm([
     field('Email address', email),
-    el('p', { class: 'gate-note' }, 'We send the link to the address on your account.'),
+    el('p', { class: 'gate-note' }, 'We send the link to the address on your account. If it does not arrive, look in the spam folder.'),
   ], 'Send reset link');
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -465,7 +569,9 @@ function forgotGate() {
     clearError(form);
     try {
       await Api.forgotPassword({ email: email.value.trim() });
-      toast('If that address is on an account, a reset link has been sent.', { type: 'info' });
+      // "On its way" rather than "sent": the request went out, and nothing
+      // here has seen a delivery. The phone's gate says the same words.
+      toast('If that address is on an account here, a reset link is on its way.', { type: 'info' });
     } catch (error) {
       showError(form, error);
     } finally {
@@ -479,7 +585,7 @@ function resetGate(token) {
   const password = input('password', { type: 'password', autocomplete: 'new-password' });
   const confirm = input('confirm', { type: 'password', required: false, autocomplete: 'new-password' });
   const form = gateForm([
-    field('New password', password),
+    field('New password', password, 'At least 8 characters. A long passphrase works well.'),
     field('Confirm password', confirm),
   ], 'Reset password');
 
@@ -488,7 +594,12 @@ function resetGate(token) {
     busy(form, true);
     clearError(form);
     if (confirm.value !== password.value) {
-      showError(form, { message: 'Passwords do not match.' });
+      showError(form, { message: 'The two passwords do not match. Type them again and try once more.' });
+      busy(form, false);
+      return;
+    }
+    if (passwordIsOverTheCeiling(password.value)) {
+      showError(form, { message: 'That passphrase is longer than passwords here can be. Trim it a little and try again.' });
       busy(form, false);
       return;
     }
@@ -508,7 +619,19 @@ function resetGate(token) {
       }
       navigate('/login', { replace: true });
     } catch (error) {
-      showError(form, error);
+      // A spent reset link is not a mistake the password fields can fix - the
+      // link itself is the thing that is gone. The way back is a new link,
+      // and that way is offered here rather than left to be figured out.
+      if (error && error.code === 'AUTH_REQUIRED') {
+        showError(form, {
+          message: (error && error.message)
+            || 'This reset link is no longer valid. Request a new one to continue.',
+        }, el('button', {
+          class: 'btn btn--default btn--sm', type: 'button', onClick: () => navigate('/forgot'),
+        }, 'Request a new link'));
+      } else {
+        showError(form, error);
+      }
     } finally {
       busy(form, false);
     }
@@ -528,8 +651,31 @@ function verifyGate(token) {
       status.textContent = 'Email confirmed. You can sign in now.';
       onward.appendChild(el('a', { class: 'btn btn--primary btn--block', href: publicPath('/login') }, 'Sign in'));
     } catch (error) {
-      status.textContent = (error && error.message) || 'That confirmation did not go through.';
-      onward.appendChild(el('a', { class: 'btn btn--default', href: publicPath('/login') }, 'Go to sign in'));
+      const mine = State.user && State.user.email;
+      status.textContent = (error && error.message)
+        || 'That confirmation did not go through.';
+      // Signed in, the way onward is the workspace itself: the fresh link is
+      // offered right here. Signed out, sign-in comes first - the link
+      // belongs to an account, and the server refuses to send to whoever
+      // asks without one.
+      const destination = mine
+        ? el('a', { class: 'btn btn--default btn--block', href: publicPath('/home') }, 'Continue to Trycord')
+        : el('a', { class: 'btn btn--default btn--block', href: publicPath('/login') }, 'Go to sign in');
+      if (mine) {
+        const resend = el('button', { class: 'btn btn--default btn--block', type: 'button' }, 'Send a new link to the address on your account');
+        resend.addEventListener('click', async () => {
+          resend.disabled = true;
+          try {
+            await Api.verifyEmailResend({ email: mine });
+            status.textContent = 'The link is on its way to ' + mine + '. If it does not arrive, look in the spam folder.';
+          } catch (resendError) {
+            status.textContent = (resendError && resendError.message) || 'That did not work. Try again.';
+            resend.disabled = false;
+          }
+        });
+        onward.appendChild(resend);
+      }
+      onward.appendChild(destination);
     }
   })();
 
@@ -589,7 +735,12 @@ function twoStepGate() {
       }
     } catch (err) {
       error.hidden = false;
-      error.textContent = (err && err.message) || 'That did not work.';
+      // The lock's wait is named the way the sign-in names it: when the
+      // server says how long is left, the sentence says that, because a
+      // countdown nobody shows is a countdown that might as well not exist.
+      error.textContent = (err && err.code === 'ACCOUNT_LOCKED')
+        ? 'Too many tries in a row. ' + waitPhrase(err.details && err.details.retryAfterSeconds)
+        : (err && err.message) || 'That did not work. Try again.';
     } finally {
       submit.disabled = false;
     }
