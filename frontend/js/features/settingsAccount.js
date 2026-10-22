@@ -245,6 +245,33 @@ function paint(identity, user, reload) {
           },
         }, 'Save profile'),
       ]),
+    }),
+    card({
+      label: 'Email', glyph: 'mail',
+      body: fold([
+        el('p', { class: 'lede' }, user.email || 'No email on this account yet.'),
+        el('p', { class: 'settings-note' },
+          user.email
+            ? (user.emailVerified
+              ? 'Verified. This address is what a password reset is sent to.'
+              : 'Not verified yet. The address is on file, but nothing sent to it is trusted until it is confirmed.')
+            : 'An address is optional. It is what a password reset is sent to, and it has to be confirmed before it is trusted.'),
+        user.email && !user.emailVerified ? el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          onClick: async (event) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            try {
+              // The address is the account's own, read at the click: the
+              // server refuses a resend without one, and the phone already
+              // answers with the same sentence for the same outcome.
+              await Api.verifyEmailResend({ email: State.user.email });
+              toast('The link is on its way. If it does not arrive, look in the spam folder.', { type: 'success' });
+            } catch (error) { errorToast(error); }
+            finally { button.disabled = false; }
+          },
+        }, 'Send a new verification link') : null,
+      ]),
     }));
 }
 
