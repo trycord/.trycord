@@ -1643,6 +1643,31 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 
 .convo { display: flex; flex-direction: column; gap: 2px; padding-bottom: var(--gap-sm); }
 
+/* The chip that says a message arrived while the reader was up in the
+   history. It sits at the timeline's end, and position:sticky keeps it at
+   the viewport's bottom edge while that end is below the fold - so new
+   messages wait behind one press instead of yanking the scroll. */
+.convo-newchip {
+  position: sticky;
+  bottom: 12px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 8px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--text-1);
+  font-weight: var(--weight-strong);
+  font-size: var(--fs-sm);
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+  transition: border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+.convo-newchip:hover { border-color: var(--brand-line); color: var(--brand); }
+
 .day-sep {
   display: flex; align-items: center; gap: 12px;
   margin: 14px 0 6px; color: var(--text-3);

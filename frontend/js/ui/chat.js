@@ -471,6 +471,20 @@ export function conversationSurface(config) {
 
   const listEl = el('div', { class: 'convo', 'aria-label': cfg.composerLabel || 'Conversation' });
 
+  // The chip that says a message arrived while the reader was up in the
+  // history. It is a promise to the reader, kept in the viewport: new
+  // messages never yank the scroll - they wait at the bottom, behind one
+  // press.
+  const newChip = el('button', {
+    class: 'convo-newchip', type: 'button', hidden: true,
+    'aria-label': 'Jump to the newest message',
+  }, icon('chevron-down', { size: 14 }), el('span', {}, 'New messages'));
+  newChip.addEventListener('click', () => {
+    newChip.hidden = true;
+    const scrollerEl = scroller();
+    if (scrollerEl) scrollerEl.scrollTop = scrollerEl.scrollHeight;
+  });
+
   const emptyHint = cfg.emptyHint;
   const scroller = () => (listEl.closest('.convo-scroll')
     || listEl.closest('.stage-body')
@@ -558,6 +572,10 @@ export function conversationSurface(config) {
       next.appendChild(rowFactory(m, linked));
       last = m;
     }
+    // The chip is part of the timeline's end, so it travels with the newest
+    // message and sticks to the viewport's bottom edge while that end is
+    // below the fold.
+    if (!newChip.hidden) next.appendChild(newChip);
     listEl.replaceChildren(next);
 
     if (before && scrollerEl) {
@@ -595,6 +613,9 @@ export function conversationSurface(config) {
     const scrollerEl = scroller();
     if (!scrollerEl || painting) return;
     const below = scrollerEl.scrollHeight - scrollerEl.scrollTop - scrollerEl.clientHeight;
+    // Arriving at the newest message is the chip's own job done: it steps
+    // aside, and the next repaint leaves it out of the timeline.
+    if (below < 160 && !newChip.hidden) newChip.hidden = true;
     if (scrollerEl.scrollTop <= 40 && below > 80) loadOlder();
   };
 
@@ -1051,11 +1072,17 @@ export function conversationSurface(config) {
         const m = insert(raw);
         if (!m) return;
         rememberRoots();
+        // The reader's position is kept whatever it was: a reader at the
+        // bottom stays at the bottom (the distance from it is preserved),
+        // and a reader up in the history stays up in the history - the
+        // message is there, behind the chip, instead of the scroll being
+        // yanked to it.
         const scrollerEl = scroller();
         const pinnedDown = scrollerEl
           ? (scrollerEl.scrollHeight - scrollerEl.scrollTop - scrollerEl.clientHeight) < 160
           : true;
-        repaint(pinnedDown);
+        if (!pinnedDown) newChip.hidden = false;
+        repaint(true);
         if (cfg.onChanged) cfg.onChanged('created', m);
       },
       updated(raw) {
