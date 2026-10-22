@@ -135,11 +135,20 @@
               <a class="btn btn-primary" href="/app/register" data-app-link>Create an account</a>
               <a class="btn btn-ghost" href="/demo">Try the demo</a>
             </div>
-            <ul class="hero-points">
-              <li>Look around and try the demo without an account.</li>
-              <li>The same client in the browser and in a desktop app.</li>
-              <li>Permissions and moderation are enforced by the server, not the interface.</li>
-            </ul>
+            <div class="fact-strip">
+              <div class="fact">
+                <b>Try it before you sign up</b>
+                <span>The demo is the real client, running on this instance's public data.</span>
+              </div>
+              <div class="fact">
+                <b>One client, two shells</b>
+                <span>The same code in a browser tab and in a desktop window.</span>
+              </div>
+              <div class="fact">
+                <b>The server decides</b>
+                <span>Permissions and moderation are enforced there, not in the interface.</span>
+              </div>
+            </div>
           </div>
 
           <div class="hero-stage">
@@ -286,7 +295,7 @@
 
     <section class="section reveal">
       <div class="wrap split">
-        <div>
+        <div class="panel">
           <p class="kicker">Find your people</p>
           <h2 class="display">Discover public communities</h2>
           <p class="muted">
@@ -299,7 +308,7 @@
             <a class="btn btn-ghost" href="/demo">Try the demo</a>
           </div>
         </div>
-        <div>
+        <div class="panel">
           <p class="kicker">Run it yourself</p>
           <h2 class="display">Start an instance in three steps</h2>
           <div class="steps">
@@ -361,7 +370,7 @@
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
         <a class="btn btn-primary btn-sm" href="/app/register" data-app-link>Create account</a>
       </div>
-      <div class="footer-col">
+      <nav class="footer-col" aria-label="Product">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
         <a href="/download">Desktop app</a>
@@ -369,36 +378,36 @@
         <a href="/changelog">Changelog</a>
         <a href="/roadmap">Roadmap</a>
         <a href="/status">Status</a>
-      </div>
-      <div class="footer-col">
+      </nav>
+      <nav class="footer-col" aria-label="Documentation">
         <h2 class="footer-heading">Documentation</h2>
         <a href="/docs">Self-hosting guide</a>
         <a href="/install">Install</a>
         <a href="/faq">FAQ</a>
         <a href="/support">Support</a>
         <a href="/security">Security</a>
-      </div>
-      <div class="footer-col">
+      </nav>
+      <nav class="footer-col" aria-label="Developers">
         <h2 class="footer-heading">Developers</h2>
         <a href="/developers">Developer guide</a>
         <a href="/developers#the-api-reference">API reference</a>
         <a href="/developers#the-sdk-trycord-botjs">SDK</a>
-      </div>
-      <div class="footer-col">
+      </nav>
+      <nav class="footer-col" aria-label="Open source">
         <h2 class="footer-heading">Open source</h2>
         <a href="https://github.com/trycord/.trycord" rel="noopener">Source code</a>
         <a href="/licenses">Licences</a>
         <a href="/about">About the project</a>
         <a href="/trust-and-safety">Trust and safety</a>
-      </div>
-      <div class="footer-col">
+      </nav>
+      <nav class="footer-col" aria-label="Legal">
         <h2 class="footer-heading">Legal</h2>
         <a href="/terms">Terms of service</a>
         <a href="/privacy">Privacy</a>
         <a href="/cookies">Cookies</a>
         <a href="/instances-terms">Instance terms</a>
         <a href="/community-guidelines">Community rules</a>
-      </div>
+      </nav>
     </div>
     <div class="wrap footer-bottom">
       <span>&copy; <span data-year>2026</span> Trycord</span>
