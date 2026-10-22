@@ -624,18 +624,24 @@ function mountSpaFallback(app, opts) {
       }
       const seg = rest.split('/').filter(Boolean)[0] || '';
 
-      // Auth pages live at root-level URLs: /login, /register, /forgot, /reset-password,
-      // /verify-email, /two-step. When the client is mounted under /app those same
-      // paths exist there too, but they redirect to the canonical root-level path so
-      // there is one address for signing in and one place password-reset emails point.
-      if (mount === '/app') {
-        const target = '/' + seg + rest.slice(seg.length + 1);
-        if (seg === 'login' || seg === 'register' || seg === 'forgot'
-          || seg === 'reset-password' || seg === 'verify-email' || seg === 'two-step') {
-          res.redirect(301, target);
-          return;
-        }
-      }
+      // Auth paths exist at both addresses the client is served from - the
+      // origin root and the mount - and both are answered with the gate. No
+      // canonicalizing redirect happens here, for a reason that is about who
+      // else is in front:
+      //
+      //   - The edge that publishes the site aliases its own root-level auth
+      //     paths (/login, /register, ...) into the mount (/app/login, ...)
+      //     so the site and the app each get one answer. If the origin
+      //     redirected /app/login back to /login, the edge would send that
+      //     /login into /app/login again: each side confessing the other to
+      //     be canonical is a redirect loop, and the sign-in page - password
+      //     resets included - doubled forever.
+      //   - Email links (clientLinks.js) are built from root-level paths
+      //     against CLIENT_URL/PUBLIC_URL and answered by the root mount,
+      //     whatever /app does.
+      //   - Deep links on the mount keep working: the mount is stripped and
+      //     the base stamped below, so /app/login and /login are the same
+      //     document to the client either way.
 
       // An instance can also serve a marketing site from the same origin. Those clean
       // URLs belong to it, so the app only claims its own prefixes and anything else
