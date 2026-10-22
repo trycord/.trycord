@@ -125,17 +125,16 @@
 
   <main id="main">
     <!--
-      The hero opens the document: kicker, display headline, lede, and a ruled
-      fact strip of what the product actually is. The framed plate beside it is
-      the specimen the brand mark was mounted in for the design tokens, scaled
-      up, so the page is documenting the product with the product's own symbol.
+      The hero is the brand's login artwork on the right, with the product window
+      over it. The window is the real miniature client, mounted from the same
+      script the demo page uses, so what a visitor sees is the product.
     -->
     <section class="hero">
       <div class="wrap">
         <div class="hero-grid">
           <div class="hero-copy">
             <p class="kicker">Private community messaging</p>
-            <h1>Talk together, <em>on your own server.</em></h1>
+            <h1>Talk together, on a server <em>you run.</em></h1>
             <p class="lede">
               Trycord is group chat you can run yourself. Set up communities with
               their own channels, roles and permissions, talk one-to-one in direct
@@ -155,7 +154,7 @@
                 <span class="dot" aria-hidden="true"></span>
                 <span class="dot" aria-hidden="true"></span>
                 <span class="dot" aria-hidden="true"></span>
-                <span class="app-url">trycord.dev</span>
+                <span class="app-url">Trycord</span>
               </div>
               <div data-demo="compact"></div>
             </div>
@@ -225,12 +224,12 @@
       </div>
     </section>
 
-    <section class="section reveal">
+    <section class="section section--plane reveal">
       <div class="wrap">
-        <div class="section-head">
+        <div class="section-head section-head--statement">
           <p class="kicker">Why self-hosted</p>
-          <h2>Software you run, for people you choose</h2>
-          <p>Trycord is not a service that holds other people's conversations. It is a server you run, on a machine you control. There is one official instance, and nothing in the software depends on it.</p>
+          <h2>A server you run, for people you choose.</h2>
+          <p>Trycord is not a service that holds other people's conversations. It is software you run on a machine you control. There is one official instance, and nothing in the software depends on it.</p>
         </div>
         <div class="features">
           <article class="feature">
@@ -305,6 +304,41 @@
     </section>
 
     <section class="section reveal">
+      <div class="wrap split split--code">
+        <div>
+          <p class="kicker">For developers</p>
+          <h2>Write a bot with the SDK</h2>
+          <p class="muted">
+            trycord-botjs is the official client for the bot API. It calls the routes
+            the developer guide describes, returns the shapes they return, and is
+            written in TypeScript with its own types.
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary" href="/developers">Read the developer guide</a>
+            <a class="btn btn-ghost" href="/developers#the-sdk-trycord-botjs">Install the SDK</a>
+          </div>
+        </div>
+        <figure class="code-callout">
+          <figcaption>A bot that answers !ping</figcaption>
+          <pre><code>import { Client, Events } from 'trycord-botjs';
+
+const client = new Client({
+  token: process.env.TRYCORD_BOT_TOKEN!,
+  baseUrl: process.env.TRYCORD_BASE_URL,
+});
+
+client.on(Events.MessageCreated, async (event) => {
+  if (event.message?.content === '!ping') {
+    await client.send(event.serverId!, event.channelId!, 'Pong.');
+  }
+});
+
+await client.login();</code></pre>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section reveal">
       <div class="wrap split">
         <div class="panel">
           <p class="kicker">Find your people</p>
@@ -358,7 +392,7 @@
             software, and the server you are on is the one that holds your data.
           </p>
           <div class="cta">
-            <a class="btn" href="/app/" data-app-link>Open the app</a>
+            <a class="btn btn-primary" href="/app/" data-app-link>Open the app</a>
             <a class="btn btn-ghost" href="https://discord.gg/dSF7eqsJuP" rel="noopener">Join the Discord</a>
           </div>
         </div>
