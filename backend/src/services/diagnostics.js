@@ -86,17 +86,45 @@ function notificationsSubsystem() {
   return state('healthy', { provider, note: 'in-app notifications are delivered by this instance' });
 }
 
-function voiceSubsystem() {
+async function voiceSubsystem() {
   const voice = features.current.voiceVideo || {};
   if (!voice.enabled) return state('disabled', 'voice and video are switched off');
   const provider = settings.isLoaded() ? settings.read('voice.provider', 'mesh') : 'mesh';
-  const stun = settings.isLoaded() ? settings.read('voice.stunUrls', []) : [];
-  const turn = settings.isLoaded() ? settings.read('voice.turnUrl', '') : '';
-  const hasIce = (Array.isArray(stun) && stun.length > 0) || !!turn;
-  if (!hasIce) {
-    return state('degraded', { provider, note: 'no STUN or TURN address is configured, so peers behind a strict NAT cannot connect' });
+
+  // A provider that carries the media elsewhere is not this instance's
+  // business, and this instance cannot say whether it is working.
+  if (provider !== 'mesh') {
+    return state('configured', { provider, note: 'the media is carried by a provider of its own' });
   }
-  return state('configured', { provider, note: 'signalling is ready; real media needs two clients and a network' });
+
+  // The mesh uses the relay this instance runs, so the check asks the relay.
+  // It used to read the retired Mesh ICE settings and always said no
+  // address was configured.
+  const relay = require('./voice/config').inHouseRelay();
+  const address = String(relay.advertised || '').trim();
+  const port = Number(relay.port || 3478);
+  if (!address || address === '0.0.0.0' || address === '::' || address === '[::]') {
+    return state('degraded', {
+      provider,
+      note: 'the relay is published at ' + (address || 'nothing') + ', which no client can reach',
+    });
+  }
+  try {
+    const probe = await require('./voice/relay').probeAddress('stun:' + address + ':' + port, 2500);
+    if (!probe.ok) {
+      return state('degraded', {
+        provider,
+        note: 'the relay does not answer a binding request at ' + address + ':' + port
+          + ', so peers behind a strict NAT cannot connect',
+      });
+    }
+    return state('healthy', {
+      provider,
+      note: 'the relay answers a binding request at ' + address + ':' + port,
+    });
+  } catch (e) {
+    return state('unknown', { provider, error: e.message });
+  }
 }
 
 async function continuumSubsystem() {
@@ -121,12 +149,20 @@ async function continuumSubsystem() {
 async function jobsSubsystem() {
   try {
     const stats = await jobs.stats();
-    const failed = Number(stats.byStatus.failed || 0);
+    // A job that failed last week is history, not a fault. The count used
+    // to be every failure the table had ever held.
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const recent = await db.get(
+      'SELECT COUNT(*) AS n FROM jobs WHERE status = ? AND updated_at >= ?',
+      ['failed', since]
+    );
+    const failed = Number((recent && recent.n) || 0);
     return state(failed ? 'degraded' : 'healthy', {
       workers: stats.workers,
       queued: Number(stats.byStatus.queued || 0),
       running: Number(stats.byStatus.running || 0),
       failed,
+      failedEver: Number(stats.byStatus.failed || 0),
       kinds: stats.kinds.length,
     });
   } catch (e) {
@@ -158,10 +194,11 @@ function migrationsSubsystem() {
 // The whole picture, for the operator who has to decide whether this instance
 // can be trusted with traffic.
 async function report() {
-  const [dbState, jobsState, continuumState] = await Promise.all([
+  const [dbState, jobsState, continuumState, voiceState] = await Promise.all([
     database(),
     jobsSubsystem(),
     continuumSubsystem(),
+    voiceSubsystem(),
   ]);
 
   const subsystems = {
@@ -172,7 +209,7 @@ async function report() {
     notifications: notificationsSubsystem(),
     mail: mailSubsystem(),
     realtime: realtimeSubsystem(),
-    voice: voiceSubsystem(),
+    voice: voiceState,
     continuum: continuumState,
     jobs: jobsState,
     migrations: migrationsSubsystem(),

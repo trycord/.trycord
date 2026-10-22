@@ -40,11 +40,8 @@ function publicHost(family) {
   // No family asked for means the primary address, whatever its family is.
   const wanted = family === 4 || family === 6 ? family : 0;
   //
-  // The saved value comes first and the environment second, which is the
-  // order every other setting follows: once a value is saved, a restart
-  // cannot quietly undo it. The environment is the fallback for a process
-  // that has not read the database, and it is the seed for a setting that
-  // has never been saved.
+  // The saved value comes first, as everywhere else: once a value is saved,
+  // a restart cannot quietly undo it.
   const voiceUrl = String(
     readSetting('voice.mesh.publicUrl', process.env.TRYCORD_VOICE_PUBLIC_URL || '')
     || readSetting('voice.publicUrl', '')

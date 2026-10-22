@@ -91,10 +91,8 @@ function writeVersion(version) {
     fs.writeFileSync(lock, JSON.stringify(parsed, null, 2) + '\n');
   }
 
-  // The desktop application is released with this one, and its manifest
-  // carries the version of the release it belongs to. It was left at the
-  // version of the last release that touched it, so a tag and the
-  // application built from it could say two different things.
+  // The desktop application is released with this one, so its manifest says
+  // the same version.
   const desktop = path.join(ROOT, 'trycord-desktop', 'package.json');
   if (fs.existsSync(desktop)) {
     const text = fs.readFileSync(desktop, 'utf8');

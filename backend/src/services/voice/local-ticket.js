@@ -1,21 +1,6 @@
-// The ticket that opens the voice process's own page.
-//
-// The voice process answers on the loopback, on a port of its own, and it
-// can change the instance's configuration and mint a credential for the
-// relay. The loopback is the boundary that keeps it off the network, and
-// the person at the machine is the operator - but "the operator" is a
-// wider circle than "an administrator of this instance", and the
-// configuration it changes is the instance's.
-//
-// So the page asks for a ticket. The voice console mints one - the route is
-// behind the platform-admin gate, so only an administrator gets one - and
-// the voice process hands the ticket to the API to check. The API is the
-// thing that knows who an administrator is, and it is the thing that
-// decides whether a ticket is good.
-//
-// A ticket is short-lived and good once. It is the same shape as the
-// gateway's ticket: a secret that is handed over once and cannot be
-// replayed.
+// The ticket that opens the voice process's own page. The console mints one
+// for an administrator, and the voice process asks the API whether it is
+// good. A ticket is good once and lasts a couple of minutes.
 
 'use strict';
 

@@ -137,11 +137,8 @@ async function checkMesh(cfg) {
   // address of the in-house relay are the same one, so they are flattened
   // and asked once each.
   //
-  // Asked once each *address*, not once each address as it is written: the
-  // relay is in the list twice - once as a STUN server and once as a TURN
-  // server - and both entries are the same host and the same port. Asked
-  // twice, it answered twice or said nothing twice, and the console read
-  // the same sentence out twice in a row.
+  // Asked once per address, not once per entry: the relay is in the list
+  // twice, once as STUN and once as TURN, and both are the same place.
   const addresses = Array.from(new Set(
     servers.flat().map((url) => String(url || '').trim()).filter(Boolean),
   )).filter((url, index, all) => all.findIndex((other) => sameAddress(url, other)) === index);

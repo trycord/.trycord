@@ -57,7 +57,8 @@ function quietMs() {
 }
 
 async function feedCursor(name) {
-  const row = await db.get('SELECT cursor FROM continuum_feed_state WHERE name = ?', [name]);
+  // `cursor` is a reserved word in MySQL and MariaDB, so it is quoted.
+  const row = await db.get('SELECT `cursor` FROM continuum_feed_state WHERE name = ?', [name]);
   return row ? String(row.cursor || '') : '';
 }
 
@@ -275,7 +276,7 @@ function safeParse(raw) {
 // and published within two, and a feed that is further behind than that is
 // not quiet about it.
 async function status() {
-  const row = await db.get('SELECT cursor, updated_at FROM continuum_feed_state WHERE name = ?', [STATUS_ROW]);
+  const row = await db.get('SELECT `cursor`, updated_at FROM continuum_feed_state WHERE name = ?', [STATUS_ROW]);
   const last = row ? safeParse(row.cursor) : {};
   const interval = intervalMs();
   const bound = interval * 2;

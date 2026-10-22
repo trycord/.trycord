@@ -96,14 +96,8 @@ router.put('/', rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req, res) =
   });
 }));
 
-// A ticket that opens the voice process's own page.
-//
-// The voice process answers on the loopback, on a port of its own, and it
-// can change the instance's configuration and mint a credential for the
-// relay. The ticket is what says that the person holding it is an
-// administrator: this route is behind the platform-admin gate, so only one
-// gets a ticket, and the voice process asks this API whether the ticket is
-// good.
+// A ticket that opens the voice process's own page. Only an administrator
+// gets one, and the voice process asks this API whether it is good.
 router.post('/local-ticket', rateLimit({ windowMs: 60000, max: 20 }), wrap(async (req, res) => {
   const minted = localTicket.mint(req.user.id);
   const port = Number(process.env.TRYCORD_VOICE_PROCESS_PORT || 9973);
