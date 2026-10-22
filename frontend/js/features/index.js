@@ -9,8 +9,6 @@
 import { renderHome } from './home.js';
 import { renderInbox } from './inbox.js';
 import { renderMenu } from './everything.js';
-import { renderExtensions } from './extensions.js';
-import { renderDeveloper } from './developer.js';
 import { renderAuth } from './auth.js';
 import {
   renderSupport, renderLegal, renderInvite, renderServerCreate, renderNotFound,
@@ -18,18 +16,19 @@ import {
 import { renderDms, renderDmConversation } from './dms.js';
 import { renderFriends } from './friends.js';
 import { renderDiscover } from './discover.js';
-import { renderInstances } from './instances.js';
 import { renderProfile } from './profile.js';
 import { renderCommunity, renderChannelView, renderMembers, renderRoles, renderInvites, renderCategories } from './community.js';
 import { renderFederatedCommunity } from './federatedCommunity.js';
 import { renderWorkspace } from './workspace.js';
 import { onboardingView as renderOnboarding } from './onboarding.js';
 import { renderSettings } from './settings.js';
-import { renderAdmin } from './admin.js';
-import { renderSearch } from './search.js';
-import { renderCollections } from './collections.js';
-import { renderFederation } from './federation.js';
-import { renderStatus } from './status.js';
+
+// Pages a reader opens once in a long while are loaded on the visit, not with
+// the shell: the developer console, the instance admin and the reader's own
+// indexes stay out of the first paint. The router awaits a page's renderer,
+// so a thunk that resolves to the real function is the same contract with a
+// smaller graph - and a page nobody opens is never downloaded.
+const lazy = (spec, name) => (ctx) => import(spec).then((m) => m[name](ctx));
 
 const gates = (ctx) => renderAuth(ctx.page, ctx.params);
 
@@ -37,26 +36,26 @@ export const RENDERERS = {
   home: () => renderHome(),
   notifications: () => renderInbox(),
   menu: () => renderMenu(),
-  extensions: (ctx) => renderExtensions(ctx),
-  developer: (ctx) => renderDeveloper(ctx),
-  'developer.keys': (ctx) => renderDeveloper(ctx),
-  'developer.applications': (ctx) => renderDeveloper(ctx),
-  'developer.documentation': (ctx) => renderDeveloper(ctx),
+  extensions: lazy('./extensions.js', 'renderExtensions'),
+  developer: lazy('./developer.js', 'renderDeveloper'),
+  'developer.keys': lazy('./developer.js', 'renderDeveloper'),
+  'developer.applications': lazy('./developer.js', 'renderDeveloper'),
+  'developer.documentation': lazy('./developer.js', 'renderDeveloper'),
   support: () => renderSupport(),
   legal: (ctx) => renderLegal(ctx),
   invite: (ctx) => renderInvite(ctx),
   discover: () => renderDiscover(),
-  instances: () => renderInstances(),
+  instances: lazy('./instances.js', 'renderInstances'),
   friends: () => renderFriends(),
   dms: () => renderDms(),
   'dms.conversation': (ctx) => renderDmConversation(ctx),
   profile: (ctx) => renderProfile(ctx),
 
   // What the reader keeps, and what happened to the instance.
-  search: (ctx) => renderSearch(ctx),
-  collections: (ctx) => renderCollections(ctx),
-  federation: (ctx) => renderFederation(ctx),
-  status: (ctx) => renderStatus(ctx),
+  search: lazy('./search.js', 'renderSearch'),
+  collections: lazy('./collections.js', 'renderCollections'),
+  federation: lazy('./federation.js', 'renderFederation'),
+  status: lazy('./status.js', 'renderStatus'),
 
   // The community surfaces. The bare community and the settings addresses all
   // answer to one dispatcher; the channels are the conversation pages.
@@ -115,23 +114,23 @@ export const RENDERERS = {
   'settings.backend': (ctx) => renderSettings(ctx),
   'settings.updates': (ctx) => renderSettings(ctx),
 
-  admin: (ctx) => renderAdmin(ctx),
-  'admin.users': (ctx) => renderAdmin(ctx),
-  'admin.approvals': (ctx) => renderAdmin(ctx), // TEMP-CHECK
-  'admin.communities': (ctx) => renderAdmin(ctx),
-  'admin.reports': (ctx) => renderAdmin(ctx),
-  'admin.appeals': (ctx) => renderAdmin(ctx),
-  'admin.audit': (ctx) => renderAdmin(ctx),
-  'admin.gdpr': (ctx) => renderAdmin(ctx),
-  'admin.announcements': (ctx) => renderAdmin(ctx),
-  'admin.pages': (ctx) => renderAdmin(ctx),
-  'admin.settings': (ctx) => renderAdmin(ctx),
-  'admin.database': (ctx) => renderAdmin(ctx),
-  'admin.continuum': (ctx) => renderAdmin(ctx),
-  'admin.voice': (ctx) => renderAdmin(ctx),
-  'admin.diagnostics': (ctx) => renderAdmin(ctx),
-  'admin.incidents': (ctx) => renderAdmin(ctx),
-  'admin.federation': (ctx) => renderAdmin(ctx),
+  admin: lazy('./admin.js', 'renderAdmin'),
+  'admin.users': lazy('./admin.js', 'renderAdmin'),
+  'admin.approvals': lazy('./admin.js', 'renderAdmin'), // TEMP-CHECK
+  'admin.communities': lazy('./admin.js', 'renderAdmin'),
+  'admin.reports': lazy('./admin.js', 'renderAdmin'),
+  'admin.appeals': lazy('./admin.js', 'renderAdmin'),
+  'admin.audit': lazy('./admin.js', 'renderAdmin'),
+  'admin.gdpr': lazy('./admin.js', 'renderAdmin'),
+  'admin.announcements': lazy('./admin.js', 'renderAdmin'),
+  'admin.pages': lazy('./admin.js', 'renderAdmin'),
+  'admin.settings': lazy('./admin.js', 'renderAdmin'),
+  'admin.database': lazy('./admin.js', 'renderAdmin'),
+  'admin.continuum': lazy('./admin.js', 'renderAdmin'),
+  'admin.voice': lazy('./admin.js', 'renderAdmin'),
+  'admin.diagnostics': lazy('./admin.js', 'renderAdmin'),
+  'admin.incidents': lazy('./admin.js', 'renderAdmin'),
+  'admin.federation': lazy('./admin.js', 'renderAdmin'),
 
   login: gates,
   register: gates,

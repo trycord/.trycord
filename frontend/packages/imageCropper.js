@@ -145,9 +145,26 @@ export async function createCropper(file, options = {}) {
   window.addEventListener('pointerup', onUp);
 
   // The picture is shown as soon as it is measured.
-  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+  //
+  // The work is deferred to the next frame rather than run inside the
+  // notification: layout() re-measures and can change the frame's size, and a
+  // size change delivered during the observer's own delivery is the loop the
+  // browser reports as "ResizeObserver loop completed with undelivered
+  // notifications" - the message is noise, but the loop it describes is real
+  // (layout running before paint, possibly twice a frame while the frame is
+  // resized). One pending flag means a burst of notifications collapses into
+  // one layout.
+  let pending = false;
+  const run = () => {
+    pending = false;
     const width = frame.clientWidth || 0;
     if (width && Math.abs(width - shown.width) > 1) { layout(); reset(); }
+  };
+  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+    if (pending) return;
+    pending = true;
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+    else run();
   }) : null;
   if (observer) observer.observe(frame);
 

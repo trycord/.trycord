@@ -15,12 +15,8 @@ import { renderFriends } from './friends.js';
 import { renderMenu } from './menu.js';
 import { renderProfile } from './profile.js';
 import { renderAuth } from './auth.js';
-import { renderInstances } from './instances.js';
 import { renderSettings } from './settings.js';
-import { renderAdmin } from './admin.js';
-import { renderExtensions } from './extensions.js';
 import { onboardingScreen as renderOnboarding } from './onboarding.js';
-import { renderDeveloper } from './developer.js';
 import {
   renderChannel, renderChannelPins, renderMembersPage, renderRolesPage,
   renderInvitesPage, renderCategoriesPage, renderCommunitySettings, renderCommunityHome,
@@ -34,10 +30,13 @@ import {
 import {
   renderSupport, renderLegal, renderInvite, renderServerCreate, renderNotFound,
 } from './plain.js';
-import { renderSearch } from './search.js';
-import { renderCollections } from './collections.js';
-import { renderFederation } from './federation.js';
-import { renderStatus } from './status.js';
+
+// Pages a reader opens once in a long while are loaded on the visit, not with
+// the shell: the developer console, the instance admin and the reader's own
+// indexes stay out of the first paint. The router awaits a page's renderer,
+// so a thunk that resolves to the real function is the same contract with a
+// smaller graph - and a page nobody opens is never downloaded.
+const lazy = (spec, name) => (ctx) => import(spec).then((m) => m[name](ctx));
 
 const auth = (ctx) => renderAuth(ctx.page, ctx.params);
 
@@ -51,10 +50,10 @@ export const RENDERERS = {
   menu: () => renderMenu(),
   profile: (ctx) => renderProfile(ctx),
   // What the reader keeps, and what happened to the instance.
-  search: (ctx) => renderSearch(ctx),
-  collections: (ctx) => renderCollections(ctx),
-  federation: (ctx) => renderFederation(ctx),
-  status: (ctx) => renderStatus(ctx),
+  search: lazy('./search.js', 'renderSearch'),
+  collections: lazy('./collections.js', 'renderCollections'),
+  federation: lazy('./federation.js', 'renderFederation'),
+  status: lazy('./status.js', 'renderStatus'),
   community: (ctx) => renderCommunityHome(ctx),
   'community.legacy': (ctx) => renderCommunityHome(ctx),
   'community.channel': (ctx) => renderChannel(ctx),
@@ -79,17 +78,17 @@ export const RENDERERS = {
   'community.workspace.polls': (ctx) => renderPolls(ctx),
   'community.workspace.poll': (ctx) => renderPoll(ctx),
   'community.new': () => renderServerCreate(),
-  extensions: (ctx) => renderExtensions(ctx),
-  developer: (ctx) => renderDeveloper(ctx),
-  'developer.keys': (ctx) => renderDeveloper(ctx),
-  'developer.applications': (ctx) => renderDeveloper(ctx),
-  'developer.documentation': (ctx) => renderDeveloper(ctx),
+  extensions: lazy('./extensions.js', 'renderExtensions'),
+  developer: lazy('./developer.js', 'renderDeveloper'),
+  'developer.keys': lazy('./developer.js', 'renderDeveloper'),
+  'developer.applications': lazy('./developer.js', 'renderDeveloper'),
+  'developer.documentation': lazy('./developer.js', 'renderDeveloper'),
   support: () => renderSupport(),
   legal: (ctx) => renderLegal(ctx),
   invite: (ctx) => renderInvite(ctx),
   login: auth,
   register: auth,
-  instances: () => renderInstances(),
+  instances: lazy('./instances.js', 'renderInstances'),
   forgot: auth,
   resetPassword: auth,
   verifyEmail: auth,
@@ -102,7 +101,7 @@ export const RENDERERS = {
 for (const page of PAGES) {
   if (RENDERERS[page.id]) continue;
   if (page.id === 'settings' || page.id.startsWith('settings.')) RENDERERS[page.id] = (ctx) => renderSettings(ctx);
-  else if (page.id.startsWith('admin')) RENDERERS[page.id] = (ctx) => renderAdmin(ctx);
+  else if (page.id.startsWith('admin')) RENDERERS[page.id] = lazy('./admin.js', 'renderAdmin');
   else if (page.id.startsWith('community.settings.')) RENDERERS[page.id] = (ctx) => renderCommunitySettings(ctx);
 }
 
