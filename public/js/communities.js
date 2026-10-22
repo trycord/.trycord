@@ -81,7 +81,9 @@
   // necessarily the origin this page was served from.
   Api.signedIn().then(function (yes) {
     state.signedIn = yes;
-    if (state.selectedId) renderPreview();
+    // The preview says what it is even when there is nothing to preview, so
+    // the column is never an empty box.
+    renderPreview();
   });
 
   function renderResults() {

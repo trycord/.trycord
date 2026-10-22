@@ -1753,8 +1753,9 @@ main { counter-reset: section; }
   color: var(--color-text-muted);
 }
 
-/* The two halves of a split section are glass. */
-.panel {
+/* The two halves of a split section are glass. The panels on the demo page
+   are not split halves, and they keep the small heading they had. */
+.split .panel {
   padding: clamp(var(--space-6), 3vw, var(--space-8));
   border-radius: var(--radius-xl);
   background: var(--glass-bg);
@@ -1765,9 +1766,9 @@ main { counter-reset: section; }
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
-.panel h2 { font-size: var(--display-md); margin: 0 0 var(--space-3); }
-.panel p { color: var(--color-text-secondary); }
-.panel .kicker { margin-bottom: var(--space-2); }
+.split .panel h2 { font-size: var(--display-md); margin: 0 0 var(--space-3); }
+.split .panel p { color: var(--color-text-secondary); }
+.split .panel .kicker { margin-bottom: var(--space-2); }
 
 /* The band at the foot of the homepage is the accent panel, and it is glass
    too. */

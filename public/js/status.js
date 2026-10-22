@@ -150,9 +150,7 @@
         else set('app', 'unknown');
       }
 
-      // The relay. The address is public - it is in the configuration the
-      // clients are given - and whether it answers is a fact about the
-      // instance, so the page can be asked without a session.
+      // The relay answers without a session; the route says why.
       if (!relay.reached || !relay.data) set('voice', 'unknown');
       else if (relay.data.ok === true) set('voice', 'ok');
       else set('voice', 'bad');
