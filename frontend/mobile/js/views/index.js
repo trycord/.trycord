@@ -14,6 +14,7 @@ import { renderDiscover } from './discover.js';
 import { renderFriends } from './friends.js';
 import { renderMenu } from './menu.js';
 import { renderCommunities } from './communities.js';
+import { renderYou } from './you.js';
 import { renderProfile } from './profile.js';
 import { renderAuth } from './auth.js';
 import { renderSettings } from './settings.js';
@@ -50,6 +51,7 @@ export const RENDERERS = {
   friends: (ctx) => renderFriends(ctx),
   menu: () => renderMenu(),
   communities: () => renderCommunities(),
+  you: () => renderYou(),
   profile: (ctx) => renderProfile(ctx),
   // What the reader keeps, and what happened to the instance.
   search: lazy('./search.js', 'renderSearch'),

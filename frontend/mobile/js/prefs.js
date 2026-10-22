@@ -17,10 +17,10 @@ export const DENSITIES = ['compact', 'cozy', 'comfortable'];
 
 // The destinations the bottom bar may carry. The list is the registry's; this
 // is the order they are shown in and which of them the reader keeps.
-// Communities replaced the finder as the bar's last place: the finder is
-// reachable from the communities screen and the app bar, while the places a
-// reader belongs to deserve a door of their own.
-export const TABS = ['home', 'dms', 'friends', 'notifications', 'communities'];
+// The bar carries three places: the conversations, the communities, and the
+// reader. Alerts live in the app bar's bell, and the finder is one tap away
+// on the communities screen.
+export const TABS = ['dms', 'communities', 'you'];
 
 const DEFAULTS = {
   density: 'cozy',

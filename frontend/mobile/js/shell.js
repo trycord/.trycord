@@ -21,6 +21,23 @@ let tabRecords = [];
 export function mountShell() {
   const lead = el('div', { class: 'm-appbar__lead' });
   const title = el('div', { class: 'm-appbar__title' });
+  // The bell is the shell's own, not a screen's: alerts follow the reader
+  // everywhere, so their door does not live behind a tab that may not be on
+  // the bar. The badge is the store's own unread count.
+  const bellBadge = el('span', { class: 'm-tab__badge', hidden: true });
+  const bell = el('a', {
+    class: 'm-iconbtn m-appbar__bell', href: path('/notifications'),
+    'aria-label': 'Alerts',
+  }, icon('bell', { size: 22 }), bellBadge);
+  // The narrow phone's door to the communities rail. On a wide phone the rail
+  // is always drawn, so the button is not; on a narrow one this overlay is
+  // how a reader switches community from inside a conversation without
+  // leaving it.
+  const railBtn = el('button', {
+    class: 'm-iconbtn m-appbar__railbtn', type: 'button', hidden: true,
+    'aria-label': 'Your communities', 'aria-expanded': 'false',
+    onClick: () => toggleRailOverlay(),
+  }, icon('globe', { size: 22 }));
   const actions = el('div', { class: 'm-appbar__actions' });
   const banner = el('div', { class: 'm-banner', hidden: true, role: 'status' });
   const view = el('main', { class: 'm-view', id: 'm-view', tabindex: '-1' });
@@ -33,13 +50,47 @@ export function mountShell() {
   const rail = el('div', { class: 'm-railwrap', id: 'm-rail', hidden: true });
   const drawer = el('div', { class: 'm-drawerwrap', id: 'm-drawer', hidden: true });
 
+  // The narrow phone's rail, as an overlay. It is the same list the wide
+  // phone draws as a column: one rail, two presentations.
+  const railPanel = el('div', { class: 'm-railoverlay__panel', role: 'dialog', 'aria-label': 'Your communities', tabindex: '-1' });
+  const railOverlay = el('div', { class: 'm-railoverlay', hidden: true },
+    el('button', {
+      class: 'm-railoverlay__backdrop', type: 'button', tabindex: '-1',
+      'aria-label': 'Close communities', onClick: () => toggleRailOverlay(),
+    }),
+    railPanel);
+
   const root = el('div', { class: 'm-app', id: 'm-shell' },
     el('a', { class: 'm-skip', href: '#m-view' }, 'Skip to content'),
-    rail, drawer,
-    el('header', { class: 'm-appbar' }, lead, title, actions),
+    rail, drawer, railOverlay,
+    el('header', { class: 'm-appbar' }, lead, title, railBtn, bell, actions),
     banner, view, composer, tabs);
 
-  refs = { root, lead, title, actions, banner, view, composer, tabs, rail, drawer };
+  refs = { root, lead, title, actions, banner, view, composer, tabs, rail, drawer, bell, bellBadge, railBtn, railOverlay, railPanel };
+
+  // The overlay's own lifecycle: open builds the rail, focuses it, and
+  // listens for Escape; close returns focus to the button that opened it.
+  let railOpen = false;
+  const onKeydown = (event) => {
+    if (event.key === 'Escape' && railOpen) toggleRailOverlay();
+  };
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('keydown', onKeydown);
+  }
+
+  function toggleRailOverlay() {
+    railOpen = !railOpen;
+    if (railOpen) {
+      railPanel.replaceChildren(buildRail());
+      railOverlay.hidden = false;
+      railBtn.setAttribute('aria-expanded', 'true');
+      railPanel.focus({ preventScroll: true });
+    } else {
+      railOverlay.hidden = true;
+      railBtn.setAttribute('aria-expanded', 'false');
+      railBtn.focus({ preventScroll: true });
+    }
+  }
   applyDensity();
   buildTabs();
   refreshTabs();
@@ -168,6 +219,17 @@ export function refreshTabs() {
     else record.badge.hidden = true;
     record.badge.textContent = count ? (count > 99 ? '99+' : String(count)) : '';
   }
+  // The bell in the app bar shows the same count the alerts tab used to
+  // carry: one number, two doors into the same list.
+  const alerts = badgeCount('notifications');
+  if (alerts) {
+    refs.bellBadge.hidden = false;
+    refs.bellBadge.textContent = alerts > 99 ? '99+' : String(alerts);
+    refs.bell.setAttribute('aria-label', 'Alerts, ' + alerts + ' unread');
+  } else {
+    refs.bellBadge.hidden = true;
+    refs.bell.setAttribute('aria-label', 'Alerts');
+  }
 }
 
 function badgeCount(pageId) {
@@ -186,6 +248,14 @@ export function refreshColumns() {
   if (!refs) return;
   const wide = isWide();
   refs.root.classList.toggle('m-app--wide', wide);
+  // The rail button is the narrow phone's door; on a wide phone the rail is
+  // already drawn, so the button steps aside and the overlay, if open, is
+  // put away.
+  refs.railBtn.hidden = wide;
+  if (wide && refs.railOverlay) {
+    refs.railOverlay.hidden = true;
+    refs.railBtn.setAttribute('aria-expanded', 'false');
+  }
   if (!wide) {
     refs.rail.hidden = true;
     refs.drawer.hidden = true;
