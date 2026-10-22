@@ -248,7 +248,34 @@ npm run status-monitor</code></pre>
           <pre><code>docker compose -f docker-compose.yml -f docker-compose.monitor.yml up -d</code></pre>
 
           <h2>Where the rest lives</h2>
-          <p>The <code>docs/</code> directory holds the long-form references: <code>selfhosting.md</code> for deployment, <code>status-monitor.md</code> for the optional status monitor, <code>architecture.md</code> for how the system is assembled, <code>theming.md</code> for themes, and <code>desktop.md</code> and <code>launcher.md</code> for the desktop shell. If you find an error in this page, the <a href="/support">support page</a> explains where to say so.</p>
+          <p>The <code>docs/</code> directory holds the long-form references. They ship with the code, so they are the version that matches the server you are running.</p>
+          <div class="cards cards--2">
+            <article class="card">
+              <h3>Deployment and running</h3>
+              <p><code>selfhosting.md</code> covers the whole deployment: the database, mail, the reverse proxy, the volumes, the upgrades. <code>backups.md</code> covers taking a backup and putting it back.</p>
+            </article>
+            <article class="card">
+              <h3>The parts of the system</h3>
+              <p><code>architecture.md</code> says how the API, the gateway, the client and the jobs fit together. <code>services.md</code> lists the services and what each one is for.</p>
+            </article>
+            <article class="card">
+              <h3>Voice and media</h3>
+              <p><code>voice.md</code> covers the relay, the credentials it mints, the stunkey another host needs, and the page that says whether the stack is working.</p>
+            </article>
+            <article class="card">
+              <h3>The client and the shell</h3>
+              <p><code>desktop.md</code> and <code>launcher.md</code> cover the desktop application. <code>theming.md</code> covers the design tokens, <code>pages.md</code> the editable pages, and <code>extensions.md</code> the extension API.</p>
+            </article>
+            <article class="card">
+              <h3>Running a community</h3>
+              <p><code>community-settings.md</code> covers the settings a community administrator has, and <code>continuum.md</code> covers federation between instances.</p>
+            </article>
+            <article class="card">
+              <h3>Checks and audits</h3>
+              <p><code>verification-matrix.md</code> says what is checked and how. <code>production-readiness.md</code>, <code>dashboard.md</code> and the two audit files record what was found and what was done about it.</p>
+            </article>
+          </div>
+          <p>If you find an error in this page, the <a href="/support">support page</a> explains where to say so.</p>
         </article>
 
         <aside class="toc" aria-label="On this page">
