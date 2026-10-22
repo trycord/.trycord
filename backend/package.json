@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "6.0.9",
+  "version": "6.0.10",
   "description": "Trycord backend: REST API, realtime WebSocket gateway, and the static server for the web client",
   "main": "src/server.js",
   "repository": {
