@@ -231,10 +231,12 @@ module.exports = {
    * carries on, and sessions silently stopped being recorded at all.
    *
    * It belongs here because this is the module that knows the dialect in the first place.
+   *
+   * The column is quoted: `cursor` is a reserved word in MySQL and MariaDB.
    */
   newRef: (column) => (conn && conn.dialect === 'mysql'
-    ? `VALUES(${column})`
-    : `excluded.${column}`),
+    ? `VALUES(\`${column}\`)`
+    : `excluded.\`${column}\``),
   /**
    * Whether an error is a uniqueness refusal.
    *

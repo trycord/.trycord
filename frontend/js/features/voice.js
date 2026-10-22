@@ -408,17 +408,8 @@ function diagnosticsSection(report, lastCheck, onChecked) {
   return card({ label: 'Diagnostics', glyph: 'activity', body });
 }
 
-// The voice process's own page.
-//
-// It is on the loopback of this machine, on a port of its own, and it does
-// three things the console cannot: it says whether the voice stack is
-// working, it changes the relay's configuration, and it mints a credential
-// for the relay.
-//
-// Opening it needs a ticket, and the ticket comes from here. This console is
-// behind the platform-admin gate, so a ticket says that the person asking
-// for one is an administrator - and the voice process checks it with the
-// API, which is the thing that knows who an administrator is.
+// The voice process's own page, on the loopback of this machine. It needs a
+// ticket, and only an administrator can get one.
 function localPageSection() {
   const open = el('button', {
     class: 'btn btn--primary btn--sm',

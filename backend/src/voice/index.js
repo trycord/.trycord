@@ -59,15 +59,9 @@ const settings = require('../services/settings');
 const PORT = Number(process.env.TRYCORD_VOICE_PROCESS_PORT || 9973);
 const HOST = String(process.env.TRYCORD_VOICE_PROCESS_HOST || '127.0.0.1').trim();
 
-// The process interface is on the loopback, and it is there by rule.
-//
-// The relay - the STUN and TURN service, the UDP port - is meant to be
-// reachable from other hosts; that is the whole point of it. This interface
-// is the other thing: the page that says whether the voice stack works, the
-// health checks, the configuration. It holds the addresses the instance
-// publishes and the credentials it mints, so it has no business on a public
-// address. It is on the loopback, and a setting that asks for anything else
-// is refused rather than obeyed.
+// The process interface is on the loopback. The relay is meant to be reached
+// from other hosts; this interface is not - it holds the addresses the
+// instance publishes and the credentials it mints.
 function isLoopback(address) {
   const text = String(address || '').trim().toLowerCase();
   if (!text) return false;
@@ -379,16 +373,8 @@ function isProxyAddress(ip) {
 
 // ---- the ticket -------------------------------------------------------------
 
-// The ticket that says the person at the machine is an administrator.
-//
-// The page can change the instance and mint a credential for the relay, so
-// it asks for a ticket: the voice console mints one - behind the
-// platform-admin gate - and the API is asked whether it is good. The API is
-// the thing that knows who an administrator is, and it is the thing that
-// says yes or no.
-//
-// The ticket is remembered in a cookie for the length of the visit, so the
-// operator is not asked for it on every form.
+// The ticket that says the person at the machine is an administrator. The
+// voice console mints one and the API says whether it is good.
 const COOKIE = 'trycord_voice_admin';
 
 function cookieValue(req, name) {
@@ -400,11 +386,8 @@ function cookieValue(req, name) {
   return '';
 }
 
-// Ask the API whether a ticket is good.
-//
-// The API is on the loopback of the same machine, and the answer is a yes
-// or a no. An API that cannot be reached is a no: a page that unlocks
-// itself because the check was skipped is not a page that is locked.
+// Ask the API whether a ticket is good. An API that cannot be reached is a
+// no: a page that unlocks itself is not a locked page.
 async function ticketIsGood(ticket) {
   const api = String(process.env.TRYCORD_API_URL || '').trim()
     || 'http://127.0.0.1:' + String(process.env.PORT || 9971);
@@ -428,14 +411,8 @@ async function ticketIsGood(ticket) {
 
 // ---- the configuration and the credentials -----------------------------------
 
-// One setting of the instance, read the way everything else is read.
-//
-// The instance's saved value is the one in force, and the deployment's
-// environment is what it falls back to - the same rule every setting
-// follows, so a restart cannot quietly undo a change an administrator
-// made. A process that has not read the database has the environment and
-// the default, which is enough to run the relay and not enough to change
-// it.
+// One setting of the instance. The saved value is the one in force and the
+// environment is the fallback, as everywhere else.
 function setting(key, fallback) {
   try {
     const value = settings.read(key, fallback);

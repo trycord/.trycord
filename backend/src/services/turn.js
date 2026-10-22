@@ -20,18 +20,9 @@
 //                         (TRYCORD_TURN_SECRET is the older name for it)
 //   TRYCORD_TURN_RELAY_MIN / TRYCORD_TURN_RELAY_MAX   the ports a relayed call may use
 //
-// The credentials.
-//
-//   username = <expiry>:<name>
-//   password = MD5(username : realm : stunkey)
-//
-// That is the derivation Coturn uses for a static auth secret, and it is the
-// one every other TURN client implements. The consequence is the point of
-// it: a host that has the stunkey can mint a credential of its own - for its
-// own expiry, with its own name - and this relay will accept it. A relay
-// whose credentials only this instance's own API can mint is a relay that
-// only this instance's own clients can use, which is the opposite of what
-// "reachable from other hosts" means.
+// The credentials: username = <expiry>:<name>, password = MD5(username :
+// realm : stunkey). Coturn's derivation, so a host with the stunkey can mint
+// credentials of its own and this relay accepts them.
 //
 // HTTP API (mounted by routes/voice.js under /api/turn):
 //   GET /api/turn/credentials   issue short-term credentials for a username
@@ -313,13 +304,8 @@ allocationSweeper.unref();
 
 // ===== Auth =====
 
-// The secret the credentials are made under.
-//
-// It is the "stunkey": a shared secret that both this instance and anything
-// else that has to reach the relay knows. The name is the one Coturn uses for
-// the same thing, because the derivation is the same too - so a credential
-// minted here is accepted by a Coturn relay, and a credential minted by a
-// Coturn relay is accepted here.
+// The secret the credentials are made under - the "stunkey", as Coturn
+// calls it. Anything that has to reach the relay needs to know it.
 //
 // There is deliberately no default. A default would be the same on every
 // instance in the world, so a credential minted against one instance would
@@ -334,12 +320,8 @@ function sharedSecret() {
   ).trim();
   if (configured) return configured;
 
-  // The instance's own saved key.
-  //
-  // The environment comes first, as it does for every secret: a secret the
-  // deployment set is the deployment's to rotate, and it stays locked there.
-  // A key an administrator has saved is the instance's own, and it is what the
-  // credentials are minted under when the deployment has said nothing.
+  // The environment comes first, as it does for every secret. A key an
+  // administrator saved is the instance's own.
   const saved = savedStunkey();
   if (saved) return saved;
 
