@@ -98,6 +98,7 @@ const SCOPES = {
       name: 'messages',
       scopes: [
         { name: 'messages:read', description: 'Read the recent messages of a channel.' },
+        { name: 'messages:write', description: 'Post a message in the name of the caller.' },
       ],
     },
   ],
@@ -359,4 +360,147 @@ test('the keys a reader holds are listed with their scopes and never their secre
   assert.ok(sent, 'the keys were never read');
   assert.equal(view.node.textContent.indexOf('tc_'), -1,
     'the list of keys carries a secret');
+});
+
+// -- the application lifecycle ---------------------------------------------------
+//
+// One application whose state the routes hold, so an act and the list that is
+// read after it agree about what happened. A test that fakes each answer
+// separately can pass while the real console shows a state that was never
+// true.
+
+function applicationRoutes() {
+  const state = Object.assign({}, APPLICATION);
+  return {
+    [V1 + '/communities/s1/applications']: () => {
+      return { json: { applications: state.deleted ? [] : [Object.assign({}, state)] } };
+    },
+    [V1 + '/communities/s1/applications/app1']: (body, calls) => {
+      const method = (calls[calls.length - 1].options && calls[calls.length - 1].options.method) || 'GET';
+      if (method === 'PATCH') {
+        Object.assign(state, body);
+        return { json: { application: Object.assign({}, state) } };
+      }
+      if (method === 'DELETE') {
+        state.deleted = true;
+        return { json: { ok: true } };
+      }
+      return { json: { application: Object.assign({}, state), credential: APPLICATION.credential } };
+    },
+    [V1 + '/communities/s1/applications/app1/credential']: (body) => {
+      return { json: { credential: Object.assign({}, APPLICATION.credential, body) } };
+    },
+  };
+}
+
+async function applicationView(calls) {
+  State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+  tabOf(view, 'Applications');
+  await waitFor(() => byLabel(view.node, 'Manage Night owl')[0]);
+  void calls;
+  return view;
+}
+
+async function managedApplication(view) {
+  byLabel(view.node, 'Manage Night owl')[0].click();
+  return waitFor(() => dialogWith('What it is, what it may do'));
+}
+
+test('an application is changed without touching its token', async () => {
+  installDomStub();
+  const calls = installFetchStub(baseRoutes(applicationRoutes()));
+
+  const view = await applicationView(calls);
+  const manage = await managedApplication(view);
+
+  byLabel(manage, 'Change for Night owl')[0].click();
+  const form = await waitFor(() => dialogWith('Change Night owl'));
+  assert.ok(form, 'changing an application did not open a form');
+  byLabel(form, 'The name of the application')[0].value = 'Night owl II';
+  findAll(form, classed('btn--primary'))[0].click();
+
+  const sent = await waitFor(() => calls.find((call) => call.options.method === 'PATCH'
+    && call.url === V1 + '/communities/s1/applications/app1'));
+  assert.ok(sent, 'the application was never changed');
+  assert.equal(sent.body.name, 'Night owl II');
+  assert.ok(!calls.some((call) => /rotate/.test(call.url)),
+    'changing an application issued a token');
+  const look = await waitFor(() => calls.find((call) => call.options.method === 'GET'
+    && call.url === V1 + '/communities/s1/applications/app1'));
+  assert.ok(look, 'the console did not look again at the application it changed');
+});
+
+test('the scopes of an application change after the fact', async () => {
+  installDomStub();
+  const calls = installFetchStub(baseRoutes(applicationRoutes()));
+
+  const view = await applicationView(calls);
+  const manage = await managedApplication(view);
+
+  byLabel(manage, 'Scopes for Night owl')[0].click();
+  const form = await waitFor(() => dialogWith('The credential of Night owl'));
+  const box = await waitFor(() => byLabel(form, 'Grant messages:read')[0]);
+  assert.ok(box.checked, 'the form did not start from the scopes the application carries');
+  box.checked = false;
+  box.dispatch('change');
+  const limit = byLabel(form, 'Requests per minute the application may make')[0];
+  assert.ok(limit, 'the form did not offer the limit');
+  limit.value = '30';
+  findAll(form, classed('btn--primary'))[0].click();
+
+  const sent = await waitFor(() => calls.find((call) => call.options.method === 'PUT'
+    && call.url === V1 + '/communities/s1/applications/app1/credential'));
+  assert.ok(sent, 'the credential was never saved');
+  assert.deepEqual(sent.body.scopes, ['messages:write']);
+  assert.equal(sent.body.rateLimitPerMinute, 30);
+  assert.ok(!calls.some((call) => /rotate|\/revoke/.test(call.url) && call.options.method === 'POST'),
+    'changing the credential burned the token');
+});
+
+test('a switched-off application comes back, still itself', async () => {
+  installDomStub();
+  const calls = installFetchStub(baseRoutes(applicationRoutes()));
+
+  const view = await applicationView(calls);
+  const manage = await managedApplication(view);
+
+  byLabel(manage, 'Switch off Night owl')[0].click();
+  const off = await waitFor(() => calls.find((call) => call.options.method === 'PATCH'
+    && call.url === V1 + '/communities/s1/applications/app1'));
+  assert.ok(off, 'the application was never switched off');
+  assert.equal(off.body.status, 'disabled');
+
+  await waitFor(() => byLabel(view.node, 'Switch on Night owl')[0]);
+  byLabel(view.node, 'Switch on Night owl')[0].click();
+  const back = await waitFor(() => calls.find((call) => call.options.method === 'PATCH'
+    && call.url === V1 + '/communities/s1/applications/app1' && call.body.status === 'active'));
+  assert.ok(back, 'the application was never switched on');
+});
+
+test('an application is deleted for good, and the list says so', async () => {
+  installDomStub();
+  const calls = installFetchStub(baseRoutes(applicationRoutes()));
+
+  const view = await applicationView(calls);
+  const manage = await managedApplication(view);
+
+  byLabel(manage, 'Delete Night owl')[0].click();
+  const answer = await waitFor(() => {
+    const found = dialogWith('Delete Night owl?');
+    return found ? findAll(found, classed('btn--danger'))[0] : null;
+  });
+  assert.ok(answer, 'deleting an application asked nothing');
+  const asked = dialogWith('Delete Night owl?');
+  assert.match(asked.textContent, /The messages it wrote stay/,
+    'the deletion did not say what happens to what the application wrote');
+  answer.click();
+
+  const gone = await waitFor(() => !dialogWith('What it is, what it may do'));
+  assert.ok(gone, 'the application kept a place after it was deleted');
+  await waitFor(() => String(view.node.textContent).indexOf('No applications yet') !== -1);
+  const sent = calls.find((call) => call.options.method === 'DELETE'
+    && call.url === V1 + '/communities/s1/applications/app1');
+  assert.ok(sent, 'the application was never deleted');
 });
