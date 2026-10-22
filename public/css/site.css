@@ -508,6 +508,11 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   mask-composite: intersect;
   pointer-events: none;
 }
+/* The artwork is a dark, cinematic piece. On the light theme it would be a
+   black plate on a white page, so the light theme keeps the warm wash the
+   glow gives it and leaves the planes to the dark theme. */
+:root[data-theme="light"] .hero::before { display: none; }
+
 .hero::after {
   content: "";
   position: absolute;
