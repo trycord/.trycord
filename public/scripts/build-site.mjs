@@ -192,6 +192,8 @@ const FOOTER = `<footer class="site-footer">
         <a href="/cookies">Cookies</a>
         <a href="/instances-terms">Instance terms</a>
         <a href="/community-guidelines">Community rules</a>
+        <a href="/guidelines">Acceptable use</a>
+        <a href="/federation-policy">Federation policy</a>
         <a href="/security">Security</a>
       </nav>
     </div>
