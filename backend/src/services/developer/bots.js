@@ -204,6 +204,11 @@ async function health(applicationId, serverId) {
     lastUsedAt: credential ? credential.last_used_at || null : null,
     lastFailure: spent ? spent.lastFailure : null,
     usage: spent ? spent.totals : null,
+    // What it spent its calls on, in the hour that just passed. The route is
+    // the pattern, so one line is one kind of ask - the same line the usage
+    // report is built from. Only the routes it actually used appear here,
+    // the busiest first; there is no list of what it never asked for.
+    routes: spent ? spent.byRoute.filter((r) => r.requests > 0).slice(0, 8) : [],
   };
 }
 

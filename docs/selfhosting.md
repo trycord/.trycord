@@ -678,8 +678,12 @@ CLIENT_ORIGIN=https://chat.example.com,trycord://app
 in the single-server layout - the split does not change who the API answers.
 Everything else about Server A is the manual setup above: same `.env`
 requirements, same proxy choice, same backups. What changes is that `GET /`
-no longer answers with a document: an API-only origin answers unmatched
-paths with the same JSON envelope its API errors use.
+no longer answers with the client: an API-only origin answers a browser with
+a short maintenance page in its own words - it says the API is what lives
+here and where the client is - and it answers everything that asked for JSON
+with the same envelope its API errors use. A proxy or tunnel pointing at
+Server A before Server B is up therefore never has to think for itself: the
+reader gets the truth instead of a bare 502.
 
 `/health` and `/ready` keep their meanings there, and `/api/health` still
 reports the database - it is the readiness signal for the API traffic.

@@ -168,6 +168,22 @@ export function navigate(route, options) {
   notify(clean, opts);
 }
 
+// The address-keeping of navigate(), with the move taken out: the entry that
+// is showing is rewritten to name the route, and nothing else happens. A page
+// that shows one of its own states under an address of its own calls this -
+// the tab switch stays a tab switch, and the address still says where the
+// reader is, so a copy of the address carries the state with it.
+export function replaceAddress(route) {
+  if (!window.history || typeof window.history.replaceState !== 'function') return;
+  try {
+    window.history.replaceState(entry(String(route || '/'), cursor), '', path(route));
+  } catch {
+    // A document off disk or a frame that does not own its address cannot
+    // write one. The tab the screen shows is the state; the address is a
+    // convenience that this page cannot keep here.
+  }
+}
+
 // pushState does not fire popstate, and the router has to hear about a route it
 // itself asked for, so the notification is explicit rather than assumed.
 function notify(route, options) {

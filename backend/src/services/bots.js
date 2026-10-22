@@ -283,10 +283,13 @@ async function updateApp(appId, serverId, patch) {
   if (!app) return null;
   const sets = [];
   const vals = [];
+  let nextName = null;
+  let nextIcon = null;
   if (patch.name !== undefined) {
     const label = String(patch.name || '').trim();
     if (!label || label.length > 64) bad('name must be 1-64 characters');
     sets.push('name = ?'); vals.push(label);
+    nextName = label;
   }
   if (patch.description !== undefined) {
     sets.push('description = ?');
@@ -296,6 +299,7 @@ async function updateApp(appId, serverId, patch) {
     const icon = patch.iconUrl == null ? null : await publicMediaUrl(patch.iconUrl, null);
     if (patch.iconUrl != null && !icon) bad('iconUrl must be a public http or https address');
     sets.push('icon_url = ?'); vals.push(icon);
+    nextIcon = icon;
   }
   if (patch.status !== undefined) {
     const status = String(patch.status || '').toLowerCase();
@@ -306,6 +310,24 @@ async function updateApp(appId, serverId, patch) {
     sets.push('updated_at = ?'); vals.push(now());
     vals.push(appId);
     await db.run('UPDATE bot_applications SET ' + sets.join(', ') + ' WHERE id = ?', vals);
+  }
+  // What the application is called and looks like is also what the community
+  // sees, because the bot posts under its own account. The account's display
+  // name and picture follow the application here, once, in the one place the
+  // application is renamed - so the member list, the messages and the
+  // moderation views keep showing one bot rather than the application's
+  // history of names. The username is untouched: it is the account's stable
+  // handle, the one value a rename must never move.
+  if ((nextName === null && nextIcon === undefined) || !app.bot_user_id) return appShape(await getApp(appId, serverId));
+  const userSets = [];
+  const userVals = [];
+  if (nextName !== null) { userSets.push('display_name = ?'); userVals.push(nextName); }
+  if (nextIcon !== undefined) { userSets.push('avatar_url = ?'); userVals.push(nextIcon); }
+  if (userSets.length) {
+    await db.run(
+      'UPDATE users SET ' + userSets.join(', ') + ' WHERE id = ? AND is_bot = 1',
+      [...userVals, app.bot_user_id]
+    );
   }
   return appShape(await getApp(appId, serverId));
 }
@@ -476,6 +498,21 @@ function botUserIdOf(app) {
   return (app && app.bot_user_id) || null;
 }
 
+// That account, named. A developer who has to tell the community's newest
+// member from their own account needs more than the id the row carries:
+// the username is what the member list, the messages and the moderation
+// tools all show.
+async function botAccountOf(app) {
+  const id = botUserIdOf(app);
+  if (!id) return null;
+  const row = await db.get(
+    'SELECT id, username, display_name AS displayName FROM users WHERE id = ? AND is_bot = 1',
+    [id]
+  );
+  if (!row) return null;
+  return { id: row.id, username: row.username, displayName: row.displayName, isBot: true };
+}
+
 async function postAsApp(app, channelRow, content, { kind } = {}) {
   const text = String(content || '').trim().slice(0, 2000);
   if (!text) return null;
@@ -548,6 +585,7 @@ async function respond(serverId, channelRow, invocation) {
 
 module.exports = {
   botUserIdOf,
+  botAccountOf,
   TOKEN_PREFIX,
   listApps, getApp, createApp, removeApp,
   listCommands, setCommand, removeCommand,

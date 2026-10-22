@@ -129,6 +129,13 @@ const APPLICATION = {
   },
 };
 
+const ACCOUNT = {
+  id: 'acc_bot_1',
+  username: 'bot_night_owl',
+  displayName: 'Night owl',
+  isBot: true,
+};
+
 const V1 = 'http://localhost/api/v1';
 
 function baseRoutes(extra) {
@@ -431,4 +438,129 @@ test('the phone deletes a switched-off application for good', async () => {
   const sent = await waitFor(() => calls.find((call) => call.options.method === 'DELETE'
     && call.url === V1 + '/communities/s1/applications/app1'));
   assert.ok(sent, 'the application was never deleted');
+});
+
+// -- what an application is named --------------------------------------------------
+
+// The sheet names the id at once (the list has it) and the member account a
+// moment later (only the one application carries it). What the phone shows
+// must be the two together, and both must be the values the server holds.
+
+function identityRoutes() {
+  return baseRoutes(Object.assign(applicationListRoutes(), {
+    [V1 + '/communities/s1/applications/app1']: (body) => {
+      if (body) {
+        return { json: { application: Object.assign({}, APPLICATION, body) } };
+      }
+      return { json: { application: Object.assign({}, APPLICATION), credential: APPLICATION.credential, account: Object.assign({}, ACCOUNT) } };
+    },
+  }));
+}
+
+test('the phone names the id and the account an application posts as', async () => {
+  installDomStub();
+  State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
+  installFetchStub(identityRoutes());
+
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+  tabOf(view, 'Applications');
+
+  const row = await waitFor(() => findAll(view.node, (node) => node.tagName === 'BUTTON'
+    && /Night owl/.test(String(node.textContent || '')))[0]);
+  row.click();
+
+  const sheet = await waitFor(() => {
+    const found = sheets().filter((node) => String(node.textContent || '').indexOf('What it is') !== -1);
+    return found.length ? found[found.length - 1] : null;
+  });
+  assert.ok(sheet, 'the sheet did not say what the application is');
+  assert.match(sheet.textContent, /app1/, 'the sheet did not show the id');
+  assert.match(sheet.textContent, /stays the same when the application is renamed/,
+    'the id was not marked as the value that outlives a rename');
+
+  const named = await waitFor(() => {
+    const found = sheets().filter((node) => /@bot_night_owl/.test(String(node.textContent || '')));
+    return found.length ? found[found.length - 1] : null;
+  });
+  assert.ok(named, 'the member account was never read by name');
+});
+
+test('the phone counts the applications of a community', async () => {
+  installDomStub();
+  State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
+  installFetchStub(identityRoutes());
+
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+  tabOf(view, 'Applications');
+
+  await waitFor(() => /1 application · 1 active/.test(String(view.node.textContent)));
+  assert.match(view.node.textContent, /1 application · 1 active/,
+    'the list did not count what it holds');
+});
+
+test('the phone shows what an application spent its calls on', async () => {
+  installDomStub();
+  State.servers = [{ id: 's1', name: 'A community', permissions: ['MANAGE_SERVER'], is_owner: false }];
+  installFetchStub(baseRoutes(Object.assign(applicationListRoutes(), {
+    [V1 + '/communities/s1/applications/app1/health']: {
+      json: {
+        applicationId: 'app1',
+        name: 'Night owl',
+        state: 'active',
+        rateLimitPerMinute: 60,
+        scopes: ['messages:read'],
+        lastUsedAt: '2026-02-02T09:00:00.000Z',
+        lastFailure: null,
+        usage: { requests: 12, succeeded: 11, clientErrors: 1, serverErrors: 0 },
+        routes: [
+          { route: '/communities/s1/channels/c1/messages', requests: 12, succeeded: 11, clientErrors: 1, serverErrors: 0 },
+          { route: '/applications/self', requests: 4, succeeded: 4, clientErrors: 0, serverErrors: 0 },
+        ],
+      },
+    },
+  })));
+
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+  tabOf(view, 'Applications');
+
+  const row = await waitFor(() => findAll(view.node, (node) => node.tagName === 'BUTTON'
+    && /Night owl/.test(String(node.textContent || '')))[0]);
+  row.click();
+
+  const sheet = await waitFor(() => {
+    const found = sheets().filter((node) => String(node.textContent || '').indexOf('The scopes it carries') !== -1);
+    return found.length ? found[found.length - 1] : null;
+  });
+  const work = buttonWith(sheet, 'Its work');
+  assert.ok(work, 'there is no way to read the health of an application');
+  work.click();
+
+  const report = await waitFor(() => {
+    const found = sheets().filter((node) => /Calls, last hour/.test(String(node.textContent || '')));
+    return found.length ? found[found.length - 1] : null;
+  });
+  assert.ok(report, 'the health did not say how much the hour cost');
+  assert.match(report.textContent, /12 calls · 11 fine · 1 refused/,
+    'the health did not say what became of the calls it took');
+  assert.match(report.textContent, /\/communities\/s1\/channels\/c1\/messages/,
+    'the health did not name the route the application used');
+});
+
+test('the phone points at the events and says what installing is', async () => {
+  installDomStub();
+  installFetchStub(baseRoutes());
+
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+
+  tabOf(view, 'Documentation');
+  assert.match(view.node.textContent, /The event vocabulary/,
+    'the documentation did not point at the vocabulary of events');
+  const events = findAll(view.node, (node) => node.getAttribute && node.getAttribute('href') === '/api/v1/events')[0];
+  assert.ok(events, 'the vocabulary of events was not linked');
+  assert.match(view.node.textContent, /Creating the application in the community is the installation/,
+    'the documentation did not say what installing an application is');
 });

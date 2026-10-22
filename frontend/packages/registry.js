@@ -80,6 +80,19 @@ export const PAGES = [
     label: 'Developer', icon: 'code',
     blurb: 'Your API keys and the applications of your communities',
   }),
+  // The console's sections are addresses of their own, so a reader can link
+  // someone to the applications or the documentation straight out. They are
+  // the one page wearing different skins: the address names the skin, and the
+  // page picks the section that goes with it.
+  p('developer.keys', '/developer/keys', {
+    layout: 'plain', sidebar: 'profile', hidden: true,
+  }),
+  p('developer.applications', '/developer/applications', {
+    layout: 'plain', sidebar: 'profile', hidden: true,
+  }),
+  p('developer.documentation', '/developer/documentation', {
+    layout: 'plain', sidebar: 'profile', hidden: true,
+  }),
   p('federation', '/federation', {
     layout: 'plain',
     nav: { label: 'Federation reports', short: 'Federation', icon: 'share' },

@@ -658,24 +658,74 @@ async function boot(options = {}) {
     });
   });
 
-  // On a backend-only deployment there is nothing behind any other path
-  // either - no website, no client shell, nothing HTML anywhere on the
-  // origin. Express's own default would answer a request to the root with
-  // "Cannot GET /", which is a document: an origin that says it serves only
-  // the API should say so in the envelope every API path already uses, not
-  // in a page a browser renders and a client cannot parse. The unified role
-  // is untouched: there the static mounts and the site's 404 page have the
-  // final say, exactly as they always did.
+  // On a backend-only deployment there is nothing behind any other path -
+  // no website, no client shell, nothing HTML on the origin by design. But a
+  // request that arrives here has still arrived, and it deserves an answer
+  // rather than a refusal:
+  //
+  //   - a browser (it accepts HTML) gets a short, honest page in the brand's
+  //     own language: what this origin is, where the client lives in a split
+  //     deployment, and which paths hold the truth about the server's state.
+  //     The status is 503 because "this path has nothing behind it" is a
+  //     service answer, not a missing file, and Retry-After says when it may
+  //     be worth looking again.
+  //   - every other caller keeps the JSON envelope all the API paths use.
+  //
+  // Without the page, a proxy or a tunnel pointed at a backend that has not
+  // brought up its frontend yet answers 502 - a fault that says "this origin
+  // is dead", when the truth is "this origin is the API". A machine-readable
+  // answer that never mentions tunnels or deployments would strand whoever
+  // followed a link. The unified role is untouched: there the static mounts
+  // and the site's 404 page have the final say, exactly as they always did.
   if (deploymentRole === 'backend') {
-    app.use((req, res, next) => {
+    const backendNotAClient = (req, res, next) => {
       if (res.headersSent) return next();
+      const accepts = String(req.headers.accept || '');
+      if (req.method === 'GET' && accepts.indexOf('text/html') !== -1) {
+        res.status(503)
+          .set({ 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Retry-After': '60' })
+          .send([
+            '<!doctype html>',
+            '<html lang="en"><head><meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1">',
+            '<title>Trycord — this is the API</title>',
+            '<style>',
+            ':root { color-scheme: dark; }',
+            'body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #17181c; color: #f4f4f5;',
+            ' font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif; }',
+            'main { max-width: 34rem; padding: 3rem 1.5rem; }',
+            '.kicker { display: inline-block; padding: .25rem .6rem; border: 1px solid rgba(255,77,36,.45); border-radius: 999px;',
+            ' font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: #ff4d24; }',
+            'h1 { font-size: clamp(1.9rem, 6vw, 2.9rem); line-height: 1.1; margin: 1rem 0 .75rem; }',
+            'p { color: #a1a1aa; line-height: 1.65; margin: .5rem 0; }',
+            'code, a { color: #ff4d24; text-decoration: none; } a { text-decoration: underline; text-underline-offset: 3px; }',
+            'footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,.08);',
+            ' font-size: .8rem; color: #71717a; display: flex; gap: 1.25rem; flex-wrap: wrap; }',
+            '@media (prefers-reduced-motion: no-preference) { main { animation: arrive .5s ease both; }',
+            ' @keyframes arrive { from { opacity: 0; transform: translateY(10px); } } }',
+            '</style></head><body><main>',
+            '<span class="kicker">Trycord · API</span>',
+            '<h1>You found the backend.</h1>',
+            '<p>This server speaks the API — /api/, the realtime gateway and the background',
+            ' jobs. It does not serve web pages, so this address has nothing behind it.</p>',
+            '<p>In a split deployment the web client and the public site live on the frontend',
+            ' server. If you expected the app here, start that process with',
+            ' <code>npm run start:frontend</code>, or point this address at it.</p>',
+            '<footer><span>Server status: <a href="/health">/health</a></span>',
+            '<span>Readiness: <a href="/ready">/ready</a></span>',
+            '<span>API: <a href="/api/v1">/api/v1</a></span></footer>',
+            '</main></body></html>',
+          ].join('\n'));
+        return;
+      }
       res.status(404).json({
         error: {
           code: 'NOT_FOUND',
           message: `No API route for ${req.method} ${req.path}`,
         },
       });
-    });
+    };
+    app.use(backendNotAClient);
   }
 
   // Consistent error envelope for anything that escapes routes.

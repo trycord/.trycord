@@ -123,6 +123,13 @@ const APPLICATION = {
   },
 };
 
+const ACCOUNT = {
+  id: 'acc_bot_1',
+  username: 'bot_night_owl',
+  displayName: 'Night owl',
+  isBot: true,
+};
+
 const V1 = 'http://localhost/api/v1';
 
 function baseRoutes(extra) {
@@ -385,7 +392,7 @@ function applicationRoutes() {
         state.deleted = true;
         return { json: { ok: true } };
       }
-      return { json: { application: Object.assign({}, state), credential: APPLICATION.credential } };
+      return { json: { application: Object.assign({}, state), credential: APPLICATION.credential, account: Object.assign({}, ACCOUNT) } };
     },
     [V1 + '/communities/s1/applications/app1/credential']: (body) => {
       return { json: { credential: Object.assign({}, APPLICATION.credential, body) } };
@@ -503,4 +510,95 @@ test('an application is deleted for good, and the list says so', async () => {
   const sent = calls.find((call) => call.options.method === 'DELETE'
     && call.url === V1 + '/communities/s1/applications/app1');
   assert.ok(sent, 'the application was never deleted');
+});
+
+test('an application names its id and the account it posts as', async () => {
+  installDomStub();
+  const calls = installFetchStub(baseRoutes(applicationRoutes()));
+
+  const view = await applicationView(calls);
+  const manage = await managedApplication(view);
+
+  // The id comes from the list; the answer that names the member arrives a
+  // moment later, so the row for it is looked for too.
+  assert.match(manage.textContent, /app1/,
+    'the dialog did not show the application\\u2019s id');
+  assert.match(manage.textContent, /stays the same when the application is renamed/,
+    'the id was not marked as the value that outlives a rename');
+  assert.match(manage.textContent, /It posts as/,
+    'the dialog did not say who the application speaks for');
+
+  const named = await waitFor(() => /@bot_night_owl/.test(String(manage.textContent || ''))
+    ? manage : null);
+  assert.ok(named, 'the account of the application was never read by name');
+  const copy = byLabel(manage, 'Copy the id of Night owl')[0];
+  assert.ok(copy, 'there was no way to take the id away');
+});
+
+test('the health of an application says what it spent its calls on', async () => {
+  installDomStub();
+  const calls = installFetchStub(baseRoutes(Object.assign(applicationRoutes(), {
+    [V1 + '/communities/s1/applications/app1/health']: {
+      json: {
+        applicationId: 'app1',
+        name: 'Night owl',
+        state: 'active',
+        status: 'active',
+        rateLimitPerMinute: 60,
+        scopes: ['messages:read', 'messages:write'],
+        lastUsedAt: '2026-02-02T09:00:00.000Z',
+        lastFailure: null,
+        usage: { requests: 12, succeeded: 11, clientErrors: 1, serverErrors: 0 },
+        routes: [
+          { route: '/communities/s1/channels/c1/messages', requests: 12, succeeded: 11, clientErrors: 1, serverErrors: 0 },
+          { route: '/applications/self', requests: 4, succeeded: 4, clientErrors: 0, serverErrors: 0 },
+        ],
+      },
+    },
+  })));
+
+  const view = await applicationView(calls);
+  const manage = await managedApplication(view);
+
+  byLabel(manage, 'Its work for Night owl')[0].click();
+  const report = await waitFor(() => {
+    const found = dialogWith('Night owl at work');
+    if (!found) return null;
+    return /Calls, last hour/.test(String(found.textContent || '')) ? found : null;
+  });
+  assert.ok(report, 'the health of the application did not open');
+  assert.match(report.textContent, /Calls, last hour/,
+    'the health did not say how much the hour cost');
+  assert.match(report.textContent, /12 calls · 11 fine · 1 refused/,
+    'the health did not say what became of the calls it took');
+  assert.match(report.textContent, /\/communities\/s1\/channels\/c1\/messages/,
+    'the health did not name the route the application used');
+  assert.match(report.textContent, /4 calls · 4 fine/,
+    'the health did not account for every route it listed');
+});
+
+test('the list of applications says how many are working', async () => {
+  installDomStub();
+  const calls = installFetchStub(baseRoutes(applicationRoutes()));
+
+  const view = await applicationView(calls);
+  await waitFor(() => byLabel(view.node, 'Manage Night owl')[0]);
+  assert.match(view.node.textContent, /1 application · 1 active/,
+    'the list did not count what it holds');
+});
+
+test('the documentation names the events and how an application is installed', async () => {
+  installDomStub();
+  installFetchStub(baseRoutes());
+
+  const view = renderDeveloper({ page: { id: 'developer' }, query: new URLSearchParams(), params: {}, rest: [] });
+  await view.onMount();
+
+  tabOf(view, 'Documentation');
+  assert.match(view.node.textContent, /The event vocabulary/,
+    'the documentation did not point at the vocabulary of events');
+  const events = findAll(view.node, (node) => node.getAttribute && node.getAttribute('href') === '/api/v1/events')[0];
+  assert.ok(events, 'the vocabulary of events was not linked');
+  assert.match(view.node.textContent, /Creating the application in the community is the installation/,
+    'the documentation did not say what installing an application is');
 });

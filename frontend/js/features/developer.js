@@ -20,7 +20,7 @@
 import { el } from '../../packages/dom.js';
 import { State, refreshServers } from '../../packages/store.js';
 import { icon } from '../../packages/icons.js';
-import { publicPath } from '../../packages/nav.js';
+import { publicPath, replaceAddress } from '../../packages/nav.js';
 import { formatDateTime } from '../../packages/locale.js';
 import { card, row, blank, fault, fold, facts, head, hold, memo } from '../ui/page.js';
 import { confirmDialog, openDialog, errorToast, toast } from '../ui/overlays.js';
@@ -606,12 +606,38 @@ function openApplicationHealth(serverId, application) {
   body.replaceChildren(hold('Reading the health'));
   applicationHealth(serverId, application.id).then((health) => {
     const answer = health || {};
+    const usage = answer.usage || null;
+    const routes = (answer.routes || []).filter((route) => Number(route.requests) > 0);
+    // One line is one kind of ask - the route as the server saw it - with
+    // what became of the calls it took. A route the application never used
+    // does not appear here.
+    function routeLine(route) {
+      const refused = (route.clientErrors || 0) + (route.serverErrors || 0);
+      return String(route.requests) + ' calls · '
+        + String(route.succeeded || 0) + ' fine'
+        + (refused ? ' · ' + String(refused) + ' refused' : '');
+    }
     body.replaceChildren(el('div', { class: 'fold fold--tight' },
       facts([
         { value: answer.state || 'unknown', label: 'Its state' },
         { value: answer.rateLimitPerMinute || '—', label: 'Requests a minute' },
         { value: answer.lastUsedAt ? formatDateTime(answer.lastUsedAt) : 'never', label: 'Last used' },
       ]),
+      usage
+        ? facts([
+          // The window the service keeps: what the last hour cost.
+          { value: usage.requests || 0, label: 'Calls, last hour' },
+          { value: usage.succeeded || 0, label: 'Answered' },
+          { value: (usage.clientErrors || 0) + (usage.serverErrors || 0), label: 'Refused' },
+        ])
+        : null,
+      routes.length
+        ? el('div', { class: 'fold fold--tight' }, routes.map((route) =>
+          el('div', { class: 'settings-item' },
+            el('div', { class: 'settings-item-main' },
+              el('p', { class: 'settings-item-label' }, route.route),
+              el('p', { class: 'settings-note' }, routeLine(route))))))
+        : el('p', { class: 'form-note' }, 'It has not asked for anything recently.'),
       answer.lastFailure
         ? memo({
           tone: 'warning',
@@ -770,6 +796,7 @@ function openApplicationScopes(serverId, application, onDone) {
 // ask.
 function openApplication(serverId, application, onDone) {
   let live = application;
+  let account = application.account || null;
   const holder = el('div', { class: 'fold fold--tight' });
   const dialog = openDialog({
     title: application.name,
@@ -784,6 +811,7 @@ function openApplication(serverId, application, onDone) {
     try {
       const answer = await readApplication(serverId, application.id);
       live = (answer && answer.application) || live;
+      account = (answer && answer.account) || account;
       paint();
     } catch (error) {
       holder.replaceChildren(fault(error, refresh));
@@ -817,6 +845,20 @@ function openApplication(serverId, application, onDone) {
         { value: scopes.length || 0, label: 'Scopes' },
         { value: credential.rateLimitPerMinute || '—', label: 'Requests a minute' },
       ]),
+      // Who the application is. The id is the one value that outlives every
+      // rename, so a configuration file reads it once and keeps it; the
+      // account is the member the community actually sees.
+      item('Its id', String(live.id) + ' — this stays the same when the application is renamed or given a new token.',
+        el('button', {
+          class: 'btn btn--ghost btn--sm', type: 'button',
+          'aria-label': 'Copy the id of ' + live.name,
+          onClick: () => copyText(live.id, 'The id was copied.'),
+        }, 'Copy it')),
+      item('It posts as',
+        account && account.username
+          ? '@' + account.username + ' — the member account this application speaks for.'
+          : 'The member account this application speaks for.',
+        null),
       el('p', { class: 'form-note' },
         live.description || 'It posts as itself, with no account behind it.'),
       act('Change it',
@@ -924,6 +966,10 @@ function openApplication(serverId, application, onDone) {
   }
 
   paint();
+  // It reads the one application at once: the list says the name and the
+  // state, but the account it posts as and the credential that is live right
+  // now are only sure from the answer about the one it opened.
+  refresh();
   return dialog;
 }
 
@@ -1006,6 +1052,10 @@ function applicationsSection() {
   const picker = el('select', { class: 'input', 'aria-label': 'The community whose applications are shown' });
   const list = el('div', { class: 'rowlist' });
   const tools = el('span', { class: 'chips' });
+  // The one-line account of what this community has: how many applications,
+  // how many are working. It is painted from the list itself, so it says
+  // only what the list says.
+  const summary = el('p', { class: 'form-note' });
   let serverId = null;
 
   function communities() {
@@ -1100,9 +1150,17 @@ function applicationsSection() {
       return;
     }
     list.replaceChildren(hold('Reading the applications'));
+    summary.textContent = '';
     try {
       const answer = await readApplications(serverId);
       const applications = (answer && answer.applications) || [];
+      const active = applications.filter((application) => application.status === 'active').length;
+      const off = applications.length - active;
+      summary.textContent = applications.length
+        ? String(applications.length) + ' application' + (applications.length === 1 ? '' : 's')
+          + ' · ' + String(active) + ' active'
+          + (off ? ' · ' + String(off) + ' switched off' : '')
+        : 'None here yet.';
       list.replaceChildren(...(applications.length
         ? applications.map(applicationRow)
         : [blank({
@@ -1133,7 +1191,7 @@ function applicationsSection() {
         glyph: 'bot',
         note: 'who they are, what they may do, and the commands they answer',
         actions: tools,
-        body: el('div', { class: 'form-stack' }, picker, list),
+        body: el('div', { class: 'form-stack' }, picker, summary, list),
       }),
     ]),
     onMount: async () => {
@@ -1228,6 +1286,12 @@ function documentationSection() {
             false,
           ),
           linkRow(
+            'The event vocabulary',
+            'Every event an application may be told about, by name and shape.',
+            '/api/v1/events',
+            false,
+          ),
+          linkRow(
             'The SDK: trycord-botjs',
             'The client library, with its types, its tests and its examples.',
             'https://github.com/trycord/.trycord/tree/main/sdk/trycord-botjs',
@@ -1240,6 +1304,14 @@ function documentationSection() {
             false,
           ),
         ]),
+      }),
+      memo({
+        tone: 'info',
+        title: 'How an application is installed',
+        text: 'There is no install page to visit and no list to be admitted to. Creating the '
+          + 'application in the community is the installation: it names the bot, scopes its '
+          + 'credential, and puts its account in the community as an ordinary member. Whoever '
+          + 'manages the community makes it.',
       }),
     ]),
     onMount: () => {},
@@ -1262,11 +1334,19 @@ export function renderDeveloper(ctx) {
   let current = null;
   let live = null;
 
-  // The section may be named in the address, so that a particular one can be
-  // linked to and a reader can come back to it.
+  // The section the reader asked for. The address may name it
+  // (/developer/applications), which is how a particular one can be linked
+  // to and where a reader comes back to it; the older ?section=… spelling
+  // says the same thing and still counts. An address that names neither
+  // opens on the first section.
   function wantedSection() {
+    const id = ctx && ctx.page && String(ctx.page.id || '');
+    const named = id
+      ? (id === 'developer' ? '' : id)  // the bare page carries no section
+      : '';
     const asked = ctx && ctx.query ? String(ctx.query.get('section') || '') : '';
-    return SECTIONS.some((section) => section.id === asked) ? asked : SECTIONS[0].id;
+    const choice = [named, asked].find((value) => SECTIONS.some((section) => section.id === value));
+    return choice || SECTIONS[0].id;
   }
 
   function paintTabs() {
@@ -1275,7 +1355,13 @@ export function renderDeveloper(ctx) {
       type: 'button',
       'aria-selected': current === section.id ? 'true' : 'false',
       'aria-label': 'Show the ' + section.label.toLowerCase() + ' section',
-      onClick: () => show(section.id),
+      // The switch is a tab switch, not a move between pages: the address
+      // follows so the copy of it carries the state, and the page stays
+      // where it is.
+      onClick: () => {
+        replaceAddress('/developer/' + section.id);
+        show(section.id);
+      },
     }, section.label)));
   }
 
