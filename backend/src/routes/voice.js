@@ -23,6 +23,32 @@ const permissions = require('../services/permissions');
 const db = require('../db');
 
 const router = express.Router();
+
+// Whether the instance's own relay answers.
+//
+// The relay's address is public - it is in the ICE configuration the clients
+// are given - and whether it answers is a fact about the instance, so the
+// answer needs no session. The status page asks it, so a reader can see
+// whether calls will work without being an administrator.
+router.get('/relay', limit({ windowMs: 60000, max: 30, key: 'voice-relay' }), wrap(async (req, res) => {
+  const relay = require('../services/voice/config').inHouseRelay();
+  const address = String(relay.advertised || '').trim();
+  if (!address) {
+    return res.json({
+      ok: false,
+      address: '',
+      detail: 'The relay is published at no address a client can reach.',
+    });
+  }
+  const probe = await require('../services/voice/relay')
+    .probeAddress('stun:' + address + ':' + relay.port, 2500);
+  res.json({
+    ok: !!probe.ok,
+    address: address + ':' + relay.port,
+    detail: probe.detail || (probe.ok ? 'The relay answers a binding request.' : 'The relay did not answer.'),
+  });
+}));
+
 router.use(auth);
 
 // The refusals the voice services raise that the shared error map does not know
