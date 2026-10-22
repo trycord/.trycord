@@ -12,6 +12,7 @@
 
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
+import { path } from '../../packages/nav.js';
 import { brandSymbolUrl } from '../../packages/brand.js';
 
 // Drag a column's edge. `sign` is +1 when the column grows to the right of its
@@ -65,8 +66,12 @@ export function attachColumnResize(grip, options) {
 }
 
 export function brandMark(className) {
+  // The address goes through path() so the link carries the mount prefix.
+  // A bare '/home' is right only on a deployment where the app is served at
+  // the root; anywhere it is mounted deeper, the click lands on the public
+  // site instead of the workspace.
   const home = el('a', {
-    class: className, href: '/home', title: 'Trycord home', 'aria-label': 'Trycord home',
+    class: className, href: path('/home'), title: 'Trycord home', 'aria-label': 'Trycord home',
   });
   const img = el('img', { src: brandSymbolUrl, alt: '', loading: 'lazy' });
   img.addEventListener('error', () => {
