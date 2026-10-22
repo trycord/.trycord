@@ -281,16 +281,22 @@ function mountClient(app, opts) {
     }
 
     // Entry points are never cached (a stale index.html paired with fresh or stale
-    // JS/CSS is what renders a blank page). Versioned assets use conditional
-    // revalidation instead: browsers revalidate on every load (ETag), so new deploys
-    // are picked up immediately without giving up caching entirely.
+    // JS/CSS is what renders a blank page). Everything else gets a short TTL:
+    // module URLs carry no version stamp, so a long TTL would hand readers a
+    // stale module for as long as it lasted. Sixty seconds is the window a
+    // deploy can leave a stale file on a reader's disk - small, and bounded by
+    // two guards: the entry document is no-store (so the graph is always
+    // entered fresh), and relative imports resolve inside the same cached
+    // entry, so a stale graph is consistently stale rather than half-new.
+    // Before the TTL, every repeat visit paid a revalidation round trip for
+    // every one of the hundred-plus modules the client loads.
     const staticOptions = (extra) => Object.assign({
       index: false,
       setHeaders(res, filePath) {
         if (/(^|[\\/])(index\.html|config\.js)$/i.test(filePath)) {
           res.setHeader('Cache-Control', 'no-store');
         } else {
-          res.setHeader('Cache-Control', 'no-cache');
+          res.setHeader('Cache-Control', 'public, max-age=60');
         }
       },
     }, extra);

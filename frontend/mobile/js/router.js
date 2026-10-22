@@ -164,7 +164,9 @@ export async function run() {
 
   let result;
   try {
-    result = renderPage(page, ctx);
+    // A renderer may be a lazy import resolving to the page; the await here is
+    // free for the eager ones, which answer synchronously.
+    result = await renderPage(page, ctx);
   } catch (error) {
     if (seq === generation) { paintError(route, error); refreshChrome(); }
     return;
