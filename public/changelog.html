@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Trycord">
   <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
   <title>Changelog: what changed in Trycord</title>
-  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 6.4.0, with development continuing on main.">
+  <meta name="description" content="A record of what changed in Trycord, taken from the repository's history. The current release is 6.6.0, with development continuing on main.">
   <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
@@ -130,13 +130,22 @@
         <h1>What changed, and when</h1>
         <p class="lede">
           This is curated from the repository's own history. Releases are listed
-          newest first. The current release is <strong>6.4.0</strong>. Anything
+          newest first. The current release is <strong>6.6.0</strong>. Anything
           above it is work on <code>main</code> that has not been cut into a
           release yet.
         </p>
       </div>
 
       <ol class="timeline">
+        <li>
+          <p class="when">6.6.0 &middot; 2026-10-22</p>
+          <h2>The whole of an application is managed in one place, and one server can become two</h2>
+          <ul>
+            <li><strong>Fixed</strong> — the in-app mark leads back into the application on every surface</li>
+            <li><strong>Added</strong> — the developer console offers the whole of an application's life - changing it, its scopes and rate limit, switching it off and on, a new token, its health and gateway, and deleting it for good, on the desk and the phone alike</li>
+            <li><strong>Added</strong> — a split deployment: the server states which part it is with TRYCORD_DEPLOYMENT_ROLE, and the frontend server started with npm run start:frontend serves only the client and the site, pointing the browsers it feeds at the API server</li>
+          </ul>
+        </li>
         <li>
           <p class="when">6.4.0 &middot; 2026-10-22</p>
           <h2>The public site is rebuilt on the brand's artwork</h2>
