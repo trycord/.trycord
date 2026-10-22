@@ -21,8 +21,22 @@ const voiceConfig = require('../services/voice/config');
 const diagnostics = require('../services/voice/diagnostics');
 const permissions = require('../services/permissions');
 const db = require('../db');
+const os = require('os');
 
 const router = express.Router();
+
+// Whether a literal IP address is on this machine. Only literal addresses are
+// checkable here - a hostname may resolve anywhere, and only an operator knows
+// whether a forwarded public address really reaches this box.
+function hostCarriesAddress(host) {
+  if (!host || /[a-zA-Z]/.test(String(host))) return true;
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const entry of list) {
+      if (entry && entry.address === host) return true;
+    }
+  }
+  return false;
+}
 
 // Whether the instance's own relay answers.
 //
@@ -42,10 +56,25 @@ router.get('/relay', limit({ windowMs: 60000, max: 30, key: 'voice-relay' }), wr
   }
   const probe = await require('../services/voice/relay')
     .probeAddress('stun:' + address + ':' + relay.port, 2500);
+  // A relay that does not answer is one of two faults, and they have opposite
+  // fixes. When the published address is not even on this machine - the box's
+  // address changed, or an operator saved an old one - nothing here can ever
+  // answer, and the sentence says so rather than leaving a reader to guess at
+  // a network problem that is actually a configuration one. When the address
+  // is here but silent, the fault is the relay itself.
+  const advertised = String(relay.advertised || '');
+  const onThisHost = hostCarriesAddress(advertised);
+  const detail = probe.ok
+    ? (probe.detail || 'The relay answers a binding request.')
+    : (onThisHost
+      ? (probe.detail || 'The relay did not answer.')
+      : 'The relay is published at ' + advertised + ', which is not an address of this host. '
+        + 'Nothing on this machine can answer there; if the address is meant to reach '
+        + 'here through a router, that forwarding is what has to answer.');
   res.json({
     ok: !!probe.ok,
     address: address + ':' + relay.port,
-    detail: probe.detail || (probe.ok ? 'The relay answers a binding request.' : 'The relay did not answer.'),
+    detail,
   });
 }));
 

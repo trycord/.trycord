@@ -34,3 +34,22 @@ test('anyone can ask whether the relay answers', async (t) => {
   assert.equal(/password|credential|stunkey|secret/i.test(text), false,
     'the relay route says something it should not: ' + text);
 });
+
+test('a relay published at an address this host does not carry says so', async (t) => {
+  // 192.0.2.0/24 is TEST-NET-1: an address no machine here has, so the probe
+  // is a real timeout against an address that does not exist - exactly the
+  // fault an operator meets when the box moved network and the saved address
+  // stayed behind.
+  const instance = await startInstance({
+    jobs: false,
+    env: { TRYCORD_VOICE_PUBLIC_URL: '192.0.2.55' },
+  });
+  t.after(() => instance.stop());
+
+  const answer = await fetch(instance.baseUrl + '/api/voice/relay');
+  assert.equal(answer.status, 200);
+  const body = await answer.json();
+  assert.equal(body.ok, false, 'an address nothing carries must not be reported as answering');
+  assert.match(body.detail, /not an address of this host/,
+    'the answer names the configuration fault, not a network mystery: ' + body.detail);
+});
