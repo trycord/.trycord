@@ -202,6 +202,36 @@ test('the unified default is unchanged: client and site are served when nothing 
   assert.equal(body.backendUrl, instance.baseUrl);
 });
 
+test('a mounted deployment answers auth deep links on the mount instead of redirecting them', async (t) => {
+  // The edge that publishes the site aliases /login and its siblings into
+  // /app/... The origin once redirected those back to the root "for one
+  // canonical address" - and the edge sent that /login into /app/login
+  // again: the two answers kept sending the reader to each other, and every
+  // sign-in, register, forgot-password and verify link on the site doubled
+  // forever. The document is the same at either address (the mount is
+  // stripped and the base stamped), so the origin serves the gate at both,
+  // and canonicality at the edge belongs to the edge.
+  const instance = await startInstance({
+    jobs: false,
+    env: { TRYCORD_APP_MOUNT: '/app' },
+  });
+  t.after(() => instance.stop());
+
+  for (const route of ['/app/login', '/app/register', '/app/forgot',
+    '/app/reset-password', '/app/verify-email', '/app/two-step']) {
+    const res = await fetch(instance.baseUrl + route, { redirect: 'manual' });
+    assert.equal(res.status, 200, route + ' is answered, not redirected');
+    assert.equal(res.headers.get('location'), null, route + ' carries no redirect');
+    const html = String(await res.text());
+    assert.ok(html.includes('<base href="/app/'), route + ' is stamped with the mount');
+  }
+
+  // The root-level paths still serve the same gate directly.
+  const root = await fetch(instance.baseUrl + '/login', { redirect: 'manual' });
+  assert.equal(root.status, 200);
+  assert.equal(root.headers.get('location'), null);
+});
+
 test('a named API origin outranks the serving origin in the client\u2019s backend.json', async (t) => {
   // No public site, so the answer comes from the client's own file, which is
   // the one that carries the failover origins.
