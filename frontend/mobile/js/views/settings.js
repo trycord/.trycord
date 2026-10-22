@@ -215,7 +215,20 @@ function profileBody() {
     class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
     onClick: async (event) => {
       event.currentTarget.disabled = true;
-      try { await Api.verifyEmailResend(); toast('Verification link sent.', { type: 'success' }); }
+      try {
+        // The server demands the address it should send to; asking it to
+        // resend without one used to answer "Enter a valid email address."
+        // on a button that looked like one less step than it was. The
+        // account knows its own address, so it is read from here at the
+        // click, not from one frame up.
+        const mine = (State.user || {}).email;
+        if (!mine) {
+          toast('There is no address on this account to send to. Add one first.', { type: 'danger' });
+          return;
+        }
+        await Api.verifyEmailResend({ email: mine });
+        toast('The link is on its way. If it does not arrive, look in the spam folder.', { type: 'success' });
+      }
       catch (error) { toast(error.message, { type: 'danger' }); }
       finally { event.currentTarget.disabled = false; }
     },
@@ -249,7 +262,7 @@ function profileBody() {
           el('span', { class: 'm-row__body' },
             el('span', { class: 'm-row__title' }, current.email || 'No email on file'),
             el('span', { class: 'm-row__sub' }, current.emailVerified ? 'Verified' : 'Not verified')),
-          current.emailVerified ? null : el('span', { class: 'm-row__actions' }, resend)))),
+          current.emailVerified || !current.email ? null : el('span', { class: 'm-row__actions' }, resend)))),
       group('Delete your account',
         el('div', { class: 'm-row' },
           el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Every channel, message and membership goes.')),

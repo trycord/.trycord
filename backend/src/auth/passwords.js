@@ -2,6 +2,10 @@
 // every endpoint that sets a password (register, change, reset).
 // Deliberately length-based: long passphrases welcome, no arbitrary
 // complexity theater, never truncated, never normalized.
+//
+// The messages are written as the sentences a person reads. They name the
+// requirement and, where it exists honestly, a next step - the sender of
+// these messages is the last hand the copy passes through.
 const MIN_LENGTH = 8;
 // bcrypt reads only the first 72 bytes of its input. A policy that accepted more
 // would tell a member their 200-character passphrase was the password while in fact
@@ -11,10 +15,10 @@ const MIN_LENGTH = 8;
 const MAX_LENGTH = 72;
 
 function checkPassword(pw) {
-  if (typeof pw !== 'string') return 'password must be a string';
-  if (pw.length < MIN_LENGTH) return `password must be ${MIN_LENGTH}+ characters`;
-  if (Buffer.byteLength(pw, 'utf8') > MAX_LENGTH) return `password must be ${MAX_LENGTH} bytes or fewer`;
-  if (!pw.trim()) return 'password cannot be blank';
+  if (typeof pw !== 'string') return 'The password is malformed. Type it again and try.';
+  if (pw.length < MIN_LENGTH) return `Use at least ${MIN_LENGTH} characters for the password. A long passphrase works well.`;
+  if (Buffer.byteLength(pw, 'utf8') > MAX_LENGTH) return `That password is longer than passwords here can be - the ceiling is ${MAX_LENGTH} bytes. Trim it a little and try again.`;
+  if (!pw.trim()) return 'The password cannot be blank.';
   return null;
 }
 

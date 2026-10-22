@@ -219,11 +219,11 @@ async function beginSetup(userId, username) {
 
 async function enable(userId, code) {
   const row = await db.get('SELECT totp_secret FROM users WHERE id = ?', [userId]);
-  if (!row || !row.totp_secret) throw { code: 'VALIDATION_ERROR', message: 'Start 2FA setup first' };
+  if (!row || !row.totp_secret) throw { code: 'VALIDATION_ERROR', message: 'Two-step sign-in has not been started yet. Choose the setup option again.' };
   let plain;
   try { plain = decryptSecret(row.totp_secret); } catch { throw { code: 'INTERNAL', message: 'The stored two-factor secret cannot be read.' }; }
   if (verifyCode(plain, code) === null) {
-    throw { code: 'VALIDATION_ERROR', message: 'That code is not correct' };
+    throw { code: 'VALIDATION_ERROR', message: 'That code is not right. Check the six digits the app shows and try again.' };
   }
   // Enable and mint the recovery set in one transaction: a member who ends up
   // enabled with no recovery codes has no way back in if they lose the
@@ -274,7 +274,7 @@ async function disable(userId, code) {
   if (!row || !row.totp_secret) return;
   const plain = decryptSecret(row.totp_secret);
   if (verifyCode(plain, code) === null) {
-    throw { code: 'VALIDATION_ERROR', message: 'That code is not correct' };
+    throw { code: 'VALIDATION_ERROR', message: 'That code is not right. Check the six digits the app shows and try again.' };
   }
   await db.transaction(async (t) => {
     await t.run('UPDATE users SET totp_secret = NULL, totp_enabled_at = NULL WHERE id = ?', [userId]);

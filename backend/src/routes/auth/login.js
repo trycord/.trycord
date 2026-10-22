@@ -44,14 +44,14 @@ router.post('/login', (req, res, next) => loginLimit()(req, res, next), async (r
       'SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1',
       [wanted.toLowerCase()]
     );
-    if (!user) return fail(res, 'AUTH_REQUIRED', 'invalid credentials');
+    if (!user) return fail(res, 'AUTH_REQUIRED', 'We could not sign you in. Check the details and try again.');
 
     // Lockout is checked after the lookup but before the password comparison, so
     // a locked account cannot be used as a password oracle: the same response
     // comes back whether or not the guess would have been right.
     const lockMs = await twofactor.remainingLockMs(user.id);
     if (lockMs > 0) {
-      return fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+      return fail(res, 'ACCOUNT_LOCKED', 'Too many tries in a row. Wait a little, then try again.', 429, {
         retryAfterSeconds: Math.ceil(lockMs / 1000),
       });
     }
@@ -60,10 +60,10 @@ router.post('/login', (req, res, next) => loginLimit()(req, res, next), async (r
     if (!ok) {
       const locked = await twofactor.recordFailure(user.id);
       return locked
-        ? fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+        ? fail(res, 'ACCOUNT_LOCKED', 'Too many tries in a row. Wait a little, then try again.', 429, {
           retryAfterSeconds: Math.ceil(twofactor.LOCKOUT_MS / 1000),
         })
-        : fail(res, 'AUTH_REQUIRED', 'invalid credentials');
+        : fail(res, 'AUTH_REQUIRED', 'We could not sign you in. Check the details and try again.');
     }
     // Reset on success, never per attempt: resetting on every attempt would let
     // a caller interleave one guess with the real password to hold the counter
@@ -110,7 +110,7 @@ router.post('/2fa/verify', rateLimit({ windowMs: 60000, max: 10 }), async (req, 
     const { challengeToken, code } = req.body || {};
     if (!challengeToken || !code) return fail(res, 'VALIDATION_ERROR', 'challengeToken and code required');
     const userId = readChallenge(challengeToken);
-    if (!userId) return fail(res, 'AUTH_REQUIRED', 'challenge expired or invalid');
+    if (!userId) return fail(res, 'CHALLENGE_EXPIRED', 'The code window closed. Start the sign-in again to get a fresh code.', 401);
 
     const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
     if (!user) return fail(res, 'NOT_FOUND', 'user not found');
@@ -123,7 +123,7 @@ router.post('/2fa/verify', rateLimit({ windowMs: 60000, max: 10 }), async (req, 
     // the second factor is the half that is supposed to be stronger.
     const lockMs = await twofactor.remainingLockMs(user.id);
     if (lockMs > 0) {
-      return fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+      return fail(res, 'ACCOUNT_LOCKED', 'Too many tries in a row. Wait a little, then try again.', 429, {
         retryAfterSeconds: Math.ceil(lockMs / 1000),
       });
     }
@@ -132,10 +132,10 @@ router.post('/2fa/verify', rateLimit({ windowMs: 60000, max: 10 }), async (req, 
     if (!result.ok) {
       const locked = await twofactor.recordFailure(user.id);
       return locked
-        ? fail(res, 'ACCOUNT_LOCKED', 'too many failed attempts; try again later', 429, {
+        ? fail(res, 'ACCOUNT_LOCKED', 'Too many tries in a row. Wait a little, then try again.', 429, {
           retryAfterSeconds: Math.ceil(twofactor.LOCKOUT_MS / 1000),
         })
-        : fail(res, 'AUTH_REQUIRED', 'invalid code');
+        : fail(res, 'AUTH_REQUIRED', 'That code is not right. Check the six digits the app shows and try again.');
     }
     await twofactor.recordSuccess(user.id);
 

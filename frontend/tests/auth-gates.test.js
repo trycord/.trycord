@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { installDomStub, installFetchStub } from './helpers/dom-stub.js';
+import { installDomStub, installFetchStub, waitFor } from './helpers/dom-stub.js';
 import { CLIENT, MODULES, read } from './helpers/source.js';
 
 installDomStub();
@@ -22,6 +22,7 @@ installDomStub();
 const { renderAuth } = await import('../js/features/auth.js');
 const { State } = await import('../packages/store.js');
 const registry = await import('../packages/registry.js');
+const TrycordConfig = (await import('../packages/config.js')).default;
 
 function gateFor(id, params) {
   const page = registry.pageById(id);
@@ -147,3 +148,180 @@ test('the standalone pages are the ones the registry names', () => {
     assert.equal(page.access, id === 'verifyEmail' || id === 'twoStep' ? 'public' : 'guest');
   }
 });
+
+// -- what a refusal says ------------------------------------------------------
+
+// The helper for driving the sign-in form: fill the two fields, send it.
+async function signInWith(form, username, password, wait) {
+  const byName = fieldsOf(form);
+  byName.username.value = username;
+  byName.password.value = password;
+  form.dispatch('submit');
+  await (wait || waitFor)(() => {
+    const error = form.querySelector('.form-error');
+    return error && error.hidden === false && error.textContent;
+  });
+  return form.querySelector('.form-error');
+}
+
+test('a wrong-password sign-in is answered with a next step, and what was typed stays', async () => {
+  const loginUrl = TrycordConfig.backendUrl() + '/api/auth/login';
+  const calls = installFetchStub({
+    [loginUrl]: {
+      ok: false, status: 401,
+      json: { error: { code: 'AUTH_REQUIRED', message: 'We could not sign you in. Check the details and try again.' } },
+    },
+  });
+
+  const result = gateFor('login');
+  const form = result.node.querySelector('form');
+  const error = await signInWith(form, 'ada', 'not-the-password');
+
+  assert.match(String(error && error.textContent), /could not sign you in/i,
+    'the refusal did not say what to do next');
+  const byName = fieldsOf(form);
+  assert.equal(byName.username.value, 'ada', 'the form emptied the name the reader typed');
+  assert.equal(byName.password.value, 'not-the-password', 'the form emptied the password field');
+});
+
+test('the login refusal never says which factor was wrong', async () => {
+  const loginUrl = TrycordConfig.backendUrl() + '/api/auth/login';
+  const calls = installFetchStub({
+    [loginUrl]: { ok: false, status: 401, json: { error: { code: 'AUTH_REQUIRED', message: 'refused' } } },
+  });
+
+  const result = gateFor('login');
+  const form = result.node.querySelector('form');
+  const error = await signInWith(form, 'nobody-here', 'not-the-password');
+  const said = String(error && error.textContent);
+  // The server withholds which of the two details failed (that difference is
+  // how an account is confirmed to exist), and the form does not invent the
+  // answer back: no sentence may name one of the fields as the wrong one.
+  assert.doesNotMatch(said, /username/i);
+  assert.doesNotMatch(said, /password/i);
+  assert.match(said, /could not sign you in/i);
+});
+
+test('a locked-out sign-in names the wait the server reports', async () => {
+  const loginUrl = TrycordConfig.backendUrl() + '/api/auth/login';
+  const calls = installFetchStub({
+    [loginUrl]: {
+      ok: false, status: 429,
+      json: { error: { code: 'ACCOUNT_LOCKED', message: 'Too many tries in a row. Wait a little, then try again.', details: { retryAfterSeconds: 120 } } },
+    },
+  });
+
+  const result = gateFor('login');
+  const form = result.node.querySelector('form');
+  const error = await signInWith(form, 'ada', 'whatever');
+  assert.match(String(error && error.textContent), /2 minutes/,
+    'a lock with a server-stated wait did not state it');
+});
+
+test('a second-factor code that arrives too late offers the way back, and keeps what was typed', async () => {  const base = TrycordConfig.backendUrl();
+  installFetchStub({
+    [base + '/api/auth/login']: {
+      json: { mfaRequired: true, challengeToken: 'tok', expiresInSeconds: 300 },
+    },
+    [base + '/api/auth/2fa/verify']: {
+      ok: false, status: 401,
+      json: { error: { code: 'CHALLENGE_EXPIRED', message: 'The code window closed. Start the sign-in again to get a fresh code.' } },
+    },
+  });
+
+  const result = gateFor('login');
+  const form = result.node.querySelector('form');
+  const byName = fieldsOf(form);
+  byName.username.value = 'ada';
+  byName.password.value = 'the-real-one';
+  byName.code.value = '000000';
+
+  form.dispatch('submit');
+  const codeLabel = Array.from(form.querySelectorAll('.field'))
+    .find((label) => String(label.textContent).includes('Two-step code'));
+  const alive = await waitFor(() => !codeLabel.hidden);
+  assert.ok(alive, 'the code field never appeared for the challenge');
+
+  form.dispatch('submit');
+  const error = await waitFor(() => {
+    const box = form.querySelector('.form-error');
+    return box && box.hidden === false ? box : null;
+  });
+  assert.match(String(error && error.textContent), /window closed|again/i,
+    'the stale-code refusal did not say what to do');
+  const again = error.querySelector('button');
+  assert.ok(again, 'the stale-code refusal offered no way to restart');
+
+  again.dispatch('click');
+  await waitFor(() => codeLabel.hidden);
+  assert.equal(byName.code.value, '', 'the restart kept the stale code');
+  assert.equal(byName.username.value, 'ada', 'the restart threw away the name');
+  assert.equal(byName.password.value, 'the-real-one', 'the restart threw away the password');
+});
+
+// -- what the form asks before the server has to -------------------------------
+
+test('the registration fields say their shape before the server refuses it', () => {
+  const result = gateFor('register');
+  const form = result.node.querySelector('form');
+  const hints = form.querySelectorAll('.field-hint')
+    .map((n) => String(n.textContent)).join(' | ');
+  assert.match(hints, /2 to 32 characters/, 'the username field does not say its shape');
+  assert.match(hints, /At least 8 characters/, 'the password field does not say its floor');
+});
+
+test('a passphrase over the ceiling is refused without spending the registration', async () => {
+  State.legal = { termsVersion: '2.0', privacyVersion: '3.1' };
+  const calls = installFetchStub({});
+
+  const result = gateFor('register');
+  const form = result.node.querySelector('form');
+  const byName = fieldsOf(form);
+  byName.username.value = 'ada';
+  byName.password.value = 'x'.repeat(80);
+  byName.confirm.value = byName.password.value;
+  byName.legal.checked = true;
+  byName.legal.dispatch('change');
+  form.dispatch('submit');
+  await waitFor(() => {
+    const error = form.querySelector('.form-error');
+    return error && error.hidden === false && error.textContent;
+  });
+
+  assert.equal(calls.find((call) => String(call.url).indexOf('/api/auth/register') !== -1), undefined,
+    'the registration was sent with a passphrase no server can keep');
+  const error = form.querySelector('.form-error');
+  assert.match(String(error.textContent), /longer than passwords here can be/);
+  State.legal = null;
+});
+
+test('an approval-gated instance shows the waiting screen, not a workspace that will refuse it', async () => {
+  State.legal = { termsVersion: '2.0', privacyVersion: '3.1' };
+  const registerUrl = TrycordConfig.backendUrl() + '/api/auth/register';
+  const calls = installFetchStub({
+    [registerUrl]: { json: { token: 'tok', user: { id: 'u1', username: 'ada' }, pendingApproval: true } },
+  });
+
+  const result = gateFor('register');
+  const form = result.node.querySelector('form');
+  const byName = fieldsOf(form);
+  byName.username.value = 'ada';
+  byName.password.value = 'a-long-enough-passphrase';
+  byName.confirm.value = 'a-long-enough-passphrase';
+  byName.legal.checked = true;
+  byName.legal.dispatch('change');
+  form.dispatch('submit');
+  await waitFor(() => String(form.textContent).includes('approval'));
+
+  assert.ok(calls.find((call) => String(call.url).indexOf('/api/auth/register') !== -1),
+    'the registration was never sent');
+  // The waiting screen is the form's replacement, and the sign-out it offers
+  // is how a reader leaves a workspace they never got into.
+  assert.match(String(form.textContent), /administrator to approve/);
+  assert.match(String(form.textContent), /Sign out/);
+  assert.equal(form.querySelector('input[name="password"]'), null,
+    'the old form stayed on screen under the waiting text');
+  State.legal = null;
+});
+
+
