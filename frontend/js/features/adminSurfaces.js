@@ -270,7 +270,7 @@ export function adminPeople() {
                 : 'The account has no creation date recorded.'),
           }),
           card({
-            label: 'Actions on this account', glyph: 'history',
+            label: 'Actions on this account', glyph: 'clock',
             body: actions.length
               ? el('div', { class: 'rowlist' }, actions.map((a) => row({
                 title: a.actionType || a.action || 'An action',
@@ -281,7 +281,7 @@ export function adminPeople() {
                 meta: a.createdAt || '',
               })))
               : blank({
-                glyph: 'history',
+                glyph: 'clock',
                 title: 'No actions recorded',
                 text: 'An enforcement applied to this account is written down here.',
               }),
@@ -574,7 +574,7 @@ export function adminReports() {
             body: el('p', { class: 'lede' }, report.reason || 'No reason was given.'),
           }),
           target ? card({
-            label: 'The reported account', glyph: 'user-plus',
+            label: 'The reported account', glyph: 'user',
             body: el('p', { class: 'lede' },
               (target.display_name || target.username || 'An account')
               + (target.username ? ' @' + target.username : '')),
@@ -735,13 +735,13 @@ export function adminAppeals() {
             body: el('p', { class: 'lede' }, appeal.reason || 'No statement was given.'),
           }),
           card({
-            label: 'The enforcement being appealed', glyph: 'shield-alert',
+            label: 'The enforcement being appealed', glyph: 'shield',
             body: el('p', { class: 'lede' },
               String(selected.action_type || 'An enforcement').replace(/_/g, ' ')
               + (selected.action_reason ? ' — ' + selected.action_reason : '')),
           }),
           decided ? card({
-            label: 'The decision', glyph: 'shield-check',
+            label: 'The decision', glyph: 'check',
             body: el('p', { class: 'lede' },
               'Decided: ' + statusWord(appeal.decision) + '. The record and the audit entry stand.'),
           }) : card({

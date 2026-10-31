@@ -114,3 +114,9 @@ backend/tmp/
 # product.
 /frontend/.browser-harness/
 /frontend/.browser-harness.html
+
+# Instructions written for any local AI that reads and works on this
+# repository. They carry truths about this machine and its limits that do not
+# belong in a public repository, so they stay out of every commit.
+/INSTRUCTIONS.MD
+/instructions.md
