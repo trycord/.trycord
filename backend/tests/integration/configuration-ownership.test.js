@@ -184,6 +184,125 @@ test('one setting, one console', async (t) => {
   });
 });
 
+test('the environment can hold the authority over the configuration', async (t) => {
+  // TRYCORD_ENV_AUTHORITY is the switch, and it lives in the environment and
+  // nowhere else: a thing the database could say about its own precedence
+  // would be the database deciding that it does not decide. On, a save writes
+  // the setting's own variable - into the running process and into this
+  // instance's .env file - and a reset removes the variable again. The file
+  // these assertions read is the instance's own: the harness gives every run
+  // its own, through DOTENV_CONFIG_PATH, which is the same resolution the
+  // writer uses.
+  const instance = await startInstance({
+    env: {
+      ADMIN_USERNAMES: 'owner',
+      TRYCORD_ENV_AUTHORITY: 'true',
+      TRYCORD_NAME: 'From the deployment',
+    },
+  });
+  t.after(() => instance.stop());
+
+  const owner = await registerUser(instance, 'owner');
+  const readEnvFile = () => fs.readFileSync(instance.envFile, 'utf8');
+
+  await t.test('the catalogue says the environment is in charge', async () => {
+    const res = await owner.get('/api/admin/settings');
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    assert.equal(res.data.envAuthority.enabled, true);
+    assert.equal(res.data.envAuthority.switch, 'TRYCORD_ENV_AUTHORITY');
+
+    const name = res.data.categories
+      .flatMap((category) => category.settings || [])
+      .find((s) => s.key === 'instance.name');
+    assert.ok(name, 'the instance name is not in the catalogue');
+    assert.equal(name.value, 'From the deployment',
+      'the deployment\'s value is not what the catalogue reports');
+    assert.equal(name.source, 'environment');
+    assert.equal(name.writesOnSave, 'deployment environment');
+  });
+
+  await t.test('a save lands in the environment, not in the database', async () => {
+    const res = await owner.put('/api/admin/settings',
+      { 'instance.name': 'Changed in the console' });
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+
+    // The variable is what is now in force: in the process, on the file, and
+    // reported by a catalogue that says where the value came from.
+    assert.equal(process.env.TRYCORD_NAME, 'Changed in the console',
+      'the running process did not pick the value up');
+    assert.ok(readEnvFile().indexOf('TRYCORD_NAME=Changed in the console') !== -1,
+      'the deployment file does not carry the saved value');
+
+    const catalogue = await owner.get('/api/admin/settings');
+    const name = catalogue.data.categories
+      .flatMap((category) => category.settings || [])
+      .find((s) => s.key === 'instance.name');
+    assert.equal(name.value, 'Changed in the console');
+    assert.equal(name.source, 'environment');
+
+    // And the row is not there: authority does not leave a second copy behind
+    // for a later run to resurrect.
+    const db = require(path.join(ROOT, 'src', 'db'));
+    const row = await db.get('SELECT value FROM instance_settings WHERE `key` = ?',
+      ['instance.name']);
+    assert.equal(row, undefined, 'the save also wrote a database row');
+  });
+
+  await t.test('the environment outranks a saved row', async () => {
+    // A value saved under the ordinary precedence - before the switch existed,
+    // say - does not come back to life because the mode did. The row is
+    // inserted directly and the store is forced to re-read, which is a restart
+    // to the running process's eyes.
+    const { now, uuid } = require(path.join(ROOT, 'src', 'clock'));
+    const db = require(path.join(ROOT, 'src', 'db'));
+    await db.run('INSERT INTO instance_settings (`key`, value, updated_at, updated_by) VALUES (?, ?, ?, ?)',
+      ['instance.name', 'Saved in the database', now(), uuid()]);
+
+    const settings = require(path.join(ROOT, 'src', 'services', 'settings'));
+    await settings.load(true);
+
+    const res = await owner.get('/api/admin/settings');
+    const name = res.data.categories
+      .flatMap((category) => category.settings || [])
+      .find((s) => s.key === 'instance.name');
+    assert.equal(name.value, 'Changed in the console',
+      'a database row outranked the environment under its authority');
+    assert.equal(name.source, 'environment');
+  });
+
+  await t.test('a reset removes the variable', async () => {
+    const res = await owner.delete('/api/admin/settings/instance.name');
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+
+    assert.ok(readEnvFile().indexOf('TRYCORD_NAME=') === -1,
+      'the deployment file still carries the variable');
+    assert.equal(process.env.TRYCORD_NAME, undefined,
+      'the running process still holds the variable');
+
+    const catalogue = await owner.get('/api/admin/settings');
+    const name = catalogue.data.categories
+      .flatMap((category) => category.settings || [])
+      .find((s) => s.key === 'instance.name');
+    assert.equal(name.value, 'Trycord', 'the reset did not fall back to the default');
+  });
+
+  await t.test('a secret is never written into the deployment file', async () => {
+    const res = await owner.put('/api/admin/settings', { 'mail.smtpPassword': 'a real credential' });
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+
+    assert.ok(readEnvFile().indexOf('SMTP_PASSWORD') === -1,
+      'the deployment file carries a credential as plaintext');
+
+    const catalogue = await owner.get('/api/admin/settings');
+    const secret = catalogue.data.categories
+      .flatMap((category) => category.settings || [])
+      .find((s) => s.key === 'mail.smtpPassword');
+    assert.equal(secret.set, true, 'the credential was not stored at all');
+    assert.equal(secret.source, 'instance', 'the credential is the instance\'s own, in the vault');
+    assert.equal(secret.writesOnSave, 'encrypted store');
+  });
+});
+
 test('the extension API version is not the application version', async (t) => {
   await t.test('it is declared on its own', () => {
     const version = require(path.join(ROOT, 'src', 'version'));
