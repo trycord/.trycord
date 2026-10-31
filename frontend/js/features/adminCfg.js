@@ -17,7 +17,9 @@ import { mailConsolePanel } from './adminMail.js';
 // numbers stay numbers; everything else is text.
 function settingField(setting, save) {
   const kind = setting.type || 'string';
-  if (kind === 'bool') {
+  // The catalogue's own names for these kinds; the server sends boolean,
+  // integer, url, list, string, secret.
+  if (kind === 'boolean') {
     return switchControl(!!setting.value, async (on) => save({ [setting.key]: on }), setting.label);
   }
   if (kind === 'enum' || (setting.allowed && setting.allowed.length)) {
@@ -26,7 +28,7 @@ function settingField(setting, save) {
     select.value = String(setting.value == null ? '' : setting.value);
     return select;
   }
-  const input = kind === 'number'
+  const input = kind === 'integer'
     ? el('input', {
       class: 'input', type: 'number', value: setting.value == null ? '' : String(setting.value),
       'aria-label': setting.label,
@@ -46,7 +48,7 @@ function controlValue(control, setting) {
     ? control
     : control.querySelector('[data-setting-key]') || control.querySelector('input');
   if (!field) return '';
-  if (setting.type === 'number') {
+  if (setting.type === 'integer') {
     const parsed = parseInt(field.value, 10);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -102,25 +104,36 @@ function ownedRow(setting) {
 function settingRow(setting, onDone) {
   if (setting.canonical) return ownedRow(setting);
   const note = el('p', { class: 'settings-note' }, setting.description || '');
+  // With the environment in authority, a row whose save writes the deployment's
+  // variable says so where the value is typed - the operator reads where a
+  // change lands without opening a page about it.
+  const destination = setting.writesOnSave === 'deployment environment' && setting.env
+    ? el('p', { class: 'settings-note' },
+      'Saving writes ' + setting.env + ' into the deployment environment.')
+    : null;
   const control = settingField(setting, (patch) => save(patch, onDone));
   return el('div', { class: 'settings-item' + (setting.pendingRestart ? ' settings-item--pending' : '') },
     el('div', { class: 'settings-item-main' },
       el('p', { class: 'settings-item-label' }, setting.label,
         setting.source === 'environment' ? el('span', { class: 'chip chip--quiet' }, 'from the environment') : null,
         setting.pendingRestart ? el('span', { class: 'chip chip--warn' }, 'restart to apply') : null),
-      note),
+      note,
+      destination),
     el('div', { class: 'settings-item-control' }, control),
-    (setting.type !== 'bool')
+    (setting.type !== 'boolean')
       ? el('div', { class: 'settings-item-actions' },
         el('button', {
           class: 'btn btn--primary btn--sm', type: 'button',
           'aria-label': 'Save ' + setting.label,
           onClick: () => save({ [setting.key]: controlValue(control, setting) }, onDone),
         }, 'Save'),
-        // A value the operator has changed can be put back to the default the
-        // instance shipped with. The setting is only resettable once it has
-        // been saved here, which is what the source says.
-        setting.source === 'stored'
+        // A value the operator has changed can be put back to whatever the
+        // deployment and the schema say: reset removes the stored row, and with
+        // the environment in authority it removes the setting's variable too.
+        // Either state is resettable once this page can see a value in force -
+        // a saved one, or the one the deployment is keeping - which is what the
+        // destination and the source say.
+        (setting.source === 'instance' || setting.writesOnSave === 'deployment environment')
           ? el('button', {
             class: 'btn btn--ghost btn--sm', type: 'button',
             'aria-label': 'Reset ' + setting.label + ' to its default',
@@ -168,6 +181,38 @@ export function adminConfiguration() {
   const stage = el('div', { class: 'cfg-stage fold fold--tight' });
   let categories = [];
   let current = null;
+  // The deployment's own switch, as the catalogue reported it. Read from the
+  // environment and nowhere else; this page never turns it on or off, because a
+  // control inside the store cannot decide the authority of the store.
+  const layout = el('div', { class: 'cfg-layout' }, nav, stage);
+  const root = fold([
+    head({
+      kicker: 'Instance',
+      title: 'Configuration',
+      lede: 'Instance settings, changed here and applied as they are saved.',
+    }),
+    layout,
+  ]);
+  let bannerShown = false;
+
+  // A save in this mode writes the setting's own environment variable - into
+  // the running process at once and into the instance's .env file, so the
+  // change is live and survives a restart. The one exception is stated where
+  // the operator would otherwise extend the promise: a secret is stored
+  // encrypted, never as plaintext in a file.
+  const showBanner = (info) => {
+    if (bannerShown || !info || !info.enabled) return;
+    bannerShown = true;
+    root.insertBefore(card({
+      label: 'The environment has authority', glyph: 'key',
+      body: fold([
+        el('p', { class: 'lede' },
+          info.switch + ' is set. Every setting that has an environment variable of its own takes its value from the deployment, and a save here writes that variable - into the running process at once and into the instance\'s .env file, so the change survives a restart.'),
+        el('p', { class: 'lede' },
+          'Credentials are the standing exception: a secret saved on this page is stored encrypted, and a secret the deployment set keeps being the deployment\'s to rotate.'),
+      ]),
+    }), layout);
+  };
 
   const paint = () => {
     if (!current) return;
@@ -191,6 +236,7 @@ export function adminConfiguration() {
     try {
       const data = await Api.instanceSettings();
       categories = (data && data.categories) || [];
+      showBanner(data && data.envAuthority);
       const still = current ? categories.find((entry) => entry.id === current.id) : null;
       if (still) {
         current = still;
@@ -211,18 +257,12 @@ export function adminConfiguration() {
   };
 
   return {
-    node: fold([
-      head({
-        kicker: 'Instance',
-        title: 'Configuration',
-        lede: 'Instance settings, changed here and applied as they are saved.',
-      }),
-      el('div', { class: 'cfg-layout' }, nav, stage),
-    ]),
+    node: root,
     onMount: async () => {
       try {
         const data = await Api.instanceSettings();
         categories = (data && data.categories) || [];
+        showBanner(data && data.envAuthority);
         current = null;
         paintNav();
         const first = categories[0];

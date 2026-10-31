@@ -13,6 +13,18 @@
 // secret the deployment set stays the deployment's, because rotating a credential is not
 // an application setting.
 //
+// With TRYCORD_ENV_AUTHORITY set truthy, all of that changes sides: the environment is
+// what is in force for every application setting that has a real environment variable, a
+// save through the console writes that variable - into the running process at once and
+// into the .env file for the next start - and a reset removes the variable again. The
+// switch itself lives in the environment and nowhere else, for the same reason
+// dashboard.mode does: a thing the database could say about its own precedence would be
+// a thing saved in the database claiming the database does not decide. Secrets stay the
+// exception either way: their values belong to the encrypted store, and a deployment
+// that set one as a variable keeps owning it. A setting with no environment variable of
+// its own - the retired keys - has nowhere for the authority to act, so it keeps living
+// in the database exactly as it always did.
+//
 // The store records which source is in force, and the UI shows it next to every value.
 //
 // Secrets are never returned. A secret is stored as a marker, replaced only by an
@@ -31,6 +43,23 @@ const secrets = require('./secrets');
 // the catalogue can report whether one is set without a query per key. Never exposed
 // except through catalogue(), which reports presence only.
 const secretValues = {};
+
+// The switch that puts the environment in charge.
+//
+// TRYCORD_ENV_AUTHORITY, read from the process and from nowhere else. It cannot
+// be a setting in the store it decides the precedence of: a value saved in the
+// database has no place telling the instance that the database does not decide.
+// There is no console control for it, and that is the design, not an omission -
+// the honest answer to "where do I turn this off?" is the deployment file the
+// instance boots from, exactly as with dashboard.mode.
+const AUTHORITY_SWITCH = 'TRYCORD_ENV_AUTHORITY';
+const AUTHORITY_TRUTHY = new Set(['1', 'true', 'on', 'yes']);
+
+function envAuthority() {
+  const raw = process.env[AUTHORITY_SWITCH];
+  if (raw === undefined) return false;
+  return AUTHORITY_TRUTHY.has(String(raw).trim().toLowerCase());
+}
 
 // The interfaces that own settings.
 //
@@ -993,6 +1022,24 @@ async function load(force = false) {
     const fromDb = saved.get(entry.key);
     const fromEnv = envValueOf(entry);
 
+    // The environment in authority: for any setting that has a real environment
+    // variable, the deployment's value is the one in force, whether or not something
+    // was once saved here. An invalid deployment value is reported, not silently
+    // replaced - the same words the seeded path below uses, because a deployment
+    // misconfiguration should be visible rather than papered over.
+    if (envAuthority() && entry.env && fromEnv !== undefined) {
+      const check = validate(entry, fromEnv);
+      if (check.ok) {
+        store.raw[entry.key] = fromEnv;
+        store.values[entry.key] = check.value;
+        store.sources[entry.key] = 'environment';
+        continue;
+      }
+      store.values[entry.key] = entry.default;
+      store.sources[entry.key] = 'default (environment value was invalid)';
+      continue;
+    }
+
     if (fromDb !== undefined) {
       store.raw[entry.key] = fromDb;
       const check = validate(entry, fromDb);
@@ -1253,9 +1300,35 @@ async function save(entries, adminId, options) {
     return { ok: false, problems: ['voice.screenSharing: screen sharing cannot be on while voice is off'] };
   }
 
+  // The environment in authority: split what the batch would do.
+  //
+  // A value with a real environment variable becomes a write into that variable
+  // - into the .env file, and into the running process so a live setting takes
+  // effect at once. A secret does not: the encrypted store is where credentials
+  // belong, either because this console is rotating one or because the
+  // deployment has it, and no credential is ever written as plaintext. A
+  // setting with no variable at all - the retired keys - keeps the database,
+  // which is the only home it has.
+  //
+  // The split exists only when the switch is on. With it off, every write is a
+  // database write exactly as it always was: the guard below still runs, and
+  // nothing of the deployment's - not the file, not even a variable in the
+  // running process - is moved by a save that was never meant to reach that
+  // far. A gate here is not an optimisation; a save that leaks into
+  // process.env survives a test instance and reaches the next one.
+  const inCharge = envAuthority();
+  const envWrites = inCharge
+    ? writes.filter((w) => !w.clear && !SECRETS.has(w.key)
+      && BY_KEY.get(w.key).env != null
+      && !RETIRED_MESH_SETTINGS.has(w.key))
+    : [];
+  const dbWrites = inCharge
+    ? writes.filter((w) => !envWrites.includes(w))
+    : writes.slice();
+
   const conflicts = [];
   await db.transaction(async (t) => {
-    for (const w of writes) {
+    for (const w of dbWrites) {
       // Clearing a secret deletes the row rather than storing an empty string, so
       // "unset" and "set to nothing" cannot mean two different things later.
       if (w.clear) {
@@ -1286,6 +1359,20 @@ async function save(entries, adminId, options) {
       [uuid(), adminId, JSON.stringify(Object.keys(before)), now()]
     );
   });
+
+  // The environment is written after the store has had its say: a conflict
+  // refuses the batch before the file has moved, so a refused save changes
+  // nothing anywhere. A file that cannot be written throws after the database
+  // part was committed, and its message says exactly that - the secrets and the
+  // keys without a variable were stored, the environment was not.
+  if (envWrites.length) {
+    const envfile = require('./envfile');
+    envfile.upsert(envfile.envPath(), envWrites
+      .map((w) => [BY_KEY.get(w.key).env, serialise(w.value)]));
+    for (const w of envWrites) {
+      process.env[BY_KEY.get(w.key).env] = serialise(w.value);
+    }
+  }
 
   await load(true);
 
@@ -1358,6 +1445,17 @@ async function reset(key, adminId, options) {
     const e = new Error(key + ': not changed in ' + CANONICAL_INTERFACES[writer].label);
     e.code = 'LOCKED';
     throw e;
+  }
+
+  // The environment in authority: a reset removes the deployment's value, not
+  // only the instance's. The variable leaves the .env file - so it stays gone
+  // after the next start - and leaves the running process, so the value falls
+  // back at once. Secrets are not touched here: a deployment-owned one was
+  // refused above, and a stored one is cleared by the transaction below.
+  if (envAuthority() && entry.env && !SECRETS.has(key)) {
+    const envfile = require('./envfile');
+    envfile.remove(envfile.envPath(), [entry.env]);
+    delete process.env[entry.env];
   }
 
   await db.transaction(async (t) => {
@@ -1443,6 +1541,14 @@ function describeSetting(s, state) {
         canonicalRoute: canonicalInterface(s.key)
           ? CANONICAL_INTERFACES[canonicalInterface(s.key)].route
           : null,
+        // Where a save lands, in this process's current mode: the deployment
+        // environment when it is in authority and the setting has a variable,
+        // the encrypted store for a secret, the database otherwise. The
+        // interface shows it on the row, so the operator knows where a change
+        // went without reading this file.
+        writesOnSave: SECRETS.has(s.key)
+          ? 'encrypted store'
+          : (envAuthority() && s.env ? 'deployment environment' : 'database'),
       };
     if (!SECRETS.has(s.key)) return base;
     const stored = state[s.key];
@@ -1455,6 +1561,9 @@ function describeSetting(s, state) {
       set: !!stored,
       readable: stored ? secrets.readable('mail:' + s.key, stored) : null,
       source: store.sources[s.key],
+      // A secret's save always lands in the encrypted store, whatever the
+      // deployment's authority over the rest of the configuration says.
+      writesOnSave: 'encrypted store',
       live: !!s.live,
       restartRequired: !s.live,
       pendingRestart: store.pendingRestart.has(s.key),
@@ -1550,6 +1659,7 @@ module.exports = {
   CANONICAL_INTERFACES,
   VOICE_OWNED,
   SCHEMA, CATEGORIES, SECRETS, DEPLOYMENT_ONLY, ownedSettings,
+  AUTHORITY_SWITCH, envAuthority,
   load, get, read, source, save, reset, catalogue, validate, serialise, isLoaded, status,
   secretStored, secretValue,
 };

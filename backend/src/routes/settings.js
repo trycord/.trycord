@@ -22,11 +22,17 @@ router.use(adminGuard);
 // The catalogue is the source of truth for the configuration page - labels, types,
 // bounds, current values, effective sources and editability all come from here rather
 // than being restated in the client, so a setting cannot drift between the two.
+//
+// envAuthority is the deployment's switch, reported so the interface can say where a
+// save lands: TRYCORD_ENV_AUTHORITY set truthy means the environment is what is in
+// force and a save writes the setting's variable. The interface never turns it on or
+// off - it governs the store it would have to be part of to be a setting.
 router.get('/', wrap(async (req, res) => {
   await settings.load();
   res.json({
     categories: settings.catalogue(),
     deploymentOnly: settings.DEPLOYMENT_ONLY,
+    envAuthority: { enabled: settings.envAuthority(), switch: settings.AUTHORITY_SWITCH },
     status: settings.status(),
   });
 }));
@@ -113,6 +119,12 @@ router.put('/', rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req, res) =
     if (e && e.code === 'CONFLICT') {
       return fail(res, 'CONFLICT', e.message, 409);
     }
+    // With the environment in authority, a save also writes the deployment's own file.
+    // A file that cannot be written is reported as exactly that, and the message
+    // carries what it says about which parts landed.
+    if (e && e.code === 'ENV_FILE_UNWRITABLE') {
+      return fail(res, 'ENV_FILE_UNWRITABLE', e.message, 500);
+    }
     throw e;
   }
   if (!result.ok) return fail(res, 'VALIDATION_ERROR', result.problems.join('; '), 400);
@@ -133,6 +145,9 @@ router.delete('/:key', rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req,
   } catch (e) {
     if (e && e.code === 'NOT_FOUND') return fail(res, 'NOT_FOUND', 'unknown setting');
     if (e && e.code === 'LOCKED') return fail(res, 'PERMISSION_DENIED', e.message, 403);
+    if (e && e.code === 'ENV_FILE_UNWRITABLE') {
+      return fail(res, 'ENV_FILE_UNWRITABLE', e.message, 500);
+    }
     throw e;
   }
   res.json({ ok: true, categories: settings.catalogue(), status: settings.status() });
