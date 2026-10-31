@@ -4,7 +4,7 @@
 // and the moderation queue in adminSurfaces.js, the instance infrastrucure in
 // adminInfra.js, and the configuration console - with the mail panel - in
 // adminCfg.js. The registry binds once; the pages stay readable. Around every
-// page the dispatcher draws the studio rail, so the twelve doors are visible
+// page the dispatcher draws the console frame, so the twelve doors are visible
 // from all of them.
 
 import {

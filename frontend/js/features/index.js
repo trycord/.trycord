@@ -124,7 +124,7 @@ export const RENDERERS = {
 
   admin: lazy('./admin.js', 'renderAdmin'),
   'admin.users': lazy('./admin.js', 'renderAdmin'),
-  'admin.approvals': lazy('./admin.js', 'renderAdmin'), // TEMP-CHECK
+  'admin.approvals': lazy('./admin.js', 'renderAdmin'),
   'admin.communities': lazy('./admin.js', 'renderAdmin'),
   'admin.reports': lazy('./admin.js', 'renderAdmin'),
   'admin.appeals': lazy('./admin.js', 'renderAdmin'),

@@ -158,43 +158,152 @@ export function adminOverview() {
 // -- people ------------------------------------------------------------------
 
 export function adminPeople() {
-  const results = el('div', { class: 'rowlist' });
-  const input = el('input', {
+  const list = el('div', { class: 'rowlist' });
+  const search = el('input', {
     class: 'input', type: 'search', placeholder: 'Search an account',
     'aria-label': 'Search accounts by name',
     autocomplete: 'off', spellcheck: 'false',
   });
+  let selected = null;
 
-  const paintRows = async (q) => {
+  const refresh = () => {
+    // The rows and the open case both live off the server's answer, and an
+    // action from either side has to leave both honest.
+    paintRows(search.value.trim());
+    if (selected) setInspector(PERSON_SPEC);
+  };
+
+  const paintRows = async (searchQ) => {
     try {
-      const rows = await Api.adminUsers(q ? { q, limit: '25' } : { limit: '25' });
+      const rows = await Api.adminUsers(searchQ ? { q: searchQ, limit: '25' } : { limit: '25' });
       const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
-      results.replaceChildren(...(items.length ? items.map((u) => row({
+      list.replaceChildren(...(items.length ? items.map((u) => row({
         lead: el('span', { class: 'role-dot' },
           icon(u.enforced ? 'shield-off' : 'user', { size: 15 })),
         title: u.displayName || u.username || 'An account',
-        sub: u.enforced ? 'Enforced: ' + String(u.enforcement || 'unknown') : '@' + (u.username || ''),
+        sub: u.enforced
+          ? 'Enforced: ' + String(u.enforcement || 'unknown')
+          : '@' + (u.username || ''),
         side: el('button', {
           class: 'btn btn--ghost btn--sm', type: 'button',
           'aria-label': 'Actions for the account ' + (u.username || ''),
-          onClick: (event) => userActions(event, u, () => paintRows(input.value.trim())),
+          onClick: (event) => userActions(event, u, refresh),
         }, icon('more', { size: 15 })),
+        onClick: () => {
+          // The row is the record: the list endpoint is the account's only
+          // directory return, so the case reads it from here and the action
+          // history from the account's own endpoint.
+          selected = u;
+          setInspector(PERSON_SPEC);
+        },
         // The same actions, raised by a right-click on the row itself.
-        menu: () => userActionItems(u, () => paintRows(input.value.trim())),
+        menu: () => userActionItems(u, refresh),
       })) : [blank({
         glyph: 'user', title: 'No account by that name',
         text: 'The search reads names and handles; try fewer letters.',
       })]));
     } catch (e) {
-      results.replaceChildren(fold([fault(e, () => paintRows(input.value.trim()))]));
+      list.replaceChildren(fold([fault(e, () => paintRows(search.value.trim()))]));
     }
   };
 
   let timer = null;
-  input.addEventListener('input', () => {
+  search.addEventListener('input', () => {
     if (timer) clearTimeout(timer);
-    timer = setTimeout(() => { timer = null; paintRows(input.value.trim()); }, 240);
+    timer = setTimeout(() => { timer = null; paintRows(search.value.trim()); }, 240);
   });
+
+  // The person: the account's own record, the actions recorded against it,
+  // and the decisions the operator can take from here. Every decision is an
+  // endpoint the server guards, applied once on purpose.
+  const personPanel = () => {
+    const body = el('div', { class: 'fold fold--tight' });
+
+    const paintPerson = async () => {
+      if (!selected) {
+        body.replaceChildren(blank({
+          glyph: 'user',
+          title: 'Pick an account',
+          text: 'The case opens here when you choose one from the list.',
+        }));
+        return;
+      }
+      body.replaceChildren(hold('Opening the case'));
+      try {
+        const history = await Api.adminUserActions(selected.id);
+        const actions = Array.isArray(history) ? history : [];
+
+        const decisions = el('div', { class: 'actionline' },
+          el('button', {
+            class: 'btn btn--default btn--sm', type: 'button',
+            onClick: () => enforceWith(selected, refresh, {
+              kind: 'suspend', duration: '1d', reason: 'Suspended by an administrator',
+            }),
+          }, 'Suspend for one day'),
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button',
+            onClick: () => enforceWith(selected, refresh, {
+              kind: 'suspend', reason: 'Suspended by an administrator',
+            }),
+          }, 'Suspend permanently'),
+          el('button', {
+            class: 'btn btn--ghost btn--sm', type: 'button', danger: true,
+            onClick: () => enforceWith(selected, refresh, { kind: 'ban', reason: 'Banned by an administrator' }),
+          }, 'Ban'),
+          selected.enforced ? el('button', {
+            class: 'btn btn--default btn--sm', type: 'button',
+            onClick: () => lift(selected, refresh),
+          }, 'Lift enforcement') : null);
+
+        body.replaceChildren(
+          facts([
+            { value: selected.enforced ? 'Enforced' : 'Active', label: 'Status' },
+            { value: selected.displayName || selected.username || 'An account', label: 'Account' },
+            { value: selected.username ? '@' + selected.username : '—', label: 'Handle' },
+            { value: selected.enforced ? (selected.enforcement || 'unknown') : '—', label: 'Enforcement' },
+          ]),
+          card({
+            label: 'The record', glyph: 'user',
+            body: el('p', { class: 'lede' },
+              selected.createdAt
+                ? 'Joined ' + String(selected.createdAt).slice(0, 10) + '.'
+                : 'The account has no creation date recorded.'),
+          }),
+          card({
+            label: 'Actions on this account', glyph: 'history',
+            body: actions.length
+              ? el('div', { class: 'rowlist' }, actions.map((a) => row({
+                title: a.actionType || a.action || 'An action',
+                sub: [a.actor_name && 'by ' + a.actor_name,
+                  a.reason,
+                  a.expiresAt && 'expires ' + String(a.expiresAt).slice(0, 10),
+                ].filter(Boolean).join(' · ') || '—',
+                meta: a.createdAt || '',
+              })))
+              : blank({
+                glyph: 'history',
+                title: 'No actions recorded',
+                text: 'An enforcement applied to this account is written down here.',
+              }),
+          }),
+          card({
+            label: 'The decisions', glyph: 'shield',
+            body: decisions,
+          }),
+        );
+      } catch (e) {
+        body.replaceChildren(fold([fault(e, paintPerson)]));
+      }
+    };
+
+    paintPerson();
+    return body;
+  };
+
+  const PERSON_SPEC = {
+    kind: 'admin-people',
+    tabs: [{ id: 'case', label: 'Case', icon: 'user', render: () => personPanel() }],
+  };
 
   return {
     node: fold([
@@ -203,13 +312,10 @@ export function adminPeople() {
         title: 'People',
         lede: 'Search an account, and act on it once on purpose.',
       }),
-      card({
-        label: 'Accounts', glyph: 'users',
-        body: fold([input, results]),
-      }),
+      card({ label: 'Accounts', glyph: 'users', body: fold([search, list]), flush: true }),
     ]),
-    onMount: () => paintRows(''),
-    cleanup() { if (timer) clearTimeout(timer); },
+    onMount: () => { setInspector(PERSON_SPEC); paintRows(''); },
+    cleanup() { setInspector(null); },
   };
 }
 
@@ -679,8 +785,63 @@ export function adminAppeals() {
 
 // -- audit -------------------------------------------------------------------
 
+// One audit entry in a reader's words: who acted, on what, and when. The
+// search narrows what has already been read - the endpoint answers with the
+// latest entries, and a filter over them is never claimed to be the whole
+// log.
 export function adminAudit() {
   const list = el('div', { class: 'rowlist' });
+  const search = el('input', {
+    class: 'input', type: 'search', placeholder: 'Search the log',
+    'aria-label': 'Search audit entries',
+    autocomplete: 'off', spellcheck: 'false',
+  });
+  let rows = [];
+
+  const matches = (entry, needle) => {
+    const hay = [
+      entry.action, entry.actor_name, entry.target_name,
+      entry.target_type, entry.reason,
+    ].map((v) => String(v || '').toLowerCase()).join(' ');
+    return hay.indexOf(needle) !== -1;
+  };
+
+  const paint = () => {
+    const needle = search.value.trim().toLowerCase();
+    const visible = needle ? rows.filter((entry) => matches(entry, needle)) : rows;
+    list.replaceChildren(...(visible.length ? visible.map((a) => row({
+      lead: el('span', { class: 'role-dot' }, icon('book', { size: 15 })),
+      title: a.action || 'An action',
+      sub: (a.actor_name ? 'by ' + a.actor_name : 'an account')
+        + (a.target_type
+          ? ' on ' + String(a.target_type).replace(/_/g, ' ')
+            + (a.target_name || a.target_id ? ' ' + (a.target_name || a.target_id) : '')
+          : ''),
+      meta: a.created_at || a.createdAt || '',
+    })) : [blank({
+      glyph: 'book', title: needle ? 'Nothing in the log matches' : 'Nothing logged yet',
+      text: needle
+        ? 'The search reads actions, actors, targets and reasons over the newest entries.'
+        : 'Administrative actions appear here as they happen.',
+    })]));
+  };
+
+  const load = async () => {
+    list.replaceChildren(hold('Reading the log'));
+    try {
+      const fetched = await Api.adminAudit({ limit: '200' });
+      rows = Array.isArray(fetched) ? fetched : (fetched && fetched.items) || [];
+      paint();
+    } catch (e) {
+      list.replaceChildren(fold([fault(e, load)]));
+    }
+  };
+
+  let timer = null;
+  search.addEventListener('input', () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { timer = null; paint(); }, 200);
+  });
 
   return {
     node: fold([
@@ -689,26 +850,10 @@ export function adminAudit() {
         title: 'Audit log',
         lede: 'Administrative actions, most recent first.',
       }),
-      card({ label: 'Actions', glyph: 'book', body: list, flush: true }),
+      card({ label: 'Actions', glyph: 'book', body: fold([search, list]), flush: true }),
     ]),
-    onMount: async () => {
-      try {
-        const rows = await Api.adminAudit({ limit: '50' });
-        const items = Array.isArray(rows) ? rows : (rows && rows.items) || [];
-        list.replaceChildren(...(items.length ? items.map((a) => row({
-          lead: el('span', { class: 'role-dot' }, icon('book', { size: 15 })),
-          title: a.action || 'An action',
-          sub: (a.actorUsername || '') + (a.target ? ' · ' + a.target : ''),
-          meta: a.createdAt || a.created_at || '',
-        })) : [blank({
-          glyph: 'book', title: 'Nothing logged yet',
-          text: 'Administrative actions appear here as they happen.',
-        })]));
-      } catch (e) {
-        list.replaceChildren(fold([fault(e, null)]));
-      }
-    },
-    cleanup() {},
+    onMount: load,
+    cleanup() { if (timer) clearTimeout(timer); },
   };
 }
 
