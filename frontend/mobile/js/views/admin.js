@@ -98,28 +98,31 @@ function overviewBody() {
 function usersBody() {
   const host = el('div', { class: 'm-stack' });
   const search = el('input', { class: 'm-input', placeholder: 'Search by username', type: 'search', 'aria-label': 'Search people' });
-  const results = el('div', { class: 'm-list' });
-  host.append(search, results);
+  const list = el('div', { class: 'm-list' });
+  host.append(search, list);
   const run = debounce((q) => load(q), 250);
   search.addEventListener('input', () => run(search.value.trim()));
 
   async function load(q) {
-    results.replaceChildren(loading('Searching'));
+    list.replaceChildren(loading('Searching'));
     try {
       const rows = await Api.adminUsers({ q: q || '' });
-      results.replaceChildren();
+      list.replaceChildren();
       if (!rows.length) {
-        results.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'No accounts match.'))));
+        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'No accounts match.'))));
         return;
       }
-      for (const user of rows) results.appendChild(rowFor(user));
+      for (const user of rows) list.appendChild(rowFor(user));
     } catch (error) {
-      results.replaceChildren(failure(error, () => load(q)));
+      list.replaceChildren(failure(error, () => load(q)));
     }
   }
 
   function stateOf(user) {
-    return user.enforcement_state || user.enforcementState || 'active';
+    // The list endpoint answers with a boolean and the kind of enforcement.
+    // A bare `true` is not a state a person reads.
+    if (user.enforced) return String(user.enforcement || user.enforcementState || user.enforcement_state || 'enforced');
+    return 'active';
   }
 
   function rowFor(user) {
@@ -129,13 +132,71 @@ function usersBody() {
       el('span', { class: 'm-row__body' },
         el('span', { class: 'm-row__title truncate' }, name),
         el('span', { class: 'm-row__sub truncate' }, '@' + user.username + ' \u00b7 ' + stateOf(user))),
-      el('span', { class: 'm-row__actions' }, el('button', {
-        class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
-        onClick: () => menuFor(user),
-      }, 'Actions')));
-    // A long press on the account raises the same actions.
-    attachLongPress(row, () => userActions(user), { title: name });
+      el('span', { class: 'm-row__actions' },
+        el('button', {
+          class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
+          onClick: () => openCase(user),
+        }, 'Case')));
+    // A long press on the account raises the same case.
+    attachLongPress(row, () => openCase(user), { title: name });
     return row;
+  }
+
+  // The case: the account as the list answered it, the actions recorded
+  // against it, and the decisions behind one more press. Everything here is
+  // the server's own answer; nothing is inferred from what it did not send.
+  async function openCase(user) {
+    const name = user.display_name || user.displayName || user.username;
+    const history = el('div', { class: 'm-list' });
+    history.appendChild(loading('Reading the actions'));
+    try {
+      const rows = await Api.adminUserActions(user.id);
+      history.replaceChildren();
+      const entries = Array.isArray(rows) ? rows : [];
+      if (!entries.length) {
+        history.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' },
+          el('span', { class: 'm-row__sub' }, 'No actions recorded.'))));
+      }
+      for (const action of entries) {
+        const subParts = [
+          (action.actor_name || action.actorName)
+            ? 'by ' + (action.actor_name || action.actorName) : '',
+          action.reason || '',
+          action.expiresAt ? 'expires ' + String(action.expiresAt).slice(0, 10) : '',
+        ].filter(Boolean).join(' \u00b7 ');
+        history.appendChild(el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__lead' }, icon('clock', { size: 17 })),
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__title truncate' }, String(action.actionType || action.action || 'An action')),
+            el('span', { class: 'm-row__sub truncate' }, subParts || '\u2014')),
+          el('span', { class: 'm-row__actions' }, relativeTime(action.createdAt))));
+      }
+    } catch (error) {
+      history.replaceChildren(failure(error, () => { openCase(user); }));
+    }
+
+    const layer = sheet({
+      title: name || 'An account',
+      body: el('div', { class: 'm-stack' },
+        el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__lead' }, avatar({ id: user.id, username: user.username, displayName: name }, { size: 'md', decorative: true })),
+          el('span', { class: 'm-row__body' },
+            el('span', { class: 'm-row__title' }, '@' + (user.username || '')),
+            el('span', { class: 'm-row__sub' },
+              (user.enforced ? 'Enforced: ' + stateOf(user) : 'Active')
+              + (user.createdAt ? ' \u00b7 joined ' + String(user.createdAt).slice(0, 10) : '')))),
+        group('Actions on this account', history),
+        el('p', { class: 'm-section__note' },
+          user.enforced
+            ? 'This account is under enforcement. Lifting it takes its decision.'
+            : 'An enforcement applied from here is written down in this case.')),
+      footer: el('div', { class: 'm-stack' },
+        el('button', {
+          class: 'm-btn m-btn--block m-btn--ghost', type: 'button',
+          onClick: () => { layer.close(); menuFor(user); },
+        }, 'Take action')),
+    });
+    return layer;
   }
 
   // The actions on an account, one list, raised either way.
@@ -144,6 +205,7 @@ function usersBody() {
       { label: 'Suspend', icon: 'clock', onSelect: () => promptEnforce(user, 'SUSPENSION') },
       { label: 'Ban', icon: 'ban', danger: true, onSelect: () => promptEnforce(user, 'ACCOUNT_BAN') },
       { label: 'Lift enforcement', icon: 'check', onSelect: () => promptLift(user) },
+      { label: 'Approve account', icon: 'check', onSelect: () => promptApprove(user) },
     ];
   }
 
@@ -202,6 +264,23 @@ function usersBody() {
           catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
         },
       }, 'Lift'),
+    });
+  }
+
+  // Approve a registration the instance is holding back. The server refuses
+  // an account that is already approved, and its answer is the truth shown.
+  function promptApprove(user) {
+    confirm({
+      title: 'Approve ' + (user.display_name || user.displayName || user.username || 'this account') + '?',
+      text: 'The account gets full access to this instance.',
+      confirmLabel: 'Approve',
+    }).then(async (yes) => {
+      if (!yes) return;
+      try {
+        await Api.approveUser(user.id);
+        toast('Approved.', { type: 'success' });
+        load(search.value.trim());
+      } catch (error) { toast(error.message, { type: 'danger' }); }
     });
   }
 

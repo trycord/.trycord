@@ -22,8 +22,11 @@ const BADGES = {
   'admin.users': (overview) => (overview && overview.enforcedUsers) || 0,
 };
 
+// Modern hybrid navigation system with desktop and mobile considerations
 export function adminFrame(activeId) {
   const stage = el('div', { class: 'adminframe-stage' });
+  
+  // Desktop navigation rail and mobile top bar
   const nav = el('nav', { class: 'adminframe-nav', 'aria-label': 'Administration sections' });
 
   const masthead = el('header', { class: 'adminframe-head' },
@@ -36,6 +39,7 @@ export function adminFrame(activeId) {
   // disagree; the badges arrive from the overview endpoint when it answers.
   const doors = new Map();
   for (const group of scopeNav('admin')) {
+    // Group labels in desktop view with mobile considerations
     nav.appendChild(el('p', { class: 'adminframe-group' }, group.group));
     for (const item of group.items) {
       const badge = el('span', { class: 'adminframe-badge', hidden: true });
