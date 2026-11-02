@@ -18,7 +18,7 @@ installDomStub();
 const require = createRequire(import.meta.url);
 const server = require(path.join(ROOT, 'backend', 'src', 'ws', 'events.js'));
 
-const { EVENTS, SESSION_EVENTS } = await import('../packages/realtime.js');
+const { EVENTS, SESSION_EVENTS, E2EE_EVENTS, CONTINUUM_EVENTS } = await import('../packages/realtime.js');
 const { State, on, markConversationRead } = await import('../packages/store.js');
 
 test('the client speaks the server\'s vocabulary', () => {
@@ -32,6 +32,16 @@ test('the client speaks the server\'s vocabulary', () => {
     Object.keys(server.SESSION_EVENTS).sort(),
     'the client and the server name their account events differently',
   );
+  assert.deepEqual(
+    Object.keys(E2EE_EVENTS).sort(),
+    Object.keys(server.E2EE_EVENTS).sort(),
+    'the client and the server name their encryption events differently',
+  );
+  assert.deepEqual(
+    Object.keys(CONTINUUM_EVENTS).sort(),
+    Object.keys(server.CONTINUUM_EVENTS).sort(),
+    'the client and the server name their federation events differently',
+  );
 });
 
 test('every event name is the same string on both sides', () => {
@@ -40,6 +50,12 @@ test('every event name is the same string on both sides', () => {
   }
   for (const [key, name] of Object.entries(SESSION_EVENTS)) {
     assert.equal(server.SESSION_EVENTS[key], name, key + ' is spelled differently on the server');
+  }
+  for (const [key, name] of Object.entries(E2EE_EVENTS)) {
+    assert.equal(server.E2EE_EVENTS[key], name, key + ' is spelled differently on the server');
+  }
+  for (const [key, name] of Object.entries(CONTINUUM_EVENTS)) {
+    assert.equal(server.CONTINUUM_EVENTS[key], name, key + ' is spelled differently on the server');
   }
 });
 
@@ -65,6 +81,16 @@ test('both modules answer the pin events', () => {
 test('both modules answer a conversation that was read', () => {
   assert.match(read(path.join(MODULES.desktop, 'main.js')), /onRealtime\(EVENTS\.DM_READ/);
   assert.match(read(path.join(MODULES.mobile, 'main.js')), /onRealtime\(EVENTS\.DM_READ/);
+});
+
+test('both modules answer a conversation key that moved', () => {
+  // The server emits the event; without a handler the reader is never told
+  // that the group a conversation was encrypted to is no longer the group it
+  // is. The surface is shared, so both clients call the same answer.
+  assert.match(read(path.join(MODULES.desktop, 'main.js')),
+    /onRealtime\(E2EE_EVENTS\.KEY_CHANGE[\s\S]*?encrypted\.keyChanged/);
+  assert.match(read(path.join(MODULES.mobile, 'main.js')),
+    /onRealtime\(E2EE_EVENTS\.KEY_CHANGE[\s\S]*?encrypted\.keyChanged/);
 });
 
 test('a conversation read elsewhere loses its unread badge', () => {

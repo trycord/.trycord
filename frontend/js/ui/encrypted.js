@@ -159,6 +159,49 @@ export function knownState(conversationId) {
 }
 
 /**
+ * Drop a conversation's cached encryption state because its key moved.
+ *
+ * The server tells every member device when a conversation key is published
+ * or rekeyed. The cached answer is stale from that moment: a badge that kept
+ * it would keep saying the conversation is encrypted under a group that has
+ * changed, and a screen that watched the cache would not ask again.
+ *
+ * The change is announced rather than only forgotten, so whatever is drawing
+ * the conversation can ask for the new state. A reader is told when the move
+ * was a membership change or a new epoch, because those are the moments the
+ * safety number matters.
+ */
+export function invalidate(conversationId, change) {
+  if (conversationId) state.conversations.delete(conversationId);
+  else state.conversations.clear();
+  announce({ type: 'key-change', conversationId: conversationId || null, change: change || null });
+}
+
+/**
+ * Answer a key-change event from the realtime gateway.
+ *
+ * A prekey publication carries no conversation and needs no warning; the
+ * next conversation state will use the fresh bundle. A membership change or
+ * a new epoch is the case the reader has to see, because the set of devices
+ * that can read the conversation is no longer the set it was.
+ */
+export function keyChanged(event) {
+  const conversationId = event && (event.conversationId || event.conversation_id);
+  // A prekey publication carries no conversation. It changes the bundle the
+  // next session will use, not the key of a conversation already open, so
+  // there is no cached answer to drop.
+  if (!conversationId) return;
+  invalidate(conversationId, event);
+  const membership = event.action === 'membership-changed';
+  const rekeyed = event.changed === true;
+  if (!membership && !rekeyed) return;
+  toast(
+    'The encryption key for this conversation changed. Check the safety number with the people in it before sending anything sensitive.',
+    { type: 'brand', timeout: 12000 },
+  );
+}
+
+/**
  * Send a message into a conversation.
  *
  * The composer hands over the message and the function that posts it. When
