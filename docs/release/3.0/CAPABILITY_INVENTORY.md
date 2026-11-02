@@ -8,7 +8,7 @@ today. The statuses are the only ones that mean something:
 - **Blocked** — cannot be completed here, with the reason stated.
 - **Not started** — not attempted.
 
-Last updated: 2026-10-19, branch `release/3.0.0`.
+Last updated: 2026-11-03, branch `main`.
 
 ## 3.1 Application foundation
 
@@ -64,7 +64,7 @@ Last updated: 2026-10-19, branch `release/3.0.0`.
 | Encrypted attachments | Verified | The file is encrypted in the browser, its key is sealed to each member device, and the server is handed the ciphertext and the seals - which it cannot open. The server refuses a body that carries a key in the clear |
 | The device store | Verified | Namespaced per instance **and per account**: the private keys of one instance are not the private keys of another, and two people sharing a browser must not present the first one's device to the second one's account |
 | Encrypted backups and recovery | Verified | `e2ee_backups`, `recovery.js`; a recovered device must present a new identity |
-| Key-change warnings | Partial | The server emits `e2ee:key-change`; the client half is not written |
+| Key-change warnings | Verified | The server emits `e2ee:key-change`; both clients answer it. A membership change or a new epoch drops the cached conversation state and warns the reader to check the safety number. A prekey publication carries no conversation and is left to the next read. `frontend/tests/e2ee/key-change.test.js` and `frontend/tests/realtime.test.js` |
 | Multi-device synchronisation | Partial | The protocol supports it; no client uses it yet |
 | Safe migration from unencrypted conversations | Not started | Deliberate: a conversation that was not encrypted cannot be made so without saying so |
 | Explicit encrypted / unencrypted state | Verified | `status.js` reports `encrypted`, `not-encrypted`, `mixed`, `key-changed` per conversation |
@@ -456,7 +456,7 @@ Shareable theme packages and a registry integration are **not started**.
 
 ## 3.25 Public website — Verified
 
-52 tests: the resolver, the link checker, the well-formedness check, the legal
+61 tests: the resolver, the link checker, the well-formedness check, the legal
 content rules, the demo's honesty, and the accessibility checks. The four
 cross-origin defects that made the demo unable to reach the instance are fixed
 and covered.
@@ -515,7 +515,10 @@ uptime percentage, because nothing computes one.
 
 The strings are in one place per module and the accessibility work is real
 (focus traps, labels, roles, live regions, reduced motion, contrast, 44px
-touch targets on the phone).
+touch targets on the phone). A route change now moves focus to the new page's
+heading, the phone names the document for the screen it is on and traps focus
+in its communities dialog, and the small badge on the brand fill uses the
+darker fill and its chosen ink instead of white on the raw accent.
 
 The **localisation architecture** has a backend: a locale the instance
 answers in, versioned packs that provide it, a reader's own preference, and

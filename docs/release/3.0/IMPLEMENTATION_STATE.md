@@ -3,7 +3,7 @@
 Where the work actually is, what is running, and what is blocking what. This
 is the file to read first when picking the work up again.
 
-Last updated: 2026-10-20, on branch `release/3.0.0`.
+Last updated: 2026-11-03, on branch `main`.
 
 ## Where the release stands
 
@@ -58,6 +58,24 @@ because a form was built, wired and never put on the page. The console has
 twelve sections now, each of which draws something — and that is now a test,
 because the check that would have caught it was missing. The audit is in
 `COMMUNITY_SETTINGS.md`.
+
+**What the encryption client work changed.** The browser half of TCE2E-v1 is
+implemented in `frontend/packages/e2ee/` and wired into both clients: the
+device lifecycle, the safety number, the key backup and recovery, encrypted
+attachments, group keys, the composer and the timeline. The server still holds
+only public keys, sealed blobs and counters. Both clients now answer the
+server's `e2ee:key-change` event: a membership change or a new epoch drops the
+cached conversation state and warns the reader to check the safety number, and
+a prekey publication is left to the next read. Encryption is still turned on
+per conversation by the reader, and the independent review remains blocked, so
+nothing here claims E2EE is secure in the release-gate sense.
+
+**What the accessibility work changed.** A client-side route change now moves
+focus to the new page's heading, so a screen reader announces where the reader
+arrived; a page that focused its own field keeps it. The phone now names the
+document for the screen it is on, focuses the screen heading, and traps Tab in
+its communities dialog. The admin badge and the phone's offline banner use the
+ink chosen for their fills rather than white on the raw accent.
 
 ## What is running
 
@@ -175,23 +193,27 @@ behaviour after the fix is unverified until the deployment is updated.
 
 ## The next actions, in order
 
-1. **The client half of the encryption.** The protocol, the API and the
-   device lifecycle are complete and tested, and the **server** now stores an
-   envelope and never the plaintext in a conversation it reports as
-   encrypted — the socket path refuses what the HTTP path refuses, and a bot
-   or a workflow cannot write in the clear into one. The client is the half
-   that encrypts, and it is the last thing between "E2EE is implemented" and
-   "E2EE is on".
-2. **Both dashboard modes under a real deployment**, not only under the
-   test harness.
-3. **The accessibility and performance passes.** The security, licensing and
-   performance reviews are written (`docs/audit/`); the two critical defects
-   they found are fixed. The accessibility pass over the whole interface, and
-   a performance pass over the parts the measurement did not cover, are not
-   done.
-4. **The client for the federation moderation surface** — the owner's view of
-   what a remote member wrote, and the writer's view of what the owner
-   decided. The API is there; the interface is not.
+1. **The independent cryptographic review and the native builds.** Neither can
+   be completed in this environment: there is no third-party reviewer here and
+   no Android SDK, JDK, Gradle, Xcode or macOS. The source is written and
+   internally checked; the release gate is not satisfied.
+2. **Both dashboard modes under a real deployment**, not only under the test
+   harness.
+3. **The performance pass, and the rest of the accessibility pass.** The first
+   accessibility pass is in: route changes are announced, the phone names the
+   document and traps focus in its communities dialog, and the contrast
+   failures found by reading the styles were fixed. A whole-interface audit
+   with a browser and a screen reader is still unverified, and the performance
+   pass over the parts the measurement did not cover is not done.
+4. **The remaining realtime events.** The key-change event is answered. The
+   other two encryption events (`e2ee:device`, `e2ee:safety-number`) and the
+   three Continuum relay events (`continuum:relay-message`,
+   `continuum:relay-reaction`, `continuum:relay-outgoing`) are in the client's
+   vocabulary but have no handlers, so the settings and federation screens
+   still wait for the next open rather than refreshing in place.
+5. **The Cloudflare deploy**, from a machine with the credentials. The tree is
+   built, verified and committed; `npx wrangler deploy` is the step that has
+   not run here.
 
 ## What is done
 
@@ -204,10 +226,16 @@ public website and its legal documents, the hybrid page editor, the provider
 registry, the incident timeline, the localisation packs, the theme packages,
 and the federation relay in both directions.
 
-The verification suite is 544 backend tests, 207 client tests and 57 public
-site tests - 808 in all, all green - and it runs in about half a minute.
+The verification suite is 911 backend tests (892 pass, 19 fail on voice
+reachability), 618 client tests and 61 public site tests. The 19 backend
+failures are the `VOICE_PROVIDER_UNREACHABLE` family; they fail identically at
+HEAD and are not caused by the client work. The client and public suites are
+green. The backend run is slow because every integration file boots its own
+instance; the client suite is about a minute.
 
 ## Uncommitted work
 
-The tree is committed. The client half of the encryption is the work in
-flight.
+The tree is committed. What remains is the independent cryptographic review,
+the native builds and the deployment credentials - none of which can be
+completed in this environment. The client-side gaps that can be worked on here
+are listed in the next actions above.

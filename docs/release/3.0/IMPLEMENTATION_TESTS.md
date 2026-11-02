@@ -3,7 +3,7 @@
 The commands that were run, and what they actually said. A command that was
 not run is not listed as passing.
 
-Last updated: 2026-10-20, branch `release/3.0.0`.
+Last updated: 2026-11-03, branch `main`.
 
 ## The suite
 
@@ -23,26 +23,26 @@ directory form works there too.
 
 | Command | Result |
 |---|---|
-| `cd backend && node --test "tests/**/*.test.js"` | **697 tests, 697 pass, 0 fail** |
+| `cd backend && node --test "tests/**/*.test.js"` | **911 tests, 892 pass, 19 fail** — the 19 failures are the `VOICE_PROVIDER_UNREACHABLE` family, all in `tests/voice/`; they fail identically at HEAD |
 | `cd backend && node --test "tests/e2ee/*.test.js"` | 64 tests, 64 pass |
-| `cd backend && node --test "tests/continuum/*.test.js"` | 53 tests, 53 pass — the relay, in **both** directions between two independently running instances |
-| `cd backend && node --test "tests/workspace/*.test.js"` | 40 tests, 40 pass |
-| `cd backend && node --test "tests/developer/*.test.js"` | 38 tests, 38 pass |
+| `cd backend && node --test "tests/continuum/*.test.js"` | 55 tests, 55 pass — the relay, in **both** directions between two independently running instances |
+| `cd backend && node --test "tests/workspace/*.test.js"` | 61 tests, 61 pass |
+| `cd backend && node --test "tests/developer/*.test.js"` | 66 tests, 66 pass |
 | `cd backend && node --test "tests/dashboard/*.test.js"` | 43 tests, 43 pass |
 | `cd backend && node --test "tests/extensions/*.test.js"` | 51 tests, 51 pass — the lifecycle, the registry, the sandbox and the capability catalogue |
 | `cd backend && node --test "tests/workflows/*.test.js"` | 13 tests, 13 pass |
-| `cd backend && node --test "tests/pages/*.test.js"` | 35 tests, 35 pass |
+| `cd backend && node --test "tests/pages/*.test.js"` | 41 tests, 41 pass |
 | `cd backend && node --test "tests/localisation/*.test.js"` | 15 tests, 15 pass |
 | `cd backend && node --test "tests/themes/*.test.js"` | 11 tests, 11 pass |
 | `cd backend && node --test "tests/reports/*.test.js"` | 20 tests, 20 pass |
-| `cd backend && node --test "tests/search/*.test.js"` | 19 tests, 19 pass |
+| `cd backend && node --test "tests/search/*.test.js"` | 24 tests, 24 pass |
 | `cd backend && node --test "tests/personal/*.test.js"` | 17 tests, 17 pass |
-| `cd backend && node --test "tests/voice/*.test.js"` | 25 tests, 25 pass — the three media providers |
+| `cd backend && node --test "tests/voice/*.test.js"` | 75 tests, 56 pass, 19 fail — the three media providers. The failures are `VOICE_PROVIDER_UNREACHABLE`: the sandbox answers the binding request but the address handed to clients is not reachable. The same failures exist at HEAD |
 | `cd backend && node --test "tests/security-3.0/*.test.js"` | 34 tests, 34 pass — the review's nine findings, one regression file each |
-| `cd backend && node --test "tests/integration/*.test.js"` | 146 tests, 146 pass |
+| `cd backend && node --test "tests/integration/*.test.js"` | 280 tests, 280 pass |
 | `cd backend && node --test tests/integration/auth.test.js` | 13 tests, 13 pass |
 | `cd backend && node --test tests/integration/community.test.js` | 19 tests, 19 pass |
-| `cd backend && node --test tests/integration/migrations.test.js` | 10 tests, 10 pass |
+| `cd backend && node --test tests/integration/migrations.test.js` | 11 tests, 11 pass |
 | `cd backend && node --test tests/integration/schema.test.js` | 7 tests, 7 pass — the portability guard |
 | `cd backend && node --test tests/integration/lifecycle.test.js` | 4 tests, 4 pass |
 | `cd backend && node --test tests/integration/push.test.js` | 9 tests, 9 pass |
@@ -52,9 +52,10 @@ directory form works there too.
 | `cd backend && node --test tests/integration/providers.test.js` | 13 tests, 13 pass |
 | `cd backend && node --test tests/integration/module-graph.test.js` | 5 tests, 5 pass — every route and service module loads |
 | `cd backend && node --test tests/integration/schema-parity.test.js` | 5 tests, 5 pass — the SQLite and MySQL change lists say the same thing |
-| `cd frontend && node --test "tests/**/*.test.js"` | **496 tests, 496 pass** — including the accessibility audit, the community-settings parity check and every console |
-| `cd frontend && node --test tests/` | 473 tests, 473 pass — the same checks in one process, which is how the documented command runs them |
-| `cd public && node --test "tests/**/*.test.js"` | 57 tests, 57 pass — the instance directory is one of the pages they check |
+| `cd frontend && node --test "tests/**/*.test.js"` | **618 tests, 618 pass** — including the accessibility audit, the route-announcement checks, the community-settings parity check and every console |
+| `cd frontend && node --test "tests/e2ee/*.test.js"` | 88 tests, 88 pass — the protocol, the device lifecycle, sending, rendering, recovery and the key-change answer |
+| `cd frontend && node --test "tests/e2ee-mobile/*.test.js"` | 22 tests, 22 pass — the phone's device, backup, recovery and safety-number surfaces |
+| `cd public && node --test "tests/**/*.test.js"` | 61 tests, 61 pass — the instance directory is one of the pages they check |
 | `node native/scripts/check-native.mjs` | 6 JSON files parsed, 91 source files scanned, 290 relative imports resolved, 0 problems |
 | `cd backend && node --test tests/integration/fresh-install.test.js` | 10 tests, 10 pass — a first install, on a database that did not exist |
 | `cd backend && npm run css` | the stylesheets are up to date |
@@ -101,10 +102,10 @@ The directive names twenty-eight. These are the ones with a test behind them.
 | 11 | Create or join a community | `community.test.js` |
 | 12 | Exercise roles and permissions | `community.test.js` — a role grants one permission and not another |
 | 13 | Send and receive persisted messages | `community.test.js` — order is the order they were posted in |
-| 14 | Verify realtime delivery | `frontend/tests/realtime.test.js` — the client's vocabulary is compared with the server's own file |
+| 14 | Verify realtime delivery | `frontend/tests/realtime.test.js` — the client's vocabulary is compared with the server's own file, including the E2EE and Continuum events. A key-change event drops the cached conversation state, warns on a membership change or a new epoch, and is wired in both clients |
 | 15 | Reconnect after disconnection | `frontend/tests/realtime.test.js` |
 | 16 | Exchange messages between separate users | `community.test.js` |
-| 17 | Exercise eligible E2EE flows | `tests/e2ee/` — 64 tests, and `frontend/tests/e2ee/` — 85. The **server** stores an envelope and never the plaintext in a conversation it reports as encrypted, the socket path refuses what the HTTP path refuses, and the **client** encrypts, opens, renders and refuses to fall back. A message the client encrypts opens with the server's ratchet, the two ratchets keep the same state object, and the associated data is the same bytes on both sides. A file in an encrypted conversation is encrypted in the browser and its key is sealed to each member device |
+| 17 | Exercise eligible E2EE flows | `tests/e2ee/` — 64 tests, `frontend/tests/e2ee/` — 88, and `frontend/tests/e2ee-mobile/` — 22. The **server** stores an envelope and never the plaintext in a conversation it reports as encrypted, the socket path refuses what the HTTP path refuses, and the **client** encrypts, opens, renders and refuses to fall back. A message the client encrypts opens with the server's ratchet, the two ratchets keep the same state object, and the associated data is the same bytes on both sides. A file in an encrypted conversation is encrypted in the browser and its key is sealed to each member device |
 | 18 | Verify device changes and recovery | `tests/e2ee/api.test.js` — revocation, recovery, and the refusal to reuse a lost identity |
 | 19 | Connect two independent federated instances | `tests/continuum/relay.test.js` — two instances, separate databases, separate keys, separate ports, peered through the real administration routes |
 | 20 | Verify cross-instance permissions and delivery | The same test: a private community, a restricted channel, a pending peer and a blocked peer each produce nothing |
@@ -134,3 +135,8 @@ The directive names twenty-eight. These are the ones with a test behind them.
 - **No deployed-browser check of the demo.** The cross-origin defects were
   found by reading the code and are fixed with tests; the deployed behaviour
   after the fix was checked over HTTP, not in a browser.
+- **No reachable voice relay in this sandbox.** The 19 voice tests that fail
+  do so with `VOICE_PROVIDER_UNREACHABLE`: a binding request is answered, but
+  the address the service hands to clients is not reachable from the test
+  process. The same 19 fail at HEAD, and no voice code was changed by the
+  client work.
