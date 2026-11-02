@@ -82,6 +82,10 @@
   --m-brand-soft: rgba(255, 77, 36, .13);
   --m-brand-ink: #FFFFFF;
   --m-danger: #F87171;
+  /* The offline banner puts text on the danger fill. In the dark palette the
+     fill is a light red, so the ink is the page's charcoal; in the light
+     palette it is white. */
+  --m-danger-ink: #13100C;
   --m-success: #4ADE9B;
   --m-warning: #FBBF67;
   --m-info: #7CB2FF;
@@ -96,6 +100,7 @@
   --m-brand-line: rgba(226, 63, 23, .35);
   --m-brand-soft: rgba(226, 63, 23, .10);
   --m-danger: #C0392B;
+  --m-danger-ink: #FFFFFF;
   --m-success: #15803D;
   --m-warning: #B45309;
   --m-info: #1D4ED8;
@@ -500,7 +505,7 @@ a:hover { text-decoration: underline; }
   color: #241a06;
   font-weight: var(--weight-medium);
 }
-.m-banner[data-state="offline"] { background: var(--m-danger); color: #fff; }
+.m-banner[data-state="offline"] { background: var(--m-danger); color: var(--m-danger-ink); }
 .m-banner .dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: currentColor;

@@ -271,6 +271,38 @@ test('accessibility of the client', async (t) => {
       'the phone\'s sheet manages focus');
   });
 
+  await t.test('the phone\'s communities dialog keeps the keyboard inside it', () => {
+    // The rail is a dialog drawn over the screen. It has to say it is modal,
+    // and Tab has to stay in it until it is closed; otherwise focus lands on
+    // the page the overlay is covering, where the reader cannot see it.
+    const mobile = fs.readFileSync(path.join(FRONTEND, 'mobile', 'js', 'shell.js'), 'utf8');
+    assert.match(mobile, /role: 'dialog'[\s\S]*?aria-modal['"]?\s*:\s*'true'/,
+      'the rail dialog does not announce that it is modal');
+    assert.match(mobile, /event\.key !== 'Tab'/,
+      'the rail dialog does not answer the Tab key');
+    assert.match(mobile, /railPanel\.contains\(document\.activeElement\)/,
+      'the rail dialog does not check where focus is before wrapping');
+  });
+
+  await t.test('a filled control uses the ink chosen for its fill', () => {
+    // White on the raw ember accent is about 3.3:1, which is not enough for
+    // the small badge in the admin frame. The fill is the darker brand step,
+    // and the ink is the one chosen for it. The phone's offline banner is the
+    // same question in the other direction: the dark palette's danger is a
+    // light red, so its ink is charcoal rather than white.
+    const features = fs.readFileSync(path.join(FRONTEND, 'css', 'features.css'), 'utf8');
+    assert.match(features,
+      /\.adminframe-badge\s*\{[^}]*background: var\(--brand-fill\)[^}]*color: var\(--brand-ink\)/s,
+      'the admin badge puts white on the raw accent');
+
+    const mobileCss = fs.readFileSync(path.join(FRONTEND, 'mobile', 'css', 'mobile.css'), 'utf8');
+    assert.match(mobileCss, /--m-danger-ink:/,
+      'the phone has no ink for the danger fill');
+    assert.match(mobileCss,
+      /\.m-banner\[data-state="offline"\]\s*\{[^}]*color: var\(--m-danger-ink\)/s,
+      'the offline banner puts a fixed white on the danger fill');
+  });
+
   await t.test('the live region a reader needs is announced', () => {
     // The status line and the connection indicator are the two places the
     // client tells a reader something happened without moving the focus.

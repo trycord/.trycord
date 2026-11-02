@@ -204,6 +204,38 @@ export function setStage(node) {
   frame.stageBody.scrollTop = 0;
 }
 
+/**
+ * Move the reader to the page that just replaced the stage.
+ *
+ * A client-side route change does not reload the document, so nothing tells a
+ * screen reader that the page changed. The heading is the page's own name; if
+ * there is one, focus it so it is read, and fall back to the stage container.
+ * `preventScroll` keeps the reading position at the top the router just set.
+ *
+ * The heading is given `tabindex="-1"` so it can receive focus without joining
+ * the tab order. It is left there: a heading that is programmatically
+ * focusable is not a control, and removing the attribute on blur would only
+ * have to put it back on the next route.
+ */
+export function focusStage() {
+  const root = document.querySelector('#view-root');
+  if (!root) return false;
+  // If the page itself has already put focus inside it - the search field, the
+  // first input of a form - that is a better landing place than the heading.
+  // Only a focus that is still on the old chrome, or nowhere, is moved.
+  if (document.activeElement && document.activeElement !== document.body
+    && root.contains(document.activeElement)) return true;
+  const heading = root.querySelector('h1');
+  const target = heading || root;
+  if (heading && !heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+  try {
+    target.focus({ preventScroll: true });
+  } catch {
+    try { target.focus(); } catch { return false; }
+  }
+  return true;
+}
+
 export function setComposer(node) {
   const frame = refs.frame;
   if (!frame) return;

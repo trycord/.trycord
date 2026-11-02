@@ -52,7 +52,10 @@ export function mountShell() {
 
   // The narrow phone's rail, as an overlay. It is the same list the wide
   // phone draws as a column: one rail, two presentations.
-  const railPanel = el('div', { class: 'm-railoverlay__panel', role: 'dialog', 'aria-label': 'Your communities', tabindex: '-1' });
+  const railPanel = el('div', {
+    class: 'm-railoverlay__panel', role: 'dialog', 'aria-modal': 'true',
+    'aria-label': 'Your communities', tabindex: '-1',
+  });
   const railOverlay = el('div', { class: 'm-railoverlay', hidden: true },
     el('button', {
       class: 'm-railoverlay__backdrop', type: 'button', tabindex: '-1',
@@ -72,7 +75,33 @@ export function mountShell() {
   // listens for Escape; close returns focus to the button that opened it.
   let railOpen = false;
   const onKeydown = (event) => {
-    if (event.key === 'Escape' && railOpen) toggleRailOverlay();
+    if (!railOpen) return;
+    if (event.key === 'Escape') { toggleRailOverlay(); return; }
+    if (event.key !== 'Tab') return;
+    // The rail is a dialog over the screen, so Tab stays inside it until it is
+    // closed. Without this a reader tabs out of the communities and into the
+    // page the overlay is covering, where they cannot see the focus.
+    const focusables = Array.from(railPanel.querySelectorAll(
+      'a[href], button, input, select, textarea, [tabindex]',
+    )).filter((node) => !node.disabled && node.getAttribute('tabindex') !== '-1');
+    if (!focusables.length) {
+      event.preventDefault();
+      railPanel.focus();
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (!railPanel.contains(document.activeElement)) {
+      event.preventDefault();
+      first.focus();
+    } else if (event.shiftKey
+      && (document.activeElement === first || document.activeElement === railPanel)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   };
   if (typeof window !== 'undefined' && window.addEventListener) {
     window.addEventListener('keydown', onKeydown);
@@ -128,9 +157,17 @@ export function mountShell() {
 export function shellRoot() { return refs && refs.root; }
 export function viewHost() { return refs && refs.view; }
 
+/** The document's own name for the screen it is showing. */
+export function setTitle(text) {
+  try {
+    document.title = text ? text + ' - Trycord' : 'Trycord';
+  } catch { /* no document */ }
+}
+
 export function setAppBar(head) {
   if (!refs) return;
   const h = head || {};
+  setTitle(h.title || '');
   refs.lead.replaceChildren();
   if (h.lead === undefined || h.lead === 'brand') {
     // The monogram's address and box are packages/brand.js's business; the link
@@ -163,9 +200,18 @@ export function setView(node) {
   refs.view.replaceChildren();
   if (node) refs.view.appendChild(node);
   refs.view.scrollTop = 0;
+  if (!node) return;
   // Move the reader's focus to the new screen so it is announced instead of the
-  // tab that was just tapped.
-  refs.view.focus({ preventScroll: true });
+  // tab that was just tapped. The screen's own heading is the best name for it;
+  // a screen without one falls back to the view container.
+  const heading = refs.view.querySelector('h1');
+  const target = heading || refs.view;
+  if (heading && !heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+  try {
+    target.focus({ preventScroll: true });
+  } catch {
+    try { target.focus(); } catch { /* nothing to focus */ }
+  }
 }
 
 export function setComposer(node) {

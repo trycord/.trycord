@@ -15,7 +15,7 @@ import {
 } from '../packages/store.js';
 import {
   shellRoot, setStage, setStageHead, setComposer, setInspector, setContextPage,
-  setTitle, refreshChrome,
+  setTitle, refreshChrome, focusStage,
 } from './shell.js';
 import { fault, blank } from './ui/page.js';
 import { renderNotFound } from './features/documents.js';
@@ -23,6 +23,17 @@ import { renderNotFound } from './features/documents.js';
 let activeCleanup = null;
 let rawNode = null;
 let generation = 0;
+
+// The first paint is the document the reader asked for; the browser has already
+// put them there. Every paint after it is a move inside the client, and a move
+// has to be announced or a screen-reader reader is left on the link they used
+// while the page under them changed.
+let paintedOnce = false;
+
+function announceRoute() {
+  if (paintedOnce) focusStage();
+  paintedOnce = true;
+}
 
 function host() {
   return document.getElementById('app');
@@ -76,6 +87,7 @@ function paintNotFound(route) {
   setTitle('Not found');
   setRoute(route);
   refreshChrome();
+  announceRoute();
 }
 
 // A fault is never allowed to blank the place column: the reader is still
@@ -139,6 +151,7 @@ function paintError(route, error, ctx, page) {
   setInspector(null);
   setTitle('This page did not open');
   setRoute(route);
+  announceRoute();
 }
 
 function paint(result, page, route) {
@@ -316,6 +329,13 @@ export async function run() {
       }
     }
   }
+  if (seq !== generation) return;
+
+  // A raw page (a gate or a public document) owns its own focus: the sign-in
+  // screen puts it in the first field. A page in the shell is announced here,
+  // after its mount has finished adding anything it adds.
+  if (mounted) announceRoute();
+  else paintedOnce = true;
 }
 
 export default { run };
