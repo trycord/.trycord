@@ -20,6 +20,7 @@ import { CLIENT, MODULES, read } from './helpers/source.js';
 installDomStub();
 
 const { renderAuth } = await import('../js/features/auth.js');
+const { passwordStrength } = await import('../packages/authwords.js');
 const { State } = await import('../packages/store.js');
 const registry = await import('../packages/registry.js');
 const TrycordConfig = (await import('../packages/config.js')).default;
@@ -324,4 +325,65 @@ test('an approval-gated instance shows the waiting screen, not a workspace that 
   State.legal = null;
 });
 
+// -- the password field -------------------------------------------------------
 
+test('the strength reading is a guide with honest edges', () => {
+  assert.equal(passwordStrength('').score, 0, 'an empty field is not a password');
+  assert.equal(passwordStrength('short').label, 'Too short');
+  assert.equal(passwordStrength('x'.repeat(73)).label, 'Too long',
+    'a phrase the server cannot store is not reported as strong');
+  assert.ok(passwordStrength('correct horse battery staple').score >= 3,
+    'a long passphrase is not read as strong');
+  assert.ok(passwordStrength('Passw0rd!').score >= 2,
+    'a mixed short phrase is not read above weak');
+});
+
+test('the registration password can be revealed without losing the field', () => {
+  const result = gateFor('register');
+  const form = result.node.querySelector('form');
+  const password = form.querySelector('input[name="password"]');
+  const toggle = form.querySelector('.password-toggle');
+  assert.ok(password, 'the registration has no password field');
+  assert.ok(toggle, 'the password cannot be revealed');
+
+  assert.equal(password.getAttribute('type'), 'password');
+  assert.equal(toggle.textContent, 'Show');
+  toggle.dispatch('click');
+  assert.equal(password.getAttribute('type'), 'text', 'the reveal did not change the field');
+  assert.equal(toggle.textContent, 'Hide');
+  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+  toggle.dispatch('click');
+  assert.equal(password.getAttribute('type'), 'password', 'the field did not hide again');
+});
+
+test('the registration meter follows the phrase and the confirmation', () => {
+  const result = gateFor('register');
+  const form = result.node.querySelector('form');
+  const password = form.querySelector('input[name="password"]');
+  const confirm = form.querySelector('input[name="confirm"]');
+  const meter = form.querySelector('.password-meter');
+
+  assert.ok(meter, 'the registration has no strength reading');
+  assert.equal(meter.hidden, true, 'the empty meter is shown');
+
+  password.value = 'correct horse battery staple';
+  password.dispatch('input');
+  assert.equal(meter.hidden, false, 'the meter stayed hidden with a phrase typed');
+  assert.ok(Number(meter.dataset.score) >= 3, 'a long passphrase did not move the meter');
+  assert.match(String(meter.textContent), /Strong|Good/);
+
+  confirm.value = 'correct horse';
+  confirm.dispatch('input');
+  assert.equal(confirm.getAttribute('aria-invalid'), 'true',
+    'a mismatch was not marked while typing');
+  confirm.value = 'correct horse battery staple';
+  confirm.dispatch('input');
+  assert.equal(confirm.getAttribute('aria-invalid'), 'false',
+    'a match was still marked invalid');
+});
+
+test('the sign-in form asks the browser to remember the name it knows', () => {
+  const source = read(path.join(MODULES.desktop, 'features', 'auth.js'));
+  assert.match(source, /input\('username', \{ autocomplete: 'username' \}\)/,
+    'the sign-in name is not offered to the password manager');
+});

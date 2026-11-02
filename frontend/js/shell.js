@@ -18,7 +18,7 @@ import { icon } from '../packages/icons.js';
 import { avatar, countBadge, serverMark } from './ui/primitives.js';
 import { State, nameOf, on as onStore } from '../packages/store.js';
 import { path, currentRoute, navigate, BASE } from '../packages/nav.js';
-import { openMenu, attachContextMenu, isOverlayOpen, isMenuOpen, closeTopOverlay } from './ui/overlays.js';
+import { openMenu, attachContextMenu, isOverlayOpen, isMenuOpen, closeTopOverlay, confirmDialog } from './ui/overlays.js';
 import { buildContext, serverMenuItems } from './shell/context.js';
 import {
   buildFrame, attachColumnResize, brandMark,
@@ -452,7 +452,17 @@ export function onSignOut(handler) {
 }
 
 function requestSignOut() {
-  if (signOutHandler) signOutHandler();
+  if (!signOutHandler) return;
+  // A sign-out is one press away in a menu, and the press is easy to make by
+  // accident. The confirmation says what ends (this session) and what does
+  // not (the account and its messages).
+  confirmDialog({
+    title: 'Sign out of Trycord?',
+    body: 'This session ends on this device. Your account and its messages stay on the instance.',
+    confirmLabel: 'Sign out',
+    cancelLabel: 'Stay signed in',
+    danger: true,
+  }).then((yes) => { if (yes) signOutHandler(); });
 }
 
 // ---- repaint on state change -----------------------------------------------

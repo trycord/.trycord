@@ -18,7 +18,7 @@ import { State, applyToken, loadLegal, loadSession, logout, refreshServers } fro
 import { withLegalVersions, isStaleLegalError } from '../../packages/legal.js';
 import { connect } from '../../packages/realtime.js';
 import { toast } from '../ui/overlays.js';
-import { waitPhrase, passwordIsOverTheCeiling, signInRefusalWords } from '../../packages/authwords.js';
+import { waitPhrase, passwordIsOverTheCeiling, passwordStrength, signInRefusalWords } from '../../packages/authwords.js';
 
 // -- the gate frame -----------------------------------------------------------
 
@@ -98,6 +98,98 @@ function field(label, control, hint) {
   // belonging to this field.
   if (hint) node.appendChild(el('span', { class: 'field-hint' }, hint));
   return node;
+}
+
+// A password field with the two controls the reader needs while typing: a way
+// to see what was typed, and a reading of how much the phrase would resist
+// guessing. The reading is guidance, not a gate - the server enforces its own
+// minimum and ceiling, and neither is guessed here.
+//
+// The toggle is a sibling of the input rather than a child of the label. A
+// button inside a label is interactive content in a label, and browsers then
+// disagree about which control a click means.
+let passwordFieldSeq = 0;
+
+function passwordField(label, name, options) {
+  const opts = options || {};
+  const control = input(name, {
+    type: 'password',
+    autocomplete: opts.autocomplete || 'new-password',
+    required: opts.required !== false,
+  });
+  const id = 'gate-password-' + (++passwordFieldSeq);
+  control.id = id;
+
+  const toggle = el('button', {
+    class: 'password-toggle',
+    type: 'button',
+    'aria-controls': id,
+    'aria-pressed': 'false',
+  }, 'Show');
+
+  const fill = el('span', { class: 'password-meter-fill' });
+  const meterLabel = el('span', { class: 'password-meter-label' });
+  const meter = el('div', { class: 'password-meter', 'aria-live': 'polite', hidden: true },
+    el('span', { class: 'password-meter-track', 'aria-hidden': 'true' }, fill),
+    meterLabel);
+
+  const node = el('div', { class: 'field' },
+    el('span', { class: 'field-label' }, label),
+    el('div', { class: 'password-control' }, control, toggle),
+    opts.hint ? el('span', { class: 'field-hint' }, opts.hint) : null,
+    meter);
+
+  const paintMeter = () => {
+    if (!opts.meter) {
+      meter.hidden = true;
+      return;
+    }
+    const strength = passwordStrength(control.value);
+    meter.hidden = !control.value;
+    meter.dataset.score = String(strength.score);
+    meterLabel.textContent = strength.label + '. ' + strength.hint;
+  };
+
+  toggle.addEventListener('click', () => {
+    const shown = control.getAttribute('type') === 'text';
+    control.setAttribute('type', shown ? 'password' : 'text');
+    toggle.textContent = shown ? 'Show' : 'Hide';
+    toggle.setAttribute('aria-pressed', shown ? 'false' : 'true');
+    if (typeof control.focus === 'function') control.focus();
+    // Keep the caret where it was. A reveal that jumps to the start makes the
+    // reader find their place again.
+    if (typeof control.setSelectionRange === 'function') {
+      try { control.setSelectionRange(control.value.length, control.value.length); } catch { /* type does not support it */ }
+    }
+  });
+
+  control.addEventListener('input', paintMeter);
+  paintMeter();
+
+  return { node, input: control, meter, paintMeter };
+}
+
+// The confirmation field answers while the reader types, not only when the
+// form is sent. A mismatch is marked on the control and said in the hint, so
+// the reader does not have to submit to find out.
+function confirmPasswordField(label, inputNode, passwordNode, hint) {
+  const node = field(label, inputNode, hint);
+  const note = node.querySelector('.field-hint');
+  const sync = () => {
+    const value = inputNode.value;
+    if (!value) {
+      inputNode.classList.remove('input--invalid');
+      inputNode.removeAttribute('aria-invalid');
+      if (note) note.textContent = hint;
+      return;
+    }
+    const matches = value === passwordNode.value;
+    inputNode.classList.toggle('input--invalid', !matches);
+    inputNode.setAttribute('aria-invalid', matches ? 'false' : 'true');
+    if (note) note.textContent = matches ? 'The passwords match.' : 'The passwords do not match yet.';
+  };
+  inputNode.addEventListener('input', sync);
+  return { node, sync };
 }
 
 function gateForm(fields, submitLabel) {
@@ -240,8 +332,12 @@ function altLine(...parts) {
 // -- sign in ------------------------------------------------------------------
 
 function loginGate() {
-  const username = input('username');
-  const password = input('password', { type: 'password', autocomplete: 'current-password' });
+  const username = input('username', { autocomplete: 'username' });
+  const passwordEntry = passwordField('Password', 'password', {
+    autocomplete: 'current-password',
+    hint: 'The password you chose for this instance.',
+  });
+  const password = passwordEntry.input;
   const code = input('code', { type: 'text', required: false, autocomplete: 'one-time-code' });
   const codeField = field('Two-step code', code);
   codeField.hidden = true;
@@ -264,7 +360,7 @@ function loginGate() {
 
   const form = gateForm([
     field('Username or email', username),
-    field('Password', password),
+    passwordEntry.node,
     codeField,
     instanceField,
   ], 'Sign in');
@@ -426,11 +522,18 @@ function legalAcceptance() {
 // the one screen every reader meets, and the one screen that cannot be
 // checked through the router without a session and a mount.
 export function registerGate() {
-  const username = input('username');
+  const username = input('username', { autocomplete: 'username' });
   const display = input('displayName', { required: false });
   const email = input('email', { type: 'email', required: false, autocomplete: 'email' });
-  const password = input('password', { type: 'password', autocomplete: 'new-password' });
+  const passwordEntry = passwordField('Password', 'password', {
+    autocomplete: 'new-password',
+    hint: 'At least 8 characters. A long passphrase works well.',
+    meter: true,
+  });
+  const password = passwordEntry.input;
   const confirm = input('confirm', { type: 'password', required: false, autocomplete: 'new-password' });
+  const confirmation = confirmPasswordField('Confirm password (optional)', confirm, password,
+    'Type the same password again.');
 
   // The instance in force, named on the form. An account made here belongs to
   // this instance, so the reader is told which one before they type, and the
@@ -447,8 +550,8 @@ export function registerGate() {
     field('Username', username, '2 to 32 characters: letters, numbers, _ or .'),
     field('Display name (optional)', display),
     field('Email (optional)', email),
-    field('Password', password, 'At least 8 characters. A long passphrase works well.'),
-    field('Confirm password (optional)', confirm),
+    passwordEntry.node,
+    confirmation.node,
   ], 'Create account');
   form.insertBefore(instanceNote, form.firstChild);
   // The documents come before the fields. A reader who is asked to accept
@@ -456,6 +559,9 @@ export function registerGate() {
   form.insertBefore(legal.block, form.querySelector('.field'));
 
   const submit = form.querySelector('button[type="submit"]');
+  // The confirmation is judged against the password as it is now, not as it
+  // was when the confirmation was typed.
+  passwordEntry.input.addEventListener('input', confirmation.sync);
   // The button says why it is closed. A disabled control with no reason is
   // the control everybody works around.
   const submitNote = el('p', { class: 'gate-submit-note', role: 'status' });
@@ -582,12 +688,21 @@ function forgotGate() {
 }
 
 function resetGate(token) {
-  const password = input('password', { type: 'password', autocomplete: 'new-password' });
+  const passwordEntry = passwordField('New password', 'password', {
+    autocomplete: 'new-password',
+    hint: 'At least 8 characters. A long passphrase works well.',
+    meter: true,
+  });
+  const password = passwordEntry.input;
   const confirm = input('confirm', { type: 'password', required: false, autocomplete: 'new-password' });
+  const confirmation = confirmPasswordField('Confirm password', confirm, password,
+    'Type the same password again.');
   const form = gateForm([
-    field('New password', password, 'At least 8 characters. A long passphrase works well.'),
-    field('Confirm password', confirm),
+    passwordEntry.node,
+    confirmation.node,
   ], 'Reset password');
+
+  passwordEntry.input.addEventListener('input', confirmation.sync);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -685,13 +800,17 @@ function verifyGate(token) {
 // -- enrolling a second factor ------------------------------------------------
 
 function twoStepGate() {
-  const password = input('password', { type: 'password', autocomplete: 'current-password' });
+  const passwordEntry = passwordField('Password', 'password', {
+    autocomplete: 'current-password',
+    hint: 'Your account password, not the six-digit code.',
+  });
+  const password = passwordEntry.input;
   const code = input('code', { type: 'text', required: false, autocomplete: 'one-time-code' });
   code.setAttribute('inputmode', 'numeric');
   code.setAttribute('maxlength', '6');
 
   const secret = el('code', { class: 'gate-secret' });
-  const body = el('div', {}, field('Password', password));
+  const body = el('div', {}, passwordEntry.node);
   const error = el('p', { class: 'form-error', hidden: true });
   const submit = el('button', { class: 'btn btn--primary btn--block', type: 'submit' }, 'Continue');
   let phase = 1;
