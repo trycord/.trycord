@@ -807,6 +807,36 @@ button.m-row__body {
 .m-input:focus { border-color: var(--m-brand-line); outline: none; }
 textarea.m-input { min-height: 96px; resize: vertical; }
 
+/* The password reveal and the strength reading, sized for a thumb. */
+.m-input--invalid { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+.m-input--invalid:focus { border-color: var(--danger); }
+.m-password-control { position: relative; display: flex; align-items: center; }
+.m-password-control .m-input { padding-right: 72px; }
+.m-password-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  min-height: 34px; padding: 4px 10px;
+  border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-2);
+  font: inherit; font-size: var(--fs-meta); font-weight: 600;
+}
+.m-password-toggle:active { background: var(--hover); }
+.m-password-meter { display: grid; gap: 4px; }
+.m-password-meter[hidden] { display: none; }
+.m-password-meter__track {
+  display: block; height: 4px; overflow: hidden;
+  border-radius: var(--radius-pill); background: var(--panel-3);
+}
+.m-password-meter__fill {
+  display: block; height: 100%; width: 0;
+  background: var(--danger);
+  transition: width var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.m-password-meter[data-score="1"] .m-password-meter__fill { width: 25%; }
+.m-password-meter[data-score="2"] .m-password-meter__fill { width: 50%; background: var(--warning); }
+.m-password-meter[data-score="3"] .m-password-meter__fill { width: 75%; background: var(--success); }
+.m-password-meter[data-score="4"] .m-password-meter__fill { width: 100%; background: var(--success); }
+.m-password-meter__label { font-size: var(--fs-micro); color: var(--text-3); }
+
 .m-error {
   padding: 10px 12px;
   border-radius: var(--tc-radius-md);

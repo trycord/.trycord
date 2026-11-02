@@ -15,7 +15,7 @@ import { withLegalVersions, isStaleLegalError } from '../../../packages/legal.js
 import { connect } from '../../../packages/realtime.js';
 import { toast } from '../ui.js';
 import { textInput, field } from './util.js';
-import { waitPhrase, passwordIsOverTheCeiling, signInRefusalWords } from '../../../packages/authwords.js';
+import { waitPhrase, passwordIsOverTheCeiling, passwordStrength, signInRefusalWords } from '../../../packages/authwords.js';
 
 // The sentences a refused sign-in answers with are shared with the desk, and
 // this file draws them on the phone: the two clients must never say two
@@ -108,9 +108,91 @@ function looksLikeAnInstance(value) {
   return !!url.hostname;
 }
 
+// A password field for the phone: the same two controls as the desk, sized
+// for a thumb. The reading is guidance, not a gate; the server enforces its
+// own minimum and ceiling.
+let passwordFieldSeq = 0;
+
+function passwordField(label, options) {
+  const opts = options || {};
+  const input = textInput({
+    name: opts.name || 'password',
+    type: 'password',
+    autocomplete: opts.autocomplete || 'new-password',
+  });
+  const id = 'm-password-' + (++passwordFieldSeq);
+  input.setAttribute('id', id);
+
+  const toggle = el('button', {
+    class: 'm-password-toggle',
+    type: 'button',
+    'aria-controls': id,
+    'aria-pressed': 'false',
+  }, 'Show');
+
+  const fill = el('span', { class: 'm-password-meter__fill' });
+  const meterLabel = el('span', { class: 'm-password-meter__label' });
+  const meter = el('div', { class: 'm-password-meter', 'aria-live': 'polite', hidden: true },
+    el('span', { class: 'm-password-meter__track', 'aria-hidden': 'true' }, fill),
+    meterLabel);
+
+  const node = el('div', { class: 'm-field' },
+    el('span', { class: 'm-field__label' }, label),
+    el('div', { class: 'm-password-control' }, input, toggle),
+    opts.note ? el('span', { class: 'm-field__note' }, opts.note) : null,
+    meter);
+
+  const paint = () => {
+    if (!opts.meter) {
+      meter.hidden = true;
+      return;
+    }
+    const strength = passwordStrength(input.value);
+    meter.hidden = !input.value;
+    meter.dataset.score = String(strength.score);
+    meterLabel.textContent = strength.label + '. ' + strength.hint;
+  };
+
+  toggle.addEventListener('click', () => {
+    const shown = input.getAttribute('type') === 'text';
+    input.setAttribute('type', shown ? 'password' : 'text');
+    toggle.textContent = shown ? 'Show' : 'Hide';
+    toggle.setAttribute('aria-pressed', shown ? 'false' : 'true');
+    if (typeof input.focus === 'function') input.focus();
+  });
+
+  input.addEventListener('input', paint);
+  paint();
+
+  return { node, input, meter, paint };
+}
+
+function confirmPasswordField(label, input, password, note) {
+  const node = field({ label, control: input, note });
+  const noteNode = node.querySelector('.m-field__note');
+  const sync = () => {
+    if (!input.value) {
+      input.classList.remove('m-input--invalid');
+      input.removeAttribute('aria-invalid');
+      if (noteNode) noteNode.textContent = note;
+      return;
+    }
+    const matches = input.value === password.value;
+    input.classList.toggle('m-input--invalid', !matches);
+    input.setAttribute('aria-invalid', matches ? 'false' : 'true');
+    if (noteNode) noteNode.textContent = matches ? 'The passwords match.' : 'The passwords do not match yet.';
+  };
+  input.addEventListener('input', sync);
+  return { node, sync };
+}
+
 function loginForm() {
   const username = textInput({ name: 'username', autocomplete: 'username' });
-  const password = textInput({ name: 'password', type: 'password', autocomplete: 'current-password' });
+  const passwordEntry = passwordField('Password', {
+    autocomplete: 'current-password',
+    note: 'The password you chose for this instance.',
+  });
+  const password = passwordEntry.input;
   const code = textInput({ name: 'code', inputmode: 'numeric' });
   const mfaField = field({ label: 'Two-step code', control: code });
   mfaField.hidden = true;
@@ -127,7 +209,7 @@ function loginForm() {
 
   const form = el('form', { class: 'm-auth__form' },
     field({ label: 'Username or email', control: username }),
-    field({ label: 'Password', control: password }),
+    passwordEntry.node,
     mfaField,
     field({ label: 'Instance', control: instance }),
     el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Sign in'));
@@ -247,8 +329,16 @@ function legalAcceptance() {
 function registerForm() {
   const username = textInput({ name: 'username', autocomplete: 'username' });
   const display = textInput({ name: 'displayName' });
-  const email = textInput({ name: 'email', type: 'email' });
-  const password = textInput({ name: 'password', type: 'password', autocomplete: 'new-password' });
+  const email = textInput({ name: 'email', type: 'email', autocomplete: 'email' });
+  const passwordEntry = passwordField('Password', {
+    autocomplete: 'new-password',
+    note: 'At least 8 characters. A long passphrase works well.',
+    meter: true,
+  });
+  const password = passwordEntry.input;
+  const confirm = textInput({ name: 'confirm', type: 'password', autocomplete: 'new-password' });
+  const confirmation = confirmPasswordField('Confirm password', confirm, password,
+    'Type the same password again.');
   const legal = legalAcceptance();
   const submit = el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Create account');
   const form = el('form', { class: 'm-auth__form' },
@@ -258,8 +348,10 @@ function registerForm() {
     field({ label: 'Username', control: username, note: '2 to 32 characters: letters, numbers, _ or .' }),
     field({ label: 'Display name', control: display }),
     field({ label: 'Email (optional)', control: email }),
-    field({ label: 'Password', control: password, note: 'At least 8 characters. A long passphrase works well.' }),
+    passwordEntry.node,
+    confirmation.node,
     submit);
+  passwordEntry.input.addEventListener('input', confirmation.sync);
 
   // The form cannot be sent until the documents are accepted, and the button
   // says why: a disabled control with no reason is the control everybody
@@ -280,6 +372,10 @@ function registerForm() {
     event.preventDefault();
     if (!legal.accepted.checked) {
       showError(form, { message: 'Accept the Terms of Service and the Privacy Policy to continue.' });
+      return;
+    }
+    if (confirm.value !== password.value) {
+      showError(form, 'The two passwords do not match. Type them again and try once more.');
       return;
     }
     busy(form, true);
@@ -361,12 +457,21 @@ function forgotForm() {
 }
 
 function resetForm(token) {
-  const next = textInput({ name: 'newPassword', type: 'password', autocomplete: 'new-password' });
+  const passwordEntry = passwordField('New password', {
+    name: 'newPassword',
+    autocomplete: 'new-password',
+    note: 'At least 8 characters. A long passphrase works well.',
+    meter: true,
+  });
+  const next = passwordEntry.input;
   const confirm = textInput({ name: 'confirmPassword', type: 'password', autocomplete: 'new-password' });
+  const confirmation = confirmPasswordField('Confirm new password', confirm, next,
+    'Type the same password again.');
   const form = el('form', { class: 'm-auth__form' },
-    field({ label: 'New password', control: next, note: 'At least 8 characters. A long passphrase works well.' }),
-    field({ label: 'Confirm new password', control: confirm }),
+    passwordEntry.node,
+    confirmation.node,
     el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Set new password'));
+  passwordEntry.input.addEventListener('input', confirmation.sync);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     busy(form, true);
@@ -452,9 +557,13 @@ function twoStepPanel() {
   function swap(node) { host.replaceChildren(node); }
 
   function passwordStep() {
-    const password = textInput({ name: 'password', type: 'password', autocomplete: 'current-password' });
+    const passwordEntry = passwordField('Password', {
+      autocomplete: 'current-password',
+      note: 'Your account password, not the six-digit code.',
+    });
+    const password = passwordEntry.input;
     const form = el('form', { class: 'm-auth__form' },
-      field({ label: 'Password', control: password }),
+      passwordEntry.node,
       el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Continue'));
     form.addEventListener('submit', async (event) => {
       event.preventDefault();

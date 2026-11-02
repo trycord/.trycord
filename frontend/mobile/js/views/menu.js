@@ -13,7 +13,7 @@ import { path, navigate, BASE } from '../../../packages/nav.js';
 import { setOverride, siblingMount } from '../../../packages/chooser.js';
 import Api from '../../../packages/api.js';
 import { screen, section } from './util.js';
-import { attachLongPress } from '../ui.js';
+import { attachLongPress, confirm } from '../ui.js';
 import { channelActions } from '../manage.js';
 import { federatedRoute, federatedName, federatedOrigin } from '../../../packages/places.js';
 
@@ -154,6 +154,13 @@ export function renderMenu() {
     list.appendChild(el('button', {
       class: 'm-row', type: 'button',
       onClick: async () => {
+        const sure = await confirm({
+          title: 'Sign out of Trycord?',
+          text: 'This session ends on this device. Your account and its messages stay on the instance.',
+          confirmLabel: 'Sign out',
+          danger: true,
+        });
+        if (!sure) return;
         try { await logout(); } catch { /* the session is going regardless */ }
         navigate('/login');
       },

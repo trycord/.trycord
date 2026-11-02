@@ -81,6 +81,38 @@
 .input--invalid { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
 .input--invalid:focus { border-color: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 14%, transparent); }
 
+/* -- password ------------------------------------------------------------ */
+/* The reveal control sits over the field rather than beside it, so a form
+   keeps one column and the input keeps the width the reader expects. */
+.password-control { position: relative; display: flex; align-items: center; }
+.password-control .input { padding-right: 68px; }
+.password-toggle {
+  position: absolute; right: 5px; top: 50%; transform: translateY(-50%);
+  padding: 4px 8px;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-2);
+  font: inherit; font-size: var(--fs-meta); font-weight: 600;
+  cursor: pointer;
+}
+.password-toggle:hover { color: var(--text-1); background: var(--hover); }
+.password-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.password-meter { display: grid; gap: 4px; }
+.password-meter[hidden] { display: none; }
+.password-meter-track {
+  display: block; height: 4px; overflow: hidden;
+  border-radius: var(--radius-pill); background: var(--panel-3);
+}
+.password-meter-fill {
+  display: block; height: 100%; width: 0;
+  background: var(--danger);
+  transition: width var(--dur-1) var(--ease), background var(--dur-1) var(--ease);
+}
+.password-meter[data-score="1"] .password-meter-fill { width: 25%; }
+.password-meter[data-score="2"] .password-meter-fill { width: 50%; background: var(--warning); }
+.password-meter[data-score="3"] .password-meter-fill { width: 75%; background: var(--success); }
+.password-meter[data-score="4"] .password-meter-fill { width: 100%; background: var(--success); }
+.password-meter-label { font-size: var(--fs-meta); color: var(--text-3); }
+
 .checkbox { display: flex; align-items: flex-start; gap: 10px; font-size: var(--fs-sm); cursor: pointer; }
 .checkbox input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--brand-fill); cursor: pointer; }
 

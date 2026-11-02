@@ -41,6 +41,61 @@ export function passwordIsOverTheCeiling(value) {
   return new TextEncoder().encode(String(value)).length > 72;
 }
 
+// A rough reading of a passphrase, while it is being typed.
+//
+// This is deliberately not an entropy calculation. The browser cannot know
+// whether a phrase is a quoted song lyric or a random string, and a meter that
+// pretends to know teaches people to satisfy the meter rather than to choose a
+// better phrase. What this does know is what the server will accept and what
+// makes a phrase harder to guess in bulk: length first, then a mix of
+// character kinds. The label is a guide, and the hint says what would improve
+// it.
+//
+// A passphrase over the storage ceiling is not "stronger" - it cannot be
+// stored at all - so that case is reported as its own state rather than as the
+// top of the scale.
+export function passwordStrength(value) {
+  const text = String(value || '');
+  if (!text) {
+    return { score: 0, label: 'No password yet', hint: 'Use at least 8 characters.' };
+  }
+  if (passwordIsOverTheCeiling(text)) {
+    return {
+      score: 0,
+      label: 'Too long',
+      hint: 'This server can store at most 72 bytes. Shorten the phrase a little.',
+    };
+  }
+  if (text.length < 8) {
+    return {
+      score: 1,
+      label: 'Too short',
+      hint: 'Use at least 8 characters. A long passphrase is easier to remember than a puzzle.',
+    };
+  }
+
+  const kinds = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/]
+    .filter((pattern) => pattern.test(text)).length;
+
+  // Length is the part that keeps working as hardware gets faster. Character
+  // variety is a smaller bonus, not the goal.
+  let score = 1;
+  if (text.length >= 12) score += 1;
+  if (text.length >= 16) score += 1;
+  if (kinds >= 2) score += 1;
+  if (kinds >= 3) score += 1;
+  score = Math.min(4, score);
+
+  const labels = { 1: 'Weak', 2: 'Fair', 3: 'Good', 4: 'Strong' };
+  const hints = {
+    1: 'A few more characters, or another kind of character, would help.',
+    2: 'Better. A longer passphrase would be stronger still.',
+    3: 'Good. Longer is stronger; this one has room.',
+    4: 'Strong. Keep it somewhere safe.',
+  };
+  return { score, label: labels[score], hint: hints[score] };
+}
+
 // A refused sign-in, told as a sentence and, when one exists, an action.
 //
 // The codes below are the ones the server distinguishes for exactly this
@@ -97,4 +152,4 @@ export function signInRefusalWords(error, restartCallback) {
   return null;
 }
 
-export default { waitPhrase, passwordIsOverTheCeiling, signInRefusalWords };
+export default { waitPhrase, passwordIsOverTheCeiling, passwordStrength, signInRefusalWords };
