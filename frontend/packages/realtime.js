@@ -41,6 +41,24 @@ export const SESSION_EVENTS = {
   SESSION_REVOKED: 'session-revoked',
 };
 
+// The encryption events the server sends to one account. They are not
+// channel-scoped: a key belongs to a conversation, and a device belongs to
+// the account, so they arrive without a server or channel join.
+export const E2EE_EVENTS = {
+  DEVICE: 'e2ee:device',
+  KEY_CHANGE: 'e2ee:key-change',
+  SAFETY_NUMBER: 'e2ee:safety-number',
+};
+
+// What arrived from an instance this account follows, or what happened to a
+// message it wrote into one. The payload says which instance and community it
+// belongs to, so a relayed message is never shown as if it were written here.
+export const CONTINUUM_EVENTS = {
+  RELAY_MESSAGE: 'continuum:relay-message',
+  RELAY_REACTION: 'continuum:relay-reaction',
+  RELAY_OUTGOING: 'continuum:relay-outgoing',
+};
+
 const listeners = new Map();
 
 export function on(type, handler) {
@@ -216,7 +234,7 @@ export function inspect() {
 }
 
 const TrycordRealtime = {
-  EVENTS, SESSION_EVENTS, on, connect, disconnect,
+  EVENTS, SESSION_EVENTS, E2EE_EVENTS, CONTINUUM_EVENTS, on, connect, disconnect,
   joinServer, leaveServer, joinChannel, leaveChannel, joinDm, leaveDm,
   typing, statusOf, isOpen, inspect, emit,
 };

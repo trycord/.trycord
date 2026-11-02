@@ -16,7 +16,7 @@ import {
 } from '../packages/store.js';
 import { installLinkHandler, installPopStateHandler, navigate, BASE } from '../packages/nav.js';
 import { loadLocale } from '../packages/locale.js';
-import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS } from '../packages/realtime.js';
+import realtime, { on as onRealtime, EVENTS, SESSION_EVENTS, E2EE_EVENTS } from '../packages/realtime.js';
 import { bind } from '../packages/registry.js';
 import { RENDERERS } from './features/index.js';
 import { mountVoiceDock } from './voice/dock.js';
@@ -94,6 +94,13 @@ function wireChrome() {
     if (reader && me && String(reader) !== String(me)) return;
     const id = event.conversationId || event.conversation_id || event.id;
     if (markConversationRead(id)) refreshChrome();
+  });
+  // A conversation key moved. The encryption surface drops its cached answer
+  // and warns the reader when the change means the group is no longer the
+  // group it was. A prekey publication carries no conversation and is left
+  // to the next read.
+  onRealtime(E2EE_EVENTS.KEY_CHANGE, (event) => {
+    encrypted.keyChanged(event);
   });
 }
 
