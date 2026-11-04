@@ -1,121 +1,255 @@
 # Trycord
 
-A self-hostable community chat platform. Run your own instance, or use an
-instance someone else runs. Your communities, users, messages, permissions
-and files stay on the instance you choose.
+**A self-hostable community chat platform.**
 
-Vocabulary: a **community** is a group of people with channels, roles and
-permissions. An **instance** is one running Trycord server. A **client** is the
-web app (WAC) or the desktop shell (DAC).
+Run your own instance, or use an instance operated by someone else. Your communities, users, messages, permissions, and files remain on the instance you choose.
 
-- `backend/` — REST API, WebSocket gateway, accounts, permissions,
-  moderation, uploads, database access
-- `frontend/` — the web client (desktop and mobile modules)
-- `trycord-desktop/` — the desktop application, a window around that client
-- `public/` — the public website and legal pages
-- `docs/` — self-hosting, theming, and the architecture reference
+> **Development disclaimer**
+>
+> No AI was used to develop this platform's implementation. My coding style may resemble AI-generated code because I prioritize consistency, readability, documentation, and maintainability in preparation for future team development.
 
-## Quick start
+## Table of Contents
 
+- [Overview](#overview)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [Running Trycord](#running-trycord)
+- [Clients](#clients)
+- [Configuration](#configuration)
+- [Voice Subsystem](#voice-subsystem)
+- [Deployment](#deployment)
+- [Security](#security)
+- [License](#license)
+
+## Overview
+
+Trycord is designed around self-hosted instances and community ownership.
+
+### Core terminology
+
+| Term | Definition |
+|---|---|
+| **Community** | A group of people with channels, roles, and permissions. |
+| **Instance** | One running Trycord server. |
+| **Client** | An application used to access an instance, including the Web Application Client (WAC) and Desktop Application Client (DAC). |
+
+## Project Structure
+
+The repository is organized into distinct components, each with its own responsibilities.
+
+```text
+Trycord/
+├── backend/             # REST API, WebSocket gateway, authentication,
+│                        # permissions, moderation, uploads, and database access
+├── frontend/            # Web client, including desktop and mobile modules
+├── trycord-desktop/     # Desktop application shell
+├── public/              # Public website and legal pages
+└── docs/                # Self-hosting, theming, and architecture documentation
 ```
+
+## Quick Start
+
+### 1. Install dependencies
+
+```bash
 cd backend
 npm install
+```
+
+### 2. Configure the environment
+
+Create your environment configuration:
+
+```bash
 cp .env.example .env
 ```
 
-At minimum set `JWT_SECRET` and a database profile. Generate a secret with:
+At minimum, configure:
 
-```
+- `JWT_SECRET`
+- The database profile
+
+Generate a secure JWT secret using:
+
+```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Then:
+### 3. Initialize and start the server
 
-```
+```bash
 npm run seed
 npm start
 ```
 
-The server serves the API, the web client and the public site on one port
-(`http://localhost:9971` by default). The seed account is `demo` /
-`demo1234` and is for local development only.
+By default, Trycord starts on:
 
-It finds the web client next to itself in the layout this repository ships with.
-If your layout is different — a single directory, a checkout of only
-`backend/`, or an image that copies the client somewhere else — point it
-at the directory holding `index.html`:
-
+```text
+http://localhost:9971
 ```
+
+The server provides the API, web client, and public website through a single port.
+
+**Development credentials**
+
+```text
+Username: demo
+Password: demo1234
+```
+
+These credentials are intended exclusively for local development.
+
+### Client directory configuration
+
+Trycord automatically locates the web client using the repository's default directory structure.
+
+If your deployment uses a different layout, such as a single directory, a backend-only checkout, or a custom container image, explicitly specify the directory containing `index.html`:
+
+```bash
 TRYCORD_CLIENT_DIR=/srv/trycord npm start
 ```
 
-A relative value resolves against `backend/`, not against the directory
-you happened to start `node` in. If it is set to something that does not contain
-`index.html`, or is set at all and no client is found, the API still runs and the
-server lists every path it looked at.
+Relative paths are resolved against `backend/`, not against the current working directory from which Node.js was launched.
 
-## Running it
+If the configured directory does not contain `index.html`, or an explicitly configured client directory cannot be found, the API will still start. The server will also report every path it attempted to inspect.
 
+## Running Trycord
+
+The following commands are available from the `backend/` directory:
+
+```bash
+npm start
+npm run migrate
+npm run db:backup
 ```
-cd backend
-npm start                                  # the API, the web client and the public site
-npm run migrate                            # apply the schema to the configured database
-npm run db:backup                          # a read-only dump of the live database
-```
 
-The automated check suite that used to live in `backend/scripts/check-*.js` has
-been removed. It booted whole instances, rendered every route and started
-browsers, and on a small host that cost more than it was worth - a restart of
-the API could begin a storm of processes on a machine that was already too warm.
-Verification is now done against a running instance, and `docs/verification-matrix.md`
-lists what each surface is and how to exercise it.
+| Command | Description |
+|---|---|
+| `npm start` | Starts the API, web client, and public website. |
+| `npm run migrate` | Applies the database schema to the configured database. |
+| `npm run db:backup` | Creates a read-only dump of the live database. |
+
+### Verification
+
+The previous automated checks under `backend/scripts/check-*.js` have been removed.
+
+Those scripts booted entire instances, rendered every route, and launched browser processes. On smaller hosts, their resource consumption was disproportionate to their value and could trigger process storms during API restarts.
+
+Verification is now performed against a running instance.
+
+See [`docs/verification-matrix.md`](docs/verification-matrix.md) for the documented verification procedures, application surfaces, and instructions for exercising each area.
 
 ## Clients
 
-Trycord ships one web client under `frontend/`, with desktop browser support
-and a purpose-built mobile module. A browser pointed at the instance gets
-both surfaces from that one client.
+Trycord provides a unified web client and a separate desktop application shell.
 
-The desktop application in `trycord-desktop/` is a window around the same
-client: it holds no database and no authority of its own, it can be pointed
-at any instance, and a release of it is attached to the releases on GitHub.
-See `docs/desktop.md` for how it works and `docs/launcher.md` for the
-startup layer it uses.
+### Web Application Client (WAC)
+
+The web client lives under `frontend/` and supports:
+
+- Desktop browsers.
+- Mobile browsers through a purpose-built mobile module.
+
+Both experiences are served by the same client when accessing a Trycord instance.
+
+### Desktop Application Client (DAC)
+
+The desktop application lives under `trycord-desktop/`.
+
+It acts as a window around the existing web client rather than operating as an independent platform.
+
+Its responsibilities are deliberately limited:
+
+- It does not own a database.
+- It does not have independent authority over an instance.
+- It can connect to any compatible Trycord instance.
+- Its releases are published alongside the project's GitHub releases.
+
+Additional documentation:
+
+- [`docs/desktop.md`](docs/desktop.md)
+- [`docs/launcher.md`](docs/launcher.md)
 
 ## Configuration
 
-`backend/.env.example` documents every variable. The ones with no
-default, where the server refuses to start without them, are `JWT_SECRET`,
-`SERVER_HOST_TYPE` and the database profile. See `docs/selfhosting.md` for
-deployment, including the nginx topology and the Docker volume layout,
-`docs/status-monitor.md` for the optional status monitor,
-`docs/backups.md` for taking a backup and putting it back,
-`docs/instances.md` for running alongside other instances, and
-`docs/architecture.md` for how the system is put together.
+The complete environment variable reference is maintained in:
 
-The voice subsystem runs as a process of its own and owns the instance's
-STUN and TURN relay. It answers on the loopback of the machine:
+[`backend/.env.example`](backend/.env.example)
 
-```
-http://127.0.0.1:9973/          # WORKING or NOT WORKING, and why
-http://127.0.0.1:9973/config    # the relay's own configuration
-http://127.0.0.1:9973/credentials   # a credential, minted on the spot
-```
+### Required configuration
 
-`docs/voice.md` has the whole of it, including the stunkey the credentials
-are derived from and how a host outside this instance mints its own.
+The following settings have no defaults and are mandatory for startup:
+
+| Variable | Purpose |
+|---|---|
+| `JWT_SECRET` | Secret used for JWT-related authentication operations. |
+| `SERVER_HOST_TYPE` | Selects the server's network deployment topology. |
+| Database profile | Defines the database configuration used by the instance. |
+
+### Documentation
+
+Additional configuration and deployment documentation:
+
+| Document | Description |
+|---|---|
+| [`docs/selfhosting.md`](docs/selfhosting.md) | Deployment, Nginx topology, and Docker volume configuration. |
+| [`docs/status-monitor.md`](docs/status-monitor.md) | Optional instance status monitor. |
+| [`docs/backups.md`](docs/backups.md) | Database backup and restoration procedures. |
+| [`docs/instances.md`](docs/instances.md) | Running multiple instances alongside one another. |
+| [`docs/architecture.md`](docs/architecture.md) | Overview of the platform's internal architecture. |
+
+## Voice Subsystem
+
+The voice subsystem operates as a separate process and manages the instance's STUN and TURN relay functionality.
+
+It exposes a local HTTP interface on port `9973`.
+
+### Available endpoints
+
+| Endpoint | Description |
+|---|---|
+| `http://127.0.0.1:9973/` | Reports whether the voice subsystem is working and provides diagnostic information. |
+| `http://127.0.0.1:9973/config` | Returns the relay's configuration. |
+| `http://127.0.0.1:9973/credentials` | Generates a credential on demand. |
+
+The voice subsystem also uses a `stunkey` from which its credentials are derived.
+
+For the complete configuration, implementation details, and information about how external hosts generate their own credentials, see [`docs/voice.md`](docs/voice.md).
 
 ## Deployment
 
-`SERVER_HOST_TYPE` selects the topology explicitly — `express` (the server is
-the public endpoint) or `nginx` (a reverse proxy fronts it, and Express binds
-loopback). Anything else is a startup error.
+The `SERVER_HOST_TYPE` environment variable explicitly selects the server's deployment topology.
+
+Two configurations are supported:
+
+### Express
+
+```env
+SERVER_HOST_TYPE=express
+```
+
+The Express server acts as the public-facing endpoint.
+
+### Nginx
+
+```env
+SERVER_HOST_TYPE=nginx
+```
+
+Nginx operates as a reverse proxy in front of Express, while Express binds to loopback.
+
+Any value other than `express` or `nginx` results in a startup error.
 
 ## Security
 
-Report vulnerabilities privately as described in `SECURITY.md`. Do not open a
-public issue for a security problem.
+Security vulnerabilities must be reported privately.
+
+Please follow the disclosure instructions in [`SECURITY.md`](SECURITY.md).
+
+**Do not open public issues containing security vulnerabilities.**
 
 ## License
 
-MIT. See `LICENSE`.
+Trycord is distributed under the **MIT License**.
+
+See [`LICENSE`](LICENSE) for the complete license text.
